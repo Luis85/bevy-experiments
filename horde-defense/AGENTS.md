@@ -8,7 +8,7 @@ the font OFL notice and geographic source attribution. See docs/GDD.md.
 Use cargo fmt --all, cargo clippy --locked --workspace --all-targets -- -D warnings,
 the same clippy with -p horde-defense --no-default-features and with --features dev,
 and cargo test --locked --workspace (plus -p horde-defense --no-default-features and --features dev) inside this directory. Each workspace owns target/ unless CARGO_TARGET_DIR is set; every script under scripts/ honours it.
-Until they are ported, package_playtest.ps1, verify_playtest.ps1 and the PowerShell 7 trace_npc.ps1 still use ./target.
+Only the PowerShell 7 trace_npc.ps1 still uses ./target.
 Performance evidence: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure_performance.ps1
 -Scene all|peak|progressed-peak|stress -Profile dev|playtest [-VsyncOff] [-Pipelined default|on|off] [-Repeat 3]
 [-ShippedSmoke] [-SaveClone] [-NoBuild] [-NoWaitQuiet] [-QuietTimeoutMinutes 240] builds the review exe, runs every scene at both sizes and compares the

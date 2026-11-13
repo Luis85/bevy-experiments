@@ -4,7 +4,7 @@ This build tests the complete survival, preparation, country and strategic loops
 
 ## Start
 
-In a packaged Windows folder, use Play Lastlight.cmd (or its optional process-local DirectX12 launcher); from the workspace use cargo run --locked -p horde-defense. Choose New game. Existing profiles get a confirmation and complete archive before replacement; Keep current journey cancels. Select Rook/June, confirm, then select the infected starting country for live Personal combat. Every main outcome returns to Results, with three actions: Upgrade opens Journey upgrades, the continuation retries/advances and Leave saves without erasing earnings. See [JOURNEYS.md](JOURNEYS.md).
+In a packaged Windows folder, use Play Lastlight.cmd (or its optional process-local DirectX12 launcher); from the workspace use cargo run --locked -p horde-defense. Choose New game. Existing profiles get a confirmation and complete archive before replacement; Keep current journey cancels. Select Rook/June, confirm, then select the infected starting country for live Personal combat. Every main outcome returns to Results, with three actions: Upgrade opens Journey upgrades, the continuation retries/advances and Leave saves without erasing earnings. See docs/JOURNEYS.md in the source repository.
 
 Journey upgrades is the main between-round destination, one action from Results. The complete tree shares earned coins and actual requirements; its camp row leads to Equipment, Character, the Briefing and the map, and Back to battle continues the journey. Main and worker outcomes are distinct; workers do not force the main screen away. The old management-first body/skills/fortification purchase tabs are superseded.
 
@@ -72,7 +72,7 @@ The throwable grid spans the attempt’s frozen path width and row count in one-
 from the five-column construction zone. Ordinary defeated enemies pay once and
 leave bodies visible throughout the attempt. Wait, pause and save/resume to
 check that old bodies remain without blocking lanes or paying again. Retry
-starts a fresh battlefield. See [SKILLS_AND_WEAPONS.md](SKILLS_AND_WEAPONS.md)
+starts a fresh battlefield. See docs/SKILLS_AND_WEAPONS.md in the source repository
 for authored effects and compatibility rules.
 
 ## Identity, scenery and continuing progression
@@ -139,7 +139,7 @@ Keep your ordinary campaign intact and use practice or a separate `LASTLIGHT_SAV
 4. Mute Master while a cue is playing, then unmute. Check for complete silence, no delayed burst from a clip that was still loading, and a gentle ambient return. At normal levels, wind and rain should remain behind danger cues and visible enemy windups.
 5. Observe one parallel expedition, then close its observation window. Ordinary fire from every off-screen survivor should not become a wall of sound. Boss/structure alerts still need to be recognizable when relevant to the campaign.
 
-For an offline comparison, [listen to the v1 survival audition reel (pre-production-pass)](audio/survival-audition.wav) and follow its [cue timeline](audio/survival-audition.csv). It predates the current library and still plays the retired NpcShot family at 4.81 s. The [audio guide](AUDIO_SURVIVAL.md) documents the 69 original WAV variations and mixer limits. This reel bypasses the in-game mix and is not a substitute for device listening during combat.
+For an offline comparison, listen to the v1 survival audition reel (pre-production-pass), docs/audio/survival-audition.wav in the source repository, and follow its cue timeline, docs/audio/survival-audition.csv. It predates the current library and still plays the retired NpcShot family at 4.81 s. The audio guide (docs/AUDIO_SURVIVAL.md in the source repository) documents the 69 original WAV variations and mixer limits. This reel bypasses the in-game mix and is not a substitute for device listening during combat.
 
 Record the country, local stage, weather/lighting tags, defender, master/effects/atmosphere values and whether you used speakers or headphones. File/header checks do not establish listening quality; report masking, repetition or a missing source cue as a playtest result.
 
@@ -176,6 +176,6 @@ Packaged playtest builds do not include recording. For a reproducible bug, use a
 
 Include an F12 screenshot and the relevant result/decision log when reporting a problem. Do not include unrelated personal files. Native and core performance reports in the review documentation distinguish measured frame intervals from simulation throughput and from minimum-spec claims.
 
-Personal body/skill/fortification purchases now share [JOURNEYS.md](JOURNEYS.md); actual modular appearance is described in [CHARACTER_COMPONENTS.md](CHARACTER_COMPONENTS.md). Human feel, NPC stutter and device performance require their own current evidence; no visual/compilation result alone closes them.
+Personal body/skill/fortification purchases now share docs/JOURNEYS.md; actual modular appearance is described in docs/CHARACTER_COMPONENTS.md (both in the source repository). Human feel, NPC stutter and device performance require their own current evidence; no visual/compilation result alone closes them.
 
 For an isolated durable-save check, request menu/return/quit during a save and during confirmed New game. Preferences/model mutations must stay gated for the critical transition, old autosave success must not dismiss a newer pending request, and no stale Quit may exit a newly reset profile. A failed save remains visible. Native IO now uses a bounded single-writer snapshot service; visual smoothness and NPC timing still require the current measured evidence.

@@ -1,10 +1,12 @@
 #requires -Version 5.1
-# Self-tests for scripts/lib/Native.ps1, scripts/measure_performance.ps1 and the capture_review.ps1 sidecar checks (with a
-# fake game exe) under Windows PowerShell 5.1.
+# Self-tests for scripts/lib/Native.ps1, scripts/measure_performance.ps1, the capture_review.ps1 sidecar checks and the
+# playtest package scripts (lib/Playtest.ps1, package_playtest.ps1, verify_playtest.ps1), with a fake game exe, under
+# Windows PowerShell 5.1.
 # Run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/run_script_tests.ps1
 # The runner is expected to pass with its own output redirected. Prints PASS or FAIL and exits 0 or 1.
+# -Only <regex> runs just the cases whose name matches (for work on one script; a full run is the gate).
 [CmdletBinding()]
-param()
+param([string]$Only = '')
 $ErrorActionPreference = 'Stop'
 $scriptsDirectory = Split-Path -Parent $PSScriptRoot
 $workspace = Split-Path -Parent $scriptsDirectory
@@ -31,6 +33,7 @@ function Assert-Equal($Expected, $Actual, [string]$Message) {
 }
 
 function Test-Case([string]$Name, [scriptblock]$Body) {
+    if ($Only -and $Name -notmatch $Only) { return }
     try {
         & $Body
         $script:passed += 1
@@ -104,7 +107,20 @@ public static class LastLightNativeHelper {
             return 0;
         }
         // Copied to <target>\debug\horde-defense.exe it stands in for the game in measure_performance.ps1 runs.
-        if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("horde-defense fake"); return 0; }
+        // HORDE_FAKE_VERSION is the --version line of a stamped build (package_playtest.ps1, verify_playtest.ps1).
+        if (args.Length == 1 && args[0] == "--version") {
+            string stamped = Environment.GetEnvironmentVariable("HORDE_FAKE_VERSION");
+            Console.WriteLine(String.IsNullOrEmpty(stamped) ? "horde-defense fake" : stamped);
+            return 0;
+        }
+        // The packaged smoke: HORDE_FAKE_SMOKE is its first stdout line, HORDE_FAKE_SMOKE_EXIT its exit code.
+        if (args.Length == 1 && args[0] == "--smoke") {
+            string smoke = Environment.GetEnvironmentVariable("HORDE_FAKE_SMOKE");
+            Console.WriteLine(String.IsNullOrEmpty(smoke) ? "PASS: fake smoke" : smoke);
+            Console.Error.WriteLine("smoke diagnostics on stderr");
+            string smokeExit = Environment.GetEnvironmentVariable("HORDE_FAKE_SMOKE_EXIT");
+            return String.IsNullOrEmpty(smokeExit) ? 0 : int.Parse(smokeExit);
+        }
         if (args.Length == 1 && args[0] == "--list-scenes") {
             Console.WriteLine("name\tkind\tmotion\tperf\tpractice\tprimary\tbefore_proxy\tsince_wave");
             Console.WriteLine("menu\tStill\ttrue\tfalse\tfalse\t\t\t0");
@@ -1652,6 +1668,267 @@ try {
         $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-motion-relative') -TimeoutSeconds 300 -WorkingDirectory $elsewhere
         $log = (Read-Log $r.Out) + (Read-Log $r.Err)
         Assert-True ($log -match 'Unknown motion scene') "capture_motion reached the scene list; $log"
+    }
+
+    # W7-02: the playtest package scripts. lib\Playtest.ps1 holds the pure parts; package_playtest.ps1 and
+    # verify_playtest.ps1 run end to end against the fake game (its --version and --smoke follow HORDE_FAKE_*).
+    $playtestLibrary = Join-Path $scriptsDirectory 'lib\Playtest.ps1'
+    if (Test-Path -LiteralPath $playtestLibrary) { . $playtestLibrary }
+    $playtestCommit = '0123456789abcdef0123456789abcdef01234567'
+    $playtestVersion = '0.0.0'
+    if (Get-Command Get-WorkspaceVersion -ErrorAction SilentlyContinue) { $playtestVersion = Get-WorkspaceVersion -Workspace $workspace }
+    $playtestTarget = Join-Path $temporary 'playtest-target'
+
+    function New-TestPackage([string]$Root, [string[]]$Features = @(), [string[]]$ExtraDocs = @()) {
+        # A small unpacked package with a version 2 manifest: the fake game, one asset, one catalog and the guide.
+        New-Item -ItemType Directory -Force -Path (Join-Path $Root 'assets\art'), (Join-Path $Root 'content'), (Join-Path $Root 'docs') | Out-Null
+        Copy-Item -LiteralPath $helper -Destination (Join-Path $Root 'Lastlight.exe')
+        Write-Utf8NoBom -Path (Join-Path $Root 'assets\art\sheet.txt') -Text 'art'
+        Write-Utf8NoBom -Path (Join-Path $Root 'content\world.json') -Text '{}'
+        Write-Utf8NoBom -Path (Join-Path $Root 'docs\PLAYTEST_GUIDE.md') -Text "# Guide`n[top](#guide) [web](https://example.com/a.md)`n"
+        foreach ($doc in $ExtraDocs) { Write-Utf8NoBom -Path (Join-Path (Join-Path $Root 'docs') $doc) -Text 'extra' }
+        $files = @(Get-PackageFileRecord -PackageRoot $Root)
+        $manifest = New-PlaytestManifest -GameVersion $playtestVersion -Commit $playtestCommit -Branch 'main' -Profile 'playtest' -Features $Features -Rustc 'rustc fake' -CreatedUtc ([DateTime]::UtcNow) -CuratedDocs @('PLAYTEST_GUIDE.md') -Files $files
+        Write-Utf8NoBom -Path (Join-Path $Root 'manifest.json') -Text ($manifest | ConvertTo-Json -Depth 6)
+        return $manifest
+    }
+    function Invoke-Verify([string[]]$Arguments, [string]$Stem) {
+        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $scriptsDirectory 'verify_playtest.ps1')) + $Arguments
+        return Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\$Stem") -TimeoutSeconds 300
+    }
+    function Get-VerificationFolders {
+        $root = Join-Path $playtestTarget 'playtest-verification'
+        if (-not (Test-Path -LiteralPath $root)) { return @() }
+        return @(Get-ChildItem -LiteralPath $root -Directory | Sort-Object CreationTimeUtc)
+    }
+
+    Test-Case 'Get-PackageRelativePath gives forward-slash paths below the root and refuses a path outside it' {
+        $root = Join-Path $temporary 'relative root'
+        Assert-Equal 'docs/PLAYTEST_GUIDE.md' (Get-PackageRelativePath -Root $root -Path (Join-Path $root 'docs\PLAYTEST_GUIDE.md')) 'nested'
+        Assert-Equal 'Lastlight.exe' (Get-PackageRelativePath -Root ($root + '\') -Path (Join-Path $root 'Lastlight.exe')) 'top level, root with a trailing separator'
+        $threw = $false
+        try { Get-PackageRelativePath -Root $root -Path (Join-Path $temporary 'relative rooted\x.txt') | Out-Null } catch { $threw = $true }
+        Assert-True $threw 'a sibling folder that shares the prefix is outside the root'
+    }
+
+    Test-Case 'New-PlaytestZip writes forward-slash entries for nested folders (no backslash entries under 5.1)' {
+        $source = Join-Path $temporary 'zip-source'
+        New-Item -ItemType Directory -Force -Path (Join-Path $source 'assets\art\pixel') | Out-Null
+        Write-Utf8NoBom -Path (Join-Path $source 'assets\art\pixel\a.txt') -Text 'a'
+        Write-Utf8NoBom -Path (Join-Path $source 'READ ME.txt') -Text 'r'
+        $zip = New-PlaytestZip -SourceDirectory $source -Destination (Join-Path $temporary 'package.zip')
+        $names = @(Get-ZipEntryName -Path $zip)
+        Assert-Equal 'READ ME.txt|assets/art/pixel/a.txt' ($names -join "|") "entries are relative to the folder contents, in ordinal order"
+        Assert-Equal 0 @(Get-ZipEntryViolation -Path $zip).Count 'no violations'
+        $threw = $false
+        try { New-PlaytestZip -SourceDirectory $source -Destination $zip | Out-Null } catch { $threw = $true }
+        Assert-True $threw 'an existing zip is never overwritten'
+    }
+
+    Test-Case 'Get-ZipEntryViolation and Expand-PlaytestZip reject backslash and parent entries before unpacking' {
+        $bad = Join-Path $temporary 'bad-entries.zip'
+        $stream = New-Object IO.FileStream($bad, [IO.FileMode]::Create)
+        $archive = New-Object IO.Compression.ZipArchive($stream, [IO.Compression.ZipArchiveMode]::Create)
+        try {
+            foreach ($name in @('docs\PLAYTEST_GUIDE.md', '../escape.txt', 'fine/a.txt')) {
+                $writer = New-Object IO.StreamWriter($archive.CreateEntry($name).Open())
+                $writer.Write('x'); $writer.Dispose()
+            }
+        }
+        finally { $archive.Dispose(); $stream.Dispose() }
+        $violations = @(Get-ZipEntryViolation -Path $bad)
+        Assert-Equal 2 $violations.Count "violations: $($violations -join '; ')"
+        Assert-True ($violations[0] -like 'backslash entry: docs\PLAYTEST_GUIDE.md') $violations[0]
+        Assert-True ($violations[1] -like 'parent entry: ../escape.txt') $violations[1]
+        $destination = Join-Path $temporary 'bad-entries-unpacked'
+        $message = ''
+        try { Expand-PlaytestZip -Path $bad -Destination $destination } catch { $message = $_.Exception.Message }
+        Assert-True ($message -like 'Unsafe archive:*') "message: $message"
+        Assert-True (-not (Test-Path -LiteralPath $destination)) 'nothing was unpacked'
+    }
+
+    Test-Case 'Test-DocLinkClosure catches a dead relative link and accepts web, anchor and in-package links' {
+        $root = Join-Path $temporary 'link-package'
+        New-Item -ItemType Directory -Force -Path (Join-Path $root 'docs') | Out-Null
+        Write-Utf8NoBom -Path (Join-Path $root 'READ ME.txt') -Text 'r'
+        Write-Utf8NoBom -Path (Join-Path $root 'docs\PLAYTEST_GUIDE.md') -Text "# Guide`n[web](https://example.com/JOURNEYS.md) [top](#guide) [self](PLAYTEST_GUIDE.md#guide) [readme](../READ%20ME.txt)`n"
+        Assert-Equal 0 @(Test-DocLinkClosure -PackageRoot $root).Count 'closed docs'
+        Write-Utf8NoBom -Path (Join-Path $root 'docs\PLAYTEST_GUIDE.md') -Text "# Guide`nSee [JOURNEYS.md](JOURNEYS.md).`nThe [reel](audio/survival-audition.wav) and [out](../../outside.md).`n"
+        $dead = @(Test-DocLinkClosure -PackageRoot $root)
+        Assert-Equal 3 $dead.Count "dead links: $($dead -join '; ')"
+        Assert-Equal "docs/PLAYTEST_GUIDE.md:2: 'JOURNEYS.md' does not resolve inside the package" $dead[0] 'names the file, line and target'
+        Assert-True ($dead[2] -like "docs/PLAYTEST_GUIDE.md:3: '../../outside.md'*") $dead[2]
+    }
+
+    Test-Case 'New-PlaytestManifest is version 2 with the stamp, commit and curated docs, in a fixed key order' {
+        $root = Join-Path $temporary 'manifest-package'
+        $manifest = New-TestPackage $root
+        Assert-Equal 'version|game|game_version|stamp|commit|commit_short|dirty|branch|profile|features|platform|rustc|created_utc|curated_docs|files' (@($manifest.Keys) -join '|') 'key order'
+        Assert-Equal 2 $manifest.version 'version'
+        Assert-Equal "v$playtestVersion (0123456)" $manifest.stamp 'stamp'
+        Assert-Equal "v$playtestVersion (0123456+dirty)" (Get-BuildStamp -Version $playtestVersion -Commit $playtestCommit -Dirty $true) 'dirty stamp'
+        Assert-Equal '0123456+dirty' (Get-BuildCommitLabel -Commit $playtestCommit -Dirty $true) 'LASTLIGHT_BUILD_COMMIT of a dirty tree'
+        Assert-Equal "Lastlight-playtest-v$playtestVersion-0123456-20261113-090807" (Get-PlaytestPackageName -Version $playtestVersion -Commit $playtestCommit -CreatedUtc ([DateTime]'2026-11-13T09:08:07Z').ToUniversalTime()) 'package name'
+        Assert-Equal 'Lastlight.exe|assets/art/sheet.txt|content/world.json|docs/PLAYTEST_GUIDE.md' (@($manifest.files | ForEach-Object { $_.path }) -join '|') 'files, ordinal order, forward slashes'
+        $bytes = [IO.File]::ReadAllBytes((Join-Path $root 'manifest.json'))
+        Assert-True ($bytes[0] -eq 0x7B) 'manifest.json has no BOM'
+        $read = [IO.File]::ReadAllText((Join-Path $root 'manifest.json')) | ConvertFrom-Json
+        Assert-Equal 0 @(Test-PackageIntegrity -Manifest $read -PackageRoot $root).Count 'integrity'
+        Assert-Equal 0 @(Test-PlaytestManifest -Manifest $read -PackageRoot $root -GameVersion $playtestVersion).Count 'manifest rules'
+    }
+
+    Test-Case 'Test-PlaytestManifest and Test-PackageIntegrity report each broken rule' {
+        $root = Join-Path $temporary 'rules-package'
+        New-TestPackage $root | Out-Null
+        $path = Join-Path $root 'manifest.json'
+        function Read-Manifest { return ([IO.File]::ReadAllText($path) | ConvertFrom-Json) }
+        function Get-Rules($Manifest) { return (@(Test-PlaytestManifest -Manifest $Manifest -PackageRoot $root -GameVersion $playtestVersion) -join '; ') }
+        $m = Read-Manifest; $m.version = 1
+        Assert-True ((Get-Rules $m) -like "manifest version is '1', expected 2") (Get-Rules $m)
+        $m = Read-Manifest; $m.commit = 'current working tree'
+        Assert-True ((Get-Rules $m) -like '*commit is not 40 lower-case hex digits*') (Get-Rules $m)
+        $m = Read-Manifest; $m.stamp = 'v9.9.9 (dev build)'
+        Assert-True ((Get-Rules $m) -like "*stamp 'v9.9.9 (dev build)' is not*") (Get-Rules $m)
+        $m = Read-Manifest; $m.game_version = '9.9.9'
+        Assert-True ((Get-Rules $m) -like "*game_version '9.9.9' is not the workspace version*") (Get-Rules $m)
+        $m = Read-Manifest; $m.PSObject.Properties.Remove('features')
+        Assert-True ((Get-Rules $m) -like "*manifest has no 'features'*") (Get-Rules $m)
+        $m = Read-Manifest; $m.files = @($m.files) + [pscustomobject]@{ path = 'docs/GDD.md'; bytes = 5; sha256 = 'x' }
+        Assert-True ((Get-Rules $m) -like '*docs are `[PLAYTEST_GUIDE.md, GDD.md`], curated_docs is `[PLAYTEST_GUIDE.md`]*') (Get-Rules $m)
+        $m = Read-Manifest; (@($m.files) | Where-Object { $_.path -eq 'docs/PLAYTEST_GUIDE.md' }).bytes = 65537
+        Assert-True ((Get-Rules $m) -like '*docs are 65537 B, above 65536 B*') (Get-Rules $m)
+        $m = Read-Manifest; $m.files = @($m.files) + [pscustomobject]@{ path = 'archive/art/actors-v1.png'; bytes = 5; sha256 = 'x' }
+        Assert-True ((Get-Rules $m) -like '*archived file in the package: archive/art/actors-v1.png*') (Get-Rules $m)
+        # Integrity: a changed file, an unlisted file and a manifest path that leaves the package.
+        Write-Utf8NoBom -Path (Join-Path $root 'content\world.json') -Text '{ }'
+        Write-Utf8NoBom -Path (Join-Path $root 'extra.txt') -Text 'x'
+        $m = Read-Manifest; $m.files = @($m.files) + [pscustomobject]@{ path = '../outside.txt'; bytes = 1; sha256 = 'x' }
+        $integrity = @(Test-PackageIntegrity -Manifest $m -PackageRoot $root) -join '; '
+        Assert-True ($integrity -like '*size differs: content/world.json*') $integrity
+        Assert-True ($integrity -like '*unlisted file: extra.txt*') $integrity
+        Assert-True ($integrity -like '*manifest path escapes the package: ../outside.txt*') $integrity
+    }
+
+    $savedFake = @{}
+    foreach ($name in @('HORDE_FAKE_VERSION', 'HORDE_FAKE_SMOKE', 'HORDE_FAKE_SMOKE_EXIT')) { $savedFake[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
+    try {
+        [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $playtestTarget, 'Process')
+        [Environment]::SetEnvironmentVariable('HORDE_FAKE_VERSION', "Lastlight: Horde Defense v$playtestVersion (0123456)", 'Process')
+        [Environment]::SetEnvironmentVariable('HORDE_FAKE_SMOKE', $null, 'Process')
+        [Environment]::SetEnvironmentVariable('HORDE_FAKE_SMOKE_EXIT', $null, 'Process')
+
+        Test-Case 'verify_playtest passes a version 2 package, as a folder and as a zip, with stderr output from the smoke' {
+            $root = Join-Path $temporary 'verify-pass'
+            New-TestPackage $root | Out-Null
+            $r = Invoke-Verify @('-Package', $root) 'verify-folder'
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-Equal 0 $r.ExitCode "folder; $log"
+            Assert-True ((Read-Log $r.Out) -match "(?m)^PASS: 4 manifest hashes; v$([regex]::Escape($playtestVersion)) \(0123456\); copied executable smoke; native capture=False") "PASS line; $log"
+            $zip = New-PlaytestZip -SourceDirectory $root -Destination (Join-Path $temporary 'verify-pass.zip')
+            $r = Invoke-Verify @('-Package', $zip) 'verify-zip'
+            Assert-Equal 0 $r.ExitCode ('zip; ' + (Read-Log $r.Out) + (Read-Log $r.Err))
+            $unpacked = Join-Path (@(Get-VerificationFolders)[-1].FullName) 'unpacked'
+            Assert-True (Test-Path -LiteralPath (Join-Path $unpacked 'docs\PLAYTEST_GUIDE.md') -PathType Leaf) 'the zip was unpacked into folders'
+        }
+
+        Test-Case 'verify_playtest refuses -NativeCapture on a package without the review feature before launching anything' {
+            $root = Join-Path $temporary 'verify-no-review'
+            New-TestPackage $root | Out-Null
+            $before = @(Get-VerificationFolders).Count
+            $r = Invoke-Verify @('-Package', $root, '-NativeCapture') 'verify-no-review'
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0) "must fail; $log"
+            Assert-True ($log -match 'no review feature') "names the cause; $log"
+            Assert-True ($r.Seconds -lt 60) "ended by itself in $($r.Seconds) s"
+            $folders = @(Get-VerificationFolders)
+            Assert-Equal ($before + 1) $folders.Count 'one verification folder'
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $folders[-1].FullName 'logs'))) 'no process was started'
+        }
+
+        Test-Case 'verify_playtest fails a version 1 manifest, a changed file, a stale stamp and a failed smoke' {
+            $root = Join-Path $temporary 'verify-v1'
+            New-TestPackage $root | Out-Null
+            $path = Join-Path $root 'manifest.json'
+            $m = [IO.File]::ReadAllText($path) | ConvertFrom-Json
+            $m.version = 1
+            Write-Utf8NoBom -Path $path -Text ($m | ConvertTo-Json -Depth 6)
+            $r = Invoke-Verify @('-Package', $root) 'verify-v1'
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0 -and $log -match "manifest version is '1', expected 2") "version 1; $log"
+
+            $root = Join-Path $temporary 'verify-tampered'
+            New-TestPackage $root | Out-Null
+            Write-Utf8NoBom -Path (Join-Path $root 'assets\art\sheet.txt') -Text 'ART'
+            $r = Invoke-Verify @('-Package', $root) 'verify-tampered'
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0 -and $log -match 'sha256 differs: assets/art/sheet.txt') "changed file; $log"
+
+            $root = Join-Path $temporary 'verify-stale'
+            New-TestPackage $root | Out-Null
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_VERSION', "Lastlight: Horde Defense v$playtestVersion (dev build)", 'Process')
+            try { $r = Invoke-Verify @('-Package', $root) 'verify-stale' }
+            finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_VERSION', "Lastlight: Horde Defense v$playtestVersion (0123456)", 'Process') }
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0 -and $log -match 'dev build' -and $log -match 'manifest stamp') "stale stamp; $log"
+
+            foreach ($case in @(@{ Line = 'PASS: but exit 1'; Exit = '1' }, @{ Line = 'Smoke report without the marker'; Exit = '0' })) {
+                [Environment]::SetEnvironmentVariable('HORDE_FAKE_SMOKE', $case.Line, 'Process')
+                [Environment]::SetEnvironmentVariable('HORDE_FAKE_SMOKE_EXIT', $case.Exit, 'Process')
+                try { $r = Invoke-Verify @('-Package', $root) "verify-smoke-$($case.Exit)" }
+                finally {
+                    [Environment]::SetEnvironmentVariable('HORDE_FAKE_SMOKE', $null, 'Process')
+                    [Environment]::SetEnvironmentVariable('HORDE_FAKE_SMOKE_EXIT', $null, 'Process')
+                }
+                $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+                Assert-True ($r.ExitCode -ne 0 -and $log -match 'campaign smoke failed') "smoke '$($case.Line)' exit $($case.Exit); $log"
+            }
+        }
+
+        Test-Case 'package_playtest packs a stamped executable into a version 2 zip that verify_playtest passes' {
+            $package = Join-Path $scriptsDirectory 'package_playtest.ps1'
+            $output = Join-Path $temporary 'packages'
+            $git = Invoke-Native -FilePath (Resolve-Tool 'git') -Arguments @('rev-parse', 'HEAD') -LogStem (Join-Path $temporary 'logs\package-git') -TimeoutSeconds 30 -WorkingDirectory $workspace
+            $commit = (Read-Log $git.Out).Trim()
+            $short = $commit.Substring(0, 7)
+            $base = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $package, '-NoBuild', '-Executable', $helper, '-AllowDirty', '-OutputDirectory', $output)
+            # An executable that does not carry this tree's stamp is refused, and nothing is left behind.
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_VERSION', "Lastlight: Horde Defense v$playtestVersion (dev build)", 'Process')
+            $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $base -LogStem (Join-Path $temporary 'logs\package-stale') -TimeoutSeconds 600
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0 -and $log -match 'expected the stamp') "stale executable; $log"
+            Assert-Equal 0 @(Get-ChildItem -LiteralPath $output | Where-Object { $_.Name -like 'Lastlight-playtest-*' }).Count 'no package after a refusal'
+            # The fake names both stamps, so the case holds for a clean and for a dirty working tree.
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_VERSION', "Lastlight: Horde Defense v$playtestVersion ($short) v$playtestVersion ($short+dirty)", 'Process')
+            $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $base -LogStem (Join-Path $temporary 'logs\package') -TimeoutSeconds 600
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-Equal 0 $r.ExitCode "package_playtest; $log"
+            $lines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ })
+            $zip = $lines[0]
+            Assert-True ([IO.Path]::GetFileName($zip) -cmatch "^Lastlight-playtest-v$([regex]::Escape($playtestVersion))-$short-\d{8}-\d{6}\.zip$") "zip name: $zip"
+            Assert-Equal (Get-FileSha256 -Path $zip) $lines[1] 'the second line is the zip SHA-256'
+            Assert-Equal 0 @(Get-ZipEntryViolation -Path $zip).Count 'forward-slash entries only'
+            $folder = $zip.Substring(0, $zip.Length - 4)
+            $manifest = [IO.File]::ReadAllText((Join-Path $folder 'manifest.json')) | ConvertFrom-Json
+            Assert-Equal 2 $manifest.version 'manifest version'
+            Assert-Equal $commit $manifest.commit 'commit'
+            Assert-Equal $playtestVersion $manifest.game_version 'game version'
+            Assert-Equal 0 @($manifest.features).Count 'no review feature'
+            Assert-Equal 'PLAYTEST_GUIDE.md' (@($manifest.curated_docs) -join '|') 'curated docs'
+            $paths = @($manifest.files | ForEach-Object { $_.path })
+            Assert-Equal 'docs/PLAYTEST_GUIDE.md' (@($paths | Where-Object { $_ -like 'docs/*' }) -join '|') 'docs holds the guide only'
+            Assert-Equal 0 @($paths | Where-Object { $_ -like 'archive/*' -or $_ -like '*\*' }).Count 'no archive files, no backslash paths'
+            foreach ($expected in @('Lastlight.exe', 'LICENSE', 'READ ME.txt', 'Play Lastlight.cmd', 'Battle practice.cmd', 'content/encounters.json', 'content/world.json', 'assets/CREDITS.md')) {
+                Assert-True ($paths -ccontains $expected) "the package has $expected"
+            }
+            $readMe = [IO.File]::ReadAllText((Join-Path $folder 'READ ME.txt'))
+            Assert-True ($readMe -match "(?m)^Build: Lastlight $([regex]::Escape($manifest.stamp)), playtest profile, created \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC\r?$") "READ ME build line; $readMe"
+            Assert-True ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process'))) 'LASTLIGHT_BUILD_COMMIT is not left set'
+            $v = Invoke-Verify @('-Package', $zip) 'verify-packaged'
+            Assert-Equal 0 $v.ExitCode ('verify_playtest on the packed zip; ' + (Read-Log $v.Out) + (Read-Log $v.Err))
+        }
+    }
+    finally {
+        foreach ($name in $savedFake.Keys) { [Environment]::SetEnvironmentVariable($name, $savedFake[$name], 'Process') }
     }
 }
 finally {

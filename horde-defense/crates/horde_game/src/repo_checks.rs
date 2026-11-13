@@ -33,10 +33,7 @@ const PS7_ALLOWLIST: &[&str] = &[
 ];
 
 /// Not yet ported, with the commit that ports each and removes it from here.
-const PENDING: &[(&str, &str)] = &[
-    ("package_playtest.ps1", "W7-02"),
-    ("verify_playtest.ps1", "W7-02"),
-];
+const PENDING: &[(&str, &str)] = &[];
 
 /// Lower-case needles searched on comment-stripped lines, with the reason.
 const FORBIDDEN: &[(&str, &str)] = &[
@@ -1076,4 +1073,102 @@ fn prepare_z(f: &mut F, b: [u8; 4]) { f.game.staging(); }
     .map(|(line, seam, place)| format!("x.rs:{line}: `{seam}` {place}; {rule}"))
     .collect();
     assert_eq!(staging_outside_entitlements("x.rs", sample), expected);
+}
+
+/// The docs a playtest package ships (`$CuratedDocs` in
+/// `scripts/package_playtest.ps1`), relative to `docs/`.
+const CURATED_DOCS: &[&str] = &["PLAYTEST_GUIDE.md"];
+/// Upper bound for the package's whole `docs/` folder, in bytes.
+const CURATED_DOCS_LIMIT: u64 = 65_536;
+
+/// Targets of the inline Markdown links (`[text](target)`) in `text`, with
+/// the 1-based line of each.
+fn markdown_link_targets(text: &str) -> Vec<(usize, String)> {
+    let mut found = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        let mut rest = line;
+        while let Some(start) = rest.find("](") {
+            let after = &rest[start + 2..];
+            let Some(end) = after.find(')') else { break };
+            found.push((index + 1, after[..end].trim().to_owned()));
+            rest = &after[end + 1..];
+        }
+    }
+    found
+}
+
+/// Links in a shipped doc that would be dead inside the package: relative
+/// targets that are not one of the curated docs. Web links and in-page
+/// anchors are fine.
+fn links_outside_the_package(name: &str, text: &str) -> Vec<String> {
+    markdown_link_targets(text)
+        .into_iter()
+        .filter(|(_, target)| {
+            let lowered = target.to_ascii_lowercase();
+            if lowered.starts_with("http://")
+                || lowered.starts_with("https://")
+                || lowered.starts_with("mailto:")
+                || target.starts_with('#')
+            {
+                return false;
+            }
+            let file = target.split('#').next().unwrap_or_default();
+            !CURATED_DOCS.contains(&file)
+        })
+        .map(|(line, target)| format!("{name}:{line}: `{target}` is not in the playtest package"))
+        .collect()
+}
+
+#[test]
+fn playtest_guide_has_no_links_outside_the_package() {
+    let workspace = workspace_directory();
+    let mut violations = Vec::new();
+    let mut bytes = 0;
+    for name in CURATED_DOCS {
+        let path = workspace.join("docs").join(name);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        bytes += text.len() as u64;
+        violations.extend(links_outside_the_package(name, &text));
+    }
+    assert!(
+        violations.is_empty(),
+        "shipped docs link outside the package ({} links):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+    assert!(
+        bytes <= CURATED_DOCS_LIMIT,
+        "the packaged docs are {bytes} B, above {CURATED_DOCS_LIMIT} B"
+    );
+    // The packaging script ships exactly this list.
+    let script = std::fs::read_to_string(scripts_directory().join("package_playtest.ps1"))
+        .expect("read package_playtest.ps1");
+    let expected = format!(
+        "$CuratedDocs = @({})",
+        CURATED_DOCS
+            .iter()
+            .map(|name| format!("'{name}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    assert!(
+        script.contains(&expected),
+        "package_playtest.ps1 must declare `{expected}`"
+    );
+}
+
+#[test]
+fn package_link_check_reports_relative_links_only() {
+    let text = "See [a](JOURNEYS.md) and [b](audio/x.wav).\n\
+                [web](https://example.com/x.md) [top](#loop) \
+                [self](PLAYTEST_GUIDE.md#loop) [mail](mailto:a@b.c)\n";
+    let violations = links_outside_the_package("PLAYTEST_GUIDE.md", text);
+    assert_eq!(
+        violations,
+        vec![
+            "PLAYTEST_GUIDE.md:1: `JOURNEYS.md` is not in the playtest package".to_owned(),
+            "PLAYTEST_GUIDE.md:1: `audio/x.wav` is not in the playtest package".to_owned(),
+        ]
+    );
 }
