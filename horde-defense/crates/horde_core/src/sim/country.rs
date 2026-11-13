@@ -40,6 +40,10 @@ pub struct OutbreakPlan {
 pub struct CountryChoicePreview {
     /// The defenses that liberate the country.
     pub stage_count: usize,
+    /// The country's regional checkpoints: the count of
+    /// `Country::regional_checkpoints()` (ruling P6), every sixth stage short
+    /// of the Capstone, at most 3. Derived, never saved.
+    pub checkpoints: usize,
     /// Mara is not yet in camp, and liberating this country is what meets
     /// her upgrade node's liberation requirement: false once the requirement
     /// is already met, and for a country already counted as liberated.
@@ -128,6 +132,7 @@ impl Game {
                 });
         Some(CountryChoicePreview {
             stage_count,
+            checkpoints: country.regional_checkpoints().len(),
             companion_after_liberation,
         })
     }

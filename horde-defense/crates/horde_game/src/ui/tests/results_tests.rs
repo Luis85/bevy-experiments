@@ -811,3 +811,37 @@ fn results_without_a_report_redirects_to_camp_home() {
     h.frame(f, View::Full, vec![]);
     assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Home);
 }
+
+/// W4-02: a victory over a Regional boss (`Report.boss_rank`) reads
+/// "Regional checkpoint secured"; a Sector or Capstone victory, and a
+/// defeat at a checkpoint, do not.
+#[test]
+fn results_name_a_secured_regional_checkpoint() {
+    use horde_core::progression::BossRank;
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    for (outcome, rank, expected) in [
+        (Outcome::Victory, BossRank::Regional, true),
+        (Outcome::Victory, BossRank::Sector, false),
+        (Outcome::Victory, BossRank::Capstone, false),
+        (Outcome::Defeat, BossRank::Regional, false),
+    ] {
+        let report = f.game.last_result_mut().as_mut().unwrap();
+        report.outcome = outcome;
+        report.boss_rank = rank;
+        let output = h.frame(f, View::Results, vec![]);
+        assert_eq!(
+            output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, "Regional checkpoint secured")),
+            expected,
+            "{outcome:?} {rank:?}"
+        );
+    }
+}

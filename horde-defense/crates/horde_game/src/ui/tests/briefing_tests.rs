@@ -196,3 +196,48 @@ fn briefing_primary_opens_the_field_of_the_defense_it_deploys() {
         );
     }
 }
+
+/// W4-02: the briefing of a Regional stage (every sixth, short of the last)
+/// names the checkpoint and what `progression.json` `boss_ranks.regional`
+/// adds; the last stage reads "Final stand"; a Sector stage has neither.
+#[test]
+fn briefing_names_regional_checkpoint_on_checkpoint_stage() {
+    let country = world()
+        .countries
+        .iter()
+        .find(|c| !c.regional_checkpoints().is_empty())
+        .expect("a country with a regional checkpoint");
+    let checkpoint = country.regional_checkpoints()[0];
+    assert_eq!(checkpoint, 5);
+    let last = country.level_count() - 1;
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game
+        .campaign_mut()
+        .choose_start_country(&country.id)
+        .unwrap();
+    f.game
+        .campaign_mut()
+        .world
+        .country_levels
+        .insert(country.id.clone(), last);
+    f.act(|c| c.open_preparation(Tab::Briefing));
+    let regional = "Regional checkpoint - boss +20% health, +20% reward";
+    for (stage, text, expected) in [
+        (checkpoint, regional, true),
+        (checkpoint, "Final stand", false),
+        (0, "Regional checkpoint", false),
+        (0, "Final stand", false),
+        (last, "Final stand", true),
+        (last, "Regional checkpoint", false),
+    ] {
+        f.campaign.stage = stage;
+        let output = h.frame_size(f, View::Camp, vec![], vec2(1440.0, 900.0));
+        assert_eq!(
+            output.shapes.iter().any(|s| shape_has_text(&s.shape, text)),
+            expected,
+            "stage {stage}: {text:?}"
+        );
+    }
+}

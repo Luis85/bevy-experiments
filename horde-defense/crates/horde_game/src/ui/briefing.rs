@@ -115,6 +115,9 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
                 .on_hover_text(hint);
         }
     });
+    if let Some(line) = &view.boss_rank_line {
+        ui.colored_label(AMBER, line);
+    }
     ui.label(supply_and_difficulty(forecast.supply, forecast.difficulty));
     ui.label(format!(
         "Threat rank {} · arrival groups {} · population cap {} (+ boss) · new gear Lv {}",

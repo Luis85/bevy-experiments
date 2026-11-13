@@ -225,6 +225,9 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
     let levels = country.level_count();
     let cleared = f.game.campaign().world.completed(&country.id);
     ui.label(defenses_and_difficulty(f.game, country));
+    if let Some(checkpoints) = checkpoints_label(f.game, &country.id) {
+        muted(ui, checkpoints);
+    }
     if f.game.campaign().world.start.is_some() {
         progress(
             ui,
@@ -275,6 +278,16 @@ fn mara_timing(game: &Game, country: &Country) -> Option<String> {
                 country.name
             )
         })
+}
+/// "N checkpoints" for the country `id`, N its regional checkpoints as the
+/// core preview counts them (`CountryChoicePreview.checkpoints`); `None` for
+/// a country without one, or outside the catalogue.
+fn checkpoints_label(game: &Game, id: &str) -> Option<String> {
+    match game.country_choice_preview(id)?.checkpoints {
+        0 => None,
+        1 => Some("1 checkpoint".into()),
+        n => Some(format!("{n} checkpoints")),
+    }
 }
 fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(country) = world().country(&f.campaign.selected_country) else {
@@ -472,5 +485,31 @@ mod tests {
             defenses_and_difficulty(&game, aut),
             format!("{} defenses · 0.95× difficulty", aut.level_count())
         );
+    }
+
+    /// W4-02: the world panel's checkpoint line reads the core preview's
+    /// count: none for a country of at most 6 defenses, the singular for one,
+    /// "N checkpoints" otherwise (at most 3).
+    #[test]
+    fn world_panel_counts_regional_checkpoints() {
+        let game = Game::default();
+        let mut seen = std::collections::BTreeSet::new();
+        for country in &world().countries {
+            let count = country.regional_checkpoints().len();
+            let expected = match count {
+                0 => None,
+                1 => Some("1 checkpoint".to_owned()),
+                n => Some(format!("{n} checkpoints")),
+            };
+            assert_eq!(
+                checkpoints_label(&game, &country.id),
+                expected,
+                "{}",
+                country.id
+            );
+            seen.insert(count);
+        }
+        assert_eq!(seen.into_iter().collect::<Vec<_>>(), [0, 1, 2, 3]);
+        assert_eq!(checkpoints_label(&game, "NOT_A_COUNTRY"), None);
     }
 }

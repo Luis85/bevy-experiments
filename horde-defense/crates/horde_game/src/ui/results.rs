@@ -111,10 +111,14 @@ fn reason_line(report: &Report) -> String {
 /// with the banked rewards beside it, and at most one muted hint under it.
 /// The header shows the wallet; this strip only names what was banked.
 /// What a victory opened, from core queries: the fronts a liberation
-/// unlocked, then the nodes whose milestone this round reached.
+/// unlocked, then the nodes whose milestone this round reached. A victory
+/// over a Regional boss (`Report.boss_rank`) leads with the checkpoint.
 fn victory_line(f: &UiCtx, report: &Report) -> Option<String> {
     let campaign = f.game.campaign();
     let mut parts = Vec::new();
+    if report.boss_rank == BossRank::Regional {
+        parts.push("Regional checkpoint secured.".to_owned());
+    }
     if let Some(id) = report.country_id.as_deref()
         && campaign.world.cleared.iter().any(|c| c == id)
         && report.country_freed

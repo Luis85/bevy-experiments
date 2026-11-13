@@ -3887,6 +3887,32 @@ fn country_choice_preview_names_stage_count_and_mara_timing() {
     assert!(!preview.companion_after_liberation);
 }
 
+/// W4-02 (ruling P6): the preview's `checkpoints` is the count of
+/// `Country::regional_checkpoints()`, every sixth stage short of the
+/// Capstone, at most 3.
+#[test]
+fn country_choice_preview_counts_regional_checkpoints() {
+    let g = Game::default();
+    let mut seen = std::collections::BTreeSet::new();
+    for country in &world().countries {
+        let preview = g.country_choice_preview(&country.id).unwrap();
+        assert_eq!(
+            preview.checkpoints,
+            country.regional_checkpoints().len(),
+            "{}",
+            country.id
+        );
+        assert_eq!(
+            preview.checkpoints,
+            ((country.level_count() - 1) / 6).min(3),
+            "{}",
+            country.id
+        );
+        seen.insert(preview.checkpoints);
+    }
+    assert_eq!(seen.into_iter().collect::<Vec<_>>(), [0, 1, 2, 3]);
+}
+
 #[test]
 fn country_choice_preview_has_no_mara_line_once_her_liberation_is_met() {
     // One liberation already meets the "Meet Mara" node's minimum_liberated,
