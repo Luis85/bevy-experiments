@@ -17,5 +17,6 @@
 
 pub mod bank;
 pub mod cue;
+pub mod mix;
 pub mod synth;
 pub mod wav;

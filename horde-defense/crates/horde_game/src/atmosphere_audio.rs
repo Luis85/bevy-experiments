@@ -52,12 +52,14 @@ pub enum AudioContext {
     Paused,
 }
 impl AudioContext {
-    fn gain(self) -> f32 {
+    /// The context's share of the ambience bus, from the mix table.
+    fn level(self) -> f32 {
+        let table = horde_audio::mix::CONTEXT_GAIN;
         match self {
-            Self::Menu => 0.55,
-            Self::Camp => 0.75,
-            Self::Battle => 1.0,
-            Self::Paused => 0.35,
+            Self::Menu => table.menu,
+            Self::Camp => table.camp,
+            Self::Battle => table.battle,
+            Self::Paused => table.paused,
         }
     }
 }
@@ -166,7 +168,7 @@ impl SceneAudioTarget {
     pub fn gains(self) -> [f32; CHANNEL_COUNT] {
         let mut weights = self.scene.weights;
         normalize(&mut weights);
-        let gain = safe_gain(self.master) * safe_gain(self.ambience) * self.context.gain();
+        let gain = safe_gain(self.master) * safe_gain(self.ambience) * self.context.level();
         weights.map(|weight| weight * gain)
     }
     fn muted(self) -> bool {

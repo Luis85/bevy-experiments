@@ -1,11 +1,12 @@
 //! `SfxPlugin`: plays the `CueRequest` messages the runner (and UI) write on a
 //! small, prioritised voice budget that follows the effects bus.
 use crate::{
-    audio::{Cue as SoundCue, CueMix, CueRequest},
+    audio::{Cue as SoundCue, CueRequest},
     runner::RuntimeSet,
     settings::Settings,
 };
 use bevy::prelude::*;
+use horde_audio::mix::{GateGroup, calibration_gain, mix};
 
 pub struct SfxPlugin;
 impl Plugin for SfxPlugin {
@@ -30,49 +31,12 @@ struct SfxState {
     gate: crate::audio::CueGate,
 }
 
-/// Selection numbers, still owned here until the mix table moves to
-/// `horde_audio` (A6-02).
-trait CueSelection {
-    fn priority(self) -> u8;
-    fn fire(self) -> bool;
+/// The priority and the fire lane of a cue, read from the mix table.
+fn rank(cue: SoundCue) -> u8 {
+    mix(cue).priority
 }
-impl CueSelection for SoundCue {
-    fn priority(self) -> u8 {
-        match self {
-            Self::Boss | Self::Retreat | Self::Victory | Self::Defeat => 0,
-            Self::Wave => 1,
-            Self::Structure | Self::Explosion | Self::Molotov => 2,
-            Self::Damage | Self::Confirm => 3,
-            Self::Melee | Self::Throw => 4,
-            Self::Reload => 5,
-            Self::Ready | Self::Kill => 6,
-            Self::Armor | Self::Impact => 7,
-            Self::Trap => 8,
-            Self::Pistol
-            | Self::Smg
-            | Self::Shotgun
-            | Self::Rifle
-            | Self::Marksman
-            | Self::MachineGun => 9,
-            Self::NpcShot => 10,
-            Self::TurretShot => 11,
-            Self::Incoming => 12,
-            Self::Fire => 13,
-        }
-    }
-    fn fire(self) -> bool {
-        matches!(
-            self,
-            Self::Pistol
-                | Self::Smg
-                | Self::Shotgun
-                | Self::Rifle
-                | Self::Marksman
-                | Self::MachineGun
-                | Self::NpcShot
-                | Self::TurretShot
-        )
-    }
+fn fires(cue: SoundCue) -> bool {
+    mix(cue).gate == GateGroup::Fire
 }
 
 pub const MAX_EFFECT_VOICES: usize = crate::audio::MAX_EFFECT_VOICES;
@@ -91,7 +55,7 @@ fn safe_bus_gain(master: f32, effects: f32) -> f32 {
             0.0
         }
     }
-    level(master) * level(effects) * 0.7
+    level(master) * level(effects) * calibration_gain()
 }
 fn select_sounds(mut sounds: Vec<SoundCue>, rotation: u64) -> Vec<SoundCue> {
     // A warning already communicates arrival; avoid stacking a second spawn cue.
@@ -109,25 +73,19 @@ fn select_sounds(mut sounds: Vec<SoundCue>, rotation: u64) -> Vec<SoundCue> {
     if sounds.contains(&SoundCue::Victory) {
         sounds.retain(|cue| *cue != SoundCue::Wave);
     }
-    sounds.sort_by_key(|cue| cue.priority());
+    sounds.sort_by_key(|cue| rank(*cue));
     sounds.dedup();
     let mut selected = Vec::with_capacity(2);
-    selected.extend(
-        sounds
-            .iter()
-            .copied()
-            .filter(|cue| cue.priority() <= 3)
-            .take(2),
-    );
+    selected.extend(sounds.iter().copied().filter(|cue| rank(*cue) <= 3).take(2));
     if selected.is_empty()
         && let Some(cue) = sounds
             .iter()
             .copied()
-            .find(|cue| !cue.fire() && cue.priority() <= 8)
+            .find(|cue| !fires(*cue) && rank(*cue) <= 8)
     {
         selected.push(cue);
     }
-    let fire: Vec<_> = sounds.iter().copied().filter(|cue| cue.fire()).collect();
+    let fire: Vec<_> = sounds.iter().copied().filter(|cue| fires(*cue)).collect();
     for n in 0..fire.len() {
         if selected.len() == 2 {
             break;
@@ -175,7 +133,7 @@ fn play_sounds(
             else {
                 continue;
             };
-            if cue.priority() >= *priority {
+            if rank(cue) >= *priority {
                 continue;
             }
             Some(index)
@@ -189,12 +147,12 @@ fn play_sounds(
             let (entity, _) = live.remove(index);
             commands.entity(entity).despawn();
         }
-        let cue_gain = cue.gain(reduced);
+        let cue_gain = mix(cue).level(reduced);
         let voice_gain = gain * cue_gain;
         let entity = commands
             .spawn((
                 EffectVoice {
-                    priority: cue.priority(),
+                    priority: rank(cue),
                     last_gain: voice_gain,
                     cue_gain,
                     cue,
@@ -203,7 +161,7 @@ fn play_sounds(
                 PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(voice_gain)),
             ))
             .id();
-        live.push((entity, cue.priority()));
+        live.push((entity, rank(cue)));
     }
 }
 /// Both pending PlaybackSettings and live sinks follow the current SFX bus.
@@ -218,7 +176,7 @@ fn update_effects_gain(
     let gain = safe_bus_gain(settings.master, settings.effects);
     let reduced = settings.reduced_effects;
     for (mut voice, mut playback, sink) in &mut voices {
-        voice.cue_gain = voice.cue.gain(reduced);
+        voice.cue_gain = mix(voice.cue).level(reduced);
         let voice_gain = gain * voice.cue_gain;
         if (voice.last_gain - voice_gain).abs() > 0.00001 {
             playback.volume = bevy::audio::Volume::Linear(voice_gain);
@@ -334,7 +292,7 @@ mod tests {
                 .get::<PlaybackSettings>()
                 .unwrap()
                 .volume,
-            bevy::audio::Volume::Linear(0.35)
+            bevy::audio::Volume::Linear(0.5 * calibration_gain())
         );
         app.world_mut().resource_mut::<Settings>().reduced_effects = true;
         app.update();
@@ -346,9 +304,11 @@ mod tests {
             .volume;
         assert_eq!(
             reduced,
-            bevy::audio::Volume::Linear(0.35 * SoundCue::Explosion.gain(true))
+            bevy::audio::Volume::Linear(
+                0.5 * calibration_gain() * mix(SoundCue::Explosion).level(true)
+            )
         );
         assert_eq!(safe_bus_gain(f32::NAN, 1.0), 0.0);
-        assert_eq!(safe_bus_gain(9.0, 9.0), 0.7);
+        assert_eq!(safe_bus_gain(9.0, 9.0), calibration_gain());
     }
 }
