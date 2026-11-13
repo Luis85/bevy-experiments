@@ -1,0 +1,22 @@
+[package]
+name = "horde_audio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+# Bevy-free by rule (plan P8): only crates already in the lock graph, so
+# `cargo test -p horde_audio` never compiles Bevy. The dependency-tree test
+# `horde_audio_builds_without_bevy` enforces it.
+[dependencies]
+horde_core = { path = "../horde_core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# The workspace's one SHA-256 (ruling S7) is test-support only; audio asset
+# audits reach it through this dev-dependency, never a production build.
+horde_core = { path = "../horde_core", features = ["test-support"] }
