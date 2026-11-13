@@ -110,3 +110,14 @@ const fn legacy_name(family: Cue) -> &'static str {
 pub fn variant_path(cue: Cue, variant: u64) -> String {
     cue.bank().variant_path(variant)
 }
+
+/// The ambience loops relative to `assets/`, in the runtime's channel order:
+/// base, wind, urban, nature, rain, cold.
+pub const AMBIENCE_FILES: [&str; 6] = [
+    "audio/ambience.wav",
+    "audio/ambient_wind.wav",
+    "audio/ambient_urban.wav",
+    "audio/ambient_nature.wav",
+    "audio/ambient_rain.wav",
+    "audio/ambient_cold.wav",
+];

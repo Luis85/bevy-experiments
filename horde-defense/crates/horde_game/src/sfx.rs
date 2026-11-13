@@ -6,7 +6,10 @@ use crate::{
     settings::Settings,
 };
 use bevy::prelude::*;
-use horde_audio::mix::{GateGroup, calibration_gain, mix};
+use horde_audio::{
+    mix::{calibration_gain, mix},
+    select::select_sounds,
+};
 
 pub struct SfxPlugin;
 impl Plugin for SfxPlugin {
@@ -31,12 +34,9 @@ struct SfxState {
     gate: crate::audio::CueGate,
 }
 
-/// The priority and the fire lane of a cue, read from the mix table.
+/// The priority of a cue, read from the mix table.
 fn rank(cue: SoundCue) -> u8 {
     mix(cue).priority
-}
-fn fires(cue: SoundCue) -> bool {
-    mix(cue).gate == GateGroup::Fire
 }
 
 pub const MAX_EFFECT_VOICES: usize = crate::audio::MAX_EFFECT_VOICES;
@@ -56,51 +56,6 @@ fn safe_bus_gain(master: f32, effects: f32) -> f32 {
         }
     }
     level(master) * level(effects) * calibration_gain()
-}
-fn select_sounds(mut sounds: Vec<SoundCue>, rotation: u64) -> Vec<SoundCue> {
-    // A warning already communicates arrival; avoid stacking a second spawn cue.
-    if sounds.contains(&SoundCue::Wave) {
-        sounds.retain(|cue| *cue != SoundCue::Incoming);
-    }
-    // A kill subsumes the hit that caused it, and a defeat stinger the
-    // collapse that ended the defense (they share the same bank).
-    if sounds.contains(&SoundCue::Kill) {
-        sounds.retain(|cue| *cue != SoundCue::Impact);
-    }
-    if sounds.contains(&SoundCue::Defeat) {
-        sounds.retain(|cue| *cue != SoundCue::Structure);
-    }
-    if sounds.contains(&SoundCue::Victory) {
-        sounds.retain(|cue| *cue != SoundCue::Wave);
-    }
-    sounds.sort_by_key(|cue| rank(*cue));
-    sounds.dedup();
-    let mut selected = Vec::with_capacity(2);
-    selected.extend(sounds.iter().copied().filter(|cue| rank(*cue) <= 3).take(2));
-    if selected.is_empty()
-        && let Some(cue) = sounds
-            .iter()
-            .copied()
-            .find(|cue| !fires(*cue) && rank(*cue) <= 8)
-    {
-        selected.push(cue);
-    }
-    let fire: Vec<_> = sounds.iter().copied().filter(|cue| fires(*cue)).collect();
-    for n in 0..fire.len() {
-        if selected.len() == 2 {
-            break;
-        }
-        selected.push(fire[(rotation as usize + n) % fire.len()]);
-    }
-    for cue in sounds {
-        if selected.len() == 2 {
-            break;
-        }
-        if !selected.contains(&cue) {
-            selected.push(cue);
-        }
-    }
-    selected
 }
 fn play_sounds(
     mut commands: Commands,
@@ -192,65 +147,6 @@ fn update_effects_gain(
 mod tests {
     use super::*;
 
-    #[test]
-    fn important_audio_cues_are_not_displaced_by_fire_and_sources_take_turns() {
-        let selected = select_sounds(
-            vec![
-                SoundCue::Rifle,
-                SoundCue::TurretShot,
-                SoundCue::Wave,
-                SoundCue::Incoming,
-            ],
-            0,
-        );
-        assert!(selected.contains(&SoundCue::Wave));
-        assert_eq!(selected.len(), 2);
-        assert_eq!(
-            select_sounds(vec![SoundCue::Boss, SoundCue::Damage, SoundCue::Rifle], 0),
-            vec![SoundCue::Boss, SoundCue::Damage]
-        );
-        assert_eq!(
-            select_sounds(vec![SoundCue::Wave, SoundCue::Incoming], 0),
-            vec![SoundCue::Wave]
-        );
-        // Rotation is exercised with cues the game still emits.
-        let turns = [SoundCue::Armor, SoundCue::Rifle, SoundCue::TurretShot];
-        assert!(turns.iter().all(|cue| !cue.retired()), "{turns:?}");
-        let a = select_sounds(turns.to_vec(), 0);
-        let b = select_sounds(turns.to_vec(), 1);
-        assert!(a.contains(&SoundCue::Armor) && a.contains(&SoundCue::Rifle));
-        assert!(b.contains(&SoundCue::Armor) && b.contains(&SoundCue::TurretShot));
-    }
-    #[test]
-    fn stingers_and_kills_replace_the_cues_they_subsume() {
-        assert_eq!(
-            select_sounds(vec![SoundCue::Rifle, SoundCue::Impact, SoundCue::Kill], 0),
-            vec![SoundCue::Kill, SoundCue::Rifle]
-        );
-        assert_eq!(
-            select_sounds(
-                vec![
-                    SoundCue::Kill,
-                    SoundCue::Victory,
-                    SoundCue::Boss,
-                    SoundCue::Rifle
-                ],
-                0
-            ),
-            vec![SoundCue::Victory, SoundCue::Boss]
-        );
-        assert_eq!(
-            select_sounds(
-                vec![SoundCue::Structure, SoundCue::Damage, SoundCue::Defeat],
-                0
-            ),
-            vec![SoundCue::Defeat, SoundCue::Damage]
-        );
-        assert_eq!(
-            select_sounds(vec![SoundCue::Fire, SoundCue::Confirm], 0),
-            vec![SoundCue::Confirm, SoundCue::Fire]
-        );
-    }
     #[test]
     fn effect_bus_updates_pending_voices_and_mutes_without_recreating_them() {
         let mut app = App::new();

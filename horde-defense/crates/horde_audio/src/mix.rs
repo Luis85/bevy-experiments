@@ -187,6 +187,13 @@ pub const MIX_CALIBRATION_DB: f32 = -3.1;
 /// The calibration knob of the ambience loops, in dB.
 pub const AMBIENCE_CALIBRATION_DB: f32 = 0.0;
 
+/// The default slider values. `Settings::default()` in `horde_game` reads
+/// these, and the offline render gates the mix at them. They hold the v1
+/// values until the calibration step retunes them.
+pub const DEFAULT_MASTER: f32 = 0.6;
+pub const DEFAULT_EFFECTS: f32 = 0.7;
+pub const DEFAULT_AMBIENCE: f32 = 0.15;
+
 /// dB to a linear factor.
 pub fn db_to_linear(db: f32) -> f32 {
     10f32.powf(db / 20.0)

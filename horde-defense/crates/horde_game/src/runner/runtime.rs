@@ -3,13 +3,13 @@
 use super::{command::*, persistence};
 use crate::audio::Cue as SoundCue;
 use bevy::prelude::*;
+pub(crate) use horde_audio::events::push_cue;
 #[cfg(feature = "dev")]
 use horde_core::command::Command;
-use horde_core::{
-    content::StructureKind,
-    ordnance::OrdnanceKind,
-    sim::{Actor, BattleId, Game, Input, Outcome, SimEvent},
-};
+// The event-to-cue mapping lives in `horde_audio`, shared with the offline
+// renderer.
+pub(super) use horde_audio::events::event_sound;
+use horde_core::sim::{BattleId, Game, Input, SimEvent};
 #[cfg(feature = "review")]
 use persistence::PersistenceMetrics;
 use std::collections::VecDeque;
@@ -410,87 +410,6 @@ pub(super) fn merge_actions(into: &mut Input, from: &Input) {
     }
 }
 
-/// Queues `cue` once per batch. A retired cue has no shipped file.
-pub(crate) fn push_cue(cues: &mut Vec<SoundCue>, cue: SoundCue) {
-    debug_assert!(!cue.retired(), "{cue:?} is retired");
-    if !cues.contains(&cue) {
-        cues.push(cue);
-    }
-}
-pub(super) fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
-    if let SimEvent::Hit(strike)
-    | SimEvent::Armor(strike)
-    | SimEvent::Miss(strike)
-    | SimEvent::Defended(strike) = event
-        && matches!(
-            strike.attacker,
-            Actor::Structure {
-                kind: StructureKind::Trap,
-                ..
-            }
-        )
-    {
-        push_cue(cues, SoundCue::Trap);
-    }
-    let cue = match event {
-        SimEvent::Boss { .. } => Some(SoundCue::Boss),
-        SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => Some(SoundCue::Wave),
-        SimEvent::BossExposure { .. } | SimEvent::CooldownReady => Some(SoundCue::Ready),
-        SimEvent::StructureLost { .. } => Some(SoundCue::Structure),
-        SimEvent::Damage(_) => Some(SoundCue::Damage),
-        SimEvent::Melee(_) => Some(SoundCue::Melee),
-        SimEvent::Reload => Some(SoundCue::Reload),
-        SimEvent::Shot { shooter, .. } => match *shooter {
-            Actor::Structure {
-                kind: StructureKind::Trap,
-                ..
-            } => Some(SoundCue::Trap),
-            Actor::Structure {
-                kind: StructureKind::Turret,
-                ..
-            } => Some(SoundCue::TurretShot),
-            // Either mode sounds like its weapon; NpcShot is retired.
-            Actor::Defender { weapon, .. } => Some(match weapon {
-                horde_core::weapons::WeaponClass::Pistol => SoundCue::Pistol,
-                horde_core::weapons::WeaponClass::Smg => SoundCue::Smg,
-                horde_core::weapons::WeaponClass::Shotgun => SoundCue::Shotgun,
-                horde_core::weapons::WeaponClass::Rifle => SoundCue::Rifle,
-                horde_core::weapons::WeaponClass::Marksman => SoundCue::Marksman,
-                horde_core::weapons::WeaponClass::MachineGun => SoundCue::MachineGun,
-            }),
-            // A source that no longer exists has no reliable timbre.
-            _ => None,
-        },
-        SimEvent::Throw { .. } => Some(SoundCue::Throw),
-        SimEvent::Explosion {
-            ordnance: OrdnanceKind::Molotov,
-            ..
-        } => Some(SoundCue::Molotov),
-        SimEvent::Explosion { .. } => Some(SoundCue::Explosion),
-        SimEvent::Burn { .. } => Some(SoundCue::Fire),
-        SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(SoundCue::Impact),
-        SimEvent::Armor(_) => Some(SoundCue::Armor),
-        SimEvent::Spawn { .. } => Some(SoundCue::Incoming),
-        SimEvent::Kill { .. } => Some(SoundCue::Kill),
-        SimEvent::AttemptFinished { outcome, .. } => Some(match outcome {
-            Outcome::Victory => SoundCue::Victory,
-            Outcome::Defeat => SoundCue::Defeat,
-            Outcome::Withdrawal => SoundCue::Retreat,
-        }),
-        // Enemy-side events have no cue until audio's exhaustive SimEvent
-        // mapping in wave 6 (A6-12). Their visual twins already exist: the
-        // W2-28 aim line for a ranged windup and the W2-37 phase label and
-        // ring for a boss phase.
-        SimEvent::Spit(_)
-        | SimEvent::Detonation { .. }
-        | SimEvent::Split { .. }
-        | SimEvent::BossPhase { .. } => None,
-        _ => None,
-    };
-    if let Some(cue) = cue {
-        push_cue(cues, cue);
-    }
-}
 /// Sounds for one tick's drained events. The main deployment is always
 /// audible; camp observation hears the observed expedition in full and only
 /// important cues from the others, without multiplying ordinary shots.

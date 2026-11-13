@@ -10,9 +10,11 @@ pub const SETTINGS_VERSION: u32 = 1;
 /// the wave-1 defaults so a later default change can tell an untouched
 /// slider from a chosen one.
 pub mod defaults {
-    pub const MASTER: f32 = 0.6;
-    pub const EFFECTS: f32 = 0.7;
-    pub const AMBIENCE: f32 = 0.15;
+    // The mix defaults live with the mix table; the offline loudness gate
+    // renders at the same constants.
+    pub const MASTER: f32 = horde_audio::mix::DEFAULT_MASTER;
+    pub const EFFECTS: f32 = horde_audio::mix::DEFAULT_EFFECTS;
+    pub const AMBIENCE: f32 = horde_audio::mix::DEFAULT_AMBIENCE;
     pub const MUSIC: f32 = 0.7;
     pub const UI: f32 = 0.7;
     #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]

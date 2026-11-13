@@ -17,7 +17,10 @@
 
 pub mod bank;
 pub mod cue;
+pub mod events;
 pub mod meter;
 pub mod mix;
+pub mod render;
+pub mod select;
 pub mod synth;
 pub mod wav;

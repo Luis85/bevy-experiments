@@ -1,13 +1,9 @@
-//! The Bevy side of the survival SFX: the cue message and the repeat gate.
+//! The Bevy side of the survival SFX: the cue message.
 //! The cue list, banks, the mix table and the offline synthesis live in
 //! `horde_audio`. Only presentation time selects/coalesces variants.
 //! No combat RNG is read.
 
-pub use horde_audio::{
-    bank::variant_path,
-    cue::Cue,
-    mix::{MAX_EFFECT_VOICES, mix},
-};
+pub use horde_audio::{bank::variant_path, cue::Cue, mix::MAX_EFFECT_VOICES, select::CueGate};
 
 /// One requested cue, written by the runner and the UI and played by
 /// `SfxPlugin`.
@@ -31,29 +27,10 @@ pub(crate) fn runtime_wav_paths() -> Vec<String> {
     paths
 }
 
-/// Coalesce repeated ticks and accelerated observation into a restrained real-
-/// time soundscape. A cue dropped by the gate never delays a simulation action.
-#[derive(Debug, Default)]
-pub struct CueGate {
-    last_started: [Option<u64>; horde_audio::cue::CUE_COUNT],
-}
-impl CueGate {
-    pub fn accept(&mut self, cue: Cue, now_ms: u64, reduced: bool) -> bool {
-        let last = &mut self.last_started[cue as usize];
-        if last.is_some_and(|previous| {
-            now_ms >= previous && now_ms - previous < mix(cue).cooldown(reduced)
-        }) {
-            return false;
-        }
-        *last = Some(now_ms);
-        true
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use horde_audio::{bank::LEGACY_FAMILIES, cue::CUE_COUNT};
+    use horde_audio::{bank::LEGACY_FAMILIES, cue::CUE_COUNT, mix::mix};
     #[test]
     fn real_time_gate_bounds_accelerated_feedback_and_keeps_critical_cues_independent() {
         let mut gate = CueGate::default();

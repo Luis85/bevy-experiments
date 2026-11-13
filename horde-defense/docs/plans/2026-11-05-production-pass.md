@@ -1228,9 +1228,20 @@ Still failing, all wave-4 work (W4-04..n, W4-p, W4-c): `goal5_tiers_affordable_3
 
 | Measure | Before (A6-04) | After (A6-17) | Gate |
 |---|---|---|---|
-| 60 s reference mix, integrated LUFS (both themes) | about -38..-42 | | -23 ±2 |
-| 60 s dense battle true peak (FS) | | | ≤ 0.95 |
+| 60 s reference mix, integrated LUFS (both themes) | -47.0 (stage-1) / -42.4 (rain); the model predicted about -38..-42 | | -23 ±2 |
+| 60 s dense battle true peak (FS) | 0.080 | | ≤ 0.95 |
 | Runtime master limiter needed (R3) | n/a | yes / no | only if TP > 0.95 |
+
+A6-04 "before" (2026-11-13): `cargo test -p horde_audio --test offline_mix -- --ignored --nocapture`, the offline render (`horde_audio::render`) of today's assets under today's policy (the v1 mix rows, calibration -3.1 dB, 6 voices, 2 starts per frame, variant rotation, dual mono) at the default sliders 0.6 / 0.7 / 0.15, metered by `horde_audio::meter` at 44.1 kHz. The scene is 8 s Camp with two Confirm cues, 44 s of the seed-1 Personal level-0 battle under `smoke_input`, and 8 s Results on the paused bed with the victory stinger; the loot reveal and the coin batch are not in it, because those cues do not exist before A6-14. The stage-1 bed is DEU stage 0; rain is the same theme with rain weather.
+
+| Scene | Integrated (LUFS) | Short-term max | Momentary max | Sample peak (FS) | True peak (FS) |
+|---|---|---|---|---|---|
+| `reference_mixed_60s`, stage-1 | -47.0 | -43.9 | -42.5 | 0.050 | 0.061 |
+| `reference_mixed_60s`, rain | -42.4 | -40.1 | -39.3 | 0.059 | 0.064 |
+| `dense_battle_60s` (`maximum_progression_render_fixture`) | -44.0 | -37.0 | -32.9 | 0.073 | 0.080 |
+| `max_sliders_60s` (stage-1, every slider 1.0) | -31.5 | -28.8 | -26.6 | 0.151 | 0.182 |
+
+`reference_mixed_60s_meets_loudness_gate` is red and ignored until A6-17: both themes are 19 to 24 LU under the gate. The stage-1 render reads 5 LU under the model's -42: the model's scripted battle was busier than the seed-1 level-0 battle, and the model is good to about 3 dB (design-audio section 14). `dense_battle_60s_true_peak_at_most_0_95` passes today (true peak 0.080, short-term max -37.0 against -14) and is ignored only for its length.
 
 ### 9.4 Frame report v3 baseline (W1-37)
 

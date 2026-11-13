@@ -7,7 +7,8 @@ use bevy::{
 };
 use horde_core::{content::Mode, world::StageTheme};
 
-pub const CROSSFADE_SECONDS: f32 = 1.2;
+/// Shared with the offline renderer, which models this crossfade.
+pub const CROSSFADE_SECONDS: f32 = horde_audio::render::CROSSFADE_SECONDS;
 pub const CHANNEL_COUNT: usize = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,15 +32,9 @@ impl AmbienceChannel {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// The channel's loop, from the bank table the offline renderer reads.
     pub fn path(self) -> &'static str {
-        match self {
-            Self::Base => "audio/ambience.wav",
-            Self::Wind => "audio/ambient_wind.wav",
-            Self::Urban => "audio/ambient_urban.wav",
-            Self::Nature => "audio/ambient_nature.wav",
-            Self::Rain => "audio/ambient_rain.wav",
-            Self::Cold => "audio/ambient_cold.wav",
-        }
+        horde_audio::bank::AMBIENCE_FILES[self.index()]
     }
 }
 
@@ -292,6 +287,36 @@ mod tests {
             lighting: lighting.into(),
             ..StageTheme::default()
         }
+    }
+    /// The offline loudness gate renders its reference scene on these beds:
+    /// the first stage of the country a new journey starts in, and the same
+    /// stage in rain. They must be what the game plays there.
+    #[test]
+    fn reference_weights_match_scene_ambience() {
+        let stage1 = horde_core::world::world()
+            .country("DEU")
+            .expect("the start country exists")
+            .stage_theme(0);
+        assert_eq!(
+            SceneAmbience::from_theme(Some(&stage1), Some(Mode::Personal)).weights,
+            horde_audio::render::REFERENCE_WEIGHTS,
+            "{stage1:?}"
+        );
+        let rain = StageTheme {
+            weather: "rain".into(),
+            ..stage1
+        };
+        assert_eq!(
+            SceneAmbience::from_theme(Some(&rain), Some(Mode::Personal)).weights,
+            horde_audio::render::RAIN_WEIGHTS
+        );
+        // The renderer reads the loops in channel order.
+        assert_eq!(
+            AmbienceChannel::ALL.map(AmbienceChannel::index),
+            [0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(AmbienceChannel::Rain.path(), "audio/ambient_rain.wav");
+        assert_eq!(horde_audio::bank::AMBIENCE_FILES.len(), CHANNEL_COUNT);
     }
     #[test]
     fn authored_scene_selects_layers_and_respects_clear_night() {
