@@ -11,7 +11,7 @@ use horde_core::command::Command;
 #[cfg(test)]
 pub(super) use horde_audio::events::event_sound;
 use horde_audio::{
-    events::event_sound_at,
+    events::{event_sound_at, root_event_sound},
     pan::{self, Places},
     render::fire_bed_x,
 };
@@ -452,8 +452,12 @@ pub(super) fn tick_sounds(
             }
         };
         if audible {
-            let width = root_width.filter(|_| record.battle == BattleId::Root);
-            event_sound_at(cues, places, &record.event, width);
+            if record.battle == BattleId::Root {
+                // The root defender's own shot also takes the player-weapon lane.
+                root_event_sound(cues, places, &record.event, root_width);
+            } else {
+                event_sound_at(cues, places, &record.event, None);
+            }
         }
     }
     let fire = match game.attempt() {

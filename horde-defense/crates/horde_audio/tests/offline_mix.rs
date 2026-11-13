@@ -98,7 +98,7 @@ fn pcm16_read_round_trips_write() {
 // ----- the v1 policy shim -----
 
 #[test]
-fn legacy_policy_starts_two_per_frame_and_rotates_only_on_frames_with_requests() {
+fn legacy_policy_starts_its_budget_per_frame_and_rotates_only_on_frames_with_requests() {
     let mut policy = LegacyPolicy::default();
     let requests = vec![Cue::Boss, Cue::Damage, Cue::Rifle];
     let first = policy.frame(requests.clone(), 0, false, &AUDIBLE, &[]);
@@ -107,7 +107,7 @@ fn legacy_policy_starts_two_per_frame_and_rotates_only_on_frames_with_requests()
         first.starts.iter().map(|s| s.cue).collect::<Vec<_>>(),
         select_sounds(requests, 0)
     );
-    assert_eq!(first.starts.len(), 2);
+    assert_eq!(first.starts.len(), 3);
     assert!(first.starts.iter().all(|start| start.variant == 0));
     assert_eq!(first.starts[0].gain, mix(Cue::Boss).level(false));
     assert_eq!(first.starts[0].priority, mix(Cue::Boss).priority);

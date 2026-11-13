@@ -91,9 +91,22 @@ pub const fn positional(cue: Cue) -> bool {
 /// The pan positions of one frame's requests: one per cue, because a frame
 /// requests each cue at most once. The first position a cue gets stands, as
 /// the first request does.
+///
+/// It also carries the frame's player-weapon lane: the cue of the root
+/// defender's own shot, which selection starts outside the bus budgets
+/// (`select::select_starts`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Places([Option<f32>; CUE_COUNT]);
+pub struct Places([Option<f32>; CUE_COUNT], Option<Cue>);
 impl Places {
+    /// Records that the root defender fired `cue` this frame. The first
+    /// shot stands.
+    pub fn mark_player_shot(&mut self, cue: Cue) {
+        self.1.get_or_insert(cue);
+    }
+    /// The cue of the root defender's own shot this frame, if he fired.
+    pub fn player_shot(&self) -> Option<Cue> {
+        self.1
+    }
     /// Places `cue` at pan position `p` unless it already has a place. A cue
     /// that is not [`positional`] stays centred.
     pub fn place(&mut self, cue: Cue, p: f32) {

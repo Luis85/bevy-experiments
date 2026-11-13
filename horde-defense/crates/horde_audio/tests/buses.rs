@@ -202,7 +202,7 @@ fn a_muted_bus_drops_its_cues_before_selection() {
     }
     .bus_gains();
     let mut policy = LegacyPolicy::default();
-    // Confirm (priority 3) and Damage (3) would take both slots from Kill.
+    // The muted Confirm starts nothing; the audible cues keep their starts.
     let requests = vec![Cue::Confirm, Cue::Damage, Cue::Kill];
     let actions = policy.frame(requests, 0, false, &ui_muted, &[]);
     assert_eq!(

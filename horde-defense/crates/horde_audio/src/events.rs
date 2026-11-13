@@ -20,6 +20,31 @@ pub fn push_cue(cues: &mut Vec<Cue>, cue: Cue) {
     }
 }
 
+/// The shot cue of a weapon class.
+pub const fn weapon_cue(weapon: WeaponClass) -> Cue {
+    match weapon {
+        WeaponClass::Pistol => Cue::Pistol,
+        WeaponClass::Smg => Cue::Smg,
+        WeaponClass::Shotgun => Cue::Shotgun,
+        WeaponClass::Rifle => Cue::Rifle,
+        WeaponClass::Marksman => Cue::Marksman,
+        WeaponClass::MachineGun => Cue::MachineGun,
+    }
+}
+
+/// The cue of a battle's own defender firing: `Some` for a `Shot` by
+/// `Actor::Defender`, in either mode. In the root battle that is the
+/// player-weapon lane's shot.
+pub fn defender_shot(event: &SimEvent) -> Option<Cue> {
+    match event {
+        SimEvent::Shot {
+            shooter: Actor::Defender { weapon, .. },
+            ..
+        } => Some(weapon_cue(*weapon)),
+        _ => None,
+    }
+}
+
 /// Queues the cues of one simulation event.
 pub fn event_sound(cues: &mut Vec<Cue>, event: &SimEvent) {
     if let SimEvent::Hit(strike)
@@ -54,14 +79,7 @@ pub fn event_sound(cues: &mut Vec<Cue>, event: &SimEvent) {
                 ..
             } => Some(Cue::TurretShot),
             // Either mode sounds like its weapon; NpcShot is retired.
-            Actor::Defender { weapon, .. } => Some(match weapon {
-                WeaponClass::Pistol => Cue::Pistol,
-                WeaponClass::Smg => Cue::Smg,
-                WeaponClass::Shotgun => Cue::Shotgun,
-                WeaponClass::Rifle => Cue::Rifle,
-                WeaponClass::Marksman => Cue::Marksman,
-                WeaponClass::MachineGun => Cue::MachineGun,
-            }),
+            Actor::Defender { weapon, .. } => Some(weapon_cue(weapon)),
             // A source that no longer exists has no reliable timbre.
             _ => None,
         },
@@ -139,5 +157,19 @@ pub fn event_sound_at(
         if let Some(x) = event_x(*cue, event) {
             places.place(*cue, pan::lane_position(x, width));
         }
+    }
+}
+
+/// [`event_sound_at`] for an event of the root battle: the root defender's
+/// own shot is also marked for the player-weapon lane.
+pub fn root_event_sound(
+    cues: &mut Vec<Cue>,
+    places: &mut Places,
+    event: &SimEvent,
+    width_yards: Option<f32>,
+) {
+    event_sound_at(cues, places, event, width_yards);
+    if let Some(shot) = defender_shot(event) {
+        places.mark_player_shot(shot);
     }
 }

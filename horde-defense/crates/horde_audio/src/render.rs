@@ -9,7 +9,7 @@
 //! What it models of the Bevy adapter:
 //!
 //! - **Effects.** [`LegacyPolicy`] is the v1 voice policy of `horde_game`'s
-//!   `SfxPlugin`: at most two starts per frame, a rotation that picks the
+//!   `SfxPlugin`: the per-bus start budgets and the player-weapon lane, a rotation that picks the
 //!   variant, [`MAX_EFFECT_VOICES`] voices, and a more important cue cutting
 //!   the least important voice at once. A voice plays its mono clip at
 //!   `bus gain x row gain`, where the bus gain is
@@ -28,11 +28,11 @@
 use crate::{
     bank::{AMBIENCE_FILES, variant_path},
     cue::Cue,
-    events::{event_sound_at, push_cue},
+    events::{push_cue, root_event_sound},
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, MAX_EFFECT_VOICES, mix},
     pan::{self, Places},
-    select::{CueGate, select_sounds},
+    select::{CueGate, select_starts},
     wav,
 };
 use horde_core::sim::{BattleId, Game, TICKS_PER_SECOND, smoke_input};
@@ -209,7 +209,7 @@ pub struct FrameActions {
 }
 
 /// The v1 voice policy as a frame-actions state machine: the decisions of
-/// `horde_game`'s `play_sounds`, on [`select_sounds`] and [`CueGate`].
+/// `horde_game`'s `play_sounds`, on [`select_starts`] and [`CueGate`].
 #[derive(Debug, Default)]
 pub struct LegacyPolicy {
     rotation: u64,
@@ -217,24 +217,42 @@ pub struct LegacyPolicy {
     next_voice: u64,
 }
 impl LegacyPolicy {
-    /// One frame. `cues` are the frame's requests, `bus_gains` is
+    /// One frame without a player shot: [`Self::frame_requests`].
+    pub fn frame(
+        &mut self,
+        cues: Vec<Cue>,
+        now_ms: u64,
+        reduced: bool,
+        bus_gains: &[f32; 5],
+        live: &[(u64, u8)],
+    ) -> FrameActions {
+        self.frame_requests(cues, None, now_ms, reduced, bus_gains, live)
+    }
+
+    /// One frame. `cues` are the frame's requests, `player_shot` the cue of
+    /// the root defender's own shot (the player-weapon lane), `bus_gains` is
     /// [`Sliders::bus_gains`], and `live` lists the sounding voices as
     /// `(voice, priority)`. A cue whose bus is muted is dropped before
     /// selection: it takes no start slot and leaves its cooldown untouched.
-    pub fn frame(
+    pub fn frame_requests(
         &mut self,
         mut cues: Vec<Cue>,
+        player_shot: Option<Cue>,
         now_ms: u64,
         reduced: bool,
         bus_gains: &[f32; 5],
         live: &[(u64, u8)],
     ) -> FrameActions {
         let rotation = self.rotation;
-        self.rotation = self.rotation.wrapping_add(u64::from(!cues.is_empty()));
+        self.rotation = self
+            .rotation
+            .wrapping_add(u64::from(!cues.is_empty() || player_shot.is_some()));
         let mut actions = FrameActions::default();
         cues.retain(|cue| audible(*cue, bus_gains));
+        let player_shot = player_shot.filter(|cue| audible(*cue, bus_gains));
         let mut live = live.to_vec();
-        for cue in select_sounds(cues, rotation) {
+        for start in select_starts(cues, player_shot, rotation) {
+            let cue = start.cue;
             let priority = mix(cue).priority;
             let replace = if live.len() >= MAX_EFFECT_VOICES {
                 let Some((index, (_, least))) = live
@@ -244,14 +262,14 @@ impl LegacyPolicy {
                 else {
                     continue;
                 };
-                if priority >= *least {
+                if !start.displaces(*least) {
                     continue;
                 }
                 Some(index)
             } else {
                 None
             };
-            if !self.gate.accept(cue, now_ms, reduced) {
+            if !self.gate.accept_start(start, now_ms, reduced) {
                 continue;
             }
             if let Some(index) = replace {
@@ -354,7 +372,14 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         voices.retain(|voice| voice.position < voice.clip.len());
         let live: Vec<(u64, u8)> = voices.iter().map(|v| (v.id, v.priority)).collect();
         let now_ms = index as u64 * 1000 / u64::from(TICKS_PER_SECOND);
-        let actions = policy.frame(frame.cues.clone(), now_ms, scene.reduced, &bus_gains, &live);
+        let actions = policy.frame_requests(
+            frame.cues.clone(),
+            frame.places.player_shot(),
+            now_ms,
+            scene.reduced,
+            &bus_gains,
+            &live,
+        );
         voices.retain(|voice| !actions.stops.contains(&voice.id));
         for start in actions.starts {
             voices.push(Voice {
@@ -423,7 +448,7 @@ pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
             let mut places = Places::default();
             for record in game.drain_events() {
                 if record.battle == BattleId::Root {
-                    event_sound_at(&mut cues, &mut places, &record.event, width);
+                    root_event_sound(&mut cues, &mut places, &record.event, width);
                 }
             }
             if let Some(attempt) = game.attempt()

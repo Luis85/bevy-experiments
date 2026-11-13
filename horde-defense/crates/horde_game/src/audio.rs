@@ -13,17 +13,25 @@ pub struct CueRequest {
     /// The lane pan position (`horde_audio::pan::lane_position`) of the event
     /// behind the cue; `None` is centred.
     pub place: Option<f32>,
+    /// The root defender's own shot: it starts on the reserved
+    /// player-weapon lane (`horde_audio::select::Lane::PlayerWeapon`).
+    pub player_weapon: bool,
 }
 impl CueRequest {
     /// A cue without a place: interface sounds, stingers, the defender.
     pub fn centred(cue: Cue) -> Self {
-        Self { cue, place: None }
+        Self {
+            cue,
+            place: None,
+            player_weapon: false,
+        }
     }
     /// A cue at its place in `places`, if it has one.
     pub fn placed(cue: Cue, places: &horde_audio::pan::Places) -> Self {
         Self {
             cue,
             place: places.of(cue),
+            player_weapon: places.player_shot() == Some(cue),
         }
     }
 }

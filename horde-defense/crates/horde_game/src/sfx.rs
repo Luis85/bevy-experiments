@@ -19,7 +19,7 @@ use horde_audio::{
     mix::{Sliders, mix},
     pan::{self, Places},
     render::audible,
-    select::select_sounds,
+    select::select_starts,
 };
 
 pub struct SfxPlugin;
@@ -147,11 +147,16 @@ fn play_sounds(
     let reduced = settings.reduced_effects;
     let now_ms = (time.elapsed_secs_f64() * 1000.0) as u64;
     let mut places = Places::default();
+    // The root defender's own shot, for the player-weapon lane.
+    let mut player_shot = None;
     let mut sounds: Vec<SoundCue> = cues
         .read()
         .map(|request| {
             if let Some(place) = request.place {
                 places.place(request.cue, place);
+            }
+            if request.player_weapon {
+                player_shot.get_or_insert(request.cue);
             }
             request.cue
         })
@@ -160,11 +165,13 @@ fn play_sounds(
     state.rotation = state.rotation.wrapping_add(u64::from(!sounds.is_empty()));
     // A cue on a muted bus takes no start slot and keeps its cooldown.
     sounds.retain(|cue| audible(*cue, &bus_gains));
+    let player_shot = player_shot.filter(|cue| audible(*cue, &bus_gains));
     let mut live: Vec<_> = voices
         .iter()
         .map(|(entity, voice)| (entity, voice.priority))
         .collect();
-    for cue in select_sounds(sounds, rotation) {
+    for start in select_starts(sounds, player_shot, rotation) {
+        let cue = start.cue;
         let replace = if live.len() >= MAX_EFFECT_VOICES {
             let Some((index, (_, priority))) = live
                 .iter()
@@ -173,14 +180,14 @@ fn play_sounds(
             else {
                 continue;
             };
-            if rank(cue) >= *priority {
+            if !start.displaces(*priority) {
                 continue;
             }
             Some(index)
         } else {
             None
         };
-        if !state.gate.accept(cue, now_ms, reduced) {
+        if !state.gate.accept_start(start, now_ms, reduced) {
             continue;
         }
         if let Some(index) = replace {
@@ -489,6 +496,7 @@ mod tests {
         CueRequest {
             cue,
             place: Some(1.0),
+            player_weapon: false,
         }
     }
 
@@ -614,5 +622,36 @@ mod tests {
         assert_eq!(clip.gains, entity.get::<EffectVoice>().unwrap().pan);
         assert_eq!(clip.source.bytes, wav.bytes);
         drop(handles);
+    }
+
+    /// The root defender's shot starts in a frame whose Effects budget is
+    /// full of critical cues; the same cue without the lane does not.
+    #[test]
+    fn player_weapon_request_starts_beside_a_full_effects_budget() {
+        let crowded = [SoundCue::Boss, SoundCue::Explosion, SoundCue::Structure];
+        for (player_weapon, expected) in [(true, 1), (false, 0)] {
+            let mut app = pan_app(Settings::default());
+            for cue in crowded {
+                app.world_mut().write_message(CueRequest::centred(cue));
+            }
+            app.world_mut().write_message(CueRequest {
+                player_weapon,
+                ..CueRequest::centred(SoundCue::Rifle)
+            });
+            app.update();
+            let mut voices = app.world_mut().query::<&EffectVoice>();
+            let started: Vec<SoundCue> = voices.iter(app.world()).map(|voice| voice.cue).collect();
+            for cue in crowded {
+                assert!(started.contains(&cue), "{cue:?} in {started:?}");
+            }
+            let rifles = started
+                .iter()
+                .filter(|cue| **cue == SoundCue::Rifle)
+                .count();
+            assert_eq!(
+                rifles, expected,
+                "player_weapon {player_weapon}: {started:?}"
+            );
+        }
     }
 }
