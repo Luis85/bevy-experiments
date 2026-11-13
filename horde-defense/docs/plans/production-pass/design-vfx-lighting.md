@@ -306,6 +306,14 @@ Usage rules:
 
 **Reduced:** no flash, no light, and one static 1-pt line in `tracer_rgb`.
 
+**As built (W5-03):**
+- `art/battlefield/weapon_fx.rs` holds the table above as `PISTOL_FX` .. `MACHINE_GUN_FX` and `TURRET_FX`; `weapon_fx(FxSource)` picks one and `paint_shot(painter, &WeaponFx, Shot { from, to, lane, age_ticks, volley, reduced })` is the only Shot painter (`fx::events` calls it; the W5-09 gallery uses the same call).
+- `FxView` gained `tick`, `seq`, `volley: Option<Volley { ordinal, first }>` and `source: Option<FxSource>`. The source travels on the event (`None` for a trap), so `FxOptions` did not need a `source` field. `FxView.ordnance` is left to W5-05, its only reader.
+- `battle_view::first_of_volley(a, index)` (no earlier Shot of the same tick and actor in the log) is shared by the view model and the casing sampler, so it does not depend on `Event.seq` (zero in hand-built logs). A turret volley has ordinal 0.
+- Flash polygons: 4 corners a kite, 5 a blunt wedge, 6 a long spike. The flash shrinks from full to half length over its life; alpha runs 230 to 0. Tracers fade linearly over `tracer_life_ticks`; the dim machine-gun tracer is at half of that alpha.
+- Reduced: one static 1-pt line per volley (a nine-pellet shell draws one line, to its first pellet's end point), full alpha for the tracer's life.
+- `light_radius` and `light_intensity` are table data only until W5-04 reads them.
+
 ## 6. Light, explosions, fire, hits, decals, wave 5
 
 **Light pools** (`art/battlefield/light.rs`):

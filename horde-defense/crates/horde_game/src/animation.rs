@@ -191,8 +191,8 @@ impl SceneAnimation {
         };
         sample_deaths(a, reduced, &mut frame);
         if !reduced {
-            for event in a.events.iter().rev().take(EVENT_BUDGET) {
-                sample_event_particles(a, event, &mut frame.particles);
+            for (index, event) in a.events.iter().enumerate().rev().take(EVENT_BUDGET) {
+                sample_event_particles(a, index, event, &mut frame.particles);
             }
             sample_weather(a, frame.weather, &mut frame.particles);
         }
@@ -612,7 +612,8 @@ fn push_particle(out: &mut Vec<Particle>, particle: Particle) {
         out.push(particle);
     }
 }
-fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
+/// `event` is `a.events[index]`.
+fn sample_event_particles(a: &Attempt, index: usize, event: &Event, out: &mut Vec<Particle>) {
     if event.tick > a.tick {
         return;
     }
@@ -650,6 +651,11 @@ fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
             }
             // Muzzle light is painted from the calibrated displayed gun transform,
             // rather than a guessed offset from the authoritative aim origin.
+            // One trigger pull ejects one casing pair, however many pellets
+            // its shell logged (W5-03).
+            if !crate::battle_view::first_of_volley(a, index) {
+                return;
+            }
             for n in 0..2 {
                 let random = noise(seed + n);
                 push_particle(
@@ -903,14 +909,16 @@ mod tests {
         let mut game = fixture();
         let mut cache = SceneCache::default();
         let a = game.attempt_mut().unwrap();
+        // One shooter per event: same-tick Shots of one actor are a single
+        // volley with one casing pair (W5-03) and would not fill the budget.
         a.events = (0..512)
-            .map(|_| Event {
+            .map(|n| Event {
                 kind: EventKind::Shot,
                 from: [0.5, 5.5],
                 to: [20., 4.5],
                 value: 0,
                 tick: a.tick,
-                actor_id: None,
+                actor_id: Some(1_000_000 + n),
                 target_id: Some(a.enemies[0].id),
                 lane: Some(4),
                 duration_ticks: 0,

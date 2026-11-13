@@ -7,9 +7,10 @@
 use super::super::{AMBER, ArenaProjection, MUTED, RED, TEXT, box_at, line};
 use super::batch::MeshBuilder;
 use super::cue::{self, CueBatch, Label};
+use super::weapon_fx;
 use crate::{
     animation::{Particle, ParticleKind},
-    battle_view::BattleViewModel,
+    battle_view::{BattleViewModel, Volley},
     visual_assets::{self, ArtTextures, PropMotion},
 };
 use bevy_egui::egui::{self, Align2, Color32 as C, Painter, Pos2, Rect, Stroke, Vec2, vec2};
@@ -227,7 +228,7 @@ pub(super) fn events(
                 }
             }
             EventKind::Shot
-                if age < 0.12
+                if e.source.is_some()
                     && !e.actor_id.is_some_and(|id| {
                         view.structure(id)
                             .is_some_and(|s| s.kind == StructureKind::Trap)
@@ -256,28 +257,20 @@ pub(super) fn events(
                             },
                         )
                 };
-                if !reduced && age < 0.065 {
-                    let direction = (arena.world(e.to[0], e.to[1]) - from).normalized();
-                    let side = vec2(-direction.y, direction.x);
-                    let length = sy * (0.12 + (1. - age / 0.065) * 0.12);
-                    p.add(egui::Shape::convex_polygon(
-                        vec![
-                            from - direction * 1.,
-                            from + side * length * 0.3,
-                            from + direction * length,
-                            from - side * length * 0.3,
-                        ],
-                        C::from_rgba_unmultiplied(248, 207, 117, ((1. - age / 0.065) * 230.) as u8),
-                        Stroke::NONE,
-                    ));
+                if let Some(source) = e.source {
+                    weapon_fx::paint_shot(
+                        p,
+                        weapon_fx::weapon_fx(source),
+                        weapon_fx::Shot {
+                            from,
+                            to: arena.world(e.to[0], e.to[1]),
+                            lane: sy,
+                            age_ticks: (age * 60.0).round() as u32,
+                            volley: e.volley.unwrap_or(Volley::SINGLE),
+                            reduced,
+                        },
+                    );
                 }
-                line(
-                    p,
-                    from,
-                    arena.world(e.to[0], e.to[1]),
-                    if reduced { 1.0 } else { 1.25 },
-                    AMBER.gamma_multiply(1.0 - age / 0.12),
-                );
             }
             EventKind::Hit
             | EventKind::WeakPoint

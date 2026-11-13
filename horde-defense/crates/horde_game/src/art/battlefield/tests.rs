@@ -991,6 +991,10 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         lane: Some(3),
         actor_id: None,
         target_id: None,
+        tick: 0,
+        seq: 0,
+        volley: Some(crate::battle_view::Volley::SINGLE),
+        source: Some(crate::art::FxSource::Turret),
     };
     let projection = ArenaProjection::for_attempt(arena(), a);
     let options = fx::FxOptions {
@@ -2428,6 +2432,10 @@ fn every_cue_view() -> (Game, BattleViewModel) {
         lane: Some(3),
         actor_id: None,
         target_id: None,
+        tick: 0,
+        seq: 0,
+        volley: Some(crate::battle_view::Volley::SINGLE),
+        source: Some(crate::art::FxSource::Turret),
     };
     view.fx = [
         EventKind::BossWarning,

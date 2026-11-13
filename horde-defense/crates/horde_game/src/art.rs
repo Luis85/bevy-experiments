@@ -11,6 +11,7 @@ mod tests;
 
 pub use backdrop::world_backdrop;
 use backdrop::{box_at, line, paint_ground};
+pub use battlefield::{FxSource, shooter_class};
 #[cfg(test)]
 pub(crate) use battlefield::reinforcements_anchor;
 pub(crate) use battlefield::{

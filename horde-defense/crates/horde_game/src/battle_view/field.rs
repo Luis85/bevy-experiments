@@ -1,6 +1,7 @@
 use super::interpolation::SceneBlend;
 use crate::{
     animation::{ActorPose, Appearance, DefenderPose, Particle, SceneAnimation, StructurePose},
+    art::{FxSource, shooter_class},
     visual_assets::enemy_visuals::{self, EnemySprite, EnemyVisualCatalog},
 };
 use horde_core::{
@@ -369,6 +370,103 @@ pub struct FxView {
     pub lane: Option<u8>,
     pub actor_id: Option<u64>,
     pub target_id: Option<u64>,
+    /// The event's tick and sequence number.
+    pub tick: u64,
+    pub seq: u64,
+    /// A Shot event's place in its trigger pull ([`Volley`]).
+    pub volley: Option<Volley>,
+    /// What fired a Shot event; `None` for a trap and for every other kind.
+    pub source: Option<FxSource>,
+}
+/// The trigger pull a Shot event belongs to (W5-03). The survivor's Shot
+/// events of one tick are one volley (a shell's pellets); a turret's are
+/// grouped by tick and structure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Volley {
+    /// The survivor's shot count at this trigger pull, 1-based:
+    /// `Attempt::shots` less the newer volleys in the log, so it stays the
+    /// same as the event log rolls. Always 0 for a turret.
+    pub ordinal: u32,
+    /// The volley's first event: the one that draws the flash, the light
+    /// and the casings.
+    pub first: bool,
+}
+impl Volley {
+    /// A lone shot outside any counted volley.
+    pub const SINGLE: Self = Self {
+        ordinal: 0,
+        first: true,
+    };
+}
+/// Whether `a.events[index]`, a Shot event, opens its volley: no earlier
+/// Shot of the same tick and actor is in the log.
+pub fn first_of_volley(a: &Attempt, index: usize) -> bool {
+    let Some(event) = a.events.get(index) else {
+        return true;
+    };
+    !a.events
+        .range(..index)
+        .rev()
+        .take_while(|other| other.tick == event.tick)
+        .any(|other| other.kind == EventKind::Shot && other.actor_id == event.actor_id)
+}
+/// What fired the Shot `event`: the survivor's deployed weapon class, a
+/// turret, or `None` for a trap's spring.
+fn shot_source(a: &Attempt, event: &Event) -> Option<FxSource> {
+    let Some(id) = event.actor_id else {
+        return Some(FxSource::Weapon(shooter_class(a)));
+    };
+    let trap = a
+        .structures
+        .iter()
+        .any(|s| s.id == id && s.kind == StructureKind::Trap);
+    (!trap).then_some(FxSource::Turret)
+}
+/// The events of `a` some painter can still draw (`art::fx_lifetime`), oldest
+/// first, each Shot with its volley and source.
+fn fx_views(a: &Attempt) -> Vec<FxView> {
+    let mut out = Vec::new();
+    // Survivor volleys newer than the event being read.
+    let mut newer = 0u32;
+    for (index, e) in a.events.iter().enumerate().rev() {
+        let age = a.tick.saturating_sub(e.tick) as f32 / 60.0;
+        if age > crate::art::fx_lifetime(e.kind) {
+            continue;
+        }
+        let shot = e.kind == EventKind::Shot;
+        let volley = shot.then(|| {
+            let first = first_of_volley(a, index);
+            let survivor = e.actor_id.is_none();
+            let ordinal = if survivor {
+                a.shots.saturating_sub(newer)
+            } else {
+                0
+            };
+            if survivor && first {
+                newer += 1;
+            }
+            Volley { ordinal, first }
+        });
+        out.push(FxView {
+            kind: e.kind,
+            age,
+            from: e.from,
+            to: {
+                let [dx, dy] = struck_stagger(a, e);
+                [e.to[0] + dx, e.to[1] + dy]
+            },
+            value: e.value,
+            lane: e.lane,
+            actor_id: e.actor_id,
+            target_id: e.target_id,
+            tick: e.tick,
+            seq: e.seq,
+            volley,
+            source: shot.then(|| shot_source(a, e)).flatten(),
+        });
+    }
+    out.reverse();
+    out
 }
 /// A phased boss holding after a transition (W2-37, ruling W-13): the
 /// visual twin of the `BossPhase` event. The painters draw the
@@ -554,27 +652,7 @@ impl BattleViewModel {
                         .clamp(0., 1.),
                 })
                 .collect(),
-            // Only events some painter can still draw (`art::fx_lifetime`).
-            fx: a
-                .events
-                .iter()
-                .filter(|e| {
-                    a.tick.saturating_sub(e.tick) as f32 / 60.0 <= crate::art::fx_lifetime(e.kind)
-                })
-                .map(|e| FxView {
-                    kind: e.kind,
-                    age: a.tick.saturating_sub(e.tick) as f32 / 60.0,
-                    from: e.from,
-                    to: {
-                        let [dx, dy] = struck_stagger(a, e);
-                        [e.to[0] + dx, e.to[1] + dy]
-                    },
-                    value: e.value,
-                    lane: e.lane,
-                    actor_id: e.actor_id,
-                    target_id: e.target_id,
-                })
-                .collect(),
+            fx: fx_views(a),
             particles: std::mem::take(&mut motion.particles),
             defender: DefenderView {
                 position: a.defender_position(),

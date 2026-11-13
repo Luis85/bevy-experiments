@@ -27,6 +27,7 @@ mod structures;
 pub(crate) use enemies::body_box as enemy_body_box;
 pub(crate) use structures::face as structure_face;
 pub mod terrain;
+mod weapon_fx;
 pub(crate) use enemies::HEALTH_BAR_LIFT;
 #[cfg(test)]
 pub(crate) use fx::reinforcements_anchor;
@@ -35,6 +36,7 @@ pub(crate) use fx::{OCCLUDER_GAP, fx_lifetime};
 pub(crate) use terrain::{
     MIDPOINT_LABEL, MIDPOINT_LABEL_MIN_WRAP, MIDPOINT_LABEL_SIZE, midpoint_label_place,
 };
+pub use weapon_fx::{FxSource, shooter_class};
 #[cfg(test)]
 mod tests;
 
