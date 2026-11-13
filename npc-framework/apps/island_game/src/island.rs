@@ -241,32 +241,7 @@ fn shipped_preset(_rules: Option<&Path>) -> island_content::worlds::WorldPreset 
 fn construction_from_preset(
     preset: island_content::worlds::WorldPreset,
 ) -> Result<ScenarioDoc, String> {
-    // The scenario's own island definition gives way to the chosen world's:
-    // the construction descriptor below is the one source of the island.
-    let mut doc = island_content::scenario::scenario_doc("living_world")?;
-    if let Some(world) = doc.world.as_object_mut() {
-        world.remove("living_world");
-    }
-    island_content::worlds::validate(&preset).map_err(|errors| errors.join("; "))?;
-    if !preset.colony {
-        return Err("Local island rules must enable the colony simulation.".into());
-    }
-    let Some(region) = &preset.living_world else {
-        return Err("This world has no living island (`living_world`) to build.".into());
-    };
-    doc.actors
-        .first_mut()
-        .ok_or("Island construction needs an arrival actor")?
-        .pos = Some((region.actor_start.x, region.actor_start.z));
-    island_content::construction::ExplorerContext::for_world(
-        "human",
-        "human",
-        &island_content::actors::human_preset(),
-        "living_world",
-        &preset,
-    )
-    .write_to(&mut doc)?;
-    Ok(doc)
+    island_content::construction::from_preset(&preset)
 }
 
 /// Restore `saved` into a fresh world of this build, after the

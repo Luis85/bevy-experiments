@@ -17,7 +17,7 @@ use serde_json::Value;
 
 /// The island's save version: bumped with every change to the living world's
 /// saved state. Saves made before the stamp existed have none.
-pub const ISLAND_SAVE_VERSION: u32 = 2;
+pub const ISLAND_SAVE_VERSION: u32 = 3;
 /// Header keys the stamp uses.
 pub const HEADER_VERSION: &str = "island_save_version";
 pub const HEADER_CONTENT: &str = "island_content_hash";

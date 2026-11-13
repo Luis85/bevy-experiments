@@ -2,7 +2,7 @@
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use island_content::{
-    TestbedIds,
+    IslandIds,
     village::{Villager, colony},
 };
 use npc_framework::kernel::hash::state_hash;
@@ -26,7 +26,7 @@ fn fixture(scenario: &str) -> (App, Entity, SimId, SimId) {
             .unwrap()
             .resting_until = 5000;
     }
-    let ids = app.world().resource::<TestbedIds>();
+    let ids = app.world().resource::<IslandIds>();
     let ada = ids.id("Ada");
     let rowan = ids.id("Rowan");
     let nell = ids.id("Nell");

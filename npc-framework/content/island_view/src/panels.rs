@@ -6,7 +6,7 @@
 use std::fmt::Write as _;
 
 use bevy::{color::palettes::css, prelude::*};
-use island_content::TestbedIds;
+use island_content::IslandIds;
 use island_content::world::kinds;
 use npc_framework::perception::{SenseKind, Sensor};
 use npc_framework::prelude::{
@@ -23,7 +23,7 @@ use crate::overlay::{label, metres, names};
 /// Which testbed panels are shown (F5 sheet, F6 perception). Insert it
 /// before the plugin to choose the initial state.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TestbedPanels {
+pub struct IslandPanels {
     pub sheet: bool,
     pub perception: bool,
     /// F7 diary and proposals (explorer mode only).
@@ -39,7 +39,7 @@ struct SheetText;
 struct PerceptionText;
 
 pub(crate) fn plugin(app: &mut App) {
-    app.init_resource::<TestbedPanels>()
+    app.init_resource::<IslandPanels>()
         .add_systems(Startup, spawn_panels)
         .add_systems(
             Update,
@@ -95,7 +95,7 @@ fn spawn_panels(mut commands: Commands) {
 
 pub(crate) fn toggle_panels(
     keys: Option<Res<ButtonInput<KeyCode>>>,
-    mut panels: ResMut<TestbedPanels>,
+    mut panels: ResMut<IslandPanels>,
 ) {
     if let Some(keys) = keys {
         if keys.just_pressed(KeyCode::F5) {
@@ -108,7 +108,7 @@ pub(crate) fn toggle_panels(
 }
 /// Presentation must synchronize even when the host gates gameplay input.
 fn sync_panel_presentation(
-    panels: Res<TestbedPanels>,
+    panels: Res<IslandPanels>,
     selected: Res<Selected>,
     gate: Option<Res<crate::FrontendGate>>,
     mut generic: Option<ResMut<PerceptionGizmos>>,
@@ -143,12 +143,12 @@ fn set_text(texts: &mut Query<&mut Text, impl bevy::ecs::query::QueryFilter>, s:
 
 #[allow(clippy::too_many_arguments)]
 fn sheet_text(
-    panels: Res<TestbedPanels>,
+    panels: Res<IslandPanels>,
     selected: Res<Selected>,
     index: Option<Res<SimIndex>>,
     rules: (Option<Res<RuleSet>>, Option<Res<RulesRegistry>>),
     progression: Option<Res<ProgressionConfig>>,
-    ids: Option<Res<TestbedIds>>,
+    ids: Option<Res<IslandIds>>,
     units: Query<(
         Option<&CharacterSheet>,
         Option<&Experience>,
@@ -256,12 +256,12 @@ fn dist_mm(a: SimPos, b: SimPos) -> i32 {
 
 #[allow(clippy::too_many_arguments)]
 fn perception_text(
-    panels: Res<TestbedPanels>,
+    panels: Res<IslandPanels>,
     selected: Res<Selected>,
     index: Option<Res<SimIndex>>,
     clock: Option<Res<SimClock>>,
     config: Option<Res<PerceptionConfig>>,
-    ids: Option<Res<TestbedIds>>,
+    ids: Option<Res<IslandIds>>,
     agents: Query<(
         &SimPos,
         Option<&Sensors>,
@@ -400,7 +400,7 @@ const ARC_SEGMENTS: usize = 20;
 
 #[allow(clippy::too_many_arguments)]
 fn perception_gizmos(
-    panels: Res<TestbedPanels>,
+    panels: Res<IslandPanels>,
     gate: Option<Res<crate::FrontendGate>>,
     selected: Res<Selected>,
     index: Option<Res<SimIndex>>,
@@ -513,7 +513,7 @@ mod frontend_tests {
     #[test]
     fn gated_title_synchronizes_default_gizmos_and_preserves_explicit_f6_intent() {
         let mut app = App::new();
-        app.init_resource::<TestbedPanels>()
+        app.init_resource::<IslandPanels>()
             .init_resource::<Selected>()
             .init_resource::<PerceptionGizmos>()
             .insert_resource(crate::FrontendGate(true))
@@ -526,7 +526,7 @@ mod frontend_tests {
             .add_systems(Update, sync_panel_presentation.in_set(ViewSystems::Sync));
         app.update();
         assert!(!app.world().resource::<PerceptionGizmos>().enabled);
-        app.world_mut().resource_mut::<TestbedPanels>().perception = true;
+        app.world_mut().resource_mut::<IslandPanels>().perception = true;
         app.update();
         assert!(
             !app.world().resource::<PerceptionGizmos>().enabled,
@@ -538,7 +538,7 @@ mod frontend_tests {
             app.world().resource::<PerceptionGizmos>().enabled,
             "the F6 setting survives returning to gameplay"
         );
-        app.world_mut().resource_mut::<TestbedPanels>().perception = false;
+        app.world_mut().resource_mut::<IslandPanels>().perception = false;
         app.update();
         assert!(!app.world().resource::<PerceptionGizmos>().enabled);
     }

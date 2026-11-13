@@ -2,7 +2,7 @@
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use island_content::{
-    TestbedIds,
+    IslandIds,
     village::{self, catalog, colony, economy, market, production},
 };
 use npc_framework::needs::{NeedRegistry, Needs};
@@ -10,7 +10,7 @@ use npc_framework::prelude::*;
 
 fn fixture() -> (App, SimId, Entity) {
     let mut app = island_content::new_sim_app(7, "living_world");
-    let builder = app.world().resource::<TestbedIds>().id("Jun");
+    let builder = app.world().resource::<IslandIds>().id("Jun");
     let actor = app.world().resource::<SimIndex>().get(builder).unwrap();
     let plot = village::homestead::plots(app.world())
         .into_iter()

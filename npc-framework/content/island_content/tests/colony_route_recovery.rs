@@ -8,10 +8,7 @@ use serde_json::json;
 use std::collections::BTreeMap;
 
 fn actor(app: &App, name: &str) -> Entity {
-    let id = app
-        .world()
-        .resource::<island_content::TestbedIds>()
-        .id(name);
+    let id = app.world().resource::<island_content::IslandIds>().id(name);
     app.world().resource::<SimIndex>().get(id).unwrap()
 }
 

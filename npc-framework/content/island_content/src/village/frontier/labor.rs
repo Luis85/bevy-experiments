@@ -386,9 +386,9 @@ pub fn spawn(world: &mut World) {
             if let Some(tool) = &trade.tool {
                 village::living::grant_tool(world, actor, tool);
             }
-            let ordinal = world.resource::<crate::TestbedIds>().units.len();
+            let ordinal = world.resource::<crate::IslandIds>().units.len();
             village::living::found_wearing_coat(world, actor, ordinal);
-            let mut ids = world.resource_mut::<crate::TestbedIds>();
+            let mut ids = world.resource_mut::<crate::IslandIds>();
             ids.name(name, id);
             ids.name(format!("{}.resident.{index}", definition.key), id);
             ids.units.push(id);
@@ -582,7 +582,7 @@ pub fn settle(world: &mut World, settlement: SimId, settler: &Settler) -> Result
             },
             village::resident::seed_traits(&traits, seed, id),
         ));
-    let mut ids = world.resource_mut::<crate::TestbedIds>();
+    let mut ids = world.resource_mut::<crate::IslandIds>();
     ids.name(key, id);
     ids.units.push(id);
     production::invalidate(world);

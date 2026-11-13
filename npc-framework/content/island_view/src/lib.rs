@@ -155,7 +155,7 @@ pub use npc_framework::view_helpers::{
     ScreenshotRequest, Selected, VisualIndex, VisualOf, save_screenshot, sim_to_world,
 };
 pub use overlay::OverlayState;
-pub use panels::TestbedPanels;
+pub use panels::IslandPanels;
 pub use visuals::{DOOR_SX, V};
 
 /// Install the same OS copy/cut/paste bridge used by the game's F7 fields
@@ -182,9 +182,9 @@ fn toggle_debug_panels(keys: Option<Res<ButtonInput<KeyCode>>>, mut panels: ResM
 
 /// Everything visual for the testbed (see the crate docs). Adds
 /// `NpcViewHelpersPlugin` and `CommandUiPlugin` when they are missing.
-pub struct TestbedViewPlugin;
+pub struct IslandViewPlugin;
 
-impl Plugin for TestbedViewPlugin {
+impl Plugin for IslandViewPlugin {
     fn build(&self, app: &mut App) {
         game_ui::install(app);
         app.init_resource::<FrontendGate>()
@@ -287,16 +287,15 @@ mod developer_key_tests {
         app.update();
     }
 
-    fn toggles(app: &App) -> [bool; 6] {
+    fn toggles(app: &App) -> [bool; 5] {
         let debug = app.world().resource::<DebugPanels>();
-        let panels = app.world().resource::<TestbedPanels>();
+        let panels = app.world().resource::<IslandPanels>();
         [
             app.world().resource::<OverlayState>().visible,
             debug.journal,
             debug.perf,
             panels.sheet,
             panels.perception,
-            app.world().resource::<FogOfWar>().enabled,
         ]
     }
 
@@ -305,8 +304,7 @@ mod developer_key_tests {
         let mut app = App::new();
         app.init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<DebugPanels>()
-            .init_resource::<TestbedPanels>()
-            .init_resource::<FogOfWar>()
+            .init_resource::<IslandPanels>()
             .insert_resource(OverlayState { visible: false })
             .add_systems(
                 Update,
@@ -314,19 +312,17 @@ mod developer_key_tests {
                     toggle_debug_panels.run_if(player_hud::developer_keys),
                     overlay::toggle_overlay,
                     panels::toggle_panels.run_if(player_hud::developer_keys),
-                    fog::toggle_fog.run_if(player_hud::developer_keys),
                 ),
             );
         app
     }
 
-    const KEYS: [KeyCode; 6] = [
+    const KEYS: [KeyCode; 5] = [
         KeyCode::F1,
         KeyCode::F3,
         KeyCode::F4,
         KeyCode::F5,
         KeyCode::F6,
-        KeyCode::F8,
     ];
 
     #[test]
@@ -335,7 +331,7 @@ mod developer_key_tests {
         let before = toggles(&app);
         app.insert_resource(PlayerExperience { enabled: true });
         press(&mut app, &KEYS);
-        assert_eq!(toggles(&app), before, "player session ignores F1, F3-F8");
+        assert_eq!(toggles(&app), before, "player session ignores F1, F3-F6");
 
         app.insert_resource(DeveloperKeys(true));
         press(&mut app, &KEYS);

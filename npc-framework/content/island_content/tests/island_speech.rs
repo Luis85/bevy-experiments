@@ -5,9 +5,7 @@ use npc_framework::kernel::journal::Journal;
 use npc_framework::prelude::*;
 
 fn id(app: &App, name: &str) -> SimId {
-    app.world()
-        .resource::<island_content::TestbedIds>()
-        .id(name)
+    app.world().resource::<island_content::IslandIds>().id(name)
 }
 fn entity(app: &App, id: SimId) -> bevy_ecs::entity::Entity {
     app.world().resource::<SimIndex>().get(id).unwrap()

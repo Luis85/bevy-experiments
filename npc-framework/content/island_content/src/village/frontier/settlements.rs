@@ -113,7 +113,7 @@ pub fn nearest(world: &World, at: SimPos) -> Option<SimId> {
         })
         .map(|(id, _)| id)
 }
-pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
+pub fn spawn(world: &mut World, ids: &mut crate::IslandIds) {
     let definitions = super::spec(world)
         .expect("living world")
         .settlements

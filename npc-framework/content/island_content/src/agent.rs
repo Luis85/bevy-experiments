@@ -13,20 +13,20 @@ use npc_framework::agent_io::{AgentCtx, AgentIoAppExt, Section};
 use npc_framework::prelude::*;
 use serde_json::json;
 
-use crate::world::TestbedUnit;
+use crate::world::IslandUnit;
 
 /// Registers the `testbed` and `walls` observation sections (add next to
 /// `AgentIoPlugin`; the scenario loader adds it).
-pub struct TestbedAgentPlugin;
+pub struct IslandAgentPlugin;
 
-impl Plugin for TestbedAgentPlugin {
+impl Plugin for IslandAgentPlugin {
     fn build(&self, app: &mut App) {
-        app.register_observation("testbed", testbed_section);
+        app.register_observation("unit", unit_section);
     }
 }
 
-fn testbed_section(world: &bevy_ecs::world::World, ctx: &AgentCtx) -> Option<Section> {
-    let unit = world.get::<TestbedUnit>(ctx.entity)?;
+fn unit_section(world: &bevy_ecs::world::World, ctx: &AgentCtx) -> Option<Section> {
+    let unit = world.get::<IslandUnit>(ctx.entity)?;
     let owner = world.get::<Owner>(ctx.entity).map(|o| o.0.0);
     let riding = world.get::<MountedIn>(ctx.entity).map(|m| m.vehicle);
     let value = json!({

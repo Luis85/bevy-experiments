@@ -170,8 +170,6 @@ pub(crate) enum ModelKind {
     TravellerWoman,
     FarmerMan,
     TravellerMan,
-    Rover,
-    Sentinel,
 }
 
 impl ModelKind {
@@ -206,7 +204,6 @@ impl ModelKind {
             ModelKind::TravellerWoman => "living/characters/TravellerWoman.glb",
             ModelKind::FarmerMan => "living/characters/FarmerMan.glb",
             ModelKind::TravellerMan => "living/characters/TravellerMan.glb",
-            ModelKind::Rover | ModelKind::Sentinel => return None,
         })
     }
 
@@ -223,14 +220,8 @@ impl ModelKind {
             "traveller_woman" => Self::TravellerWoman,
             "farmer_man" => Self::FarmerMan,
             "traveller_man" => Self::TravellerMan,
-            "rover" => Self::Rover,
-            "sentinel" => Self::Sentinel,
             _ => return None,
         })
-    }
-
-    pub fn is_robot(self) -> bool {
-        matches!(self, Self::Rover | Self::Sentinel)
     }
 
     pub fn civilian_rig(self) -> bool {
@@ -310,7 +301,6 @@ models! {
     wall = "testbed/dungeon/wall.gltf.glb",
     doorway = "testbed/dungeon/wall_doorway.glb",
     chest = "testbed/dungeon/chest.glb",
-    key = "testbed/dungeon/key.gltf.glb",
     food = "testbed/dungeon/plate_food_A.gltf.glb",
     ingot = "testbed/dungeon/coin_stack_small.gltf.glb",
     barrel = "testbed/dungeon/barrel_small.gltf.glb",
@@ -330,7 +320,6 @@ models! {
     hammer = "testbed/survival/tool-hammer.glb",
     log = "testbed/survival/tree-log.glb",
     planks = "testbed/survival/resource-planks.glb",
-    scroll = "testbed/survival/bedroll-packed.glb",
     ram = "testbed/castle/siege-ram.glb",
     cart = "testbed/town/cart.glb",
 }

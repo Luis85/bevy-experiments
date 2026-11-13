@@ -13,7 +13,7 @@
 use bevy::gltf::Gltf;
 use bevy::prelude::*;
 use bevy::world_serialization::WorldAsset;
-use island_view::TestbedViewPlugin;
+use island_view::IslandViewPlugin;
 use npc_framework::prelude::SimControl;
 use npc_framework::view_helpers::VisualIndex;
 
@@ -45,7 +45,7 @@ fn app() -> App {
             paused: true,
             ..default()
         })
-        .add_plugins(TestbedViewPlugin);
+        .add_plugins(IslandViewPlugin);
     })
     .expect("the shipped island builds")
 }

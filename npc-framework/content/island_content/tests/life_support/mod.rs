@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use island_content::TestbedIds;
+use island_content::IslandIds;
 use island_content::village::{
     self, CoinPurse, VillageState, Wallet, civic,
     frontier::{labor::ResidentProfile, settlements},
@@ -70,7 +70,7 @@ pub fn only_weather(world: &mut Value, kind: &str) {
 
 pub fn settlement(world: &World, key: &str) -> SimId {
     world
-        .resource::<TestbedIds>()
+        .resource::<IslandIds>()
         .id(&format!("settlement_{key}"))
 }
 

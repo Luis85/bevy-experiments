@@ -628,7 +628,7 @@ fn new_life(world: &mut World) -> Result<(), String> {
         npc_framework::perception::RevealsFog,
     ));
     // The alias is a snapshot-only host lookup. The new SimId is authoritative.
-    let mut ids = world.resource_mut::<crate::TestbedIds>();
+    let mut ids = world.resource_mut::<crate::IslandIds>();
     for assigned in ids.names.values_mut() {
         if *assigned == old.played {
             *assigned = id;

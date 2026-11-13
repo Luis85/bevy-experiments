@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use bevy::{color::palettes::css, prelude::*};
-use island_content::{Prop, TestbedIds, TestbedUnit};
+use island_content::{IslandIds, IslandUnit, Prop};
 use npc_framework::agent_io::ExternalController;
 use npc_framework::crafting::Crafting;
 use npc_framework::interaction::Interacting;
@@ -71,7 +71,7 @@ fn colony_diagnostics(
     gate: Option<Res<crate::FrontendGate>>,
     player: Option<Res<crate::PlayerExperience>>,
     mode: Option<Res<crate::IslandMode>>,
-    panels: Option<Res<crate::TestbedPanels>>,
+    panels: Option<Res<crate::IslandPanels>>,
     store: Option<ResMut<GizmoConfigStore>>,
 ) {
     let gated = gate.is_some_and(|gate| gate.0);
@@ -172,8 +172,8 @@ fn update_hash(world: &mut World) {
     }
 }
 
-/// `SimId` → testbed name (`TestbedIds`, reversed).
-pub(crate) fn names(ids: Option<&TestbedIds>) -> BTreeMap<SimId, String> {
+/// `SimId` → testbed name (`IslandIds`, reversed).
+pub(crate) fn names(ids: Option<&IslandIds>) -> BTreeMap<SimId, String> {
     ids.map(|ids| ids.names.iter().map(|(n, id)| (*id, n.clone())).collect())
         .unwrap_or_default()
 }
@@ -223,7 +223,7 @@ fn item_str(item: &Item) -> String {
 type UnitRow<'a> = (
     &'a SimId,
     &'a SimPos,
-    Option<&'a TestbedUnit>,
+    Option<&'a IslandUnit>,
     Option<&'a Owner>,
     (Option<&'a Brain>, Option<&'a BrainState>, Option<&'a Needs>),
     (
@@ -258,7 +258,7 @@ fn update_text(
         Option<Res<SimIndex>>,
         Option<Res<AiRegistry>>,
         Option<Res<NeedRegistry>>,
-        Option<Res<TestbedIds>>,
+        Option<Res<IslandIds>>,
     ),
     units: Query<UnitRow>,
     items: Query<&Item>,

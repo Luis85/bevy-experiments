@@ -1,5 +1,5 @@
 //! Visual entities for the testbed's sim entities. Each sim entity with a
-//! `Prop`, an `Item` or a `TestbedUnit` gets its own visual root carrying
+//! `Prop`, an `Item` or a `IslandUnit` gets its own visual root carrying
 //! `VisualOf(sim)`; nothing is ever inserted on the sim entity itself.
 //!
 //! Scale (`docs/_notes/testbed-assets-measured.md`): every model is brought
@@ -23,10 +23,8 @@
 use std::f32::consts::PI;
 
 use bevy::{prelude::*, world_serialization::WorldInstanceReady};
-use island_content::content::{
-    AXE, BOOK, BREAD, HAMMER, INGOT, LOG, ORE, PICKAXE, PLANK, SCROLL, STORE_KEY,
-};
-use island_content::{Prop, PropKind, TestbedUnit};
+use island_content::content::{AXE, BREAD, HAMMER, INGOT, LOG, ORE, PICKAXE, PLANK};
+use island_content::{IslandUnit, Prop, PropKind};
 use npc_framework::interaction::items::{MAIN_HAND, OFF_HAND};
 use npc_framework::perception::{SeenState, Sensors};
 use npc_framework::prelude::{
@@ -263,9 +261,9 @@ fn make_rings(
 }
 
 /// The body the played character wears: the adventurer Knight, which no
-/// resident wears, unless its preset names a body that is not a robot.
+/// resident wears, unless its preset names a body.
 pub(crate) fn player_kind(kind: ModelKind, played: bool, named: bool) -> ModelKind {
-    if played && (!named || kind.is_robot()) {
+    if played && !named {
         ModelKind::Knight
     } else {
         kind
@@ -306,11 +304,11 @@ fn spawn_visuals(
     mut index: ResMut<VisualIndex>,
     alive: Query<(), With<VisualOf>>,
     props: Query<(Entity, Option<&SimId>, &Prop, &SimPos, Option<&GridBlocker>)>,
-    items: Query<(Entity, &Item, Option<&SimPos>), (Without<Prop>, Without<TestbedUnit>)>,
+    items: Query<(Entity, &Item, Option<&SimPos>), (Without<Prop>, Without<IslandUnit>)>,
     actors: Query<
         (
             Entity,
-            &TestbedUnit,
+            &IslandUnit,
             &SimPos,
             Option<&Owner>,
             Option<&island_content::actors::ActorModel>,
@@ -555,10 +553,6 @@ fn spawn_visuals(
             Some(cast) if is_played && profile.is_none() => cast::player(cast, kind),
             _ => kind,
         };
-        // The island has no robot bodies.
-        if kind.is_robot() {
-            continue;
-        }
         let at = sim_to_world(*pos);
         let root = commands
             .spawn((
@@ -747,7 +741,7 @@ fn on_vehicle_ready(
 type VisualSimKinds = Or<(
     With<Prop>,
     With<Item>,
-    With<TestbedUnit>,
+    With<IslandUnit>,
     With<island_content::village::VillagePlace>,
     With<island_content::village::ResourcePatch>,
     With<island_content::village::colony::Household>,
@@ -1067,11 +1061,9 @@ impl ItemLook {
                 0.03,
                 Some((Quat::from_rotation_y(PI), Vec3::new(0.0, -0.18, 0.0))),
             ),
-            STORE_KEY => (|m| &m.key, 0.5, flat_x, 0.08, None),
-            BOOK | island_content::village::catalog::DIARY => {
+            island_content::village::catalog::DIARY => {
                 (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None)
             }
-            SCROLL => (|m| &m.scroll, 1.5 * V, upright, 0.0, None),
             BREAD | island_content::village::catalog::BOWL => {
                 (|m| &m.food, 0.5 * V, upright, 0.0, None)
             }
@@ -1201,16 +1193,13 @@ mod tests {
 
     #[test]
     fn the_played_character_wears_the_knight_unless_its_preset_names_a_body() {
-        use ModelKind::{Knight, Rogue, Rover, TravellerMan};
+        use ModelKind::{Knight, Rogue, TravellerMan};
         // Played, no named body: the Knight, whatever the faction default.
         assert_eq!(player_kind(Rogue, true, false), Knight);
-        // A robot preset is never kept for the played character.
-        assert_eq!(player_kind(Rover, true, true), Knight);
         // A preset that names a body keeps it.
         assert_eq!(player_kind(TravellerMan, true, true), TravellerMan);
-        // Nobody else changes, robots included.
+        // Nobody else changes.
         assert_eq!(player_kind(Rogue, false, false), Rogue);
-        assert_eq!(player_kind(Rover, false, true), Rover);
         assert!(
             (0..8)
                 .map(ModelKind::for_resident)
@@ -1274,7 +1263,6 @@ mod tests {
                 wall,
                 doorway,
                 chest,
-                key,
                 food,
                 ingot,
                 barrel,
@@ -1294,7 +1282,6 @@ mod tests {
                 hammer,
                 log,
                 planks,
-                scroll,
                 ram,
                 cart
             ),
@@ -1329,11 +1316,7 @@ mod tests {
         let grip = app
             .world_mut()
             .spawn((
-                Name::new(if kind.is_robot() {
-                    "robot right grip"
-                } else {
-                    "human hand bone"
-                }),
+                Name::new("human hand bone"),
                 ChildOf(root),
                 Transform::default(),
             ))
@@ -1408,8 +1391,8 @@ mod tests {
         assert!(app.world().get::<Selectable>(root).is_some());
     }
     #[test]
-    fn real_equipment_attaches_to_human_and_robot_grips() {
-        for kind in [ModelKind::Rogue, ModelKind::Rover] {
+    fn real_equipment_attaches_to_human_grips() {
+        for kind in [ModelKind::Rogue, ModelKind::FarmerMan] {
             let (mut app, holder, item, grip) = carried_fixture(kind);
             app.update();
             let root = item_root(&app, item);
@@ -1527,13 +1510,13 @@ mod tests {
 
     #[test]
     fn fog_cannot_reveal_own_inventory_or_hide_its_equipped_grip() {
-        let (mut app, holder, item, grip) = carried_fixture(ModelKind::Rover);
+        let (mut app, holder, item, grip) = carried_fixture(ModelKind::Rogue);
         let bounds = GridBounds::centered(8, 8);
         app.insert_resource(SpatialGrid::new(1000, bounds));
         app.insert_resource(crate::fog::FogOfWar { enabled: true });
         app.add_plugins(crate::fog::plugin);
         app.world_mut().entity_mut(holder).insert((
-            TestbedUnit {
+            IslandUnit {
                 template: "scout".into(),
                 behaviour: island_content::world::Behaviour::Idle,
                 speed_mm_per_tick: 70,
@@ -1618,9 +1601,7 @@ mod tests {
 
     #[test]
     fn every_item_kind_has_a_look() {
-        for kind in [
-            AXE, PICKAXE, HAMMER, LOG, PLANK, ORE, INGOT, BREAD, BOOK, SCROLL, STORE_KEY,
-        ] {
+        for kind in [AXE, PICKAXE, HAMMER, LOG, PLANK, ORE, INGOT, BREAD] {
             let look = ItemLook::of(kind);
             assert!(look.scale > 0.0, "{kind}");
             assert!(look.lying().translation.y >= 0.0, "{kind}");
@@ -1628,7 +1609,11 @@ mod tests {
         // Tools can be held; the rest is hidden while carried.
         assert!(ItemLook::of(AXE).held().is_some());
         assert!(ItemLook::of(PICKAXE).held().is_some());
-        assert!(ItemLook::of(BOOK).held().is_none());
+        assert!(
+            ItemLook::of(island_content::village::catalog::DIARY)
+                .held()
+                .is_none()
+        );
     }
 
     #[test]

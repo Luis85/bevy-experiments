@@ -11,13 +11,6 @@ use std::path::{Path, PathBuf};
 pub const BUILTIN_PRESETS: [(&str, &str); 1] =
     [("living_world", include_str!("../worlds/living_world.json"))];
 
-/// The rules the headless constructor builds a scenario's island from when no
-/// construction descriptor travels with it (tests, tools, replays); the
-/// scenario's own `world` block overrides the island profile. Not a
-/// selectable world. Replaced by the shipped construction in a later step
-/// (decision D2), which changes every island hash.
-pub const HEADLESS_BASE: &str = include_str!("../worlds/living_island.json");
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldPreset {

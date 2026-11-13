@@ -63,7 +63,7 @@ pub fn register(app: &mut App) {
         .register_command::<shape::PlacePlot>()
         .register_command::<shape::RemovePlot>();
 }
-pub fn spawn_places(world: &mut World, ids: &mut crate::TestbedIds) {
+pub fn spawn_places(world: &mut World, ids: &mut crate::IslandIds) {
     settlements::spawn(world, ids);
     terrain::spawn(world);
     ecology::spawn(world, ids);

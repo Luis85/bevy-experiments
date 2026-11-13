@@ -9,7 +9,7 @@ use bevy_ecs::prelude::*;
 use npc_framework::prelude::*;
 use serde_json::{Value, json};
 
-use crate::world::{TestbedIds, TestbedUnit};
+use crate::world::{IslandIds, IslandUnit};
 
 fn entity(world: &World, id: SimId) -> Option<Entity> {
     world.get_resource::<SimIndex>()?.get(id)
@@ -37,7 +37,7 @@ fn load(world: &World, holder: Entity) -> BTreeMap<String, u32> {
 
 /// The summary (see the module docs).
 pub fn summary_json(world: &World) -> Value {
-    let Some(ids) = world.get_resource::<TestbedIds>() else {
+    let Some(ids) = world.get_resource::<IslandIds>() else {
         return Value::Null;
     };
     let names: BTreeMap<SimId, &str> = ids.names.iter().map(|(n, &id)| (id, n.as_str())).collect();
@@ -52,7 +52,7 @@ pub fn summary_json(world: &World) -> Value {
         units.push(json!({
             "sim_id": id,
             "name": names.get(&id),
-            "template": world.get::<TestbedUnit>(e).map(|u| u.template.clone()),
+            "template": world.get::<IslandUnit>(e).map(|u| u.template.clone()),
             "owner": world.get::<Owner>(e).map(|o| o.0.0),
             "pos": [pos.x, pos.z],
             "level": exp.map(|x| x.level),

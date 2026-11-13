@@ -150,7 +150,7 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
         .register_sim_resource::<VillageState>()
         .register_command::<VillageAct>()
         .register_command::<PublishDiary>()
-        .register_verb_gate("testbed.world_rules", crate::world_runtime::verb_gate)
+        .register_verb_gate("island.world_rules", crate::world_runtime::verb_gate)
         .register_snapshot_component_named::<VillageSight>("island_base_sight")
         .register_observation("village", agent::observe)
         .register_affordances("village", agent::affordances)
@@ -245,7 +245,7 @@ pub const PLACES: [(Role, i32, i32, &str); 9] = [
     (Role::Smith, 12, -5, "Ivo's smithy"),
     (Role::Innkeeper, 2, -7, "The Lantern Inn"),
 ];
-pub fn spawn_places(world: &mut World, ids: &mut crate::TestbedIds) {
+pub fn spawn_places(world: &mut World, ids: &mut crate::IslandIds) {
     frontier::spawn_places(world, ids);
 }
 pub fn apply(world: &mut World, played: SimId) {
@@ -253,7 +253,7 @@ pub fn apply(world: &mut World, played: SimId) {
         return;
     }
     let alias = world
-        .resource::<crate::TestbedIds>()
+        .resource::<crate::IslandIds>()
         .names
         .iter()
         .find(|(_, id)| **id == played)

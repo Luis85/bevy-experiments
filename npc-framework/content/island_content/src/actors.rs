@@ -41,7 +41,7 @@ use npc_framework::prelude::{CharacterSheet, Commandable};
 use npc_framework::rules::{Attributes, Stat, with_rules};
 use serde::{Deserialize, Serialize};
 
-use crate::world::TestbedUnit;
+use crate::world::IslandUnit;
 
 /// The built-in presets `(id, JSON)`, by id.
 pub const BUILTIN_PRESETS: [(&str, &str); 1] = [("human", include_str!("../actors/human.json"))];
@@ -635,7 +635,7 @@ pub const ALLOWED_ACTIONS: &str = "allowed_actions";
 /// Snapshot name of [`ActorModel`].
 pub const ACTOR_MODEL: &str = "actor_model";
 /// Name of the verb gate ([`verb_gate`]).
-pub const ALLOWED_ACTIONS_GATE: &str = "testbed.allowed_actions";
+pub const ALLOWED_ACTIONS_GATE: &str = "island.allowed_actions";
 
 /// The presets a scenario's actors may name besides the built-ins, by id
 /// (the host inserts the one it chose before the world spawns). Not sim
@@ -660,7 +660,7 @@ pub fn resolve_preset(world: &World, id: &str) -> Option<ActorPreset> {
 }
 
 /// Gives `entity` preset `p` (validated by the caller): its sheet, speed
-/// (`TestbedUnit` and `Commandable`), carrying capacity (`Inventory`), its
+/// (`IslandUnit` and `Commandable`), carrying capacity (`Inventory`), its
 /// sensors ([`Sensors`]: vision, hearing, LIDAR, camera and radar, interest
 /// kept), its reach ([`ReachSense`]; none at 0), [`AllowedActions`] and
 /// [`ActorModel`]. A robot has no eyes or ears unless its preset lists
@@ -670,7 +670,7 @@ pub fn resolve_preset(world: &World, id: &str) -> Option<ActorPreset> {
 pub fn apply_preset(world: &mut World, entity: Entity, p: &ActorPreset) {
     let mut e = world.entity_mut(entity);
     e.insert(p.sheet.to_sheet());
-    if let Some(mut unit) = e.get_mut::<TestbedUnit>() {
+    if let Some(mut unit) = e.get_mut::<IslandUnit>() {
         unit.speed_mm_per_tick = p.speed_mm_per_tick;
     }
     if let Some(mut c) = e.get_mut::<Commandable>() {
@@ -743,9 +743,6 @@ pub fn verb_gate(world: &World, entity: Entity, verb: &str) -> Option<String> {
         .is_some()
         && crate::village::intrinsic_action(verb)
     {
-        return None;
-    }
-    if crate::world_runtime::intrinsic_recovery(world, entity, verb) {
         return None;
     }
     let allowed = world.get::<AllowedActions>(entity)?;

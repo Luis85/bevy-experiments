@@ -36,10 +36,10 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 
 use bevy::prelude::*;
-use island_content::TestbedIds;
+use island_content::IslandIds;
 use island_view::{
-    CameraFocusOnSelected, CameraStart, CommandUi, FogOfWar, RtsCamera, Selected, TestbedPanels,
-    TestbedViewPlugin,
+    CameraFocusOnSelected, CameraStart, CommandUi, IslandPanels, IslandViewPlugin, RtsCamera,
+    Selected,
 };
 use npc_framework::agent_io::scenario::{ScenarioDoc, attach_controllers};
 use npc_framework::kernel::journal::{Journal, JournalSink};
@@ -64,7 +64,7 @@ const USAGE: &str = "usage: island_game [--front-end] [--island-save FILE] [--is
        island_game (--scenario NAME|FILE | --island-save FILE [--island-new]) [--island-mode inspector|character|editor] \
 [--seed N] [--speed N] [--player N] [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] \
 [--screenshot PATH] [--after-secs S] [--panels journal,perf,sheet,perception] [--journal FILE] [--record FILE] [--paused] \
-[--perf-warn] [--mute] [--fog on|off] [remote flags]";
+[--perf-warn] [--mute] [remote flags]";
 
 #[cfg_attr(not(feature = "debug-tools"), allow(dead_code))]
 struct Args {
@@ -88,7 +88,7 @@ struct Args {
     screenshot: Option<PathBuf>,
     after_secs: f32,
     panels: DebugPanels,
-    testbed_panels: TestbedPanels,
+    panels_shown: IslandPanels,
     journal: Option<PathBuf>,
     record: Option<PathBuf>,
     paused: bool,
@@ -96,8 +96,6 @@ struct Args {
     perf_warn: bool,
     /// No island audio (also implied by `--screenshot` capture runs).
     mute: bool,
-    /// `--fog on|off` (`None`: on in explorer mode, off elsewhere).
-    fog: Option<bool>,
     remote: RemoteArgs,
 }
 
@@ -109,39 +107,20 @@ fn usage(msg: &str) -> ! {
     std::process::exit(2);
 }
 
-fn parse_panels(list: &str) -> (DebugPanels, TestbedPanels) {
-    let (mut debug, mut testbed) = (DebugPanels::default(), TestbedPanels::default());
+fn parse_panels(list: &str) -> (DebugPanels, IslandPanels) {
+    let (mut debug, mut panels) = (DebugPanels::default(), IslandPanels::default());
     for name in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
         match name {
             "journal" => debug.journal = true,
             "perf" => debug.perf = true,
-            "sheet" => testbed.sheet = true,
-            "perception" => testbed.perception = true,
-            "explorer" => testbed.explorer = true,
-            "map" => {
-                testbed.explorer = true;
-                testbed.map = true;
-            }
+            "sheet" => panels.sheet = true,
+            "perception" => panels.perception = true,
             other => usage(&format!(
-                "unknown panel `{other}` (expected journal, perf, sheet, perception, explorer, map)"
+                "unknown panel `{other}` (expected journal, perf, sheet, perception)"
             )),
         }
     }
-    (debug, testbed)
-}
-
-/// `--fog on|off`.
-fn parse_fog(value: &str) -> Option<bool> {
-    match value {
-        "on" => Some(true),
-        "off" => Some(false),
-        _ => None,
-    }
-}
-
-/// Fog of war in the window: `--fog`, else on in explorer mode only.
-fn fog_enabled(flag: Option<bool>, explorer: bool) -> bool {
-    flag.unwrap_or(explorer)
+    (debug, panels)
 }
 
 fn parse_camera(value: &str) -> Option<RtsCamera> {
@@ -185,13 +164,12 @@ fn parse_args(raw: &[String]) -> Args {
         screenshot: None,
         after_secs: 3.0,
         panels: DebugPanels::default(),
-        testbed_panels: TestbedPanels::default(),
+        panels_shown: IslandPanels::default(),
         journal: None,
         record: None,
         paused: false,
         perf_warn: false,
         mute: false,
-        fog: None,
         // BRP on in dev builds, off in release builds (and never without
         // `debug-tools`).
         remote: RemoteArgs::new(cfg!(debug_assertions) && cfg!(feature = "debug-tools")),
@@ -267,10 +245,9 @@ fn parse_args(raw: &[String]) -> Args {
             "--commands" => args.commands = Some(PathBuf::from(value)),
             "--screenshot" => args.screenshot = Some(PathBuf::from(value)),
             "--after-secs" => args.after_secs = value.parse().unwrap_or_else(|_| bad("a number")),
-            "--panels" => (args.panels, args.testbed_panels) = parse_panels(&value),
+            "--panels" => (args.panels, args.panels_shown) = parse_panels(&value),
             "--journal" => args.journal = Some(PathBuf::from(value)),
             "--record" => args.record = Some(PathBuf::from(value)),
-            "--fog" => args.fog = Some(parse_fog(&value).unwrap_or_else(|| bad("on or off"))),
             "--ui-gallery" => {
                 args.ui_gallery = Some(
                     island_view::game_ui::gallery::Page::parse(&value)
@@ -415,15 +392,12 @@ fn host(app: &mut App, args: &Args) {
             ..default()
         })
         .insert_resource(args.panels)
-        .insert_resource(args.testbed_panels)
+        .insert_resource(args.panels_shown)
         .insert_resource(CommandUi {
             player: PlayerId(args.player),
             ..default()
         })
-        .insert_resource(FogOfWar {
-            enabled: fog_enabled(args.fog, false),
-        })
-        .add_plugins(TestbedViewPlugin)
+        .add_plugins(IslandViewPlugin)
         .add_systems(
             Update,
             (speed_input, step_input).chain().in_set(ViewSystems::Input),
@@ -581,7 +555,7 @@ fn preselect(world: &mut World) {
     world.resource_mut::<Selected>().0 = ids.first().copied();
 }
 
-fn log_names(ids: Option<Res<TestbedIds>>, info: Option<Res<ScenarioInfo>>) {
+fn log_names(ids: Option<Res<IslandIds>>, info: Option<Res<ScenarioInfo>>) {
     let Some(ids) = ids else { return };
     let list: Vec<String> = ids
         .names
@@ -658,17 +632,6 @@ mod tests {
         assert_eq!(window_title(true), "Island Village");
         assert_eq!(window_title(false), "Island Village | NPC Framework");
     }
-
-    #[test]
-    fn fog_flag_defaults_to_explorer_mode() {
-        assert_eq!(parse_fog("on"), Some(true));
-        assert_eq!(parse_fog("off"), Some(false));
-        assert_eq!(parse_fog("yes"), None);
-        assert!(fog_enabled(None, true), "on in explorer mode");
-        assert!(!fog_enabled(None, false), "off elsewhere");
-        assert!(!fog_enabled(Some(false), true));
-        assert!(fog_enabled(Some(true), false));
-    }
 }
 
 #[cfg(feature = "debug-tools")]
@@ -733,15 +696,5 @@ mod debug_tools {
         if let Some(path) = &args.record {
             record_from_startup(app, "island_game", path.clone());
         }
-    }
-}
-
-#[cfg(test)]
-mod map_panel_tests {
-    #[test]
-    fn panels_map_opens_explorer_on_the_map_tab() {
-        let (debug, panels) = super::parse_panels("map");
-        assert!(panels.explorer && panels.map);
-        assert!(!panels.sheet && !panels.perception && !debug.journal && !debug.perf);
     }
 }

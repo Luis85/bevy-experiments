@@ -740,7 +740,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("npc-observer-entry-{}", std::process::id()));
         let path = dir.join("island.json");
         let host = |app: &mut App| {
-            app.add_plugins(island_view::TestbedViewPlugin);
+            app.add_plugins(island_view::IslandViewPlugin);
             install(app);
         };
         let mut app = session::open(&path, None, None, host).unwrap();
@@ -800,7 +800,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("npc-coherent-flow-{}", std::process::id()));
         let path = dir.join("island.json");
         let mut app = session::open(&path, None, None, |app| {
-            app.add_plugins(island_view::TestbedViewPlugin);
+            app.add_plugins(island_view::IslandViewPlugin);
             install(app);
         })
         .unwrap();
@@ -841,7 +841,7 @@ mod tests {
             std::env::temp_dir().join(format!("npc-flow-exit-failure-{}", std::process::id()));
         let path = dir.join("island.json");
         let mut app = session::open(&path, None, None, |app| {
-            app.add_plugins(island_view::TestbedViewPlugin);
+            app.add_plugins(island_view::IslandViewPlugin);
             install(app);
             app.init_resource::<Messages<AppExit>>();
         })
@@ -888,7 +888,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("npc-flow-work-{}", std::process::id()));
         let path = dir.join("island.json");
         let host = |app: &mut App| {
-            app.add_plugins(island_view::TestbedViewPlugin);
+            app.add_plugins(island_view::IslandViewPlugin);
             install(app);
         };
         let mut app = session::open(&path, None, None, host).unwrap();

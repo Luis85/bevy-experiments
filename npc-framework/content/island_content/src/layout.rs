@@ -11,8 +11,8 @@ use npc_framework::prelude::*;
 use npc_framework::rules::template_sheet;
 use serde::Deserialize;
 
-use crate::content::{AXE, BOOK, BREAD, HAMMER, LOG, ORE, PICKAXE, SCROLL, STORE_KEY};
-use crate::world::{Behaviour, Prop, PropKind, TestbedUnit, kinds};
+use crate::content::{AXE, BREAD, HAMMER, LOG, ORE, PICKAXE};
+use crate::world::{Behaviour, IslandUnit, Prop, PropKind, kinds};
 
 /// Grid size in cells (centred on the origin).
 pub const GRID_CELLS: u32 = 64;
@@ -34,20 +34,17 @@ pub const fn cell(x: i32, z: i32) -> SimPos {
 
 // ---------------------------------------------------------------- things
 
-/// An item lying at `pos` (a book or scroll also [`Teaches`](crate::content::teaches)).
+/// An item lying at `pos`.
 pub fn spawn_item(world: &mut World, kind: &str, stack: u32, quality: i32, pos: SimPos) -> SimId {
-    let (id, e) = spawn_sim(
+    spawn_sim(
         world,
         (
             pos,
             Item::new(kind).stack(stack).quality(quality),
             Perceivable::new(kinds::ITEM),
         ),
-    );
-    if let Some(t) = crate::content::teaches(kind) {
-        world.entity_mut(e).insert(t);
-    }
-    id
+    )
+    .0
 }
 
 // ---------------------------------------------------------------- actors
@@ -79,7 +76,7 @@ fn one() -> u32 {
 pub struct UnitSpec {
     /// Registered sheet template (required).
     pub template: String,
-    /// Name in [`TestbedIds`].
+    /// Name in [`IslandIds`].
     pub name: Option<String>,
     /// `PlayerId` that owns it (default 1).
     pub owner: Option<u32>,
@@ -121,9 +118,6 @@ fn carried_item(world: &mut World, holder: Entity, spec: &ItemSpec) -> Result<En
             Perceivable::new(kinds::ITEM),
         ),
     );
-    if let Some(t) = crate::content::teaches(&spec.kind) {
-        world.entity_mut(e).insert(t);
-    }
     put_in_inventory(world, holder, e);
     Ok(e)
 }
@@ -168,7 +162,7 @@ pub fn spawn_unit(world: &mut World, pos: SimPos, spec: &UnitSpec) -> Result<Sim
         world,
         (
             pos,
-            TestbedUnit {
+            IslandUnit {
                 template: spec.template.clone(),
                 behaviour: spec.behaviour,
                 speed_mm_per_tick: speed,
@@ -286,7 +280,7 @@ pub fn ascii_map(world: &World, x0: i32, x1: i32, z0: i32, z1: i32) -> String {
 
 fn symbol(world: &World, e: Entity) -> (u8, char) {
     if let Some(owner) = world.get::<Owner>(e)
-        && world.get::<TestbedUnit>(e).is_some()
+        && world.get::<IslandUnit>(e).is_some()
     {
         let digit = char::from_digit(owner.0.0 % 10, 10).unwrap_or('?');
         return (9, digit);
@@ -318,12 +312,9 @@ fn symbol(world: &World, e: Entity) -> (u8, char) {
     }
     if let Some(item) = world.get::<Item>(e) {
         let c = match item.kind.as_str() {
-            STORE_KEY => 'k',
             AXE => 'x',
             PICKAXE => 'p',
             HAMMER => 'h',
-            BOOK => 'b',
-            SCROLL => 's',
             BREAD => 'f',
             LOG => 'l',
             ORE => 'o',

@@ -15,7 +15,7 @@ use npc_framework::{kernel::hash::state_hash, prelude::*, snapshot};
 fn scene() -> App {
     let mut doc = island_content::scenario::scenario_doc("living_world").unwrap();
     let preset = island_content::worlds::builtin_preset("living_world").unwrap();
-    island_content::construction::ExplorerContext::for_world(
+    island_content::construction::Construction::for_world(
         "human",
         "human",
         &island_content::actors::human_preset(),

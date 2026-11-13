@@ -1,5 +1,5 @@
 //! Boundaries that must remain true when colony mechanics gain new callers.
-use island_content::TestbedIds;
+use island_content::IslandIds;
 use island_content::village::{colony, economy, homestead};
 use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::*;
@@ -7,7 +7,7 @@ use npc_framework::prelude::*;
 #[test]
 fn construction_queries_cannot_move_workers_or_reserve_their_materials() {
     let mut app = island_content::new_sim_app(7, "living_world");
-    let builder = app.world().resource::<TestbedIds>().id("Jun");
+    let builder = app.world().resource::<IslandIds>().id("Jun");
     let actor = app.world().resource::<SimIndex>().get(builder).unwrap();
     let (plot, estate) = homestead::plots(app.world())
         .into_iter()

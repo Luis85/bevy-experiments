@@ -116,7 +116,7 @@ pub(crate) fn open(
     let played = app.world().resource::<VillageState>().played;
     let reserved_names = app
         .world()
-        .resource::<island_content::TestbedIds>()
+        .resource::<island_content::IslandIds>()
         .names
         .iter()
         .filter(|(_, id)| **id != played)
@@ -183,7 +183,7 @@ fn named_construction(world: &World, base: ScenarioDoc, name: &str) -> Result<Sc
     actor.extra.insert("name".into(), name.trim().into());
     let context = doc
         .world
-        .get_mut("explorer_context")
+        .get_mut("construction")
         .and_then(serde_json::Value::as_object_mut)
         .ok_or("This island is missing its immutable character construction")?;
     context.insert("actor".into(), name.trim().into());
@@ -250,7 +250,7 @@ pub(crate) fn new_game_on(
         let taken = staged
             .app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .names
             .iter()
             .any(|(known, id)| *id != played && known.eq_ignore_ascii_case(name.trim()));
@@ -380,7 +380,7 @@ mod tests {
         assert_eq!(app.world().resource::<SimClock>().tick, 0);
         let saved = snapshot::read(&path).unwrap();
         assert_eq!(
-            saved.header["scenario"]["world"]["explorer_context"]["actor"],
+            saved.header["scenario"]["world"]["construction"]["actor"],
             "Zephyrine"
         );
         drop(app);
@@ -401,11 +401,11 @@ mod tests {
         // Fresh-game validation must not inherit those aliases, or forget a
         // reserved construction name if a later lookup was renamed.
         app.world_mut()
-            .resource_mut::<island_content::TestbedIds>()
+            .resource_mut::<island_content::IslandIds>()
             .names
             .insert("Former visitor".into(), SimId(played.0 + 1));
         app.world_mut()
-            .resource_mut::<island_content::TestbedIds>()
+            .resource_mut::<island_content::IslandIds>()
             .names
             .remove("Ada");
         assert!(name_problem(app.world(), "Former visitor").is_none());

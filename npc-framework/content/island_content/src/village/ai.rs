@@ -870,7 +870,7 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
     if let Some(mut c) = world.get_mut::<Commandable>(e) {
         c.speed_mm_per_tick = speed;
     }
-    if let Some(mut u) = world.get_mut::<crate::TestbedUnit>(e) {
+    if let Some(mut u) = world.get_mut::<crate::IslandUnit>(e) {
         u.speed_mm_per_tick = speed;
     }
     if let Some(mut intent) = world.get_mut::<MoveIntent>(e) {

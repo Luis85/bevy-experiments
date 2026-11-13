@@ -9,10 +9,7 @@ fn scene() -> App {
     island_content::new_sim_app(7, "living_world")
 }
 fn person(app: &App, name: &str) -> (SimId, Entity) {
-    let id = app
-        .world()
-        .resource::<island_content::TestbedIds>()
-        .id(name);
+    let id = app.world().resource::<island_content::IslandIds>().id(name);
     (id, app.world().resource::<SimIndex>().get(id).unwrap())
 }
 fn offer(actor: SimId, quantity: u32, minimum: Option<u32>) -> VillageAct {

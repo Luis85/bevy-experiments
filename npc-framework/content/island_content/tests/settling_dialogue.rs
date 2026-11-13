@@ -17,7 +17,7 @@ fn fixture(scenario: &str) -> (App, SimId, SimId) {
     }
     let resident = app
         .world()
-        .resource::<island_content::TestbedIds>()
+        .resource::<island_content::IslandIds>()
         .id("Ada");
     let actor = app.world().resource::<SimIndex>().get(visitor).unwrap();
     let target = app.world().resource::<SimIndex>().get(resident).unwrap();

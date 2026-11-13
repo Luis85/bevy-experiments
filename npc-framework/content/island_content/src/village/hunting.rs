@@ -74,7 +74,7 @@ fn next_day(world: &World) -> u64 {
 
 /// Must run after the original island actors, stock and new professions spawn.
 /// Appending here preserves every incumbent SimId.
-pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
+pub fn spawn(world: &mut World, ids: &mut crate::IslandIds) {
     let renew_at = next_day(world);
     for (kind, capacity, gather_ticks) in [(catalog::FIBER, 80, 120), (catalog::BERRIES, 80, 80)] {
         let pos = super::geography::for_world(world)

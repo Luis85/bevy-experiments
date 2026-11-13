@@ -146,7 +146,7 @@ fn home_heating_projects_real_fuel_and_automatic_upkeep_without_an_invented_acti
 #[test]
 fn watching_after_death_is_view_only_epoch_scoped_and_life_choices_remain_reachable() {
     let mut app = island_content::new_sim_app(7, "living_world");
-    app.add_plugins(crate::TestbedViewPlugin);
+    app.add_plugins(crate::IslandViewPlugin);
     app.world_mut()
         .insert_resource(PlayerExperience { enabled: true });
     let played = app

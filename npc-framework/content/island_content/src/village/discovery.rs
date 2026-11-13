@@ -139,7 +139,7 @@ mod tests {
                 .get(station)
                 .is_some()
         );
-        let neighbour = app.world().resource::<crate::TestbedIds>().id("Ada");
+        let neighbour = app.world().resource::<crate::IslandIds>().id("Ada");
         learn(&mut app, actor, neighbour, SimPos::new(123, 456));
         app.world_mut()
             .entity_mut(entity)
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(state_hash(restored.world_mut()), before);
         let ctx = observe::ctx(restored.world(), actor).unwrap();
         assert_eq!(position(restored.world(), &ctx, station), Some(at));
-        let other = restored.world().resource::<crate::TestbedIds>().id("Ada");
+        let other = restored.world().resource::<crate::IslandIds>().id("Ada");
         let other_ctx = observe::ctx(restored.world(), other).unwrap();
         assert_eq!(position(restored.world(), &other_ctx, station), None);
         let (fresh, _, _, _) = fixture("living_world");

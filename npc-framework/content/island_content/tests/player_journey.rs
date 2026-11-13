@@ -17,7 +17,7 @@ fn guidance_and_social_observations_are_pure_and_withhold_unknown_neighbors() {
     let actor = app.world().resource::<SimIndex>().get(me).unwrap();
     let ada = app
         .world()
-        .resource::<island_content::TestbedIds>()
+        .resource::<island_content::IslandIds>()
         .id("Ada");
     app.world_mut()
         .get_mut::<SocialLife>(actor)

@@ -626,9 +626,7 @@ fn place(app: &mut App, settlement: &str, building: &str) -> village::civic::Sit
     use npc_framework::kernel::commands::{SimCommand, submit};
     let (x, z, rotation) = {
         let world = app.world();
-        let settlement = world
-            .resource::<island_content::TestbedIds>()
-            .id(settlement);
+        let settlement = world.resource::<island_content::IslandIds>().id(settlement);
         let def = village::civic::definition(world, building).expect("definition");
         village::civic::find_site(world, def, settlement, 36).expect("a buildable spot")
     };

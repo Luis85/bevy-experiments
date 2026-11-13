@@ -159,7 +159,7 @@ pub fn validate_colony(world: &World) -> Result<(), String> {
         .get_resource::<VillageState>()
         .ok_or("Island state is missing")?;
     world
-        .get_resource::<crate::TestbedIds>()
+        .get_resource::<crate::IslandIds>()
         .ok_or("Island anchors are missing")?;
     let played = index
         .get(state.played)

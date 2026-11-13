@@ -53,7 +53,7 @@ use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use island_content::village::hunting::Wildlife;
-use island_content::{Prop, PropKind, TestbedUnit};
+use island_content::{IslandUnit, Prop, PropKind};
 use npc_framework::perception::{
     ExploredCells, PerceptionMemory, RevealsFog, SeenState, SeenStatics, VisibleCells,
 };
@@ -409,18 +409,13 @@ struct FogMask {
 #[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct FogSet;
 
-/// The fog: F8, the looks, the mask and the dimming.
+/// The fog: the looks, the mask and the dimming. The island never turns it
+/// on (no host flag, no key); it stays until a later cleanup removes it.
 pub(crate) fn plugin(app: &mut App) {
     app.init_resource::<FogOfWar>()
         .init_resource::<DimMaterials>()
         .init_resource::<DimPending>()
         .add_systems(Startup, spawn_mask)
-        .add_systems(
-            Update,
-            toggle_fog
-                .run_if(crate::player_hud::developer_keys)
-                .in_set(ViewSystems::Input),
-        )
         .add_systems(
             Update,
             decide_looks.in_set(FogSet).in_set(ViewSystems::Animate),
@@ -429,13 +424,6 @@ pub(crate) fn plugin(app: &mut App) {
             Update,
             (update_mask, apply_dim).in_set(ViewSystems::Present),
         );
-}
-
-/// F8 toggles fog.
-pub(crate) fn toggle_fog(keys: Option<Res<ButtonInput<KeyCode>>>, mut fog: ResMut<FogOfWar>) {
-    if keys.is_some_and(|k| k.just_pressed(KeyCode::F8)) {
-        fog.enabled = !fog.enabled;
-    }
 }
 
 /// The played actor's fog components: the `RevealsFog` actor with the
@@ -483,7 +471,7 @@ fn decide_looks(
     sims: Query<(
         &SimId,
         Option<&SimPos>,
-        Has<TestbedUnit>,
+        Has<IslandUnit>,
         Has<Wildlife>,
         Option<&Prop>,
         Has<Item>,

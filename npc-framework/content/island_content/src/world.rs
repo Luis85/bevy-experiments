@@ -1,6 +1,6 @@
-//! The testbed's own sim components: [`TestbedUnit`] on actors and [`Prop`]
+//! The testbed's own sim components: [`IslandUnit`] on actors and [`Prop`]
 //! on the compound's fixed things (walls, trees, workstations, vehicles), plus
-//! the perception kind bits and the non-hashed [`TestbedIds`] lookup.
+//! the perception kind bits and the non-hashed [`IslandIds`] lookup.
 //!
 //! Everything else on testbed entities is capability data (`Item`, `Door`,
 //! `ToolTarget`, `Workstation`, `Vehicle`, `CharacterSheet`, `Sensors`, ..),
@@ -61,19 +61,12 @@ pub enum Behaviour {
     /// Stands still (orders, driving and agents still work).
     #[default]
     Idle,
-    /// Walks to random free spots within `wander_radius_mm` of home.
-    Wander,
-    /// Works `ToolTarget`s it has the equipped tool for (chops trees with an
-    /// axe, mines ore with a pickaxe), else wanders.
-    Worker,
 }
 
 impl Behaviour {
     pub fn tag(self) -> u8 {
         match self {
             Behaviour::Idle => 0,
-            Behaviour::Wander => 1,
-            Behaviour::Worker => 2,
         }
     }
 
@@ -81,8 +74,6 @@ impl Behaviour {
     pub fn tree_name(self) -> &'static str {
         match self {
             Behaviour::Idle => crate::tree::TREE_IDLE,
-            Behaviour::Wander => crate::tree::TREE_WANDER,
-            Behaviour::Worker => crate::tree::TREE_WORKER,
         }
     }
 }
@@ -91,7 +82,7 @@ impl Behaviour {
 /// walking speed and the home spot it wanders around.
 #[derive(Component, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 #[reflect(Component)]
-pub struct TestbedUnit {
+pub struct IslandUnit {
     pub template: String,
     pub behaviour: Behaviour,
     pub speed_mm_per_tick: i32,
@@ -99,8 +90,8 @@ pub struct TestbedUnit {
     pub wander_radius_mm: i32,
 }
 
-impl SimHash for TestbedUnit {
-    const NAME: &'static str = "testbed_unit";
+impl SimHash for IslandUnit {
+    const NAME: &'static str = "island_unit";
     fn sim_hash(&self, h: &mut Fnv64) {
         h.str(&self.template);
         h.u8(self.behaviour.tag());
@@ -194,7 +185,7 @@ impl Prop {
 }
 
 impl SimHash for Prop {
-    const NAME: &'static str = "testbed_prop";
+    const NAME: &'static str = "island_prop";
     fn sim_hash(&self, h: &mut Fnv64) {
         h.u8(self.kind.tag());
         h.i32(self.yaw_deg);
@@ -206,13 +197,13 @@ impl SimHash for Prop {
 /// order. A lookup for tests, tools and the view; **not** hashed (it only
 /// mirrors spawn order).
 #[derive(Resource, Clone, Debug, Default, Serialize, Deserialize)]
-pub struct TestbedIds {
+pub struct IslandIds {
     pub names: BTreeMap<String, SimId>,
     /// Every actor, in the order of the scenario's `actors`.
     pub units: Vec<SimId>,
 }
 
-impl TestbedIds {
+impl IslandIds {
     /// The `SimId` named `name`.
     ///
     /// # Panics
@@ -245,41 +236,5 @@ pub fn kind_name(world: &World, entity: Entity) -> Option<&'static str> {
     if let Some(p) = world.get::<Prop>(entity) {
         return Some(p.kind.name());
     }
-    world.get::<TestbedUnit>(entity).map(|_| "actor")
-}
-
-/// The testbed's fog-of-war statics (plan Task 9, spec G8): doors with
-/// their open state, trees felled or standing, ore rocks, workstations,
-/// items and chests ([`kinds::FOG_STATICS`]), and the wall runs (their
-/// `GridOccluder`, as [`kinds::WALL`]).
-pub fn fog_statics() -> npc_framework::perception::FogStatics {
-    npc_framework::perception::FogStatics {
-        kinds: kinds::FOG_STATICS,
-        occluder_kind: kinds::WALL,
-        open: Some(door_open),
-        felled: Some(tree_felled),
-    }
-}
-
-/// The testbed's LIDAR obstacles (plan Task 12 fix round 1):
-/// [`kinds::LIDAR_OBSTACLES`].
-pub fn lidar_obstacles() -> npc_framework::perception::LidarObstacles {
-    npc_framework::perception::LidarObstacles {
-        kinds: kinds::LIDAR_OBSTACLES,
-    }
-}
-
-/// A door's open state (`None` for anything else).
-fn door_open(e: EntityRef) -> Option<bool> {
-    e.get::<npc_framework::interaction::Door>().map(|d| d.open)
-}
-
-/// Whether a tree is felled (its `ToolTarget` used up: the view shows a
-/// stump); `None` for anything but a tree.
-fn tree_felled(e: EntityRef) -> Option<bool> {
-    if e.get::<Prop>()?.kind != PropKind::Tree {
-        return None;
-    }
-    e.get::<npc_framework::interaction::ToolTarget>()
-        .map(npc_framework::interaction::ToolTarget::depleted)
+    world.get::<IslandUnit>(entity).map(|_| "actor")
 }

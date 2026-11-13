@@ -7,7 +7,7 @@
 //! live tests let the residents do everything themselves.
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use island_content::TestbedIds;
+use island_content::IslandIds;
 use island_content::village::{
     self, CoinPurse, VillageAct, VillageState, Villager, Wallet, civic, colony, economy,
     frontier::{
@@ -83,7 +83,7 @@ fn test_buildings(world: &mut Value) {
 
 fn settlement(world: &World, key: &str) -> SimId {
     world
-        .resource::<TestbedIds>()
+        .resource::<IslandIds>()
         .id(&format!("settlement_{key}"))
 }
 
@@ -467,7 +467,7 @@ fn placement_is_validated_rule_by_rule_with_a_reason() {
         0,
         "the footprint covers an entrance or a public place",
     );
-    let patch = app.world().resource::<TestbedIds>().id("harbour_patch_log");
+    let patch = app.world().resource::<IslandIds>().id("harbour_patch_log");
     let patch = *app
         .world()
         .get::<SimPos>(entity(app.world(), patch))

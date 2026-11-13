@@ -11,10 +11,7 @@ fn scene() -> App {
     island_content::new_sim_app(7, "living_world")
 }
 fn actor(app: &App, name: &str) -> Entity {
-    let id = app
-        .world()
-        .resource::<island_content::TestbedIds>()
-        .id(name);
+    let id = app.world().resource::<island_content::IslandIds>().id(name);
     app.world().resource::<SimIndex>().get(id).unwrap()
 }
 fn residents(app: &App) -> Vec<Entity> {

@@ -738,7 +738,7 @@ mod tests {
         restore(&mut app, target, "plant_tree");
         let other = app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .id("Ada");
         let other_entity = app.world().resource::<SimIndex>().get(other).unwrap();
         // Retain the foreign events in the shared buffer so this verifies the
@@ -861,7 +861,7 @@ mod tests {
         use island_content::village::{VillageAct, Wallet};
         let buyer = app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .id("Jun");
         let buyer_entity = app.world().resource::<SimIndex>().get(buyer).unwrap();
         let at = *app.world().get::<SimPos>(who.entity).unwrap();
@@ -918,7 +918,7 @@ mod tests {
         let coins = resident_buys_log(&mut app, who);
         let other = app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .id("Ada");
         journal::record_effect(
             app.world_mut(),
@@ -982,7 +982,7 @@ mod tests {
         gather(&mut app, source);
         let other = app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .id("Ada");
         journal::record_effect(
             app.world_mut(),
@@ -1040,7 +1040,7 @@ mod tests {
         track(app.world_mut(), who, None, &response, seq);
         let other = app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .id("Ada");
         for (unit, handle) in [(who.id, 122), (other, 123)] {
             journal::record(app.world_mut(), Some(unit), || {

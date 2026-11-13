@@ -1,7 +1,7 @@
 //! Colony policies, physical social contacts and safe replayable terraforming.
 use bevy_app::App;
 use island_content::{
-    TestbedIds,
+    IslandIds,
     village::{
         self, VillageState, Vitality,
         colony::{self, AwaitingArrival, ColonyAct, ColonyState, JoinIsland, SocialLife},
@@ -20,7 +20,7 @@ fn visitor(app: &App) -> (SimId, bevy_ecs::entity::Entity) {
 #[test]
 fn social_relationships_require_real_proximity_and_obey_gathering_policy() {
     let mut app = scene();
-    let ids = app.world().resource::<TestbedIds>();
+    let ids = app.world().resource::<IslandIds>();
     let ada = ids.id("Ada");
     let rowan = ids.id("Rowan");
     let a = app.world().resource::<SimIndex>().get(ada).unwrap();

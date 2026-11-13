@@ -90,7 +90,6 @@ pub(crate) fn player_body_override() -> Option<ModelKind> {
         std::env::var("ISLAND_VIEW_PLAYER_BODY")
             .ok()
             .and_then(|name| ModelKind::from_name(name.trim()))
-            .filter(|kind| !kind.is_robot())
     })
 }
 
@@ -319,7 +318,7 @@ mod tests {
         let mut looks = std::collections::BTreeSet::new();
         for id in 1..400 {
             let (kind, outfit) = resident(Cast::Adventurers, id, (id % 8) as u8);
-            assert!(!kind.civilian_rig() && kind != ModelKind::Knight && !kind.is_robot());
+            assert!(!kind.civilian_rig() && kind != ModelKind::Knight);
             assert_eq!(resident(Cast::Adventurers, id, 0), (kind, outfit));
             let outfit = outfit.expect("an adventurer has an outfit");
             bodies.insert(kind.index());

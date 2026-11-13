@@ -2,7 +2,7 @@
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use island_content::{
-    TestbedIds,
+    IslandIds,
     village::{
         self, Role, Villager, Wallet, catalog, economy,
         frontier::{
@@ -18,7 +18,7 @@ fn scene() -> App {
     island_content::new_sim_app(7, "living_world")
 }
 fn person(app: &App, name: &str) -> Entity {
-    let id = app.world().resource::<TestbedIds>().id(name);
+    let id = app.world().resource::<IslandIds>().id(name);
     app.world().resource::<SimIndex>().get(id).unwrap()
 }
 fn workplace(app: &App, actor: Entity, role: Role) -> SimId {

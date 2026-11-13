@@ -1,6 +1,6 @@
 use super::model::{self, Card, CardBody, Ghost, Group, PaletteItem, Shelf, SiteRow, Stage, Tint};
 use super::*;
-use island_content::TestbedIds;
+use island_content::IslandIds;
 use island_content::village::frontier::building_spec::{BuildingDef, BuildingKind};
 use npc_framework::kernel::hash::state_hash;
 use npc_framework::kernel::journal::{record_effect, set_journal};
@@ -839,7 +839,7 @@ fn fixture() -> App {
 /// A spot the simulation accepts for `building` near the Harbour.
 fn spot(app: &App, building: &str) -> (i32, i32, u8) {
     let world = app.world();
-    let settlement = world.resource::<TestbedIds>().id("settlement_harbour");
+    let settlement = world.resource::<IslandIds>().id("settlement_harbour");
     let def = civic::definition(world, building).expect("definition");
     civic::find_site(world, def, settlement, 36).expect("a buildable spot")
 }
@@ -1170,10 +1170,7 @@ fn clicking_a_building_opens_its_card_and_a_founding_home_has_one_too() {
 #[test]
 fn planner_decisions_are_logged_from_the_journal_with_names() {
     let mut app = fixture();
-    let settlement = app
-        .world()
-        .resource::<TestbedIds>()
-        .id("settlement_harbour");
+    let settlement = app.world().resource::<IslandIds>().id("settlement_harbour");
     record_effect(
         app.world_mut(),
         None,

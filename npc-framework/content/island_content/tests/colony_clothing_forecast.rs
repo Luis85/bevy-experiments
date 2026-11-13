@@ -7,10 +7,7 @@ use npc_framework::interaction::items;
 use npc_framework::prelude::*;
 
 fn actor(app: &App, name: &str) -> Entity {
-    let id = app
-        .world()
-        .resource::<island_content::TestbedIds>()
-        .id(name);
+    let id = app.world().resource::<island_content::IslandIds>().id(name);
     app.world().resource::<SimIndex>().get(id).unwrap()
 }
 fn give_coat(app: &mut App, person: Entity, durability: u32, equip: bool) -> Entity {

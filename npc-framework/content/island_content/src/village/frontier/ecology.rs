@@ -96,7 +96,7 @@ pub fn register(app: &mut App) {
     app.register_sim_component::<EcologicalPatch>()
         .register_sim_component::<HabitatEcology>();
 }
-pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
+pub fn spawn(world: &mut World, ids: &mut crate::IslandIds) {
     let day = world.resource::<SimConfig>().day_length.max(1);
     let grid = world.resource::<SpatialGrid>();
     let blocked: BTreeSet<_> = world

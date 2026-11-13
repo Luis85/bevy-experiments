@@ -830,7 +830,7 @@ mod tests {
             .unwrap();
         let carpenter = app
             .world()
-            .resource::<island_content::TestbedIds>()
+            .resource::<island_content::IslandIds>()
             .id("Jun");
         submit(
             app.world_mut(),

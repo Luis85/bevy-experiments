@@ -583,7 +583,7 @@ fn choosing_a_roster_row_opens_the_inspector_where_job_and_home_are_arranged() {
 fn buildable(app: &App, building: &str) -> (i32, i32, u8) {
     let world = app.world();
     let settlement = world
-        .resource::<island_content::TestbedIds>()
+        .resource::<island_content::IslandIds>()
         .id("settlement_harbour");
     let def = village::civic::definition(world, building).expect("definition");
     village::civic::find_site(world, def, settlement, 36).expect("a buildable spot")

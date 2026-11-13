@@ -1,6 +1,9 @@
-//! Pure explorer construction data carried by a generated scenario. No
-//! credentials or filesystem paths: the ordinary content loader can replay
-//! the same world without an explorer host or its agent folder.
+//! The island's construction: the immutable descriptor a scenario carries
+//! (`world.construction`) that names the played actor, its preset, its
+//! perception memory and the chosen world preset. No credentials or
+//! filesystem paths: the ordinary content loader rebuilds the same world from
+//! it. [`shipped`] is the one island the game, the headless constructor and
+//! the replay factory all build (decision D2).
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use npc_framework::agent_io::scenario::ScenarioDoc;
@@ -8,14 +11,14 @@ use npc_framework::perception::{Perceivable, PerceptionConfig, ReachSense, Revea
 use npc_framework::prelude::SimIndex;
 use serde::{Deserialize, Serialize};
 
-use crate::TestbedIds;
+use crate::IslandIds;
 use crate::actors::ActorPreset;
 use crate::world::{Prop, PropKind, kinds};
 use crate::worlds::WorldPreset;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ExplorerContext {
+pub struct Construction {
     pub actor: String,
     pub preset_id: String,
     pub preset: ActorPreset,
@@ -53,7 +56,7 @@ impl MemoryConfig {
     }
 }
 
-impl ExplorerContext {
+impl Construction {
     pub fn new(
         actor: &str,
         preset_id: &str,
@@ -109,17 +112,17 @@ impl ExplorerContext {
         let world = doc
             .world
             .as_object_mut()
-            .ok_or("explorer scenario world must be an object")?;
+            .ok_or("the scenario world must be an object")?;
         world.insert(
-            "explorer_context".into(),
-            serde_json::to_value(self).map_err(|e| format!("explorer context: {e}"))?,
+            "construction".into(),
+            serde_json::to_value(self).map_err(|e| format!("construction: {e}"))?,
         );
         Ok(())
     }
 
     pub fn apply(&self, app: &mut App) -> Result<(), String> {
         if self.memory.stagger == 0 || self.memory.memory_capacity == 0 {
-            return Err("explorer context memory requires a positive stagger and capacity".into());
+            return Err("the construction memory requires a positive stagger and capacity".into());
         }
         app.insert_resource(self.memory.to_config());
         if let Some(world) = &self.world {
@@ -137,6 +140,39 @@ impl ExplorerContext {
     }
 }
 
+/// The construction of world `preset`: the embedded `living_world` scenario
+/// (layout, actor) with the descriptor of `preset` written in. A world without
+/// a living island (`living_world`) or without the colony is refused.
+pub fn from_preset(preset: &WorldPreset) -> Result<ScenarioDoc, String> {
+    let mut doc = crate::scenario::scenario_doc("living_world")?;
+    crate::worlds::validate(preset).map_err(|errors| errors.join("; "))?;
+    if !preset.colony {
+        return Err("Local island rules must enable the colony simulation.".into());
+    }
+    let Some(region) = &preset.living_world else {
+        return Err("This world has no living island (`living_world`) to build.".into());
+    };
+    doc.actors
+        .first_mut()
+        .ok_or("Island construction needs an arrival actor")?
+        .pos = Some((region.actor_start.x, region.actor_start.z));
+    Construction::for_world(
+        "human",
+        "human",
+        &crate::actors::human_preset(),
+        "living_world",
+        preset,
+    )
+    .write_to(&mut doc)?;
+    Ok(doc)
+}
+
+/// The shipped island: [`from_preset`] of the built-in `living_world` world.
+pub fn shipped() -> ScenarioDoc {
+    let preset = crate::worlds::builtin_preset("living_world").expect("the shipped world parses");
+    from_preset(&preset).expect("the shipped world builds")
+}
+
 /// Idempotent world setup shared by host resume and explicit scenario data.
 pub fn apply_senses(
     app: &mut App,
@@ -147,7 +183,7 @@ pub fn apply_senses(
 ) -> Result<(), String> {
     let world = app.world_mut();
     let entity = world
-        .get_resource::<TestbedIds>()
+        .get_resource::<IslandIds>()
         .and_then(|ids| ids.get(actor))
         .and_then(|id| world.resource::<SimIndex>().get(id))
         .ok_or_else(|| format!("the explorer world has no actor named `{actor}`"))?;

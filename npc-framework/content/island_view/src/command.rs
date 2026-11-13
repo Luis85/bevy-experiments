@@ -6,7 +6,7 @@
 //! recorded `IssueOrder` commands.
 
 use bevy::prelude::*;
-use island_content::TestbedUnit;
+use island_content::IslandUnit;
 use npc_framework::interaction::builtin::USE_TOOL_ON;
 use npc_framework::prelude::{
     Formation, FormationKind, IssueOrder, MountedIn, PlayerId, SimId, SimIndex, ToolTarget,
@@ -113,7 +113,7 @@ fn inspect_target(
     sims: Option<Res<SimIndex>>,
     sel: Res<CommandSelection>,
     mut selected: ResMut<Selected>,
-    inspectable: Query<(), Or<(With<TestbedUnit>, With<Vehicle>)>>,
+    inspectable: Query<(), Or<(With<IslandUnit>, With<Vehicle>)>>,
 ) {
     let Some(id) = selected.0 else { return };
     let ok = sims

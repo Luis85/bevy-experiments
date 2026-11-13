@@ -138,7 +138,7 @@ pub fn spawn(world: &mut World) {
         if role == Role::Tanner {
             economy::grant(world, actor, Item::new(catalog::BOWL));
         }
-        let mut ids = world.resource_mut::<crate::TestbedIds>();
+        let mut ids = world.resource_mut::<crate::IslandIds>();
         ids.name(format!("village_{}", role.tag()), station);
         ids.name(role.person(), id);
         ids.units.push(id);

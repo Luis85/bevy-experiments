@@ -10,10 +10,7 @@ fn scene() -> App {
 }
 
 fn person(app: &App, name: &str) -> (SimId, Entity) {
-    let id = app
-        .world()
-        .resource::<island_content::TestbedIds>()
-        .id(name);
+    let id = app.world().resource::<island_content::IslandIds>().id(name);
     (id, app.world().resource::<SimIndex>().get(id).unwrap())
 }
 

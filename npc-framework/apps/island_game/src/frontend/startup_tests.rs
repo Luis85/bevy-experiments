@@ -7,7 +7,7 @@ fn fixture(tag: &str) -> (App, std::path::PathBuf) {
     let dir = std::env::temp_dir().join(format!("npc-scene-startup-{tag}-{}", std::process::id()));
     let path = dir.join("island.json");
     let mut app = session::open(&path, None, None, |app| {
-        app.add_plugins(island_view::TestbedViewPlugin);
+        app.add_plugins(island_view::IslandViewPlugin);
         install(app);
     })
     .unwrap();
