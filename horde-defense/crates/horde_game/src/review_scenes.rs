@@ -208,8 +208,12 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     wave1_still("weapon-classes-marksman", "qa-captures", "battle", true),
     wave1_still("weapon-classes-machine-gun", "qa-captures", "battle", true),
     wave1_still("weapon-classes-turret", "qa-captures", "construction", true),
-    // The stress fixture as a paused still; never a practice campaign.
-    wave1_still("fx-stress", "perf-architecture", "max-lanes", true),
+    // The stress fixture as a paused still; never a practice campaign. Run
+    // live it is also the wave-5 effect-load perf scene (W5-11).
+    ReviewScene {
+        perf: true,
+        ..wave1_still("fx-stress", "perf-architecture", "max-lanes", true)
+    },
     wave1_still("battle-mid", "ux-flow", "battle", false),
     wave1_still("operations-observer", "ux-flow", "operations", false),
     // Wave-2 close stills (W2-55): W2-37's phase hold and W2-41's Firearms
@@ -628,7 +632,9 @@ mod tests {
                 "{}: before proxy {proxy} is not a wave-0 still",
                 scene.name
             );
-            assert!(!scene.practice && !scene.perf, "{}", scene.name);
+            assert!(!scene.practice, "{}", scene.name);
+            // fx-stress is the one wave-1 still measure_performance.ps1 runs.
+            assert_eq!(scene.perf, scene.name == "fx-stress", "{}", scene.name);
         }
         for name in ["weapon-classes-shotgun", "weapon-classes-machine-gun"] {
             assert!(

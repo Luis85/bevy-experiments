@@ -4,7 +4,8 @@
 # Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure_performance.ps1 -Scene all -Profile dev -VsyncOff -Repeat 3
 #      powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure_performance.ps1 -SelfTest
 # Parameters:
-#   -Scene peak|progressed-peak|stress|all   all = every scene of PERF_BUDGET.json run.frames, in that order
+#   -Scene peak|progressed-peak|stress|fx-stress|all
+#                                            all = every scene of PERF_BUDGET.json run.frames, in that order
 #   -Profile dev|playtest                    dev builds into <target>/debug, playtest adds --profile playtest
 #                                            (both with default features, so the review fixtures exist)
 #   -VsyncOff                                LASTLIGHT_PERF_PRESENT_MODE=autonovsync; only these runs carry the
@@ -96,7 +97,7 @@ $ErrorActionPreference = 'Stop'
 # Any error outside the measured runs (arguments, output directory, summary) is a run failure, never exit 1.
 trap { Write-Output "FAIL $($_.Exception.Message)"; exit 3 }
 # perf_budget.rs reads this list: the -Scene values minus all are the PERF_BUDGET.json scenes.
-$sceneChoices = @('peak', 'progressed-peak', 'stress', 'all')
+$sceneChoices = @('peak', 'progressed-peak', 'stress', 'fx-stress', 'all')
 $profileChoices = @('dev', 'playtest')
 $pipelinedChoices = @('default', 'on', 'off')
 

@@ -127,6 +127,7 @@ public static class LastLightNativeHelper {
             Console.WriteLine("progressed-peak\tStill\ttrue\ttrue\tfalse\t\t\t0");
             Console.WriteLine("peak\tStill\ttrue\ttrue\tfalse\t\t\t0");
             Console.WriteLine("stress\tMotionOnly\ttrue\ttrue\tfalse\t\tmax-lanes\t1");
+            Console.WriteLine("fx-stress\tStill\ttrue\ttrue\tfalse\t\tmax-lanes\t1");
             Console.WriteLine("battle\tStill\tfalse\tfalse\tfalse\t\t\t0");
             Console.WriteLine("construction\tStill\tfalse\tfalse\ttrue\t\t\t0");
             Console.WriteLine("max-lanes\tStill\tfalse\tfalse\tfalse\t\t\t1");
@@ -1092,7 +1093,7 @@ try {
             $r = Invoke-ShimMeasure @('-Scene', 'all', '-Profile', 'dev', '-NoBuild', '-NoBudget', '-OutputDirectory', $out) 'measure-relative'
             Assert-Equal 0 $r.ExitCode ("exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $reports = @(Get-ChildItem -LiteralPath $out -Filter '*.json' -File | Where-Object { $_.Name -ne 'summary.json' -and $_.Name -notlike '*.invalid.json' } | ForEach-Object { $_.Name } | Sort-Object)
-            Assert-Equal 'peak-normal.json,peak-small.json,progressed-peak-normal.json,progressed-peak-small.json,stress-normal.json,stress-small.json' ($reports -join ',') 'v3 reports'
+            Assert-Equal 'fx-stress-normal.json,fx-stress-small.json,peak-normal.json,peak-small.json,progressed-peak-normal.json,progressed-peak-small.json,stress-normal.json,stress-small.json' ($reports -join ',') 'v3 reports'
             Assert-True (Test-Path -LiteralPath (Join-Path $out 'peak-normal.invalid.json')) 'the rejected attempt was not kept'
             Assert-True (Test-Path -LiteralPath (Join-Path $out 'summary.md')) 'summary.md'
             $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json

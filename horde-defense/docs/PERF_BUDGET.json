@@ -27,7 +27,7 @@
   },
   "run": {
     "warmup_frames": 180,
-    "frames": { "peak": 600, "progressed-peak": 600, "stress": 1800 },
+    "frames": { "peak": 600, "progressed-peak": 600, "stress": 1800, "fx-stress": 1800 },
     "repeat_acceptance": 3
   },
   "baseline": {
@@ -224,6 +224,10 @@
     "stress": {
       "frames_over_50ms_max": 0,
       "cpu_frame_p99_ms_max": 10.0
+    },
+    "fx-stress": {
+      "frames_over_50ms_max": 0,
+      "cpu_frame_p99_ms_max": 10.0
     }
   },
   "driver_stall": {
@@ -251,6 +255,18 @@
     "damage_popups": 24,
     "loot_flyups": 12,
     "fx_lifetime_max_seconds": 2.0
+  },
+  "fx": {
+    "lights": 24,
+    "decals": 64,
+    "scorch": 8,
+    "explosions_concurrent": 8,
+    "hit_events": 64,
+    "flames_per_zone": 21,
+    "flames_per_zone_reduced": 9,
+    "fire_zones_drawn": 8,
+    "elite_tells": 48,
+    "particles": 128
   },
   "egui": {
     "battlefield_primitives_max": 23,

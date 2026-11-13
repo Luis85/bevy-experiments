@@ -32,8 +32,9 @@ pub const DRIVER_STALL_FRAME_MS_OVER: f64 = 50.0;
 pub const DRIVER_STALL_ACQUIRE_SHARE_MIN: f64 = 0.8;
 pub const DRIVER_STALL_NAMED_COVERAGE_MIN: f64 = 0.95;
 pub const DRIVER_STALL_IN_PROCESS_MS_BELOW: f64 = 50.0;
-/// Scenes that carry the CPU p99 gate.
-pub const CPU_GATED_SCENES: &[&str] = &["progressed-peak", "stress"];
+/// Scenes that carry the CPU p99 gate. fx-stress (W5-11) is the stress
+/// fixture with the wave-5 effect load, measured live like stress.
+pub const CPU_GATED_SCENES: &[&str] = &["progressed-peak", "stress", "fx-stress"];
 
 /// Most enemies a production save can field: the authored cap plus the boss.
 pub const ENEMIES_CEILING: usize = horde_core::progression::GAMEPLAY_ENEMY_CAP + 1;
@@ -50,8 +51,9 @@ pub const FX_LIFETIME_MAX_SECONDS: f64 = 2.0;
 /// effect class one battlefield frame draws. The presentation constants equal
 /// these rows (`art::battlefield` test `fx_budget_matches_presentation_caps`)
 /// and the fx-stress scene stays within them
-/// (`fx_stress_shape_counts_within_perf_budget`). W5-11 mirrors the table
-/// into `docs/PERF_BUDGET.json`.
+/// (`fx_stress_shape_counts_within_perf_budget`). `docs/PERF_BUDGET.json`
+/// `fx` mirrors the table (W5-11; `perf_budget_json_matches_presentation_caps`
+/// holds the two equal in both directions).
 pub const FX_BUDGET: &[(&str, usize)] = &[
     ("lights", 24),
     ("decals", 64),
@@ -121,6 +123,32 @@ mod tests {
     use std::collections::BTreeSet;
 
     const BUDGET: &str = include_str!("../../../docs/PERF_BUDGET.json");
+    /// The CPU-gated scenes of the passes recorded before W5-11 added
+    /// fx-stress (`acceptance`, `acceptance.w2_47`, the pipelined decision):
+    /// those records carry these two scenes' cells and stay as measured.
+    const RECORDED_CPU_GATED_SCENES: &[&str] = &["progressed-peak", "stress"];
+    /// Scenes added to the budget after `baseline.v3` was measured (W1-37,
+    /// re-measured in W2-47). The baseline has no cell for them, so none may
+    /// carry the interface_total gate that reads it.
+    const SCENES_AFTER_V3_BASELINE: &[&str] = &["fx-stress"];
+
+    /// The budget scenes `baseline.v3` was measured on.
+    fn v3_baseline_scenes(json: &Value) -> Vec<&str> {
+        let scenes = object(json, "/scenes");
+        for late in SCENES_AFTER_V3_BASELINE {
+            let gates = scenes
+                .get(*late)
+                .unwrap_or_else(|| panic!("{late} is a budget scene"));
+            assert!(
+                gates.get("interface_total_not_above_baseline_v3").is_none(),
+                "{late}: baseline.v3 has no cell to gate interface_total against"
+            );
+        }
+        keys(scenes)
+            .into_iter()
+            .filter(|scene| !SCENES_AFTER_V3_BASELINE.contains(scene))
+            .collect()
+    }
     const ACCEPTANCE: &str = include_str!("../../../docs/ACCEPTANCE.md");
 
     fn budget() -> Value {
@@ -191,6 +219,19 @@ mod tests {
             number(&json, "/caps/fx_lifetime_max_seconds"),
             FX_LIFETIME_MAX_SECONDS
         );
+
+        // fx: the per-frame effect caps (W5-11), both directions.
+        assert_table_matches(FX_BUDGET, object(&json, "/fx"), "/fx");
+        // The caps the W5-11 row names, at their designed values.
+        for (key, value) in [
+            ("decals", 64),
+            ("lights", 24),
+            ("explosions_concurrent", 8),
+            ("flames_per_zone", 21),
+            ("flames_per_zone_reduced", 9),
+        ] {
+            assert_eq!(whole(&json, &format!("/fx/{key}")), value, "/fx/{key}");
+        }
 
         // egui ceilings.
         assert_eq!(
@@ -757,7 +798,7 @@ mod tests {
             if !vsync {
                 metrics.push("cpu_frame_p99_ms");
             }
-            for scene in keys(object(&json, "/scenes")) {
+            for scene in v3_baseline_scenes(&json) {
                 for size in keys(object(&json, "/sizes")) {
                     for metric in &metrics {
                         let path = format!("/baseline/v3/runs/{name}/{metric}/{scene}/{size}");
@@ -796,7 +837,7 @@ mod tests {
             "the plan's v3 section states Fifo, pipelined and the {power_plan:?} power plan"
         );
         let wave0 = object(&json, "/baseline/wave0/interface_mean_ms");
-        for scene in keys(object(&json, "/scenes")) {
+        for scene in v3_baseline_scenes(&json) {
             for size in keys(object(&json, "/sizes")) {
                 for metric in ["interface_total_mean_ms", "interface_draw_mean_ms"] {
                     let path = format!("/baseline/v3/{metric}/{scene}/{size}");
@@ -911,7 +952,8 @@ mod tests {
         // interface_total_mean_ms, which is the re-measure except where a
         // gated cell would loosen, and those cells are listed.
         let mut kept = BTreeSet::new();
-        for (scene, gates) in object(&json, "/scenes") {
+        for scene in v3_baseline_scenes(&json) {
+            let gates = &json["scenes"][scene];
             let gated =
                 gates.get("interface_total_not_above_baseline_v3") == Some(&Value::Bool(true));
             for size in keys(object(&json, "/sizes")) {
@@ -1210,7 +1252,7 @@ mod tests {
             );
         }
         for profile in ["dev", "playtest"] {
-            for scene in CPU_GATED_SCENES {
+            for scene in RECORDED_CPU_GATED_SCENES {
                 for size in &sizes {
                     let p99 = number(
                         &json,
@@ -1501,7 +1543,7 @@ mod tests {
         let mut off_qualifies = true;
         for arm in ["off", "on"] {
             for profile in ["playtest", "dev"] {
-                for scene in CPU_GATED_SCENES {
+                for scene in RECORDED_CPU_GATED_SCENES {
                     for size in ["normal", "small"] {
                         let at = format!("{path}/{arm}/vsync_off/{profile}/{scene}/{size}");
                         let p99 = number(&json, &format!("{at}/cpu_frame_p99_ms_median"));
@@ -1513,7 +1555,7 @@ mod tests {
                     }
                 }
             }
-            for scene in CPU_GATED_SCENES {
+            for scene in RECORDED_CPU_GATED_SCENES {
                 for size in ["normal", "small"] {
                     let at = format!("{path}/{arm}/vsync_on/{scene}/{size}");
                     let fps = number(&json, &format!("{at}/mean_fps_median"));
