@@ -973,8 +973,6 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         EventKind::Damage,
         EventKind::Melee,
         EventKind::Spawn,
-        EventKind::Boss,
-        EventKind::BossWarning,
         EventKind::Reinforcements,
         EventKind::Explosion,
     ];

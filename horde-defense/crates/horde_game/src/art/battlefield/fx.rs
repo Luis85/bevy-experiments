@@ -1,6 +1,6 @@
 //! Weather, impact particles and short-lived event effects: explosions,
 //! callouts, tracers, contact damage and hit sparks.
-use super::super::{AMBER, ArenaProjection, MUTED, PANEL, RED, TEXT, box_at, line};
+use super::super::{AMBER, ArenaProjection, MUTED, RED, TEXT, box_at, line};
 use super::batch::MeshBuilder;
 use crate::{
     animation::{Particle, ParticleKind},
@@ -24,25 +24,6 @@ pub(super) struct FxOptions {
 /// The least gap between a field callout and the overlay that would cover it.
 pub(crate) const OCCLUDER_GAP: f32 = 4.0;
 
-/// The BOSS APPROACHING banner, the on-field twin of the boss warning's
-/// sound: centred at 80% of a `width`-yard field on the lane centre line
-/// `lane`. Under an `occluder` (the open construction panel) it moves left
-/// until it ends [`OCCLUDER_GAP`] short of the panel, so the warning stays
-/// visible while building.
-pub(crate) fn boss_banner_rect(
-    arena: ArenaProjection,
-    width: f32,
-    lane: f32,
-    occluder: Option<Rect>,
-) -> Rect {
-    let size = vec2((arena.rect.width() * 0.34).min(290.), 36.);
-    let mut center = arena.world(width * 0.8, lane);
-    if let Some(occluder) = occluder {
-        center.x = center.x.min(occluder.left() - OCCLUDER_GAP - size.x * 0.5);
-    }
-    Rect::from_center_size(center, size)
-}
-
 /// The REINFORCEMENTS label's right-centre anchor: a yard inside the right
 /// edge of a `width`-yard field on the lane centre line `lane`, or
 /// [`OCCLUDER_GAP`] left of an `occluder` that would cover it.
@@ -64,8 +45,10 @@ const DOT_SEGMENTS: u32 = 8;
 
 /// How long after its tick an event can still be painted, in seconds: the
 /// single table the field view's event filter and the painters share. No
-/// painter draws an event older than this; the boss warning keeps 2.0 s for
-/// the ux-flow banner (at least 1.5 s visible).
+/// painter draws an event older than this. No painter here draws the boss
+/// warning or the boss's arrival any more: their banner runs on the wall
+/// clock (`ui::battle::boss_banner`, W3-14), and the warning's 2.0 s is that
+/// banner's nominal time.
 pub(crate) fn fx_lifetime(kind: EventKind) -> f32 {
     match kind {
         EventKind::BossWarning => 2.0,
@@ -242,18 +225,6 @@ pub(super) fn events(
                     }
                 }
             }
-            EventKind::BossWarning if age < 1.0 => {
-                let banner =
-                    boss_banner_rect(arena, view.width, view.defender.position[1], occluder);
-                p.rect_filled(banner, 2., PANEL);
-                p.text(
-                    banner.center(),
-                    Align2::CENTER_CENTER,
-                    "BOSS APPROACHING",
-                    FontId::proportional(14.),
-                    AMBER,
-                );
-            }
             EventKind::Reinforcements if age < fx_lifetime(EventKind::Reinforcements) => {
                 let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
                 p.text(
@@ -264,7 +235,8 @@ pub(super) fn events(
                     AMBER,
                 );
             }
-            EventKind::Spawn | EventKind::Boss if age < fx_lifetime(e.kind) => {
+            // The boss's arrival is the wall-clock banner's, not a spawn tag.
+            EventKind::Spawn if age < fx_lifetime(e.kind) => {
                 let at = arena.world(view.width - 0.5, e.to[1]);
                 p.add(egui::Shape::convex_polygon(
                     vec![
@@ -278,11 +250,7 @@ pub(super) fn events(
                 p.text(
                     at + vec2(-12.0, 0.0),
                     Align2::RIGHT_CENTER,
-                    if e.kind == EventKind::Boss {
-                        "BOSS"
-                    } else {
-                        "INCOMING"
-                    },
+                    "INCOMING",
                     FontId::proportional(10.0),
                     AMBER,
                 );

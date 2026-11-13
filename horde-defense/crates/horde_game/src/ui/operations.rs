@@ -311,6 +311,19 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     );
                     damage::draw_for(ui,a,projection,f.battle.interpolation.scene(Some(id), a),id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode(),&[]);
                     if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode(),&[],f.settings.palette) { f.notify_rare_loot(); }
+                    // The observed expedition's boss sounds are audible in
+                    // camp: their banner is the same wall-clock one, keyed
+                    // by the battle (worker attempts share ids).
+                    let boss = crate::battle_view::BossNotice { attempt: id, ..crate::battle_view::BossNotice::of(a) };
+                    super::battle::boss_banner(
+                        ui,
+                        effects_clip,
+                        super::battle::observer_banner_rect(effects_clip),
+                        &mut f.battle.observer_boss_banner,
+                        &boss,
+                        !f.game.global_paused() && !a.paused,
+                        f.settings.reduced_effects,
+                    );
                     if response.hover_pos().is_some_and(|p| r.contains(p)) && ui.input(|i|i.raw.focused) && !ui.ctx().any_popup_open() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
                         reticle::paint(ui,&crate::battle_view::ReticleReadout::build(a,None),projection,aim,reticle::Marks{cross:false,building:false,reduced:f.settings.reduced_effects});

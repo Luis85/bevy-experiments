@@ -16,9 +16,9 @@ mod ordnance;
 mod structures;
 pub mod terrain;
 pub(crate) use enemies::HEALTH_BAR_LIFT;
-pub(crate) use fx::fx_lifetime;
 #[cfg(test)]
-pub(crate) use fx::{OCCLUDER_GAP, boss_banner_rect, reinforcements_anchor};
+pub(crate) use fx::reinforcements_anchor;
+pub(crate) use fx::{OCCLUDER_GAP, fx_lifetime};
 #[cfg(test)]
 mod tests;
 
@@ -43,8 +43,8 @@ pub struct RenderOptions {
     pub textures: ArtTextures,
     /// An opaque overlay painted over the field after it (the main battle's
     /// open construction panel; `None` for the observer and with the panel
-    /// closed). Field callouts that are the visual twin of an audio warning
-    /// (BOSS APPROACHING, REINFORCEMENTS) move left of it.
+    /// closed). The field callout that is the visual twin of an audio
+    /// warning (REINFORCEMENTS) moves left of it.
     pub occluder: Option<Rect>,
 }
 

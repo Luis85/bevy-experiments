@@ -1,6 +1,7 @@
 use super::{
     BarRows, BattleFrame, BattleLayout,
     attack::{attack_selector, field_actions, ordnance_cursor, personal_controls},
+    boss_banner::boss_banner,
     construction::{construction_controls, placement_cursor},
     details::field_details,
     input::{preview_aim, reticle_ownership},
@@ -25,6 +26,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
     let perf = f.perf;
     let (Some(views), Some(a)) = (views, game.attempt()) else {
         f.battle.occluded_lanes.clear();
+        f.battle.boss_banner_rect = None;
         f.go(Screen::Results);
         return;
     };
@@ -141,9 +143,21 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 pause_banner(ui, &layout, view, &f.settings.bindings);
             }
             // The callout sits in the reserved band over a zoomed field.
-            if f.settings.show_guidance && view.first_deployment && view.personal() {
+            let callout = f.settings.show_guidance && view.first_deployment && view.personal();
+            if callout {
                 field_hint_callout(ui, layout.hint_callout, f, view);
             }
+            // The boss banner counts wall time while the battle runs (UX-11),
+            // under the callout and left of the open construction panel.
+            f.battle.boss_banner_rect = boss_banner(
+                ui,
+                layout.arena,
+                layout.boss_banner(callout, f.battle.construction),
+                &mut f.battle.boss_banner,
+                &view.boss,
+                !view.paused && !view.global_paused,
+                f.settings.reduced_effects,
+            );
             corner_hud(ui, &layout, f, hud_view);
             // The battle has no status line (C-10): a new status message is
             // a toast. The battle's one toast takes the slot over the loot

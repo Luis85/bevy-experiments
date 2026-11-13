@@ -7,6 +7,7 @@ use crate::{art, battle_view};
 use bevy_egui::egui::Rect;
 
 mod attack;
+mod boss_banner;
 mod construction;
 mod details;
 mod field;
@@ -18,6 +19,7 @@ mod retreat;
 #[cfg(test)]
 mod tests;
 
+pub(in crate::ui) use boss_banner::{BossBanner, boss_banner, observer_banner_rect};
 pub(super) use field::battle;
 pub(super) use frame::BattleFrame;
 pub(super) use input::{AttackSelection, controls, gather_combat_input};

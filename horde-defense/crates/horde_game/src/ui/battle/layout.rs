@@ -9,6 +9,7 @@
 //! already-filling field (17x30, 11x20, every field with 11 or more lanes) is
 //! today's rect bit for bit. Construction never moves the field: its panel is
 //! an overlay anchored to the arena.
+use super::boss_banner::{BOSS_BANNER_CALLOUT_GAP, BOSS_BANNER_TOP, banner_rect};
 use crate::{
     art::{self, FieldFit, camera::REFERENCE_LANES},
     battle_view::EnemyView,
@@ -170,6 +171,24 @@ impl BattleLayout {
     pub(in crate::ui) fn addresses_field(&self, pointer: Pos2, construction: bool) -> bool {
         self.field.rect.contains(pointer)
             && !(construction && self.construction_panel.contains(pointer))
+    }
+    /// The boss banner (ruling C-11), computed from the arena, the hint
+    /// callout and the construction panel: centred on the arena, `min(380,
+    /// 0.6 x arena width)` by 34, 4 pt under the hint callout while that
+    /// shows (`callout`) and 6 pt under the arena top otherwise. While
+    /// `construction` is open it ends `art::OCCLUDER_GAP` left of the panel,
+    /// so the warning stays readable while building.
+    pub(in crate::ui) fn boss_banner(&self, callout: bool, construction: bool) -> Rect {
+        let top = if callout {
+            self.hint_callout.bottom() + BOSS_BANNER_CALLOUT_GAP
+        } else {
+            self.arena.top() + BOSS_BANNER_TOP
+        };
+        banner_rect(
+            self.arena,
+            top,
+            construction.then_some(self.construction_panel),
+        )
     }
     /// The forest dressing's size cap: a lane of the arena's reference
     /// clearing, so zoomed fields never grow props past today's size.
@@ -717,11 +736,13 @@ mod tests {
         }
     }
 
-    /// W1 review: the BOSS APPROACHING banner and the REINFORCEMENTS label
-    /// are the on-field twins of the wave sound, so the open construction
-    /// overlay never covers them: on every lane of every geometry at both
-    /// target sizes, both end at least `OCCLUDER_GAP` left of the panel.
-    /// With the panel closed they keep their field points.
+    /// W1 review: the boss banner and the REINFORCEMENTS label are the
+    /// visual twins of the wave sound, so the open construction overlay
+    /// never covers them: at every geometry and both target sizes the banner
+    /// (W3-14: `BattleLayout::boss_banner`, with and without the hint
+    /// callout) and, on every lane, the label end at least `OCCLUDER_GAP`
+    /// left of the panel. With the panel closed the banner is centred on the
+    /// arena and the label keeps its field point.
     #[test]
     fn construction_panel_never_covers_the_wave_warning_callouts() {
         let ctx = bevy_egui::egui::Context::default();
@@ -746,14 +767,27 @@ mod tests {
                         art::ArenaProjection::with_geometry(layout.field.rect, lanes, width);
                     let panel = layout.construction_panel;
                     let name = format!("{lanes}x{width} band {band} in {:?}", canvas.size());
-                    for lane in 0..lanes {
-                        let lane = f32::from(lane) + 0.5;
-                        let banner = art::boss_banner_rect(field, width, lane, Some(panel));
+                    for callout in [false, true] {
+                        let banner = layout.boss_banner(callout, true);
                         assert!(
                             banner.right() <= panel.left() - art::OCCLUDER_GAP
                                 && !banner.intersects(panel),
                             "{name}: banner {banner:?} under the panel {panel:?}"
                         );
+                        // It keeps its size and stays in the arena.
+                        let open = layout.boss_banner(callout, false);
+                        assert!(
+                            (banner.size() - open.size()).length() < 1e-3,
+                            "{name}: {banner:?} is not the size of {open:?}"
+                        );
+                        assert!(layout.arena.contains_rect(banner), "{name}: {banner:?}");
+                        assert!(
+                            (open.center().x - layout.arena.center().x).abs() < 1e-3,
+                            "{name}: {open:?} is not centred"
+                        );
+                    }
+                    for lane in 0..lanes {
+                        let lane = f32::from(lane) + 0.5;
                         let anchor = art::reinforcements_anchor(field, width, lane, Some(panel));
                         let text =
                             Rect::from_min_size(anchor - vec2(label.x, label.y * 0.5), label);
@@ -763,15 +797,7 @@ mod tests {
                             "{name}: REINFORCEMENTS {text:?} under the panel {panel:?}"
                         );
                         // The observer, and the closed panel, keep the
-                        // field points.
-                        assert_eq!(
-                            art::boss_banner_rect(field, width, lane, None),
-                            Rect::from_center_size(
-                                field.world(width * 0.8, lane),
-                                vec2((field.rect.width() * 0.34).min(290.0), 36.0),
-                            ),
-                            "{name}"
-                        );
+                        // field point.
                         assert_eq!(
                             art::reinforcements_anchor(field, width, lane, None),
                             field.world(width - 1.0, lane),

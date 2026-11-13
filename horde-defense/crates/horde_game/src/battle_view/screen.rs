@@ -1,5 +1,5 @@
 use super::readouts::{
-    FieldHint, FieldReadout, LOG_TAIL, OrdnanceSlotView, ReticleReadout, WeaponView,
+    BossNotice, FieldHint, FieldReadout, LOG_TAIL, OrdnanceSlotView, ReticleReadout, WeaponView,
 };
 use horde_core::{
     content::{Mode, StructureKind, content},
@@ -71,6 +71,8 @@ pub struct BattleScreen {
     pub global_paused: bool,
     /// The campaign has not finished a deployment yet.
     pub first_deployment: bool,
+    /// What the boss banner announces.
+    pub boss: BossNotice,
 }
 impl BattleScreen {
     /// The active battle's screen, or `None` outside a battle.
@@ -124,6 +126,7 @@ impl BattleScreen {
             any_blueprint: game.campaign().blueprints.iter().any(|owned| *owned),
             global_paused: game.global_paused(),
             first_deployment: game.campaign().attempts == 0,
+            boss: BossNotice::of(a),
         })
     }
     pub fn personal(&self) -> bool {

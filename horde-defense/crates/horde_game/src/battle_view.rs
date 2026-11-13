@@ -21,7 +21,9 @@ pub use field::{BattleViewModel, BossPhaseView, ContactView, CorpseView, EnemyVi
 pub use field::{crowd_stagger, health_view, struck_stagger};
 pub use interpolation::{ActorInterpolation, BattleViewPlugin, SceneBlend};
 pub use placement::placement_preview;
-pub use readouts::{FieldHint, OrdnanceSlotView, ReticleReadout};
+#[cfg(test)]
+pub use readouts::BossEvent;
+pub use readouts::{BossNotice, FieldHint, OrdnanceSlotView, ReticleReadout};
 pub use screen::{BattleScreen, arena_geometry};
 
 /// Per-thread counts of the battle view builds, for the once-per-egui-pass

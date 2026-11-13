@@ -180,6 +180,16 @@ pub(crate) struct BattleUi {
     /// The egui frame the retreat button last drew in. A hold older than the
     /// frame before this one belongs to a battle that ended under it.
     pub(super) retreat_hold_frame: u64,
+    /// The main battle's boss banner: which warning or arrival it announces
+    /// and its wall-clock seconds shown (presentation only;
+    /// `battle::boss_banner`, UX-11). `None` before the first.
+    pub(super) boss_banner: Option<super::battle::BossBanner>,
+    /// The same for the worker observer window, keyed by the observed
+    /// expedition's battle id.
+    pub(super) observer_boss_banner: Option<super::battle::BossBanner>,
+    /// Where the main battle painted its boss banner in the last drawn
+    /// battle frame, `None` when it painted none (presentation only).
+    pub(super) boss_banner_rect: Option<Rect>,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -211,6 +221,9 @@ impl BattleUi {
             retreat_hold: None,
             retreat_hold_spent: false,
             retreat_hold_frame: u64::MAX,
+            boss_banner: None,
+            observer_boss_banner: None,
+            boss_banner_rect: None,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,

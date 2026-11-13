@@ -769,6 +769,15 @@ impl Attempt {
             .max(self.progression.boss_time_floor)
             * self.balance.boss_time
     }
+    /// The tick the boss warning was due, once the director has sent it
+    /// (`None` before): the boss's tick less the level's warning lead, the
+    /// tick of the `BossWarning` event. Pure: no mutation, no RNG.
+    pub fn boss_warning_tick(&self) -> Option<u64> {
+        self.boss_warning_sent.then(|| {
+            let warning = content().levels[self.level].boss_timing.warning;
+            u64::from(seconds(self.boss_time())).saturating_sub(u64::from(seconds(warning)))
+        })
+    }
     pub fn arrival_rate(&self) -> f32 {
         let l = &content().levels[self.level];
         ((l.start_rate.max(self.progression.start_rate_floor)

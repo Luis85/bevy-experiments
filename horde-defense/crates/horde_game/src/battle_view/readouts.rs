@@ -149,5 +149,50 @@ pub struct FieldReadout {
     pub setting: Option<StageTheme>,
 }
 
+/// What the boss banner announces, read from one attempt: the newest of the
+/// boss's warning and its arrival, with the tick it happened on. Pure core
+/// reads; the banner's wall clock lives in `ui::battle::boss_banner`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BossNotice {
+    /// The attempt's id: a banner never carries over to another attempt.
+    pub attempt: u64,
+    /// The attempt's tick now.
+    pub tick: u64,
+    /// The level's boss name.
+    pub name: &'static str,
+    /// Whole seconds of battle time until the boss arrives, as the HUD
+    /// counts them.
+    pub seconds: u32,
+    pub event: Option<BossEvent>,
+}
+/// The boss's warning, or its arrival once it is on the field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BossEvent {
+    pub arrived: bool,
+    /// The tick the warning or the arrival happened on.
+    pub tick: u64,
+}
+impl BossNotice {
+    pub fn of(a: &Attempt) -> Self {
+        let arrived = a.telemetry.boss_arrival_tick.map(|tick| BossEvent {
+            arrived: true,
+            tick,
+        });
+        let warned = || {
+            a.boss_warning_tick().map(|tick| BossEvent {
+                arrived: false,
+                tick,
+            })
+        };
+        Self {
+            attempt: a.id,
+            tick: a.tick,
+            name: &horde_core::content::content().levels[a.level].boss_name,
+            seconds: a.boss_countdown() as u32,
+            event: arrived.or_else(warned),
+        }
+    }
+}
+
 /// Lines of the resolution log the field-details menu shows.
 pub const LOG_TAIL: usize = 18;

@@ -379,3 +379,52 @@ fn boss_armor(armor: i32, multiplier: f32) -> i32 {
     }
     (armor as f32 * multiplier).round() as i32
 }
+
+#[cfg(test)]
+mod boss_warning_tests {
+    use super::*;
+    use crate::balance::BalanceSettings;
+
+    /// W3-14: `Attempt::boss_warning_tick` is `None` until the director warns
+    /// and then names the `BossWarning` event's tick, the boss's tick less
+    /// the level's warning lead. The UI keys its wall-clock banner on it.
+    #[test]
+    fn boss_warning_tick_is_the_warning_events_tick() {
+        let mut g = Game::default();
+        g.campaign.legacy_features = true;
+        g.campaign.balance_settings = BalanceSettings::legacy();
+        g.deploy(0, Mode::Personal).unwrap();
+        g.set_paused(false);
+        let a = g.attempt.as_mut().unwrap();
+        a.max_hp = 1_000_000;
+        a.hp = a.max_hp;
+        a.spawn_credit = -1.0e9;
+        let lead = u64::from(seconds(content().levels[a.level].boss_timing.warning));
+        let due = u64::from(seconds(a.boss_time())) - lead;
+        assert!(lead > 0 && due > 3);
+        a.tick = due - 3;
+        assert_eq!(a.boss_warning_tick(), None);
+        let mut ticks = 0;
+        while g.attempt().unwrap().boss_warning_tick().is_none() {
+            g.tick(Input::default());
+            ticks += 1;
+            assert!(ticks <= 10, "the director never warned");
+        }
+        let a = g.attempt().unwrap();
+        let event = a
+            .events
+            .iter()
+            .find(|e| e.kind == EventKind::BossWarning)
+            .expect("the warning's event");
+        assert_eq!(event.tick, due);
+        assert_eq!(a.boss_warning_tick(), Some(due));
+        // The answer stays once the boss has arrived.
+        for _ in 0..=lead {
+            g.tick(Input::default());
+        }
+        let a = g.attempt().unwrap();
+        assert!(a.enemies.iter().any(|e| e.boss));
+        assert_eq!(a.boss_warning_tick(), Some(due));
+        assert_eq!(a.telemetry.boss_arrival_tick, Some(due + lead));
+    }
+}
