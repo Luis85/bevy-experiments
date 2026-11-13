@@ -22,6 +22,9 @@ use horde_audio::{
 use horde_core::{content::Mode, sim::Game};
 use std::path::{Path, PathBuf};
 
+/// Every bus audible.
+const AUDIBLE: [f32; 5] = [1.0; 5];
+
 fn assets() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets")
 }
@@ -100,7 +103,7 @@ fn pcm16_read_round_trips_write() {
 fn legacy_policy_starts_two_per_frame_and_rotates_only_on_frames_with_requests() {
     let mut policy = LegacyPolicy::default();
     let requests = vec![Cue::Boss, Cue::Damage, Cue::Rifle];
-    let first = policy.frame(requests.clone(), 0, false, true, &[]);
+    let first = policy.frame(requests.clone(), 0, false, &AUDIBLE, &[]);
     assert!(first.stops.is_empty());
     assert_eq!(
         first.starts.iter().map(|s| s.cue).collect::<Vec<_>>(),
@@ -114,24 +117,24 @@ fn legacy_policy_starts_two_per_frame_and_rotates_only_on_frames_with_requests()
     // An empty frame does not advance the rotation; the next request does.
     assert!(
         policy
-            .frame(Vec::new(), 17, false, true, &[])
+            .frame(Vec::new(), 17, false, &AUDIBLE, &[])
             .starts
             .is_empty()
     );
-    let second = policy.frame(vec![Cue::Kill], 34, false, true, &[]);
+    let second = policy.frame(vec![Cue::Kill], 34, false, &AUDIBLE, &[]);
     assert_eq!(second.starts[0].variant, 1);
     // The repeat gate holds a cue back inside its cooldown.
-    let gated = policy.frame(vec![Cue::Boss], 1_000, false, true, &[]);
+    let gated = policy.frame(vec![Cue::Boss], 1_000, false, &AUDIBLE, &[]);
     assert!(gated.starts.is_empty(), "{gated:?}");
     assert_eq!(
         policy
-            .frame(vec![Cue::Boss], 3_000, false, true, &[])
+            .frame(vec![Cue::Boss], 3_000, false, &AUDIBLE, &[])
             .starts
             .len(),
         1
     );
     // Reduced effects plays the reduced column.
-    let reduced = policy.frame(vec![Cue::Explosion], 9_000, true, true, &[]);
+    let reduced = policy.frame(vec![Cue::Explosion], 9_000, true, &AUDIBLE, &[]);
     assert_eq!(reduced.starts[0].gain, mix(Cue::Explosion).level(true));
 }
 
@@ -143,29 +146,32 @@ fn legacy_policy_caps_at_six_voices_and_cuts_the_least_important() {
     live[2].1 = mix(Cue::Fire).priority;
     let mut policy = LegacyPolicy::default();
     // A cue no more important than the least important live voice is dropped.
-    let dropped = policy.frame(vec![Cue::Fire], 0, false, true, &live);
+    let dropped = policy.frame(vec![Cue::Fire], 0, false, &AUDIBLE, &live);
     assert!(
         dropped.starts.is_empty() && dropped.stops.is_empty(),
         "{dropped:?}"
     );
     // A more important one cuts it at once.
-    let stolen = policy.frame(vec![Cue::Boss], 20, false, true, &live);
+    let stolen = policy.frame(vec![Cue::Boss], 20, false, &AUDIBLE, &live);
     assert_eq!(stolen.stops, vec![102]);
     assert_eq!(stolen.starts.len(), 1);
     // With a free voice nothing is cut.
-    let free = policy.frame(vec![Cue::Explosion], 40, false, true, &live[..5]);
+    let free = policy.frame(vec![Cue::Explosion], 40, false, &AUDIBLE, &live[..5]);
     assert!(free.stops.is_empty());
     assert_eq!(free.starts.len(), 1);
     // A muted bus starts nothing but still turns the rotation.
     let mut muted = LegacyPolicy::default();
     assert!(
         muted
-            .frame(vec![Cue::Boss], 0, false, false, &[])
+            .frame(vec![Cue::Boss], 0, false, &[0.0; 5], &[])
             .starts
             .is_empty()
     );
     assert_eq!(
-        muted.frame(vec![Cue::Boss], 20, false, true, &[]).starts[0].variant,
+        muted
+            .frame(vec![Cue::Boss], 20, false, &AUDIBLE, &[])
+            .starts[0]
+            .variant,
         1
     );
 }

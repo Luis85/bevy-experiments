@@ -122,8 +122,12 @@ fn mix_rows_keep_the_v1_numbers() {
 fn every_cue_has_one_mix_row_bank_and_bus() {
     for cue in Cue::ALL {
         let row = mix(cue);
-        // Every cue rides the effects bus until the bus split (A6-06).
-        assert_eq!(row.bus, Bus::Effects, "{cue:?}");
+        // A cue is a voice: it rides Effects, UI or Music (`tests/buses.rs`
+        // pins which), never Master or the loops' bus.
+        assert!(
+            matches!(row.bus, Bus::Effects | Bus::Ui | Bus::Music),
+            "{cue:?}"
+        );
         assert_eq!(row.retired, cue.retired(), "{cue:?}");
         assert!(row.gain > 0.0 && row.gain <= 1.0, "{cue:?}");
         // The bank is the cue's own or its alias family's.

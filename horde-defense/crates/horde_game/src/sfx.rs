@@ -1,5 +1,6 @@
 //! `SfxPlugin`: plays the `CueRequest` messages the runner (and UI) write on a
-//! small, prioritised voice budget that follows the effects bus.
+//! small, prioritised voice budget. Each voice follows the bus its cue's mix
+//! row names: Combat effects, Interface sounds or Music & stingers.
 use crate::{
     audio::{Cue as SoundCue, CueRequest},
     runner::RuntimeSet,
@@ -7,7 +8,8 @@ use crate::{
 };
 use bevy::prelude::*;
 use horde_audio::{
-    mix::{calibration_gain, mix},
+    mix::{Sliders, mix},
+    render::audible,
     select::select_sounds,
 };
 
@@ -47,15 +49,9 @@ pub struct EffectVoice {
     cue_gain: f32,
     cue: SoundCue,
 }
-fn safe_bus_gain(master: f32, effects: f32) -> f32 {
-    fn level(x: f32) -> f32 {
-        if x.is_finite() {
-            x.clamp(0.0, 1.0)
-        } else {
-            0.0
-        }
-    }
-    level(master) * level(effects) * calibration_gain()
+/// The gain of `cue`'s bus at the current sliders.
+fn bus_gain(sliders: Sliders, cue: SoundCue) -> f32 {
+    sliders.bus_gain(mix(cue).bus)
 }
 fn play_sounds(
     mut commands: Commands,
@@ -66,15 +62,15 @@ fn play_sounds(
     mut state: ResMut<SfxState>,
     voices: Query<(Entity, &EffectVoice)>,
 ) {
-    let gain = safe_bus_gain(settings.master, settings.effects);
+    let sliders = settings.sliders();
+    let bus_gains = sliders.bus_gains();
     let reduced = settings.reduced_effects;
     let now_ms = (time.elapsed_secs_f64() * 1000.0) as u64;
-    let sounds: Vec<SoundCue> = cues.read().map(|request| request.0).collect();
+    let mut sounds: Vec<SoundCue> = cues.read().map(|request| request.0).collect();
     let rotation = state.rotation;
     state.rotation = state.rotation.wrapping_add(u64::from(!sounds.is_empty()));
-    if gain == 0.0 {
-        return;
-    }
+    // A cue on a muted bus takes no start slot and keeps its cooldown.
+    sounds.retain(|cue| audible(*cue, &bus_gains));
     let mut live: Vec<_> = voices
         .iter()
         .map(|(entity, voice)| (entity, voice.priority))
@@ -103,7 +99,7 @@ fn play_sounds(
             commands.entity(entity).despawn();
         }
         let cue_gain = mix(cue).level(reduced);
-        let voice_gain = gain * cue_gain;
+        let voice_gain = bus_gain(sliders, cue) * cue_gain;
         let entity = commands
             .spawn((
                 EffectVoice {
@@ -119,7 +115,7 @@ fn play_sounds(
         live.push((entity, rank(cue)));
     }
 }
-/// Both pending PlaybackSettings and live sinks follow the current SFX bus.
+/// Both pending PlaybackSettings and live sinks follow their cue's bus.
 fn update_effects_gain(
     settings: Res<Settings>,
     mut voices: Query<(
@@ -128,11 +124,11 @@ fn update_effects_gain(
         Option<&mut AudioSink>,
     )>,
 ) {
-    let gain = safe_bus_gain(settings.master, settings.effects);
+    let sliders = settings.sliders();
     let reduced = settings.reduced_effects;
     for (mut voice, mut playback, sink) in &mut voices {
         voice.cue_gain = mix(voice.cue).level(reduced);
-        let voice_gain = gain * voice.cue_gain;
+        let voice_gain = bus_gain(sliders, voice.cue) * voice.cue_gain;
         if (voice.last_gain - voice_gain).abs() > 0.00001 {
             playback.volume = bevy::audio::Volume::Linear(voice_gain);
             if let Some(mut sink) = sink {
@@ -146,6 +142,7 @@ fn update_effects_gain(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use horde_audio::mix::calibration_gain;
 
     #[test]
     fn effect_bus_updates_pending_voices_and_mutes_without_recreating_them() {
@@ -204,7 +201,145 @@ mod tests {
                 0.5 * calibration_gain() * mix(SoundCue::Explosion).level(true)
             )
         );
-        assert_eq!(safe_bus_gain(f32::NAN, 1.0), 0.0);
-        assert_eq!(safe_bus_gain(9.0, 9.0), calibration_gain());
+    }
+
+    fn volume(app: &App, voice: Entity) -> f32 {
+        match app
+            .world()
+            .entity(voice)
+            .get::<PlaybackSettings>()
+            .unwrap()
+            .volume
+        {
+            bevy::audio::Volume::Linear(gain) => gain,
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// One live voice per voice bus; each slider moves its own bus's voice
+    /// and no other, and Master moves all three.
+    #[test]
+    fn each_bus_slider_changes_only_its_voices() {
+        use horde_audio::mix::Bus;
+        let mut app = App::new();
+        app.insert_resource(Settings {
+            master: 1.0,
+            effects: 1.0,
+            ui: 1.0,
+            music: 1.0,
+            ambience: 1.0,
+            ..Settings::default()
+        })
+        .add_systems(Update, update_effects_gain);
+        // A combat warning, an interface sound and a stinger.
+        let cues = [SoundCue::Boss, SoundCue::Confirm, SoundCue::Victory];
+        assert_eq!(
+            cues.map(|cue| mix(cue).bus),
+            [Bus::Effects, Bus::Ui, Bus::Music]
+        );
+        let voices = cues.map(|cue| {
+            app.world_mut()
+                .spawn((
+                    EffectVoice {
+                        priority: mix(cue).priority,
+                        last_gain: -1.0,
+                        cue_gain: mix(cue).level(false),
+                        cue,
+                    },
+                    PlaybackSettings::DESPAWN,
+                ))
+                .id()
+        });
+        app.update();
+        let full = voices.map(|voice| volume(&app, voice));
+        for (cue, gain) in cues.into_iter().zip(full) {
+            assert_eq!(gain, calibration_gain() * mix(cue).level(false), "{cue:?}");
+        }
+        type Set = fn(&mut Settings, f32);
+        let sliders: [(Set, [bool; 3]); 5] = [
+            (|s, v| s.effects = v, [true, false, false]),
+            (|s, v| s.ui = v, [false, true, false]),
+            (|s, v| s.music = v, [false, false, true]),
+            (|s, v| s.ambience = v, [false, false, false]),
+            (|s, v| s.master = v, [true, true, true]),
+        ];
+        for (index, (set, moves)) in sliders.into_iter().enumerate() {
+            for level in [0.5, 0.0] {
+                set(&mut app.world_mut().resource_mut::<Settings>(), level);
+                app.update();
+                for n in 0..3 {
+                    let expected = if moves[n] { level * full[n] } else { full[n] };
+                    assert_eq!(
+                        volume(&app, voices[n]),
+                        expected,
+                        "slider {index} at {level}, {:?}",
+                        cues[n]
+                    );
+                }
+            }
+            set(&mut app.world_mut().resource_mut::<Settings>(), 1.0);
+            app.update();
+        }
+    }
+
+    /// A request on a muted bus starts no voice; the other buses still play.
+    #[test]
+    fn muted_bus_starts_no_voice_and_other_buses_still_play() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
+            .init_asset::<AudioSource>()
+            .add_message::<CueRequest>()
+            .init_resource::<SfxState>()
+            .insert_resource(Settings {
+                effects: 0.0,
+                ..Settings::default()
+            })
+            .add_systems(Update, play_sounds);
+        let started = |app: &mut App, cue: SoundCue| {
+            app.world_mut().write_message(CueRequest(cue));
+            app.update();
+            let mut voices = app.world_mut().query::<&EffectVoice>();
+            voices.iter(app.world()).filter(|v| v.cue == cue).count()
+        };
+        // Combat effects is muted: no combat voice, but the interface sound
+        // and the stinger play at their own buses' gains.
+        assert_eq!(started(&mut app, SoundCue::Explosion), 0);
+        assert_eq!(started(&mut app, SoundCue::Confirm), 1);
+        assert_eq!(started(&mut app, SoundCue::Victory), 1);
+        let gains: Vec<(SoundCue, f32)> = {
+            let mut voices = app.world_mut().query::<&EffectVoice>();
+            voices
+                .iter(app.world())
+                .map(|voice| (voice.cue, voice.last_gain))
+                .collect()
+        };
+        let settings = app.world().resource::<Settings>().sliders();
+        for (cue, gain) in gains {
+            assert_eq!(
+                gain,
+                settings.bus_gain(mix(cue).bus) * mix(cue).level(false),
+                "{cue:?}"
+            );
+            assert!(gain > 0.0, "{cue:?}");
+        }
+        // Interface sounds muted: the confirm no longer starts.
+        {
+            let mut settings = app.world_mut().resource_mut::<Settings>();
+            settings.effects = 1.0;
+            settings.ui = 0.0;
+        }
+        let mut voices = app
+            .world_mut()
+            .query_filtered::<Entity, With<EffectVoice>>();
+        let live: Vec<Entity> = voices.iter(app.world()).collect();
+        for entity in live {
+            app.world_mut().despawn(entity);
+        }
+        // Past every cooldown.
+        app.world_mut()
+            .resource_mut::<Time<Real>>()
+            .advance_by(std::time::Duration::from_secs(10));
+        assert_eq!(started(&mut app, SoundCue::Confirm), 0);
+        assert_eq!(started(&mut app, SoundCue::Explosion), 1);
     }
 }

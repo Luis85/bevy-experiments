@@ -15,8 +15,8 @@ pub mod defaults {
     pub const MASTER: f32 = horde_audio::mix::DEFAULT_MASTER;
     pub const EFFECTS: f32 = horde_audio::mix::DEFAULT_EFFECTS;
     pub const AMBIENCE: f32 = horde_audio::mix::DEFAULT_AMBIENCE;
-    pub const MUSIC: f32 = 0.7;
-    pub const UI: f32 = 0.7;
+    pub const MUSIC: f32 = horde_audio::mix::DEFAULT_MUSIC;
+    pub const UI: f32 = horde_audio::mix::DEFAULT_UI;
     #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
     pub const WAVE1_MASTER: f32 = 0.6;
     #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
@@ -361,6 +361,16 @@ impl Settings {
         }
         // Every kept key parsed alongside the others, so this cannot fail.
         (parse(&kept).unwrap_or_default(), dropped)
+    }
+    /// The volume sliders as the mix reads them, one per bus.
+    pub fn sliders(&self) -> horde_audio::mix::Sliders {
+        horde_audio::mix::Sliders {
+            master: self.master,
+            effects: self.effects,
+            ui: self.ui,
+            music: self.music,
+            ambience: self.ambience,
+        }
     }
     fn clamp_volumes(&mut self) {
         for (volume, default) in [

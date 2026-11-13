@@ -12,7 +12,9 @@
 //!   `SfxPlugin`: at most two starts per frame, a rotation that picks the
 //!   variant, [`MAX_EFFECT_VOICES`] voices, and a more important cue cutting
 //!   the least important voice at once. A voice plays its mono clip into both
-//!   channels at `master x effects x calibration x row gain`.
+//!   channels at `bus gain x row gain`, where the bus gain is
+//!   `master x the bus's slider x calibration` of the cue's own bus
+//!   ([`Sliders::bus_gain`]).
 //! - **Ambience.** The six loops play dual mono from the scene's first sample.
 //!   Each follows `weight x master x ambience x context share x calibration`
 //!   through the adapter's 1.2 s smoothstep crossfade, stepped per frame and
@@ -27,10 +29,7 @@ use crate::{
     cue::Cue,
     events::{event_sound, push_cue},
     meter::{self, Loudness},
-    mix::{
-        self, CONTEXT_GAIN, DEFAULT_AMBIENCE, DEFAULT_EFFECTS, DEFAULT_MASTER, MAX_EFFECT_VOICES,
-        mix,
-    },
+    mix::{Bus, CONTEXT_GAIN, MAX_EFFECT_VOICES, mix},
     select::{CueGate, select_sounds},
     wav,
 };
@@ -79,25 +78,7 @@ pub struct Frame {
     pub context: Context,
 }
 
-/// The volume sliders a scene is rendered at.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Sliders {
-    pub master: f32,
-    pub effects: f32,
-    pub ambience: f32,
-}
-impl Sliders {
-    pub const DEFAULT: Self = Self {
-        master: DEFAULT_MASTER,
-        effects: DEFAULT_EFFECTS,
-        ambience: DEFAULT_AMBIENCE,
-    };
-    pub const MAX: Self = Self {
-        master: 1.0,
-        effects: 1.0,
-        ambience: 1.0,
-    };
-}
+pub use crate::mix::Sliders;
 
 /// What a render needs besides the frames.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -198,7 +179,7 @@ pub struct VoiceStart {
     pub variant: u64,
     pub priority: u8,
     /// The cue's row gain in the current effects mode. The executor multiplies
-    /// in the bus gain.
+    /// in the gain of the cue's bus.
     pub gain: f32,
 }
 
@@ -219,23 +200,22 @@ pub struct LegacyPolicy {
     next_voice: u64,
 }
 impl LegacyPolicy {
-    /// One frame. `cues` are the frame's requests, `audible` is false when the
-    /// effects bus gain is zero, and `live` lists the sounding voices as
-    /// `(voice, priority)`.
+    /// One frame. `cues` are the frame's requests, `bus_gains` is
+    /// [`Sliders::bus_gains`], and `live` lists the sounding voices as
+    /// `(voice, priority)`. A cue whose bus is muted is dropped before
+    /// selection: it takes no start slot and leaves its cooldown untouched.
     pub fn frame(
         &mut self,
-        cues: Vec<Cue>,
+        mut cues: Vec<Cue>,
         now_ms: u64,
         reduced: bool,
-        audible: bool,
+        bus_gains: &[f32; 5],
         live: &[(u64, u8)],
     ) -> FrameActions {
         let rotation = self.rotation;
         self.rotation = self.rotation.wrapping_add(u64::from(!cues.is_empty()));
         let mut actions = FrameActions::default();
-        if !audible {
-            return actions;
-        }
+        cues.retain(|cue| audible(*cue, bus_gains));
         let mut live = live.to_vec();
         for cue in select_sounds(cues, rotation) {
             let priority = mix(cue).priority;
@@ -275,12 +255,9 @@ impl LegacyPolicy {
     }
 }
 
-fn safe_gain(gain: f32) -> f32 {
-    if gain.is_finite() {
-        gain.clamp(0.0, 1.0)
-    } else {
-        0.0
-    }
+/// Whether `cue`'s bus is audible at `bus_gains` ([`Sliders::bus_gains`]).
+pub fn audible(cue: Cue, bus_gains: &[f32; 5]) -> bool {
+    bus_gains[mix(cue).bus as usize] > 0.0
 }
 
 /// The adapter's ambience envelope: a smoothstep crossfade to the target
@@ -317,7 +294,11 @@ impl Envelope {
 /// down when they sum to more than 1.
 fn normalized(mut weights: [f32; 6]) -> [f32; 6] {
     for weight in &mut weights {
-        *weight = safe_gain(*weight);
+        *weight = if weight.is_finite() {
+            weight.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
     }
     let total: f32 = weights.iter().sum();
     if total > 1.0 {
@@ -338,10 +319,8 @@ struct Voice<'a> {
 
 /// Renders `frames` at the scene's sliders and theme.
 pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
-    let sliders = scene.sliders;
-    let master = safe_gain(sliders.master);
-    let bus = master * safe_gain(sliders.effects) * mix::calibration_gain();
-    let ambience = master * safe_gain(sliders.ambience) * mix::ambience_calibration_gain();
+    let bus_gains = scene.sliders.bus_gains();
+    let ambience = bus_gains[Bus::Atmosphere as usize];
     let weights = normalized(scene.weights);
     let mut out = vec![0.0_f32; frames.len() * FRAME_SAMPLES];
     let mut policy = LegacyPolicy::default();
@@ -354,7 +333,7 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         voices.retain(|voice| voice.position < voice.clip.len());
         let live: Vec<(u64, u8)> = voices.iter().map(|v| (v.id, v.priority)).collect();
         let now_ms = index as u64 * 1000 / u64::from(TICKS_PER_SECOND);
-        let actions = policy.frame(frame.cues.clone(), now_ms, scene.reduced, bus > 0.0, &live);
+        let actions = policy.frame(frame.cues.clone(), now_ms, scene.reduced, &bus_gains, &live);
         voices.retain(|voice| !actions.stops.contains(&voice.id));
         for start in actions.starts {
             voices.push(Voice {
@@ -362,7 +341,7 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
                 priority: start.priority,
                 clip: library.clip(start.cue, start.variant),
                 position: 0,
-                gain: bus * start.gain,
+                gain: bus_gains[mix(start.cue).bus as usize] * start.gain,
             });
         }
         for voice in &mut voices {

@@ -7,14 +7,32 @@
 
 use crate::cue::Cue;
 
-/// The output buses. Every cue rides `Effects` until the bus split.
+/// The output buses. `Master` scales every other bus; a voice rides exactly
+/// one of the others, named by its cue's mix row ([`CueMix::bus`]):
+///
+/// - `Effects`: every combat cue, warnings included, so no slider but Master
+///   and Combat effects can mute a danger cue.
+/// - `Ui`: interface sounds.
+/// - `Music`: the attempt stingers (and the music tracks, once there are any).
+/// - `Atmosphere`: the ambience loops.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
 pub enum Bus {
     Master,
     Effects,
     Ui,
     Music,
     Atmosphere,
+}
+impl Bus {
+    /// Every bus, in discriminant order; indexes [`Sliders::bus_gains`].
+    pub const ALL: [Self; 5] = [
+        Self::Master,
+        Self::Effects,
+        Self::Ui,
+        Self::Music,
+        Self::Atmosphere,
+    ];
 }
 
 /// Which selection lane a cue competes in.
@@ -133,6 +151,20 @@ const fn row(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
         warning: None,
     }
 }
+/// An attempt stinger: it rides the Music bus.
+const fn stinger(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
+    CueMix {
+        bus: Bus::Music,
+        ..row(gain, cooldown_ms, priority)
+    }
+}
+/// An interface sound: it rides the UI bus.
+const fn interface(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
+    CueMix {
+        bus: Bus::Ui,
+        ..row(gain, cooldown_ms, priority)
+    }
+}
 const fn fire(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
     CueMix {
         gate: GateGroup::Fire,
@@ -161,7 +193,7 @@ pub const fn mix(cue: Cue) -> CueMix {
         Cue::Explosion => row(1.0, 180, 2),
         Cue::Molotov => row(0.65, 180, 2),
         Cue::Fire => row(0.3, 850, 13),
-        Cue::Retreat => row(0.65, 1500, 0),
+        Cue::Retreat => stinger(0.65, 1500, 0),
         Cue::Boss => row(1.0, 3000, 0),
         Cue::Wave => row(0.65, 1800, 1),
         Cue::Damage => row(0.75, 240, 3),
@@ -172,17 +204,17 @@ pub const fn mix(cue: Cue) -> CueMix {
         Cue::Incoming => row(0.3, 2400, 12),
         // Quieter than a hit: a horde's kills must not mask the guns.
         Cue::Kill => row(0.5, 160, 6),
-        Cue::Victory => row(0.8, 3000, 0),
-        Cue::Defeat => row(0.8, 3000, 0),
-        Cue::Confirm => row(0.45, 250, 3),
+        Cue::Victory => stinger(0.8, 3000, 0),
+        Cue::Defeat => stinger(0.8, 3000, 0),
+        Cue::Confirm => interface(0.45, 250, 3),
     }
 }
 
 /// Effect voices that may sound at once.
 pub const MAX_EFFECT_VOICES: usize = 6;
 
-/// The one calibration knob of the effects bus, in dB. It replaces the hidden
-/// x0.7 the bus used to apply.
+/// The one calibration knob of the voice buses (Effects, UI and Music), in
+/// dB. It replaces the hidden x0.7 the effects bus used to apply.
 pub const MIX_CALIBRATION_DB: f32 = -3.1;
 /// The calibration knob of the ambience loops, in dB.
 pub const AMBIENCE_CALIBRATION_DB: f32 = 0.0;
@@ -193,6 +225,66 @@ pub const AMBIENCE_CALIBRATION_DB: f32 = 0.0;
 pub const DEFAULT_MASTER: f32 = 0.6;
 pub const DEFAULT_EFFECTS: f32 = 0.7;
 pub const DEFAULT_AMBIENCE: f32 = 0.15;
+/// "Interface sounds" and "Music & stingers" start at the level their cues
+/// had on the effects bus, so the bus split is silent at the defaults.
+pub const DEFAULT_UI: f32 = 0.7;
+pub const DEFAULT_MUSIC: f32 = 0.7;
+
+/// The volume sliders: one per bus.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Sliders {
+    pub master: f32,
+    /// "Combat effects".
+    pub effects: f32,
+    /// "Interface sounds".
+    pub ui: f32,
+    /// "Music & stingers".
+    pub music: f32,
+    /// "Atmosphere".
+    pub ambience: f32,
+}
+impl Sliders {
+    pub const DEFAULT: Self = Self {
+        master: DEFAULT_MASTER,
+        effects: DEFAULT_EFFECTS,
+        ui: DEFAULT_UI,
+        music: DEFAULT_MUSIC,
+        ambience: DEFAULT_AMBIENCE,
+    };
+    pub const MAX: Self = Self {
+        master: 1.0,
+        effects: 1.0,
+        ui: 1.0,
+        music: 1.0,
+        ambience: 1.0,
+    };
+
+    /// The linear gain of everything on `bus`: Master, times the bus's own
+    /// slider, times the bus's calibration. A slider is clamped to 0..=1 and
+    /// a non-finite one is silence. A voice plays at its bus gain times its
+    /// row gain ([`CueMix::level`]).
+    pub fn bus_gain(self, bus: Bus) -> f32 {
+        fn level(slider: f32) -> f32 {
+            if slider.is_finite() {
+                slider.clamp(0.0, 1.0)
+            } else {
+                0.0
+            }
+        }
+        let master = level(self.master);
+        match bus {
+            Bus::Master => master,
+            Bus::Effects => master * level(self.effects) * calibration_gain(),
+            Bus::Ui => master * level(self.ui) * calibration_gain(),
+            Bus::Music => master * level(self.music) * calibration_gain(),
+            Bus::Atmosphere => master * level(self.ambience) * ambience_calibration_gain(),
+        }
+    }
+    /// [`Sliders::bus_gain`] of every bus, indexed by `Bus as usize`.
+    pub fn bus_gains(self) -> [f32; 5] {
+        Bus::ALL.map(|bus| self.bus_gain(bus))
+    }
+}
 
 /// dB to a linear factor.
 pub fn db_to_linear(db: f32) -> f32 {
