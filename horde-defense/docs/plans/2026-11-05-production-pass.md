@@ -11,7 +11,7 @@ This file is the plan of record. The detail lives in `docs/plans/production-pass
 | `acceptance.md` | The acceptance matrix: every brief criterion, user restatement and ruling mapped to its proof and wave. |
 | `design-<remit>.md` (10 files) | Each expert remit's synthesized spec, followed by the integration rulings that supersede parts of it. |
 
-Precedence when documents disagree: user decisions, then orchestrator rulings R1-R54 and RL, then `schema-v7.md` / `waves.md` / `acceptance.md`, then the "Integration rulings" section of each design doc, then the synthesized spec text above it.
+Precedence when documents disagree: user decisions, then orchestrator rulings R1-R55 and RL, then `schema-v7.md` / `waves.md` / `acceptance.md`, then the "Integration rulings" section of each design doc, then the synthesized spec text above it.
 
 ## Contents
 
@@ -234,6 +234,7 @@ Shipped WAV count: 90 today, 78 after W1-57, 75 after W1-58. `docs/audio/surviva
 | R52 | Orchestrator ruling (2026-11-13): the stale comment in `target_urgency_is_authored_data_with_a_legacy_category_default` (`crates/horde_core/src/enemy_catalog.rs`) is owned by W4-10 (enemy-balance docs). It should say that only the W2-31 exploder (-4, Shambler-based) and spitter (-2, Runner-based) author an urgency other than their category default; runner, caller-pack, skitter and plated-runner author the Runner -3 explicitly; sprinter and splitter-brood omit it and take that -3. The W2 review could not build it either and reverted it. |
 | R53 | Orchestrator ruling (2026-11-13): `scripts/check_views.py` exits 1 at a9fc30a ("ARCHITECTURE.md: guard test not found: sim/elite_tests.rs"), because the core `loot.rs` and `sim/combat.rs` rows of docs/ARCHITECTURE.md write the guard file as `sim/elite_tests.rs` (ea878a9). The first build commit that edits docs/ARCHITECTURE.md or has check_views as its gate writes the workspace path `crates/horde_core/src/sim/elite_tests.rs` in both rows, and W4-11 at the latest. The closing phase's full verify checks it. |
 | R54 | Orchestrator ruling (2026-11-13): the real `scripts/generate_world.py --rebuild --download --check` path (docs/WORLD.md) needs a download from Natural Earth and has never run against today's master, so it is a human check. It is listed in §11 "Human checks pending". |
+| R55 | Orchestrator ruling (2026-11-13): W4-p runs before the W4-04..n tuning loop resumes (waves.md listed it after the loop). The loop's first commit (146737b) added the per-window seed count, and its measurements show that the listed enemy levers do not move G6.11 or G6.12. Baseline: 33 of 38 defeat windows outside 10-25% and a median 49-win streak after run 10. `health_per_rank_late` 0.07 / 0.10 / 0.12 / 0.14, `front_ramp_max` 0.25, elite `end_bp` 3000 and `damage_per_rank_late` 0.04 each leave 26-34 windows out and a 40-49 win streak, while boss TTK rises toward the 60 s cap. The tree is exhausted at run 27 in every variant, so the survivor's power, not the enemy curve, decides the late runs. design-enemy-balance's risk note says to tune progression first, so W4-p (repricing, the tree-quality rules, the blueprint price fix and the goal-5 calibration) lands first and reports the goal-6 table after its calibration; the loop then resumes on the repriced tree. |
 
 R12-R23 are the wave-1 close rulings (2026-11-07), recorded verbatim. Where they land:
 - **R12:** schema-v7.md §11 note and VALIDATION.md "save_v6.json as cut".
@@ -290,6 +291,8 @@ R37-R54 are orchestrator rulings (2026-11-13), made at the wave-2 close for the 
 - **R52:** the W4-10 "Also owns" note in waves.md.
 - **R53:** the W4-11 "Also owns" note in waves.md and §7 "Wave-2 close".
 - **R54:** §11 "Human checks pending".
+
+R55 is an orchestrator ruling (2026-11-13), made when the W4-04..n loop stopped after its first commit. Where it lands: the W4-p "Also owns" note in waves.md (the order change) and the W4-p commits.
 
 One wave-2 finding is not ruled, because it would change a user decision: R30's quiet window is checked only before measuring. It is the §2.5 row "A foreign build that starts during a perf pass".
 
