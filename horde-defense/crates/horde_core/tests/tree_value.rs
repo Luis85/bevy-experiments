@@ -8,7 +8,7 @@ use horde_core::campaign::tree_value::{
     node_value_at, reference_ranks, value_table,
 };
 use horde_core::content::Mode;
-use horde_core::skill_catalog::{SkillNode, skills};
+use horde_core::skill_catalog::{SkillEffect, SkillNode, skills};
 use horde_core::weapons::WeaponClass;
 
 fn node(id: &str) -> &'static SkillNode {
@@ -40,20 +40,33 @@ fn field_fitness_ehp_gain_matches_ratio() {
 }
 
 #[test]
-fn quick_throw_is_zero_today() {
-    // Ordnance value counts charges, damage and radius, not the cooldown,
-    // so the shipped cooldown-only Quick throw is worth nothing (it is
-    // retuned in wave 4).
+fn quick_throw_is_valued_by_its_charges() {
+    // Ordnance value counts charges, damage and radius, not the cooldown.
+    // Before W4-03 the cooldown-only Quick throw was worth nothing; it now
+    // adds one grenade and one Molotov charge, so it has a value, below the
+    // two-charge bandolier's.
     let value = node_value(node("quick_throw")).expect("quick throw is valued");
     assert_eq!(value.axis, ValueAxis::Ordnance);
     assert_eq!(value.group, DominanceGroup::Ordnance);
-    for gain in value.ln_gain {
-        assert!(gain.abs() <= ZERO_GAIN, "quick throw gain {gain}");
-    }
-    // A charge node on the same axis is worth something, so zero is not
-    // the model's default.
     let bandolier = node_value(node("grenade_bandolier")).expect("valued");
-    assert!(bandolier.ln_gain.iter().all(|gain| *gain > ZERO_GAIN));
+    for (gain, two_charges) in value.ln_gain.into_iter().zip(bandolier.ln_gain) {
+        assert!(gain > ZERO_GAIN, "quick throw gain {gain}");
+        assert!(
+            gain < two_charges,
+            "quick throw {gain} vs bandolier {two_charges}"
+        );
+    }
+    // The cooldown still carries no value: the same node without its
+    // charges is worth nothing.
+    let mut cooldown_only = node("quick_throw").clone();
+    cooldown_only
+        .effects
+        .retain(|effect| matches!(effect, SkillEffect::OrdnanceCooldownMultiplier(_)));
+    assert_eq!(cooldown_only.effects.len(), 1);
+    let value = node_value(&cooldown_only).expect("valued");
+    for gain in value.ln_gain {
+        assert!(gain.abs() <= ZERO_GAIN, "cooldown-only gain {gain}");
+    }
 }
 
 #[test]

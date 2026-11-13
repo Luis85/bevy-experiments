@@ -2706,6 +2706,7 @@
       "range": 0.7,
       "cooldown": 1,
       "charges": 3,
+      "charges_per_rank": 1,
       "blueprint_price": 25,
       "unlock_clear": 1,
       "npc": {

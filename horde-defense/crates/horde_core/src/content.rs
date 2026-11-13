@@ -814,12 +814,19 @@ mod tests {
     }
     #[test]
     fn rejects_charges_per_rank_on_a_wall() {
-        // Neutral today: no authored structure gains charges per rank, and
-        // the key is skipped at 0 so the shipped catalogue is unchanged.
+        // Since W4-03 only the shrapnel trap gains charges per rank (1); the
+        // key is skipped at 0, so walls and turrets serialize without it.
         for d in &content().structures {
-            assert_eq!(d.charges_per_rank, 0, "{}", d.id);
+            let expected = u32::from(d.kind == StructureKind::Trap);
+            assert_eq!(d.charges_per_rank, expected, "{}", d.id);
         }
         let text = serde_json::to_string(content()).unwrap();
+        assert_eq!(text.matches("charges_per_rank").count(), 1, "skipped at 0");
+        let mut flat = content().clone();
+        for d in &mut flat.structures {
+            d.charges_per_rank = 0;
+        }
+        let text = serde_json::to_string(&flat).unwrap();
         assert!(!text.contains("charges_per_rank"), "skipped at 0");
         let index = |kind| {
             content()

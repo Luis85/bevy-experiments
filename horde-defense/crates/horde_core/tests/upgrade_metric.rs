@@ -132,6 +132,13 @@ fn equip(mode: &str, item: &str, id: u64) -> Recommendation {
 /// before `slot_score`, `loadout_metrics` and `UPGRADE_MARGIN` were
 /// extracted from it: the extraction must not change one recommendation or
 /// one comparison in any of the three fixture campaigns.
+///
+/// W4-03 re-pinned the v6 digest (17_223_248_231_927_613_725 ->
+/// 9_285_995_252_995_655_082): the v6 fixture campaign owns steady_hands,
+/// hardened, quick_throw and combat_reload, whose retuned effects change the
+/// profile every `compare_item` answer is measured against. The fresh and
+/// liberated campaigns own none of them and did not move, and the three
+/// recommendations are unchanged.
 #[test]
 fn recommendation_unchanged_after_refactor() {
     let fresh = fresh_with_loot();
@@ -175,7 +182,7 @@ fn recommendation_unchanged_after_refactor() {
         [
             14_584_140_189_704_006_710,
             6_625_371_839_841_207_539,
-            17_223_248_231_927_613_725
+            9_285_995_252_995_655_082
         ]
     );
 }

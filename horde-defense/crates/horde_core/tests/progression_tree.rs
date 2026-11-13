@@ -3,11 +3,12 @@
 //! value rules (W4-p) join this file.
 mod support;
 use horde_core::{
-    content::{BossKind, content},
+    content::{BossKind, ItemDefId, Mode, PersonalProfile, Slot, StructureKind, content},
     enemy_catalog::enemy_catalog,
+    ordnance::OrdnanceKind,
     progression,
-    skill_catalog::{SkillEffect, SkillNode, skills},
-    weapons::WeaponClass,
+    skill_catalog::{SkillEffect, SkillModifiers, SkillNode, skills},
+    weapons::{WeaponClass, WeaponSpec},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -208,6 +209,150 @@ fn every_milestone_rank_opens_a_new_non_ladder_node() {
         assert!(
             !opened.is_empty(),
             "victory {milestone} opens no new non-ladder node"
+        );
+    }
+}
+
+// ---- Wave-4 effect retunes (W4-03, design progression-tree §1 and §3.7) ----
+
+/// The personal profile of a fresh campaign that bought `nodes`, with the
+/// starter loadout (worn service pistol, work jacket).
+fn personal_with(nodes: &[&str]) -> PersonalProfile {
+    support::trained_campaign(0, nodes)
+        .profile(Mode::Personal)
+        .personal
+}
+
+/// The personal profile of a campaign that bought `nodes` and carries the
+/// catalogue weapon `weapon` (built without the equip gate, so the weapon is
+/// judged with and without the nodes its training sits behind).
+fn personal_with_weapon(nodes: &[&str], weapon: &str) -> (PersonalProfile, WeaponSpec) {
+    let mut campaign = support::trained_campaign(0, nodes);
+    let definition = ItemDefId::from(weapon).index().expect("catalogue weapon");
+    let id = campaign.add_item(definition).unwrap();
+    let mut loadout = campaign.player.loadout;
+    loadout[Slot::Ranged.index()] = id;
+    let profile = campaign.profile_for_loadout(Mode::Personal, loadout, &campaign.npc);
+    (profile.personal, profile.weapon)
+}
+
+/// Shots a rank-0 `archetype` takes from `personal` with `weapon`: armor
+/// comes off each projectile and the weapon's per-hit cap applies.
+fn shots_to_kill(personal: &PersonalProfile, weapon: &WeaponSpec, archetype: &str) -> i32 {
+    let enemy = enemy_catalog().resolve(archetype).unwrap();
+    let hit = (personal.damage - enemy.armor)
+        .max(1)
+        .min(weapon.hit_cap(enemy.health));
+    (enemy.health + hit - 1) / hit
+}
+
+#[test]
+fn hardened_leaves_runner_contact_damaging() {
+    let base = personal_with(&[]);
+    let hardened = personal_with(&["field_fitness", "hardened"]);
+    assert_eq!(base.armor, 1, "the starter work jacket");
+    assert_eq!(hardened.armor, base.armor + 2, "Hardened adds 2 armor");
+    // sim/combat.rs: a contact hit deals `(damage - armor).max(0)`.
+    let runner = enemy_catalog().resolve("runner").unwrap();
+    assert_eq!(runner.damage, 4, "the rank-0 Runner");
+    assert!(
+        runner.damage - hardened.armor >= 1,
+        "a Runner hit ({}) no longer hurts through {} armor",
+        runner.damage,
+        hardened.armor
+    );
+}
+
+#[test]
+fn steady_hands_keeps_rank_zero_shambler_two_shot_and_adds_at_most_40_percent_per_shotgun_trigger()
+{
+    let (base, pistol) = personal_with_weapon(&[], "worn_service_pistol");
+    let (steady, _) = personal_with_weapon(&["steady_hands"], "worn_service_pistol");
+    assert_eq!((base.damage, steady.damage), (12, 16));
+    assert_eq!(shots_to_kill(&base, &pistol, "shambler"), 3);
+    assert_eq!(
+        shots_to_kill(&steady, &pistol, "shambler"),
+        2,
+        "Steady hands buys the two-shot on a 32-health Shambler"
+    );
+    // The pump shotgun: damage is per pellet, so the flat add counts per pellet.
+    let (pump_base, pump) = personal_with_weapon(&[], "pump_shotgun");
+    let (pump_steady, _) = personal_with_weapon(&["steady_hands"], "pump_shotgun");
+    let trigger = |p: &PersonalProfile| p.damage * pump.pellets as i32;
+    assert!(trigger(&pump_steady) > trigger(&pump_base));
+    assert!(
+        trigger(&pump_steady) * 10 <= trigger(&pump_base) * 14,
+        "pump trigger {} -> {} is more than +40%",
+        trigger(&pump_base),
+        trigger(&pump_steady)
+    );
+}
+
+#[test]
+fn quick_throw_adds_throws_per_deployment() {
+    let chain = [
+        "grenade_training",
+        "grenade_bandolier",
+        "molotov_training",
+        "bottle_carrier",
+    ];
+    let before = support::trained_campaign(0, &chain).modifiers();
+    let mut with = chain.to_vec();
+    with.push("quick_throw");
+    let after = support::trained_campaign(0, &with).modifiers();
+    let issued = |m: &SkillModifiers| horde_core::ordnance::allowance(Mode::Personal, m);
+    for kind in [OrdnanceKind::Grenade, OrdnanceKind::Molotov] {
+        assert_eq!(
+            issued(&after)[kind],
+            issued(&before)[kind] + 1,
+            "{kind:?}: Quick throw adds one throw per deployment"
+        );
+    }
+    assert_eq!(before.ordnance_cooldown_multiplier, 1.0);
+    assert_eq!(after.ordnance_cooldown_multiplier, 0.85);
+}
+
+#[test]
+fn combat_reload_cuts_reload_by_a_quarter() {
+    let before = personal_with(&["quick_reload", "rapid_cycle"]);
+    let after = personal_with(&["quick_reload", "rapid_cycle", "combat_reload"]);
+    assert!(
+        after.reload > 0.65,
+        "the starter pistol stays above the reload floor, so the ratio is the node's"
+    );
+    let ratio = after.reload / before.reload;
+    assert!((ratio - 0.75).abs() < 1e-5, "reload ratio {ratio}");
+    // Not dominated by Reload drill (x0.80) on the same stat.
+    let drill = personal_with(&["quick_reload"]).reload / personal_with(&[]).reload;
+    assert!(
+        ratio < drill,
+        "Combat reload {ratio} vs Reload drill {drill}"
+    );
+}
+
+#[test]
+fn trap_ranks_each_add_one_charge_and_say_so() {
+    let trap = content().structure(StructureKind::Trap);
+    assert_eq!((trap.id.as_str(), trap.charges), ("shrapnel_trap", 3));
+    for rank in 0..=10u32 {
+        assert_eq!(trap.charges_at_rank(rank), 3 + rank, "rank {rank}");
+    }
+    for other in [StructureKind::Wall, StructureKind::Turret] {
+        let d = content().structure(other);
+        assert_eq!(d.charges_at_rank(10), d.charges, "{}", d.id);
+    }
+    for rank in 1..=10u32 {
+        let node = skills().node(&format!("trap_rank_{rank}")).unwrap();
+        let charges = if rank == 1 {
+            "+1 charge ".to_string()
+        } else {
+            format!("+{rank} charges ")
+        };
+        assert!(
+            node.description.contains(&charges) && node.description.contains("+1 charge per rank"),
+            "{}: {:?} does not name {charges:?}",
+            node.id,
+            node.description
         );
     }
 }

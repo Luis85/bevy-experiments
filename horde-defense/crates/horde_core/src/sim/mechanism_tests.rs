@@ -2,8 +2,8 @@
 //! mechanisms at neutral authored values. Every test injects the value it
 //! needs, so the mechanism is pinned apart from the shipped tree. Since W2-41
 //! nodes 170-177 author class perks, `shield_breaker`'s penetration and
-//! `blast_discipline`'s hazard multiplier; only trap charges per rank are
-//! still unauthored.
+//! `blast_discipline`'s hazard multiplier, and since W4-03 the shrapnel trap
+//! authors one charge per mastery rank.
 
 use super::*;
 use crate::content::StructureDefinition;
@@ -255,7 +255,8 @@ fn trap_charges_after_placement(definition: &StructureDefinition, rank: u32) -> 
 
 #[test]
 fn trap_rank_r_places_three_plus_r_charges() {
-    // Test-only authored value: the shipped trap gains charges in wave 4.
+    // The value is set here so the mechanism is pinned apart from the
+    // shipped trap, which authors the same 1 since W4-03.
     let mut trap = content().structure(StructureKind::Trap).clone();
     assert_eq!(trap.charges, 3);
     trap.charges_per_rank = 1;
@@ -270,18 +271,54 @@ fn trap_rank_r_places_three_plus_r_charges() {
 }
 
 #[test]
-fn existing_structures_keep_charges_without_charges_per_rank() {
-    // Pin: with no authored charges_per_rank every structure keeps its
-    // catalogue charges at every rank, as before the mechanism.
+fn structures_without_charges_per_rank_keep_their_charges() {
+    // Pin: a structure that authors no charges_per_rank keeps its catalogue
+    // charges at every rank, as before the mechanism. Since W4-03 the
+    // shipped shrapnel trap authors 1; walls and turrets author none.
     for d in &content().structures {
+        if d.kind == StructureKind::Trap {
+            assert_eq!(d.charges_per_rank, 1, "{}", d.id);
+            continue;
+        }
         for rank in 0..=10 {
             assert_eq!(d.charges_at_rank(rank), d.charges, "{} rank {rank}", d.id);
         }
     }
-    let trap = content().structure(StructureKind::Trap);
+    let mut flat = content().structure(StructureKind::Trap).clone();
+    flat.charges_per_rank = 0;
     for rank in 0..=10 {
-        assert_eq!(trap_charges_after_placement(trap, rank), trap.charges);
+        assert_eq!(trap_charges_after_placement(&flat, rank), flat.charges);
     }
+}
+
+/// The charges of the shipped trap placed by a campaign that learned `nodes`
+/// through the tree (the tree's own gates, prices and rank mirror).
+fn shipped_trap_charges_with(nodes: &[&str]) -> u32 {
+    let mut g = Game::default();
+    g.campaign.first_clear(0, Mode::Personal);
+    g.campaign.reward(100_000, 0, Mode::Personal);
+    for node in nodes {
+        g.campaign.purchase_node(node).unwrap();
+    }
+    g.deploy(0, Mode::Personal).unwrap();
+    g.place_definition(content().structure(StructureKind::Trap), 0, 0)
+        .unwrap();
+    let a = g.attempt.as_ref().unwrap();
+    a.structures.last().unwrap().charges
+}
+
+#[test]
+fn trap_mastery_1_adds_a_trap_charge() {
+    // W4-03: the shipped shrapnel trap gains one charge per mastery rank
+    // (design progression-tree §1, ruling E12), so Trap mastery 1 is worth a
+    // kill and every later rank another.
+    let blueprint = ["engineering", "trap_blueprint"];
+    assert_eq!(shipped_trap_charges_with(&blueprint), 3);
+    let mut owned = blueprint.to_vec();
+    owned.push("trap_rank_1");
+    assert_eq!(shipped_trap_charges_with(&owned), 4);
+    owned.push("trap_rank_2");
+    assert_eq!(shipped_trap_charges_with(&owned), 5);
 }
 
 #[test]
@@ -289,8 +326,8 @@ fn placed_trap_keeps_its_placement_charges_when_the_rank_rises() {
     // Ruling E12: charges are fixed at placement. The definition scales
     // (test-only authored value): a trap placed at rank 0 holds 3 and one
     // placed after the rank rises to 10 holds 13. A sim that re-derived
-    // charges after placement (from the catalogue, whose trap does not
-    // scale, or from the current rank) cannot keep both through a tick.
+    // charges after placement (from the catalogue trap as placed at rank 0
+    // or from the current rank) cannot keep both through a tick.
     let mut trap = content().structure(StructureKind::Trap).clone();
     trap.charges_per_rank = 1;
     let mut g = trap_game();

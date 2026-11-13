@@ -43,7 +43,7 @@
     {
       "id": "steady_hands",
       "name": "Steady hands",
-      "description": "Add +8 damage to every personal firearm projectile: a worn pistol hits for 20 instead of 12.",
+      "description": "Add +4 damage to every personal firearm projectile: a worn pistol hits for 16 instead of 12.",
       "price": 40,
       "prerequisites": [
         "pistol_training"
@@ -57,7 +57,7 @@
       "effects": [
         {
           "kind": "DamageAdd",
-          "value": 8
+          "value": 4
         }
       ]
     },
@@ -233,7 +233,7 @@
     {
       "id": "combat_reload",
       "name": "Combat reload",
-      "description": "Reload a further 15% faster (reload time ×0.85). Stacks with Reload drill.",
+      "description": "Reload a further 25% faster (reload time ×0.75). Stacks with Reload drill.",
       "price": 180,
       "prerequisites": [
         "rapid_cycle"
@@ -247,7 +247,7 @@
       "effects": [
         {
           "kind": "ReloadMultiplier",
-          "value": 0.85
+          "value": 0.75
         }
       ]
     },
@@ -359,7 +359,7 @@
     {
       "id": "hardened",
       "name": "Hardened survivor",
-      "description": "Gain +3 armor: every contact hit deals 3 less damage.",
+      "description": "Gain +2 armor: every contact hit deals 2 less damage.",
       "price": 100,
       "prerequisites": [
         "field_fitness"
@@ -373,7 +373,7 @@
       "effects": [
         {
           "kind": "ArmorAdd",
-          "value": 3
+          "value": 2
         }
       ]
     },
@@ -658,7 +658,7 @@
     {
       "id": "quick_throw",
       "name": "Quick throw",
-      "description": "Each ordnance cooldown is 30% shorter (×0.70).",
+      "description": "Carry 1 extra grenade charge and 1 extra Molotov charge in every defense. Each ordnance cooldown is 15% shorter (×0.85).",
       "price": 165,
       "prerequisites": [
         "grenade_bandolier",
@@ -672,8 +672,16 @@
       "icon": "grenade",
       "effects": [
         {
+          "kind": "GrenadeCharges",
+          "value": 1
+        },
+        {
+          "kind": "MolotovCharges",
+          "value": 1
+        },
+        {
           "kind": "OrdnanceCooldownMultiplier",
-          "value": 0.7
+          "value": 0.85
         }
       ]
     },
@@ -3202,7 +3210,7 @@
     {
       "id": "trap_rank_1",
       "name": "Trap mastery 1",
-      "description": "Raise trap mastery to rank 1: +20% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 1: +20% trap damage and +1 charge in total (+20% and +1 charge per rank).",
       "price": 75,
       "prerequisites": [
         "trap_blueprint"
@@ -3227,7 +3235,7 @@
     {
       "id": "trap_rank_2",
       "name": "Trap mastery 2",
-      "description": "Raise trap mastery to rank 2: +40% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 2: +40% trap damage and +2 charges in total (+20% and +1 charge per rank).",
       "price": 150,
       "prerequisites": [
         "trap_rank_1"
@@ -3252,7 +3260,7 @@
     {
       "id": "trap_rank_3",
       "name": "Trap mastery 3",
-      "description": "Raise trap mastery to rank 3: +60% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 3: +60% trap damage and +3 charges in total (+20% and +1 charge per rank).",
       "price": 225,
       "prerequisites": [
         "trap_rank_2"
@@ -3277,7 +3285,7 @@
     {
       "id": "trap_rank_4",
       "name": "Trap mastery 4",
-      "description": "Raise trap mastery to rank 4: +80% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 4: +80% trap damage and +4 charges in total (+20% and +1 charge per rank).",
       "price": 300,
       "prerequisites": [
         "trap_rank_3"
@@ -3302,7 +3310,7 @@
     {
       "id": "trap_rank_5",
       "name": "Trap mastery 5",
-      "description": "Raise trap mastery to rank 5: +100% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 5: +100% trap damage and +5 charges in total (+20% and +1 charge per rank).",
       "price": 375,
       "prerequisites": [
         "trap_rank_4"
@@ -3327,7 +3335,7 @@
     {
       "id": "trap_rank_6",
       "name": "Trap mastery 6",
-      "description": "Raise trap mastery to rank 6: +120% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 6: +120% trap damage and +6 charges in total (+20% and +1 charge per rank).",
       "price": 450,
       "prerequisites": [
         "trap_rank_5"
@@ -3352,7 +3360,7 @@
     {
       "id": "trap_rank_7",
       "name": "Trap mastery 7",
-      "description": "Raise trap mastery to rank 7: +140% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 7: +140% trap damage and +7 charges in total (+20% and +1 charge per rank).",
       "price": 525,
       "prerequisites": [
         "trap_rank_6"
@@ -3377,7 +3385,7 @@
     {
       "id": "trap_rank_8",
       "name": "Trap mastery 8",
-      "description": "Raise trap mastery to rank 8: +160% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 8: +160% trap damage and +8 charges in total (+20% and +1 charge per rank).",
       "price": 600,
       "prerequisites": [
         "trap_rank_7"
@@ -3402,7 +3410,7 @@
     {
       "id": "trap_rank_9",
       "name": "Trap mastery 9",
-      "description": "Raise trap mastery to rank 9: +180% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 9: +180% trap damage and +9 charges in total (+20% and +1 charge per rank).",
       "price": 675,
       "prerequisites": [
         "trap_rank_8"
@@ -3427,7 +3435,7 @@
     {
       "id": "trap_rank_10",
       "name": "Trap mastery 10",
-      "description": "Raise trap mastery to rank 10: +200% trap damage in total (+20% per rank).",
+      "description": "Raise trap mastery to rank 10: +200% trap damage and +10 charges in total (+20% and +1 charge per rank).",
       "price": 750,
       "prerequisites": [
         "trap_rank_9"

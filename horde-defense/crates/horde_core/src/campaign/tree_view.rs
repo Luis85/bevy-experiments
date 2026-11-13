@@ -1312,7 +1312,7 @@ mod tests {
         assert_eq!(reload[0].summary(), "Reload time ×1.00 → ×0.80");
         assert_eq!(
             delta(&c, "steady_hands", PreviewStat::DamageBonus),
-            (0.0, 8.0)
+            (0.0, 4.0)
         );
         assert_eq!(PreviewStat::DamageBonus.format(8.0), "+8");
         // Body ranks change the rank and the derived stat.

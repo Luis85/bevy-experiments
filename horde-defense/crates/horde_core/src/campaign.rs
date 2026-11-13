@@ -656,9 +656,9 @@ mod tests {
         c.purchase_node("combat_reload").unwrap();
         c.purchase_node("field_fitness").unwrap();
         let p = c.profile(Mode::Personal);
-        assert_eq!(p.personal.damage, 25);
+        assert_eq!(p.personal.damage, 20);
         assert_eq!(p.personal.health, 135);
-        assert!((p.personal.reload - 2.1 * 0.8 * 0.85).abs() < 0.001);
+        assert!((p.personal.reload - 2.1 * 0.8 * 0.75).abs() < 0.001);
         assert!((p.personal.cadence - 0.42 * 0.85).abs() < 0.001);
         let before = c.clone();
         assert!(c.purchase_node("steady_hands").is_err());
