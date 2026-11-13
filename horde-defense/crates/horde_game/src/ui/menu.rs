@@ -176,7 +176,7 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                             }
                         });
                         if ui
-                            .add_sized([190.0, 36.0], egui::Button::new("Save and exit"))
+                            .add_sized([190.0, 36.0], egui::Button::new("Save and quit"))
                             .clicked()
                         {
                             f.request_save(SaveIntent::Quit);
@@ -194,17 +194,21 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                                 ),
                             );
                         });
-                        if !f.status.message.is_empty()
-                            && (!f.status.practice_profile || f.status.message_error)
-                        {
+                        let message = !f.status.message.is_empty()
+                            && (!f.status.practice_profile || f.status.message_error);
+                        if message {
                             ui.add_space(8.0);
                             ui.colored_label(
                                 if f.status.message_error { RED } else { MUTED },
                                 &f.status.message,
                             );
                         }
-                        if f.status.save_pending {
-                            muted(ui, "Saving your campaign...");
+                        // The pending text, once: the status message is
+                        // "Saving…" itself while a save it requested runs.
+                        if f.status.save_pending
+                            && !(message && f.status.message == super::context::SAVING)
+                        {
+                            muted(ui, super::context::SAVING);
                         }
                     });
             });
@@ -549,7 +553,7 @@ mod tests {
                 } else {
                     "New game"
                 };
-                for label in ["LASTLIGHT", launch, "Settings", "Save and exit"] {
+                for label in ["LASTLIGHT", launch, "Settings", "Save and quit"] {
                     let (clip, text) = output
                         .shapes
                         .iter()

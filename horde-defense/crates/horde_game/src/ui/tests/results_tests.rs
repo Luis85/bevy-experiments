@@ -229,12 +229,13 @@ fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
     for label in ["Briefing", "Equipment", "Character", "World map"] {
         assert_eq!(text_count(&output, label), 1, "{label} only in the row");
     }
-    // "More" keeps only what the row does not list.
+    // "More" keeps only what the row does not list. The manual save moved
+    // to the header's "Save" (W3-05), so "Save journey" is gone from it.
     h.click(f, View::ResultsWithChrome, "More");
     let output = h.frame(f, View::ResultsWithChrome, vec![]);
-    for label in ["Plan or replay a defense", "Save journey"] {
-        assert_eq!(text_count(&output, label), 1, "{label} in More");
-    }
+    assert_eq!(text_count(&output, "Plan or replay a defense"), 1);
+    assert_eq!(text_count(&output, "Save journey"), 0);
+    assert_eq!(text_count(&output, "Save"), 1, "the header saves");
     for label in [
         "World map",
         "Character",

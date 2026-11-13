@@ -751,8 +751,9 @@ fn retreat_is_the_one_visible_withdraw_and_management_keeps_its_tools() {
     let output = h.frame(f, View::Battle, vec![]);
     for kept in [
         "Settings",
-        "Save deployment",
-        "Save and return to menu",
+        // W3-05: the one manual-save label and the compound exit's name.
+        "Save",
+        "Save and return to main menu",
         "Combat log",
     ] {
         assert_eq!(text_count(&output, kept), 1, "Management keeps {kept}");

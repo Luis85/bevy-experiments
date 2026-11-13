@@ -5,7 +5,6 @@ use super::{
 };
 use crate::{
     art::{AMBER, GREEN, INK, PANEL, RED},
-    runner::SaveIntent,
     settings::Action,
 };
 use bevy_egui::egui::{self, Align, Layout, RichText, vec2};
@@ -50,16 +49,12 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
                 _ => briefing::mission_actions(ui, f),
             }
             ui.add_space(5.0);
+            // The manual save is the header's "Save" (W3-05).
             if f.game.campaign().world.start.is_some() {
-                chrome::row(ui, |ui| {
-                    if ui.button("Save campaign").clicked() {
-                        f.request_save(SaveIntent::Manual);
-                    }
-                    // Camp home owns the world clock (decision 6).
-                    if f.tab == Tab::Home && f.operations_available() {
-                        time_controls(ui, f);
-                    }
-                });
+                // Camp home owns the world clock (decision 6).
+                if f.tab == Tab::Home && f.operations_available() {
+                    chrome::row(ui, |ui| time_controls(ui, f));
+                }
             } else if ui.button("Back to survivor").clicked() {
                 f.open_survivor_selection();
             }

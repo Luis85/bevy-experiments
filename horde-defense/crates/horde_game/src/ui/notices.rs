@@ -1,8 +1,10 @@
 //! Runtime notices become feedback text and state transitions here, in one
 //! system; `OnEnter(Screen::Battle)` owns the reset a new deployment needs.
 use super::{
-    BattleUi, CampaignUi, Navigation, Screen, Tab, UiCtx, UiParams, battle::AttackSelection,
+    BattleUi, CampaignUi, Navigation, Screen, Tab, UiCtx, UiParams,
+    battle::AttackSelection,
     damage, loot,
+    toast::{TOAST_LONG_SECS, ToastKind},
 };
 use crate::{
     audio::Cue as SoundCue,
@@ -15,6 +17,12 @@ use horde_core::{
     sim::Game,
     survivors::SurvivorId,
 };
+
+/// The toast a finished save of any intent but Autosave shows.
+const SAVED: &str = "Saved";
+/// The same toast when unreadable save bytes were kept as recovery copies
+/// (Info, 6 s; the status line keeps the copies' paths).
+const SAVED_WITH_RECOVERY: &str = "Saved · recovery copies kept";
 
 /// The single navigation system: reads every runtime notice once (after the
 /// runner's Apply pass, before this frame's state transition).
@@ -129,16 +137,22 @@ impl UiCtx<'_> {
                     Ok(()) => {
                         self.status.profile_exists = true;
                         if intent != SaveIntent::Autosave {
+                            // The toast says "Saved"; the status line keeps
+                            // only what must stay findable (the copies' paths).
                             self.status.feedback_revision =
                                 self.status.feedback_revision.wrapping_add(1);
-                            self.status.message = if self.status.recovery_notice.is_empty() {
-                                "Campaign and current actions saved.".into()
+                            if self.status.recovery_notice.is_empty() {
+                                self.status.toasts.push(SAVED, ToastKind::Success);
+                                self.status.message.clear();
                             } else {
-                                format!(
-                                    "Campaign saved. Recovery copies: {}",
-                                    self.status.recovery_notice
-                                )
-                            };
+                                self.status.toasts.push_for(
+                                    SAVED_WITH_RECOVERY,
+                                    ToastKind::Info,
+                                    TOAST_LONG_SECS,
+                                );
+                                self.status.message =
+                                    format!("Recovery copies: {}", self.status.recovery_notice);
+                            }
                             self.status.message_error = false;
                         }
                         self.finish_save_intent(intent);

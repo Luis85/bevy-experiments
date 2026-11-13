@@ -44,6 +44,16 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                     if between_runs && ui.button("History").clicked() {
                         f.open_history();
                     }
+                    // The one manual save (W3-05): "Saved" answers as a toast.
+                    if between_runs
+                        && f.game.campaign().world.start.is_some()
+                        && ui
+                            .add_enabled(!f.status.save_pending, egui::Button::new("Save"))
+                            .on_hover_text("Save the journey now")
+                            .clicked()
+                    {
+                        f.request_save(SaveIntent::Manual);
+                    }
                     if between_runs && ui.button("Menu").clicked() {
                         f.dispatch(Command::SetPaused(true), "");
                         f.request_save(SaveIntent::Menu);

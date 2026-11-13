@@ -102,6 +102,9 @@ impl UiParams<'_> {
     }
 }
 
+/// The status text while a save runs (design-ux-flow §4 "Save UX").
+pub(super) const SAVING: &str = "Saving…";
+
 /// Queues a save; menu, quit and settings-return saves pause first.
 pub(crate) fn request_save(runtime: &mut Runtime, status: &mut StatusUi, intent: SaveIntent) {
     if matches!(
@@ -113,7 +116,7 @@ pub(crate) fn request_save(runtime: &mut Runtime, status: &mut StatusUi, intent:
     runtime.enqueue(AppCommand::Save(intent), "");
     status.save_pending = true;
     status.feedback_revision = status.feedback_revision.wrapping_add(1);
-    status.message = "Saving campaign and current actions…".into();
+    status.message = SAVING.into();
     status.message_error = false;
 }
 

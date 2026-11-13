@@ -43,7 +43,9 @@ fn escape_on_menu_opens_quit_confirmation() {
     // "Save and quit" saves the journey with the quit intent.
     h.key(f, View::Full, Key::Escape);
     let model = serde_json::to_value(&f.game).unwrap();
-    h.click(f, View::Full, "Save and quit");
+    // The menu's own button reads "Save and quit" too since W3-05; the
+    // modal's is the one on top.
+    h.click_topmost(f, View::Full, "Save and quit");
     assert_eq!(f.status.modal, None);
     assert!(!f.status.save_pending, "{}", f.status.message);
     let saved = Game::load(&f.paths.campaign()).unwrap();

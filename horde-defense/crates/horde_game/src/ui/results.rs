@@ -1,9 +1,6 @@
 //! Primary home after every main round. All rewards have already been settled.
 use super::{Screen, Tab, UiCtx, muted, navigation, primary, progression, status};
-use crate::{
-    art::{AMBER, GREEN, INK, MUTED, RED, TEXT},
-    runner::SaveIntent,
-};
+use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob};
 use horde_core::{
     command::Command,
@@ -187,19 +184,16 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             f.open_campaign();
         }
     }
-    ui.menu_button("More", |ui| {
-        if !live
-            && (f.game.campaign().legacy_features || f.game.campaign().victories > 0)
-            && ui.button("Plan or replay a defense").clicked()
-        {
-            f.open_preparation(Tab::Briefing);
-            ui.close();
-        }
-        if ui.button("Save journey").clicked() {
-            f.request_save(SaveIntent::Manual);
-            ui.close();
-        }
-    });
+    // The manual save is the header's "Save" (W3-05), so "More" holds only
+    // the replay route and is hidden when that is unavailable.
+    if !live && (f.game.campaign().legacy_features || f.game.campaign().victories > 0) {
+        ui.menu_button("More", |ui| {
+            if ui.button("Plan or replay a defense").clicked() {
+                f.open_preparation(Tab::Briefing);
+                ui.close();
+            }
+        });
+    }
     // A durable transition (a save or reset) would reject the leave and
     // strand "Saving…", so the exit waits for it.
     if !live

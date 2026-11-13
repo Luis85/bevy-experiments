@@ -20,6 +20,7 @@ mod state;
 mod test_support;
 #[cfg(test)]
 mod tests;
+mod toast;
 #[cfg(feature = "review")]
 pub(crate) use context::request_save;
 pub(crate) use context::{UiCtx, UiParams, ambience_target};
@@ -101,6 +102,8 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
     // Before anything draws, so the registry holds this frame's primaries.
     primary_action::clear_frame_primaries(ctx);
     settings::configure(ctx, f.settings.scale);
+    // New toasts start their wall clock; expired ones go before any draws.
+    toast::advance(ctx, f);
     // Before any reader of the keyboard: Escape is decided and consumed here.
     escape::escape_router(ctx, f);
     ctx.style_mut_of(egui::Theme::Dark, |style| {
@@ -152,6 +155,7 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
         Screen::Settings => settings_ui(root, f),
     }
     modal::show(ctx, f);
+    toast::toast_layer(ctx, f);
     // A transition requested this frame ends live control immediately.
     let active =
         f.screen == Screen::Battle && !f.leaving() && f.game.attempt().is_some_and(|a| !a.paused);

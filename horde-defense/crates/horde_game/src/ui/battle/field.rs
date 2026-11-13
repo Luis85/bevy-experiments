@@ -12,7 +12,7 @@ use crate::{
     art::{self, INK, MUTED, TEXT},
     diagnostics::{self, InterfaceSpan},
     runner::SaveIntent,
-    ui::{Screen, UiCtx, armory, damage, loot, policy, primary_action, reticle, status},
+    ui::{Screen, UiCtx, armory, damage, loot, policy, primary_action, reticle, status, toast},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke};
 use horde_core::{command::Command, content::Mode};
@@ -144,7 +144,10 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 field_hint_callout(ui, layout.hint_callout, f, view);
             }
             corner_hud(ui, &layout, f, hud_view);
-            if let Some(receipt) = &view.last_loot {
+            // The battle's one toast takes the slot over the loot receipt.
+            if !toast::battle_toast(ui, layout.receipt_slot, f)
+                && let Some(receipt) = &view.last_loot
+            {
                 let area = layout.receipt_slot;
                 ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
                     ui.set_clip_rect(area.intersect(ui.clip_rect()));
@@ -303,10 +306,10 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                         if ui.button("Settings").clicked() {
                             f.open_settings();
                         }
-                        if ui.button("Save deployment").clicked() {
+                        if ui.button("Save").clicked() {
                             f.request_save(SaveIntent::Manual);
                         }
-                        if ui.button("Save and return to menu").clicked() {
+                        if ui.button("Save and return to main menu").clicked() {
                             f.dispatch(Command::SetPaused(true), "");
                             f.battle.fire_latched = false;
                             f.request_save(SaveIntent::Menu);

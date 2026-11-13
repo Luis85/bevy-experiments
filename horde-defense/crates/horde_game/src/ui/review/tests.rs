@@ -562,7 +562,7 @@ fn stress_screen_never_requests_a_save_and_shows_no_save_error() {
 }
 /// No intent on the stress screen is dropped: each one finishes without a
 /// save, so the working indicator clears, Back from Settings returns to the
-/// battle and "Save and return to menu" reaches the menu.
+/// battle and "Save and return to main menu" reaches the menu.
 #[cfg(feature = "review")]
 #[test]
 fn stress_screen_finishes_every_intent_without_a_save() {

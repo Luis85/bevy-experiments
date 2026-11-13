@@ -76,6 +76,8 @@ pub(crate) struct StatusUi {
     pub(super) feedback: FeedbackState,
     pub(super) feedback_revision: u64,
     pub(super) save_pending: bool,
+    /// Short non-blocking feedback (ui/toast.rs), oldest first.
+    pub(super) toasts: super::toast::Toasts,
     /// The one application modal slot (ui/modal.rs).
     pub(super) modal: Option<super::modal::AppModal>,
     pub(super) practice_profile: bool,

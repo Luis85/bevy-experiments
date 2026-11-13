@@ -268,6 +268,23 @@ impl Harness {
             .iter()
             .find_map(|clipped| text_position(&clipped.shape, label))
             .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+        self.press_at(f, view, position, size);
+    }
+    /// Clicks the topmost text run reading `label`: the last one painted, so
+    /// a modal's button wins over the same label on the screen under it.
+    fn click_topmost(&self, f: &mut FrontendParts, view: View, label: &str) {
+        let size = self.target.pixels;
+        let output = self.frame_size(f, view, vec![], size);
+        let position = output
+            .shapes
+            .iter()
+            .rev()
+            .find_map(|clipped| text_position(&clipped.shape, label))
+            .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+        self.press_at(f, view, position, size);
+    }
+    /// A primary press and release at `position`, one frame each.
+    fn press_at(&self, f: &mut FrontendParts, view: View, position: Pos2, size: Vec2) {
         self.frame_size(
             f,
             view,
@@ -533,3 +550,4 @@ mod primary_tests;
 mod progression_tests;
 mod results_tests;
 mod settings_tests;
+mod toast_tests;

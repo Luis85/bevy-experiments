@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/menu.rs::menu"
 
 Resume the local campaign or choose a personal survivor before its first country.
 
-- **Entry, exit and actions:** Launch or saved return enters; a fresh New game route opens survivor confirmation, then the world-country choice. Continue opens the campaign or active battle. Change survivor is available before the first country; Settings and Save and exit remain explicit actions.
+- **Entry, exit and actions:** Launch or saved return enters; a fresh New game route opens survivor confirmation, then the world-country choice. Continue opens the campaign or active battle. Change survivor is available before the first country; Settings and Save and quit remain explicit actions.
 - **State boundary:** Committed identity, profile existence and active attempt come from Game. The preview identity, measured title, keyart-v2 checkpoint layering and animation are presentation; menu motion consumes no simulation RNG or ticks.
 - **Responsiveness and accessibility:** The title and actions use compact spacing and a scrollable content area on short windows; reduced effects freezes the checkpoint scene and save errors remain visible.
 
