@@ -7,7 +7,7 @@ use super::{
 use crate::{
     art::{AMBER, INK, RED},
     runner::SaveIntent,
-    settings::{Action, Palette, QualityMarkers, Settings, WindowModeSetting},
+    settings::{self, Action, BindingId, Palette, QualityMarkers, Settings, WindowModeSetting},
 };
 use bevy_egui::egui;
 use horde_core::{campaign::Campaign, command::Command};
@@ -63,7 +63,7 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
                 if ui.button("Restore display, audio & control defaults").clicked() {
                     *f.settings = Settings::default();
                     f.prefs.scale_draft = None;
-                    f.prefs.rebind = None;
+                    f.prefs.cancel_rebind();
                 }
                 muted(ui, format!("Save location: {}", f.paths.campaign().display()));
                 muted(ui, "Every important sound has a visual cue. The camera is fixed; aiming never shakes.");
@@ -200,12 +200,13 @@ fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     ui.add(egui::Slider::new(&mut settings.music, 0.0..=1.0).text("Music & stingers"));
     ui.add(egui::Slider::new(&mut settings.ui, 0.0..=1.0).text("Interface sounds"));
 }
-/// The Controls row label of a core action. Pause is the battle's pause: the
+/// The Controls row label of a binding. Pause is the battle's pause: the
 /// camp's world clock has its own key.
-fn binding_label(action: Action) -> &'static str {
-    match action {
-        Action::Pause => "Pause (battle)",
-        action => action.name(),
+fn binding_label(id: BindingId) -> &'static str {
+    match id {
+        BindingId::Core(Action::Pause) => "Pause (battle)",
+        BindingId::Core(action) => action.name(),
+        BindingId::Extra(action) => action.name(),
     }
 }
 fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
@@ -219,24 +220,25 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
         .num_columns(2)
         .spacing([24.0, 6.0])
         .show(ui, |ui| {
-            for action in Action::ALL {
-                ui.label(binding_label(action));
+            // Core rows first, then the extra actions; one prompt and one
+            // conflict rule span both tables.
+            for id in BindingId::all() {
+                ui.label(binding_label(id));
                 if ui
-                    .button(if f.prefs.rebind == Some(action) {
-                        "Press key or mouse button…".into()
+                    .button(if f.prefs.rebinding() == Some(id) {
+                        "Press key or mouse button…"
                     } else {
-                        f.settings.bindings[action as usize].clone()
+                        settings::binding_text(f.settings.binding(id))
                     })
                     .clicked()
                 {
-                    f.prefs.rebind = Some(action);
-                    f.prefs.binding_armed = false;
+                    f.prefs.start_rebind(id);
                     clicked = true;
                 }
                 ui.end_row();
             }
         });
-    if let Some(action) = f.prefs.rebind
+    if let Some(id) = f.prefs.rebinding()
         && !f.runtime.durable_transition_pending()
     {
         if f.prefs.binding_armed && !clicked {
@@ -263,10 +265,10 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
             if pressed.as_deref() == Some("Escape") {
                 // Escape cancels the rebind; it is never captured as a binding
                 // from this prompt.
-                f.prefs.rebind = None;
+                f.prefs.cancel_rebind();
             } else if let Some(key) = pressed {
-                f.settings.bind(action, key);
-                f.prefs.rebind = None;
+                f.settings.set_binding(id, key);
+                f.prefs.cancel_rebind();
             }
         } else if !clicked {
             f.prefs.binding_armed = true;
@@ -491,7 +493,7 @@ impl UiCtx<'_> {
             self.finish_leaving_settings(then);
         } else {
             // A waiting rebind prompt would capture the modal's click.
-            self.prefs.rebind = None;
+            self.prefs.cancel_rebind();
             self.status.modal = Some(AppModal::DraftWarning { then });
         }
     }

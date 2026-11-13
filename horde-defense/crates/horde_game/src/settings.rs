@@ -83,6 +83,92 @@ impl ExtraBindings {
     fn slots_mut(&mut self) -> [&mut String; 2] {
         [&mut self.world_clock, &mut self.cycle_attack]
     }
+    pub fn get(&self, action: ExtraAction) -> &str {
+        match action {
+            ExtraAction::WorldClock => &self.world_clock,
+            ExtraAction::CycleAttack => &self.cycle_attack,
+        }
+    }
+    fn get_mut(&mut self, action: ExtraAction) -> &mut String {
+        match action {
+            ExtraAction::WorldClock => &mut self.world_clock,
+            ExtraAction::CycleAttack => &mut self.cycle_attack,
+        }
+    }
+}
+
+/// An action outside the eight core bindings; its key is a field of
+/// [`ExtraBindings`]. Variants are append-only.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ExtraAction {
+    /// Pauses and resumes the world clock; Camp home only.
+    WorldClock,
+    /// Selects the next unlocked attack (Gun, Grenade, Molotov) in a battle.
+    CycleAttack,
+}
+impl ExtraAction {
+    pub const ALL: [Self; 2] = [Self::WorldClock, Self::CycleAttack];
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::WorldClock => "World clock (camp home)",
+            Self::CycleAttack => "Cycle attack",
+        }
+    }
+}
+
+/// One row of the Controls table: a core action or an extra one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BindingId {
+    Core(Action),
+    Extra(ExtraAction),
+}
+impl BindingId {
+    /// Every binding, core rows first: the order of the Controls table.
+    pub fn all() -> impl Iterator<Item = Self> {
+        Action::ALL
+            .into_iter()
+            .map(Self::Core)
+            .chain(ExtraAction::ALL.into_iter().map(Self::Extra))
+    }
+}
+
+/// What a binding shows in place of its key when it has none.
+pub const UNBOUND: &str = "Unbound";
+
+/// The text a binding shows: its key, or [`UNBOUND`].
+pub fn binding_text(binding: &str) -> &str {
+    if binding.is_empty() { UNBOUND } else { binding }
+}
+
+/// Whether the key or mouse button named `binding` is down (`held`) or was
+/// pressed this pass. `""` (Unbound) and an unknown name never fire.
+pub fn binding_pressed(ctx: &Context, binding: &str, held: bool) -> bool {
+    let button = |i: &egui::InputState, button| {
+        if held {
+            i.pointer.button_down(button)
+        } else {
+            i.pointer.button_pressed(button)
+        }
+    };
+    ctx.input(|i| match binding {
+        "" => false,
+        "Mouse1" => button(i, PointerButton::Primary),
+        "Mouse2" => button(i, PointerButton::Secondary),
+        "Mouse3" => button(i, PointerButton::Middle),
+        name => egui::Key::from_name(name).is_some_and(|key| {
+            if held {
+                i.key_down(key)
+            } else {
+                i.events.iter().any(|event| {
+                    matches!(
+                        event,
+                        egui::Event::Key { key: event_key, pressed: true, repeat: false, .. }
+                            if *event_key == key
+                    )
+                })
+            }
+        }),
+    })
 }
 
 /// Variants are append-only: an unknown variant falls back alone.
@@ -304,22 +390,31 @@ impl Settings {
             }
         }
     }
-    /// Binds `action` to `key`. A key another core or extra action holds
-    /// swaps over: that action takes `action`'s previous key.
-    pub fn bind(&mut self, action: Action, key: String) {
-        let index = action as usize;
-        let previous = std::mem::replace(&mut self.bindings[index], key.clone());
-        if let Some(other) =
-            (0..self.bindings.len()).find(|&other| other != index && self.bindings[other] == key)
-        {
-            self.bindings[other] = previous;
-        } else if let Some(slot) = self
-            .extra_bindings
-            .slots_mut()
-            .into_iter()
-            .find(|slot| **slot == key)
-        {
-            *slot = previous;
+    /// The key of `id`; `""` is Unbound.
+    pub fn binding(&self, id: BindingId) -> &str {
+        match id {
+            BindingId::Core(action) => &self.bindings[action as usize],
+            BindingId::Extra(action) => self.extra_bindings.get(action),
+        }
+    }
+    fn binding_mut(&mut self, id: BindingId) -> &mut String {
+        match id {
+            BindingId::Core(action) => &mut self.bindings[action as usize],
+            BindingId::Extra(action) => self.extra_bindings.get_mut(action),
+        }
+    }
+    /// Binds `id` to `key`. A key another action holds, in either table,
+    /// swaps over: that action takes `id`'s previous key (Unbound when `id`
+    /// had none), so one key never drives two actions.
+    pub fn set_binding(&mut self, id: BindingId, key: String) {
+        let holder = if key.is_empty() {
+            None
+        } else {
+            BindingId::all().find(|&other| other != id && self.binding(other) == key)
+        };
+        let previous = std::mem::replace(self.binding_mut(id), key);
+        if let Some(holder) = holder {
+            *self.binding_mut(holder) = previous;
         }
     }
     pub fn save(&self, path: &Path) -> Result<(), String> {
@@ -330,37 +425,11 @@ impl Settings {
         std::fs::write(path, data).map_err(|e| e.to_string())
     }
     pub fn pressed(&self, ctx: &Context, action: Action, held: bool) -> bool {
-        let binding = &self.bindings[action as usize];
-        ctx.input(|i| match binding.as_str() {
-            "Mouse1" => {
-                if held {
-                    i.pointer.button_down(PointerButton::Primary)
-                } else {
-                    i.pointer.button_pressed(PointerButton::Primary)
-                }
-            }
-            "Mouse2" => {
-                if held {
-                    i.pointer.button_down(PointerButton::Secondary)
-                } else {
-                    i.pointer.button_pressed(PointerButton::Secondary)
-                }
-            }
-            "Mouse3" => {
-                if held {
-                    i.pointer.button_down(PointerButton::Middle)
-                } else {
-                    i.pointer.button_pressed(PointerButton::Middle)
-                }
-            }
-            name => egui::Key::from_name(name).is_some_and(|key| {
-                if held {
-                    i.key_down(key)
-                } else {
-                    i.events.iter().any(|event|matches!(event,egui::Event::Key{key:event_key,pressed:true,repeat:false,..} if *event_key==key))
-                }
-            }),
-        })
+        binding_pressed(ctx, &self.bindings[action as usize], held)
+    }
+    /// [`Settings::pressed`] for an extra action. An unbound one never fires.
+    pub fn pressed_extra(&self, ctx: &Context, action: ExtraAction, held: bool) -> bool {
+        binding_pressed(ctx, self.extra_bindings.get(action), held)
     }
 }
 /// The egui zoom `configure` applies for an interface `scale`: the
@@ -628,14 +697,14 @@ mod tests {
     #[test]
     fn core_rebind_to_an_extra_key_swaps_across_the_tables() {
         let mut settings = Settings::default();
-        settings.bind(Action::Reload, "P".into());
+        settings.set_binding(BindingId::Core(Action::Reload), "P".into());
         assert_eq!(settings.bindings[Action::Reload as usize], "P");
         assert_eq!(settings.extra_bindings.world_clock, "R");
-        settings.bind(Action::Reload, "B".into());
+        settings.set_binding(BindingId::Core(Action::Reload), "B".into());
         assert_eq!(settings.bindings[Action::Reload as usize], "B");
         assert_eq!(settings.bindings[Action::Build as usize], "P");
         assert_eq!(settings.extra_bindings.world_clock, "R");
-        settings.bind(Action::Build, "K".into());
+        settings.set_binding(BindingId::Core(Action::Build), "K".into());
         assert_eq!(settings.bindings[Action::Build as usize], "K");
         assert_eq!(settings.extra_bindings.world_clock, "R");
     }
@@ -688,6 +757,109 @@ mod tests {
             let bytes = serde_json::to_vec(&settings).unwrap();
             assert_eq!(Settings::decode(&bytes).settings, settings);
         }
+    }
+
+    #[test]
+    fn rebind_conflict_spans_core_and_extra_tables() {
+        use BindingId::{Core, Extra};
+        let mut settings = Settings::default();
+        // An extra action takes a core key: the core action takes its old key.
+        settings.set_binding(Extra(ExtraAction::CycleAttack), "R".into());
+        assert_eq!(settings.binding(Extra(ExtraAction::CycleAttack)), "R");
+        assert_eq!(settings.binding(Core(Action::Reload)), "Q");
+        assert_eq!(settings.extra_bindings.cycle_attack, "R");
+        assert_eq!(settings.bindings[Action::Reload as usize], "Q");
+        // Two extra actions swap with one another.
+        settings.set_binding(Extra(ExtraAction::WorldClock), "R".into());
+        assert_eq!(settings.extra_bindings.world_clock, "R");
+        assert_eq!(settings.extra_bindings.cycle_attack, "P");
+        // A core action takes an extra key.
+        settings.set_binding(Core(Action::Build), "P".into());
+        assert_eq!(settings.bindings[Action::Build as usize], "P");
+        assert_eq!(settings.extra_bindings.cycle_attack, "B");
+        // A free key displaces nothing.
+        let before = settings.clone();
+        settings.set_binding(Extra(ExtraAction::WorldClock), "K".into());
+        assert_eq!(settings.extra_bindings.world_clock, "K");
+        assert_eq!(settings.bindings, before.bindings);
+        assert_eq!(settings.extra_bindings.cycle_attack, "B");
+        // Rebinding an action to its own key changes nothing.
+        let before = settings.clone();
+        settings.set_binding(Extra(ExtraAction::WorldClock), "K".into());
+        assert_eq!(settings, before);
+        // An unbound extra action that takes a held key leaves the other
+        // action unbound: the two never share it.
+        settings.extra_bindings.world_clock.clear();
+        settings.set_binding(Extra(ExtraAction::WorldClock), "B".into());
+        assert_eq!(settings.extra_bindings.world_clock, "B");
+        assert_eq!(settings.extra_bindings.cycle_attack, "");
+        // After any sequence every bound key has exactly one action, so
+        // `normalise` has nothing to unbind.
+        let mut normalised = settings.clone();
+        normalised.normalise();
+        assert_eq!(normalised, settings);
+        let mut keys: Vec<&str> = BindingId::all()
+            .map(|id| settings.binding(id))
+            .filter(|key| !key.is_empty())
+            .collect();
+        let bound = keys.len();
+        keys.sort_unstable();
+        keys.dedup();
+        assert_eq!(keys.len(), bound);
+    }
+
+    #[test]
+    fn extra_actions_cover_every_extra_binding_slot() {
+        let mut bindings = ExtraBindings::default();
+        assert_eq!(bindings.slots_mut().len(), ExtraAction::ALL.len());
+        assert_eq!(bindings.get(ExtraAction::WorldClock), "P");
+        assert_eq!(bindings.get(ExtraAction::CycleAttack), "Q");
+        assert_eq!(BindingId::all().count(), 10);
+        assert_eq!(binding_text(""), "Unbound");
+        assert_eq!(binding_text("Q"), "Q");
+    }
+
+    fn key_press(key: egui::Key) -> egui::Event {
+        egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        }
+    }
+
+    #[test]
+    fn binding_pressed_reads_keys_and_never_fires_unbound() {
+        let ctx = Context::default();
+        let mut fired = Vec::new();
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                events: vec![key_press(egui::Key::Q)],
+                ..Default::default()
+            },
+            |ui| {
+                let ctx = ui.ctx();
+                let mut settings = Settings::default();
+                fired.push(settings.pressed_extra(ctx, ExtraAction::CycleAttack, false));
+                fired.push(settings.pressed_extra(ctx, ExtraAction::CycleAttack, true));
+                fired.push(settings.pressed_extra(ctx, ExtraAction::WorldClock, false));
+                settings.extra_bindings.cycle_attack.clear();
+                fired.push(settings.pressed_extra(ctx, ExtraAction::CycleAttack, false));
+                fired.push(settings.pressed_extra(ctx, ExtraAction::CycleAttack, true));
+                fired.push(binding_pressed(ctx, "", false));
+                fired.push(binding_pressed(ctx, "Q", false));
+                fired.push(binding_pressed(ctx, "NoSuchKey", false));
+                settings.bindings[Action::Heal as usize] = "Q".into();
+                fired.push(settings.pressed(ctx, Action::Heal, false));
+            },
+        );
+        // A headless pass has no texture uploader.
+        output.textures_delta.clear();
+        assert_eq!(
+            fired,
+            [true, true, false, false, false, false, true, false, true]
+        );
     }
 
     #[test]

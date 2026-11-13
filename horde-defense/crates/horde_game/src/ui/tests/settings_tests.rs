@@ -190,6 +190,64 @@ fn binding_capture_swaps_a_core_key_with_an_extra_key() {
     assert_eq!(f.settings.extra_bindings.world_clock, "R");
 }
 
+/// W3-10: the Controls table lists the extra actions; an extra row captures a
+/// key like a core row, swaps with whichever action holds it, and Escape
+/// cancels its prompt.
+#[test]
+fn extra_binding_rows_capture_swap_and_cancel() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    // The Controls table runs below the fold of the large target: the tall
+    // window shows every row. The grid sizes itself on its first frame.
+    h.frame_size(f, View::Settings, vec![], TALL);
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    for label in ["Pause (battle)", "World clock (camp home)", "Cycle attack"] {
+        assert_eq!(text_count(&output, label), 1, "{label}");
+    }
+    // The Cycle attack row (Q) takes Reload's key: Reload takes Q.
+    h.click_size(f, View::Settings, "Q", TALL);
+    assert_eq!(
+        text_count(&h.frame_size(f, View::Settings, vec![], TALL), "Q"),
+        0
+    );
+    h.key(f, View::Settings, Key::R);
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "R");
+    assert_eq!(f.settings.bindings[Action::Reload as usize], "Q");
+    // The World clock row (P) takes Cycle attack's key: the extras swap.
+    h.click_size(f, View::Settings, "P", TALL);
+    h.frame_size(f, View::Settings, vec![], TALL);
+    h.key(f, View::Settings, Key::R);
+    assert_eq!(f.settings.extra_bindings.world_clock, "R");
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "P");
+    // Escape cancels an extra row's prompt through the router and binds
+    // nothing; Settings stays open.
+    h.click_size(f, View::Settings, "P", TALL);
+    h.frame(f, View::Full, vec![]);
+    h.key(f, View::Full, Key::Escape);
+    assert!(f.screen == Screen::Settings);
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "P");
+    assert_eq!(f.settings.bindings[Action::Pause as usize], "Escape");
+    // The prompt is gone: the next key binds nothing.
+    h.key(f, View::Settings, Key::K);
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "P");
+    // An unbound action says so, and its row still rebinds.
+    f.settings.extra_bindings.cycle_attack.clear();
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    assert_eq!(text_count(&output, "Unbound"), 1);
+    h.click_size(f, View::Settings, "Unbound", TALL);
+    h.frame_size(f, View::Settings, vec![], TALL);
+    h.key(f, View::Settings, Key::K);
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "K");
+    // The saved file carries the extra keys.
+    h.click(f, View::Settings, "Save and return to camp");
+    assert!(f.screen == Screen::Camp, "{}", f.status.message);
+    let saved = Settings::load(&f.paths.settings());
+    assert_eq!(saved.extra_bindings, f.settings.extra_bindings);
+    assert_eq!(saved.bindings, f.settings.bindings);
+}
+
 /// The frontend as startup builds it from the files already in `directory`.
 fn frontend_loaded_from(directory: &std::path::Path) -> FrontendParts {
     let paths = ProfilePaths::in_directory(directory.to_path_buf());

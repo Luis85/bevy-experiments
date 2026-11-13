@@ -94,7 +94,7 @@ impl UiCtx<'_> {
         match intent {
             SaveIntent::Menu => {
                 self.go(Screen::Menu);
-                self.prefs.rebind = None;
+                self.prefs.cancel_rebind();
                 self.battle.fire_latched = false;
                 self.runtime.clear_input();
             }
@@ -103,7 +103,7 @@ impl UiCtx<'_> {
                     Screen::Settings => Screen::Menu,
                     screen => screen,
                 });
-                self.prefs.rebind = None;
+                self.prefs.cancel_rebind();
                 if self.nav.return_screen == Screen::Camp {
                     self.dispatch(Command::SetPaused(self.nav.return_world_paused), "");
                 }

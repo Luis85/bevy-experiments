@@ -2,7 +2,7 @@ use super::{BattleFrame, projection};
 use crate::{
     art,
     battle_view::{self, BattleScreen},
-    settings::Action,
+    settings::{Action, ExtraAction},
     ui::{UiCtx, escape},
 };
 use bevy_egui::egui;
@@ -20,6 +20,17 @@ pub(in crate::ui) enum AttackSelection {
     Molotov,
 }
 impl AttackSelection {
+    /// The selector's order, which the cycle key follows.
+    pub(super) const ALL: [Self; 3] = [Self::Gun, Self::Grenade, Self::Molotov];
+    /// The next selection after `self` that `unlocked` allows, wrapping
+    /// round; `self` when no other is.
+    pub(in crate::ui) fn next(self, unlocked: impl Fn(Self) -> bool) -> Self {
+        let at = Self::ALL.iter().position(|&s| s == self).unwrap_or(0);
+        (1..Self::ALL.len())
+            .map(|step| Self::ALL[(at + step) % Self::ALL.len()])
+            .find(|&selection| unlocked(selection))
+            .unwrap_or(self)
+    }
     pub(super) fn ordnance(self) -> Option<OrdnanceKind> {
         match self {
             Self::Gun => None,
@@ -71,6 +82,34 @@ pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx, views: Option<
     {
         f.toggle_fire(ctx);
     }
+    // The cycle key works where the attack selector is shown: a personal
+    // defense outside construction. It skips a locked throwable, as the
+    // selector's disabled button does.
+    if let Some(view) = views.map(|views| &views.screen)
+        && view.personal()
+        && !f.battle.construction
+        && f.settings
+            .pressed_extra(ctx, ExtraAction::CycleAttack, false)
+    {
+        let next = f.battle.attack_selection.next(|selection| {
+            selection
+                .ordnance()
+                .is_none_or(|kind| view.slot(kind).unlocked)
+        });
+        if next != f.battle.attack_selection {
+            select_attack(f, next);
+        }
+    }
+}
+/// Selects an attack, as the selector's buttons and the cycle key do: a
+/// firing latch, a queued shot or throw never carries over to the new one.
+pub(super) fn select_attack(f: &mut UiCtx, selection: AttackSelection) {
+    f.battle.attack_selection = selection;
+    f.battle.fire_latched = false;
+    f.battle.pending.fire = false;
+    f.battle.pending.throw = None;
+    f.battle.pending_attack_aims.fire = None;
+    f.runtime.clear_input();
 }
 pub(in crate::ui) fn gather_combat_input(
     ctx: &egui::Context,

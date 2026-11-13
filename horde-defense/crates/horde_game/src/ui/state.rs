@@ -9,7 +9,7 @@ use crate::{
     launch::LaunchConfig,
     profile::{LoadedProfile, ProfilePaths, SettingsLoad},
     runner::{AttackAims, GameSession, Runtime, RuntimeNotice},
-    settings::{Action, Settings},
+    settings::{Action, BindingId, ExtraAction, Settings},
     visual_assets::ArtTextures,
     worldmap::MapCache,
 };
@@ -213,8 +213,34 @@ pub(crate) struct SettingsUi {
     /// keeps the applied value until the drag ends, so the screen does not
     /// rescale under the pointer; `None` whenever the slider is at rest.
     pub(super) scale_draft: Option<f32>,
+    /// The core Controls row waiting for a key.
     pub(super) rebind: Option<Action>,
+    /// The extra Controls row waiting for a key. At most one of `rebind` and
+    /// `rebind_extra` is set (`start_rebind`).
+    pub(super) rebind_extra: Option<ExtraAction>,
     pub(super) binding_armed: bool,
+}
+impl SettingsUi {
+    /// The Controls row waiting for a key, in either table.
+    pub(super) fn rebinding(&self) -> Option<BindingId> {
+        self.rebind
+            .map(BindingId::Core)
+            .or(self.rebind_extra.map(BindingId::Extra))
+    }
+    /// Opens the key prompt of `id`, closing any other. The prompt arms on
+    /// the next frame, so the click that opened it is never captured.
+    pub(super) fn start_rebind(&mut self, id: BindingId) {
+        (self.rebind, self.rebind_extra) = match id {
+            BindingId::Core(action) => (Some(action), None),
+            BindingId::Extra(action) => (None, Some(action)),
+        };
+        self.binding_armed = false;
+    }
+    /// Closes the key prompt without binding.
+    pub(super) fn cancel_rebind(&mut self) {
+        self.rebind = None;
+        self.rebind_extra = None;
+    }
 }
 
 #[derive(Resource, Default)]

@@ -51,10 +51,11 @@ fn camp_pause_key_and_footer_control_pause_and_resume_all_parallel_work() {
     f.game.deploy_survivor(recruit, "POL", 0).unwrap();
     // W3-02 rewrite: Camp home owns the clock and its key (decision 6).
     // W3-04 rewrite: Escape on Camp home now goes back (to Results or the
-    // return-to-menu confirmation, ui/escape.rs), so the clock key is the
-    // Pause binding off Escape (W3-10 gives the clock its own binding).
+    // return-to-menu confirmation, ui/escape.rs).
+    // W3-10 rewrite: the clock key is the `world_clock` extra binding (P),
+    // not the battle's Pause binding.
     f.nav.tab = Tab::Home;
-    f.settings.bindings[Action::Pause as usize] = "P".into();
+    assert_eq!(f.settings.bindings[Action::Pause as usize], "Escape");
     h.key(f, View::Full, Key::P);
     assert!(f.game.global_paused());
     let frozen = serde_json::to_value(&f.game).unwrap();
@@ -73,7 +74,9 @@ fn camp_pause_binding_does_not_steal_text_from_country_search() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
+    // Both the battle's Pause and the world clock sit on P.
     f.settings.bindings[Action::Pause as usize] = "P".into();
+    assert_eq!(f.settings.extra_bindings.world_clock, "P");
     h.frame(f, View::Camp, vec![]);
     h.ctx
         .memory_mut(|memory| memory.request_focus(egui::Id::new("country_search")));

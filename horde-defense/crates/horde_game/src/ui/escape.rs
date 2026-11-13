@@ -190,7 +190,7 @@ pub(super) fn keyboard_owner(ctx: &egui::Context, f: &UiCtx) -> KeyboardOwner {
 
 /// The topmost overlay of this frame, read before the frame draws.
 fn overlay(ctx: &egui::Context, f: &UiCtx) -> Overlay {
-    if f.screen == Screen::Settings && f.prefs.rebind.is_some() {
+    if f.screen == Screen::Settings && f.prefs.rebinding().is_some() {
         Overlay::Rebind
     } else if ctx.text_edit_focused() {
         Overlay::TextFocus
@@ -297,7 +297,7 @@ fn apply(action: EscapeAction, f: &mut UiCtx) {
     use EscapeAction as A;
     match action {
         A::LeaveToEgui | A::PassToPause | A::Ignore => {}
-        A::CancelRebind => f.prefs.rebind = None,
+        A::CancelRebind => f.prefs.cancel_rebind(),
         A::CloseModal => f.status.close_modal(),
         A::CloseNewJourney => f.menu.new_journey_confirm = false,
         A::CloseDetails => f.status.feedback.details_open = false,

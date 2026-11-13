@@ -1200,3 +1200,79 @@ fn battlefield_sprite_clip_stays_the_arena() {
         );
     }
 }
+
+/// A deployed personal defense with `nodes` bought first.
+fn battle_with_nodes(nodes: &[&str]) -> IsolatedFrontend {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.frontend.game.campaign_mut().coins = 10_000;
+    for node in nodes {
+        fixture
+            .frontend
+            .game
+            .campaign_mut()
+            .purchase_node(node)
+            .unwrap();
+    }
+    fixture.deploy();
+    fixture
+}
+
+#[test]
+fn cycle_attack_key_cycles_unlocked_attacks() {
+    use battle::AttackSelection::{Grenade, Gun, Molotov};
+    // The pure rule: the next unlocked selection in selector order, wrapping.
+    assert_eq!(Gun.next(|_| true), Grenade);
+    assert_eq!(Grenade.next(|_| true), Molotov);
+    assert_eq!(Molotov.next(|_| true), Gun);
+    assert_eq!(Gun.next(|s| s != Grenade), Molotov);
+    assert_eq!(Molotov.next(|s| s == Molotov), Molotov);
+    assert_eq!(Grenade.next(|_| false), Grenade);
+    let h = Harness::new();
+    // Nothing but the gun: the key keeps it.
+    let mut fixture = battle_with_nodes(&[]);
+    let f = &mut fixture.frontend;
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "Q");
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Gun);
+
+    // Grenades learned: the key skips the locked Molotov.
+    let mut fixture = battle_with_nodes(&["grenade_training"]);
+    let f = &mut fixture.frontend;
+    f.battle.fire_latched = true;
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Grenade);
+    // As a click on the selector: a firing latch never carries over.
+    assert!(!f.battle.fire_latched);
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Gun);
+
+    // Both learned: Gun, Grenade, Molotov and round again.
+    let mut fixture = battle_with_nodes(&["grenade_training", "molotov_training"]);
+    let f = &mut fixture.frontend;
+    let mut seen = Vec::new();
+    for _ in 0..4 {
+        h.key(f, View::Battle, Key::Q);
+        seen.push(f.battle.attack_selection);
+    }
+    assert_eq!(seen, [Grenade, Molotov, Gun, Grenade]);
+    // The rebound key cycles; the old one no longer does.
+    f.settings.set_binding(
+        settings::BindingId::Extra(settings::ExtraAction::CycleAttack),
+        "K".into(),
+    );
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Grenade);
+    h.key(f, View::Battle, Key::K);
+    assert_eq!(f.battle.attack_selection, Molotov);
+    // The construction overlay hides the selector: the key waits.
+    f.battle.set_construction(true);
+    h.key(f, View::Battle, Key::K);
+    assert_eq!(f.battle.attack_selection, Molotov);
+    f.battle.set_construction(false);
+    // An observed defense has no attack selector to cycle.
+    let mut fixture = fresh_battle(Mode::Npc, true);
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().coins = 10_000;
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Gun);
+}

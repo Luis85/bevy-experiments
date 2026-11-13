@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     art::{AMBER, GREEN, INK, PANEL, RED},
-    settings::Action,
+    settings::{self, ExtraAction},
 };
 use bevy_egui::egui::{self, Align, Layout, RichText, vec2};
 use horde_core::{
@@ -333,13 +333,15 @@ fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
     if escape::keyboard_owner(ctx, f) != escape::KeyboardOwner::Free {
         return;
     }
-    // The camp's pause key drives the world clock only where the clock is
-    // shown (Camp home, decision 6), and never resumes a waiting main
-    // defense from here: that has its own "Return to active defense".
+    // The world-clock key (its own binding, never the battle's Pause) drives
+    // the clock only where the clock is shown (Camp home, decision 6), and
+    // never resumes a waiting main defense from here: that has its own
+    // "Return to active defense".
     if f.tab == Tab::Home
         && f.operations_available()
         && f.game.attempt().is_none()
-        && f.settings.pressed(ctx, Action::Pause, false)
+        && f.settings
+            .pressed_extra(ctx, ExtraAction::WorldClock, false)
     {
         toggle_time(f);
     }
@@ -369,11 +371,18 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
     } else {
         ""
     };
+    // With a main defense waiting the key is off (`camp_controls`), so the
+    // hover names it only when it works.
+    let key = f.settings.extra_bindings.get(ExtraAction::WorldClock);
+    let key = if key.is_empty() || f.game.attempt().is_some() {
+        String::new()
+    } else {
+        format!(" Key: {}.", settings::binding_text(key))
+    };
     if ui
         .button(label)
         .on_hover_text(format!(
-            "{} pauses every battle and strategic deadline. Personal combat runs at 1×.{returns}",
-            f.settings.bindings[Action::Pause as usize]
+            "Pausing the world clock stops every battle and strategic deadline. Personal combat runs at 1×.{key}{returns}"
         ))
         .clicked()
     {

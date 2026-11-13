@@ -1,5 +1,5 @@
 use super::{
-    input::{AttackSelection, assisted_aim, target_cell},
+    input::{AttackSelection, assisted_aim, select_attack, target_cell},
     projection,
 };
 use crate::{
@@ -10,23 +10,26 @@ use crate::{
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Stroke, pos2, vec2};
 
+/// The selector's button labels, in `AttackSelection::ALL` order.
+const ATTACK_LABELS: [&str; 3] = ["Gun", "Grenade", "Molotov"];
+
 pub(super) fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
     let class = view.weapon_class;
+    let cycle = f.settings.extra_bindings.cycle_attack.clone();
     let spacing = 4.0;
     let button_width = ((ui.available_width() - 2.0 * spacing) / 3.0).max(1.0);
     ui.spacing_mut().item_spacing.x = spacing;
     ui.spacing_mut().button_padding = vec2(3.0, 4.0);
     ui.horizontal(|ui| {
-        for (selection, label) in [
-            (AttackSelection::Gun, "Gun"),
-            (AttackSelection::Grenade, "Grenade"),
-            (AttackSelection::Molotov, "Molotov"),
-        ] {
+        for (selection, label) in AttackSelection::ALL.into_iter().zip(ATTACK_LABELS) {
             let slot = selection.ordnance().map(|kind| view.slot(kind));
             let unlocked = slot.is_none_or(|slot| slot.unlocked);
             let fire = &f.settings.bindings[Action::Fire as usize];
-            let (hint, color) =
+            let (mut hint, color) =
                 throwable_state(label, slot, || format!("{class}: hold {fire} to fire."));
+            if unlocked && !cycle.is_empty() {
+                hint.push_str(&format!(" {cycle} cycles attacks."));
+            }
             let selected = f.battle.attack_selection == selection;
             let button = egui::Button::new(RichText::new(label).size(12.0).color(color))
                 .selected(selected)
@@ -56,12 +59,7 @@ pub(super) fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScr
                 .on_disabled_hover_text(&hint)
                 .clicked()
             {
-                f.battle.attack_selection = selection;
-                f.battle.fire_latched = false;
-                f.battle.pending.fire = false;
-                f.battle.pending.throw = None;
-                f.battle.pending_attack_aims.fire = None;
-                f.runtime.clear_input();
+                select_attack(f, selection);
             }
         }
     });

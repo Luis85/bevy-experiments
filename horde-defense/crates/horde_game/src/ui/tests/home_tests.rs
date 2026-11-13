@@ -174,8 +174,9 @@ fn clock_controls_only_on_home() {
         let output = settle(&h, f);
         assert!(f.nav.tab == tab, "{tab:?}");
         assert_eq!(clocks(&output), usize::from(tab == Tab::Home), "{tab:?}");
-        // The clock key works where the clock is shown, and only there.
-        f.settings.bindings[Action::Pause as usize] = "P".into();
+        // The clock key (the `world_clock` extra binding, W3-10) works where
+        // the clock is shown, and only there.
+        assert_eq!(f.settings.extra_bindings.world_clock, "P");
         let before = f.game.global_paused();
         h.key(f, View::Full, Key::P);
         assert_eq!(
@@ -207,6 +208,38 @@ fn clock_controls_only_on_home() {
             "{tab:?}"
         );
     }
+}
+
+/// W3-10: the world clock has its own key. The battle's Pause binding never
+/// drives it, and an unbound clock key never fires.
+#[test]
+fn unbound_extra_action_never_fires() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::large();
+    let f = unlocked_home(&mut fixture);
+    settle(&h, f);
+    assert!(!f.game.global_paused());
+    // Unbound: no key drives the clock, not even the Pause binding, and not
+    // the key the action had before.
+    f.settings.extra_bindings.world_clock.clear();
+    f.settings.bindings[Action::Pause as usize] = "K".into();
+    for key in [Key::K, Key::P] {
+        h.key(f, View::Full, key);
+        assert!(!f.game.global_paused(), "{key:?} with the clock unbound");
+    }
+    let output = settle(&h, f);
+    assert_eq!(text_count(&output, "Pause world clock"), 1);
+    // The button still works; only the key is unbound.
+    h.click(f, View::Full, "Pause world clock");
+    assert!(f.game.global_paused());
+    // Bound again, the clock key drives it and Pause still does not.
+    f.settings.extra_bindings.world_clock = "J".into();
+    h.key(f, View::Full, Key::K);
+    assert!(f.game.global_paused(), "Pause is the battle's key");
+    h.key(f, View::Full, Key::J);
+    assert!(!f.game.global_paused());
+    h.key(f, View::Full, Key::J);
+    assert!(f.game.global_paused());
 }
 
 /// The power text a roster row must show, built from core's numbers.
