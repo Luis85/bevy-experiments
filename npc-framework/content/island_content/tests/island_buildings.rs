@@ -33,8 +33,8 @@ fn shipped() -> App {
 /// The shipped world with its `living_world` block edited as JSON only.
 fn try_world_with(edit: impl FnOnce(&mut Value)) -> Result<App, String> {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    edit(&mut doc.world["living_world"]);
-    no_founding(&mut doc.world["living_world"]);
+    edit(&mut doc.world["construction"]["world"]["preset"]["living_world"]);
+    no_founding(&mut doc.world["construction"]["world"]["preset"]["living_world"]);
     island_content::scenario::load_scenario(&doc, SEED).map(|loaded| loaded.app)
 }
 

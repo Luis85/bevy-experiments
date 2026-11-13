@@ -24,7 +24,7 @@ fn shipped_world() -> Value {
 
 fn app_with(living_world: &Value) -> Result<App, String> {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    doc.world["living_world"] = living_world.clone();
+    doc.world["construction"]["world"]["preset"]["living_world"] = living_world.clone();
     island_content::scenario::load_scenario(&doc, 7).map(|loaded| loaded.app)
 }
 

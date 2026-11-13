@@ -464,7 +464,7 @@ fn plots_and_props_are_exported_and_built_again() {
             .is_some_and(|b| b.iter().any(|b| b["building"] == "garden"))
     );
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    doc.world["living_world"] = living.clone();
+    doc.world["construction"]["world"]["preset"]["living_world"] = living.clone();
     only_weather(&mut doc.world, "clear");
     let mut again = island_content::scenario::load_scenario(&doc, SEED)
         .unwrap_or_else(|error| panic!("{error}"))

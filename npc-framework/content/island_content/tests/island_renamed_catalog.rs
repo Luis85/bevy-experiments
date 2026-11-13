@@ -20,7 +20,7 @@ fn rename(value: &mut Value, from: &str, to: &str) {
 /// -> cloak, and the tailor's trade called clothier.
 fn renamed_world(seed: u64) -> bevy_app::App {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    let world = &mut doc.world["living_world"];
+    let world = &mut doc.world["construction"]["world"]["preset"]["living_world"];
     for (from, to) in [
         ("log", "timber"),
         ("bread", "loaf"),
@@ -130,7 +130,7 @@ fn a_world_with_renamed_goods_and_trade_lives_fourteen_days() {
 #[test]
 fn a_world_without_a_fuel_is_refused_naming_the_role() {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    for good in doc.world["living_world"]["economy"]["goods"]
+    for good in doc.world["construction"]["world"]["preset"]["living_world"]["economy"]["goods"]
         .as_array_mut()
         .expect("goods")
     {

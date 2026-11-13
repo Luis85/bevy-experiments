@@ -21,7 +21,7 @@ const STEP: u64 = 20;
 
 fn app_with(behavior: Value, seed: u64) -> App {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    doc.world["living_world"]["behavior"] = behavior;
+    doc.world["construction"]["world"]["preset"]["living_world"]["behavior"] = behavior;
     island_content::scenario::load_scenario(&doc, seed)
         .expect("edited behaviour loads")
         .app

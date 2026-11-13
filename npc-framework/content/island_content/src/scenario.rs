@@ -382,8 +382,16 @@ pub fn scenario_text(name: &str) -> Option<&'static str> {
         .map(|(_, t)| *t)
 }
 
-/// The embedded scenario `name`, parsed.
+/// The scenario `name` as the island builds it: the embedded file with its
+/// construction written in ([`crate::construction::shipped`]).
 pub fn scenario_doc(name: &str) -> Result<ScenarioDoc, String> {
+    base_doc(name)?;
+    Ok(crate::construction::shipped())
+}
+
+/// The embedded scenario file `name`, parsed, without a construction (the
+/// base [`crate::construction::from_preset`] writes into).
+pub fn base_doc(name: &str) -> Result<ScenarioDoc, String> {
     let text = scenario_text(name).ok_or_else(|| {
         format!(
             "unknown island scenario `{name}` (expected one of {:?})",
@@ -409,10 +417,8 @@ pub fn try_new_sim_app_with(
     scenario: &str,
     plugins: impl FnOnce(&mut App),
 ) -> Result<App, String> {
-    // The embedded scenario names the island; its world is the shipped
-    // construction, the same one the game builds (decision D2).
-    scenario_doc(scenario)?;
-    let doc = crate::construction::shipped();
+    // The shipped construction, the same one the game builds (decision D2).
+    let doc = scenario_doc(scenario)?;
     let mut loaded = load_with(&doc, seed, plugins)?;
     attach_controllers(&doc, &mut loaded)?;
     loaded.app.insert_resource(ScenarioInfo {

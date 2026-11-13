@@ -140,8 +140,11 @@ fn immutable_preset_and_scenario_describe_the_same_world() {
     let preset = island_content::worlds::builtin_preset("living_world").unwrap();
     island_content::worlds::validate(&preset).unwrap();
     let doc = island_content::scenario::scenario_doc("living_world").unwrap();
-    let spec = island_content::scenario::WorldSpec::parse(&doc.world).unwrap();
-    assert_eq!(preset.living_world, spec.living_world);
+    let built: LivingWorldSpec = serde_json::from_value(
+        doc.world["construction"]["world"]["preset"]["living_world"].clone(),
+    )
+    .unwrap();
+    assert_eq!(preset.living_world, Some(built));
     assert_eq!(preset.living_world, Some(LivingWorldSpec::default()));
     let mut bad = LivingWorldSpec::default();
     bad.settlements[0].sites[0].role = Role::Fisher;

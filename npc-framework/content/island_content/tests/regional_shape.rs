@@ -210,7 +210,7 @@ fn an_exported_world_builds_again_with_its_terrain_patches_and_buildings() {
     );
 
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    doc.world["living_world"] = living.clone();
+    doc.world["construction"]["world"]["preset"]["living_world"] = living.clone();
     only_weather(&mut doc.world, "clear");
     let mut again = island_content::scenario::load_scenario(&doc, SEED)
         .unwrap_or_else(|error| panic!("{error}"))

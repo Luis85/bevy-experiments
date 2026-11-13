@@ -26,13 +26,13 @@ fn shipped_tree() -> Value {
 fn shipped_world() -> Value {
     island_content::scenario::scenario_doc("living_world")
         .expect("scenario")
-        .world["living_world"]
+        .world["construction"]["world"]["preset"]["living_world"]
         .clone()
 }
 
 fn app_with(living_world: &Value) -> Result<App, String> {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    doc.world["living_world"] = living_world.clone();
+    doc.world["construction"]["world"]["preset"]["living_world"] = living_world.clone();
     island_content::scenario::load_scenario(&doc, 7).map(|loaded| loaded.app)
 }
 
@@ -121,11 +121,12 @@ fn the_shipped_tree_file_is_the_tree_every_resident_runs() {
 
 #[test]
 fn a_world_without_a_behaviour_block_gets_the_built_in_behaviour() {
-    let world = shipped_world();
-    assert!(
-        world.get("behavior").is_none(),
-        "the shipped world relies on the built-in block"
-    );
+    // The shipped construction writes the built-in block out; drop it.
+    let mut world = shipped_world();
+    let written: BehaviorSpec =
+        serde_json::from_value(world["behavior"].clone()).expect("written block");
+    assert_eq!(written, BehaviorSpec::default());
+    world.as_object_mut().expect("world").remove("behavior");
     let spec: LivingWorldSpec = serde_json::from_value(world.clone()).expect("shipped world");
     assert_eq!(spec.behavior, BehaviorSpec::default());
     spec.validate().expect("valid");

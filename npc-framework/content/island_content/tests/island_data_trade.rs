@@ -22,7 +22,7 @@ pub const POTTER_DISPLAY: &str = "clay potter";
 /// The shipped world with the pottery trade added in data only.
 pub fn pottery_world(seed: u64) -> bevy_app::App {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    let world = &mut doc.world["living_world"];
+    let world = &mut doc.world["construction"]["world"]["preset"]["living_world"];
     let economy = &mut world["economy"];
     let goods = economy["goods"].as_array_mut().expect("goods");
     goods.push(json!({

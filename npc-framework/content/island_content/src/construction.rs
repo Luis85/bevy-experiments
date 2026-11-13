@@ -144,7 +144,7 @@ impl Construction {
 /// (layout, actor) with the descriptor of `preset` written in. A world without
 /// a living island (`living_world`) or without the colony is refused.
 pub fn from_preset(preset: &WorldPreset) -> Result<ScenarioDoc, String> {
-    let mut doc = crate::scenario::scenario_doc("living_world")?;
+    let mut doc = crate::scenario::base_doc("living_world")?;
     crate::worlds::validate(preset).map_err(|errors| errors.join("; "))?;
     if !preset.colony {
         return Err("Local island rules must enable the colony simulation.".into());

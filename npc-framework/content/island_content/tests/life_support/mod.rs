@@ -19,11 +19,12 @@ pub const SEED: u64 = 7;
 /// both in reach.
 pub fn world_for(seed: u64, edit: impl FnOnce(&mut Value)) -> App {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
-    edit(&mut doc.world);
+    // Tests edit the chosen world preset (its `living_world` block and
+    // more), which the construction carries.
+    edit(&mut doc.world["construction"]["world"]["preset"]);
     // The day length is not part of a scenario's world: `short_days` leaves a
     // note here and the built world gets it before its first tick.
-    let day = doc
-        .world
+    let day = doc.world["construction"]["world"]["preset"]
         .as_object_mut()
         .and_then(|world| world.remove(DAY_TICKS))
         .and_then(|ticks| ticks.as_u64());
