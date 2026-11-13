@@ -416,6 +416,15 @@ Usage rules:
 - Reduced: no glint, no rise or drift. The fly-up holds at -12 pt and only fades. This fixes loot.rs:178-183.
 - No auto-sell or sale status is ever shown on the battlefield.
 
+**As built (W5-08):**
+
+- `draw_for(.., keep_clear, reduced)`; both callers pass `settings.reduced_effects`.
+- Glint: `glint_phase` gives 0..1 over seconds 0.15 to 0.55 of the fly-up (Rare and better, never reduced). `glint_band` is one additive quad a third of the icon wide, leaning 45 degrees, clipped to the icon; its colour is the quality colour lifted halfway to white at 0.6, times the fade.
+- Tier marker: `tier_marker(quality, at, colour)`, half-size 3 pt on an INK disc of radius 4.5 pt inside the icon's top-right corner, static and the same in reduced effects. The shapes follow ux-flow's set, which names all six tiers: Poor hollow point-down triangle, Common dot, Uncommon diamond, Rare square, Epic triangle, Legendary star. The marker is always drawn; it does not read `settings.quality_markers`.
+- Seam: ux-flow's shared `quality_marker(ui, quality, settings)` (chrome.rs, wave 3) is not in this lane. When it lands, it and `ui/loot.rs::tier_marker` should share one shape table, and the colour-blind palette should reach the fly-up colour.
+- Reduced: the rise input to `drop_icon_center` is held at 0, so the icon stays 12 pt over the kill with no drift; the fade is unchanged.
+- Tests: `rare_or_better_flyup_paints_one_glint_common_none`, `reduced_flyup_is_static_and_glintless`, `every_tier_flyup_paints_its_own_corner_marker`, pin `flyup_never_shows_sale_status`.
+
 ## 9. Reduced-effects coverage (every new effect)
 
 - No muzzle flash, light pool, sky flash, explosion keyframes, embers, glint, elite pulse, fly-up rise or scorch motion.

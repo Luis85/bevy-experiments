@@ -277,6 +277,7 @@ fn headroom_popups_never_overlap_hud_rects() {
                                 LootCaptureMode::Disabled,
                                 &keep_clear,
                                 settings.palette,
+                                settings.reduced_effects,
                             );
                         });
                         output.textures_delta.clear();

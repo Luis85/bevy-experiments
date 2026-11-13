@@ -149,9 +149,11 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         capture,
         &f.battle.effects_keep_clear,
         f.settings.palette,
+        f.settings.reduced_effects,
     );
 }
-/// The centre of a drop's icon `age` (0..=1) into its rise: 12 + 78 * age pt
+/// The centre of a drop's icon `age` (0..=1) into its rise (reduced effects
+/// hold it at 0): 12 + 78 * age pt
 /// above the feet at world `at`, drifting sideways by item id. The rise stops
 /// where the quality label, 29 pt above the centre, meets the top of the
 /// effects clip, so a top-lane drop is never cut off while it still shows.
@@ -192,6 +194,89 @@ fn drop_origin(attempt: &horde_core::sim::Attempt, receipt: &LootEvent) -> [f32;
 }
 /// How far above the icon centre the quality label starts.
 const LABEL_RISE: f32 = 29.0;
+/// The seconds of a fly-up's life its glint sweeps the icon.
+const GLINT: std::ops::Range<f64> = 0.15..0.55;
+/// How far across the icon (0..=1) the glint of a `quality` drop is `seconds`
+/// into its fly-up: Rare and better only, inside [`GLINT`], never in reduced
+/// effects.
+fn glint_phase(quality: Quality, seconds: f64, reduced: bool) -> Option<f32> {
+    (!reduced && quality >= Quality::Rare && GLINT.contains(&seconds))
+        .then(|| ((seconds - GLINT.start) / (GLINT.end - GLINT.start)) as f32)
+}
+/// The glint: one additive diagonal band, a third of the icon wide and
+/// leaning 45 degrees, `phase` of the way from clear of the icon's left edge
+/// to clear of its right. The caller clips it to the icon.
+fn glint_band(icon: Rect, phase: f32, color: Color32, fade: f32) -> egui::Mesh {
+    let half = icon.width() / 6.0;
+    let lean = icon.height() * 0.5;
+    let reach = half + lean;
+    let x = egui::lerp((icon.left() - reach)..=(icon.right() + reach), phase);
+    let lit = |c: u8| ((f32::from(c) * 0.5 + 127.5) * 0.6 * fade).round() as u8;
+    let color = Color32::from_rgb_additive(lit(color.r()), lit(color.g()), lit(color.b()));
+    let mut mesh = egui::Mesh::default();
+    for at in [
+        pos2(x + lean - half, icon.top()),
+        pos2(x + lean + half, icon.top()),
+        pos2(x - lean + half, icon.bottom()),
+        pos2(x - lean - half, icon.bottom()),
+    ] {
+        mesh.colored_vertex(at, color);
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    mesh
+}
+/// Half the size of a tier marker, and the radius of the INK disc under it.
+const MARKER_HALF: f32 = 3.0;
+const MARKER_DISC: f32 = 4.5;
+/// The marker sits inside the icon's top-right corner, its disc 1 pt clear
+/// of both edges.
+fn marker_center(icon: Rect) -> egui::Pos2 {
+    icon.right_top() + vec2(-MARKER_DISC - 1.0, MARKER_DISC + 1.0)
+}
+/// A drop's tier as a shape, so quality never rests on colour alone: Poor a
+/// hollow point-down triangle, Common a dot, Uncommon a diamond, Rare a
+/// square, Epic a triangle, Legendary a five-point star (the ux-flow shape
+/// set). Fits a square of half-size [`MARKER_HALF`] on `at`.
+fn tier_marker(quality: Quality, at: egui::Pos2, color: Color32) -> egui::Shape {
+    let h = MARKER_HALF;
+    let points = |unit: &[[f32; 2]]| -> Vec<egui::Pos2> {
+        unit.iter().map(|[x, y]| at + vec2(x * h, y * h)).collect()
+    };
+    match quality {
+        Quality::Poor => egui::Shape::closed_line(
+            points(&[[-1.0, -0.8], [1.0, -0.8], [0.0, 1.0]]),
+            Stroke::new(1.0, color),
+        ),
+        Quality::Common => egui::Shape::circle_filled(at, h * 0.8, color),
+        Quality::Uncommon => egui::Shape::convex_polygon(
+            points(&[[0.0, -1.0], [1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]]),
+            color,
+            Stroke::NONE,
+        ),
+        Quality::Rare => {
+            egui::Shape::rect_filled(Rect::from_center_size(at, vec2(h, h) * 1.7), 0.0, color)
+        }
+        Quality::Epic => egui::Shape::convex_polygon(
+            points(&[[0.0, -1.0], [1.0, 0.8], [-1.0, 0.8]]),
+            color,
+            Stroke::NONE,
+        ),
+        Quality::Legendary => {
+            // A star is not convex: a fan from the centre over ten rim
+            // points, the tips at radius 1 and the notches at 0.45.
+            let mut mesh = egui::Mesh::default();
+            mesh.colored_vertex(at, color);
+            for i in 0..10u32 {
+                let radius = if i % 2 == 0 { h } else { h * 0.45 };
+                let angle = std::f32::consts::TAU * i as f32 / 10.0;
+                mesh.colored_vertex(at + vec2(angle.sin(), -angle.cos()) * radius, color);
+                mesh.add_triangle(0, 1 + i, 1 + (i + 1) % 10);
+            }
+            egui::Shape::mesh(mesh)
+        }
+    }
+}
 /// Draws `battle`'s fly-ups; none meets a rect of `keep_clear` (CF-1-09).
 #[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
@@ -204,6 +289,7 @@ pub(super) fn draw_for(
     capture: review::LootCaptureMode,
     keep_clear: &[Rect],
     palette: crate::settings::Palette,
+    reduced: bool,
 ) -> bool {
     let ready = textures.actors.is_some()
         && textures.props.is_some()
@@ -222,10 +308,14 @@ pub(super) fn draw_for(
     );
     let painter = ui.painter_at(projection.effects_clip);
     for entry in &state.streams[&battle].active {
-        let age = ((now - entry.started) / LIFETIME).clamp(0.0, 1.0) as f32;
+        let seconds = now - entry.started;
+        let age = (seconds / LIFETIME).clamp(0.0, 1.0) as f32;
         let fade = (1.0 - age).powf(0.65);
         let origin = drop_origin(attempt, &entry.receipt);
-        let at = drop_icon_center(projection, origin, entry.receipt.item_id, age);
+        // Reduced effects: no rise and no drift. The fly-up holds where it
+        // appears, 12 pt over the kill, and only fades.
+        let rise = if reduced { 0.0 } else { age };
+        let at = drop_icon_center(projection, origin, entry.receipt.item_id, rise);
         let color = chrome::quality_colour(entry.receipt.quality, palette).gamma_multiply(fade);
         let text = if entry.receipt.quality >= Quality::Rare {
             format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
@@ -279,6 +369,17 @@ pub(super) fn draw_for(
             ),
             egui::StrokeKind::Inside,
         );
+        if let Some(phase) = glint_phase(entry.receipt.quality, seconds, reduced) {
+            painter
+                .with_clip_rect(icon.intersect(projection.effects_clip))
+                .add(glint_band(icon, phase, color, fade));
+        }
+        // The tier marker and its disc: static, the same in reduced effects.
+        let marker = marker_center(icon);
+        painter.circle_filled(marker, MARKER_DISC, art::INK.gamma_multiply(fade));
+        painter.add(tier_marker(entry.receipt.quality, marker, color));
+        // Quality and name only: no auto-sell or sale status is ever shown
+        // on the battlefield (G4.9, `flyup_never_shows_sale_status`).
         painter.galley(text_at, galley, color);
     }
     rare
@@ -471,5 +572,219 @@ mod tests {
         state.observe(2, 100, &[], 0.1);
         assert!(state.active.is_empty());
         assert!(state.seen.is_empty());
+    }
+    /// One fly-up of `quality` drawn `seconds` after it appeared, in normal
+    /// or reduced effects: every shape of that egui pass, and where its rise
+    /// starts (the icon centre at age 0).
+    fn drawn(quality: Quality, reduced: bool, seconds: f64) -> (Vec<egui::Shape>, egui::Pos2) {
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let a = game.attempt_mut().unwrap();
+        let mut event = receipt(6, quality);
+        event.tick = a.tick;
+        event.at = [a.width_yards * 0.5, a.lane_count as f32 * 0.5];
+        a.loot_events.push(event.clone());
+        let a = game.attempt().unwrap();
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
+        let projection = art::ArenaProjection::for_attempt(canvas, a);
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, 1.0);
+        let mut feedback = Feedback::default();
+        let mut shapes = Vec::new();
+        for time in [0.0, seconds] {
+            let input = egui::RawInput {
+                time: Some(time),
+                screen_rect: Some(canvas),
+                ..Default::default()
+            };
+            let mut output = ctx.run_ui(input, |ui| {
+                draw_for(
+                    ui,
+                    projection,
+                    a,
+                    0,
+                    Default::default(),
+                    &mut feedback,
+                    review::LootCaptureMode::Disabled,
+                    &[],
+                    reduced,
+                );
+            });
+            output.textures_delta.clear();
+            shapes = output.shapes.into_iter().map(|c| c.shape).collect();
+        }
+        (shapes, drop_icon_center(projection, event.at, 6, 0.0))
+    }
+    /// Meshes with an additive vertex (alpha 0, colour not transparent).
+    fn glints(shapes: &[egui::Shape]) -> usize {
+        shapes
+            .iter()
+            .filter(|shape| match shape {
+                egui::Shape::Mesh(mesh) => mesh
+                    .vertices
+                    .iter()
+                    .any(|v| v.color.a() == 0 && v.color != Color32::TRANSPARENT),
+                _ => false,
+            })
+            .count()
+    }
+    /// The 25 pt icon plate of the one fly-up drawn: its rect and fill.
+    fn plate(shapes: &[egui::Shape]) -> (Rect, Color32) {
+        let plates: Vec<_> = shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                egui::Shape::Rect(r)
+                    if r.fill != Color32::TRANSPARENT && r.rect.size() == vec2(25.0, 25.0) =>
+                {
+                    Some((r.rect, r.fill))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(plates.len(), 1, "one fly-up, one icon plate");
+        plates[0]
+    }
+    fn texts(shapes: &[egui::Shape]) -> Vec<String> {
+        shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                egui::Shape::Text(text) => Some(text.galley.job.text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+    /// G7 (FX-7): a Rare or better drop gets exactly one additive band sweep
+    /// across its icon between 0.15 and 0.55 s; lesser tiers never do, and
+    /// nothing glints outside that window.
+    #[test]
+    fn rare_or_better_flyup_paints_one_glint_common_none() {
+        for quality in Quality::ALL {
+            let expected = usize::from(quality >= Quality::Rare);
+            for seconds in [0.16, 0.3, 0.54] {
+                assert_eq!(
+                    glints(&drawn(quality, false, seconds).0),
+                    expected,
+                    "{quality:?} at {seconds} s"
+                );
+            }
+            for seconds in [0.0, 0.14, 0.56, 1.2] {
+                assert_eq!(
+                    glints(&drawn(quality, false, seconds).0),
+                    0,
+                    "{quality:?} outside the sweep at {seconds} s"
+                );
+            }
+        }
+        // The band crosses the icon left to right.
+        let band = |seconds| {
+            let (shapes, _) = drawn(Quality::Epic, false, seconds);
+            shapes
+                .iter()
+                .find_map(|shape| match shape {
+                    egui::Shape::Mesh(mesh) if glints(std::slice::from_ref(shape)) == 1 => {
+                        Some(mesh.calc_bounds().center().x - plate(&shapes).0.center().x)
+                    }
+                    _ => None,
+                })
+                .expect("a glint")
+        };
+        assert!(band(0.2) < band(0.35) && band(0.35) < band(0.5));
+        assert!(band(0.2) < 0.0 && band(0.5) > 0.0);
+    }
+    /// G7 (FX-7, the reduced half): in reduced effects a fly-up holds 12 pt
+    /// above the kill, neither rising nor drifting, never glints and only
+    /// fades; normal effects still rise.
+    #[test]
+    fn reduced_flyup_is_static_and_glintless() {
+        for quality in Quality::ALL {
+            let mut alphas = Vec::new();
+            for seconds in [0.0, 0.3, 0.75, 1.2] {
+                let (shapes, start) = drawn(quality, true, seconds);
+                let (icon, fill) = plate(&shapes);
+                assert_eq!(icon.center(), start, "{quality:?} holds at {seconds} s");
+                assert_eq!(glints(&shapes), 0, "{quality:?} glintless at {seconds} s");
+                alphas.push(fill.a());
+            }
+            assert!(
+                alphas.windows(2).all(|pair| pair[0] > pair[1]),
+                "{quality:?} only fades: {alphas:?}"
+            );
+        }
+        let (shapes, start) = drawn(Quality::Rare, false, 0.75);
+        assert!(plate(&shapes).0.center().y < start.y - 30.0, "normal rises");
+    }
+    /// Every tier carries its own corner marker shape on an INK disc inside
+    /// the icon's top-right corner, the same in reduced effects.
+    #[test]
+    fn every_tier_flyup_paints_its_own_corner_marker() {
+        let at = pos2(40.0, 40.0);
+        let markers: Vec<_> = Quality::ALL
+            .iter()
+            .map(|&quality| tier_marker(quality, at, Color32::WHITE))
+            .collect();
+        for (i, a) in markers.iter().enumerate() {
+            assert!(
+                Rect::from_center_size(at, vec2(2.0, 2.0) * MARKER_HALF)
+                    .expand(0.6)
+                    .contains_rect(a.visual_bounding_rect()),
+                "{:?} fits its disc",
+                Quality::ALL[i]
+            );
+            for b in &markers[i + 1..] {
+                assert_ne!(a, b, "tier markers differ in shape");
+            }
+        }
+        for reduced in [false, true] {
+            for quality in Quality::ALL {
+                let (shapes, _) = drawn(quality, reduced, 0.3);
+                let (icon, _) = plate(&shapes);
+                let disc = shapes
+                    .iter()
+                    .position(|shape| {
+                        matches!(shape, egui::Shape::Circle(c)
+                        if c.radius == MARKER_DISC
+                            && c.fill.to_opaque() == art::INK
+                            && c.center == marker_center(icon))
+                    })
+                    .unwrap_or_else(|| panic!("{quality:?} marker disc, reduced {reduced}"));
+                let marker = &shapes[disc + 1];
+                assert!(
+                    icon.contains_rect(marker.visual_bounding_rect()),
+                    "{quality:?} marker inside the icon"
+                );
+                assert!(
+                    Rect::from_center_size(marker_center(icon), vec2(2.0, 2.0) * MARKER_DISC)
+                        .contains_rect(marker.visual_bounding_rect()),
+                    "{quality:?} marker on its disc"
+                );
+            }
+        }
+    }
+    /// Acceptance G4.9 pin: a fly-up says the drop's quality (and, Rare or
+    /// better, its name) and nothing else. No auto-sell or sale status ever
+    /// shows on the battlefield, in normal or reduced effects.
+    #[test]
+    fn flyup_never_shows_sale_status() {
+        for reduced in [false, true] {
+            for quality in Quality::ALL {
+                for seconds in [0.0, 0.3, 1.2] {
+                    let said = texts(&drawn(quality, reduced, seconds).0);
+                    let expected = if quality >= Quality::Rare {
+                        format!("{} \u{b7} Rifle", quality.name())
+                    } else {
+                        quality.name().to_owned()
+                    };
+                    assert_eq!(said, [expected], "{quality:?} reduced {reduced}");
+                    for word in ["sell", "sold", "sale", "auto", "coin", "+"] {
+                        assert!(
+                            !said[0].to_lowercase().contains(word),
+                            "{quality:?} fly-up says {word:?}: {said:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
