@@ -63,7 +63,7 @@ pub struct AutoSoldReceipt { pub count: u32, pub coins: u64, pub by_quality: Kin
 pub struct AutoSoldLine { pub definition: ItemDefId, pub level: u32, pub quality: Quality, pub coins: u64 } // no item_id by design
 ```
 
-- Lines keep the 12 sales with the highest coins (ties go to ascending id). Totals are always exact. Results shows "and N more".
+- Lines keep the 12 sales with the highest coins. Ties: within one settlement (`sim/auto_sell.rs`) they go to ascending item id; when `AutoSoldReceipt::absorb` merges an expedition's final sweep into the run's receipt, the earlier receipt's lines come first on a tie, because `AutoSoldLine` carries no item id (amended to the as-built order by plan R42, 2026-11-13). Totals are always exact. Results shows "and N more".
 - All saved fields are listed in the saved-fields table. Every one is `serde(default)` plus `skip_serializing_if` default, so the wave-1 commit moves no GOLDEN digest. `SAVE_VERSION` becomes 7 (user decision 8).
 - The v6_to_v7 loot entries in `sim/migrations.rs` are owned by save-determinism and ordered with the other remits' entries:
   - Root `last_result` and every `battles[].game.last_result` get `drop_ids` set to `loot_events[].item_id` in event order.

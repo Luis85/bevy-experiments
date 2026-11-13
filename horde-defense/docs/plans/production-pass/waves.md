@@ -5,6 +5,7 @@
 - **Test-first.** Each commit's named test fails on the parent commit. A characterisation pin must record a mutation or perturbation proof in the commit message.
 - **Verify before committing.** Every commit leaves the full verify green: fmt, the 3 clippy configs, the workspace tests, the `-p horde-defense --no-default-features` and `--features dev` tests, `--smoke` and check_views.
 - **Wave-close rule (R25, user decision 2026-11-07).** A wave closes when two review rounds in a row find nothing above minor, the perf acceptance and the full verify are green at HEAD, and every confirmed finding is fixed or explicitly ruled. Remaining minor findings carry into the next wave's review.
+- **Build, then one closing phase (R36, user decision 2026-11-13).** Waves 3-7 are built in one go. A commit still writes its row's tests first and records the failure line (or, for a pin, the mutation or perturbation proof) in its body. Before committing it runs `cargo fmt --all`, `cargo check --locked --workspace --all-targets` (plus `-p horde-defense --no-default-features` and `--features dev` when it touches horde_game) and its own new and directly affected tests; `scripts/tests/run_script_tests.ps1` when it touches scripts; and pacing only when its row is a pacing measurement or tuning (wave 4). A digest move sets the provisional pin with its cause (P3). The full verify, the review rounds, captures, perf acceptance, smoke and pacing re-runs move to one closing phase after the wave-7 build, which also fixes, improves and polishes what they show. A row's verification half (captures, perf passes, smoke, a capture-matrix review) is a closing-phase item, not build work. W4-08 stays the single re-bless for waves 3-4; any later digest move stays provisional and is re-blessed once in the closing phase. The R25 close conditions apply once, to the closing phase. For waves 3-7 this bullet wins over the "Verify before committing", "Wave-close rule", "Captures" and "Wave close" bullets where they differ.
 - **Digest moves.** A commit that moves a digest sets the provisional pin and its cause (P3). Only the wave's SD re-bless commit folds the pins.
 - **Scope.** No root-repo file is touched (R6). The review checks `git diff --name-only main... | grep -v ^horde-defense/` is empty.
 - **Scripts.** Scripts run under Windows PowerShell 5.1 and use `Native.ps1` once it exists (W1-02).
@@ -724,6 +725,7 @@ Wave-2 exit:
 - Audio handoffs exist: the BossPhase event and the twins W2-28/W2-37.
 - The gate-3 episode of the shipped default configuration (W2-50) is attributed or fixed, or closed by the §2.5 decision; the sample-932 stall-tail question is answered.
 - Handed on (W2 review, 2026-11-10): capture row CF-2-01, opened by the W2-41 close capture (the `pistol_training` → `smg_training` stub label on the new Spray control wire), is fixed by W3-32 before W3-27's matrix review.
+- **Review closed at a9fc30a (2026-11-13; plan §7 "Wave-2 close").** Review rounds 1-5 confirmed 24, 12, 7, 8 and 11 findings, with nothing above minor in rounds 4 and 5, so R25's two-round condition is met. Every confirmed finding is fixed or ruled (R34-R35, R37-R54), except the R30 question that the user owns (plan §2.5). The perf acceptance and the full verify at HEAD did not run: a usage limit stopped them, and R36 then moved them to the closing phase, together with the capture items listed in plan §7. Checked in the closing phase under R36.
 
 ---
 
@@ -951,6 +953,7 @@ Wave-3 exit:
 - The W3 capture matrix is reviewed.
 - Capture rows CF-1-01, CF-1-02 (W3-29), CF-1-03 (W3-30), CF-1-07 (W3-31), CF-1-08 (W3-12) and CF-2-01 (W3-32) are fixed.
 - The construction-rect CF row is closed (already fixed in W1).
+- Checked in the closing phase under R36: the full-loop headless test runs with the build, and the W3 capture matrix and the CF rows' after captures are taken and reviewed there.
 
 ---
 
@@ -973,7 +976,16 @@ Wave-3 exit:
 Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
 - **W4-l:** optional single-home cleanup. `validate_attempt_loot` (`sim/persistence.rs:455`) calls `content().max_drop_tier()` rather than `crate::loot::max_drop_tier()` (`loot.rs:23`). The two are equivalent today, so the change moves no digest. It is not a defect, and the row may drop it.
 
-Wave-4 exit: every ignored `pacing_targets` assertion passes in release (goal 3, goal 4 auto-sell, goal 5, goal 6), with before/after tables in the plan.
+Also owns (wave-2 close, 2026-11-13; orchestrator rulings R37-R53, plan §2.4):
+- **W4-04..n (R37):** G6.11 has no minimum seed count per window. The goal-6 defeat-window summary reports how many seeds each window pooled; at a9fc30a `defeat_rate_windows` names only the seeds of the lowest and highest windows and the fewest-to-most range, so the loop's first commit adds the count for every window (test-first), and every tuning commit reads those counts beside the rates.
+- **W4-03 and W4-08 (R38):** structures in saved encounters have no frozen pin; the continuation pins and R4 cover them. If W4-03's shrapnel_trap `charges_per_rank` 1 moves a continuation pin, W4-03 sets it provisional with its cause, and W4-08 re-blesses it with a written reason.
+- **W4-l (R39):** the two unmeasured post-L4 loot numbers: the median stash size after 60 and 150 runs and the auto-sold coins per run in runs 1-6 (auto-sell profile, 20 seeds, median), recorded in plan §9.7 beside the rank-23 figure (75.6 extra elite drops per run).
+- **W4-p (R48):** before it runs `no_valued_node_is_dominated_at_its_reference_states`, records in design-progression-tree §2 the three dominance groups W2-25 gave the decision-19 kinds (`CadenceMultiplier`, `ArmorPenetration`, `HazardDamageMultiplier`) and the multi-axis gain sum.
+- **W4-p (R51):** the W2-42 "one option" correction, in its own commit: `takeover` also starts in Luxembourg and `farm` also plays the novice aim. It corrects the registry comment in `sim/pacing.rs`, renames `w2_42_rows_vary_the_acceptance_profile_by_one_option` to `w2_42_rows_vary_the_acceptance_profile_only_in_their_named_fields` (assertions unchanged; a doc comment names each row's changed fields), adds a correcting note under W2-42 above and one sentence to plan §9.6 saying the takeover and farm columns do not isolate their plan. It changes no behaviour (a comment, a test name and docs), so like a doc fix it has no fail-first test; the commit body says so.
+- **W4-10 (R52):** the comment in `target_urgency_is_authored_data_with_a_legacy_category_default` (`crates/horde_core/src/enemy_catalog.rs`): only the W2-31 exploder (-4, Shambler-based) and spitter (-2, Runner-based) author an urgency other than their category default; runner, caller-pack, skitter and plated-runner author the Runner -3 explicitly; sprinter and splitter-brood omit it and take that -3. Comment only, in its own commit.
+- **W4-11 (R53), unless an earlier commit did it:** `scripts/check_views.py` exits 1 at a9fc30a ("ARCHITECTURE.md: guard test not found: sim/elite_tests.rs"). The first build commit that edits docs/ARCHITECTURE.md or has check_views as its gate writes `crates/horde_core/src/sim/elite_tests.rs` in place of `sim/elite_tests.rs` in the core `loot.rs` and `sim/combat.rs` rows; W4-11's check_views gate needs it at the latest.
+
+Wave-4 exit: every ignored `pacing_targets` assertion passes in release (goal 3, goal 4 auto-sell, goal 5, goal 6), with before/after tables in the plan. Checked in the closing phase under R36: the tuning rows still measure pacing as their own work, and the closing phase re-runs every `pacing_targets` assertion at HEAD.
 
 ---
 
@@ -999,6 +1011,8 @@ Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
   - The same rerun-once rule covers the three R30 `Invoke-Native -Sample` cases in `scripts/tests/run_script_tests.ps1`. The W2 review replaced their absolute wall-clock bounds (W2-47: 4 to 6 samples over a 2 s child, a first sample within 0.4 s) with structural asserts. Exactly one sample is taken before the first wait, and it sees no exit marker. A 2 s child gets at least 2 samples. A timed-out run gets at least 1. The only upper bounds are twice the wait slices that fit in the run's own measured length or in its 1 s timeout. Load lengthens the run or takes time from the loop, so it cannot push a count over them. W5-11 owes no further work on them.
 
 The human review for weapon-classes and night/storm is logged as pending if it is not done.
+
+Wave-5 exit (plan §7): fx-stress within budget, the reduced MOTION gates pass and the human review is logged. Checked in the closing phase under R36: W5-11's fx-stress perf passes and the capture review run there.
 
 ---
 
@@ -1029,6 +1043,8 @@ The human review for weapon-classes and night/storm is logged as pending if it i
 
 The listening pass is logged as pending.
 
+Wave-6 exit (plan §7): the -23 ±2 LUFS integrated / TP ≤ 0.95 FS gate is closed and the listening pass is logged as pending. Checked in the closing phase under R36.
+
 ---
 
 ## WAVE 7: goals 9-10 and docs
@@ -1047,3 +1063,5 @@ The listening pass is logged as pending.
 | W7-10 | save-determinism | SIMULATION/VALIDATION/ARCHITECTURE v7 docs; final zero-move record | existing pins |
 | W7-11 | qa-captures | Final full-loop capture review at both sizes, normal and reduced; findings table with owners; pairs in `docs/screenshots/production/` (≤ 40 MB) | `check_capture_findings.py --final` exits 0 only when every CF row is fixed or "approved by user" |
 | W7-12 | orchestrator | The plan's Outcome section: branch, commits, change per finding, numbers, verify results, pending human checks; ask before fast-forwarding `main` | n/a |
+
+Wave-7 exit (plan §7): the package is verified under 5.1, `check_capture_findings.py --final` exits 0 and the Outcome is written. Checked in the closing phase under R36: W7-09's final acceptance, W7-11's final capture review and the packaged verify are closing-phase work, and W7-12's Outcome is written after the closing phase.
