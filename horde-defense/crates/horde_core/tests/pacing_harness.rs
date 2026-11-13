@@ -1010,8 +1010,18 @@ fn takeover_profile_records_first_takeover() {
     assert!(spent > 0, "the recruit was paid for");
 }
 
+/// The fields each W2-42 row changes on expert-deu (R51), beside its id and
+/// name:
+/// - `manual-sell`: `plan.sell` (ManualExtras).
+/// - `auto-sell`: `plan.sell` (Auto).
+/// - `takeover`: `plan.defender` (RecruitWhenReady) and `country` (LUX).
+/// - `farm`: `plan.farm` (ReplayAfterDefeats(2)) and `aim` (Novice).
+/// - `easy`, `hard`: `difficulty`.
+/// - `long`: `max_runs` (150).
+///
+/// So the takeover and farm columns do not isolate their plan option.
 #[test]
-fn w2_42_rows_vary_the_acceptance_profile_by_one_option() {
+fn w2_42_rows_vary_the_acceptance_profile_only_in_their_named_fields() {
     let expert = by_id(DEFAULT_PROFILE_ID).expect("registered");
     let row = |id: &str| by_id(id).unwrap_or_else(|| panic!("{id} is registered"));
     let plan = |p: PacingPlan| PacingProfile {

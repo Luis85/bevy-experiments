@@ -211,8 +211,8 @@ const GOAL6_PLAYER: PacingProfile = PacingProfile {
     plan: PacingPlan::SOLO,
     stop_after: None,
 };
-/// The acceptance profile, which the W2-42 rows vary by one plan option,
-/// preset or run limit each.
+/// The acceptance profile, which the W2-42 rows vary only in their named
+/// fields (see the registry comment above `manual-sell`).
 const EXPERT_DEU: PacingProfile = PacingProfile {
     id: "expert-deu",
     name: "expert, tree first, Germany",
@@ -294,8 +294,12 @@ const REGISTRY: [PacingProfile; 19] = [
         ..GOAL6_PLAYER
     },
     // W2-42 (W2-I): the rows that need other remits' commands. Each varies
-    // the acceptance profile by one option, so its table column reads
-    // against expert-deu's.
+    // the acceptance profile only in the fields it names. manual-sell,
+    // auto-sell, easy, hard and long change one field (the sale plan, the
+    // preset or the run limit), so their table columns read against
+    // expert-deu's. takeover changes two (the defender plan and a Luxembourg
+    // start) and farm two (the farm plan and the novice aim), so those two
+    // columns do not isolate their plan (R51).
     PacingProfile {
         id: "manual-sell",
         name: "expert, tree first, Germany, sells extras",
