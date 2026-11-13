@@ -4,7 +4,7 @@ use super::{
     command::RuntimeNotice,
     runtime::{GameSession, Runtime},
 };
-use crate::{audio::Cue as SoundCue, profile::ProfilePaths, settings::Settings};
+use crate::{audio::CueRequest, profile::ProfilePaths, settings::Settings};
 use bevy::{app::AppExit, ecs::system::SystemParam, prelude::*};
 
 /// Runner phases. Only `Apply` has dependants (the UI's notice handling runs
@@ -26,7 +26,7 @@ impl Plugin for SimRuntimePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Time::<Fixed>::from_hz(60.0))
             .add_message::<RuntimeNotice>()
-            .add_message::<SoundCue>()
+            .add_message::<CueRequest>()
             .add_systems(PreUpdate, apply_commands.in_set(RuntimeSet::Apply))
             .add_systems(FixedUpdate, advance.in_set(RuntimeSet::Advance))
             .add_systems(Update, persist.in_set(RuntimeSet::Persist));
@@ -41,7 +41,7 @@ pub struct RuntimeParams<'w> {
     settings: Res<'w, Settings>,
     paths: Res<'w, ProfilePaths>,
     notices: MessageWriter<'w, RuntimeNotice>,
-    cues: MessageWriter<'w, SoundCue>,
+    cues: MessageWriter<'w, CueRequest>,
     perf: Option<Res<'w, crate::diagnostics::PerfProbe>>,
 }
 impl RuntimeParams<'_> {
@@ -67,7 +67,7 @@ impl RuntimeParams<'_> {
             self.session.set_changed();
         }
         self.notices.write_batch(notices);
-        self.cues.write_batch(cues);
+        self.cues.write_batch(cues.into_iter().map(CueRequest));
         result
     }
 }

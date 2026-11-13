@@ -63,7 +63,7 @@ pub(crate) fn player_model_review_report(ctx: &egui::Context) -> Option<review::
 pub(super) fn draw(
     mut contexts: EguiContexts,
     mut params: UiParams,
-    mut sounds: MessageWriter<crate::audio::Cue>,
+    mut sounds: MessageWriter<crate::audio::CueRequest>,
     time: Res<Time>,
     frames: Res<bevy::diagnostic::FrameCount>,
     render_device: Res<bevy::render::renderer::RenderDevice>,
@@ -93,7 +93,7 @@ pub(super) fn draw(
         return Ok(());
     }
     draw_screen(ctx, &mut f, time.elapsed_secs());
-    sounds.write_batch(cues);
+    sounds.write_batch(cues.into_iter().map(crate::audio::CueRequest));
     ctx.request_repaint();
     Ok(())
 }

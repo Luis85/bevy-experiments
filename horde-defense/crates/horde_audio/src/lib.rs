@@ -14,3 +14,8 @@
 //!   state. Variation comes from presentation counters.
 //! - SHA-256 for asset audits is `horde_core::sha256`, reached through the
 //!   test-support dev-dependency only.
+
+pub mod bank;
+pub mod cue;
+pub mod synth;
+pub mod wav;

@@ -8,7 +8,7 @@ use super::{
     toast::{RECOVERY_COPIES, TOAST_LONG_SECS, ToastKind},
 };
 use crate::{
-    audio::Cue as SoundCue,
+    audio::CueRequest,
     runner::{
         AppCommand, AppOutcome, GameSession, Runtime, RuntimeNotice, SAVE_SUPERSEDED, SaveIntent,
     },
@@ -32,7 +32,7 @@ const SAVED_WITH_RECOVERY: &str = "Saved · recovery copies kept";
 pub(super) fn handle_notices(
     mut notices: MessageReader<RuntimeNotice>,
     mut params: UiParams,
-    mut cues: MessageWriter<SoundCue>,
+    mut cues: MessageWriter<CueRequest>,
 ) {
     let notices: Vec<_> = notices.read().cloned().collect();
     if notices.is_empty() {
@@ -43,7 +43,7 @@ pub(super) fn handle_notices(
     for notice in notices {
         f.apply_notice(notice);
     }
-    cues.write_batch(buffer);
+    cues.write_batch(buffer.into_iter().map(CueRequest));
 }
 
 /// `OnEnter(Screen::Battle)`: a new deployment starts with centred aim,

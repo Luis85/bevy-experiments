@@ -9,6 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+horde_audio = { path = "../horde_audio" }
 horde_core = { path = "../horde_core" }
 # No picking: the frontend is egui-only and never uses Bevy pointer picking, so
 # both Bevy's picking plugins and bevy_egui's picking integration are left out.

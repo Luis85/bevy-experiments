@@ -31,7 +31,7 @@ Four presentation cues reuse a synthesized family's files instead of adding new 
 
 A withdrawal plays the existing Retreat cue once, from its `AttemptFinished` event. A `Withdraw` command drains that event immediately because it pauses the game.
 
-`crates/horde_game/src/audio.rs` defines timbre metadata and the offline synthesizer. It contains no simulation calls. Weapon selection and resolved events choose cues; procedural variations use presentation counters and their own fixed seeds. They never consume combat randomness, determine hits or pay rewards.
+The Bevy-free crate `crates/horde_audio` defines the cue list (`cue.rs`), the banks and file paths (`bank.rs`) and the offline synthesizer (`synth/legacy.rs`). `crates/horde_game/src/audio.rs` keeps the cue message, the per-cue gains and the repeat gate. Neither contains simulation calls. Weapon selection and resolved events choose cues; procedural variations use presentation counters and their own fixed seeds. They never consume combat randomness, determine hits or pay rewards.
 
 The mixer caps effects at six concurrent voices and selects at most two new cues per update. Real-time per-cue gates suppress repeated damage/arrival/fire feedback when many simulation ticks advance together. Important warnings retain their existing visual equivalents. Pending and playing voices follow master/effects changes, including immediate mute; reduced effects lowers individual gains and increases minimum repeat intervals. The existing separate ambience bus continues to crossfade the six scene/biome/weather layers, including quieter menu and paused contexts.
 
@@ -39,15 +39,15 @@ Each waveform peaks at no more than 0.18 full scale. At the maximum effects bus 
 
 ## Reproduce and verify
 
-From the Horde Defense workspace, run the synthesis tests through Cargo. `audio.rs` uses Bevy, `CARGO_MANIFEST_DIR` and `crate::atmosphere_audio`, so it no longer compiles as a standalone `rustc --test` file. The `audio::tests` filter also matches `atmosphere_audio::tests`.
+From the Horde Defense workspace, run the synthesis tests through Cargo. They live in `horde_audio`, which never compiles Bevy. `raw_synthesis_matches_v1_library` holds the synthesis to the recorded sha256 of every v1 file.
 
 ```powershell
-cargo test --locked -p horde-defense audio::tests
+cargo test --locked -p horde_audio
 $env:LASTLIGHT_AUDIO_EXPORT = (Get-Location).Path
-cargo test --locked -p horde-defense audio::tests::export_survival_audio_assets_and_audition -- --ignored --exact
+cargo test --locked -p horde_audio --test legacy_library export_survival_audio_assets_and_audition -- --ignored --exact
 ```
 
-The export explicitly regenerates the 69 shipped files and audition reel (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. Normal application tests also include `audio::tests`; its export test remains ignored unless explicitly invoked.
+The export explicitly regenerates the 69 shipped files and audition reel (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. The normal workspace tests include the `horde_audio` tests and the gain and gate tests in the game's `audio::tests`; the export test remains ignored unless explicitly invoked.
 
 Tests check deterministic variants, distinct weapon decay/energy profiles, finite samples, DC offset, zero-valued endpoints, useful RMS levels, effect headroom and repeat gating. Independent WAV inspection confirmed all 69 shipped encoded files have the expected format and endpoints; their peak is at most 0.179998 and RMS spans 0.008312–0.057572 before mixer gains.
 

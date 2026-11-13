@@ -39,7 +39,7 @@ pub(crate) struct UiCtx<'a> {
     pub(super) history: &'a mut HistoryUi,
     pub(super) prefs: &'a mut SettingsUi,
     pub(super) menu: &'a mut MenuUi,
-    /// UI-originated sound cues, forwarded as `SoundCue` messages.
+    /// UI-originated sound cues, forwarded as `CueRequest` messages.
     pub(super) cues: &'a mut Vec<SoundCue>,
     /// Perf launches only: sub-spans and scene counts inside `ui::draw`.
     pub(super) perf: Option<&'a crate::diagnostics::PerfProbe>,

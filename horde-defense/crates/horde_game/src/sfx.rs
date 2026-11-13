@@ -1,12 +1,16 @@
-//! `SfxPlugin`: plays the `SoundCue` messages the runner (and UI) write on a
+//! `SfxPlugin`: plays the `CueRequest` messages the runner (and UI) write on a
 //! small, prioritised voice budget that follows the effects bus.
-use crate::{audio::Cue as SoundCue, runner::RuntimeSet, settings::Settings};
+use crate::{
+    audio::{Cue as SoundCue, CueMix, CueRequest},
+    runner::RuntimeSet,
+    settings::Settings,
+};
 use bevy::prelude::*;
 
 pub struct SfxPlugin;
 impl Plugin for SfxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<SoundCue>()
+        app.add_message::<CueRequest>()
             .init_resource::<SfxState>()
             .add_systems(
                 Update,
@@ -26,7 +30,13 @@ struct SfxState {
     gate: crate::audio::CueGate,
 }
 
-impl SoundCue {
+/// Selection numbers, still owned here until the mix table moves to
+/// `horde_audio` (A6-02).
+trait CueSelection {
+    fn priority(self) -> u8;
+    fn fire(self) -> bool;
+}
+impl CueSelection for SoundCue {
     fn priority(self) -> u8 {
         match self {
             Self::Boss | Self::Retreat | Self::Victory | Self::Defeat => 0,
@@ -139,14 +149,14 @@ fn play_sounds(
     assets: Res<AssetServer>,
     time: Res<Time<Real>>,
     settings: Res<Settings>,
-    mut cues: MessageReader<SoundCue>,
+    mut cues: MessageReader<CueRequest>,
     mut state: ResMut<SfxState>,
     voices: Query<(Entity, &EffectVoice)>,
 ) {
     let gain = safe_bus_gain(settings.master, settings.effects);
     let reduced = settings.reduced_effects;
     let now_ms = (time.elapsed_secs_f64() * 1000.0) as u64;
-    let sounds: Vec<SoundCue> = cues.read().copied().collect();
+    let sounds: Vec<SoundCue> = cues.read().map(|request| request.0).collect();
     let rotation = state.rotation;
     state.rotation = state.rotation.wrapping_add(u64::from(!sounds.is_empty()));
     if gain == 0.0 {
