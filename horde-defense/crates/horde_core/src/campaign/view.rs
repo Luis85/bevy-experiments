@@ -517,21 +517,21 @@ mod tests {
     }
 
     #[test]
-    fn feature_unlock_companion_is_75_after_1_liberation() {
+    fn feature_unlock_companion_quotes_its_node_price_after_1_liberation() {
         let c = started();
         assert_eq!(
             c.feature_unlock(CampaignFeature::Companion),
             Some(FeatureUnlock {
                 node_id: "companion_contact".into(),
                 name: "Meet Mara".into(),
-                cost: 75,
+                cost: 400,
                 liberations_required: 1,
             })
         );
         let recruitment = c.feature_unlock(CampaignFeature::Recruitment).unwrap();
         assert_eq!(
             (recruitment.node_id.as_str(), recruitment.cost),
-            ("recruitment_network", 100)
+            ("recruitment_network", 1_700)
         );
         assert_eq!(recruitment.liberations_required, 1);
         // Every feature is granted by exactly one catalogue node (a second

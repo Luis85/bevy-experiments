@@ -1,12 +1,17 @@
 //! Static tree rules (design progression-tree §3). W2-41 lands the structural
-//! rows for the decision-19 nodes (append-only ids 170-177, §5); the wave-4
-//! value rules (W4-p) join this file.
+//! rows for the decision-19 nodes (append-only ids 170-177, §5), W4-03 the
+//! effect retunes and W4-p the value rules 1-6 on the repriced catalogue.
 mod support;
 use horde_core::{
+    campaign::tree_value::{
+        CHEAP_NODE_LIMIT, CHEAP_NODE_PRICE, DEPTH_PEER_LIMIT, ZERO_GAIN, branch_value_per_coin,
+        ladder_rank, node_value, node_value_at, reference_ranks,
+    },
     content::{BossKind, ItemDefId, Mode, PersonalProfile, Slot, StructureKind, content},
     enemy_catalog::enemy_catalog,
     ordnance::OrdnanceKind,
     progression,
+    sim::{node_depths, tier_cost},
     skill_catalog::{SkillEffect, SkillModifiers, SkillNode, skills},
     weapons::{WeaponClass, WeaponSpec},
 };
@@ -355,4 +360,391 @@ fn trap_ranks_each_add_one_charge_and_say_so() {
             node.description
         );
     }
+}
+
+// ---- Wave-4 value rules (W4-p, design progression-tree §3 rules 1-6) ----
+
+fn node(id: &str) -> &'static SkillNode {
+    skills().node(id).expect("shipped skill node")
+}
+
+/// `ancestor` is one of `node`'s prerequisite ancestors.
+fn is_ancestor(ancestor: &SkillNode, node: &SkillNode) -> bool {
+    let mut stack: Vec<&str> = node.prerequisites.iter().map(String::as_str).collect();
+    let mut seen = BTreeSet::new();
+    while let Some(id) = stack.pop() {
+        if id == ancestor.id {
+            return true;
+        }
+        if seen.insert(id)
+            && let Some(parent) = skills().node(id)
+        {
+            stack.extend(parent.prerequisites.iter().map(String::as_str));
+        }
+    }
+    false
+}
+
+/// The branch whose value per coin a node is measured against: its own,
+/// except that a body rank reads its dedicated peer's branch (design §3
+/// rule 2: Vitality, Strength and Endurance against Survival; Coordination
+/// and Perception against Firearms).
+fn value_branch(node: &SkillNode) -> &str {
+    use horde_core::campaign::BodyAttribute as B;
+    node.effects
+        .iter()
+        .find_map(|effect| match effect {
+            SkillEffect::BodyDevelopment { attribute, .. } => Some(match attribute {
+                B::Vitality | B::Strength | B::Endurance => "Survival",
+                B::Coordination | B::Perception => "Firearms",
+            }),
+            _ => None,
+        })
+        .unwrap_or(node.branch.as_str())
+}
+
+/// Rule 1. A valued node is dominated when (i) it gains nothing at both
+/// reference ranks, or (ii) a node of its dominance group that is neither
+/// its ancestor nor its descendant costs no more, opens no later (victories
+/// and liberations) and gains at least as much at both of its reference
+/// ranks, strictly more at one. Ladder ranks of 2 or more neither dominate
+/// nor are dominated under (ii).
+///
+/// The groups are the W2-25 model's (R48): the decision-19 kinds
+/// `CadenceMultiplier`, `ArmorPenetration` and `HazardDamageMultiplier` each
+/// have a group of their own, and a node with several effects sums its gain
+/// over the axes it touches.
+#[test]
+fn no_valued_node_is_dominated_at_its_reference_states() {
+    let valued: Vec<_> = skills()
+        .nodes
+        .iter()
+        .filter(|n| n.price > 0)
+        .filter_map(|n| Some((n, node_value(n)?)))
+        .collect();
+    assert!(valued.len() > 100, "{} valued nodes", valued.len());
+    let pairwise = |n: &SkillNode| ladder_rank(n).is_none_or(|rank| rank < 2);
+    let mut dominated = Vec::new();
+    for (a, value) in &valued {
+        if value.ln_gain.iter().all(|gain| *gain <= ZERO_GAIN) {
+            dominated.push(format!("{} gains nothing ({:?})", a.id, value.ln_gain));
+            continue;
+        }
+        if !pairwise(a) {
+            continue;
+        }
+        let refs = reference_ranks(a);
+        for (b, other) in &valued {
+            if b.id == a.id
+                || other.group != value.group
+                || !pairwise(b)
+                || is_ancestor(a, b)
+                || is_ancestor(b, a)
+                || b.price > a.price
+                || b.minimum_victories > a.minimum_victories
+                || b.minimum_liberated > a.minimum_liberated
+            {
+                continue;
+            }
+            let theirs = refs.map(|rank| node_value_at(b, rank).expect("valued"));
+            let at_least = theirs.iter().zip(value.ln_gain).all(|(b, a)| *b >= a);
+            let strictly = theirs.iter().zip(value.ln_gain).any(|(b, a)| *b > a);
+            if at_least && strictly {
+                dominated.push(format!(
+                    "{} ({} coins, {:?}) is dominated by {} ({} coins, {theirs:?})",
+                    a.id, a.price, value.ln_gain, b.id, b.price
+                ));
+            }
+        }
+    }
+    assert!(dominated.is_empty(), "{}", dominated.join("; "));
+}
+
+/// Rule 2. A valued node under [`CHEAP_NODE_PRICE`] is worth at most
+/// [`CHEAP_NODE_LIMIT`] times its branch's value per coin at each of its
+/// reference ranks.
+#[test]
+fn cheap_nodes_stay_within_twice_branch_value_per_coin() {
+    let mut over = Vec::new();
+    for n in skills()
+        .nodes
+        .iter()
+        .filter(|n| n.price > 0 && n.price < CHEAP_NODE_PRICE)
+    {
+        let Some(value) = node_value(n) else { continue };
+        for (rank, gain) in reference_ranks(n).into_iter().zip(value.ln_gain) {
+            let branch = branch_value_per_coin(value_branch(n), rank);
+            let per_coin = gain / n.price as f32;
+            if per_coin > CHEAP_NODE_LIMIT * branch {
+                over.push(format!(
+                    "{} ({} coins) at rank {rank}: {per_coin:.5} per coin > {CHEAP_NODE_LIMIT} x {branch:.5} ({})",
+                    n.id,
+                    n.price,
+                    value_branch(n)
+                ));
+            }
+        }
+    }
+    assert!(over.is_empty(), "{}", over.join("; "));
+}
+
+/// Value per coin of a valued, priced node at `rank`.
+fn per_coin_at(n: &SkillNode, rank: u32) -> Option<f32> {
+    (n.price > 0).then_some(())?;
+    Some(node_value_at(n, rank)? / n.price as f32)
+}
+
+/// Rule 3. At any price, a non-ladder node's value per coin is at most
+/// [`DEPTH_PEER_LIMIT`] times the median of the valued non-ladder nodes of
+/// its branch one prerequisite depth either side that are open at that
+/// rank. Ladders have their own rule (4).
+#[test]
+fn no_node_outvalues_its_depth_peers_by_more_than_two_and_a_half_x() {
+    let depths = node_depths();
+    let single = |n: &SkillNode| ladder_rank(n).is_none();
+    let mut over = Vec::new();
+    let mut checked = 0;
+    for n in skills().nodes.iter().filter(|n| single(n)) {
+        let Some(value) = node_value(n) else { continue };
+        for (rank, gain) in reference_ranks(n).into_iter().zip(value.ln_gain) {
+            let mut peers: Vec<f32> = skills()
+                .nodes
+                .iter()
+                .filter(|p| {
+                    p.id != n.id
+                        && single(p)
+                        && p.branch == n.branch
+                        && depths[&p.id].abs_diff(depths[&n.id]) <= 1
+                        && p.minimum_victories <= u64::from(rank)
+                })
+                .filter_map(|p| per_coin_at(p, rank))
+                .collect();
+            if peers.is_empty() {
+                continue;
+            }
+            peers.sort_by(f32::total_cmp);
+            // The lower median, as the pacing statistics use.
+            let median = peers[(peers.len() - 1) / 2];
+            let per_coin = gain / n.price as f32;
+            checked += 1;
+            if per_coin > DEPTH_PEER_LIMIT * median {
+                over.push(format!(
+                    "{} ({} coins) at rank {rank}: {per_coin:.5} per coin > {DEPTH_PEER_LIMIT} x median {median:.5} of {} peers",
+                    n.id,
+                    n.price,
+                    peers.len()
+                ));
+            }
+        }
+    }
+    assert!(checked > 40, "{checked} node states checked");
+    assert!(over.is_empty(), "{}", over.join("; "));
+}
+
+/// The ladders: each body attribute and each structure kind, ranks in order.
+fn ladders() -> Vec<Vec<&'static SkillNode>> {
+    let mut ladders = Vec::new();
+    for prefix in [
+        "body_vitality_",
+        "body_strength_",
+        "body_coordination_",
+        "body_endurance_",
+        "body_perception_",
+        "trap_rank_",
+        "wall_rank_",
+        "turret_rank_",
+    ] {
+        let ranks: Vec<_> = (1..)
+            .map_while(|rank| skills().node(&format!("{prefix}{rank}")))
+            .collect();
+        assert!(ranks.len() >= 10, "{prefix}: {} ranks", ranks.len());
+        ladders.push(ranks);
+    }
+    ladders
+}
+
+/// Rule 4. Along a ladder the value per coin never rises: at each of a
+/// rank's reference ranks it is worth no more per coin than the rank below.
+///
+/// Perception is checked by halves instead. Its gain is a staircase: a
+/// weak hit deals `round(damage x (1 + bonus))`, so a rank is worth
+/// something only when its small bonus moves that whole number (at rank 0
+/// every odd rank gains exactly nothing), and no rising price ladder makes
+/// rank 4 worth less per coin than a rank 3 that gains 0. Over ten ranks the
+/// steps average out: ranks 11-20 are worth no more per coin than ranks
+/// 1-10 at the reference ranks of the first and the last rank.
+#[test]
+fn ladder_value_per_coin_never_rises() {
+    let mut rises = Vec::new();
+    for ladder in ladders() {
+        if ladder[0].id == "body_perception_1" {
+            assert_eq!(ladder.len(), 20);
+            let last = ladder[ladder.len() - 1];
+            let half = |nodes: &[&SkillNode], rank: u32| {
+                let gain: f32 = nodes
+                    .iter()
+                    .map(|n| node_value_at(n, rank).expect("valued ladder rank"))
+                    .sum();
+                gain / nodes.iter().map(|n| n.price).sum::<u64>() as f32
+            };
+            for rank in reference_ranks(ladder[0])
+                .into_iter()
+                .chain(reference_ranks(last))
+            {
+                let (lower, upper) = (half(&ladder[..10], rank), half(&ladder[10..], rank));
+                assert!(lower > 0.0, "Perception 1-10 gains nothing at rank {rank}");
+                if upper > lower * 1.000_01 {
+                    rises.push(format!(
+                        "body_perception 11-20 {upper:.6} per coin > 1-10 {lower:.6} at rank {rank}"
+                    ));
+                }
+            }
+            continue;
+        }
+        for pair in ladder.windows(2) {
+            let (lower, upper) = (pair[0], pair[1]);
+            for rank in reference_ranks(upper) {
+                let below = per_coin_at(lower, rank).expect("valued ladder rank");
+                let above = per_coin_at(upper, rank).expect("valued ladder rank");
+                if above > below * 1.000_01 {
+                    rises.push(format!(
+                        "{} {above:.6} per coin > {} {below:.6} at rank {rank}",
+                        upper.id, lower.id
+                    ));
+                }
+            }
+        }
+    }
+    assert!(rises.is_empty(), "{}", rises.join("; "));
+}
+
+/// Rule 5. A body rank 1 is the cheap way into its stat: cheaper than the
+/// dedicated node of the same dominance group.
+#[test]
+fn body_rank_one_is_cheaper_than_its_dedicated_peer() {
+    for (body, peer) in [
+        ("body_vitality_1", "field_fitness"),
+        ("body_coordination_1", "quick_reload"),
+        ("body_strength_1", "heavy_strike"),
+        ("body_endurance_1", "endurance_drill"),
+    ] {
+        let (body, peer) = (node(body), node(peer));
+        assert_eq!(
+            node_value(body).expect("valued").group,
+            node_value(peer).expect("valued").group,
+            "{} and {} share a dominance group",
+            body.id,
+            peer.id
+        );
+        assert!(
+            body.price < peer.price,
+            "{} ({}) is not cheaper than {} ({})",
+            body.id,
+            body.price,
+            peer.id,
+            peer.price
+        );
+    }
+}
+
+/// Rule 6 and the design §4 tier definition: a tier is every node up to its
+/// prerequisite depth that a fresh campaign can buy inside the tier window,
+/// so the milestone-gated nodes (a victory gate of 5 or more) stay out.
+#[test]
+fn tier_costs_sit_in_design_bands() {
+    let depths = node_depths();
+    let gated = |n: &SkillNode| n.minimum_victories >= 5;
+    assert!(
+        skills()
+            .nodes
+            .iter()
+            .any(|n| depths[&n.id] <= 2 && gated(n)),
+        "a milestone-gated node sits inside tier 2, so the definition matters"
+    );
+    for (tier, band) in [(1, 1_700..=2_300), (2, 7_800..=9_800), (3, 18_500..=22_500)] {
+        let expected: u64 = skills()
+            .nodes
+            .iter()
+            .filter(|n| depths[&n.id] <= tier && !gated(n))
+            .map(|n| n.price)
+            .sum();
+        assert_eq!(
+            tier_cost(tier),
+            expected,
+            "tier {tier} counts a milestone-gated node"
+        );
+        assert!(
+            band.contains(&expected),
+            "tier {tier} costs {expected}, outside {band:?}"
+        );
+    }
+}
+
+// ---- The blueprint price (W4-p) ----
+
+/// A blueprint is bought as its tree node, so every place that quotes or
+/// checks its price reads the node's: the recommendation (text, price and
+/// the affordable flag) and the smoke preparation. The content
+/// `blueprint_price` is what a legacy-features campaign pays outside the
+/// tree, and the two differ since the repricing.
+#[test]
+fn blueprint_offers_quote_the_tree_node_price() {
+    use horde_core::campaign::{Campaign, RecommendationAction};
+    let fresh = Campaign::default();
+    for kind in StructureKind::ALL {
+        let id = match kind {
+            StructureKind::Trap => "trap_blueprint",
+            StructureKind::Wall => "wall_blueprint",
+            StructureKind::Turret => "turret_blueprint",
+        };
+        assert_eq!(fresh.blueprint_price(kind), support::node_price(id), "{id}");
+        let legacy = Campaign {
+            legacy_features: true,
+            ..Campaign::default()
+        };
+        assert_eq!(
+            legacy.blueprint_price(kind),
+            content().structure(kind).blueprint_price,
+            "{id} on a legacy-features campaign"
+        );
+    }
+    let node = support::node_price("trap_blueprint");
+    let legacy = content().structure(StructureKind::Trap).blueprint_price;
+    assert!(
+        legacy < node,
+        "the trap node ({node}) costs more than the legacy blueprint ({legacy}), so the two are told apart"
+    );
+    // One victory and Field engineering open the trap blueprint; the wallet
+    // covers the legacy price but not the node.
+    let mut game = support::country_game("DEU");
+    let campaign = game.campaign_mut();
+    campaign.reward(
+        support::node_price("engineering") + legacy,
+        0,
+        Mode::Personal,
+    );
+    campaign.purchase_node("engineering").unwrap();
+    campaign.victories = 1;
+    assert_eq!(campaign.coins, legacy);
+    assert!(campaign.blueprint_available(StructureKind::Trap));
+    let offer = campaign.recommendation(Mode::Personal);
+    assert_eq!(
+        offer.action,
+        RecommendationAction::LearnNode("trap_blueprint".into())
+    );
+    assert_eq!(offer.price, node, "the offer quotes the node price");
+    assert!(
+        !offer.affordable,
+        "{legacy} coins do not buy a {node}-coin node"
+    );
+    assert!(
+        offer.detail.contains(&format!("{node} coins required")),
+        "{:?}",
+        offer.detail
+    );
+    // The smoke preparation buys the trap only when the node is affordable.
+    horde_core::sim::smoke_prepare(&mut game, Mode::Npc)
+        .expect("an unaffordable blueprint is skipped, not an error");
+    assert_eq!(game.campaign().coins, legacy);
+    assert!(!game.campaign().blueprints[StructureKind::Trap]);
 }

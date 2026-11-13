@@ -138,7 +138,7 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
     if mode == Mode::Npc
         && g.campaign.blueprint_available(StructureKind::Trap)
         && !g.campaign.blueprints[StructureKind::Trap]
-        && g.campaign.coins >= content().structure(StructureKind::Trap).blueprint_price
+        && g.campaign.coins >= g.campaign.blueprint_price(StructureKind::Trap)
     {
         g.campaign.purchase_blueprint(StructureKind::Trap)?;
     }

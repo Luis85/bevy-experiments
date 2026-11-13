@@ -1227,6 +1227,40 @@ The 20-seed release acceptance, post-W1-69 (W2-01, W2-03 and W2-04 "before" runs
 
 Still failing, all wave-4 work (W4-04..n, W4-p, W4-c): `goal5_tiers_affordable_3_5_7_9_11_13`, `goal5_unlock_order_fortifications_mara_operations`, `goal6_defeat_rate_windows`, `goal6_lux_hard_at_most_1_5x_normal`, `goal6_no_15_streak_after_run_10` and `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`.
 
+W4-p repricing and goal-5 calibration (2026-11-13; R55 runs it before the enemy tuning loop resumes). `cargo test --locked --release -p horde_core --test pacing_targets -- goal --ignored --nocapture` (expert-deu, Normal, 20 seeds, 60 runs; the goal-6 rows 20 seeds), before on the parent commit 1b59e20 and after on the repriced `skills.json`. Cells are the lower median [p25, p75].
+
+| Row | Before | After | Gate |
+|---|---|---|---|
+| Tier 1 / 2 / 3 cost | 930 / 5,190 / 11,675 (every node up to the depth) | 2,030 / 8,700 / 19,830 (milestone-gated nodes left out) | bands 1,700-2,300 / 7,800-9,800 / 18,500-22,500 |
+| Whole tree | 61,180 | 96,920 | - |
+| First victory | 3 [3, 4] | 3 [3, 4] | runs 2-4, pass |
+| Tier 1 affordable | 3 [3, 3] | 4 [4, 4] | runs 3-5, pass |
+| Tier 2 affordable | 6 [5, 6], fail | 8 [8, 8] | runs 7-9, pass |
+| Tier 3 affordable | 8 [8, 9], fail | 12 [11, 12] | runs 11-13, pass |
+| Liberation(2) | 18 [17, 20] | 19 [18, 20] | - |
+| Tree exhausted | 27 [26, 29] | 28 [27, 29] | after Liberation(2), pass |
+| Nodes bought after Liberation(2) | 17 [11, 22] | 74 [68, 81] | at least 1, pass |
+| Fortifications / Mara / Operations | 3 [3, 4] / 15 [14, 17] / 15 [14, 17], fail (medians tie) | 3 [3, 4] / 16 [15, 17] / 19 [18, 19] | strictly rising medians, pass |
+| Defeat windows outside 10-25% | 33 of 38 (0.0% to 18.2%) | 32 of 38 (0.0% at offset 14 to 25.0% at offset 0) | 0, fail |
+| Seeds per defeat window | offsets 0-34 pool 20, 35 pool 19, 36 pool 15, 37 pool 12 | offsets 0-35 pool 20, 36 pool 17, 37 pool 12 | reported (R37) |
+| Longest win streak from run 11 | median 49, max 50 | median 49, max 50 | under 15, fail |
+| LUX Easy / Normal / Hard | 5 [5, 6] / 7 [6, 7] / 11 [10, 12], Hard fails (above 10.5) | 5 [5, 6] / 9 [7, 10] / 13 [12, 15] | Easy at most 6, Hard at most 1.5x Normal (13.5), pass |
+| Boss TTK | 28.1 s [p25 23.5, p90 43.5] | 31.4 s [p25 25.6, p90 47.5] | median 20-60 s, pass |
+| AUT / BGD clamped starts | 4 [2, 4] / 3 [3, 4] | 3 [3, 5] / 3 [3, 4] | runs 2-4, pass |
+| Archetype coverage | 18 of 18 | 18 of 18 | pass |
+
+All four goal5_* rows pass. Still failing after W4-p: `goal6_defeat_rate_windows` and `goal6_no_15_streak_after_run_10` (W4-04..n). The repricing moves neither: the expert still wins every run from about run 14, whatever the tree costs.
+
+The calibration, each step a full price set checked against the six tree rules and then played (expert-deu, 20 seeds; first victory / tiers 1-2-3 affordable / Mara / Operations):
+- Design §4 first pass (T 1,950 / 8,250 / 19,700): fails rules 1, 3 and 4, not played.
+- Rule fit C (steady_hands 160, quick_reload 110, structure ladders 300 / 225 / 150 + 75 per rank; T 2,050 / 8,850 / 18,875): 4 [4, 5] / 5 - 9 - 12 / 16 / 17. Passes, with the first victory and tiers 1-2 on the late edge of their windows.
+- D (steady_hands 120 with rapid_cycle 150, stopping_power 220, combat_reload 270; T 2,010 / 8,680 / 19,025): 3 [3, 5] / 4 - 8 - 12 / 17 / 17. The unlock order fails: the bot has finished the structure ladders before the first liberation and buys Mara and Survivor network in one camp.
+- E (structure ladders 400 / 320 / 240 + 120 per rank; T 2,010 / 8,680 / 19,310): 3 [3, 5] / 4 - 8 - 11 / 15 / 18.
+- G (quick_reload 130 so steady_hands stays the first recommendation, marksman and machine-gun training 2,000 / 2,200; T 2,030 / 8,700 / 19,630): 3 [3, 4] / 4 - 8 - 12 / 17 / 18.
+- Shipped (structure step 140, recruitment_network 1,700; T 2,030 / 8,700 / 19,830): the After column.
+
+Digests: none moved (tests/determinism.rs, the continuation pins and the save fixtures are green), so `PROVISIONAL` stays None. Default `pacing 60 --runs` and smoke move with the prices; their before/after files are closing-phase items (R36).
+
 ### 9.3 Audio
 
 | Measure | Before (A6-04) | After (A6-17) | Gate |

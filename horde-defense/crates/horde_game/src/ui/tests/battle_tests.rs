@@ -551,7 +551,11 @@ fn locked_throwables_are_disabled_buttons_that_explain_where_to_learn_them() {
 #[test]
 fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_toggle() {
     let mut fixture = IsolatedFrontend::new();
-    fixture.frontend.game.campaign_mut().coins = 100;
+    fixture.frontend.game.campaign_mut().coins = horde_core::skill_catalog::skills()
+        .node("grenade_training")
+        .unwrap()
+        .price
+        + 50;
     fixture
         .frontend
         .game
@@ -609,7 +613,11 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
     f.game.campaign_mut().player.level = f.game.campaign_mut().player_level_cap();
     f.game.campaign_mut().player.points = f.game.campaign_mut().player.level - 1;
     f.game.campaign_mut().player.xp = 0;
-    f.game.campaign_mut().coins = 100;
+    f.game.campaign_mut().coins = horde_core::skill_catalog::skills()
+        .node("grenade_training")
+        .unwrap()
+        .price
+        + 50;
     f.game
         .campaign_mut()
         .purchase_node("grenade_training")

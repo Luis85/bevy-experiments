@@ -484,8 +484,9 @@ pub struct PacingRun {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Milestone {
     FirstVictory,
-    /// Every node of this prerequisite depth (1-based) is affordable from
-    /// the coins earned so far.
+    /// Every node up to this prerequisite depth (1-based) that is not
+    /// milestone gated is affordable from the coins earned so far
+    /// ([`tier_cost`]).
     TierAffordable(usize),
     /// The scripted player owns a node of this depth.
     TierFirstNode(usize),
@@ -674,13 +675,19 @@ pub fn tree_exhausted<'a>(
 ) -> bool {
     nodes_left(nodes, owned, retired) == 0
 }
-/// Coins needed to learn every node up to and including `depth`.
+/// The smallest victory gate that keeps a node out of its tier: the first
+/// rank milestone. A node gated at 5 victories or more cannot be bought
+/// inside the tier windows (runs 3-13), so it is not part of a tier's cost
+/// (design progression-tree section 4).
+pub const TIER_GATE_VICTORIES: u64 = 5;
+/// Coins needed to learn every node up to and including `depth` that is
+/// not milestone gated ([`TIER_GATE_VICTORIES`]).
 pub fn tier_cost(depth: usize) -> u64 {
     let depths = node_depths();
     skills()
         .nodes
         .iter()
-        .filter(|n| depths[&n.id] <= depth)
+        .filter(|n| depths[&n.id] <= depth && n.minimum_victories < TIER_GATE_VICTORIES)
         .map(|n| n.price)
         .sum()
 }

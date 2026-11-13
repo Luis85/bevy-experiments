@@ -1144,7 +1144,10 @@ mod tests {
             [
                 ("Learn Field fitness".to_owned(), false),
                 ("Liberate 1 country (0 / 1)".to_owned(), false),
-                ("75 coins (have 25)".to_owned(), false)
+                (
+                    format!("{} coins (have 25)", price("companion_contact")),
+                    false
+                )
             ]
         );
         assert_eq!(
@@ -1478,7 +1481,15 @@ mod tests {
     #[test]
     fn the_recommendation_buys_what_helps_now_before_body_ranks() {
         let mut c = started();
-        let route = recommended_route(&mut c, 400);
+        // Enough for every node that acts now up to Endurance drill's price
+        // (the dearest of the four starters below), with too little left
+        // over for the next one, so the leftover goes to a body rank.
+        let budget: u64 = 3_000;
+        let route = recommended_route(&mut c, budget);
+        assert!(
+            route.iter().any(|id| id.starts_with("body_")),
+            "{budget} coins leave nothing for a body rank: {route:?}"
+        );
         let first_body = route
             .iter()
             .position(|id| id.starts_with("body_"))
@@ -1623,7 +1634,8 @@ mod tests {
     #[test]
     fn recommended_node_is_never_owned_and_prefers_buyable_starters() {
         let mut c = started();
-        c.coins = 40;
+        // The price of the cheapest starter that acts now.
+        c.coins = price("steady_hands");
         let id = c.recommended_node(Mode::Personal).unwrap();
         assert!(c.node_state(&id).is_buyable(), "{id}");
         let node = skills().node(&id).unwrap();

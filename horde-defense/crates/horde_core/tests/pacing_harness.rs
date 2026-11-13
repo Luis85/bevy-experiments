@@ -979,17 +979,21 @@ fn equip_drops_profile_wears_dropped_upgrades() {
     assert_ne!(wore, bare, "the equipped drops change a later run");
 }
 
+// Since the W4-p repricing the tree-first bot learns Survivor network
+// (1,700 coins) only after the cheaper nodes that act now, about ten runs
+// after Luxembourg is free, so the first takeover is run 20 at seed 0 (it was
+// run 7 at the 100-coin price). The two takeover tests play 26 runs.
 #[test]
 fn takeover_profile_records_first_takeover() {
     let profile = PacingProfile {
-        max_runs: 20,
+        max_runs: 26,
         stop_after: Some(Milestone::FirstTakeover),
         ..by_id("takeover").expect("takeover is registered")
     };
     let report = simulate_pacing(&profile).expect("profile runs");
     let (run, _) = report
         .milestone(Milestone::FirstTakeover)
-        .expect("a recruit defends the main run inside 20 runs");
+        .expect("a recruit defends the main run inside 26 runs");
     assert_eq!(report.runs.len(), run, "the profile stops at the takeover");
     assert!(
         matches!(report.runs[run - 1].defender, DefenderId::Recruit(_)),
@@ -1133,7 +1137,7 @@ fn non_normal_profiles_play_at_their_preset() {
 #[test]
 fn takeover_survivor_retries_a_stage_the_recruit_lost() {
     let profile = PacingProfile {
-        max_runs: 12,
+        max_runs: 26,
         ..by_id("takeover").expect("registered")
     };
     let report = simulate_pacing(&profile).expect("profile runs");
@@ -1149,7 +1153,7 @@ fn takeover_survivor_retries_a_stage_the_recruit_lost() {
             w[0].index
         })
         .collect();
-    assert!(!lost.is_empty(), "a recruit loses inside 12 runs");
+    assert!(!lost.is_empty(), "a recruit loses inside 26 runs");
     // After the survivor's win the recruit defends again.
     let back = report.runs.windows(2).any(|w| {
         w[0].defender == DefenderId::Player

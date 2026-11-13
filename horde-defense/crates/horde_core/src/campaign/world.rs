@@ -78,9 +78,26 @@ impl Campaign {
         }
         skills().nodes.iter().find(|node|node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::Blueprint(value) if *value==kind))).is_some_and(|node|self.has_node(&node.id)||(self.victories>=node.minimum_victories&&self.liberated_count()>=node.minimum_liberated&&node.prerequisites.iter().all(|id|self.has_node(id))))
     }
+    /// The skill node that grants `kind`'s blueprint.
+    fn blueprint_node(kind: StructureKind) -> Option<&'static crate::skill_catalog::SkillNode> {
+        skills().nodes.iter().find(|node|node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::Blueprint(value) if *value==kind)))
+    }
+    /// What [`Self::purchase_blueprint`] charges: the price of the
+    /// blueprint's skill node, or the content `blueprint_price` on a
+    /// legacy-features campaign, which buys the blueprint outside the tree.
+    pub fn blueprint_price(&self, kind: StructureKind) -> u64 {
+        let legacy = content().structure(kind).blueprint_price;
+        if self.legacy_features {
+            return legacy;
+        }
+        Self::blueprint_node(kind).map_or(legacy, |node| node.price)
+    }
     pub fn purchase_blueprint(&mut self, kind: StructureKind) -> Result<(), String> {
         if !self.legacy_features {
-            let id=skills().nodes.iter().find(|node|node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::Blueprint(value) if *value==kind))).ok_or("Blueprint node missing")?.id.clone();
+            let id = Self::blueprint_node(kind)
+                .ok_or("Blueprint node missing")?
+                .id
+                .clone();
             return self.purchase_node(&id);
         }
         self.preparation()?;

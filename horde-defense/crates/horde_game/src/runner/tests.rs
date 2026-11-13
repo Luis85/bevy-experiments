@@ -204,7 +204,7 @@ fn withdrawal_plays_retreat_once_without_waiting_for_a_tick() {
 #[test]
 fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
     let mut host = Host::new();
-    host.game.campaign_mut().coins = 100;
+    host.game.campaign_mut().coins = 1_000;
     host.runtime.begin_frame(1);
     host.runtime
         .enqueue(Command::BuySkillNode("steady_hands".into()), "Learned");
@@ -220,13 +220,13 @@ fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
 #[test]
 fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
     let mut game = Game::default();
-    game.campaign_mut().coins = 100;
+    game.campaign_mut().coins = 1_000;
     game.apply(&Command::BuySkillNode("steady_hands".into()))
         .unwrap();
     assert!(game.campaign().has_node("steady_hands"));
     assert_eq!(
         game.campaign().coins,
-        100 - skills().node("steady_hands").unwrap().price
+        1_000 - skills().node("steady_hands").unwrap().price
     );
     let before = game.clone();
     assert!(
@@ -435,7 +435,7 @@ fn state(game: &Game) -> serde_json::Value {
 #[test]
 fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
     let mut host = Host::new();
-    host.game.campaign_mut().coins = 100;
+    host.game.campaign_mut().coins = 1_000;
     host.runtime.begin_frame(20);
     assert!(
         host.runtime
@@ -450,7 +450,7 @@ fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
     assert!(!flush_for_test(&mut host.ctx()));
     assert_eq!(
         host.game.campaign().coins,
-        100 - skills().node("quick_reload").unwrap().price
+        1_000 - skills().node("quick_reload").unwrap().price
     );
     assert!(host.game.campaign().has_node("quick_reload"));
     assert_eq!(
@@ -1145,7 +1145,7 @@ fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_ge
             .campaign_mut()
             .choose_start_country("DEU")
             .unwrap();
-        host.game.campaign_mut().coins = 77;
+        host.game.campaign_mut().coins = skills().node("steady_hands").unwrap().price;
         assert!(
             host.game
                 .campaign()

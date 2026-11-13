@@ -130,7 +130,9 @@ pub(super) fn prepare_progression(game: &mut Game) {
     // skill and point investment. This does not represent earned campaign income.
     enable_legacy_ledgers(game);
     let campaign = game.staging().campaign();
-    campaign.coins = 1800;
+    // 600 more than before the W4-p repricing, which is what the six nodes
+    // bought below cost more, so the fixture ends with the same wallet.
+    campaign.coins = 2400;
     for stage in 0..5 {
         campaign.first_clear(stage, Mode::Personal);
     }

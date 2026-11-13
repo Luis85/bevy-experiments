@@ -68,6 +68,10 @@ Descriptions are updated, including all 10 trap-rank texts ("+1 charge").
 - **Fortification** = ln of structure charges × kills per charge, plus the engineering multiplier.
 - **Capability nodes return None, listed explicitly:** Unlock, FeatureUnlock, Blueprint, WeaponTraining, or any node carrying one.
 
+*As built (W2-25; R48, recorded by W4-p before it ran rule 1):* the model in `campaign/tree_value.rs` is accepted as built (plan §2.4 R48). It differs from the list above in two ways.
+- **Three more dominance groups.** The decision-19 effect kinds postdate this section, so W2-25 gave each a group of its own: `Cadence` (`CadenceMultiplier`), `Penetration` (`ArmorPenetration`) and `Hazard` (`HazardDamageMultiplier`). A node is compared only with nodes of its own group, so no other node can dominate a cadence, penetration or hazard node (today Rapid cycle, Shield breaker and Blast discipline).
+- **Multi-axis gain sum.** A node with several effects sums its ln gain over every axis its effects touch (`node_value_at`), and takes its axis and group from its first effect (`node_value`). `NodeValue` holds one axis, one group and the summed gain at the two reference ranks.
+
 ## 3. Static tree rules (new `crates/horde_core/tests/progression_tree.rs`)
 1. **`no_valued_node_is_dominated_at_its_reference_states`.** A valued node A is dominated if:
    - (i) ln_gain <= ZERO_GAIN at both refs; or
@@ -97,6 +101,11 @@ Descriptions are updated, including all 10 trap-rank texts ("+1 charge").
    - counter_nodes_open_no_later_than_their_archetypes: gate <= the first rank at which any listed archetype has spawn weight.
    - milestone-gated nodes do not collide in position: validator plus capture.
 
+*As built (W4-p):* rules 1-6 are in `tests/progression_tree.rs` and pass on the repriced catalogue. Three readings the text above leaves open:
+- **Rule 3** compares non-ladder nodes only, at each of the node's reference ranks, against the lower median of the valued non-ladder nodes of its branch one prerequisite depth either side whose victory gate is open at that rank. Ladder ranks are left to rule 4: every node of the Body development branch is a ladder rank, so a depth-peer median there would compare ranks of one ladder with each other.
+- **Rule 4** compares each rank with the rank below at the upper rank's reference ranks, except Perception, which is checked by halves (ranks 11-20 are worth no more per coin than ranks 1-10 at the reference ranks of rank 1 and rank 20). Perception's gain is a staircase: a weak hit deals `round(damage x (1 + bonus))`, so at rank 0 every odd rank gains exactly nothing and the next rank gains the whole step. No rising price ladder passes the pairwise form.
+- **Rule 2** reads a body rank against its dedicated peer's branch, as written. No node is under 100 coins after the repricing, so the rule is a guard for later price cuts.
+
 ## 4. Repricing (static skills.json, wave 4; first pass computed against the shipped catalogue)
 - **d1:** quick_reload 120, steady_hands 120, smg_training 100, piercing 200, field_fitness 120, second_wind 130, brace 140, sweep 150, engineering 120, grenade_training 120, molotov_training 130.
 - **d2:** shotgun_training 300, rifle_training 350, rapid_cycle 450, stopping_power 500, endurance_drill 300, hardened 450, heavy_strike 350, reinforced_frames 450, blast_packing 350, grenade_bandolier 400, bottle_carrier 400, slow_burn 350, trap_blueprint 150, wall_blueprint 200, turret_blueprint 250, companion_contact 400.
@@ -119,6 +128,19 @@ Descriptions are updated, including all 10 trap-rank texts ("+1 charge").
   3. T2 outside [7,9]: body step ±10, then blueprints ±50, then companion_contact ±100.
   4. T3 outside [11,13]: structure rank start ±50, then d3 nodes ±100.
   5. TreeExhausted <= Liberation(2): body step +10.
+
+*As built (W4-p, 2026-11-13):* `skills.json` is authoritative. The first pass above fails rules 1, 3 and 4 on the W2-25 value model (6 dominated nodes, 15 depth-peer misses, 1 structure-ladder rise), so the shipped prices were fitted to the rules first and then to the release acceptance.
+- **d1:** steady_hands 120, quick_reload 130, smg_training 100, piercing 200, field_fitness 190, second_wind 130, brace 140, sweep 150, engineering 120, grenade_training 120, molotov_training 130.
+- **d2:** shotgun_training 300, rifle_training 350, rapid_cycle 150, stopping_power 220, endurance_drill 300, hardened 720, heavy_strike 180, reinforced_frames 550, blast_packing 200, slow_burn 250, grenade_bandolier 900, bottle_carrier 900, trap_blueprint 150, wall_blueprint 200, turret_blueprint 250, companion_contact 400.
+- **d3:** marksman_training 2,000, machine_gun_training 2,200, combat_reload 270, veteran_vitality 700, defensive_fabrication 1,300, wide_blast 700, quick_throw 500, recruitment_network 1,700.
+- **d4+:** outpost_mastery 1,500, parallel_command 1,100, country_operations 1,500.
+- **Decision 19:** shotgun_pump_drill 1,000, marksman_steady_aim 800, shield_breaker 1,000, blast_discipline 1,000, pistol_double_tap 1,200, smg_spray_control 1,200, rifle_breath_control 1,500, mg_belt_feeder 1,200.
+- **Ladders:** body rank r = 100 + 30(r-1), as above. Structure rank r = start + 140(r-1), with start 400 for the trap (400..1,660), 320 for the wall (320..1,580) and 240 for the turret (240..1,500).
+- **Tiers:** T1 2,030 / T2 8,700 / T3 19,830 under the tier definition above (`sim::tier_cost`, `TIER_GATE_VICTORIES`). The whole tree costs 96,920 coins.
+- **What the rules forced.** Rule 1 orders the ordnance group by gain (blast_packing < slow_burn < quick_throw < wide_blast < the two +2-charge nodes) and the structure rank 1s (turret < wall < trap, and the turret rank 1 below reinforced_frames). Rule 3 keeps a node within 2.5x of its depth peers, so the firearm stat nodes follow their gain (rapid_cycle, stopping_power and combat_reload are far below the first pass), hardened and veteran_vitality move together, and defensive_fabrication stays under 2.5x reinforced_frames. steady_hands is the cheapest starter that acts now, so the recommender still offers it first. The mass the stat nodes lost went to the capability nodes that carry no value (marksman and machine-gun training, recruitment_network).
+- **Why the structure ladders are longer.** With the 300 + 75(r-1) ladder the tree-first bot finished all thirty structure ranks before the first liberation and then bought Meet Mara and Survivor network in the same camp, so the Mara and Operations medians tied (17 and 17, `goal5_unlock_order_fortifications_mara_operations` red). The bot buys the cheapest affordable node that acts now, so a recruitment_network priced above every structure rank waits until the ladders are done. The 140-coin step keeps them open past the first liberation: Mara 16 [15, 17], Operations 19 [18, 19].
+- **Release acceptance** (expert-deu, Normal, 20 seeds; before is the parent commit): first victory 3 [3, 4] → 3 [3, 4]; tiers 1 / 2 / 3 affordable 3 / 6 / 8 → 4 / 8 / 12; Liberation(2) 18 [17, 20] → 19 [18, 20]; tree exhausted 27 [26, 29] → 28 [27, 29]; Fortifications / Mara / Operations 3 / 15 / 15 → 3 / 16 / 19. All four goal5_* rows pass. The full tables are in plan §9.6.
+- **The lever order above was not needed.** The fitted prices put the first victory at run 3 and every tier in the middle of its window, so no lever was pulled. Lever 1's floors (steady_hands 100, grenade 50, smg 60) would bring rule 2 into play, which holds no node today.
 
 ## 5. Decision-19 nodes (append-only ids 170-177, existing icons; prices provisional, then fitted by rules 1 and 3)
 | id | effects | prereq | position | gate | price | counters |

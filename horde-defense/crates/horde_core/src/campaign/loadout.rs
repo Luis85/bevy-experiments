@@ -595,7 +595,7 @@ impl Campaign {
                     format!("Unlock {}", def.name),
                     format!(
                         "Blueprint ownership is permanent. Placement uses renewed attempt supply, not your wallet. {} coins required.",
-                        def.blueprint_price
+                        self.blueprint_price(kind)
                     ),
                     RecommendationAction::LearnNode(
                         match kind {
@@ -605,7 +605,7 @@ impl Campaign {
                         }
                         .into(),
                     ),
-                    def.blueprint_price,
+                    self.blueprint_price(kind),
                 );
             }
         }

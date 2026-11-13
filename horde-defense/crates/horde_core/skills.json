@@ -23,7 +23,7 @@
       "id": "quick_reload",
       "name": "Reload drill",
       "description": "Reloads take 20% less time (×0.80). Reloads never drop below 0.65 s.",
-      "price": 50,
+      "price": 130,
       "prerequisites": [
         "pistol_training"
       ],
@@ -44,7 +44,7 @@
       "id": "steady_hands",
       "name": "Steady hands",
       "description": "Add +4 damage to every personal firearm projectile: a worn pistol hits for 16 instead of 12.",
-      "price": 40,
+      "price": 120,
       "prerequisites": [
         "pistol_training"
       ],
@@ -65,7 +65,7 @@
       "id": "smg_training",
       "name": "SMG proficiency",
       "description": "Equip owned SMGs: rapid fire, short magazines and frequent reloads. Buy or loot the gun separately.",
-      "price": 60,
+      "price": 100,
       "prerequisites": [
         "pistol_training"
       ],
@@ -86,7 +86,7 @@
       "id": "shotgun_training",
       "name": "Shotgun proficiency",
       "description": "Equip owned shotguns: each shell fires a fan of pellets. Buy or loot the gun separately.",
-      "price": 90,
+      "price": 300,
       "prerequisites": [
         "steady_hands"
       ],
@@ -107,7 +107,7 @@
       "id": "rifle_training",
       "name": "Rifle proficiency",
       "description": "Equip owned rifles for balanced damage and sustained fire. Buy or loot the gun separately.",
-      "price": 100,
+      "price": 350,
       "prerequisites": [
         "quick_reload"
       ],
@@ -128,7 +128,7 @@
       "id": "piercing",
       "name": "Controlled penetration",
       "description": "Your personal shots pierce one additional enemy.",
-      "price": 110,
+      "price": 200,
       "prerequisites": [
         "pistol_training"
       ],
@@ -149,7 +149,7 @@
       "id": "rapid_cycle",
       "name": "Rapid cycling",
       "description": "Time between shots ×0.85, about 18% more shots. Faster fire also empties the magazine sooner.",
-      "price": 110,
+      "price": 150,
       "prerequisites": [
         "quick_reload"
       ],
@@ -170,7 +170,7 @@
       "id": "marksman_training",
       "name": "Marksman proficiency",
       "description": "Equip owned marksman rifles for deliberate, heavy single shots. Buy or loot the gun separately.",
-      "price": 165,
+      "price": 2000,
       "prerequisites": [
         "rifle_training"
       ],
@@ -191,7 +191,7 @@
       "id": "machine_gun_training",
       "name": "Machine gun proficiency",
       "description": "Equip owned machine guns: large magazines and sustained fire, offset by long reloads. Buy or loot the gun separately.",
-      "price": 180,
+      "price": 2200,
       "prerequisites": [
         "rifle_training",
         "smg_training"
@@ -213,7 +213,7 @@
       "id": "stopping_power",
       "name": "Stopping power",
       "description": "Deal 25% more personal firearm damage (×1.25), applied after flat damage bonuses.",
-      "price": 140,
+      "price": 220,
       "prerequisites": [
         "steady_hands"
       ],
@@ -234,7 +234,7 @@
       "id": "combat_reload",
       "name": "Combat reload",
       "description": "Reload a further 25% faster (reload time ×0.75). Stacks with Reload drill.",
-      "price": 180,
+      "price": 270,
       "prerequisites": [
         "rapid_cycle"
       ],
@@ -255,7 +255,7 @@
       "id": "field_fitness",
       "name": "Field fitness",
       "description": "Gain +35 max health in every defense.",
-      "price": 40,
+      "price": 190,
       "prerequisites": [
         "pistol_training"
       ],
@@ -276,7 +276,7 @@
       "id": "second_wind",
       "name": "Emergency aid",
       "description": "Unlock a personal heal: restore up to 35 health once per defense.",
-      "price": 60,
+      "price": 130,
       "prerequisites": [
         "pistol_training"
       ],
@@ -297,7 +297,7 @@
       "id": "brace",
       "name": "Brace the line",
       "description": "Unlock Brace: spend 30 stamina to halve incoming damage for 5 seconds.",
-      "price": 70,
+      "price": 140,
       "prerequisites": [
         "pistol_training"
       ],
@@ -318,7 +318,7 @@
       "id": "endurance_drill",
       "name": "Endurance drill",
       "description": "Gain +40 max stamina for more melee strikes and bracing.",
-      "price": 60,
+      "price": 300,
       "prerequisites": [
         "field_fitness"
       ],
@@ -339,7 +339,7 @@
       "id": "sweep",
       "name": "Contact sweep",
       "description": "Your personal melee strikes also hit enemies in adjacent contact lanes.",
-      "price": 80,
+      "price": 150,
       "prerequisites": [
         "pistol_training"
       ],
@@ -360,7 +360,7 @@
       "id": "hardened",
       "name": "Hardened survivor",
       "description": "Gain +2 armor: every contact hit deals 2 less damage.",
-      "price": 100,
+      "price": 720,
       "prerequisites": [
         "field_fitness"
       ],
@@ -381,7 +381,7 @@
       "id": "heavy_strike",
       "name": "Heavy strike",
       "description": "Add +22 damage to every personal melee strike, including sweep targets.",
-      "price": 90,
+      "price": 180,
       "prerequisites": [
         "sweep"
       ],
@@ -402,7 +402,7 @@
       "id": "veteran_vitality",
       "name": "Veteran vitality",
       "description": "Gain a further +50 max health. Stacks with Field fitness.",
-      "price": 165,
+      "price": 700,
       "prerequisites": [
         "endurance_drill",
         "hardened"
@@ -424,7 +424,7 @@
       "id": "engineering",
       "name": "Field engineering",
       "description": "Unlock fortification building; the Trap blueprint opens after your first victory. Structures gain 25% durability and damage (×1.25) in every defense, Mara's included.",
-      "price": 60,
+      "price": 120,
       "prerequisites": [
         "pistol_training"
       ],
@@ -449,7 +449,7 @@
       "id": "reinforced_frames",
       "name": "Reinforced frames",
       "description": "Structures gain a further 20% durability and damage (×1.20).",
-      "price": 125,
+      "price": 550,
       "prerequisites": [
         "engineering"
       ],
@@ -470,7 +470,7 @@
       "id": "defensive_fabrication",
       "name": "Defensive fabrication",
       "description": "Structures gain a further 20% durability and damage (×1.20).",
-      "price": 195,
+      "price": 1300,
       "prerequisites": [
         "reinforced_frames"
       ],
@@ -491,7 +491,7 @@
       "id": "outpost_mastery",
       "name": "Outpost mastery",
       "description": "Structures gain a further 25% durability and damage (×1.25).",
-      "price": 255,
+      "price": 1500,
       "prerequisites": [
         "defensive_fabrication"
       ],
@@ -512,7 +512,7 @@
       "id": "grenade_training",
       "name": "Grenade handling",
       "description": "Unlock the grenade action with 2 charges per defense: up to 105 damage in a 2.7-yard blast.",
-      "price": 50,
+      "price": 120,
       "prerequisites": [
         "pistol_training"
       ],
@@ -533,7 +533,7 @@
       "id": "molotov_training",
       "name": "Incendiary handling",
       "description": "Unlock the Molotov action with 2 charges per defense: burning ground deals 12 damage every 0.5 s for 6 s.",
-      "price": 60,
+      "price": 130,
       "prerequisites": [
         "pistol_training"
       ],
@@ -554,7 +554,7 @@
       "id": "blast_packing",
       "name": "Blast packing",
       "description": "Deal 30% more grenade and Molotov damage (×1.30).",
-      "price": 100,
+      "price": 200,
       "prerequisites": [
         "grenade_training"
       ],
@@ -575,7 +575,7 @@
       "id": "grenade_bandolier",
       "name": "Grenade bandolier",
       "description": "Carry 2 extra grenade charges in every defense.",
-      "price": 100,
+      "price": 900,
       "prerequisites": [
         "grenade_training"
       ],
@@ -596,7 +596,7 @@
       "id": "bottle_carrier",
       "name": "Bottle carrier",
       "description": "Carry 2 extra Molotov charges in every defense.",
-      "price": 100,
+      "price": 900,
       "prerequisites": [
         "molotov_training"
       ],
@@ -617,7 +617,7 @@
       "id": "wide_blast",
       "name": "Wide blast",
       "description": "Widen grenade blasts and burning ground by 25% (radius ×1.25).",
-      "price": 135,
+      "price": 700,
       "prerequisites": [
         "blast_packing"
       ],
@@ -638,7 +638,7 @@
       "id": "slow_burn",
       "name": "Slow burn",
       "description": "Burning ground lasts 50% longer (×1.50).",
-      "price": 110,
+      "price": 250,
       "prerequisites": [
         "molotov_training"
       ],
@@ -659,7 +659,7 @@
       "id": "quick_throw",
       "name": "Quick throw",
       "description": "Carry 1 extra grenade charge and 1 extra Molotov charge in every defense. Each ordnance cooldown is 15% shorter (×0.85).",
-      "price": 165,
+      "price": 500,
       "prerequisites": [
         "grenade_bandolier",
         "bottle_carrier"
@@ -689,7 +689,7 @@
       "id": "body_vitality_1",
       "name": "Vitality 1",
       "description": "Raise Vitality to rank 1: +5 max health in total (+5 per rank).",
-      "price": 50,
+      "price": 100,
       "prerequisites": [
         "pistol_training"
       ],
@@ -714,7 +714,7 @@
       "id": "body_vitality_2",
       "name": "Vitality 2",
       "description": "Raise Vitality to rank 2: +10 max health in total (+5 per rank).",
-      "price": 90,
+      "price": 130,
       "prerequisites": [
         "body_vitality_1"
       ],
@@ -739,7 +739,7 @@
       "id": "body_vitality_3",
       "name": "Vitality 3",
       "description": "Raise Vitality to rank 3: +15 max health in total (+5 per rank).",
-      "price": 135,
+      "price": 160,
       "prerequisites": [
         "body_vitality_2"
       ],
@@ -764,7 +764,7 @@
       "id": "body_vitality_4",
       "name": "Vitality 4",
       "description": "Raise Vitality to rank 4: +20 max health in total (+5 per rank).",
-      "price": 165,
+      "price": 190,
       "prerequisites": [
         "body_vitality_3"
       ],
@@ -789,7 +789,7 @@
       "id": "body_vitality_5",
       "name": "Vitality 5",
       "description": "Raise Vitality to rank 5: +25 max health in total (+5 per rank).",
-      "price": 195,
+      "price": 220,
       "prerequisites": [
         "body_vitality_4"
       ],
@@ -814,7 +814,7 @@
       "id": "body_vitality_6",
       "name": "Vitality 6",
       "description": "Raise Vitality to rank 6: +30 max health in total (+5 per rank).",
-      "price": 225,
+      "price": 250,
       "prerequisites": [
         "body_vitality_5"
       ],
@@ -839,7 +839,7 @@
       "id": "body_vitality_7",
       "name": "Vitality 7",
       "description": "Raise Vitality to rank 7: +35 max health in total (+5 per rank).",
-      "price": 255,
+      "price": 280,
       "prerequisites": [
         "body_vitality_6"
       ],
@@ -864,7 +864,7 @@
       "id": "body_vitality_8",
       "name": "Vitality 8",
       "description": "Raise Vitality to rank 8: +40 max health in total (+5 per rank).",
-      "price": 285,
+      "price": 310,
       "prerequisites": [
         "body_vitality_7"
       ],
@@ -889,7 +889,7 @@
       "id": "body_vitality_9",
       "name": "Vitality 9",
       "description": "Raise Vitality to rank 9: +45 max health in total (+5 per rank).",
-      "price": 315,
+      "price": 340,
       "prerequisites": [
         "body_vitality_8"
       ],
@@ -914,7 +914,7 @@
       "id": "body_vitality_10",
       "name": "Vitality 10",
       "description": "Raise Vitality to rank 10: +50 max health in total (+5 per rank).",
-      "price": 345,
+      "price": 370,
       "prerequisites": [
         "body_vitality_9"
       ],
@@ -939,7 +939,7 @@
       "id": "body_vitality_11",
       "name": "Vitality 11",
       "description": "Raise Vitality to rank 11: +55 max health in total (+5 per rank).",
-      "price": 375,
+      "price": 400,
       "prerequisites": [
         "body_vitality_10"
       ],
@@ -964,7 +964,7 @@
       "id": "body_vitality_12",
       "name": "Vitality 12",
       "description": "Raise Vitality to rank 12: +60 max health in total (+5 per rank).",
-      "price": 405,
+      "price": 430,
       "prerequisites": [
         "body_vitality_11"
       ],
@@ -989,7 +989,7 @@
       "id": "body_vitality_13",
       "name": "Vitality 13",
       "description": "Raise Vitality to rank 13: +65 max health in total (+5 per rank).",
-      "price": 435,
+      "price": 460,
       "prerequisites": [
         "body_vitality_12"
       ],
@@ -1014,7 +1014,7 @@
       "id": "body_vitality_14",
       "name": "Vitality 14",
       "description": "Raise Vitality to rank 14: +70 max health in total (+5 per rank).",
-      "price": 465,
+      "price": 490,
       "prerequisites": [
         "body_vitality_13"
       ],
@@ -1039,7 +1039,7 @@
       "id": "body_vitality_15",
       "name": "Vitality 15",
       "description": "Raise Vitality to rank 15: +75 max health in total (+5 per rank).",
-      "price": 495,
+      "price": 520,
       "prerequisites": [
         "body_vitality_14"
       ],
@@ -1064,7 +1064,7 @@
       "id": "body_vitality_16",
       "name": "Vitality 16",
       "description": "Raise Vitality to rank 16: +80 max health in total (+5 per rank).",
-      "price": 525,
+      "price": 550,
       "prerequisites": [
         "body_vitality_15"
       ],
@@ -1089,7 +1089,7 @@
       "id": "body_vitality_17",
       "name": "Vitality 17",
       "description": "Raise Vitality to rank 17: +85 max health in total (+5 per rank).",
-      "price": 555,
+      "price": 580,
       "prerequisites": [
         "body_vitality_16"
       ],
@@ -1114,7 +1114,7 @@
       "id": "body_vitality_18",
       "name": "Vitality 18",
       "description": "Raise Vitality to rank 18: +90 max health in total (+5 per rank).",
-      "price": 585,
+      "price": 610,
       "prerequisites": [
         "body_vitality_17"
       ],
@@ -1139,7 +1139,7 @@
       "id": "body_vitality_19",
       "name": "Vitality 19",
       "description": "Raise Vitality to rank 19: +95 max health in total (+5 per rank).",
-      "price": 615,
+      "price": 640,
       "prerequisites": [
         "body_vitality_18"
       ],
@@ -1164,7 +1164,7 @@
       "id": "body_vitality_20",
       "name": "Vitality 20",
       "description": "Raise Vitality to rank 20: +100 max health in total (+5 per rank).",
-      "price": 645,
+      "price": 670,
       "prerequisites": [
         "body_vitality_19"
       ],
@@ -1189,7 +1189,7 @@
       "id": "body_strength_1",
       "name": "Strength 1",
       "description": "Raise Strength to rank 1: +5 melee damage in total (+5 per rank).",
-      "price": 50,
+      "price": 100,
       "prerequisites": [
         "pistol_training"
       ],
@@ -1214,7 +1214,7 @@
       "id": "body_strength_2",
       "name": "Strength 2",
       "description": "Raise Strength to rank 2: +10 melee damage in total (+5 per rank).",
-      "price": 90,
+      "price": 130,
       "prerequisites": [
         "body_strength_1"
       ],
@@ -1239,7 +1239,7 @@
       "id": "body_strength_3",
       "name": "Strength 3",
       "description": "Raise Strength to rank 3: +15 melee damage in total (+5 per rank).",
-      "price": 135,
+      "price": 160,
       "prerequisites": [
         "body_strength_2"
       ],
@@ -1264,7 +1264,7 @@
       "id": "body_strength_4",
       "name": "Strength 4",
       "description": "Raise Strength to rank 4: +20 melee damage in total (+5 per rank).",
-      "price": 165,
+      "price": 190,
       "prerequisites": [
         "body_strength_3"
       ],
@@ -1289,7 +1289,7 @@
       "id": "body_strength_5",
       "name": "Strength 5",
       "description": "Raise Strength to rank 5: +25 melee damage in total (+5 per rank).",
-      "price": 195,
+      "price": 220,
       "prerequisites": [
         "body_strength_4"
       ],
@@ -1314,7 +1314,7 @@
       "id": "body_strength_6",
       "name": "Strength 6",
       "description": "Raise Strength to rank 6: +30 melee damage in total (+5 per rank).",
-      "price": 225,
+      "price": 250,
       "prerequisites": [
         "body_strength_5"
       ],
@@ -1339,7 +1339,7 @@
       "id": "body_strength_7",
       "name": "Strength 7",
       "description": "Raise Strength to rank 7: +35 melee damage in total (+5 per rank).",
-      "price": 255,
+      "price": 280,
       "prerequisites": [
         "body_strength_6"
       ],
@@ -1364,7 +1364,7 @@
       "id": "body_strength_8",
       "name": "Strength 8",
       "description": "Raise Strength to rank 8: +40 melee damage in total (+5 per rank).",
-      "price": 285,
+      "price": 310,
       "prerequisites": [
         "body_strength_7"
       ],
@@ -1389,7 +1389,7 @@
       "id": "body_strength_9",
       "name": "Strength 9",
       "description": "Raise Strength to rank 9: +45 melee damage in total (+5 per rank).",
-      "price": 315,
+      "price": 340,
       "prerequisites": [
         "body_strength_8"
       ],
@@ -1414,7 +1414,7 @@
       "id": "body_strength_10",
       "name": "Strength 10",
       "description": "Raise Strength to rank 10: +50 melee damage in total (+5 per rank).",
-      "price": 345,
+      "price": 370,
       "prerequisites": [
         "body_strength_9"
       ],
@@ -1439,7 +1439,7 @@
       "id": "body_strength_11",
       "name": "Strength 11",
       "description": "Raise Strength to rank 11: +55 melee damage in total (+5 per rank).",
-      "price": 375,
+      "price": 400,
       "prerequisites": [
         "body_strength_10"
       ],
@@ -1464,7 +1464,7 @@
       "id": "body_strength_12",
       "name": "Strength 12",
       "description": "Raise Strength to rank 12: +60 melee damage in total (+5 per rank).",
-      "price": 405,
+      "price": 430,
       "prerequisites": [
         "body_strength_11"
       ],
@@ -1489,7 +1489,7 @@
       "id": "body_strength_13",
       "name": "Strength 13",
       "description": "Raise Strength to rank 13: +65 melee damage in total (+5 per rank).",
-      "price": 435,
+      "price": 460,
       "prerequisites": [
         "body_strength_12"
       ],
@@ -1514,7 +1514,7 @@
       "id": "body_strength_14",
       "name": "Strength 14",
       "description": "Raise Strength to rank 14: +70 melee damage in total (+5 per rank).",
-      "price": 465,
+      "price": 490,
       "prerequisites": [
         "body_strength_13"
       ],
@@ -1539,7 +1539,7 @@
       "id": "body_strength_15",
       "name": "Strength 15",
       "description": "Raise Strength to rank 15: +75 melee damage in total (+5 per rank).",
-      "price": 495,
+      "price": 520,
       "prerequisites": [
         "body_strength_14"
       ],
@@ -1564,7 +1564,7 @@
       "id": "body_strength_16",
       "name": "Strength 16",
       "description": "Raise Strength to rank 16: +80 melee damage in total (+5 per rank).",
-      "price": 525,
+      "price": 550,
       "prerequisites": [
         "body_strength_15"
       ],
@@ -1589,7 +1589,7 @@
       "id": "body_strength_17",
       "name": "Strength 17",
       "description": "Raise Strength to rank 17: +85 melee damage in total (+5 per rank).",
-      "price": 555,
+      "price": 580,
       "prerequisites": [
         "body_strength_16"
       ],
@@ -1614,7 +1614,7 @@
       "id": "body_strength_18",
       "name": "Strength 18",
       "description": "Raise Strength to rank 18: +90 melee damage in total (+5 per rank).",
-      "price": 585,
+      "price": 610,
       "prerequisites": [
         "body_strength_17"
       ],
@@ -1639,7 +1639,7 @@
       "id": "body_strength_19",
       "name": "Strength 19",
       "description": "Raise Strength to rank 19: +95 melee damage in total (+5 per rank).",
-      "price": 615,
+      "price": 640,
       "prerequisites": [
         "body_strength_18"
       ],
@@ -1664,7 +1664,7 @@
       "id": "body_strength_20",
       "name": "Strength 20",
       "description": "Raise Strength to rank 20: +100 melee damage in total (+5 per rank).",
-      "price": 645,
+      "price": 670,
       "prerequisites": [
         "body_strength_19"
       ],
@@ -1689,7 +1689,7 @@
       "id": "body_coordination_1",
       "name": "Coordination 1",
       "description": "Raise Coordination to rank 1: 2.5% shorter reloads in total (2.5% per rank).",
-      "price": 50,
+      "price": 100,
       "prerequisites": [
         "pistol_training"
       ],
@@ -1714,7 +1714,7 @@
       "id": "body_coordination_2",
       "name": "Coordination 2",
       "description": "Raise Coordination to rank 2: 5% shorter reloads in total (2.5% per rank).",
-      "price": 90,
+      "price": 130,
       "prerequisites": [
         "body_coordination_1"
       ],
@@ -1739,7 +1739,7 @@
       "id": "body_coordination_3",
       "name": "Coordination 3",
       "description": "Raise Coordination to rank 3: 7.5% shorter reloads in total (2.5% per rank).",
-      "price": 135,
+      "price": 160,
       "prerequisites": [
         "body_coordination_2"
       ],
@@ -1764,7 +1764,7 @@
       "id": "body_coordination_4",
       "name": "Coordination 4",
       "description": "Raise Coordination to rank 4: 10% shorter reloads in total (2.5% per rank).",
-      "price": 165,
+      "price": 190,
       "prerequisites": [
         "body_coordination_3"
       ],
@@ -1789,7 +1789,7 @@
       "id": "body_coordination_5",
       "name": "Coordination 5",
       "description": "Raise Coordination to rank 5: 12.5% shorter reloads in total (2.5% per rank).",
-      "price": 195,
+      "price": 220,
       "prerequisites": [
         "body_coordination_4"
       ],
@@ -1814,7 +1814,7 @@
       "id": "body_coordination_6",
       "name": "Coordination 6",
       "description": "Raise Coordination to rank 6: 15% shorter reloads in total (2.5% per rank).",
-      "price": 225,
+      "price": 250,
       "prerequisites": [
         "body_coordination_5"
       ],
@@ -1839,7 +1839,7 @@
       "id": "body_coordination_7",
       "name": "Coordination 7",
       "description": "Raise Coordination to rank 7: 17.5% shorter reloads in total (2.5% per rank).",
-      "price": 255,
+      "price": 280,
       "prerequisites": [
         "body_coordination_6"
       ],
@@ -1864,7 +1864,7 @@
       "id": "body_coordination_8",
       "name": "Coordination 8",
       "description": "Raise Coordination to rank 8: 20% shorter reloads in total (2.5% per rank).",
-      "price": 285,
+      "price": 310,
       "prerequisites": [
         "body_coordination_7"
       ],
@@ -1889,7 +1889,7 @@
       "id": "body_coordination_9",
       "name": "Coordination 9",
       "description": "Raise Coordination to rank 9: 22.5% shorter reloads in total (2.5% per rank).",
-      "price": 315,
+      "price": 340,
       "prerequisites": [
         "body_coordination_8"
       ],
@@ -1914,7 +1914,7 @@
       "id": "body_coordination_10",
       "name": "Coordination 10",
       "description": "Raise Coordination to rank 10: 25% shorter reloads in total (2.5% per rank).",
-      "price": 345,
+      "price": 370,
       "prerequisites": [
         "body_coordination_9"
       ],
@@ -1939,7 +1939,7 @@
       "id": "body_coordination_11",
       "name": "Coordination 11",
       "description": "Raise Coordination to rank 11: 27.5% shorter reloads in total (2.5% per rank).",
-      "price": 375,
+      "price": 400,
       "prerequisites": [
         "body_coordination_10"
       ],
@@ -1964,7 +1964,7 @@
       "id": "body_coordination_12",
       "name": "Coordination 12",
       "description": "Raise Coordination to rank 12: 30% shorter reloads in total (2.5% per rank).",
-      "price": 405,
+      "price": 430,
       "prerequisites": [
         "body_coordination_11"
       ],
@@ -1989,7 +1989,7 @@
       "id": "body_coordination_13",
       "name": "Coordination 13",
       "description": "Raise Coordination to rank 13: 32.5% shorter reloads in total (2.5% per rank).",
-      "price": 435,
+      "price": 460,
       "prerequisites": [
         "body_coordination_12"
       ],
@@ -2014,7 +2014,7 @@
       "id": "body_coordination_14",
       "name": "Coordination 14",
       "description": "Raise Coordination to rank 14: 35% shorter reloads in total (2.5% per rank).",
-      "price": 465,
+      "price": 490,
       "prerequisites": [
         "body_coordination_13"
       ],
@@ -2039,7 +2039,7 @@
       "id": "body_coordination_15",
       "name": "Coordination 15",
       "description": "Raise Coordination to rank 15: 37.5% shorter reloads in total (2.5% per rank).",
-      "price": 495,
+      "price": 520,
       "prerequisites": [
         "body_coordination_14"
       ],
@@ -2064,7 +2064,7 @@
       "id": "body_coordination_16",
       "name": "Coordination 16",
       "description": "Raise Coordination to rank 16: 40% shorter reloads in total (2.5% per rank).",
-      "price": 525,
+      "price": 550,
       "prerequisites": [
         "body_coordination_15"
       ],
@@ -2089,7 +2089,7 @@
       "id": "body_coordination_17",
       "name": "Coordination 17",
       "description": "Raise Coordination to rank 17: 42.5% shorter reloads in total (2.5% per rank).",
-      "price": 555,
+      "price": 580,
       "prerequisites": [
         "body_coordination_16"
       ],
@@ -2114,7 +2114,7 @@
       "id": "body_coordination_18",
       "name": "Coordination 18",
       "description": "Raise Coordination to rank 18: 45% shorter reloads in total (2.5% per rank).",
-      "price": 585,
+      "price": 610,
       "prerequisites": [
         "body_coordination_17"
       ],
@@ -2139,7 +2139,7 @@
       "id": "body_coordination_19",
       "name": "Coordination 19",
       "description": "Raise Coordination to rank 19: 47.5% shorter reloads in total (2.5% per rank).",
-      "price": 615,
+      "price": 640,
       "prerequisites": [
         "body_coordination_18"
       ],
@@ -2164,7 +2164,7 @@
       "id": "body_coordination_20",
       "name": "Coordination 20",
       "description": "Raise Coordination to rank 20: 50% shorter reloads in total (2.5% per rank).",
-      "price": 645,
+      "price": 670,
       "prerequisites": [
         "body_coordination_19"
       ],
@@ -2189,7 +2189,7 @@
       "id": "body_endurance_1",
       "name": "Endurance 1",
       "description": "Raise Endurance to rank 1: +5 max stamina in total (+5 per rank).",
-      "price": 50,
+      "price": 100,
       "prerequisites": [
         "pistol_training"
       ],
@@ -2214,7 +2214,7 @@
       "id": "body_endurance_2",
       "name": "Endurance 2",
       "description": "Raise Endurance to rank 2: +10 max stamina in total (+5 per rank).",
-      "price": 90,
+      "price": 130,
       "prerequisites": [
         "body_endurance_1"
       ],
@@ -2239,7 +2239,7 @@
       "id": "body_endurance_3",
       "name": "Endurance 3",
       "description": "Raise Endurance to rank 3: +15 max stamina in total (+5 per rank).",
-      "price": 135,
+      "price": 160,
       "prerequisites": [
         "body_endurance_2"
       ],
@@ -2264,7 +2264,7 @@
       "id": "body_endurance_4",
       "name": "Endurance 4",
       "description": "Raise Endurance to rank 4: +20 max stamina in total (+5 per rank).",
-      "price": 165,
+      "price": 190,
       "prerequisites": [
         "body_endurance_3"
       ],
@@ -2289,7 +2289,7 @@
       "id": "body_endurance_5",
       "name": "Endurance 5",
       "description": "Raise Endurance to rank 5: +25 max stamina in total (+5 per rank).",
-      "price": 195,
+      "price": 220,
       "prerequisites": [
         "body_endurance_4"
       ],
@@ -2314,7 +2314,7 @@
       "id": "body_endurance_6",
       "name": "Endurance 6",
       "description": "Raise Endurance to rank 6: +30 max stamina in total (+5 per rank).",
-      "price": 225,
+      "price": 250,
       "prerequisites": [
         "body_endurance_5"
       ],
@@ -2339,7 +2339,7 @@
       "id": "body_endurance_7",
       "name": "Endurance 7",
       "description": "Raise Endurance to rank 7: +35 max stamina in total (+5 per rank).",
-      "price": 255,
+      "price": 280,
       "prerequisites": [
         "body_endurance_6"
       ],
@@ -2364,7 +2364,7 @@
       "id": "body_endurance_8",
       "name": "Endurance 8",
       "description": "Raise Endurance to rank 8: +40 max stamina in total (+5 per rank).",
-      "price": 285,
+      "price": 310,
       "prerequisites": [
         "body_endurance_7"
       ],
@@ -2389,7 +2389,7 @@
       "id": "body_endurance_9",
       "name": "Endurance 9",
       "description": "Raise Endurance to rank 9: +45 max stamina in total (+5 per rank).",
-      "price": 315,
+      "price": 340,
       "prerequisites": [
         "body_endurance_8"
       ],
@@ -2414,7 +2414,7 @@
       "id": "body_endurance_10",
       "name": "Endurance 10",
       "description": "Raise Endurance to rank 10: +50 max stamina in total (+5 per rank).",
-      "price": 345,
+      "price": 370,
       "prerequisites": [
         "body_endurance_9"
       ],
@@ -2439,7 +2439,7 @@
       "id": "body_endurance_11",
       "name": "Endurance 11",
       "description": "Raise Endurance to rank 11: +55 max stamina in total (+5 per rank).",
-      "price": 375,
+      "price": 400,
       "prerequisites": [
         "body_endurance_10"
       ],
@@ -2464,7 +2464,7 @@
       "id": "body_endurance_12",
       "name": "Endurance 12",
       "description": "Raise Endurance to rank 12: +60 max stamina in total (+5 per rank).",
-      "price": 405,
+      "price": 430,
       "prerequisites": [
         "body_endurance_11"
       ],
@@ -2489,7 +2489,7 @@
       "id": "body_endurance_13",
       "name": "Endurance 13",
       "description": "Raise Endurance to rank 13: +65 max stamina in total (+5 per rank).",
-      "price": 435,
+      "price": 460,
       "prerequisites": [
         "body_endurance_12"
       ],
@@ -2514,7 +2514,7 @@
       "id": "body_endurance_14",
       "name": "Endurance 14",
       "description": "Raise Endurance to rank 14: +70 max stamina in total (+5 per rank).",
-      "price": 465,
+      "price": 490,
       "prerequisites": [
         "body_endurance_13"
       ],
@@ -2539,7 +2539,7 @@
       "id": "body_endurance_15",
       "name": "Endurance 15",
       "description": "Raise Endurance to rank 15: +75 max stamina in total (+5 per rank).",
-      "price": 495,
+      "price": 520,
       "prerequisites": [
         "body_endurance_14"
       ],
@@ -2564,7 +2564,7 @@
       "id": "body_endurance_16",
       "name": "Endurance 16",
       "description": "Raise Endurance to rank 16: +80 max stamina in total (+5 per rank).",
-      "price": 525,
+      "price": 550,
       "prerequisites": [
         "body_endurance_15"
       ],
@@ -2589,7 +2589,7 @@
       "id": "body_endurance_17",
       "name": "Endurance 17",
       "description": "Raise Endurance to rank 17: +85 max stamina in total (+5 per rank).",
-      "price": 555,
+      "price": 580,
       "prerequisites": [
         "body_endurance_16"
       ],
@@ -2614,7 +2614,7 @@
       "id": "body_endurance_18",
       "name": "Endurance 18",
       "description": "Raise Endurance to rank 18: +90 max stamina in total (+5 per rank).",
-      "price": 585,
+      "price": 610,
       "prerequisites": [
         "body_endurance_17"
       ],
@@ -2639,7 +2639,7 @@
       "id": "body_endurance_19",
       "name": "Endurance 19",
       "description": "Raise Endurance to rank 19: +95 max stamina in total (+5 per rank).",
-      "price": 615,
+      "price": 640,
       "prerequisites": [
         "body_endurance_18"
       ],
@@ -2664,7 +2664,7 @@
       "id": "body_endurance_20",
       "name": "Endurance 20",
       "description": "Raise Endurance to rank 20: +100 max stamina in total (+5 per rank).",
-      "price": 645,
+      "price": 670,
       "prerequisites": [
         "body_endurance_19"
       ],
@@ -2689,7 +2689,7 @@
       "id": "body_perception_1",
       "name": "Perception 1",
       "description": "Raise Perception to rank 1: +3% weak-spot damage in total (+3% per rank).",
-      "price": 50,
+      "price": 100,
       "prerequisites": [
         "pistol_training"
       ],
@@ -2714,7 +2714,7 @@
       "id": "body_perception_2",
       "name": "Perception 2",
       "description": "Raise Perception to rank 2: +6% weak-spot damage in total (+3% per rank).",
-      "price": 90,
+      "price": 130,
       "prerequisites": [
         "body_perception_1"
       ],
@@ -2739,7 +2739,7 @@
       "id": "body_perception_3",
       "name": "Perception 3",
       "description": "Raise Perception to rank 3: +9% weak-spot damage in total (+3% per rank).",
-      "price": 135,
+      "price": 160,
       "prerequisites": [
         "body_perception_2"
       ],
@@ -2764,7 +2764,7 @@
       "id": "body_perception_4",
       "name": "Perception 4",
       "description": "Raise Perception to rank 4: +12% weak-spot damage in total (+3% per rank).",
-      "price": 165,
+      "price": 190,
       "prerequisites": [
         "body_perception_3"
       ],
@@ -2789,7 +2789,7 @@
       "id": "body_perception_5",
       "name": "Perception 5",
       "description": "Raise Perception to rank 5: +15% weak-spot damage in total (+3% per rank).",
-      "price": 195,
+      "price": 220,
       "prerequisites": [
         "body_perception_4"
       ],
@@ -2814,7 +2814,7 @@
       "id": "body_perception_6",
       "name": "Perception 6",
       "description": "Raise Perception to rank 6: +18% weak-spot damage in total (+3% per rank).",
-      "price": 225,
+      "price": 250,
       "prerequisites": [
         "body_perception_5"
       ],
@@ -2839,7 +2839,7 @@
       "id": "body_perception_7",
       "name": "Perception 7",
       "description": "Raise Perception to rank 7: +21% weak-spot damage in total (+3% per rank).",
-      "price": 255,
+      "price": 280,
       "prerequisites": [
         "body_perception_6"
       ],
@@ -2864,7 +2864,7 @@
       "id": "body_perception_8",
       "name": "Perception 8",
       "description": "Raise Perception to rank 8: +24% weak-spot damage in total (+3% per rank).",
-      "price": 285,
+      "price": 310,
       "prerequisites": [
         "body_perception_7"
       ],
@@ -2889,7 +2889,7 @@
       "id": "body_perception_9",
       "name": "Perception 9",
       "description": "Raise Perception to rank 9: +27% weak-spot damage in total (+3% per rank).",
-      "price": 315,
+      "price": 340,
       "prerequisites": [
         "body_perception_8"
       ],
@@ -2914,7 +2914,7 @@
       "id": "body_perception_10",
       "name": "Perception 10",
       "description": "Raise Perception to rank 10: +30% weak-spot damage in total (+3% per rank).",
-      "price": 345,
+      "price": 370,
       "prerequisites": [
         "body_perception_9"
       ],
@@ -2939,7 +2939,7 @@
       "id": "body_perception_11",
       "name": "Perception 11",
       "description": "Raise Perception to rank 11: +33% weak-spot damage in total (+3% per rank).",
-      "price": 375,
+      "price": 400,
       "prerequisites": [
         "body_perception_10"
       ],
@@ -2964,7 +2964,7 @@
       "id": "body_perception_12",
       "name": "Perception 12",
       "description": "Raise Perception to rank 12: +36% weak-spot damage in total (+3% per rank).",
-      "price": 405,
+      "price": 430,
       "prerequisites": [
         "body_perception_11"
       ],
@@ -2989,7 +2989,7 @@
       "id": "body_perception_13",
       "name": "Perception 13",
       "description": "Raise Perception to rank 13: +39% weak-spot damage in total (+3% per rank).",
-      "price": 435,
+      "price": 460,
       "prerequisites": [
         "body_perception_12"
       ],
@@ -3014,7 +3014,7 @@
       "id": "body_perception_14",
       "name": "Perception 14",
       "description": "Raise Perception to rank 14: +42% weak-spot damage in total (+3% per rank).",
-      "price": 465,
+      "price": 490,
       "prerequisites": [
         "body_perception_13"
       ],
@@ -3039,7 +3039,7 @@
       "id": "body_perception_15",
       "name": "Perception 15",
       "description": "Raise Perception to rank 15: +45% weak-spot damage in total (+3% per rank).",
-      "price": 495,
+      "price": 520,
       "prerequisites": [
         "body_perception_14"
       ],
@@ -3064,7 +3064,7 @@
       "id": "body_perception_16",
       "name": "Perception 16",
       "description": "Raise Perception to rank 16: +48% weak-spot damage in total (+3% per rank).",
-      "price": 525,
+      "price": 550,
       "prerequisites": [
         "body_perception_15"
       ],
@@ -3089,7 +3089,7 @@
       "id": "body_perception_17",
       "name": "Perception 17",
       "description": "Raise Perception to rank 17: +51% weak-spot damage in total (+3% per rank).",
-      "price": 555,
+      "price": 580,
       "prerequisites": [
         "body_perception_16"
       ],
@@ -3114,7 +3114,7 @@
       "id": "body_perception_18",
       "name": "Perception 18",
       "description": "Raise Perception to rank 18: +54% weak-spot damage in total (+3% per rank).",
-      "price": 585,
+      "price": 610,
       "prerequisites": [
         "body_perception_17"
       ],
@@ -3139,7 +3139,7 @@
       "id": "body_perception_19",
       "name": "Perception 19",
       "description": "Raise Perception to rank 19: +57% weak-spot damage in total (+3% per rank).",
-      "price": 615,
+      "price": 640,
       "prerequisites": [
         "body_perception_18"
       ],
@@ -3164,7 +3164,7 @@
       "id": "body_perception_20",
       "name": "Perception 20",
       "description": "Raise Perception to rank 20: +60% weak-spot damage in total (+3% per rank).",
-      "price": 645,
+      "price": 670,
       "prerequisites": [
         "body_perception_19"
       ],
@@ -3189,7 +3189,7 @@
       "id": "trap_blueprint",
       "name": "Trap blueprint",
       "description": "Learn the trap blueprint for good. Each trap costs 4 battle supply to place, never coins.",
-      "price": 25,
+      "price": 150,
       "prerequisites": [
         "engineering"
       ],
@@ -3211,7 +3211,7 @@
       "id": "trap_rank_1",
       "name": "Trap mastery 1",
       "description": "Raise trap mastery to rank 1: +20% trap damage and +1 charge in total (+20% and +1 charge per rank).",
-      "price": 75,
+      "price": 400,
       "prerequisites": [
         "trap_blueprint"
       ],
@@ -3236,7 +3236,7 @@
       "id": "trap_rank_2",
       "name": "Trap mastery 2",
       "description": "Raise trap mastery to rank 2: +40% trap damage and +2 charges in total (+20% and +1 charge per rank).",
-      "price": 150,
+      "price": 540,
       "prerequisites": [
         "trap_rank_1"
       ],
@@ -3261,7 +3261,7 @@
       "id": "trap_rank_3",
       "name": "Trap mastery 3",
       "description": "Raise trap mastery to rank 3: +60% trap damage and +3 charges in total (+20% and +1 charge per rank).",
-      "price": 225,
+      "price": 680,
       "prerequisites": [
         "trap_rank_2"
       ],
@@ -3286,7 +3286,7 @@
       "id": "trap_rank_4",
       "name": "Trap mastery 4",
       "description": "Raise trap mastery to rank 4: +80% trap damage and +4 charges in total (+20% and +1 charge per rank).",
-      "price": 300,
+      "price": 820,
       "prerequisites": [
         "trap_rank_3"
       ],
@@ -3311,7 +3311,7 @@
       "id": "trap_rank_5",
       "name": "Trap mastery 5",
       "description": "Raise trap mastery to rank 5: +100% trap damage and +5 charges in total (+20% and +1 charge per rank).",
-      "price": 375,
+      "price": 960,
       "prerequisites": [
         "trap_rank_4"
       ],
@@ -3336,7 +3336,7 @@
       "id": "trap_rank_6",
       "name": "Trap mastery 6",
       "description": "Raise trap mastery to rank 6: +120% trap damage and +6 charges in total (+20% and +1 charge per rank).",
-      "price": 450,
+      "price": 1100,
       "prerequisites": [
         "trap_rank_5"
       ],
@@ -3361,7 +3361,7 @@
       "id": "trap_rank_7",
       "name": "Trap mastery 7",
       "description": "Raise trap mastery to rank 7: +140% trap damage and +7 charges in total (+20% and +1 charge per rank).",
-      "price": 525,
+      "price": 1240,
       "prerequisites": [
         "trap_rank_6"
       ],
@@ -3386,7 +3386,7 @@
       "id": "trap_rank_8",
       "name": "Trap mastery 8",
       "description": "Raise trap mastery to rank 8: +160% trap damage and +8 charges in total (+20% and +1 charge per rank).",
-      "price": 600,
+      "price": 1380,
       "prerequisites": [
         "trap_rank_7"
       ],
@@ -3411,7 +3411,7 @@
       "id": "trap_rank_9",
       "name": "Trap mastery 9",
       "description": "Raise trap mastery to rank 9: +180% trap damage and +9 charges in total (+20% and +1 charge per rank).",
-      "price": 675,
+      "price": 1520,
       "prerequisites": [
         "trap_rank_8"
       ],
@@ -3436,7 +3436,7 @@
       "id": "trap_rank_10",
       "name": "Trap mastery 10",
       "description": "Raise trap mastery to rank 10: +200% trap damage and +10 charges in total (+20% and +1 charge per rank).",
-      "price": 750,
+      "price": 1660,
       "prerequisites": [
         "trap_rank_9"
       ],
@@ -3461,7 +3461,7 @@
       "id": "wall_blueprint",
       "name": "Wall blueprint",
       "description": "Learn the wall blueprint for good. Each wall costs 3 battle supply to place, never coins.",
-      "price": 35,
+      "price": 200,
       "prerequisites": [
         "engineering"
       ],
@@ -3483,7 +3483,7 @@
       "id": "wall_rank_1",
       "name": "Wall mastery 1",
       "description": "Raise wall mastery to rank 1: +20% wall durability in total (+20% per rank).",
-      "price": 75,
+      "price": 320,
       "prerequisites": [
         "wall_blueprint"
       ],
@@ -3508,7 +3508,7 @@
       "id": "wall_rank_2",
       "name": "Wall mastery 2",
       "description": "Raise wall mastery to rank 2: +40% wall durability in total (+20% per rank).",
-      "price": 150,
+      "price": 460,
       "prerequisites": [
         "wall_rank_1"
       ],
@@ -3533,7 +3533,7 @@
       "id": "wall_rank_3",
       "name": "Wall mastery 3",
       "description": "Raise wall mastery to rank 3: +60% wall durability in total (+20% per rank).",
-      "price": 225,
+      "price": 600,
       "prerequisites": [
         "wall_rank_2"
       ],
@@ -3558,7 +3558,7 @@
       "id": "wall_rank_4",
       "name": "Wall mastery 4",
       "description": "Raise wall mastery to rank 4: +80% wall durability in total (+20% per rank).",
-      "price": 300,
+      "price": 740,
       "prerequisites": [
         "wall_rank_3"
       ],
@@ -3583,7 +3583,7 @@
       "id": "wall_rank_5",
       "name": "Wall mastery 5",
       "description": "Raise wall mastery to rank 5: +100% wall durability in total (+20% per rank).",
-      "price": 375,
+      "price": 880,
       "prerequisites": [
         "wall_rank_4"
       ],
@@ -3608,7 +3608,7 @@
       "id": "wall_rank_6",
       "name": "Wall mastery 6",
       "description": "Raise wall mastery to rank 6: +120% wall durability in total (+20% per rank).",
-      "price": 450,
+      "price": 1020,
       "prerequisites": [
         "wall_rank_5"
       ],
@@ -3633,7 +3633,7 @@
       "id": "wall_rank_7",
       "name": "Wall mastery 7",
       "description": "Raise wall mastery to rank 7: +140% wall durability in total (+20% per rank).",
-      "price": 525,
+      "price": 1160,
       "prerequisites": [
         "wall_rank_6"
       ],
@@ -3658,7 +3658,7 @@
       "id": "wall_rank_8",
       "name": "Wall mastery 8",
       "description": "Raise wall mastery to rank 8: +160% wall durability in total (+20% per rank).",
-      "price": 600,
+      "price": 1300,
       "prerequisites": [
         "wall_rank_7"
       ],
@@ -3683,7 +3683,7 @@
       "id": "wall_rank_9",
       "name": "Wall mastery 9",
       "description": "Raise wall mastery to rank 9: +180% wall durability in total (+20% per rank).",
-      "price": 675,
+      "price": 1440,
       "prerequisites": [
         "wall_rank_8"
       ],
@@ -3708,7 +3708,7 @@
       "id": "wall_rank_10",
       "name": "Wall mastery 10",
       "description": "Raise wall mastery to rank 10: +200% wall durability in total (+20% per rank).",
-      "price": 750,
+      "price": 1580,
       "prerequisites": [
         "wall_rank_9"
       ],
@@ -3733,7 +3733,7 @@
       "id": "turret_blueprint",
       "name": "Turret blueprint",
       "description": "Learn the turret blueprint for good. Each turret costs 10 battle supply to place, never coins.",
-      "price": 50,
+      "price": 250,
       "prerequisites": [
         "engineering"
       ],
@@ -3755,7 +3755,7 @@
       "id": "turret_rank_1",
       "name": "Turret mastery 1",
       "description": "Raise turret mastery to rank 1: +20% turret durability and damage in total (+20% per rank).",
-      "price": 75,
+      "price": 240,
       "prerequisites": [
         "turret_blueprint"
       ],
@@ -3780,7 +3780,7 @@
       "id": "turret_rank_2",
       "name": "Turret mastery 2",
       "description": "Raise turret mastery to rank 2: +40% turret durability and damage in total (+20% per rank).",
-      "price": 150,
+      "price": 380,
       "prerequisites": [
         "turret_rank_1"
       ],
@@ -3805,7 +3805,7 @@
       "id": "turret_rank_3",
       "name": "Turret mastery 3",
       "description": "Raise turret mastery to rank 3: +60% turret durability and damage in total (+20% per rank).",
-      "price": 225,
+      "price": 520,
       "prerequisites": [
         "turret_rank_2"
       ],
@@ -3830,7 +3830,7 @@
       "id": "turret_rank_4",
       "name": "Turret mastery 4",
       "description": "Raise turret mastery to rank 4: +80% turret durability and damage in total (+20% per rank).",
-      "price": 300,
+      "price": 660,
       "prerequisites": [
         "turret_rank_3"
       ],
@@ -3855,7 +3855,7 @@
       "id": "turret_rank_5",
       "name": "Turret mastery 5",
       "description": "Raise turret mastery to rank 5: +100% turret durability and damage in total (+20% per rank).",
-      "price": 375,
+      "price": 800,
       "prerequisites": [
         "turret_rank_4"
       ],
@@ -3880,7 +3880,7 @@
       "id": "turret_rank_6",
       "name": "Turret mastery 6",
       "description": "Raise turret mastery to rank 6: +120% turret durability and damage in total (+20% per rank).",
-      "price": 450,
+      "price": 940,
       "prerequisites": [
         "turret_rank_5"
       ],
@@ -3905,7 +3905,7 @@
       "id": "turret_rank_7",
       "name": "Turret mastery 7",
       "description": "Raise turret mastery to rank 7: +140% turret durability and damage in total (+20% per rank).",
-      "price": 525,
+      "price": 1080,
       "prerequisites": [
         "turret_rank_6"
       ],
@@ -3930,7 +3930,7 @@
       "id": "turret_rank_8",
       "name": "Turret mastery 8",
       "description": "Raise turret mastery to rank 8: +160% turret durability and damage in total (+20% per rank).",
-      "price": 600,
+      "price": 1220,
       "prerequisites": [
         "turret_rank_7"
       ],
@@ -3955,7 +3955,7 @@
       "id": "turret_rank_9",
       "name": "Turret mastery 9",
       "description": "Raise turret mastery to rank 9: +180% turret durability and damage in total (+20% per rank).",
-      "price": 675,
+      "price": 1360,
       "prerequisites": [
         "turret_rank_8"
       ],
@@ -3980,7 +3980,7 @@
       "id": "turret_rank_10",
       "name": "Turret mastery 10",
       "description": "Raise turret mastery to rank 10: +200% turret durability and damage in total (+20% per rank).",
-      "price": 750,
+      "price": 1500,
       "prerequisites": [
         "turret_rank_9"
       ],
@@ -4005,7 +4005,7 @@
       "id": "companion_contact",
       "name": "Meet Mara",
       "description": "Mara joins you as a companion who can defend in your place. She keeps her own equipment and training.",
-      "price": 75,
+      "price": 400,
       "prerequisites": [
         "field_fitness"
       ],
@@ -4027,7 +4027,7 @@
       "id": "recruitment_network",
       "name": "Survivor network",
       "description": "Recruit survivors in liberated countries. Each recruit keeps their own equipment, training and history.",
-      "price": 100,
+      "price": 1700,
       "prerequisites": [
         "companion_contact"
       ],
@@ -4049,7 +4049,7 @@
       "id": "parallel_command",
       "name": "Parallel command",
       "description": "Run defenses in several countries at once, with one defender on each battlefield.",
-      "price": 150,
+      "price": 1100,
       "prerequisites": [
         "recruitment_network"
       ],
@@ -4071,7 +4071,7 @@
       "id": "country_operations",
       "name": "Country operations",
       "description": "Send defenders on country operations that chain local battles until liberation, defeat or recall.",
-      "price": 225,
+      "price": 1500,
       "prerequisites": [
         "parallel_command"
       ],
@@ -4093,7 +4093,7 @@
       "id": "shotgun_pump_drill",
       "name": "Pump drill",
       "description": "Your shotguns: time between shots ×0.80, about 25% more shots, and reloads take 20% less time (×0.80). Personal play only.",
-      "price": 800,
+      "price": 1000,
       "prerequisites": [
         "shotgun_training"
       ],
@@ -4301,7 +4301,7 @@
       "id": "mg_belt_feeder",
       "name": "Belt feeder",
       "description": "Your machine guns: reloads take 40% less time (×0.60), so a 5.1 s belt change takes about 3.1 s. Personal play only.",
-      "price": 1500,
+      "price": 1200,
       "prerequisites": [
         "machine_gun_training"
       ],
