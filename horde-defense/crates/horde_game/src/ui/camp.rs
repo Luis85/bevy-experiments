@@ -281,18 +281,7 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     ui.horizontal_wrapped(|ui| {
         let allowed = choosing || f.game.campaign().world.can_enter(&country.id);
         ui.add_enabled_ui(allowed, |ui| {
-            if primary(
-                ui,
-                if !choosing
-                    && f.game.campaign().world.completed(&country.id) >= country.level_count()
-                {
-                    "Manage country"
-                } else {
-                    "Start journey"
-                },
-            )
-            .clicked()
-            {
+            if primary(ui, country_action_label(f.game, country)).clicked() {
                 if choosing {
                     f.dispatch(
                         Command::ChooseStart(country.id.clone()),
@@ -300,10 +289,9 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
                     );
                     f.campaign.stage = 0;
                 } else {
-                    f.dispatch(
-                        Command::EnterCountry(country.id.clone()),
-                        "Journey started in the selected country.",
-                    );
+                    // Choosing a later country never deploys (CD6): core
+                    // selects it, then its Briefing opens (notices.rs).
+                    f.dispatch(Command::SelectCountry(country.id.clone()), "");
                 }
             }
         });
@@ -317,6 +305,19 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
             muted(ui, "Liberate a neighboring country to open this front.");
         }
     });
+}
+/// The World footer's label for `country`: "Start journey" deploys the first
+/// country (`ChooseStart`); later countries are only chosen (`SelectCountry`),
+/// as "Manage country" once liberated and "Plan defense" before.
+fn country_action_label(game: &Game, country: &Country) -> &'static str {
+    let world = &game.campaign().world;
+    if world.start.is_none() {
+        "Start journey"
+    } else if world.completed(&country.id) >= country.level_count() {
+        "Manage country"
+    } else {
+        "Plan defense"
+    }
 }
 #[cfg(test)]
 pub(super) fn country_dossier(ui: &mut egui::Ui, f: &mut UiCtx) {

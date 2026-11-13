@@ -122,7 +122,7 @@ fn failed_outbreak_front_change_keeps_operations_and_the_requested_country_conte
             ready_turns: 0,
         });
     let before = serde_json::to_value(&f.game).unwrap();
-    h.click(f, View::Camp, "Defend now");
+    h.click(f, View::Camp, "Plan response");
     assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Operations);
     assert_eq!(f.campaign.selected_country, "FRA");
     assert_eq!(f.game.attempt().unwrap().country_id.as_deref(), Some("DEU"));
@@ -175,4 +175,60 @@ fn npc_critical_state_stays_explicit_at_one_and_four_times_observation_speed() {
         dossier.textures_delta.clear();
         assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
     }
+}
+
+/// W3-18 (CD6): an urgent outbreak's "Plan response" selects the country and
+/// opens its Briefing on the final stage. Nothing deploys until the Briefing
+/// primary sends `BeginDefense`.
+#[test]
+fn plan_response_opens_briefing_without_attempt() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().attempts = 1;
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Operations;
+    let levels = world().country("FRA").unwrap().level_count();
+    f.game.campaign_mut().world.cleared.push("FRA".into());
+    f.game
+        .campaign_mut()
+        .world
+        .country_levels
+        .insert("FRA".into(), levels);
+    f.game.strategy_mut().peak_freed = 1;
+    f.game.strategy_mut().next_outbreak_id = 2;
+    f.game
+        .strategy_mut()
+        .outbreaks
+        .push(horde_core::strategy::Outbreak {
+            id: 1,
+            country_id: "FRA".into(),
+            started_tick: 0,
+            deadline_tick: 9999,
+            strength: 2,
+            enemy: horde_core::rules::InjuryState::new(9, 10),
+            outcome: horde_core::strategy::OutbreakOutcome::Active,
+            ready_turns: 0,
+        });
+    let ids = f.game.campaign().next_attempt_id;
+    let output = h.frame(f, View::Camp, vec![]);
+    assert_eq!(text_count(&output, "Plan response"), 1);
+    assert_eq!(text_count(&output, "Defend now"), 0);
+    h.click(f, View::Camp, "Plan response");
+    assert!(f.game.attempt().is_none(), "nothing deploys");
+    assert_eq!(f.game.campaign().next_attempt_id, ids);
+    assert_eq!(f.game.campaign().world.active.as_deref(), Some("FRA"));
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Briefing);
+    assert_eq!(f.campaign.selected_country, "FRA");
+    assert_eq!(
+        f.campaign.stage,
+        levels - 1,
+        "the response replays the final stage"
+    );
+    assert_eq!(
+        f.game.outbreak_plan("FRA").map(|plan| plan.stage),
+        Some(f.campaign.stage)
+    );
+    assert!(!f.status.message_error);
 }

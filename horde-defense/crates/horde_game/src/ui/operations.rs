@@ -43,17 +43,17 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         outbreak.country, outbreak.strength, outbreak.seconds_left
                     ),
                 );
-                // Entering the country deploys at once; the label says so.
+                // Planning never deploys (CD6): core selects the country,
+                // then its Briefing opens on the final stage (notices.rs).
                 if ui
-                    .button("Defend now")
-                    .on_hover_text("Starts a live defense in this country to contain the outbreak.")
+                    .button("Plan response")
+                    .on_hover_text(
+                        "Selects the country and opens its briefing. Nothing deploys until you begin.",
+                    )
                     .clicked()
                 {
                     f.campaign.selected_country = outbreak.country_id.clone();
-                    f.dispatch(
-                        Command::EnterCountry(outbreak.country_id.clone()),
-                        "Outbreak defense started.",
-                    );
+                    f.dispatch(Command::SelectCountry(outbreak.country_id.clone()), "");
                 }
             });
         }

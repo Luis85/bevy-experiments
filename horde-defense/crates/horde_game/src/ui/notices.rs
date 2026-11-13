@@ -448,6 +448,18 @@ impl UiCtx<'_> {
                     self.open_preparation(Tab::Briefing);
                 }
             }
+            AppCommand::Game(Command::SelectCountry(id)) => {
+                // The country is chosen, nothing is deployed (CD6): open its
+                // Briefing on the stage to plan. An outbreak's response
+                // replays the final stage (`Game::outbreak_plan`).
+                self.status.profile_exists = true;
+                self.open_preparation(Tab::Briefing);
+                self.campaign.stage = self.game.outbreak_plan(&id).map_or_else(
+                    || self.game.campaign().world.next_stage(),
+                    |plan| plan.stage,
+                );
+                self.campaign.selected_country = id;
+            }
             AppCommand::Game(Command::SetPaused(_)) => {
                 self.battle.fire_latched = false;
                 self.runtime.clear_input();

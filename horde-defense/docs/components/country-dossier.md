@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/camp.rs::country_summary, country_action"
 
 Summarize the selected country's defenses, difficulty, biome and liberation progress.
 
-- **Entry, exit and actions:** Map or browser selection updates the dossier; Choose survivor first routes an unselected profile to survivor-selection; after confirmation, Start in this country chooses the first front; Plan defense enters later fronts; Return to active defense restores an existing attempt.
+- **Entry, exit and actions:** Map or browser selection updates the dossier; Choose survivor first routes an unselected profile to survivor-selection; after confirmation, Start in this country chooses the first front; Plan defense (Manage country once liberated) selects a later front through `SelectCountry` and opens its Briefing without deploying; Return to active defense restores an existing attempt.
 - **State boundary:** The world catalog supplies country properties; Game validates access. Selection never starts a second active defense implicitly.
 - **Responsiveness and accessibility:** Compact dossier is a named disclosure below a reserved map-first region, rather than above a tiny map strip. Numerical progress and labels accompany color.
 

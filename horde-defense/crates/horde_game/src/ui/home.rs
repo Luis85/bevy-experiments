@@ -335,11 +335,10 @@ fn alerts(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .on_disabled_hover_text("Finish the active defense first.")
                     .clicked()
                 {
-                    // Core selects the country; the briefing opens on it once
-                    // the command applies. Nothing deploys here.
-                    f.dispatch(Command::SelectCountry(country_id.clone()), "");
-                    f.open_preparation(Tab::Briefing);
+                    // Core selects the country; its briefing opens once the
+                    // command applies (notices.rs). Nothing deploys here.
                     f.campaign.selected_country = country_id.clone();
+                    f.dispatch(Command::SelectCountry(country_id.clone()), "");
                 }
             });
         });

@@ -19,7 +19,7 @@ return/observe routes. The global clock remains explicit.
 
 Campaign uses a bounded country browser/map and a compact actionable dossier.
 Selecting a starting country leads to briefing; planning another front first
-uses the existing EnterCountry command. Detailed regional facts collapse below
+uses SelectCountry, which never deploys (W3-18). Detailed regional facts collapse below
 the primary action. Briefing collects stage, defender, loadout, boss timing,
 conditions and supply before creating an attempt. No automatic purchases.
 

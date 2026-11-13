@@ -207,3 +207,49 @@ fn reselecting_the_current_camp_screen_keeps_strategy_ticks_running() {
     assert_eq!(f.runtime.simulated_ticks, before + 1);
     assert!(f.screen == Screen::Camp);
 }
+
+/// W3-18 (CD6): for a non-first country the World footer chooses the country
+/// through `SelectCountry` and opens its Briefing. It never deploys.
+#[test]
+fn world_footer_never_creates_attempt() {
+    for (liberated, label) in [(false, "Plan defense"), (true, "Manage country")] {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.campaign_mut().attempts = 1;
+        f.game.campaign_mut().world.unlocked.push("FRA".into());
+        let levels = world().country("FRA").unwrap().level_count();
+        if liberated {
+            f.game.campaign_mut().world.cleared.push("FRA".into());
+            f.game
+                .campaign_mut()
+                .world
+                .country_levels
+                .insert("FRA".into(), levels);
+        }
+        f.screen = Screen::Camp;
+        f.nav.tab = Tab::World;
+        f.campaign.selected_country = "FRA".into();
+        f.campaign.stage = 3;
+        let ids = f.game.campaign().next_attempt_id;
+        let output = h.frame(f, View::Dossier, vec![]);
+        assert_eq!(text_count(&output, label), 1, "{label}");
+        assert_eq!(text_count(&output, "Start journey"), 0, "{label}");
+        h.click(f, View::Dossier, label);
+        assert!(f.game.attempt().is_none(), "{label}: nothing deploys");
+        assert_eq!(f.game.campaign().next_attempt_id, ids, "{label}");
+        assert_eq!(f.game.campaign().world.active.as_deref(), Some("FRA"));
+        assert!(
+            f.screen == Screen::Camp && f.nav.tab == Tab::Briefing,
+            "{label}: the Briefing opens"
+        );
+        assert_eq!(f.campaign.selected_country, "FRA", "{label}");
+        assert_eq!(
+            f.campaign.stage,
+            if liberated { levels - 1 } else { 0 },
+            "{label}: the planned stage is the country's next stage"
+        );
+        assert!(!f.status.message_error, "{label}");
+    }
+}
