@@ -4,13 +4,13 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Island Village entry point: one native title/play/pause flow, with an explicit developer launcher for authoring and diagnostics."
+description = "The developer menu: Worlds/Actors editors, settings, AI explorer New/Resume, detached worlds and the framework examples (Actor Testbed, village, RTS demo)."
 
 [dependencies]
 # Not `bevy.workspace = true`: the workspace entry keeps Bevy's default
 # features, which select the `ruzstd` backend. The actor testbed's list
 # (`zstd_c`, never `zstd_rust`; see apps/village/Cargo.toml). These features
-# cover the developer launcher; actor_testbed contributes the 3D game host.
+# cover the developer launcher.
 # `ui` brings `ui_widgets` (buttons, `TextInput`) and `png` (screenshots).
 bevy = { version = "0.20.0", default-features = false, features = [
     "2d", "ui",
@@ -21,8 +21,6 @@ bevy = { version = "0.20.0", default-features = false, features = [
 # Scenario names and descriptions, the agents-folder settings and their
 # validation. The developer launcher itself owns no simulation mechanics.
 testbed_content.workspace = true
-# Normal play uses the host library directly: one window and one process.
-actor_testbed = { path = "../actor_testbed" }
 # The `--check-save` line and the save header's `saved` date (both already in
 # the graph through testbed_content).
 serde.workspace = true

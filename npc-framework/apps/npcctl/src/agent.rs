@@ -75,8 +75,6 @@ pub struct ServeArgs {
     #[arg(long, value_name = "TOKEN")]
     pub token: Option<String>,
     #[command(flatten)]
-    pub projection: crate::projection::ProjectionArgs,
-    #[command(flatten)]
     pub explorer: crate::explorer::ExplorerServeArgs,
 }
 
@@ -90,7 +88,6 @@ impl std::fmt::Debug for ServeArgs {
             .field("seed", &self.seed)
             .field("token", &self.token.as_ref().map(|_| "<redacted>"))
             .field("explorer", &self.explorer)
-            .field("projection", &self.projection)
             .finish()
     }
 }
@@ -959,10 +956,6 @@ pub fn cmd_serve(a: &ServeArgs, out: &mut Out) -> Result<u8, Failure> {
         .map_err(|e| Failure::usage(format!("cannot read scenario {}: {e}", scenario.display())))?;
     let doc = ScenarioDoc::parse(&text)
         .map_err(|e| Failure::usage(format!("scenario {}: {e}", scenario.display())))?;
-    let publisher = std::rc::Rc::new(std::cell::RefCell::new(
-        None::<crate::projection::Publisher>,
-    ));
-    let frame_publisher = std::rc::Rc::clone(&publisher);
     let options = SessionOptions {
         port: a.port.unwrap_or(15702),
         tick_hz: a.tick_hz,
@@ -970,9 +963,6 @@ pub fn cmd_serve(a: &ServeArgs, out: &mut Out) -> Result<u8, Failure> {
         seed: a.seed,
         token: a.token.clone(),
         on_frame: Some(Box::new(move |world| {
-            if let Some(publisher) = &mut *frame_publisher.borrow_mut() {
-                publisher.frame(world);
-            }
             // A scenario reset replaces the World, including host-only supervisor state.
             if !world.contains_resource::<npc_framework::agent_io::scheduler::SchedulerRuntime>() {
                 npc_framework::agent_io::scheduler::configure_host(
@@ -980,14 +970,11 @@ pub fn cmd_serve(a: &ServeArgs, out: &mut Out) -> Result<u8, Failure> {
                     npc_framework::agent_io::scheduler::default_bindings_path(),
                 );
             }
-            testbed_content::village::host::frame(world);
             npc_framework::agent_io::scheduler::frame(world);
         })),
         ..SessionOptions::default()
     };
     let mut session = Session::start(loaders(), doc, options).map_err(Failure::usage)?;
-    // Validate and publish before printing the listening address.
-    *publisher.borrow_mut() = a.projection.start(session.app_mut().world_mut())?;
     npc_framework::agent_io::scheduler::configure_host(
         session.app_mut().world_mut(),
         npc_framework::agent_io::scheduler::default_bindings_path(),

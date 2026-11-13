@@ -8,7 +8,6 @@
 
 mod agent;
 mod explorer;
-mod projection;
 mod scheduler;
 mod sim;
 

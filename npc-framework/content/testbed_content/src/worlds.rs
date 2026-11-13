@@ -10,52 +10,23 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub const PLAIN_EXPLORER: &str = "plain_explorer";
-pub const BUILTIN_PRESETS: [(&str, &str); 8] = [
-    ("living_world", include_str!("../worlds/living_world.json")),
+pub const BUILTIN_PRESETS: [(&str, &str); 3] = [
     (
         PLAIN_EXPLORER,
         include_str!("../worlds/plain_explorer.json"),
     ),
     ("survival", include_str!("../worlds/survival.json")),
     ("night_shift", include_str!("../worlds/night_shift.json")),
-    (
-        "island_village",
-        include_str!("../worlds/island_village.json"),
-    ),
-    (
-        "living_island",
-        include_str!("../worlds/living_island.json"),
-    ),
-    (
-        "living_homestead",
-        include_str!("../worlds/living_homestead.json"),
-    ),
-    (
-        "island_colony",
-        include_str!("../worlds/island_colony.json"),
-    ),
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldPreset {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub living_world: Option<crate::village::frontier::LivingWorldSpec>,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub colony: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub island_ai: Option<crate::village::policy::IslandAiPolicy>,
-    #[serde(default, skip_serializing_if = "EconomyModel::is_fixed")]
-    pub economy: EconomyModel,
-    #[serde(default, skip_serializing_if = "IslandGeography::is_compact")]
-    pub island_geography: IslandGeography,
     #[serde(
         default,
         skip_serializing_if = "npc_framework::agent_io::scheduler::SchedulerPolicy::is_default"
     )]
     pub ai_scheduler: npc_framework::agent_io::scheduler::SchedulerPolicy,
-    #[serde(default, skip_serializing_if = "WorldScene::is_explorer")]
-    pub scene: WorldScene,
     pub name: String,
     pub description: String,
     pub needs: NeedsSpec,
@@ -65,47 +36,6 @@ pub struct WorldPreset {
     pub perception: PerceptionRulesSpec,
     pub systems: SystemsSpec,
     pub inhabitants: InhabitantsSpec,
-}
-fn is_false(value: &bool) -> bool {
-    !*value
-}
-/// Opt-in content model; existing presets keep their exact fixed-economy shape.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EconomyModel {
-    #[default]
-    Fixed,
-    NeedsDriven,
-}
-impl EconomyModel {
-    pub fn is_fixed(&self) -> bool {
-        *self == Self::Fixed
-    }
-}
-/// Immutable construction profile, retained in each saved world's preset copy.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum IslandGeography {
-    #[default]
-    Compact,
-    Expanded,
-}
-impl IslandGeography {
-    pub fn is_compact(&self) -> bool {
-        *self == Self::Compact
-    }
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WorldScene {
-    #[default]
-    Explorer,
-    IslandVillage,
-}
-impl WorldScene {
-    fn is_explorer(&self) -> bool {
-        *self == Self::Explorer
-    }
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -168,59 +98,8 @@ pub struct InhabitantsSpec {
 
 pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
-    if let Some(definition) = &p.living_world {
-        if !p.colony || p.island_ai.is_none() {
-            errors.push("The regional living world requires colony and resident AI policy.".into());
-        }
-        if let Err(error) = definition.validate() {
-            errors.push(error);
-        }
-    }
-    if p.colony
-        && (p.scene != WorldScene::IslandVillage
-            || p.economy != EconomyModel::NeedsDriven
-            || p.island_geography != IslandGeography::Expanded)
-    {
-        errors.push("Colony simulation requires an expanded, needs-driven Island Village.".into());
-    }
-    if let Some(policy) = &p.island_ai {
-        if p.scene != WorldScene::IslandVillage || p.economy != EconomyModel::NeedsDriven {
-            errors.push("Island AI policy requires a needs-driven Island Village.".into());
-        }
-        if let Err(error) = policy.validate() {
-            errors.push(error);
-        }
-        if p.living_world.is_some()
-            && let Err(error) = policy.validate_regional()
-        {
-            errors.push(error);
-        }
-    }
-    if p.island_geography == IslandGeography::Expanded
-        && (p.scene != WorldScene::IslandVillage || p.economy != EconomyModel::NeedsDriven)
-    {
-        errors.push("Expanded island geography requires the Living Island Village economy.".into());
-    }
-    if p.economy == EconomyModel::NeedsDriven && p.scene != WorldScene::IslandVillage {
-        errors.push("The needs-driven economy requires the Island Village scene.".into());
-    }
     if let Err(error) = p.ai_scheduler.validate() {
         errors.push(error);
-    }
-    if p.scene == WorldScene::IslandVillage {
-        if !p.needs.hunger.on || !p.needs.thirst.on || !p.needs.energy.on || p.needs.battery.on {
-            errors.push(
-                "Island Village requires Hunger, Thirst and Energy on, and Battery off.".into(),
-            );
-        }
-        if !p.systems.crafting {
-            errors.push("Island Village needs Crafting enabled for its production chains.".into());
-        }
-        if p.inhabitants.workers != 0 || p.inhabitants.skeletons != 0 {
-            errors.push(if p.economy == EconomyModel::NeedsDriven {
-                "Living Island Village supplies its own twelve residents; extra workers and skeletons must be zero.".into()
-            } else { "Island Village supplies its own nine residents; extra workers and skeletons must be zero.".into() });
-        }
     }
     if p.name.trim().is_empty() {
         errors.push("name must not be empty".into());
@@ -313,31 +192,6 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
         if !usable {
             return Ok(());
         }
-        // A new shipped scene is additive to existing installations; never replace a user's preset.
-        for (id, text) in BUILTIN_PRESETS.iter().filter(|(id, _)| {
-            matches!(
-                *id,
-                "island_village"
-                    | "living_island"
-                    | "living_homestead"
-                    | "island_colony"
-                    | "living_world"
-            )
-        }) {
-            let path = dir.join(format!("{id}.json"));
-            match std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(path)
-            {
-                Ok(mut file) => {
-                    use std::io::Write;
-                    file.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-                Err(e) => return Err(e.to_string()),
-            }
-        }
         return Ok(());
     }
     for (id, text) in BUILTIN_PRESETS {
@@ -401,16 +255,6 @@ pub fn resolve_preset(world: &World, id: &str) -> Option<WorldPreset> {
 pub fn world_doc(p: &WorldPreset, actor: &ActorPreset) -> Result<ScenarioDoc, String> {
     validate(p).map_err(|e| e.join("; "))?;
     let mut doc = crate::scenario::scenario_doc("explorer")?;
-    if p.scene == WorldScene::IslandVillage {
-        if actor.body != crate::actors::Body::Human {
-            return Err(
-                "The island village requires a human actor with Hunger, Thirst and Energy.".into(),
-            );
-        }
-        doc.world["layout"] = "island".into();
-        doc.world["furnish"] = false.into();
-        doc.actors[0].pos = Some((500, -1500));
-    }
     doc.world["store_locked"] = p.systems.locked_doors.into();
     doc.world["detection"] = serde_json::to_value(p.detection).map_err(|e| e.to_string())?;
     doc.actors[0].extra.insert("preset".into(), "human".into());

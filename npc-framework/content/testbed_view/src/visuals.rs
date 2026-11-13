@@ -38,7 +38,6 @@ use testbed_content::{Prop, PropKind, TestbedUnit};
 
 use crate::assets::{ModelKind, Models, ViewAssets};
 use crate::fog::{FogArea, FogDim, FogSet, Fogged, Look};
-use crate::island_world::cast::{self, Cast};
 
 /// The view factor: KayKit 1:1 model units → metres.
 pub const V: f32 = 0.75;
@@ -209,10 +208,6 @@ struct VehicleModel {
 pub(crate) struct Rings {
     mesh: Handle<Mesh>,
     owner: [Handle<StandardMaterial>; 3],
-    /// The played character's ring: wider and warm, the only thing that
-    /// marks their body apart from a resident's.
-    player_mesh: Handle<Mesh>,
-    player: Handle<StandardMaterial>,
 }
 
 pub(crate) fn plugin(app: &mut App) {
@@ -257,19 +252,7 @@ fn make_rings(
             mat(Color::srgb(0.2, 0.5, 1.0)),
             mat(Color::srgb(0.95, 0.18, 0.15)),
         ],
-        player_mesh: meshes.add(Annulus::new(0.5, 0.68)),
-        player: mat(Color::srgb(1.0, 0.78, 0.22)),
     });
-}
-
-/// The body the played character wears: the adventurer Knight, which no
-/// resident wears, unless its preset names a body that is not a robot.
-pub(crate) fn player_kind(kind: ModelKind, played: bool, named: bool) -> ModelKind {
-    if played && (!named || kind.is_robot()) {
-        ModelKind::Knight
-    } else {
-        kind
-    }
 }
 
 /// Ring colour index of an owner (0 = none/other, 1, 2).
@@ -300,10 +283,6 @@ fn spawn_visuals(
     assets: Option<Res<ViewAssets>>,
     rings: Option<Res<Rings>>,
     robots: Option<Res<crate::robots::RobotAssets>>,
-    (village, regional): (
-        Option<Res<testbed_content::village::VillageState>>,
-        Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
-    ),
     mut index: ResMut<VisualIndex>,
     alive: Query<(), With<VisualOf>>,
     props: Query<(Entity, Option<&SimId>, &Prop, &SimPos, Option<&GridBlocker>)>,
@@ -316,8 +295,6 @@ fn spawn_visuals(
             Option<&Owner>,
             Option<&testbed_content::actors::ActorModel>,
             Option<&Sensors>,
-            Option<&testbed_content::village::frontier::labor::ResidentProfile>,
-            Option<&SimId>,
         ),
         Without<Prop>,
     >,
@@ -518,44 +495,13 @@ fn spawn_visuals(
         index.map.insert(sim, root);
     }
 
-    // Only on the regional island: elsewhere a played robot stays a robot.
-    let played = village
-        .as_deref()
-        .filter(|_| regional.is_some())
-        .map(|state| state.played);
-    for (sim, unit, pos, owner, preset_model, sensors, profile, id) in &actors {
+    for (sim, unit, pos, owner, preset_model, sensors) in &actors {
         if !fresh(&mut index, sim) {
             continue;
         }
-        let is_played = id.is_some() && id.copied() == played;
-        // On the regional island one family of bodies (`island_world::cast`)
-        // dresses residents, children and the played character.
-        let cast = regional.is_some().then(Cast::current);
-        let (resident_kind, outfit) = match (profile, cast) {
-            (Some(profile), Some(cast)) => {
-                let (kind, outfit) =
-                    cast::resident(cast, id.map_or(0, |id| id.0), profile.appearance);
-                (Some(kind), outfit)
-            }
-            (Some(profile), None) => (Some(ModelKind::for_resident(profile.appearance)), None),
-            (None, _) => (None, None),
-        };
-        let kind = resident_kind
-            .or_else(|| preset_model.and_then(|m| ModelKind::from_name(&m.0)))
+        let kind = preset_model
+            .and_then(|m| ModelKind::from_name(&m.0))
             .unwrap_or_else(|| ModelKind::for_actor(&unit.template, owner.map(|o| o.0.0)));
-        // The island's played character has no resident profile: unless its
-        // preset names a body, it wears the Knight, which no resident wears,
-        // so it reads apart from the hooded rogues from above; poses, the
-        // door step, the cutaway and unblocking treat it as a resident.
-        let kind = player_kind(
-            kind,
-            is_played && profile.is_none(),
-            preset_model.is_some_and(|m| ModelKind::from_name(&m.0).is_some()),
-        );
-        let kind = match cast {
-            Some(cast) if is_played && profile.is_none() => cast::player(cast, kind),
-            _ => kind,
-        };
         if kind.is_robot() && robots.is_none() {
             continue;
         }
@@ -592,7 +538,7 @@ fn spawn_visuals(
                 hand_l: Some(left),
             });
         } else {
-            let scale = cast.map_or(kind.scale(), |cast| cast::adult_scale(cast, kind));
+            let scale = kind.scale();
             let mut body = commands.spawn((
                 ChildOf(root),
                 ActorModel { root },
@@ -602,23 +548,12 @@ fn spawn_visuals(
                 ),
             ));
             body.observe(crate::anim::on_actor_ready);
-            if cast.is_some() {
-                body.insert(cast::IslandBody { adult: scale });
-            }
-            if let Some(outfit) = outfit {
-                body.insert(outfit).observe(cast::on_outfit_ready);
-            }
         }
-        let (ring_name, ring_mesh, ring_material) = if is_played {
-            ("player ring", &rings.player_mesh, &rings.player)
-        } else {
-            ("faction ring", &rings.mesh, &rings.owner[owner_slot(owner)])
-        };
         commands.spawn((
             ChildOf(root),
-            Name::new(ring_name),
-            Mesh3d(ring_mesh.clone()),
-            MeshMaterial3d(ring_material.clone()),
+            Name::new("faction ring"),
+            Mesh3d(rings.mesh.clone()),
+            MeshMaterial3d(rings.owner[owner_slot(owner)].clone()),
             Transform::from_xyz(0.0, 0.03, 0.0).with_rotation(Quat::from_rotation_x(-PI / 2.0)),
         ));
         index.map.insert(sim, root);
@@ -758,19 +693,7 @@ fn on_vehicle_ready(
 }
 
 /// Despawns visuals whose sim entity is gone.
-type VisualSimKinds = Or<(
-    With<Prop>,
-    With<Item>,
-    With<TestbedUnit>,
-    With<testbed_content::village::VillagePlace>,
-    With<testbed_content::village::ResourcePatch>,
-    With<testbed_content::village::colony::Household>,
-    With<testbed_content::village::hunting::Wildlife>,
-    With<testbed_content::village::homestead::HomesteadPlot>,
-    With<testbed_content::village::homestead::Cottage>,
-    With<testbed_content::village::civic::ConstructionSite>,
-    With<testbed_content::village::civic::Building>,
-)>;
+type VisualSimKinds = Or<(With<Prop>, With<Item>, With<TestbedUnit>)>;
 pub(crate) fn despawn_visuals(
     mut commands: Commands,
     mut index: ResMut<VisualIndex>,
@@ -1082,17 +1005,9 @@ impl ItemLook {
                 Some((Quat::from_rotation_y(PI), Vec3::new(0.0, -0.18, 0.0))),
             ),
             STORE_KEY => (|m| &m.key, 0.5, flat_x, 0.08, None),
-            BOOK | testbed_content::village::catalog::DIARY => {
-                (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None)
-            }
+            BOOK => (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None),
             SCROLL => (|m| &m.scroll, 1.5 * V, upright, 0.0, None),
-            BREAD | testbed_content::village::catalog::BOWL => {
-                (|m| &m.food, 0.5 * V, upright, 0.0, None)
-            }
-            testbed_content::village::catalog::WATER => {
-                (|m| &m.barrel, 0.4 * V, upright, 0.0, None)
-            }
-            testbed_content::village::catalog::COINS => (|m| &m.ingot, 0.5 * V, upright, 0.0, None),
+            BREAD => (|m| &m.food, 0.5 * V, upright, 0.0, None),
             LOG => (|m| &m.log, 2.0 * V, upright, 0.11, None),
             PLANK => (|m| &m.planks, 2.0 * V, upright, 0.0, None),
             ORE => (|m| &m.stone, 1.4 * V, upright, 0.0, None),
@@ -1217,146 +1132,6 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn the_played_character_wears_the_knight_unless_its_preset_names_a_body() {
-        use ModelKind::{Knight, Rogue, Rover, TravellerMan};
-        // Played, no named body: the Knight, whatever the faction default.
-        assert_eq!(player_kind(Rogue, true, false), Knight);
-        // A robot preset is never kept for the played character.
-        assert_eq!(player_kind(Rover, true, true), Knight);
-        // A preset that names a body keeps it.
-        assert_eq!(player_kind(TravellerMan, true, true), TravellerMan);
-        // Nobody else changes, robots included.
-        assert_eq!(player_kind(Rogue, false, false), Rogue);
-        assert_eq!(player_kind(Rover, false, true), Rover);
-        assert!(
-            (0..8)
-                .map(ModelKind::for_resident)
-                .all(|kind| kind != Knight)
-        );
-    }
-
-    #[test]
-    fn living_wildlife_visuals_survive_cleanup_until_the_animal_is_gone() {
-        let mut app = testbed_content::new_sim_app(7, "living_village");
-        app.init_resource::<VisualIndex>()
-            .add_systems(Update, despawn_visuals);
-        let animals: Vec<_> = app
-            .world_mut()
-            .query_filtered::<Entity, With<testbed_content::village::hunting::Wildlife>>()
-            .iter(app.world())
-            .collect();
-        assert_eq!(animals.len(), 8);
-        let roots: Vec<_> = animals
-            .into_iter()
-            .map(|animal| {
-                let visual = app.world_mut().spawn(VisualOf(animal)).id();
-                app.world_mut()
-                    .resource_mut::<VisualIndex>()
-                    .map
-                    .insert(animal, visual);
-                (animal, visual)
-            })
-            .collect();
-        for _ in 0..5 {
-            app.update();
-            assert_eq!(app.world().resource::<VisualIndex>().map.len(), 8);
-            assert!(
-                roots
-                    .iter()
-                    .all(|(_, visual)| app.world().get_entity(*visual).is_ok())
-            );
-        }
-        let (animal, visual) = roots[0];
-        app.world_mut().despawn(animal);
-        app.update();
-        assert!(app.world().get_entity(visual).is_err());
-        assert!(
-            !app.world()
-                .resource::<VisualIndex>()
-                .map
-                .contains_key(&animal)
-        );
-        assert_eq!(app.world().resource::<VisualIndex>().map.len(), 7);
-        assert!(
-            roots[1..]
-                .iter()
-                .all(|(_, visual)| app.world().get_entity(*visual).is_ok())
-        );
-    }
-
-    #[test]
-    fn village_buildings_and_patches_survive_visual_cleanup_until_the_sim_entity_is_removed() {
-        use testbed_content::village::{ResourcePatch, VillagePlace};
-        let mut app = testbed_content::new_sim_app(3, "ai_village");
-        app.init_resource::<VisualIndex>()
-            .add_systems(Update, despawn_visuals);
-        let targets: Vec<_> = app
-            .world_mut()
-            .query_filtered::<Entity, Or<(With<VillagePlace>, With<ResourcePatch>)>>()
-            .iter(app.world())
-            .collect();
-        assert_eq!(targets.len(), 13);
-        let mut roots = Vec::new();
-        for sim in targets {
-            let root = app.world_mut().spawn(VisualOf(sim)).id();
-            app.world_mut()
-                .resource_mut::<VisualIndex>()
-                .map
-                .insert(sim, root);
-            roots.push((sim, root));
-        }
-        app.update();
-        assert!(
-            roots
-                .iter()
-                .all(|(_, root)| app.world().get_entity(*root).is_ok())
-        );
-        let (sim, root) = roots[0];
-        app.world_mut().despawn(sim);
-        app.update();
-        assert!(app.world().get_entity(root).is_err());
-        assert!(!app.world().resource::<VisualIndex>().map.contains_key(&sim));
-        assert!(
-            roots[1..]
-                .iter()
-                .all(|(_, root)| app.world().get_entity(*root).is_ok())
-        );
-    }
-
-    #[test]
-    fn settlement_house_visual_survives_cleanup_until_its_household_is_removed() {
-        let mut app = App::new();
-        app.init_resource::<VisualIndex>()
-            .add_systems(Update, despawn_visuals);
-        let home = app
-            .world_mut()
-            .spawn(testbed_content::village::colony::Household {
-                label: "Household".into(),
-                capacity: 2,
-                residents: vec![],
-                door: SimPos::new(0, 0),
-                heated_until: 0,
-                logs_burned: 0,
-            })
-            .id();
-        let visual = app.world_mut().spawn(VisualOf(home)).id();
-        app.world_mut()
-            .resource_mut::<VisualIndex>()
-            .map
-            .insert(home, visual);
-        app.update();
-        app.update();
-        assert!(app.world().get_entity(visual).is_ok());
-        assert_eq!(
-            app.world().resource::<VisualIndex>().map.get(&home),
-            Some(&visual)
-        );
-        app.world_mut().despawn(home);
-        app.update();
-        assert!(app.world().get_entity(visual).is_err());
-    }
-
     use npc_framework::interaction::items::{place_in_world, put_in_inventory, put_in_slot};
     use npc_framework::perception::{ExploredCells, RevealsFog, SeenStatics, VisibleCells};
     use npc_framework::prelude::{Equipment, GridBounds, Inventory, SpatialGrid, spawn_sim};
@@ -1410,8 +1185,6 @@ mod tests {
         app.insert_resource(Rings {
             mesh: default(),
             owner: default(),
-            player_mesh: default(),
-            player: default(),
         });
         app.add_systems(
             Update,

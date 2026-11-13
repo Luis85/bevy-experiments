@@ -148,12 +148,16 @@ impl Scenario {
                 },
             });
         }
-        // A bare embedded testbed scenario (`smithy`) is `testbed:smithy`.
-        let name = if !testbed_content::replay::is_testbed(name)
-            && !name.starts_with("village")
-            && testbed_content::scenario::scenario_text(name).is_some()
-        {
+        // A bare embedded testbed scenario (`smithy`) is `testbed:smithy`;
+        // a bare embedded island scenario (`living_world`) is
+        // `island:living_world`.
+        let qualifiable = !testbed_content::replay::is_testbed(name)
+            && !island_content::replay::is_island(name)
+            && !name.starts_with("village");
+        let name = if qualifiable && testbed_content::scenario::scenario_text(name).is_some() {
             testbed_content::replay::qualified(name)
+        } else if qualifiable && island_content::scenario::scenario_text(name).is_some() {
+            island_content::replay::qualified(name)
         } else {
             name.to_owned()
         };

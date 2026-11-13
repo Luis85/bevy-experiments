@@ -292,7 +292,6 @@ pub fn cmd_serve_explorer(a: &crate::agent::ServeArgs, out: &mut Out) -> Result<
             }
             failure
         })?;
-    let mut publisher = a.projection.start(app.world_mut())?;
     let server = server
         .into_inner()
         .ok_or_else(|| Failure::usage("no server bound"))?;
@@ -313,10 +312,6 @@ pub fn cmd_serve_explorer(a: &crate::agent::ServeArgs, out: &mut Out) -> Result<
         started: now,
         agent: session.meta.agent.clone(),
         world: session.meta.world.clone(),
-        projection: app
-            .world()
-            .get_resource::<testbed_content::explorer::host::ProjectionLaunch>()
-            .cloned(),
     };
     if let Err(err) = run.write(&dir) {
         tracing::warn!(
@@ -355,9 +350,6 @@ pub fn cmd_serve_explorer(a: &crate::agent::ServeArgs, out: &mut Out) -> Result<
         seed: Some(session.seed),
         on_frame: Some(Box::new(move |world| {
             autosave(world);
-            if let Some(publisher) = &mut publisher {
-                publisher.frame(world);
-            }
         })),
         on_stop: Some(save_on_stop(dir.clone(), Rc::clone(&stopped_at))),
         rebuild: Some(rebuild(session.clone(), dir.clone(), e.paused)),
@@ -390,7 +382,6 @@ fn autosave(
     let mut last = Instant::now();
     let mut saved_tick = start_tick;
     Box::new(move |world| {
-        testbed_content::village::host::frame(world);
         npc_framework::agent_io::scheduler::frame(world);
         if last.elapsed() < every {
             return;

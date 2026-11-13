@@ -16,7 +16,7 @@ use testbed_content::worlds::{self, WorldPreset};
 use crate::screens::Screen;
 use crate::{AppSettings, ui};
 
-const PAGES: [&str; 9] = [
+const PAGES: [&str; 8] = [
     "Identity",
     "Hunger",
     "Thirst",
@@ -25,7 +25,6 @@ const PAGES: [&str; 9] = [
     "Environment",
     "Systems",
     "AI scheduler",
-    "Resident AI",
 ];
 const NEEDS: [&str; 4] = ["hunger", "thirst", "energy", "battery"];
 
@@ -33,20 +32,17 @@ const NEEDS: [&str; 4] = ["hunger", "thirst", "energy", "battery"];
 #[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScreenshotPage {
     AiScheduler,
-    ResidentAi,
 }
 impl ScreenshotPage {
     pub fn from_name(name: &str) -> Result<Self, String> {
         match name {
             "ai_scheduler" => Ok(Self::AiScheduler),
-            "resident_ai" => Ok(Self::ResidentAi),
-            _ => Err("--worlds-page supports ai_scheduler or resident_ai".into()),
+            _ => Err("--worlds-page supports ai_scheduler".into()),
         }
     }
     fn index(self) -> usize {
         match self {
             Self::AiScheduler => 7,
-            Self::ResidentAi => 8,
         }
     }
 }
@@ -100,15 +96,6 @@ impl Draft {
     }
     fn parse(&self) -> Result<WorldPreset, Vec<String>> {
         let mut value = serde_json::to_value(&self.source).expect("WorldPreset serializes");
-        value["scene"] = "explorer".into();
-        value["economy"] = "fixed".into();
-        value["island_geography"] = "compact".into();
-        value["colony"] = false.into();
-        if self.values.keys().any(|key| key.starts_with("island_ai.")) {
-            value["island_ai"] =
-                serde_json::to_value(testbed_content::village::policy::IslandAiPolicy::default())
-                    .expect("AI policy serializes");
-        }
         value["ai_scheduler"] = serde_json::to_value(worlds::plain_preset().ai_scheduler)
             .expect("scheduler policy serializes");
         value["ai_scheduler"]["events_enabled"] = true.into();
@@ -829,9 +816,6 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
     let d = &editor.draft;
     match editor.page {
         0 => {
-            if d.text("scene") == "island_village" {
-                p.spawn(ui::label("Island village: resident production and trade, seasons and permanent actor lives.",12.0,ui::DIM));
-            }
             field(
                 p,
                 d,
@@ -994,55 +978,6 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
             }
             p.spawn(ui::label("Link an exact Codex/Claude CLI session with npcctl scheduler bind after the agent connects. Session IDs, programs and workspaces stay in operator-owned host settings, separate from the world preset.",12.0,ui::DIM));
         }
-        8 => {
-            if d.text("island_ai.routine").is_empty() {
-                p.spawn(ui::label("Select Island Village to edit its resident behavior tree and production planner. Legacy worlds keep their original AI.", 14.0, ui::DIM));
-                return;
-            }
-            p.spawn(ui::label("Emergency survival and player orders always come first. Routine goals run left to right; recovery precedes home, and work stays last. These rules are copied into new worlds.", 13.0, ui::DIM));
-            field(
-                p,
-                d,
-                "island_ai.routine",
-                "Routine order (JSON list: thirst, hunger, recovery, home, work)",
-                200,
-                true,
-            );
-            for (i, (key, label)) in [
-                ("decision_ticks", "Reconsider after (ticks, 1..300)"),
-                (
-                    "critical_need",
-                    "Emergency threshold (remaining need, 1..40000)",
-                ),
-                ("thirst_threshold", "Seek water below (remaining need)"),
-                ("hunger_threshold", "Seek food below (remaining need)"),
-                ("recovery_threshold", "Rest below (remaining energy)"),
-                (
-                    "night_recovery_threshold",
-                    "Rest at night below (remaining energy)",
-                ),
-                (
-                    "goap.max_expansions",
-                    "Planner search budget (8..512 states)",
-                ),
-                ("goap.max_steps", "Maximum plan length (1..24 actions)"),
-                ("goap.buy_cost", "Buying cost multiplier (1..100)"),
-                ("goap.gather_cost", "Gathering cost multiplier (1..100)"),
-                ("goap.craft_cost", "Crafting cost multiplier (1..100)"),
-            ]
-            .iter()
-            .enumerate()
-            {
-                field(
-                    p,
-                    d,
-                    &format!("island_ai.{key}"),
-                    label,
-                    201 + i as i32,
-                    false,
-                );
-            }
-        }
         _ => {}
     }
 }
@@ -1123,30 +1058,6 @@ fn refresh(
 mod tests {
     use super::*;
     use crate::screens::tests::{app, tmp};
-    #[test]
-    fn resident_ai_capture_opens_the_authored_policy_without_dirtying_it() {
-        let dir = tmp("resident-ai-capture");
-        let mut captured = app(&dir, &dir.join("agents"));
-        let presets = captured.world().resource::<AppSettings>().0.worlds_dir();
-        std::fs::create_dir_all(&presets).unwrap();
-        let path = presets.join("island_colony.json");
-        let preset = worlds::builtin_preset("island_colony").unwrap();
-        std::fs::write(&path, serde_json::to_string(&preset).unwrap()).unwrap();
-        captured.insert_resource(ScreenshotPage::from_name("resident_ai").unwrap());
-        captured
-            .world_mut()
-            .resource_mut::<NextState<Screen>>()
-            .set(Screen::Worlds);
-        captured.update();
-        captured.update();
-        let editor = captured.world().resource::<WorldEditor>();
-        assert_eq!(PAGES[editor.page], "Resident AI");
-        assert_eq!(editor.selected.as_ref(), Some(&path));
-        assert!(!editor.dirty());
-        assert_eq!(editor.draft.parse().unwrap(), preset);
-        assert_eq!(editor.draft.values, editor.baseline.values);
-        std::fs::remove_dir_all(dir).unwrap();
-    }
     #[test]
     fn screenshot_page_opens_scheduler_without_editing_the_preset_or_dirtying_the_draft() {
         let dir = tmp("world-screenshot-page");
@@ -1297,113 +1208,6 @@ mod tests {
         assert!(draft.parse().is_err());
     }
 
-    fn authored_regional_preset() -> WorldPreset {
-        let mut preset = worlds::builtin_preset("living_world").unwrap();
-        preset.name = "Authored coastal world".into();
-        let construction = preset.living_world.as_mut().unwrap();
-        construction.width_cells = 320;
-        construction.actor_start.x = 1500;
-        construction.settlements[0].label = "Dawn Harbour".into();
-        construction.settlements[0].sites[0].capacity = 3;
-        construction.settlements[1].homes[0].label = "Alder cottage".into();
-        construction.plots[0].x -= 1000;
-        worlds::validate(&preset).unwrap();
-        preset
-    }
-
-    #[test]
-    fn unrelated_world_edits_and_draft_clone_preserve_authored_regional_geometry() {
-        let mut expected = authored_regional_preset();
-        let mut draft = Draft::new(&expected);
-        expected.description = "Only the public description changed".into();
-        draft
-            .values
-            .insert("description".into(), expected.description.clone());
-        assert_eq!(draft.parse().unwrap(), expected);
-        assert_eq!(draft.clone().parse().unwrap(), expected);
-    }
-
-    #[test]
-    fn regional_geometry_survives_editor_save_duplicate_and_both_revert_paths() {
-        let dir = tmp("regional-world-preservation");
-        let original = dir.join("authored_coast.json");
-        let preset = authored_regional_preset();
-        let construction = preset.living_world.clone();
-        std::fs::write(&original, serde_json::to_vec_pretty(&preset).unwrap()).unwrap();
-        let mut editor = WorldEditor::new(dir.clone());
-        let index = editor
-            .entries
-            .iter()
-            .position(|entry| entry.path == original)
-            .unwrap();
-        editor.select(index);
-        assert_eq!(editor.draft.parse().unwrap(), preset);
-        assert!(!editor.dirty());
-
-        let description = "Saved without changing regional construction";
-        editor
-            .draft
-            .values
-            .insert("description".into(), description.into());
-        assert_eq!(editor.save(false).unwrap(), original);
-        let saved: WorldPreset =
-            serde_json::from_slice(&std::fs::read(&original).unwrap()).unwrap();
-        assert_eq!(saved.living_world, construction);
-        assert_eq!(saved.description, description);
-
-        perform(&mut editor, WorldAction::Duplicate);
-        assert!(editor.selected.is_none());
-        editor
-            .draft
-            .values
-            .insert("description".into(), "Discard this unsaved edit".into());
-        perform(&mut editor, WorldAction::Revert);
-        let reverted = editor.draft.parse().unwrap();
-        assert_eq!(reverted.living_world, construction);
-        assert_eq!(reverted.description, description);
-        let duplicate = editor.save(false).unwrap();
-        assert_ne!(duplicate, original);
-        let copied: WorldPreset =
-            serde_json::from_slice(&std::fs::read(&duplicate).unwrap()).unwrap();
-        assert_eq!(copied.living_world, construction);
-
-        editor.draft.values.insert(
-            "description".into(),
-            "Discard this persisted-draft edit".into(),
-        );
-        perform(&mut editor, WorldAction::Revert);
-        assert_eq!(editor.draft.parse().unwrap(), copied);
-        assert!(!editor.dirty());
-        perform(&mut editor, WorldAction::New);
-        assert!(editor.draft.parse().unwrap().living_world.is_none());
-
-        let resolved = dir.canonicalize().unwrap();
-        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
-        drop(editor);
-        std::fs::remove_dir_all(resolved).unwrap();
-    }
-
-    #[test]
-    fn resident_ai_routine_is_editable_without_losing_colony_rules() {
-        let preset = worlds::builtin_preset("island_colony").unwrap();
-        let mut draft = Draft::new(&preset);
-        assert_eq!(draft.parse().unwrap(), preset);
-        draft.values.insert(
-            "island_ai.routine".into(),
-            r#"["hunger","thirst","recovery","home","work"]"#.into(),
-        );
-        let edited = draft.parse().unwrap();
-        assert!(edited.colony);
-        assert_eq!(
-            edited.island_ai.unwrap().routine[0],
-            testbed_content::village::policy::RoutineGoal::Hunger
-        );
-        draft.values.insert(
-            "island_ai.routine".into(),
-            r#"["hunger","hunger","recovery","home","work"]"#.into(),
-        );
-        assert!(draft.parse().is_err());
-    }
     #[test]
     fn selecting_after_an_external_edit_uses_the_same_fresh_bytes_for_draft_and_baseline() {
         let dir = tmp("world-fresh-select");
@@ -1666,12 +1470,7 @@ mod tests {
                 .resource::<WorldEditor>()
                 .entries
                 .iter()
-                .any(|entry| {
-                    entry
-                        .path
-                        .file_stem()
-                        .is_some_and(|id| id == "island_village")
-                })
+                .any(|entry| { entry.path.file_stem().is_some_and(|id| id == "night_shift") })
         );
         let entity = app
             .world_mut()

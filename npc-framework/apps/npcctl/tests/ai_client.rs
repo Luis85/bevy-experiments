@@ -219,7 +219,7 @@ impl Host {
         let worlds = base.join("worlds");
         std::fs::create_dir(&worlds).unwrap();
         let mut preset: Value = serde_json::from_str(include_str!(
-            "../../../content/testbed_content/worlds/island_village.json"
+            "../../../content/testbed_content/worlds/plain_explorer.json"
         ))
         .unwrap();
         preset["ai_scheduler"] = json!({"enabled":true,"events_enabled":true,"idle_seconds":5,"cooldown_seconds":5,"poll_seconds":1,"max_nudges_per_hour":60,"runner_timeout_seconds":10,"max_concurrent":1,"skip_paused":true});

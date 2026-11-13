@@ -257,20 +257,6 @@ impl ModelKind {
         }
     }
 
-    pub fn for_resident(appearance: u8) -> Self {
-        const ROSTER: [ModelKind; 8] = [
-            ModelKind::VillageWoman,
-            ModelKind::FarmerMan,
-            ModelKind::TravellerWoman,
-            ModelKind::TravellerMan,
-            ModelKind::UnhoodedRogue,
-            ModelKind::Mage,
-            ModelKind::Barbarian,
-            ModelKind::Rogue,
-        ];
-        ROSTER[appearance as usize % ROSTER.len()]
-    }
-
     /// Faction 1 = adventurers (Knight for the smith and the woodcutter,
     /// Rogue for everyone else), faction 2 = skeletons (Warrior for
     /// `*warrior*` templates).
@@ -477,11 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn resident_roster_uses_distinct_models_and_separate_rig_families() {
-        let roster: std::collections::BTreeSet<_> = (0..42).map(ModelKind::for_resident).collect();
-        assert!(roster.len() >= 6);
-        assert!(roster.contains(&ModelKind::VillageWoman));
-        assert!(roster.contains(&ModelKind::FarmerMan));
+    fn animated_models_have_separate_rig_families_and_ship_their_files() {
         for (index, kind) in ModelKind::ANIMATED.into_iter().enumerate() {
             assert_eq!(kind.index(), index);
             assert!(

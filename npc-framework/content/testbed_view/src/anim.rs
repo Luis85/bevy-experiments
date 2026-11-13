@@ -114,11 +114,6 @@ impl Pose {
         }
     }
 
-    /// Whether the clip itself lays the body down (no root rotation needed).
-    pub(crate) fn clip_lies_down(self, kind: ModelKind) -> bool {
-        self == Pose::Sleep && !kind.civilian_rig()
-    }
-
     pub fn label(self) -> &'static str {
         match self {
             Pose::Idle => "idle",
@@ -177,17 +172,6 @@ pub(crate) struct ActorAnimTarget {
     current: Option<Pose>,
     /// When the sim first reported a different pose than the one playing.
     pending_since: Option<(Pose, f32)>,
-}
-
-impl ActorAnimTarget {
-    /// The actor's visual root.
-    pub(crate) fn root(&self) -> Entity {
-        self.root
-    }
-    /// The pose whose clip is playing now.
-    pub(crate) fn playing(&self) -> Option<Pose> {
-        self.current
-    }
 }
 
 /// Meshes of the KayKit kits an actor should not carry around.
@@ -322,14 +306,8 @@ fn drive_animation(
     mut commands: Commands,
     time: Res<Time>,
     anims: Res<ActorAnimations>,
-    island: crate::island_poses::IslandPoseContext,
     roots: Query<(&VisualOf, &ActorVisual)>,
-    sims: Query<(
-        Option<&MountedIn>,
-        Option<&Interacting>,
-        Option<&Crafting>,
-        Option<&testbed_content::village::Gathering>,
-    )>,
+    sims: Query<(Option<&MountedIn>, Option<&Interacting>, Option<&Crafting>)>,
     mut players: Query<(
         Entity,
         &mut AnimationPlayer,
@@ -350,19 +328,8 @@ fn drive_animation(
             .get(target.root)
             .ok()
             .and_then(|(of, actor)| {
-                let (m, i, c, gathering) = sims.get(of.0).ok()?;
-                if m.is_none()
-                    && let Some(pose) = island.pose(of.0, i, c, gathering, actor.motion.moving)
-                {
-                    return Some(pose);
-                }
-                Some(
-                    if gathering.is_some() && m.is_none() && i.is_none() && !actor.motion.moving {
-                        Pose::Work
-                    } else {
-                        pose_of(m, i, c, actor.motion.moving)
-                    },
-                )
+                let (m, i, c) = sims.get(of.0).ok()?;
+                Some(pose_of(m, i, c, actor.motion.moving))
             })
             .unwrap_or_default();
         if target.current.is_some() && target.current != Some(pose) {
@@ -552,8 +519,5 @@ mod tests {
                 .map(|pose| pose.clip(ModelKind::FarmerMan))
                 .collect();
         assert_eq!(civilian.len(), 4);
-        assert!(Pose::Sleep.clip_lies_down(ModelKind::Rogue));
-        assert!(!Pose::Sleep.clip_lies_down(ModelKind::VillageWoman));
-        assert!(!Pose::Sit.clip_lies_down(ModelKind::Rogue));
     }
 }

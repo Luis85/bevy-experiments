@@ -306,10 +306,6 @@ pub(crate) fn plugin(app: &mut App) {
     )
     .add_systems(Startup, spawn.run_if(resource_exists::<ExplorerFiles>))
     .add_systems(
-        PreUpdate,
-        sync_village_notebook.run_if(resource_exists::<ExplorerFiles>),
-    )
-    .add_systems(
         Update,
         (
             keys.in_set(NotesInput).before(apply_requests),
@@ -324,41 +320,6 @@ pub(crate) fn plugin(app: &mut App) {
             .in_set(ViewSystems::Present)
             .run_if(resource_exists::<ExplorerFiles>),
     );
-}
-
-/// A successor gets fresh books. A developer's unfinished draft stays pinned to its original folder.
-fn sync_village_notebook(
-    village: Option<Res<testbed_content::village::VillageState>>,
-    session: Option<Res<testbed_content::explorer::host::ExplorerSession>>,
-    mut files: ResMut<ExplorerFiles>,
-    mut editor: ResMut<NotesEditor>,
-    mut state: ResMut<PanelState>,
-) {
-    let (Some(village), Some(session)) = (village, session) else {
-        return;
-    };
-    let desired = testbed_content::village::host::life_notes_dir(&session.dir.dir, village.life);
-    if files.dir == desired {
-        return;
-    }
-    if editor.form.is_some() || editor.map_form.is_some() {
-        editor.message=Some("A new life has begun. Finish or cancel this draft in the previous life's notebook; then fresh books will open.".into());
-        return;
-    }
-    files.dir = desired;
-    editor.notes.clear();
-    editor.unreadable.clear();
-    editor.landmarks.clear();
-    editor.selected = None;
-    editor.selected_landmark = None;
-    editor.requests.clear();
-    editor.rows_dirty = true;
-    editor.message = Some(format!(
-        "Life {}: fresh Diary, Memory and Map. Earlier files are preserved in their original folders.",
-        village.life
-    ));
-    state.was_open = false;
-    state.timer.reset();
 }
 
 /// Run condition: a notes control owns keyboard focus, including form actions.
@@ -560,8 +521,6 @@ struct KeyboardContext<'w, 's> {
     fields: Query<'w, 's, (), With<NoteField>>,
     controls: Query<'w, 's, (), With<NotesControl>>,
     actions: Query<'w, 's, &'static PanelAction>,
-    experience: Option<Res<'w, crate::PlayerExperience>>,
-    developer: Option<Res<'w, crate::DeveloperKeys>>,
 }
 
 /// Standard control traversal; Ctrl+Tab keeps fast book switching available.
@@ -586,11 +545,7 @@ fn keys(
         .focus
         .get()
         .is_some_and(|entity| keyboard.fields.contains(entity));
-    let developer_keys = crate::player_hud::developer_keys_allowed(
-        keyboard.experience.as_deref(),
-        keyboard.developer.as_deref(),
-    );
-    if developer_keys && keys.just_pressed(KeyCode::F7) && !typing {
+    if keys.just_pressed(KeyCode::F7) && !typing {
         panels.explorer = !panels.explorer;
         if !panels.explorer {
             keyboard.focus.clear();
