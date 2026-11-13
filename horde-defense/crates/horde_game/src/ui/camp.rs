@@ -241,7 +241,7 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
         return;
     };
     if f.game.attempt().is_some() {
-        if primary(ui, "Return to active defense") {
+        if primary(ui, "Return to active defense").clicked() {
             f.go(Screen::Battle);
             f.battle.fire_latched = false;
         }
@@ -249,7 +249,7 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     let choosing = f.game.campaign().world.start.is_none();
     if choosing && f.game.campaign().selected_survivor.is_none() {
-        if primary(ui, "Choose survivor first") {
+        if primary(ui, "Choose survivor first").clicked() {
             f.open_survivor_selection();
         }
         return;
@@ -266,7 +266,9 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
                 } else {
                     "Start journey"
                 },
-            ) {
+            )
+            .clicked()
+            {
                 if choosing {
                     f.dispatch(
                         Command::ChooseStart(country.id.clone()),

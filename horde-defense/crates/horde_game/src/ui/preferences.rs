@@ -24,7 +24,7 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
             chrome::row(ui, |ui| {
                 chrome::page_title(ui, "Settings", "");
                 ui.add_enabled_ui(!f.runtime.durable_transition_pending(), |ui| {
-                    if primary(ui, f.settings_return_label()) {
+                    if primary(ui, f.settings_return_label()).clicked() {
                         f.request_save(SaveIntent::SettingsBack);
                     }
                     if !matches!(f.nav.return_screen, Screen::Menu | Screen::SurvivorSelection | Screen::Settings)

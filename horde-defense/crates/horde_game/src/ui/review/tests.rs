@@ -288,6 +288,12 @@ fn staged(scene: &str) -> FrontendParts {
 
 /// One headless 1440x900 frame of the staged screen, drawn as the App draws it.
 fn one_frame(f: &mut FrontendParts) -> egui::FullOutput {
+    one_frame_with_context(f).1
+}
+
+/// [`one_frame`], also returning the context it drew in (its primary
+/// registry holds the frame's primaries).
+fn one_frame_with_context(f: &mut FrontendParts) -> (egui::Context, egui::FullOutput) {
     let ctx = egui::Context::default();
     crate::settings::install_font(&ctx);
     let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
@@ -304,7 +310,7 @@ fn one_frame(f: &mut FrontendParts) -> egui::FullOutput {
         |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
     );
     output.textures_delta.clear();
-    output
+    (ctx, output)
 }
 
 /// Every still on `screens` prepares to its EXPECTED screen and tab, draws one
@@ -325,12 +331,24 @@ fn stills_prepare_headless(screens: &[Screen]) {
         if let Some(tab) = tab {
             assert_eq!(f.nav.tab, tab, "{name}");
         }
-        let output = one_frame(&mut f);
+        let (ctx, output) = one_frame_with_context(&mut f);
         if let Some(primary) = scene.primary {
             assert_eq!(
                 crate::ui::tests::text_count(&output, primary),
                 1,
                 "{name}: one {primary:?}"
+            );
+            // The amber primary (AMBER fill, INK text) is the one the
+            // frame's primary registry recorded on the screen surface.
+            let screen: Vec<_> = crate::ui::frame_primaries(&ctx)
+                .into_iter()
+                .filter(|record| record.surface == crate::ui::Surface::Screen)
+                .map(|record| record.label)
+                .collect();
+            assert_eq!(
+                screen,
+                [primary],
+                "{name}: {primary:?} is the amber primary"
             );
             let color = output
                 .shapes
@@ -338,8 +356,8 @@ fn stills_prepare_headless(screens: &[Screen]) {
                 .find_map(|clipped| crate::ui::tests::text_color(&clipped.shape, primary));
             assert_eq!(
                 color,
-                Some(crate::art::AMBER),
-                "{name}: {primary:?} is amber"
+                Some(crate::art::INK),
+                "{name}: {primary:?} is INK on amber"
             );
         }
         checked += 1;

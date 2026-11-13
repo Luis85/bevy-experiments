@@ -12,7 +12,7 @@ use crate::{
     art::{self, INK, MUTED, TEXT},
     diagnostics::{self, InterfaceSpan},
     runner::SaveIntent,
-    ui::{Screen, UiCtx, armory, damage, loot, policy, reticle, status},
+    ui::{Screen, UiCtx, armory, damage, loot, policy, primary_action, reticle, status},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke};
 use horde_core::{command::Command, content::Mode};
@@ -225,7 +225,14 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     } else {
                         "Resume defense"
                     };
-                    if ui.button(RichText::new(label).strong()).clicked() {
+                    // Amber only while paused: Begin or Resume is the
+                    // battle's one primary; a running battle has none.
+                    let response = if paused {
+                        primary_action::primary_in_bar(ui, label)
+                    } else {
+                        ui.button(RichText::new(label).strong())
+                    };
+                    if response.clicked() {
                         f.dispatch(Command::SetPaused(!paused), "");
                         f.battle.set_construction(false);
                         f.battle.fire_latched = false;

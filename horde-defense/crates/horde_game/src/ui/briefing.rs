@@ -240,21 +240,21 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
 /// briefing deploys.
 pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     if f.game.attempt().is_some() {
-        if primary(ui, "Return to active defense") {
+        if primary(ui, "Return to active defense").clicked() {
             f.go(Screen::Battle);
             f.battle.fire_latched = false;
         }
         return;
     }
     let Some(country) = f.game.campaign().world.active_country() else {
-        if primary(ui, "Choose a country") {
+        if primary(ui, "Choose a country").clicked() {
             f.open_campaign();
         }
         return;
     };
     if f.tab != Tab::Briefing {
         ui.horizontal_wrapped(|ui| {
-            if primary(ui, "Go to briefing") {
+            if primary(ui, "Go to briefing").clicked() {
                 f.open_preparation(Tab::Briefing);
             }
             muted(
@@ -280,7 +280,9 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             } else {
                 "Deploy survivor"
             },
-        ) {
+        )
+        .clicked()
+        {
             f.begin();
         }
         ui.label(format!(

@@ -1,12 +1,10 @@
 //! Primary home after every main round. All rewards have already been settled.
-use super::{Screen, Tab, UiCtx, muted, navigation, progression, status};
+use super::{Screen, Tab, UiCtx, muted, navigation, primary, progression, status};
 use crate::{
     art::{AMBER, GREEN, INK, MUTED, RED, TEXT},
     runner::SaveIntent,
 };
-use bevy_egui::egui::{
-    self, Align, Color32, FontId, RichText, Stroke, TextFormat, text::LayoutJob, vec2,
-};
+use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob};
 use horde_core::{
     command::Command,
     sim::{Outcome, Report},
@@ -179,15 +177,7 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     } else {
         continue_label(f)
     };
-    if ui
-        .add(
-            egui::Button::new(RichText::new(label).strong())
-                .fill(Color32::BLACK)
-                .stroke(Stroke::new(2.0, TEXT))
-                .min_size(vec2(200.0, 40.0)),
-        )
-        .clicked()
-    {
+    if primary(ui, label).clicked() {
         if live {
             f.go(Screen::Battle);
             f.battle.fire_latched = false;

@@ -1,12 +1,8 @@
-use crate::{
-    art::{MUTED, TEXT},
-    runner::ControlFrame,
-    settings,
-};
+use crate::{art::MUTED, runner::ControlFrame, settings};
 use bevy::prelude::*;
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Color32, RichText, Stroke, vec2},
+    egui::{self, Color32, RichText},
 };
 use horde_core::{content::Mode, sim::Input};
 
@@ -15,6 +11,7 @@ mod app_tests;
 mod context;
 mod notices;
 mod plugin;
+mod primary_action;
 mod screen;
 mod state;
 #[cfg(test)]
@@ -25,6 +22,9 @@ mod tests;
 pub(crate) use context::request_save;
 pub(crate) use context::{UiCtx, UiParams, ambience_target};
 pub use plugin::UiPlugin;
+use primary_action::primary;
+#[cfg(test)]
+pub(crate) use primary_action::{PrimaryRecord, Surface, frame_primaries};
 pub use screen::{Screen, ScreenAmbience, Tab};
 pub(crate) use state::{
     ArmoryUi, BattleUi, CampaignUi, FrontendParts, MenuUi, Navigation, SettingsUi, StatusUi,
@@ -36,16 +36,6 @@ fn status(ui: &mut egui::Ui, f: &mut UiCtx) {
 
 fn muted(ui: &mut egui::Ui, text: impl Into<String>) {
     ui.label(RichText::new(text).color(MUTED));
-}
-fn primary(ui: &mut egui::Ui, text: &str) -> bool {
-    ui.add(
-        egui::Button::new(RichText::new(text).color(TEXT).strong())
-            .fill(Color32::BLACK)
-            .stroke(Stroke::new(2.0, TEXT))
-            .min_size(vec2(ui.available_width().min(190.0), 40.0))
-            .wrap(),
-    )
-    .clicked()
 }
 fn progress(ui: &mut egui::Ui, value: f32, text: String, color: Color32) {
     ui.add(
@@ -105,6 +95,8 @@ pub(super) fn draw(
 
 /// One frame of the current screen plus the control frame it publishes.
 fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
+    // Before anything draws, so the registry holds this frame's primaries.
+    primary_action::clear_frame_primaries(ctx);
     settings::configure(ctx, f.settings.scale);
     ctx.style_mut_of(egui::Theme::Dark, |style| {
         style.animation_time = if f.settings.reduced_effects {

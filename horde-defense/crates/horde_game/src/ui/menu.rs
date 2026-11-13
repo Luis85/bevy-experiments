@@ -117,7 +117,9 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                             } else {
                                 "New game"
                             },
-                        ) {
+                        )
+                        .clicked()
+                        {
                             if has_journey {
                                 f.resume();
                             } else {
@@ -425,7 +427,9 @@ pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut UiCtx, time: f32) 
                         if primary(
                             ui,
                             &format!("Continue as {}", f.campaign.preview_survivor.name()),
-                        ) {
+                        )
+                        .clicked()
+                        {
                             f.dispatch(
                                 Command::ChooseSurvivor(f.campaign.preview_survivor),
                                 "Survivor chosen. Select your starting country.",

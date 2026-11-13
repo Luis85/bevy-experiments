@@ -148,22 +148,79 @@ enum View {
     ResultsWithChrome,
     History,
     Feedback,
+    /// The whole App frame as `draw_screen` draws it: the current screen with
+    /// its header and controls, and the primary registry cleared first. The
+    /// harness sets `settings.scale` to its target's scale before drawing,
+    /// since `draw_screen` applies that scale.
+    Full,
 }
+
+/// A target window, the one harness size convention: `pixels` is the window
+/// in physical pixels and `scale` the UI scale, so a frame is `pixels /
+/// scale` points (`RawInput::screen_rect` is `pixels`, the context's zoom is
+/// `scale`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Target {
+    pixels: Vec2,
+    scale: f32,
+}
+impl Target {
+    /// 1440x900 at scale 1.0.
+    const LARGE: Self = Self {
+        pixels: vec2(1440.0, 900.0),
+        scale: 1.0,
+    };
+    /// 1050x700 at scale 1.35 (777.8x518.5 points).
+    const SMALL: Self = Self {
+        pixels: vec2(1050.0, 700.0),
+        scale: 1.35,
+    };
+    /// Both target sizes, large first.
+    const BOTH: [Self; 2] = [Self::LARGE, Self::SMALL];
+}
+
 struct Harness {
     ctx: egui::Context,
+    target: Target,
 }
 impl Harness {
+    /// The large target (1440x900 at 1.0), as every older test assumed.
     fn new() -> Self {
+        Self::at(Target::LARGE)
+    }
+    /// 1440x900 at scale 1.0.
+    fn large() -> Self {
+        Self::at(Target::LARGE)
+    }
+    /// 1050x700 at scale 1.35.
+    fn small() -> Self {
+        Self::at(Target::SMALL)
+    }
+    /// A harness whose frames run at `target`.
+    fn at(target: Target) -> Self {
         let ctx = egui::Context::default();
         settings::install_font(&ctx);
-        settings::configure(&ctx, 1.0);
+        settings::configure(&ctx, target.scale);
         let mut warmup = ctx.run_ui(RawInput::default(), |_| {});
         // This headless event backend deliberately has no GPU texture uploader.
         warmup.textures_delta.clear();
-        Self { ctx }
+        Self { ctx, target }
+    }
+    /// The primaries of the last frame (see `View::Full`; a partial view's
+    /// frame clears the registry itself).
+    fn primaries(&self) -> Vec<PrimaryRecord> {
+        frame_primaries(&self.ctx)
+    }
+    /// The labels of the last frame's screen primaries.
+    fn screen_primaries(&self) -> Vec<String> {
+        self.primaries()
+            .into_iter()
+            .filter(|record| record.surface == Surface::Screen)
+            .map(|record| record.label)
+            .collect()
     }
     fn frame(&self, f: &mut FrontendParts, view: View, events: Vec<Event>) -> FullOutput {
-        self.frame_size(f, view, events, vec2(1440.0, 900.0))
+        self.frame_size(f, view, events, self.target.pixels)
     }
     fn frame_size(
         &self,
@@ -173,6 +230,9 @@ impl Harness {
         size: Vec2,
     ) -> FullOutput {
         f.runtime.begin_frame(self.ctx.cumulative_frame_nr() as u32);
+        if matches!(view, View::Full) {
+            f.settings.scale = self.target.scale;
+        }
         let mut output = {
             let mut c = f.ctx();
             let f = &mut c;
@@ -183,39 +243,13 @@ impl Harness {
                     ..RawInput::default()
                 },
                 |ui| match view {
-                    View::Menu => menu(ui, f, 0.0),
-                    View::SurvivorSelection => menu::survivor_selection(ui, f, 0.0),
-                    View::Header => navigation::header(ui, f, 1.0),
-                    View::Dossier => {
-                        egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
-                    }
-                    View::Battle => {
-                        let views = BattleFrame::build(ui.ctx(), f);
-                        controls(ui.ctx(), f, views.as_ref());
-                        battle(ui, f, views.as_ref());
-                    }
-                    View::Settings => settings_ui(ui, f),
-                    View::WorldWithChrome => {
-                        navigation::header(ui, f, 1.0);
-                        navigation::field_status(ui, f);
-                        camp(ui, f);
-                    }
-                    View::Camp => {
-                        navigation::field_status(ui, f);
-                        camp(ui, f);
-                    }
-                    View::Armory => {
-                        egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
-                    }
-                    View::Results => results(ui, f),
-                    View::ResultsWithChrome => {
-                        navigation::header(ui, f, 1.0);
-                        navigation::field_status(ui, f);
-                        results(ui, f);
-                    }
-                    View::History => history::show(ui, f),
-                    View::Feedback => {
-                        egui::CentralPanel::default().show(ui, |ui| status(ui, f));
+                    // draw_screen clears the primary registry itself.
+                    View::Full => draw_screen(ui.ctx(), f, 0.0),
+                    view => {
+                        // A partial view clears it as draw_screen would, once
+                        // per pass, so its registry holds this frame only.
+                        primary_action::clear_frame_primaries(ui.ctx());
+                        partial_view(ui, f, view);
                     }
                 },
             )
@@ -225,7 +259,7 @@ impl Harness {
         output
     }
     fn click(&self, f: &mut FrontendParts, view: View, label: &str) {
-        self.click_size(f, view, label, vec2(1440.0, 900.0));
+        self.click_size(f, view, label, self.target.pixels);
     }
     fn click_size(&self, f: &mut FrontendParts, view: View, label: &str, size: Vec2) {
         let output = self.frame_size(f, view, vec![], size);
@@ -318,6 +352,46 @@ impl Harness {
         let mut c = f.ctx();
         let views = BattleFrame::build(&self.ctx, &c);
         gather_combat_input(&self.ctx, &mut c, views.as_ref())
+    }
+}
+/// One frame of a partial `view` (every view but `View::Full`).
+fn partial_view(ui: &mut egui::Ui, f: &mut UiCtx, view: View) {
+    match view {
+        View::Full => unreachable!("draw_screen draws the full frame"),
+        View::Menu => menu(ui, f, 0.0),
+        View::SurvivorSelection => menu::survivor_selection(ui, f, 0.0),
+        View::Header => navigation::header(ui, f, 1.0),
+        View::Dossier => {
+            egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
+        }
+        View::Battle => {
+            let views = BattleFrame::build(ui.ctx(), f);
+            controls(ui.ctx(), f, views.as_ref());
+            battle(ui, f, views.as_ref());
+        }
+        View::Settings => settings_ui(ui, f),
+        View::WorldWithChrome => {
+            navigation::header(ui, f, 1.0);
+            navigation::field_status(ui, f);
+            camp(ui, f);
+        }
+        View::Camp => {
+            navigation::field_status(ui, f);
+            camp(ui, f);
+        }
+        View::Armory => {
+            egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
+        }
+        View::Results => results(ui, f),
+        View::ResultsWithChrome => {
+            navigation::header(ui, f, 1.0);
+            navigation::field_status(ui, f);
+            results(ui, f);
+        }
+        View::History => history::show(ui, f),
+        View::Feedback => {
+            egui::CentralPanel::default().show(ui, |ui| status(ui, f));
+        }
     }
 }
 fn key_event(key: Key, pressed: bool) -> Event {
@@ -453,6 +527,7 @@ mod history_tests;
 mod menu_tests;
 mod navigation_tests;
 mod operations_tests;
+mod primary_tests;
 mod progression_tests;
 mod results_tests;
 mod settings_tests;
