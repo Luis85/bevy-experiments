@@ -52,12 +52,6 @@ use npc_framework::needs::{NeedDef, NeedRegistry, NeedThresholds};
 use npc_framework::prelude::*;
 pub const REMAINS_TREE: &str = "island_remains";
 
-pub fn needs_driven(world: &World) -> bool {
-    world
-        .get_resource::<crate::world_runtime::ActiveWorld>()
-        .is_some_and(|active| active.0.economy == crate::worlds::EconomyModel::NeedsDriven)
-}
-
 /// Immutable construction data rebuilt from the saved scenario, like ActorPresets.
 /// Never inferred from registry ordering or read from the host's preset files during play.
 #[derive(Resource)]
@@ -109,37 +103,17 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
         terrain::register(app);
         discovery::register(app);
     }
-    if needs_driven(app.world()) {
-        if geography::is_expanded(app.world()) {
-            geography::register_living(app);
-            homestead::register(app);
-        }
-        catalog::register_living(app);
-        living::register(app);
-        hunting::register(app);
-        wildlife::register(app);
-        production::register(app);
-        market::register(app);
-        for verb in ["equip", "unequip"] {
-            app.register_action_handler(
-                verb,
-                npc_framework::glue::interaction_agent::interaction_handler,
-            );
-        }
-        if !frontier::enabled(app.world()) {
-            for verb in catalog::LIVING_RECIPE_VERBS {
-                app.register_action_handler(
-                    verb,
-                    npc_framework::glue::crafting_agent::craft_handler,
-                );
-            }
-        }
-    }
-    if !frontier::enabled(app.world()) {
-        // The regional profile registers one handler per recipe of its data.
-        for verb in catalog::RECIPE_VERBS {
-            app.register_action_handler(verb, npc_framework::glue::crafting_agent::craft_handler);
-        }
+    homestead::register(app);
+    living::register(app);
+    hunting::register(app);
+    wildlife::register(app);
+    production::register(app);
+    market::register(app);
+    for verb in ["equip", "unequip"] {
+        app.register_action_handler(
+            verb,
+            npc_framework::glue::interaction_agent::interaction_handler,
+        );
     }
     behavior::register(app);
     app.register_action(
@@ -244,9 +218,7 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
                 .map(|r| r.outputs.clone())
                 .unwrap_or_default();
             for output in outputs {
-                if needs_driven(world) {
-                    production::completed(world, completed.unit, &output.kind, output.count);
-                }
+                production::completed(world, completed.unit, &output.kind, output.count);
                 economy::produce(world, &output.kind, output.count);
                 live::booked(
                     world,
@@ -274,93 +246,7 @@ pub const PLACES: [(Role, i32, i32, &str); 9] = [
     (Role::Innkeeper, 2, -7, "The Lantern Inn"),
 ];
 pub fn spawn_places(world: &mut World, ids: &mut crate::TestbedIds) {
-    if frontier::enabled(world) {
-        frontier::spawn_places(world, ids);
-        return;
-    }
-    let day_length = world.resource::<SimConfig>().day_length;
-    let geography = *geography::for_world(world);
-    // Allocate exactly the original shoreline identities before any incumbent
-    // workplace/actor/item. Expanded rows reuse those identities in place;
-    // their ten additional right spans are appended only after construction.
-    for z in geography::MIN_CELL..geography::MAX_CELL_EXCLUSIVE {
-        let expanded = geography.shoreline_segments(z);
-        for (index, old) in geography::FIXED
-            .shoreline_segments(z)
-            .into_iter()
-            .enumerate()
-        {
-            if old.is_none() {
-                continue;
-            }
-            let segment = expanded[index].expect("expanded shoreline retains incumbent row spans");
-            spawn_sim(world, (segment.pos, GridBlocker(segment.footprint)));
-        }
-    }
-    for (role, x, z, label) in PLACES {
-        let pos = crate::layout::cell(x, z);
-        let station = match role {
-            Role::Miller => catalog::MILL,
-            Role::Baker => catalog::BAKE,
-            Role::Carpenter => catalog::SAW,
-            Role::Smith => catalog::SMELT,
-            _ => catalog::INN,
-        };
-        let (id, _) = spawn_sim(
-            world,
-            (
-                pos,
-                VillagePlace {
-                    role,
-                    label: label.into(),
-                },
-                Workstation::new([station]),
-                Approach(pos),
-                Perceivable::new(crate::world::kinds::STATION),
-            ),
-        );
-        ids.name(format!("village_{}", role.tag()), id);
-        if role != Role::WaterKeeper {
-            spawn_sim(
-                world,
-                (
-                    SimPos::new(pos.x, pos.z + 2000),
-                    GridBlocker(Footprint {
-                        half_x_mm: 1000,
-                        half_z_mm: 1000,
-                    }),
-                    GridOccluder(Footprint {
-                        half_x_mm: 1000,
-                        half_z_mm: 1000,
-                    }),
-                ),
-            );
-        }
-    }
-    for (kind, x, z, ticks, capacity) in [
-        (catalog::GRAIN, -16, 7, 180, 80),
-        ("log", -18, -5, 240, 60),
-        ("ore", 17, 8, 300, 60),
-        (catalog::WATER, 8, 3, 100, 100),
-    ] {
-        let (id, _) = spawn_sim(
-            world,
-            (
-                geography
-                    .resource_position(kind)
-                    .unwrap_or_else(|| crate::layout::cell(x, z)),
-                ResourcePatch {
-                    kind: kind.into(),
-                    remaining: capacity,
-                    capacity,
-                    replenish_at: day_length,
-                    gather_ticks: ticks,
-                },
-                Perceivable::new(crate::world::kinds::STATION),
-            ),
-        );
-        ids.name(format!("patch_{kind}"), id);
-    }
+    frontier::spawn_places(world, ids);
 }
 pub fn apply(world: &mut World, played: SimId) {
     if world.contains_resource::<VillageState>() {
@@ -389,85 +275,7 @@ pub fn apply(world: &mut World, played: SimId) {
     let home = world.get::<SimPos>(e).copied().unwrap_or_default();
     initialise_person(world, e, Role::Visitor, &alias, home, SimId(0));
     world.entity_mut(e).insert(VillageDiary::default());
-    if frontier::enabled(world) {
-        frontier::spawn(world);
-        return;
-    }
-    for role in Role::RESIDENTS {
-        let station = world
-            .resource::<crate::TestbedIds>()
-            .id(&format!("village_{}", role.tag()));
-        let place = world.resource::<SimIndex>().get(station).expect("station");
-        let pos = *world.get::<SimPos>(place).expect("station pos");
-        let spec = crate::layout::UnitSpec {
-            template: match role {
-                Role::Smith => "smith",
-                Role::Carpenter => "carpenter",
-                Role::Woodcutter => "woodcutter",
-                _ => "novice",
-            }
-            .into(),
-            behaviour: crate::Behaviour::Idle,
-            ..Default::default()
-        };
-        let id = crate::layout::spawn_unit(world, SimPos::new(pos.x, pos.z - 1000), &spec)
-            .expect("resident template");
-        let e = world.resource::<SimIndex>().get(id).expect("resident");
-        initialise_person(
-            world,
-            e,
-            role,
-            role.person(),
-            SimPos::new(pos.x - 1000, pos.z - 1000),
-            station,
-        );
-        let tree = world
-            .resource::<AiRegistry>()
-            .tree_id(behavior::TREE)
-            .expect("island life tree");
-        world
-            .entity_mut(e)
-            .remove::<(BrainState, ActiveLeaf)>()
-            .insert((Brain { tree }, Inventory::new(64, 500_000)));
-        world.get_mut::<Wallet>(e).expect("wallet").coins = NPC_SEED_COINS;
-        for kind in catalog::outputs(role) {
-            let n = if *kind == "hammer" { 2 } else { 8 };
-            economy::grant(world, e, Item::new(*kind).stack(n));
-        }
-        if role == Role::Innkeeper {
-            for (kind, n) in [("log", 4), (catalog::BOWL, 2), ("hammer", 1)] {
-                economy::grant(world, e, Item::new(kind).stack(n));
-            }
-        }
-        if role != Role::Baker {
-            economy::grant(world, e, Item::new("bread").stack(2));
-        }
-        if role != Role::WaterKeeper {
-            economy::grant(world, e, Item::new(catalog::WATER).stack(2));
-        }
-        let mut ids = world.resource_mut::<crate::TestbedIds>();
-        ids.name(role.person(), id);
-        ids.units.push(id);
-    }
-    if needs_driven(world) {
-        living::spawn(world);
-        let mut ids = world
-            .remove_resource::<crate::TestbedIds>()
-            .expect("world identities");
-        hunting::spawn(world, &mut ids);
-        world.insert_resource(ids);
-        geography::append_boundary(world);
-        homestead::spawn(world);
-        if world
-            .resource::<crate::world_runtime::ActiveWorld>()
-            .0
-            .colony
-        {
-            colony::spawn(world);
-            terrain::spawn(world);
-        }
-        production::validate(world).expect("living production graph must be acyclic");
-    }
+    frontier::spawn(world);
 }
 pub(crate) fn initialise_person(
     world: &mut World,

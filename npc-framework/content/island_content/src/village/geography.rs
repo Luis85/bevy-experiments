@@ -1,6 +1,5 @@
 //! Shared integer island geography. Plots describe clear land, not ownership or actions.
-use super::{catalog, needs_driven};
-use bevy_app::App;
+use super::catalog;
 use bevy_ecs::prelude::*;
 use npc_framework::kernel::hash::SimHashResource;
 use npc_framework::prelude::*;
@@ -524,53 +523,6 @@ impl SimHashResource for Geography {
     }
 }
 
-pub fn register_living(app: &mut App) {
-    if super::frontier::enabled(app.world()) {
-        return;
-    }
-    if !is_expanded(app.world()) {
-        return;
-    }
-    app.insert_resource(LIVING)
-        .register_sim_resource::<Geography>();
-}
-
-pub fn is_expanded(world: &World) -> bool {
-    needs_driven(world)
-        && world
-            .get_resource::<crate::world_runtime::ActiveWorld>()
-            .is_some_and(|active| {
-                active.0.island_geography == crate::worlds::IslandGeography::Expanded
-            })
-}
-
-pub fn for_world(world: &World) -> &Geography {
-    if super::frontier::enabled(world) {
-        return &REGIONAL;
-    }
-    if is_expanded(world) {
-        world.get_resource::<Geography>().unwrap_or(&LIVING)
-    } else {
-        &FIXED
-    }
-}
-
-/// Original spans retain their existing IDs. Only ten newly split outer-row
-/// right spans need new entities, appended after every incumbent spawn.
-pub(super) fn append_boundary(world: &mut World) {
-    if !is_expanded(world) {
-        return;
-    }
-    let geo = *for_world(world);
-    for z in MIN_CELL..MAX_CELL_EXCLUSIVE {
-        let old_count = FIXED.shoreline_segments(z).iter().flatten().count();
-        for segment in geo
-            .shoreline_segments(z)
-            .into_iter()
-            .flatten()
-            .skip(old_count)
-        {
-            spawn_sim(world, (segment.pos, GridBlocker(segment.footprint)));
-        }
-    }
+pub fn for_world(_world: &World) -> &'static Geography {
+    &REGIONAL
 }

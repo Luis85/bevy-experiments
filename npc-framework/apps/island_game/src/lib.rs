@@ -168,7 +168,7 @@ fn parse_camera(value: &str) -> Option<RtsCamera> {
 
 fn parse_args(raw: &[String]) -> Args {
     let mut args = Args {
-        scenario: "island_colony".into(),
+        scenario: "living_world".into(),
         island_mode: island_view::IslandMode::Inspector,
         island_save: None,
         island_rules: None,
@@ -294,7 +294,7 @@ fn parse_args(raw: &[String]) -> Args {
             || args.record.is_some()
             || args.commands.is_some());
     if args.front_end {
-        if args.scenario != "island_colony"
+        if args.scenario != "living_world"
             || args.island_new
             || args.record.is_some()
             || args.commands.is_some()
@@ -311,8 +311,8 @@ fn parse_args(raw: &[String]) -> Args {
             }
         }
     }
-    if args.island_save.is_some() && args.scenario != "island_colony" {
-        usage("--island-save requires the standalone island_colony scenario");
+    if args.island_save.is_some() && args.scenario != "living_world" {
+        usage("--island-save requires the living_world scenario");
     }
     if args.island_rules.is_some() && args.island_save.is_none() {
         usage("--island-rules requires --island-save (saved worlds retain their original rules)");
@@ -363,21 +363,18 @@ fn scenario_doc(name: &str) -> Result<(ScenarioDoc, bool), String> {
 
 /// The player session carries the game's name only; developer launches keep
 /// the framework in theirs.
-fn window_title(front_end: bool, colony: bool) -> &'static str {
-    match (front_end, colony) {
-        (true, _) => "Island Village",
-        (false, true) => "Island Village | NPC Framework",
-        (false, false) => "NPC Framework | Actor Testbed",
+fn window_title(front_end: bool) -> &'static str {
+    if front_end {
+        "Island Village"
+    } else {
+        "Island Village | NPC Framework"
     }
 }
 
 /// The host side added to the testbed app before its content freezes:
 /// window, renderer, driver, view, journal and the remote interface.
 fn host(app: &mut App, args: &Args) {
-    let colony = island_content::village::colony::enabled(app.world());
-    if colony {
-        app.insert_resource(island_view::OverlayState { visible: false });
-    }
+    app.insert_resource(island_view::OverlayState { visible: false });
     if args.front_end {
         app.insert_resource(island_view::PlayerExperience { enabled: true })
             .insert_resource(island_view::FrontendGate(true))
@@ -390,7 +387,7 @@ fn host(app: &mut App, args: &Args) {
     let plugins = DefaultPlugins
         .set(WindowPlugin {
             primary_window: Some(Window {
-                title: window_title(args.front_end, colony).into(),
+                title: window_title(args.front_end).into(),
                 resolution: (1280, 720).into(),
                 ..default()
             }),
@@ -643,7 +640,7 @@ mod tests {
             .map(str::to_owned),
         );
         assert!(args.front_end);
-        assert_eq!(args.scenario, "island_colony");
+        assert_eq!(args.scenario, "living_world");
         assert_eq!(args.island_save, Some(PathBuf::from("scratch.json")));
         assert_eq!(args.screenshot, Some(PathBuf::from("title.png")));
         assert_eq!(args.after_secs, 2.0);
@@ -658,9 +655,8 @@ mod tests {
         assert!(!parse_args(&raw.map(str::to_owned)).mute);
         let quiet = ["--front-end", "--mute", "--island-save", "scratch.json"];
         assert!(parse_args(&quiet.map(str::to_owned)).mute);
-        assert_eq!(window_title(true, true), "Island Village");
-        assert_eq!(window_title(false, true), "Island Village | NPC Framework");
-        assert_eq!(window_title(false, false), "NPC Framework | Actor Testbed");
+        assert_eq!(window_title(true), "Island Village");
+        assert_eq!(window_title(false), "Island Village | NPC Framework");
     }
 
     #[test]

@@ -1,12 +1,12 @@
 //! Boundaries that must remain true when colony mechanics gain new callers.
 use island_content::TestbedIds;
-use island_content::village::{self, colony, economy, homestead, production};
+use island_content::village::{colony, economy, homestead};
 use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::*;
 
 #[test]
 fn construction_queries_cannot_move_workers_or_reserve_their_materials() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let builder = app.world().resource::<TestbedIds>().id("Jun");
     let actor = app.world().resource::<SimIndex>().get(builder).unwrap();
     let (plot, estate) = homestead::plots(app.world())
@@ -49,34 +49,4 @@ fn construction_queries_cannot_move_workers_or_reserve_their_materials() {
     assert_eq!(state_hash(app.world_mut()), before);
     assert_eq!(app.world().resource::<Reservations>().count(plot), 0);
     assert!(app.world().get::<homestead::CottageBuild>(actor).is_none());
-}
-
-#[test]
-fn civic_demand_invalidates_production_through_the_application_bridge() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
-    production::refresh(app.world_mut());
-    assert!(
-        app.world()
-            .resource::<production::ProductionPlan>()
-            .refreshed_at
-            .is_some()
-    );
-    for (verb, value, invalidated) in [("gatherings", 0, false), ("reserve_food", 3, true)] {
-        colony::ColonyAct {
-            verb: verb.into(),
-            resident: None,
-            house: None,
-            value,
-        }
-        .perform(app.world_mut())
-        .unwrap();
-        assert_eq!(
-            app.world()
-                .resource::<production::ProductionPlan>()
-                .refreshed_at
-                .is_none(),
-            invalidated
-        );
-    }
-    assert_eq!(village::colony::summary(app.world()).residents, 12);
 }

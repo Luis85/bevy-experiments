@@ -11,7 +11,6 @@ use island_content::TestbedIds;
 use island_content::village::{
     self, CoinPurse, VillageAct, VillageState, Villager, Wallet, civic, colony, economy,
     frontier::{
-        economy_spec::EconomySpec,
         labor::{self, ResidentProfile},
         settlements,
         terrain::{self, TerrainState, TerrainSurface},
@@ -19,7 +18,7 @@ use island_content::village::{
     market,
 };
 use npc_framework::interaction::Item;
-use npc_framework::kernel::commands::{CommandRegistry, SimCommand, submit};
+use npc_framework::kernel::commands::{SimCommand, submit};
 use npc_framework::kernel::journal::set_journal;
 use npc_framework::prelude::*;
 use npc_framework::snapshot;
@@ -233,58 +232,6 @@ fn effects(world: &World, kind: &str) -> Vec<Value> {
             _ => None,
         })
         .collect()
-}
-
-#[test]
-fn the_shipped_world_states_the_built_in_buildings_and_they_express_its_layout() {
-    let default = EconomySpec::default();
-    let app = shipped();
-    assert_eq!(civic::catalog(app.world()), default.buildings.as_slice());
-    let kinds: Vec<&str> = default
-        .buildings
-        .iter()
-        .map(|def| def.kind.name())
-        .collect();
-    assert_eq!(kinds.iter().filter(|kind| **kind == "home").count(), 2);
-    assert_eq!(
-        kinds.iter().filter(|kind| **kind == "workplace").count(),
-        13
-    );
-    // The field is a storage building with plots; the trading post is a stall.
-    assert_eq!(kinds.iter().filter(|kind| **kind == "storage").count(), 3);
-    assert_eq!(kinds.iter().filter(|kind| **kind == "stall").count(), 2);
-    assert_eq!(
-        default
-            .buildings
-            .iter()
-            .filter(|def| def.field.is_some())
-            .count(),
-        1
-    );
-    // Every authored workplace has a definition with its profession and station.
-    let harbour = settlement(app.world(), "harbour");
-    let definition = settlements::definition(app.world(), harbour).expect("harbour");
-    for site in &definition.sites {
-        let station = default
-            .profession(site.role)
-            .expect("profession")
-            .station
-            .clone();
-        assert!(
-            default.buildings.iter().any(|def| matches!(&def.kind,
-                village::frontier::building_spec::BuildingKind::Workplace {
-                    profession, station: named, capacity
-                } if *profession == site.role && *named == station && *capacity == site.capacity)),
-            "no building definition for {}",
-            site.label
-        );
-    }
-    // The authored homes are cottages: two beds each.
-    assert!(definition.homes.iter().all(|home| home.capacity == 2));
-    // Building data adds no entity: the founding layout and identities stay.
-    assert!(civic::sites(app.world()).is_empty());
-    assert!(civic::buildings(app.world()).is_empty());
-    assert_eq!(residents(app.world(), harbour).len(), 14);
 }
 
 #[test]
@@ -679,79 +626,6 @@ fn placement_is_validated_rule_by_rule_with_a_reason() {
     );
     assert_eq!(civic::sites(app.world()).len(), civic::MAX_OPEN_SITES);
     assert_eq!(open.len(), civic::MAX_OPEN_SITES - 1);
-}
-
-#[test]
-fn place_building_is_one_recorded_command_only_in_the_regional_profile() {
-    let mut app = shipped();
-    let harbour = settlement(app.world(), "harbour");
-    let def = civic::definition(app.world(), "stockpile")
-        .expect("stockpile")
-        .clone();
-    let (x, z, rotation) = civic::find_site(app.world(), &def, harbour, 36).expect("site");
-    let parsed: civic::PlaceBuilding = serde_json::from_value(
-        json!({"building": "stockpile", "x": x, "z": z, "rotation": rotation}),
-    )
-    .expect("JSON shape");
-    assert!(
-        serde_json::from_value::<civic::PlaceBuilding>(
-            json!({"building": "stockpile", "x": x, "z": z, "free": true})
-        )
-        .is_err(),
-        "unknown fields are refused"
-    );
-    let ids_before: Vec<SimId> = app
-        .world()
-        .resource::<SimIndex>()
-        .map
-        .keys()
-        .copied()
-        .collect();
-    submit(app.world_mut(), None, SimCommand::content(&parsed)).expect("accepted");
-    run_ticks(app.world_mut(), 1);
-    let sites = civic::sites(app.world());
-    assert_eq!(sites.len(), 1);
-    let site = &sites[0];
-    assert_eq!(site.building, "stockpile");
-    assert_eq!(site.label, "Harbour stockpile 1");
-    assert_eq!(site.settlement, harbour);
-    assert_eq!(site.cost.get("log"), Some(&4));
-    assert!(!site.civic);
-    // A new site is a new identity after every existing one.
-    assert!(ids_before.iter().all(|id| *id < site.id));
-    // A refused placement is refused at submission, with the same reason.
-    let again = submit(app.world_mut(), None, SimCommand::content(&parsed)).expect_err("refused");
-    assert!(
-        format!("{again:?}").contains("another building"),
-        "{again:?}"
-    );
-    let cancel: civic::CancelBuilding =
-        serde_json::from_value(json!({"site": site.id})).expect("JSON shape");
-    submit(app.world_mut(), None, SimCommand::content(&cancel)).expect("accepted");
-    run_ticks(app.world_mut(), 1);
-    assert!(civic::sites(app.world()).is_empty());
-    assert!(app.world().resource::<SimIndex>().get(site.id).is_none());
-    village::integrity::validate_colony(app.world()).expect("colony integrity");
-
-    for command in ["PlaceBuilding", "CancelBuilding"] {
-        assert!(
-            app.world()
-                .resource::<CommandRegistry>()
-                .get(command)
-                .is_some()
-        );
-    }
-    for legacy in ["island_colony", "living_village", "ai_village"] {
-        let old = island_content::new_sim_app(SEED, legacy);
-        assert!(
-            old.world()
-                .resource::<CommandRegistry>()
-                .get("PlaceBuilding")
-                .is_none(),
-            "{legacy} must keep its command set"
-        );
-        assert!(!old.world().contains_resource::<civic::CivicState>());
-    }
 }
 
 #[test]

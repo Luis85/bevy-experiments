@@ -35,9 +35,6 @@ pub const VERBS: &[&str] = &[
 ];
 
 pub fn register(app: &mut App) {
-    if !geography::is_expanded(app.world()) {
-        return;
-    }
     app.register_sim_component::<HomesteadPlot>()
         .register_sim_component::<Cottage>()
         .register_sim_component::<CottageBuild>()
@@ -59,9 +56,6 @@ pub fn register(app: &mut App) {
 
 /// Call once after all geography, residents, inventory and boundary entities.
 pub fn spawn(world: &mut World) {
-    if !geography::is_expanded(world) {
-        return;
-    }
     let regional = super::frontier::spec(world).map(|s| s.plots.clone());
     let definitions: Vec<_> = regional
         .as_ref()
@@ -145,9 +139,7 @@ pub fn cottage_body(
     door: SimPos,
     building: Option<&str>,
 ) -> (SimPos, Footprint, u32) {
-    if super::frontier::enabled(world)
-        && let Some(def) = super::civic::definition(world, building.unwrap_or(COTTAGE_BUILDING))
-    {
+    if let Some(def) = super::civic::definition(world, building.unwrap_or(COTTAGE_BUILDING)) {
         let half_x_mm = def.footprint.width as i32 * 500;
         let half_z_mm = def.footprint.depth as i32 * 500;
         let beds = match def.kind {
@@ -196,11 +188,9 @@ pub fn body_fits(
         return Err(format!("a {size} cottage does not fit inside the map here"));
     }
     if cells.iter().any(|cell| {
-        if super::frontier::enabled(world) {
+        {
             super::frontier::terrain::cell(world, cell.x, cell.z)
                 .is_none_or(|terrain| !terrain.walkable())
-        } else {
-            !geography::for_world(world).land_cell(cell.x, cell.z)
         }
     }) {
         return Err(format!("the {size} cottage footprint must be on land"));
@@ -384,9 +374,6 @@ fn finish_build(world: &mut World, actor: Entity, build: CottageBuild) {
 }
 
 pub fn tick(world: &mut World) {
-    if !geography::is_expanded(world) {
-        return;
-    }
     let now = world.resource::<SimClock>().tick;
     let builders: Vec<_> = world
         .resource::<SimIndex>()

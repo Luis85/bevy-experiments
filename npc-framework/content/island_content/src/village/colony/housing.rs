@@ -230,12 +230,11 @@ pub(super) fn assign(world: &mut World, resident: SimId, house: SimId) {
         .get(resident)
         .expect("resident");
     let now = world.resource::<SimClock>().tick;
-    let living_world = super::super::frontier::enabled(world);
     let mut person = world.get_mut::<Villager>(actor).expect("resident");
     // Living world: a resident moved to another home while it rests in the
     // old one wakes, and walks to the new one: it does not sleep on where
     // the old home was, outside every building.
-    if living_world && person.home != door && person.resting_until > now {
+    if person.home != door && person.resting_until > now {
         person.resting_until = now;
     }
     person.home = door;

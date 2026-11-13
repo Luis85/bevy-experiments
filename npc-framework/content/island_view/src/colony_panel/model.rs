@@ -342,28 +342,26 @@ fn village_entries(world: &World) -> Vec<Entry> {
             Action::Gatherings,
         ),
     ]);
-    if village::frontier::enabled(world) {
-        rows.push(Entry::text("regions_title", "Across the island", true));
-        for (id, entity) in village::frontier::settlements::all(world) {
-            let place = world
-                .get::<village::frontier::Settlement>(entity)
-                .expect("settlement");
-            let residents = world
-                .resource::<SimIndex>()
-                .map
-                .values()
-                .filter(|actor| {
-                    village::frontier::settlements::member(world, **actor) == Some(id)
-                        && world.get::<Villager>(**actor).is_some()
-                        && village::living(world, **actor)
-                })
-                .count();
-            rows.push(Entry::action(
-                format!("region{}", id.0),
-                format!("{} · {residents} residents", place.label),
-                Action::Settlement(id),
-            ));
-        }
+    rows.push(Entry::text("regions_title", "Across the island", true));
+    for (id, entity) in village::frontier::settlements::all(world) {
+        let place = world
+            .get::<village::frontier::Settlement>(entity)
+            .expect("settlement");
+        let residents = world
+            .resource::<SimIndex>()
+            .map
+            .values()
+            .filter(|actor| {
+                village::frontier::settlements::member(world, **actor) == Some(id)
+                    && world.get::<Villager>(**actor).is_some()
+                    && village::living(world, **actor)
+            })
+            .count();
+        rows.push(Entry::action(
+            format!("region{}", id.0),
+            format!("{} · {residents} residents", place.label),
+            Action::Settlement(id),
+        ));
     }
     rows
 }

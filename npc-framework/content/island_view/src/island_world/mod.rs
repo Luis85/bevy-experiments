@@ -20,9 +20,6 @@ use island_content::village::civic;
 use npc_framework::view_helpers::ViewSystems;
 
 pub(crate) fn plugin(app: &mut App) {
-    if !island_content::village::frontier::enabled(app.world()) {
-        return;
-    }
     // `ISLAND_VIEW_NO_AMBIENT=1`: the island without its ambient motion
     // (the earlier fixed breeze), for measuring what the motion costs.
     if std::env::var_os("ISLAND_VIEW_NO_AMBIENT").is_none() {

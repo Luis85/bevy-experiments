@@ -47,9 +47,7 @@ fn site_clear(world: &World, plot: Entity) -> Result<(), String> {
     let (house, body, _) = cottage_body(world, front_door(center), None);
     body_fits(world, house, body, None)?;
     // Living world: the plot must also hold the body the cottage grows into.
-    if super::super::frontier::enabled(world)
-        && let Some(larger) = super::super::live::larger_building(world)
-    {
+    if let Some(larger) = super::super::live::larger_building(world) {
         let (house, body, _) = cottage_body(world, front_door(center), Some(&larger));
         body_fits(world, house, body, None)
             .map_err(|reason| format!("this plot has no room for the larger cottage: {reason}"))?;
@@ -99,9 +97,6 @@ impl HomesteadAct {
     }
 
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !geography::is_expanded(world) {
-            return Err("homesteads require an expanded Living world".into());
-        }
         let actor = entity(world, self.unit).map_err(|e| e.to_string())?;
         if !living(world, actor) || world.get::<Villager>(actor).is_none() {
             return Err("only living villagers can work a homestead".into());

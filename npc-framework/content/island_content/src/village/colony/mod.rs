@@ -32,12 +32,6 @@ use bevy_ecs::prelude::*;
 use npc_framework::agent_io::{Affordance, AgentIoAppExt};
 use npc_framework::prelude::*;
 
-pub fn enabled(world: &World) -> bool {
-    world
-        .get_resource::<crate::world_runtime::ActiveWorld>()
-        .is_some_and(|active| active.0.colony)
-}
-
 /// Coordinate the two resident contexts without resetting either one.
 /// First arrival and later successor lives share this same initialization seam.
 pub fn participant_spawned(world: &mut World, actor: Entity) {
@@ -53,9 +47,6 @@ pub fn participant_spawned(world: &mut World, actor: Entity) {
 }
 
 pub fn register(app: &mut App) {
-    if !enabled(app.world()) {
-        return;
-    }
     app.register_sim_resource::<ColonyState>()
         .register_sim_component::<Household>()
         .register_sim_component::<SocialLife>()
@@ -81,7 +72,7 @@ pub fn register(app: &mut App) {
 }
 
 pub fn spawn(world: &mut World) {
-    if !enabled(world) || world.contains_resource::<ColonyState>() {
+    if world.contains_resource::<ColonyState>() {
         return;
     }
     world.insert_resource(ColonyState::default());

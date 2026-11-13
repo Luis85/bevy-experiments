@@ -32,21 +32,10 @@ pub const CONTENT: &str = "island";
 
 /// The embedded scenario files: `(name, JSON)`. `testbed` is the default
 /// showcase; the others focus on one feature each (see the README).
-pub const SCENARIO_FILES: [(&str, &str); 4] = [
-    (
-        "living_world",
-        include_str!("../scenarios/living_world.json"),
-    ),
-    ("ai_village", include_str!("../scenarios/ai_village.json")),
-    (
-        "living_village",
-        include_str!("../scenarios/living_village.json"),
-    ),
-    (
-        "island_colony",
-        include_str!("../scenarios/island_colony.json"),
-    ),
-];
+pub const SCENARIO_FILES: [(&str, &str); 1] = [(
+    "living_world",
+    include_str!("../scenarios/living_world.json"),
+)];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -224,14 +213,9 @@ pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -
             .and_then(|c| c.world.as_ref())
             .map(|s| s.preset.clone())
             .unwrap_or_else(|| {
-                let mut preset = crate::worlds::builtin_preset(
-                    if world.economy == crate::worlds::EconomyModel::NeedsDriven {
-                        "living_island"
-                    } else {
-                        "island_village"
-                    },
-                )
-                .expect("shipped island rules");
+                let mut preset: crate::worlds::WorldPreset =
+                    serde_json::from_str(crate::worlds::HEADLESS_BASE)
+                        .expect("shipped headless island rules");
                 preset.island_geography = world.island_geography;
                 preset.colony = world.colony;
                 preset.island_ai = world.island_ai.clone();

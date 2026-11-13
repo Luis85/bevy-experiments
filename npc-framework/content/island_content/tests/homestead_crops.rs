@@ -14,7 +14,7 @@ use npc_framework::prelude::*;
 use serde_json::json;
 
 fn fixture() -> (App, SimId, Entity, SimId, Entity) {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let id = app.world().resource::<village::VillageState>().played;
     JoinIsland { unit: id.0 }.perform(app.world_mut()).unwrap();
     let actor = app.world().resource::<SimIndex>().get(id).unwrap();
@@ -41,37 +41,6 @@ fn fixture() -> (App, SimId, Entity, SimId, Entity) {
     let bed = homestead::bed_position(app.world(), plot, 0).unwrap();
     app.world_mut().entity_mut(actor).insert(bed);
     (app, id, actor, plot_id, plot)
-}
-
-#[test]
-fn crop_catalog_extends_colony_without_changing_legacy_grain_rules() {
-    let mut colony = island_content::new_sim_app(7, "island_colony");
-    let before = state_hash(colony.world_mut());
-    let grains = homestead::crop_definition(colony.world(), catalog::GRAIN).unwrap();
-    assert_eq!(
-        (
-            grains.seed_count,
-            grains.water_count,
-            grains.growth_ticks,
-            grains.yield_count
-        ),
-        (1, 1, 6000, 3)
-    );
-    let berries = homestead::crop_definition(colony.world(), catalog::BERRIES).unwrap();
-    assert_eq!(
-        (
-            berries.seed_kind,
-            berries.growth_ticks,
-            berries.yield_kind,
-            berries.yield_count
-        ),
-        (catalog::BERRIES, 9000, catalog::BERRIES, 4)
-    );
-    assert_eq!(homestead::crop_catalog(colony.world()).len(), 2);
-    assert_eq!(state_hash(colony.world_mut()), before);
-    let legacy = island_content::new_sim_app(7, "living_village");
-    assert_eq!(homestead::crop_catalog(legacy.world()).len(), 1);
-    assert!(homestead::crop_definition(legacy.world(), catalog::BERRIES).is_none());
 }
 
 #[test]
@@ -169,7 +138,7 @@ fn berry_growth_and_ready_state_resume_exactly() {
 
 #[test]
 fn crop_rules_are_public_but_do_not_reveal_unknown_estates() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let id = app.world().resource::<village::VillageState>().played;
     JoinIsland { unit: id.0 }.perform(app.world_mut()).unwrap();
     let before = state_hash(app.world_mut());

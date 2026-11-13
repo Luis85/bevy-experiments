@@ -19,11 +19,6 @@ pub use settlements::{Settlement, SettlementMember, SettlementSite};
 pub use shape::{PlaceResourcePatch, RemoveResourcePatch, export_spec, export_world};
 pub use world_spec::{Biome, HomeDef, LivingWorldSpec, SettlementDef, SiteDef};
 
-pub fn enabled(world: &World) -> bool {
-    world
-        .get_resource::<crate::world_runtime::ActiveWorld>()
-        .is_some_and(|w| w.0.living_world.is_some())
-}
 pub fn spec(world: &World) -> Option<&LivingWorldSpec> {
     world.get_resource::<LivingWorldSpec>()
 }
@@ -111,16 +106,14 @@ pub fn spawn(world: &mut World) {
     super::production::validate(world).expect("regional production graph must be acyclic");
 }
 pub fn tick(world: &mut World) {
-    if enabled(world) {
-        activities::tick(world);
-        labor::tick(world);
-        super::weather::tick(world);
-        super::fields::tick(world);
-        super::civic::tick(world);
-        super::merchant::tick(world);
-        super::demography::tick(world);
-        super::indoors::tick(world);
-        super::live::tick(world);
-        super::living::wear_carried_coats(world);
-    }
+    activities::tick(world);
+    labor::tick(world);
+    super::weather::tick(world);
+    super::fields::tick(world);
+    super::civic::tick(world);
+    super::merchant::tick(world);
+    super::demography::tick(world);
+    super::indoors::tick(world);
+    super::live::tick(world);
+    super::living::wear_carried_coats(world);
 }

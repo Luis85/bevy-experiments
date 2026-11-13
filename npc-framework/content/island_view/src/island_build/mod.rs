@@ -21,7 +21,7 @@ use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use island_content::village::{
     self, VillagePlace, Villager, catalog, civic,
-    colony::{self, Household},
+    colony::Household,
     frontier::{self, settlements::WORKPLACE_OFFSET_MM},
     production::JobIntent,
 };
@@ -165,10 +165,7 @@ pub(crate) struct CivicLog {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world())
-        || !frontier::enabled(app.world())
-        || !app.world().contains_resource::<civic::CivicState>()
-    {
+    if !app.world().contains_resource::<civic::CivicState>() {
         return;
     }
     ui::install(app);

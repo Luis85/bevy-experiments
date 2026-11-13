@@ -120,21 +120,6 @@ fn the_shipped_tree_file_is_the_tree_every_resident_runs() {
 }
 
 #[test]
-fn legacy_island_profiles_keep_the_built_in_tree_and_register_nothing_new() {
-    for scenario in ["ai_village", "living_village", "island_colony"] {
-        let app = island_content::new_sim_app(7, scenario);
-        let registry = app.world().resource::<AiRegistry>();
-        assert!(
-            registry.action_id("IslandLifeDecision").is_some(),
-            "{scenario}"
-        );
-        assert!(registry.action_id("life.eat").is_none(), "{scenario}");
-        assert!(registry.cond_id("life.hungry").is_none(), "{scenario}");
-        assert!(!frontier::enabled(app.world()));
-    }
-}
-
-#[test]
 fn a_world_without_a_behaviour_block_gets_the_built_in_behaviour() {
     let world = shipped_world();
     assert!(

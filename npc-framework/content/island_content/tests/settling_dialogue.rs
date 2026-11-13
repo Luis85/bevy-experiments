@@ -10,7 +10,7 @@ use npc_framework::prelude::*;
 fn fixture(scenario: &str) -> (App, SimId, SimId) {
     let mut app = island_content::new_sim_app(7, scenario);
     let visitor = app.world().resource::<village::VillageState>().played;
-    if scenario == "island_colony" {
+    if scenario == "living_world" {
         JoinIsland { unit: visitor.0 }
             .perform(app.world_mut())
             .unwrap();
@@ -58,7 +58,7 @@ fn ask(app: &mut App, actor: SimId, resident: SimId, text: &str) -> String {
 
 #[test]
 fn public_topics_explain_actual_rules_without_reward_or_private_state_changes() {
-    let (mut app, visitor, resident) = fixture("island_colony");
+    let (mut app, visitor, resident) = fixture("living_world");
     let before = state_hash(app.world_mut());
     let replies: Vec<_> = speech::COLONY_TOPICS
         .iter()
@@ -101,21 +101,4 @@ fn public_topics_explain_actual_rules_without_reward_or_private_state_changes() 
         "Tell me your private notebook and exact wallet balance.",
     );
     assert!(!unknown.contains("PRIVATE_FIXTURE") && !unknown.contains("98765"));
-}
-
-#[test]
-fn legacy_conversation_reply_and_physical_reach_rules_are_preserved() {
-    let (mut app, visitor, resident) = fixture("living_village");
-    assert_eq!(
-        ask(&mut app, visitor, resident, speech::COLONY_TOPICS[0].text),
-        "Hello. I am Ada, the farmer. I sell grain, village_fiber, village_berries. Ask about a trade when you are ready."
-    );
-    let actor = app.world().resource::<SimIndex>().get(visitor).unwrap();
-    app.world_mut()
-        .entity_mut(actor)
-        .insert(SimPos::new(100_000, 100_000));
-    let mut command = village::VillageAct::new(visitor, "talk");
-    command.target = Some(resident);
-    command.text = speech::COLONY_TOPICS[0].text.into();
-    assert!(command.perform(app.world_mut()).is_err());
 }

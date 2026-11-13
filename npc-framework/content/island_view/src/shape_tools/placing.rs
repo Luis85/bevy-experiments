@@ -34,7 +34,6 @@ use bevy::ui_widgets::Activate;
 use island_content::village::{
     civic,
     frontier::{
-        self,
         props::{self as prop_data, PlaceProp, RemoveProp},
         shape::{PlacePlot, RemovePlot},
     },
@@ -821,7 +820,7 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn editing(world: &World) -> bool {
-    world.get_resource::<IslandMode>() == Some(&IslandMode::Editor) && frontier::enabled(world)
+    world.get_resource::<IslandMode>() == Some(&IslandMode::Editor)
 }
 
 /// The rail's Place tile.
@@ -1441,7 +1440,7 @@ mod tests {
     /// A cell near a settlement where `thing` may be placed.
     fn placeable(world: &World, kind: Kind, key: &str) -> Thing {
         let centres: Vec<SimPos> = world
-            .try_query::<(&frontier::Settlement, &SimPos)>()
+            .try_query::<(&island_content::village::frontier::Settlement, &SimPos)>()
             .unwrap()
             .iter(world)
             .map(|(_, pos)| *pos)

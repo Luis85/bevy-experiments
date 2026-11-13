@@ -351,7 +351,7 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn editing(world: &World) -> bool {
-    world.get_resource::<IslandMode>() == Some(&IslandMode::Editor) && frontier::enabled(world)
+    world.get_resource::<IslandMode>() == Some(&IslandMode::Editor)
 }
 
 /// The rail's three resource tiles: Resource, Remove and Export world.
@@ -1348,24 +1348,6 @@ mod tests {
             Some(SimId(4))
         );
         assert_eq!(nearest(&patches, SimPos::new(5_000, 0), 2_000), None);
-    }
-
-    #[test]
-    fn the_goods_come_from_the_world_once_each() {
-        let app = island_content::new_sim_app(7, "island_colony");
-        // The compact island has no regional patch list: nothing to offer.
-        assert!(patch_goods(app.world()).is_empty());
-        let app = island_content::new_sim_app(7, "living_world");
-        let goods = patch_goods(app.world());
-        assert!(!goods.is_empty(), "the living world grows goods in patches");
-        let mut unique = goods.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(unique.len(), goods.len(), "each good once: {goods:?}");
-        assert_eq!(
-            sentence("a patch cannot stand in water"),
-            "A patch cannot stand in water."
-        );
     }
 
     #[test]

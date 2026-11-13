@@ -1,6 +1,0 @@
-{
-  "version":1,"content":"island","name":"ai_village","seed":1,
-  "world":{"layout":"island","furnish":false,"store_locked":false,"detection":"automatic","ai_scheduler":{"enabled":true}},
-  "actors":[{"kind":"unit","name":"human","template":"scout","pos":[500,-1500],"preset":"human","facing":[0,1]}],
-  "controllers":[{"actor":0,"controller":"visitor","mode":"Direct","on_idle":"Idle"}]
-}

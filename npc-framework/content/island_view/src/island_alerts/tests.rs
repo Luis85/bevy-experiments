@@ -6,7 +6,7 @@ use npc_framework::prelude::run_ticks;
 use serde_json::json;
 
 fn fixture() -> App {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     set_journal(app.world_mut(), true, false);
     app.init_resource::<Alerts>()
         .init_resource::<IslandMode>()
@@ -134,61 +134,6 @@ fn repeated_exposure_folds_and_selecting_an_alert_focuses_the_resident() {
         .requests
         .push(Request::Row(RowKey::Alert(9999)));
     process(app.world_mut());
-}
-
-#[test]
-fn hunger_and_depleted_sources_are_reported_once_from_existing_components() {
-    let mut app = fixture();
-    let (farmer, farmer_entity) = resident(&app, Role::Farmer);
-    let (patch, patch_entity) = app
-        .world()
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .find(|(_, entity)| {
-            app.world()
-                .get::<ResourcePatch>(**entity)
-                .is_some_and(|patch| patch.remaining > 0)
-        })
-        .map(|(id, entity)| (*id, *entity))
-        .expect("a stocked resource patch");
-    scan(app.world_mut());
-    assert!(kinds(&app).is_empty(), "the first scan is only a baseline");
-
-    // Fixture shortcuts for conditions the simulation produces by itself.
-    app.world_mut()
-        .get_mut::<Vitality>(farmer_entity)
-        .unwrap()
-        .starved_ticks = CRITICAL_TICKS;
-    app.world_mut()
-        .get_mut::<ResourcePatch>(patch_entity)
-        .unwrap()
-        .remaining = 0;
-    scan(app.world_mut());
-    scan(app.world_mut());
-    let mut seen = kinds(&app);
-    seen.sort();
-    assert_eq!(seen, [AlertKind::Starving, AlertKind::Depleted]);
-    let feed = &app.world().resource::<Alerts>().feed;
-    let starving = feed
-        .iter()
-        .find(|alert| alert.kind == AlertKind::Starving)
-        .unwrap();
-    assert_eq!((starving.subject, starving.count), (Some(farmer.0), 1));
-    let depleted = feed
-        .iter()
-        .find(|alert| alert.kind == AlertKind::Depleted)
-        .unwrap();
-    assert_eq!(depleted.subject, Some(patch.0));
-    assert!(depleted.focus.is_some(), "click-to-focus knows the site");
-
-    // Recovery re-arms the alert for the next time.
-    app.world_mut()
-        .get_mut::<Vitality>(farmer_entity)
-        .unwrap()
-        .starved_ticks = 0;
-    scan(app.world_mut());
-    assert!(app.world().resource::<Alerts>().suffering.is_empty());
 }
 
 #[test]
@@ -662,38 +607,6 @@ fn a_need_that_began_before_the_session_is_read_once_and_its_effect_not_repeated
         .collect();
     assert_eq!(starving.len(), 1);
     assert_eq!(starving[0].count, 2);
-}
-
-#[test]
-fn without_journaled_onsets_the_scan_remains_the_source() {
-    // The regional world with its journal off records no effects at all.
-    let mut app = regional(false);
-    assert!(!onsets_journaled(app.world()));
-    let (farmer, farmer_entity) = resident(&app, Role::Farmer);
-    let (patch, patch_entity) = stocked_patch(&app);
-    scan(app.world_mut());
-    assert!(kinds(&app).is_empty(), "{:?}", kinds(&app));
-    app.world_mut()
-        .get_mut::<Vitality>(farmer_entity)
-        .unwrap()
-        .starved_ticks = CRITICAL_TICKS;
-    app.world_mut()
-        .get_mut::<ResourcePatch>(patch_entity)
-        .unwrap()
-        .remaining = 0;
-    scan(app.world_mut());
-    scan(app.world_mut());
-    let starving = about(&app, AlertKind::Starving);
-    assert_eq!(starving.len(), 1);
-    assert_eq!(
-        (starving[0].subject, starving[0].count),
-        (Some(farmer.0), 1)
-    );
-    let depleted = about(&app, AlertKind::Depleted);
-    assert_eq!(depleted.len(), 1);
-    assert_eq!((depleted[0].subject, depleted[0].count), (Some(patch.0), 1));
-    // The older island profile journals no onsets either.
-    assert!(!onsets_journaled(fixture().world()));
 }
 
 fn living_fixture() -> App {

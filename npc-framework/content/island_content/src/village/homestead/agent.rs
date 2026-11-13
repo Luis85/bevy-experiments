@@ -58,7 +58,7 @@ pub fn plot_json(world: &World, plot: Entity, state_known: bool) -> Option<Value
     // The living world's cottage is a catalogue body behind the door (and
     // grows with the larger-cottage tier): report the body there is, or
     // would be, instead of the old fixed offset.
-    if super::super::frontier::enabled(world) {
+    {
         let built = estate
             .cottage_entity
             .and_then(|id| entity_of(world, id))
@@ -70,15 +70,13 @@ pub fn plot_json(world: &World, plot: Entity, state_known: bool) -> Option<Value
         value["cottage_center"] = json!(body_center);
         value["cottage_half_extents_mm"] = json!([body.half_x_mm, body.half_z_mm]);
     }
-    if super::super::colony::enabled(world) {
-        value["owner_alive"] = json!(if state_known {
-            estate
-                .owner
-                .map(|owner| entity_of(world, owner).is_some_and(|entity| living(world, entity)))
-        } else {
-            None
-        });
-    }
+    value["owner_alive"] = json!(if state_known {
+        estate
+            .owner
+            .map(|owner| entity_of(world, owner).is_some_and(|entity| living(world, entity)))
+    } else {
+        None
+    });
     Some(value)
 }
 
@@ -91,7 +89,7 @@ fn current(world: &World, ctx: &AgentCtx, id: SimId, plot: Entity) -> bool {
 }
 
 pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
-    if !geography::is_expanded(world) || world.get::<Villager>(ctx.entity).is_none() {
+    if world.get::<Villager>(ctx.entity).is_none() {
         return None;
     }
     let known = known_targets(world, ctx);
@@ -117,14 +115,10 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         "crop":{"seed_kind":super::super::roles::roles(world).grain,"seed_count":SEED_COUNT,"water_kind":super::super::roles::roles(world).drink,"water_count":WATER_COUNT,
             "growth_ticks":GROW_TICKS,"yield_kind":super::super::roles::roles(world).grain,"yield_count":HARVEST_GRAIN},
         "claim_limits":{"housing":MAX_HOUSING_PLOTS,"garden":MAX_GARDEN_PLOTS}});
-    if super::super::colony::enabled(world) {
-        value["crops"] = json!(crop_catalog(world));
-    }
+    value["crops"] = json!(crop_catalog(world));
     let mut section = Section::new(value)
         .line("Homesteads: claim one housing and one garden plot. A cottage costs 8 planks + 4 logs and 600 ticks; it changes your home without moving you. Plant one real grain seed, water once with one clean water, then harvest three grain after 6000 ticks. Use each advertised bed position and its bed index; all work requires reach. stop_work cancels construction without spending its reserved materials.");
-    if super::super::colony::enabled(world) {
-        section = section.line("Colony crop choices are declared in homestead.crops. Hardy berries consume one carried berry and one clean water, grow for 9000 ticks, and yield four edible/tradable berries. Choose plant.args.kind explicitly; omitted kind still means village_grain.");
-    }
+    section = section.line("Colony crop choices are declared in homestead.crops. Hardy berries consume one carried berry and one clean water, grow for 9000 ticks, and yield four edible/tradable berries. Choose plant.args.kind explicitly; omitted kind still means village_grain.");
     Some(section)
 }
 
@@ -137,10 +131,7 @@ fn checked(mut affordance: Affordance, result: Result<(), String>) -> Affordance
 }
 
 pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
-    if !geography::is_expanded(world)
-        || world.get::<Villager>(ctx.entity).is_none()
-        || !living(world, ctx.entity)
-    {
+    if world.get::<Villager>(ctx.entity).is_none() || !living(world, ctx.entity) {
         return Vec::new();
     }
     let known = known_targets(world, ctx);
@@ -222,24 +213,20 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
                         Err("this plot has no crop beds".into()),
                     )
                 });
-            let label = if super::super::colony::enabled(world) {
+            let label = {
                 match verb {
                     "plant" => "Plant a crop from your pack",
                     "harvest" => "Harvest a mature crop",
                     _ => label,
                 }
-            } else {
-                label
             };
             let mut affordance=Affordance::new(verb,format!("{label} on {}; approach the chosen bed position",definition.label))
                 .target(id).arg("bed",&format!("0..{}; default 0. See homestead.plots[].beds[].position for exact approach coordinates",estate.beds.len().saturating_sub(1)));
             if verb == "plant" {
-                let options = if super::super::colony::enabled(world) {
+                let options = {
                     format!(
                         "village_grain or village_berries; default village_grain. Checked available choice: {kind}; pass kind explicitly for berries."
                     )
-                } else {
-                    "village_grain; default village_grain".into()
                 };
                 affordance = affordance.arg("kind", &options);
             }

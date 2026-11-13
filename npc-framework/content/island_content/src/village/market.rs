@@ -117,10 +117,6 @@ impl SimHashResource for MarketState {
     }
 }
 
-pub fn enabled(world: &World) -> bool {
-    super::needs_driven(world)
-}
-
 /// Called only for the opt-in economy, before content freeze.
 pub fn register(app: &mut App) {
     app.register_sim_resource::<MarketState>();
@@ -142,9 +138,6 @@ fn commodity(seed: u32) -> Commodity {
 /// Quoting is pure; prices change only at simulation market rounds.
 pub fn unit_price(world: &World, kind: &str) -> Option<u32> {
     let seed = catalog::price_in(world, kind)?;
-    if !enabled(world) {
-        return Some(seed);
-    }
     if !catalog::trade_kinds(world).contains(&kind) {
         return None;
     }
@@ -199,9 +192,6 @@ fn listing(world: &World, actor: Entity, kind: &str) -> Option<Listing> {
 /// test: that runs in every market scan.)
 pub fn no_use(world: &World, actor: Entity, kind: &str) -> bool {
     use super::frontier::economy_spec::GoodTag;
-    if !super::frontier::enabled(world) {
-        return false;
-    }
     let Some(role) = world.get::<Villager>(actor).map(|person| person.role) else {
         return false;
     };
@@ -255,7 +245,7 @@ pub(super) fn person_sells(world: &World, actor: Entity, kind: &str) -> bool {
     if !living(world, actor) {
         return false;
     }
-    if enabled(world) && listing(world, actor, kind).is_some() {
+    if listing(world, actor, kind).is_some() {
         return available_to_sell(world, actor, kind) > 0;
     }
     automatic_seller(world, actor, kind)
@@ -267,9 +257,6 @@ pub fn available_to_sell(world: &World, actor: Entity, kind: &str) -> u32 {
         return depot.available(kind, None, world.resource::<SimClock>().tick);
     }
     let stock = econ::count(world, actor, kind);
-    if !enabled(world) {
-        return stock;
-    }
     if let Some(offer) = listing(world, actor, kind) {
         return offer.quantity.min(stock);
     }
@@ -281,13 +268,11 @@ pub fn available_to_sell(world: &World, actor: Entity, kind: &str) -> u32 {
 
 pub fn asking_price(world: &World, seller: Entity, kind: &str) -> Option<u32> {
     let reference = unit_price(world, kind)?;
-    Some(if enabled(world) {
+    Some({
         listing(world, seller, kind)
             .and_then(|offer| offer.minimum_unit_price)
             .map_or(reference, |minimum| reference.max(minimum))
             .max(reservation_for(world, seller, kind).unwrap_or(0))
-    } else {
-        reference
     })
 }
 
@@ -328,7 +313,7 @@ pub fn quote(
     if s.coins.checked_add(total).is_none() {
         return Err("seller wallet is full".into());
     }
-    if enabled(world) {
+    {
         let automatic_stock = automatic_seller(world, seller, kind);
         if (automatic_stock || listing(world, seller, kind).is_some())
             && available_to_sell(world, seller, kind) < n
@@ -362,9 +347,6 @@ pub fn check_offer(
     quantity: u32,
     minimum: Option<u32>,
 ) -> Result<(), String> {
-    if !enabled(world) {
-        return Err("public goods offers require the needs-driven economy".into());
-    }
     if !living(world, actor) || world.get::<SimId>(actor).is_none() {
         return Err("only a living actor can offer goods".into());
     }
@@ -422,7 +404,7 @@ pub fn post_offer(
 }
 
 pub fn has_offer(world: &World, actor: Entity, kind: &str) -> bool {
-    enabled(world) && listing(world, actor, kind).is_some()
+    listing(world, actor, kind).is_some()
 }
 
 pub fn withdraw_offer(world: &mut World, actor: Entity, kind: &str) -> Result<(), String> {
@@ -455,9 +437,6 @@ pub fn record_trade(
     quantity: u32,
     total: u32,
 ) {
-    if !enabled(world) {
-        return;
-    }
     let Some(seed) = catalog::price_in(world, kind) else {
         return;
     };
@@ -533,9 +512,6 @@ pub fn round_ticks(world: &World) -> u64 {
 
 /// The host calls production::refresh before this, in the deterministic Effects seam.
 pub fn tick(world: &mut World) {
-    if !enabled(world) {
-        return;
-    }
     let now = world.resource::<SimClock>().tick;
     let interval = round_ticks(world);
     if world
@@ -847,9 +823,6 @@ pub fn tick(world: &mut World) {
 
 /// Published market news contains no individual wallet, inventory or position.
 pub fn public_book(world: &World) -> Vec<Value> {
-    if !enabled(world) {
-        return Vec::new();
-    }
     catalog::trade_kinds(world).iter().filter_map(|kind| {
         let price = unit_price(world, kind)?;
         let row = world.get_resource::<MarketState>().and_then(|state| state.commodities.get(*kind));

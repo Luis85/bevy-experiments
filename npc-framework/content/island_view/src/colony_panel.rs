@@ -126,7 +126,7 @@ pub(crate) enum Action {
     CancelSite(SimId),
     ConfirmCancelSite(SimId),
     KeepSite,
-    /// Page Down (true) or Page Up over the open page.
+    /// Page Down true or Page Up over the open page.
     Page(bool),
     /// Journal page: frame an alert, unfold a day's notes, choose a filter.
     AlertRow(u64),
@@ -211,9 +211,6 @@ pub(crate) struct LedgerAction(pub(crate) Action);
 pub(crate) struct LedgerControl;
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world()) {
-        return;
-    }
     crate::game_ui::install(app);
     crate::panel_scroll::install(app);
     app.init_resource::<IslandMode>()
@@ -236,8 +233,7 @@ pub(crate) fn plugin(app: &mut App) {
             Update,
             (economy::sample, process, refresh, sync)
                 .chain()
-                .in_set(ViewSystems::Present)
-                .after(crate::homestead_panel::refresh),
+                .in_set(ViewSystems::Present),
         );
 }
 
@@ -947,7 +943,6 @@ fn sync_mode(world: &mut World) {
     let shell = shell(world);
     if mode == IslandMode::Character {
         crate::island_camera::character(world);
-        crate::homestead_panel::set_open(world, true);
         world.resource_mut::<Ledger>().open = false;
     } else {
         let previous = world.resource::<Ledger>().last_mode;
@@ -956,7 +951,6 @@ fn sync_mode(world: &mut World) {
         if previous.is_none() || previous == Some(IslandMode::Character) || !shell {
             crate::island_camera::overview(world, previous.is_none());
         }
-        crate::homestead_panel::set_open(world, false);
         let mut state = world.resource_mut::<Ledger>();
         if shell {
             // Shape has its own palette; the ledger is an Oversee reference

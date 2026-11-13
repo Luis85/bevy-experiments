@@ -3,7 +3,7 @@
 //! This module never constructs widgets or mutates authoritative actor state.
 use crate::player_actions::{self, ControlState};
 use bevy::prelude::*;
-use island_content::village::{VillageState, colony};
+use island_content::village::VillageState;
 use npc_framework::kernel::commands::{CommandQueue, SkippedCommands};
 use npc_framework::prelude::{Owner, SimClock, SimCommand, SimControl, SimId, SimIndex, SimPos};
 use npc_framework::view_helpers::command_ui::{
@@ -55,9 +55,6 @@ struct IslandControl {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world()) {
-        return;
-    }
     app.init_resource::<IslandMode>()
         .init_resource::<IslandControl>()
         .init_resource::<CharacterWalk>()
@@ -73,8 +70,7 @@ pub(crate) fn plugin(app: &mut App) {
             Update,
             reconcile
                 .in_set(ViewSystems::Present)
-                .after(player_actions::tick)
-                .before(crate::homestead_panel::refresh),
+                .after(player_actions::tick),
         );
 }
 fn initialize(world: &mut World) {
@@ -117,9 +113,6 @@ pub(crate) fn clear_navigation_input(world: &mut World) -> bool {
             *input = CharacterWalk::default();
             moving
         })
-}
-pub(crate) fn available(world: &World) -> bool {
-    world.contains_resource::<IslandControl>()
 }
 pub(crate) fn control_pending(world: &World) -> bool {
     world
@@ -589,7 +582,7 @@ mod tests {
     use npc_framework::kernel::{commands::CommandLog, hash::state_hash};
     use npc_framework::prelude::run_ticks;
     fn fixture() -> App {
-        let mut app = island_content::new_sim_app(7, "island_colony");
+        let mut app = island_content::new_sim_app(7, "living_world");
         app.init_resource::<IslandMode>()
             .init_resource::<IslandControl>()
             .init_resource::<CharacterWalk>()
@@ -1063,7 +1056,11 @@ mod tests {
         let mut app = fixture();
         let id = app.world().resource::<VillageState>().played;
         let entity = app.world().resource::<SimIndex>().get(id).unwrap();
-        assert!(app.world().get::<colony::AwaitingArrival>(entity).is_some());
+        assert!(
+            app.world()
+                .get::<island_content::village::colony::AwaitingArrival>(entity)
+                .is_some()
+        );
         let before = state_hash(app.world_mut());
         request_mode(app.world_mut(), IslandMode::Character).unwrap();
         assert_eq!(*app.world().resource::<IslandMode>(), IslandMode::Character);
@@ -1075,7 +1072,11 @@ mod tests {
         run_ticks(app.world_mut(), 2);
         player_actions::tick(app.world_mut());
         reconcile_control(app.world_mut()).unwrap();
-        assert!(app.world().get::<colony::AwaitingArrival>(entity).is_none());
+        assert!(
+            app.world()
+                .get::<island_content::village::colony::AwaitingArrival>(entity)
+                .is_none()
+        );
         assert!(app.world().get::<Villager>(entity).is_some());
         assert_eq!(player_actions::control(app.world()), ControlState::Native);
         let kinds: Vec<_> = app

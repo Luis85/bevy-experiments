@@ -79,7 +79,7 @@ pub fn settlement_of(world: &World, seller: Entity) -> Option<SimId> {
 
 /// Books a sale for the moving sum. Called by [`market::record_trade`].
 pub(super) fn record(world: &mut World, seller: Entity, kind: &str, units: u32) {
-    if !super::frontier::enabled(world) || !world.contains_resource::<TradeVolume>() {
+    if !world.contains_resource::<TradeVolume>() {
         return;
     }
     let Some(settlement) = settlement_of(world, seller) else {
@@ -97,7 +97,7 @@ pub(super) fn record(world: &mut World, seller: Entity, kind: &str, units: u32) 
 
 /// Closes a market round: the pending sales join the window.
 pub(super) fn close_round(world: &mut World) {
-    if !super::frontier::enabled(world) || !world.contains_resource::<TradeVolume>() {
+    if !world.contains_resource::<TradeVolume>() {
         return;
     }
     let window = tuning(world).map_or(24, |tuning| tuning.trade_window_rounds.max(1)) as usize;
@@ -305,7 +305,7 @@ pub fn island_target(world: &World, kind: &str) -> u32 {
 /// `None` when the rule is off or outside the regional profile.
 pub fn reservation(world: &World, kind: &str) -> Option<u32> {
     let tuning = tuning(world)?;
-    if !tuning.reservation_prices || !super::frontier::enabled(world) {
+    if !tuning.reservation_prices {
         return None;
     }
     let made = super::frontier::economy_spec::registry(world)?

@@ -191,10 +191,8 @@ impl VillageAct {
                     return Err("move within 1.5 m of the resource patch".into());
                 }
                 if p.remaining == 0 {
-                    return Err(if super::frontier::enabled(world) {
+                    return Err({
                         "resource patch is depleted; renewable sites recover over time".into()
-                    } else {
-                        "resource patch is depleted until tomorrow".into()
                     });
                 }
                 if p.kind == catalog::FISH && econ::count(world, actor, catalog::FISHING_ROD) == 0 {
@@ -220,11 +218,7 @@ impl VillageAct {
                 } else {
                     super::roles::roles(world).drink
                 };
-                if self.verb == "eat"
-                    && (catalog::food_restore_in(world, kind).is_none()
-                        || (!super::needs_driven(world)
-                            && kind != super::roles::roles(world).baked))
-                {
+                if self.verb == "eat" && catalog::food_restore_in(world, kind).is_none() {
                     return Err(
                         "eat needs a finished edible good; raw materials must be cooked".into(),
                     );
@@ -257,14 +251,12 @@ impl VillageAct {
                 }
                 // Living world: a bed is rented at the inn, the keeper paid
                 // wherever it is; elsewhere from the innkeeper in person.
-                let at_the_inn = super::frontier::enabled(world)
-                    && super::indoors::at_inn(world, actor, keeper.workplace);
+                let at_the_inn = super::indoors::at_inn(world, actor, keeper.workplace);
                 if !at_the_inn && !econ::near(world, actor, inn) {
                     return Err("move within 1.5 m of the innkeeper".into());
                 }
                 // Regional: the inn has a fixed number of guest beds.
-                if super::frontier::enabled(world)
-                    && super::indoors::inside_entity(world, actor) != Some(keeper.workplace)
+                if super::indoors::inside_entity(world, actor) != Some(keeper.workplace)
                     && super::indoors::free_guest_bed(world, keeper.workplace).is_none()
                 {
                     return Err("the inn has no free bed".into());
@@ -479,9 +471,7 @@ impl VillageAct {
                 ai::stop_work(world, actor, "renting a bed");
                 world.get_mut::<Wallet>(actor).expect("wallet").coins -= catalog::BED_PRICE;
                 world.get_mut::<Wallet>(keeper).expect("wallet").coins += catalog::BED_PRICE;
-                if super::frontier::enabled(world) {
-                    super::frontier::labor::took(world, keeper, catalog::BED_PRICE);
-                }
+                super::frontier::labor::took(world, keeper, catalog::BED_PRICE);
                 ai::start_rest(world, actor, catalog::BED_TICKS, 400);
                 super::indoors::rented_bed(world, actor, keeper);
                 record_effect(
@@ -499,19 +489,21 @@ impl VillageAct {
                 }
                 let target = self.target(world)?;
                 let v = world.get::<Villager>(target).expect("villager");
-                let offered = if market::enabled(world) {
+                let offered: Vec<_> = {
                     catalog::trade_kinds(world)
                         .iter()
                         .copied()
                         .filter(|kind| market::sells(world, target, kind))
                         .collect()
-                } else {
-                    catalog::outputs(v.role).to_vec()
                 };
-                let offers: Vec<_> = offered.iter()
-                    .map(|kind| json!({"kind":kind,
-                        "quantity":if market::enabled(world) { market::available_to_sell(world,target,kind) } else { econ::count(world,target,kind) },
-                        "price":market::asking_price(world,target,kind)})).collect();
+                let offers: Vec<_> = offered
+                    .iter()
+                    .map(|kind| {
+                        json!({"kind":kind,
+                        "quantity":market::available_to_sell(world,target,kind),
+                        "price":market::asking_price(world,target,kind)})
+                    })
+                    .collect();
                 let keeper = super::frontier::economy_spec::is_service(world, v.role);
                 record_effect(
                     world,

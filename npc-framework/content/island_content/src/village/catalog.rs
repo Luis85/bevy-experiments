@@ -147,11 +147,6 @@ pub const FRONTIER_TRADE_KINDS: &[&str] = &[
     WATER,
 ];
 
-fn frontier_profile(app: &App) -> bool {
-    app.world()
-        .contains_resource::<super::frontier::economy_spec::EconomyRegistry>()
-}
-
 /// The regional profile registers every good and recipe of its `economy` data
 /// block; the Rust tables below serve the older profiles only.
 pub fn register_frontier(app: &mut App) {
@@ -282,136 +277,11 @@ pub fn display_in(world: &World, kind: &str) -> Option<&'static str> {
         .map(|good| good.display)
 }
 pub fn register(app: &mut App) {
-    let data_driven = frontier_profile(app);
-    for (kind, grams, stack) in [
-        (GRAIN, 250, 50),
-        (FLOUR, 250, 50),
-        (WATER, 1000, 20),
-        (BOWL, 200, 20),
-        (DIARY, 300, 1),
-        (COINS, 0, 1),
-    ] {
-        if data_driven && !matches!(kind, DIARY | COINS) {
-            continue;
-        }
+    // The data-driven economy registers its goods and recipes
+    // (`register_frontier`); the diary and the coin purse are the island's own.
+    for (kind, grams, stack) in [(DIARY, 300, 1), (COINS, 0, 1)] {
         app.register_item_kind(ItemKindDef::new(kind).weight_g(grams).stackable(stack));
     }
-    if data_driven {
-        return;
-    }
-    for r in [
-        RecipeDef::new(MILL)
-            .input(GRAIN, 1)
-            .station(MILL)
-            .duration(140)
-            .output(FLOUR, 1),
-        RecipeDef::new(BAKE)
-            .input(FLOUR, 2)
-            .input(WATER, 1)
-            .input("log", 1)
-            .station(BAKE)
-            .duration(240)
-            .output("bread", 4),
-        RecipeDef::new(SAW)
-            .input("log", SAW_LOG_COST)
-            .station(SAW)
-            .duration(160)
-            .output("plank", SAW_PLANK_YIELD),
-        RecipeDef::new(CARVE)
-            .input("plank", 2)
-            .station(SAW)
-            .duration(200)
-            .output(BOWL, 1),
-        RecipeDef::new(SMELT)
-            .input("ore", 2)
-            .input("log", 1)
-            .station(SMELT)
-            .duration(240)
-            .output("ingot", 2),
-        RecipeDef::new(TOOL)
-            .input("ingot", 2)
-            .input("plank", 1)
-            .station(SMELT)
-            .duration(240)
-            .output("hammer", 1),
-    ] {
-        app.register_recipe(r);
-    }
-}
-
-/// Additional materials and joining production chains for the living economy.
-/// The original island's registrations, seed stock and recipe names stay separate.
-pub fn register_living(app: &mut App) {
-    if frontier_profile(app) {
-        return;
-    }
-    for (kind, grams, stack) in [
-        (RAW_MEAT, 500, 20),
-        (HIDE, 500, 20),
-        (LEATHER, 400, 20),
-        (FIBER, 100, 40),
-        (THREAD, 100, 40),
-        (COOKED_MEAL, 500, 10),
-        (BERRIES, 100, 40),
-    ] {
-        app.register_item_kind(ItemKindDef::new(kind).weight_g(grams).stackable(stack));
-    }
-    app.register_item_kind(ItemKindDef::new(SPEAR).weight_g(1500).tag("tool:hunting"))
-        .register_item_kind(
-            ItemKindDef::new(WARM_CLOTHES)
-                .weight_g(1500)
-                .equip_slot("body"),
-        );
-    for recipe in [
-        RecipeDef::new(FORGE_SPEAR)
-            .input("ingot", 1)
-            .input("plank", 1)
-            .station(SMELT)
-            .duration(200)
-            .output(SPEAR, 1),
-        RecipeDef::new(COOK)
-            .input(RAW_MEAT, 2)
-            .input(WATER, 1)
-            .input("log", 1)
-            .station(BAKE)
-            .duration(200)
-            .output(COOKED_MEAL, 2),
-        RecipeDef::new(TAN)
-            .input(HIDE, 2)
-            .input(WATER, 1)
-            .input(BOWL, 1)
-            .station(TAN)
-            .duration(240)
-            .output(LEATHER, 2),
-        RecipeDef::new(SPIN)
-            .input(FIBER, 2)
-            .station(TAILOR)
-            .duration(140)
-            .output(THREAD, 1),
-        RecipeDef::new(TAILOR)
-            .input(LEATHER, 2)
-            .input(THREAD, 2)
-            .station(TAILOR)
-            .duration(320)
-            .output(WARM_CLOTHES, 1),
-    ] {
-        app.register_recipe(recipe);
-    }
-    app.add_craft_hook("island.living_product_wear", |world, completed| {
-        for id in &completed.outputs {
-            let Some(entity) = world.resource::<SimIndex>().get(*id) else {
-                continue;
-            };
-            if world
-                .get::<Item>(entity)
-                .is_some_and(|item| item.kind == WARM_CLOTHES)
-            {
-                world
-                    .entity_mut(entity)
-                    .insert(Durability::new(CLOTHING_DURABILITY));
-            }
-        }
-    });
 }
 
 /// Hunger restored by a finished edible good. Raw meat is deliberately not food.
@@ -427,19 +297,14 @@ pub fn food_restore(kind: &str) -> Option<i32> {
 pub fn trade_kinds(world: &World) -> &'static [&'static str] {
     if let Some(registry) = super::frontier::economy_spec::registry(world) {
         registry.trade_kinds()
-    } else if super::needs_driven(world) {
-        LIVING_TRADE_KINDS
     } else {
-        TRADE_KINDS
+        LIVING_TRADE_KINDS
     }
 }
 
 pub fn outputs_for(world: &World, role: Role) -> &'static [&'static str] {
     if let Some(registry) = super::frontier::economy_spec::registry(world) {
         return registry.profession(role).map_or(&[], |entry| entry.outputs);
-    }
-    if !super::needs_driven(world) {
-        return outputs(role);
     }
     match role {
         Role::Farmer => &[GRAIN, FIBER, BERRIES],
@@ -460,9 +325,6 @@ pub fn wants_for(world: &World, role: Role, kind: &str) -> bool {
             None => registry.good(kind).is_some_and(|good| good.staple),
         };
     }
-    if !super::needs_driven(world) {
-        return wants(role, kind);
-    }
     if matches!(kind, COOKED_MEAL | BERRIES | WARM_CLOTHES) {
         return true;
     }
@@ -481,14 +343,12 @@ pub fn recipes_for(world: &World, role: Role) -> &'static [&'static str] {
     if let Some(registry) = super::frontier::economy_spec::registry(world) {
         return registry.profession(role).map_or(&[], |entry| entry.recipes);
     }
-    if super::needs_driven(world) {
-        match role {
-            Role::Baker => return &[BAKE, COOK],
-            Role::Smith => return &[SMELT, TOOL, FORGE_SPEAR],
-            Role::Tanner => return &[TAN],
-            Role::Tailor => return &[SPIN, TAILOR],
-            _ => {}
-        }
+    match role {
+        Role::Baker => return &[BAKE, COOK],
+        Role::Smith => return &[SMELT, TOOL, FORGE_SPEAR],
+        Role::Tanner => return &[TAN],
+        Role::Tailor => return &[SPIN, TAILOR],
+        _ => {}
     }
     match role {
         Role::Miller => &[MILL],

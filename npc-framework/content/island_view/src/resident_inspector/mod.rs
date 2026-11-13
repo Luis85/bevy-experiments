@@ -130,9 +130,6 @@ struct AvatarRing;
 struct AvatarSlot;
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world()) {
-        return;
-    }
     ui::install(app);
     crate::panel_scroll::install(app);
     app.init_resource::<Inspector>()
@@ -283,7 +280,7 @@ pub(crate) fn activity_label(world: &World, entity: Entity) -> String {
     // The simulation's own label of the running leaf; the older island has
     // none and names the goal instead.
     let leaf = village::view::activity_label(world, entity)
-        .filter(|_| village::frontier::enabled(world))
+        .filter(|_| true)
         .or_else(|| village::behavior::decision(world, entity));
     let generic = matches!(
         leaf,

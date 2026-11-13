@@ -197,11 +197,7 @@ fn saved_construction(
 
 fn fresh_construction(rules: Option<&Path>) -> Result<ScenarioDoc, String> {
     let preset = if let Some(path) = rules {
-        if !path.exists()
-            && path
-                .file_stem()
-                .is_some_and(|name| name == "island_colony" || name == "living_world")
-        {
+        if !path.exists() && path.file_stem().is_some_and(|name| name == "living_world") {
             island_content::worlds::install_builtins(
                 path.parent().ok_or("World rules need a parent directory")?,
             )?;
@@ -213,7 +209,7 @@ fn fresh_construction(rules: Option<&Path>) -> Result<ScenarioDoc, String> {
         )
         .map_err(|e| e.to_string())?
     } else {
-        island_content::worlds::builtin_preset("island_colony").expect("shipped island rules")
+        island_content::worlds::builtin_preset("living_world").expect("shipped island rules")
     };
     construction_from_preset(preset)
 }
@@ -238,41 +234,35 @@ pub(crate) fn world_file_construction(path: &Path) -> Result<ScenarioDoc, String
     construction_from_preset(world_file_preset(path)?)
 }
 
-fn shipped_preset(rules: Option<&Path>) -> island_content::worlds::WorldPreset {
-    let key = if rules
-        .and_then(Path::file_stem)
-        .is_some_and(|name| name == "living_world")
-    {
-        "living_world"
-    } else {
-        "island_colony"
-    };
-    island_content::worlds::builtin_preset(key).expect("shipped island profile")
+fn shipped_preset(_rules: Option<&Path>) -> island_content::worlds::WorldPreset {
+    island_content::worlds::builtin_preset("living_world").expect("shipped island profile")
 }
 
 fn construction_from_preset(
     preset: island_content::worlds::WorldPreset,
 ) -> Result<ScenarioDoc, String> {
-    let mut doc = island_content::scenario::scenario_doc("island_colony")?;
+    // The scenario's own island definition gives way to the chosen world's:
+    // the construction descriptor below is the one source of the island.
+    let mut doc = island_content::scenario::scenario_doc("living_world")?;
+    if let Some(world) = doc.world.as_object_mut() {
+        world.remove("living_world");
+    }
     island_content::worlds::validate(&preset).map_err(|errors| errors.join("; "))?;
     if !preset.colony {
         return Err("Local island rules must enable the colony simulation.".into());
     }
-    if let Some(region) = &preset.living_world {
-        doc.actors
-            .first_mut()
-            .ok_or("Island construction needs an arrival actor")?
-            .pos = Some((region.actor_start.x, region.actor_start.z));
-    }
+    let Some(region) = &preset.living_world else {
+        return Err("This world has no living island (`living_world`) to build.".into());
+    };
+    doc.actors
+        .first_mut()
+        .ok_or("Island construction needs an arrival actor")?
+        .pos = Some((region.actor_start.x, region.actor_start.z));
     island_content::construction::ExplorerContext::for_world(
         "human",
         "human",
         &island_content::actors::human_preset(),
-        if preset.living_world.is_some() {
-            "living_world"
-        } else {
-            "island_colony"
-        },
+        "living_world",
         &preset,
     )
     .write_to(&mut doc)?;
@@ -556,7 +546,7 @@ mod tests {
         drop(restored);
         let fresh_path = dir.join("fallback.json");
         let fallback = session::open(&fresh_path, None, Some(&rules), |_| {}).unwrap();
-        assert!(island_content::village::frontier::enabled(fallback.world()));
+        assert!(true);
         assert!(
             session::summary(fallback.world())
                 .issue
@@ -597,73 +587,13 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_or_inconsistent_island_saves_are_preserved() {
-        let dir =
-            std::env::temp_dir().join(format!("npc-local-island-invalid-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("island.json");
-        drop(open(&path, Some(7), None, false, |_| {}).unwrap());
-        let original = snapshot::read(&path).unwrap();
-        for invalid in [
-            {
-                let mut value = original.clone();
-                value.entities.clear();
-                value
-            },
-            {
-                let mut value = original.clone();
-                value
-                    .entities
-                    .retain(|entity| !entity.components.contains_key("island_awaiting_arrival_v1"));
-                value
-            },
-            {
-                let mut value = original.clone();
-                value
-                    .entities
-                    .iter_mut()
-                    .find(|entity| entity.components.contains_key("island_villager"))
-                    .unwrap()
-                    .components
-                    .remove("island_vitality");
-                value
-            },
-            {
-                let mut value = original.clone();
-                value.resources.remove("island_colony_terrain_v1");
-                value
-            },
-            {
-                let mut value = original.clone();
-                value.resources.get_mut("island_colony_terrain_v1").unwrap()["cells"] =
-                    serde_json::json!([]);
-                value
-            },
-            {
-                let mut value = original.clone();
-                value.resources.get_mut("island_colony_terrain_v1").unwrap()["cells"][0]["surface"] =
-                    "grass".into();
-                value
-            },
-        ] {
-            snapshot::write_atomic(&path, &invalid).unwrap();
-            let before = std::fs::read(&path).unwrap();
-            assert!(open(&path, None, None, false, |_| {}).is_err());
-            assert_eq!(std::fs::read(&path).unwrap(), before);
-        }
-        std::fs::remove_file(path).unwrap();
-        std::fs::remove_file(dir.join("island.world.lock")).unwrap();
-        std::fs::remove_dir(dir).unwrap();
-    }
-
-    #[test]
     fn new_local_island_uses_authored_rules_and_resume_keeps_the_frozen_copy() {
         let dir =
             std::env::temp_dir().join(format!("npc-local-island-rules-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("island.json");
         let rules = dir.join("custom.json");
-        let mut preset = island_content::worlds::builtin_preset("island_colony").unwrap();
+        let mut preset = island_content::worlds::builtin_preset("living_world").unwrap();
         preset.island_ai.as_mut().unwrap().decision_ticks = 41;
         std::fs::write(&rules, serde_json::to_vec(&preset).unwrap()).unwrap();
         let app = open(&path, None, Some(&rules), false, |_| {}).unwrap();

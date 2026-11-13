@@ -2,7 +2,7 @@ use super::*;
 use bevy::input_focus::FocusCause;
 
 fn fixture(player_session: bool) -> App {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     app.init_resource::<IslandMode>()
         .init_resource::<InputFocus>()
         .init_resource::<SimControl>()

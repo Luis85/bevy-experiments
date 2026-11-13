@@ -11,7 +11,7 @@
 //! Nothing here mints a coin: an estate goes to the household or the civic
 //! fund, a coming-of-age gift comes from the parents and an arrival grant
 //! from the fund.
-use super::colony::{self, ColonyAct, Household, SocialLife};
+use super::colony::{ColonyAct, Household, SocialLife};
 use super::frontier::labor::{self, ResidentProfile, Settler};
 use super::frontier::life_spec::DemographySpec;
 use super::frontier::{SettlementMember, economy_spec, settlements};
@@ -1885,6 +1885,5 @@ pub fn validate(world: &World) -> Result<(), String> {
             }
         }
     }
-    let _ = colony::enabled(world);
     Ok(())
 }

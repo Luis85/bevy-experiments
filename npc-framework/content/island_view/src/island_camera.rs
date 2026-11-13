@@ -44,9 +44,6 @@ fn target_holds(framed: Option<RtsCamera>, pose: RtsCamera) -> bool {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !island_content::village::colony::enabled(app.world()) {
-        return;
-    }
     app.init_resource::<Framing>()
         .init_resource::<Follow>()
         .add_systems(

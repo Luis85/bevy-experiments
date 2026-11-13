@@ -120,7 +120,7 @@ fn player_tab_navigation_respects_foreign_controls_and_can_start_from_window_foc
 
 #[test]
 fn undiscovered_world_offers_exploration_without_inventing_claims_or_targets() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"unit":42,"sections":{"self":{"pos":[1200,3400]},"village":{"environment":{}},"homestead":{"plots":[]}}});
     let before = state_hash(app.world_mut());
     for tab in [Tab::Craft, Tab::Build, Tab::Explore] {
@@ -175,7 +175,7 @@ fn undiscovered_world_offers_exploration_without_inventing_claims_or_targets() {
 
 #[test]
 fn trade_quotes_and_physical_inventory_are_carried_into_actions() {
-    let app = island_content::new_sim_app(7, "island_colony");
+    let app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"sections":{"inventory":{"items":[{"id":1,"kind":"village_warm_clothes","stack":1,"slot":"body"},{"id":2,"kind":"log","stack":4}]},"village":{"nearby_market":[{"id":55,"name":"Neighbour","offers":[{"kind":"log","direction":"buy","unit_price":17,"available":true}]}]}}});
     let stock = model::inventory(&observed);
     assert_eq!(stock.get("log"), Some(&4));
@@ -276,7 +276,7 @@ fn host_overlay_hides_game_roots_without_erasing_host_focus_or_original_display(
 
 #[test]
 fn people_use_authored_topics_and_known_positions_only() {
-    let app = island_content::new_sim_app(7, "island_colony");
+    let app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"unit":42,"sections":{"perception":{"remembered":[{"id":5,"kind":"actor","name":"Ada","pos":[1200,3400]}]},"village":{"social":{"relationships":[{"id":5,"name":"Ada","affinity":17000}],"topics":[{"id":"garden","label":"Growing crops","text":"How do I start a garden?"}]}}}});
     let rows = model::rows(
         app.world(),
@@ -548,7 +548,7 @@ fn a_recipe_shows_what_it_takes_and_says_what_is_missing() {
 
 #[test]
 fn a_pouch_item_is_chosen_first_and_then_offers_what_can_be_done_with_it() {
-    let app = island_content::new_sim_app(7, "island_colony");
+    let app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"sections":{
         "inventory":{"items":[{"id":5,"kind":"bread","stack":2},{"id":6,"kind":"village_plank","stack":3}]},
         "village":{}}});

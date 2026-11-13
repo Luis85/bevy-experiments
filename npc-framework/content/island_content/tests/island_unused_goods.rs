@@ -60,19 +60,3 @@ fn thread_a_fisher_cannot_use_is_offered_and_carried_to_a_store() {
     );
     village::integrity::validate_colony(app.world()).expect("valid");
 }
-
-/// The rule is the living world's: a legacy profile has no "no use".
-#[test]
-fn legacy_profiles_have_no_unused_goods_rule() {
-    let app = island_content::new_sim_app(7, "smithy");
-    let anyone = app
-        .world()
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .find(|entity| app.world().get::<Villager>(*entity).is_some());
-    if let Some(actor) = anyone {
-        assert!(!market::no_use(app.world(), actor, catalog::THREAD));
-    }
-}

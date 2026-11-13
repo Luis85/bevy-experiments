@@ -80,9 +80,7 @@ impl SceneReadiness {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !island_content::village::frontier::enabled(app.world())
-        || app.get_sub_app(RenderApp).is_none()
-    {
+    if app.get_sub_app(RenderApp).is_none() {
         return;
     }
     app.init_resource::<SceneReadiness>()
@@ -391,21 +389,5 @@ mod tests {
         });
         assert!(state.ready);
         assert_eq!(state.rendered_frames, 1);
-    }
-
-    #[test]
-    fn headless_regional_and_legacy_hosts_have_no_loading_resource() {
-        let mut regional = App::new();
-        regional.insert_resource(island_content::world_runtime::ActiveWorld(
-            island_content::worlds::builtin_preset("living_world").unwrap(),
-        ));
-        assert!(island_content::village::frontier::enabled(regional.world()));
-        plugin(&mut regional);
-        assert!(!regional.world().contains_resource::<SceneReadiness>());
-
-        let mut legacy = App::new();
-        legacy.insert_sub_app(RenderApp, SubApp::new());
-        plugin(&mut legacy);
-        assert!(!legacy.world().contains_resource::<SceneReadiness>());
     }
 }

@@ -430,9 +430,6 @@ pub fn days_per_season(world: &World) -> u64 {
 /// Calendar day of tick 0. Older profiles: 19 when needs-driven, else 0. The
 /// regional profile reads `economy.tuning.founding_day`.
 pub fn first_day(world: &World) -> u64 {
-    if !super::needs_driven(world) {
-        return 0;
-    }
     match super::frontier::economy_spec::tuning(world) {
         Some(tuning) if tuning.founding_day >= 0 => tuning.founding_day as u64,
         Some(tuning) => founding_day(tuning.days_per_season.max(1)),
@@ -443,7 +440,7 @@ pub fn first_day(world: &World) -> u64 {
 pub fn calendar_on(world: &World, tick: u64) -> (u64, Season, bool) {
     let config = world.resource::<SimConfig>();
     if super::frontier::economy_spec::tuning(world).is_none() {
-        return calendar_at(tick, config, super::needs_driven(world));
+        return calendar_at(tick, config, true);
     }
     calendar_with(tick, config, first_day(world), days_per_season(world))
 }

@@ -375,9 +375,6 @@ pub(crate) fn watch_village(world: &mut World) -> Result<(), String> {
     life::watch(world)
 }
 pub(crate) fn plugin(app: &mut App) {
-    if !island_content::village::colony::enabled(app.world()) {
-        return;
-    }
     ui::install(app);
     crate::panel_scroll::install(app);
     app.init_resource::<PlayerExperience>()
@@ -439,7 +436,6 @@ pub(crate) fn clear(world: &mut World) {
     if let Some(mut input) = world.get_resource_mut::<InputFocus>() {
         input.clear();
     }
-    crate::homestead_panel::set_open(world, false);
 }
 /// A top-level piece of the Live HUD: `skin` is the kit's `chrome` or
 /// `panel` bundle for its node.
@@ -873,8 +869,6 @@ pub(crate) fn refresh(world: &mut World) {
     }
     for mut node in world
         .query_filtered::<&mut Node, Or<(
-            With<crate::homestead_panel::FarmRoot>,
-            With<crate::homestead_panel::FarmLauncher>,
             With<crate::colony_panel::LedgerRoot>,
             With<crate::colony_panel::LedgerLauncher>,
         )>>()

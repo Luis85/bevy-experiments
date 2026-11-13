@@ -60,7 +60,7 @@ fn fixtures() -> PathBuf {
 /// `session::named_construction` in `apps/island_game`).
 fn construction() -> ScenarioDoc {
     let preset = island_content::worlds::builtin_preset("living_world").expect("shipped");
-    let mut doc = island_content::scenario::scenario_doc("island_colony").expect("scenario");
+    let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
     let region = preset.living_world.as_ref().expect("living world");
     let actor = doc.actors.first_mut().expect("arrival actor");
     actor.pos = Some((region.actor_start.x, region.actor_start.z));

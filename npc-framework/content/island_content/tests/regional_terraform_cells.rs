@@ -8,10 +8,7 @@ use island_content::village::{
     },
     terrain::Terraform,
 };
-use npc_framework::kernel::commands::{CommandRegistry, SimCommand, submit};
 use npc_framework::kernel::hash::state_hash;
-use npc_framework::prelude::*;
-use serde_json::json;
 
 fn scene() -> App {
     island_content::new_sim_app(7, "living_world")
@@ -164,52 +161,4 @@ fn one_refused_cell_leaves_the_whole_batch_unapplied() {
         assert!(reason.contains(expected), "{reason}");
     }
     assert_eq!(before, state_hash(app.world_mut()));
-}
-
-#[test]
-fn the_batch_is_one_recorded_command_and_only_the_regional_profile_has_it() {
-    let mut app = scene();
-    let row = open_row(app.world(), 3);
-    let cells = raised(app.world(), &row);
-    let payload = json!({"cells": cells});
-    let parsed: TerraformCells = serde_json::from_value(payload).expect("JSON shape");
-    assert!(
-        serde_json::from_value::<TerraformCells>(json!({"cells": [], "radius": 1})).is_err(),
-        "unknown fields are refused"
-    );
-    let revision = app.world().resource::<TerrainState>().revision;
-    submit(app.world_mut(), None, SimCommand::content(&parsed)).expect("accepted");
-    run_ticks(app.world_mut(), 1);
-    assert_eq!(
-        app.world().resource::<TerrainState>().revision,
-        revision + 1
-    );
-    let first = terrain::cell(app.world(), cells[0].x, cells[0].z).expect("cell");
-    assert_eq!(first.height_mm, cells[0].height_mm);
-    // The single-brush command keeps its JSON shape.
-    let brush: Terraform = serde_json::from_value(
-        json!({"x": row[0].0, "z": row[0].1, "radius": 0, "height_mm": cells[0].height_mm, "surface": "soil"}),
-    )
-    .expect("existing Terraform shape");
-    brush.check(app.world()).expect("still valid");
-    // Older island profiles keep their command set, and so their content hash.
-    assert!(
-        app.world()
-            .resource::<CommandRegistry>()
-            .get("TerraformCells")
-            .is_some()
-    );
-    let old = island_content::new_sim_app(7, "island_colony");
-    assert!(
-        old.world()
-            .resource::<CommandRegistry>()
-            .get("Terraform")
-            .is_some()
-    );
-    assert!(
-        old.world()
-            .resource::<CommandRegistry>()
-            .get("TerraformCells")
-            .is_none()
-    );
 }

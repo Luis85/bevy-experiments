@@ -7,25 +7,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-pub const BUILTIN_PRESETS: [(&str, &str); 5] = [
-    ("living_world", include_str!("../worlds/living_world.json")),
-    (
-        "island_village",
-        include_str!("../worlds/island_village.json"),
-    ),
-    (
-        "living_island",
-        include_str!("../worlds/living_island.json"),
-    ),
-    (
-        "living_homestead",
-        include_str!("../worlds/living_homestead.json"),
-    ),
-    (
-        "island_colony",
-        include_str!("../worlds/island_colony.json"),
-    ),
-];
+/// The one shipped world: the regional living island.
+pub const BUILTIN_PRESETS: [(&str, &str); 1] =
+    [("living_world", include_str!("../worlds/living_world.json"))];
+
+/// The rules the headless constructor builds a scenario's island from when no
+/// construction descriptor travels with it (tests, tools, replays); the
+/// scenario's own `world` block overrides the island profile. Not a
+/// selectable world. Replaced by the shipped construction in a later step
+/// (decision D2), which changes every island hash.
+pub const HEADLESS_BASE: &str = include_str!("../worlds/living_island.json");
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -302,16 +293,7 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
             return Ok(());
         }
         // A new shipped scene is additive to existing installations; never replace a user's preset.
-        for (id, text) in BUILTIN_PRESETS.iter().filter(|(id, _)| {
-            matches!(
-                *id,
-                "island_village"
-                    | "living_island"
-                    | "living_homestead"
-                    | "island_colony"
-                    | "living_world"
-            )
-        }) {
+        for (id, text) in BUILTIN_PRESETS {
             let path = dir.join(format!("{id}.json"));
             match std::fs::OpenOptions::new()
                 .write(true)

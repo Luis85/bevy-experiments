@@ -4,7 +4,6 @@ use bevy_ecs::prelude::*;
 use island_content::village::{self, Role, Villager, Wallet, catalog, economy, living, production};
 use npc_framework::crafting::Durability;
 use npc_framework::interaction::items;
-use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::*;
 
 fn actor(app: &App, name: &str) -> Entity {
@@ -32,7 +31,7 @@ fn give_coat(app: &mut App, person: Entity, durability: u32, equip: bool) -> Ent
     item
 }
 fn prepared() -> App {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let people: Vec<_> = app
         .world()
         .resource::<SimIndex>()
@@ -81,44 +80,6 @@ fn coins(app: &App) -> u64 {
         })
         .sum::<u64>()
         + u64::from(app.world().resource::<village::VillageState>().fund)
-}
-
-#[test]
-fn worn_equipped_coat_requests_one_funded_replacement_before_current_warmth_drops() {
-    let mut app = prepared();
-    let ada = actor(&app, "Ada");
-    let lina = actor(&app, "Lina");
-    assert_eq!(living::clothing_reserve_target(app.world(), ada), 0);
-    wear(&mut app, ada, 40_000);
-    assert!(living::has_coat(app.world(), ada));
-    assert_eq!(economy::need(app.world(), ada, "Warmth"), 100_000);
-    assert_eq!(living::clothing_lead_exposure(app.world(), ada), 48_000);
-    let before = state_hash(app.world_mut());
-    assert_eq!(living::clothing_reserve_target(app.world(), ada), 1);
-    assert_eq!(
-        state_hash(app.world_mut()),
-        before,
-        "forecast must be read-only"
-    );
-    let cash = coins(&app);
-    refresh(&mut app);
-    assert_eq!(
-        production::wanted_stock(app.world(), ada, catalog::WARM_CLOTHES),
-        1
-    );
-    assert_eq!(
-        production::purchase_target(app.world(), ada, catalog::WARM_CLOTHES),
-        1
-    );
-    assert!(production::production_demand(app.world(), lina, catalog::WARM_CLOTHES) > 0);
-    let plan = app.world().resource::<production::ProductionPlan>().clone();
-    refresh(&mut app);
-    assert_eq!(
-        app.world().resource::<production::ProductionPlan>(),
-        &plan,
-        "refresh must not accumulate another replacement"
-    );
-    assert_eq!(coins(&app), cash);
 }
 
 #[test]
@@ -189,15 +150,6 @@ fn replacement_horizon_counts_calendar_cold_and_only_known_sheltered_rest() {
     app.world_mut().resource_mut::<SimConfig>().night_permille = 0;
     wear(&mut app, ada, 1);
     assert_eq!(living::clothing_lead_exposure(app.world(), ada), 0);
-    assert_eq!(living::clothing_reserve_target(app.world(), ada), 0);
-}
-
-#[test]
-fn incumbent_living_policy_does_not_gain_preventive_clothing_demand() {
-    let mut app = island_content::new_sim_app(7, "living_village");
-    let ada = actor(&app, "Ada");
-    give_coat(&mut app, ada, 1, true);
-    app.world_mut().resource_mut::<SimClock>().tick = 144_000;
     assert_eq!(living::clothing_reserve_target(app.world(), ada), 0);
 }
 

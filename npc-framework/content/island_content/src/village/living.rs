@@ -30,9 +30,6 @@ pub fn register(app: &mut App) {
 }
 
 pub fn prepare_person(world: &mut World, actor: Entity) {
-    if !super::needs_driven(world) {
-        return;
-    }
     if let Some(mut equipment) = world.get_mut::<Equipment>(actor) {
         equipment.slots.entry("body".into()).or_insert(None);
     } else {
@@ -153,7 +150,7 @@ pub fn spawn(world: &mut World) {
 }
 
 pub fn cold(world: &World) -> bool {
-    super::needs_driven(world) && {
+    {
         let (_, season, night) = super::calendar(world);
         night || season == Season::Winter || super::weather::snowing(world)
     }
@@ -196,8 +193,7 @@ pub fn coat_grant_room(world: &World) -> u32 {
 /// coat season always; in any other season while a coat is on offer in its
 /// settlement and it, or the fund's balance above its reserve, can pay.
 pub fn coat_wanted_now(world: &World, actor: Entity) -> bool {
-    if !super::frontier::enabled(world)
-        || has_coat(world, actor)
+    if has_coat(world, actor)
         || economy::count(world, actor, super::roles::roles(world).garment) > 0
     {
         return false;
@@ -247,7 +243,7 @@ pub fn exposed(world: &World, actor: Entity) -> bool {
 /// (or only a worn-out one) puts it on at once, in any season; the worn-out
 /// one goes back to the pack. Sorted by id.
 pub fn wear_carried_coats(world: &mut World) {
-    if !super::frontier::enabled(world) || !world.resource::<SimClock>().tick.is_multiple_of(20) {
+    if !world.resource::<SimClock>().tick.is_multiple_of(20) {
         return;
     }
     let mut people: Vec<(SimId, Entity)> = world
@@ -426,9 +422,6 @@ pub fn usable_tool(world: &World, actor: Entity, kind: &str) -> Option<Entity> {
 /// the unchanged base duration of the patch. In it, the matching tool speeds the work,
 /// bare hands slow it, and morale scales the result within a bounded band.
 pub fn gather_ticks(world: &World, actor: Entity, kind: &str, base: u32) -> u32 {
-    if !super::frontier::enabled(world) {
-        return base;
-    }
     let (with_tool, bare) = super::frontier::economy_spec::tuning(world).map_or(
         (catalog::TOOL_GATHER_PERCENT, catalog::BARE_GATHER_PERCENT),
         |tuning| (tuning.tool_gather_percent, tuning.bare_gather_percent),
@@ -445,9 +438,6 @@ pub fn gather_ticks(world: &World, actor: Entity, kind: &str, base: u32) -> u32 
 
 /// One completed gather wears the matching tool; a spent tool breaks for good.
 pub(super) fn wear_gather_tool(world: &mut World, actor: Entity, id: SimId, kind: &str) {
-    if !super::frontier::enabled(world) {
-        return;
-    }
     let Some(tool) = catalog::gather_tool_in(world, kind) else {
         return;
     };
@@ -476,9 +466,6 @@ fn change_need(world: &mut World, actor: Entity, name: &str, delta: i32) {
 }
 
 pub fn climate_tick(world: &mut World) {
-    if !super::needs_driven(world) {
-        return;
-    }
     let cold = cold(world);
     // 100 outside the regional profile and in ordinary weather.
     let loss_percent = super::weather::warmth_loss_percent(world).max(1) as i32;

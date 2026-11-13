@@ -1,6 +1,6 @@
 //! Learned island places outlive short-term perception. Their live stock,
 //! occupants and ownership remain governed by the ordinary observation checks.
-use super::{ResourcePatch, VillagePlace, colony, homestead::HomesteadPlot};
+use super::{ResourcePatch, VillagePlace, homestead::HomesteadPlot};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use npc_framework::agent_io::{AgentCtx, AgentIoAppExt};
@@ -15,16 +15,15 @@ pub(super) fn register(app: &mut App) {
 fn immovable(world: &World, id: SimId) -> bool {
     world.resource::<SimIndex>().get(id).is_some_and(|entity| {
         world.get::<VillagePlace>(entity).is_some()
-            || (super::frontier::enabled(world)
-                && (world.get::<super::frontier::Settlement>(entity).is_some()
-                    || world.get::<super::colony::Household>(entity).is_some()))
+            || (world.get::<super::frontier::Settlement>(entity).is_some()
+                || world.get::<super::colony::Household>(entity).is_some())
             || world.get::<ResourcePatch>(entity).is_some()
             || world.get::<HomesteadPlot>(entity).is_some()
     })
 }
 
 fn record<'a>(world: &'a World, ctx: &AgentCtx) -> Option<&'a SeenStatics> {
-    if !colony::enabled(world) || world.get::<RevealsFog>(ctx.entity).is_none() {
+    if world.get::<RevealsFog>(ctx.entity).is_none() {
         return None;
     }
     world.get::<SeenStatics>(ctx.entity)
@@ -63,8 +62,8 @@ mod tests {
     fn fixture(scenario: &str) -> (App, SimId, SimId, SimId) {
         let mut app = crate::new_sim_app(7, scenario);
         let actor = app.world().resource::<super::super::VillageState>().played;
-        if scenario == "island_colony" {
-            colony::JoinIsland { unit: actor.0 }
+        if scenario == "living_world" {
+            super::super::colony::JoinIsland { unit: actor.0 }
                 .perform(app.world_mut())
                 .unwrap();
         }
@@ -113,7 +112,7 @@ mod tests {
 
     #[test]
     fn learned_places_survive_perception_expiry_without_unseen_stock_or_moving_identity() {
-        let (mut app, actor, station, source) = fixture("island_colony");
+        let (mut app, actor, station, source) = fixture("living_world");
         let entity = app.world().resource::<SimIndex>().get(actor).unwrap();
         let station_pos = SimPos::new(-7000, -2000);
         learn(&mut app, actor, station, station_pos);
@@ -187,13 +186,13 @@ mod tests {
 
     #[test]
     fn discovered_positions_restore_per_actor_but_never_cross_into_a_fresh_world() {
-        let (mut app, actor, station, _) = fixture("island_colony");
+        let (mut app, actor, station, _) = fixture("living_world");
         let at = SimPos::new(-9876, 5432);
         learn(&mut app, actor, station, at);
         let before = state_hash(app.world_mut());
         let saved = npc_framework::snapshot::save(app.world_mut()).unwrap();
         let old_epoch = api::epoch(app.world());
-        let (mut restored, _, _, _) = fixture("island_colony");
+        let (mut restored, _, _, _) = fixture("living_world");
         npc_framework::snapshot::load(
             restored.world_mut(),
             &saved,
@@ -207,23 +206,8 @@ mod tests {
         let other = restored.world().resource::<crate::TestbedIds>().id("Ada");
         let other_ctx = observe::ctx(restored.world(), other).unwrap();
         assert_eq!(position(restored.world(), &other_ctx, station), None);
-        let (fresh, _, _, _) = fixture("island_colony");
+        let (fresh, _, _, _) = fixture("living_world");
         let ctx = observe::ctx(fresh.world(), actor).unwrap();
         assert_eq!(position(fresh.world(), &ctx, station), None);
-    }
-
-    #[test]
-    fn legacy_worlds_do_not_gain_persistent_place_knowledge() {
-        let (mut app, actor, station, _) = fixture("living_village");
-        learn(&mut app, actor, station, SimPos::new(111, 222));
-        let ctx = observe::ctx(app.world(), actor).unwrap();
-        assert_eq!(known(app.world(), &ctx), None);
-        assert_eq!(position(app.world(), &ctx, station), None);
-        assert!(
-            !app.world()
-                .resource::<AgentRegistry>()
-                .known
-                .contains_key("island.discovered_places")
-        );
     }
 }

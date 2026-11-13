@@ -180,9 +180,6 @@ pub fn place_near(
 /// A newborn's place: the habitat's birth offset if it is spaced and open,
 /// else the nearest spot that is.
 pub fn birth_spot(world: &World, home: SimPos, nominal: SimPos) -> SimPos {
-    if !super::frontier::enabled(world) {
-        return nominal;
-    }
     let others = others(world);
     place_near(world, SimId(0), home, nominal, &others).unwrap_or(nominal)
 }
@@ -215,9 +212,7 @@ fn step(from: SimPos, to: SimPos, speed: i32) -> SimPos {
 /// every living animal, sorted by id, looks for danger, moves and changes
 /// state.
 pub fn tick(world: &mut World) {
-    if !super::frontier::enabled(world)
-        || !super::frontier::economy_spec::tuning(world).is_some_and(|t| t.wildlife_motion)
-    {
+    if !super::frontier::economy_spec::tuning(world).is_some_and(|t| t.wildlife_motion) {
         return;
     }
     let now = world.resource::<SimClock>().tick;

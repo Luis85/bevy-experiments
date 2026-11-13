@@ -191,9 +191,6 @@ pub(crate) struct ShellState {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world()) {
-        return;
-    }
     ui::install(app);
     app.init_resource::<ShellState>()
         .init_resource::<dock::Docks>()
@@ -1062,8 +1059,6 @@ fn popover_input(world: &mut World) {
 
 /// What the running world says the seasons change, for the calendar.
 fn season_facts(world: &World) -> model::SeasonFacts {
-    let regional = village::frontier::enabled(world);
-    let cold = village::needs_driven(world);
     let winter_growth = village::frontier::spec(world)
         .map(|spec| {
             spec.economy
@@ -1083,12 +1078,11 @@ fn season_facts(world: &World) -> model::SeasonFacts {
     winter_growth.sort();
     winter_growth.dedup();
     model::SeasonFacts {
-        cold,
-        regional,
+        cold: true,
+        regional: true,
         winter_growth,
-        seasonal_grain: !regional && cold,
+        seasonal_grain: false,
         hearth_logs: village::frontier::economy_spec::tuning(world)
-            .filter(|_| cold)
             .map(|tuning| (tuning.winter_hearth_lightings.max(1), 2)),
     }
 }

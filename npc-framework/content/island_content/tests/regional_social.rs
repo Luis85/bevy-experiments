@@ -3,7 +3,7 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use island_content::{
     TestbedIds,
-    village::{self, Villager, colony},
+    village::{Villager, colony},
 };
 use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::*;
@@ -77,14 +77,4 @@ fn regional_meeting_prefers_reachable_company_over_a_neighbour_across_a_pond() {
         Some(reachable)
     );
     assert_eq!(state_hash(app.world_mut()), before);
-}
-
-#[test]
-fn old_island_keeps_its_original_social_selection_contract() {
-    let (app, actor, nearest, _) = fixture("island_colony");
-    assert!(!village::frontier::enabled(app.world()));
-    assert_eq!(
-        colony::social_target(app.world(), actor).map(|(id, _)| id),
-        Some(nearest)
-    );
 }

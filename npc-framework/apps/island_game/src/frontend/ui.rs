@@ -585,10 +585,8 @@ fn rebuild(world: &mut World) {
             w::paragraph(
                 world,
                 panel,
-                if island_content::village::frontier::enabled(world) {
+                {
                     "Follow the coast, discover three villages, and make a home in a changing world."
-                } else {
-                    "Build a home, tend a garden, and find your place among a living village."
                 },
                 t::SUBHEADING,
                 Tone::secondary(surface),

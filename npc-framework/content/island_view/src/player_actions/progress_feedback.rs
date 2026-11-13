@@ -38,9 +38,6 @@ pub(super) fn reset_sales(world: &mut World) {
 }
 
 fn update_sales(world: &mut World, current: Option<ActorStamp>, native_now: bool) {
-    if !island_content::village::colony::enabled(world) {
-        return;
-    }
     let Some(actor) = current else {
         world.resource_mut::<NativeActions>().sales = None;
         return;
@@ -131,10 +128,7 @@ fn update_sales(world: &mut World, current: Option<ActorStamp>, native_now: bool
     world.resource_mut::<NativeActions>().sales = Some(sales);
 }
 
-pub(super) fn refusal(world: &World, reason: &str) -> String {
-    if !island_content::village::colony::enabled(world) {
-        return reason.into();
-    }
+pub(super) fn refusal(_world: &World, reason: &str) -> String {
     let lower = reason.to_ascii_lowercase();
     let message = if lower.contains("control") {
         "Character control changed before the activity could start."
@@ -282,9 +276,6 @@ pub(super) fn track(
     response: &Value,
     seq: u64,
 ) {
-    if !island_content::village::colony::enabled(world) {
-        return;
-    }
     let verb = response["verb"].as_str().unwrap_or("activity").to_owned();
     let words = words(world, &verb);
     let commands = world
@@ -557,7 +548,7 @@ mod tests {
     use npc_framework::kernel::{hash::state_hash, journal};
 
     fn fixture() -> (App, ActorStamp, SimId) {
-        let mut app = island_content::new_sim_app(7, "island_colony");
+        let mut app = island_content::new_sim_app(7, "living_world");
         let id = app.world().resource::<VillageState>().played;
         JoinIsland { unit: id.0 }.perform(app.world_mut()).unwrap();
         take_control(app.world_mut()).unwrap();

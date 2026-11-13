@@ -375,18 +375,18 @@ mod tests {
         let before = state_hash(app.world_mut());
         assert!(new_game(app.world_mut(), "Ada").is_err());
         assert_eq!(state_hash(app.world_mut()), before);
-        new_game(app.world_mut(), "Robin").unwrap();
-        assert_eq!(summary(app.world()).player, "Robin");
+        new_game(app.world_mut(), "Zephyrine").unwrap();
+        assert_eq!(summary(app.world()).player, "Zephyrine");
         assert_eq!(app.world().resource::<SimClock>().tick, 0);
         let saved = snapshot::read(&path).unwrap();
         assert_eq!(
             saved.header["scenario"]["world"]["explorer_context"]["actor"],
-            "Robin"
+            "Zephyrine"
         );
         drop(app);
         let resumed = open(&path, None, None, |_| {}).unwrap();
         assert!(summary(resumed.world()).can_continue);
-        assert_eq!(summary(resumed.world()).player, "Robin");
+        assert_eq!(summary(resumed.world()).player, "Zephyrine");
         drop(resumed);
         cleanup(&path);
     }
@@ -395,7 +395,7 @@ mod tests {
     fn new_name_validation_uses_fresh_aliases_instead_of_saved_history() {
         let path = path("historical-names");
         let mut app = open(&path, None, None, |_| {}).unwrap();
-        new_game(app.world_mut(), "Robin").unwrap();
+        new_game(app.world_mut(), "Zephyrine").unwrap();
         let played = app.world().resource::<VillageState>().played;
         // Host lookup fixture: saved aliases can describe historical actors.
         // Fresh-game validation must not inherit those aliases, or forget a
@@ -420,7 +420,7 @@ mod tests {
     fn failed_new_game_write_restores_previous_live_world_and_original_file() {
         let path = path("write-failure");
         let mut app = open(&path, None, None, |_| {}).unwrap();
-        new_game(app.world_mut(), "Robin").unwrap();
+        new_game(app.world_mut(), "Zephyrine").unwrap();
         run_ticks(app.world_mut(), 29);
         save(app.world_mut()).unwrap();
         let before = state_hash(app.world_mut());
@@ -431,12 +431,12 @@ mod tests {
             .join("missing-parent")
             .join("island.json");
         assert!(
-            new_game(app.world_mut(), "Wren")
+            new_game(app.world_mut(), "Ysolde")
                 .unwrap_err()
                 .contains("could not be saved")
         );
         assert_eq!(state_hash(app.world_mut()), before);
-        assert_eq!(summary(app.world()).player, "Robin");
+        assert_eq!(summary(app.world()).player, "Zephyrine");
         assert!(summary(app.world()).active);
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
         app.world_mut().resource_mut::<LocalIsland>().path = path.clone();
@@ -587,7 +587,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let mut app = open(&path, None, None, |_| {}).unwrap();
-        new_game(app.world_mut(), "Robin").unwrap();
+        new_game(app.world_mut(), "Zephyrine").unwrap();
         drop(app);
         let mut saved = snapshot::read(&path).unwrap();
         saved
@@ -606,7 +606,7 @@ mod tests {
             bytes,
             "the file is untouched"
         );
-        new_game(app.world_mut(), "Wren").unwrap();
+        new_game(app.world_mut(), "Ysolde").unwrap();
         assert_eq!(
             std::fs::read(path.with_extension("previous-1.json")).unwrap(),
             bytes,
@@ -620,7 +620,7 @@ mod tests {
     fn every_island_save_carries_the_islands_stamp() {
         let path = path("stamped");
         let mut app = open(&path, None, None, |_| {}).unwrap();
-        new_game(app.world_mut(), "Robin").unwrap();
+        new_game(app.world_mut(), "Zephyrine").unwrap();
         drop(app);
         let saved = snapshot::read(&path).unwrap();
         assert!(
@@ -640,7 +640,7 @@ mod tests {
         assert!(!summary(app.world()).can_continue);
         assert!(summary(app.world()).issue.is_some());
         assert_eq!(std::fs::read(&path).unwrap(), b"unreadable old save");
-        new_game(app.world_mut(), "Wren").unwrap();
+        new_game(app.world_mut(), "Ysolde").unwrap();
         assert_eq!(
             std::fs::read(path.with_extension("previous-1.json")).unwrap(),
             b"unreadable old save"

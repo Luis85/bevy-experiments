@@ -151,7 +151,7 @@ struct FeedContent;
 struct FeedControl(Request);
 #[derive(Component)]
 struct CollapseLabel;
-/// The header's count of critical (true) or warning rows.
+/// The header's count of critical true or warning rows.
 #[derive(Component)]
 struct CountBadge(bool);
 #[derive(Component)]
@@ -164,9 +164,6 @@ struct ToastRoot;
 struct ToastText;
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world()) {
-        return;
-    }
     ui::install(app);
     crate::panel_scroll::install(app);
     app.init_resource::<Alerts>()
@@ -437,10 +434,9 @@ fn point(position: Option<SimPos>) -> Option<(i32, i32)> {
 /// while the journal records; then those effects are the only source and the
 /// scan leaves the three conditions alone, so none is reported twice.
 fn onsets_journaled(world: &World) -> bool {
-    village::frontier::enabled(world)
-        && world
-            .get_resource::<Journal>()
-            .is_some_and(|journal| journal.enabled)
+    world
+        .get_resource::<Journal>()
+        .is_some_and(|journal| journal.enabled)
 }
 
 fn depleted_line(world: &World, patch: Entity, kind: &str) -> String {

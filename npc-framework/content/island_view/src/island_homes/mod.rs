@@ -244,9 +244,6 @@ impl ShellAssets {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !island_content::village::frontier::enabled(app.world()) {
-        return;
-    }
     app.init_resource::<Shells>()
         .init_resource::<Cutaways>()
         .init_resource::<IndoorViews>()

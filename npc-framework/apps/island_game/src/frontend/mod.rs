@@ -809,7 +809,7 @@ mod tests {
             Screen::Title
         );
         assert!(!path.exists());
-        start_play(app.world_mut(), Some("Robin".into())).unwrap();
+        start_play(app.world_mut(), Some("Zephyrine".into())).unwrap();
         run_ticks(app.world_mut(), 3);
         pause(app.world_mut());
         assert_eq!(
@@ -846,7 +846,7 @@ mod tests {
             app.init_resource::<Messages<AppExit>>();
         })
         .unwrap();
-        start_play(app.world_mut(), Some("Robin".into())).unwrap();
+        start_play(app.world_mut(), Some("Zephyrine".into())).unwrap();
         run_ticks(app.world_mut(), 3);
         begin_exit(app.world_mut(), Destination::Quit).unwrap();
         finish_exit(app.world_mut());
@@ -892,7 +892,7 @@ mod tests {
             install(app);
         };
         let mut app = session::open(&path, None, None, host).unwrap();
-        start_play(app.world_mut(), Some("Robin".into())).unwrap();
+        start_play(app.world_mut(), Some("Zephyrine".into())).unwrap();
         run_ticks(app.world_mut(), 3);
         let actor_id = app.world().resource::<village::VillageState>().played;
         let actor = app.world().resource::<SimIndex>().get(actor_id).unwrap();

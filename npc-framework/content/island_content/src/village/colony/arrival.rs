@@ -1,6 +1,6 @@
 //! The one-time visitor arrival command and its shared agent action adapter.
 use super::super::{Role, VillageState, Villager, Vitality};
-use super::{AwaitingArrival, enabled, home_of};
+use super::{AwaitingArrival, home_of};
 use bevy_ecs::prelude::*;
 use npc_framework::agent_io::{ActionPlan, ActionRequest, AgentCtx, Rejection};
 use npc_framework::kernel::commands::CommandError;
@@ -28,10 +28,9 @@ pub struct JoinIsland {
 }
 impl JoinIsland {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !enabled(world)
-            || world
-                .get_resource::<VillageState>()
-                .is_none_or(|v| v.played != SimId(self.unit))
+        if world
+            .get_resource::<VillageState>()
+            .is_none_or(|v| v.played != SimId(self.unit))
         {
             return Err("only the island's reserved visitor may arrive".into());
         }

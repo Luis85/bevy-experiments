@@ -13,7 +13,7 @@
 //! or draw the resident indoors.
 use super::civic::Building;
 use super::colony::{self, Household};
-use super::commands::{HOME_REST_RATE, HOME_REST_REACH_MM};
+use super::commands::HOME_REST_REACH_MM;
 use super::frontier::settlements::{HOME_OFFSET_MM, SettlementMember, WORKPLACE_OFFSET_MM};
 use super::resident::BlockKind;
 use super::{Role, VillagePlace, Villager, living};
@@ -311,9 +311,6 @@ pub(crate) fn at_inn(world: &World, actor: Entity, inn: SimId) -> bool {
 }
 
 pub(super) fn rented_bed(world: &mut World, actor: Entity, keeper: Entity) {
-    if !super::frontier::enabled(world) {
-        return;
-    }
     let Some(inn) = world.get::<Villager>(keeper).map(|person| person.workplace) else {
         return;
     };
@@ -466,19 +463,9 @@ pub fn repose(world: &World, actor: Entity) -> Repose {
     if !living(world, actor) || person.resting_until <= now {
         return Repose::Awake;
     }
-    if super::frontier::enabled(world) {
-        // Regional: asleep is the night's sleep in a bed, whatever the hour
-        // it started; any other rest is awake.
-        return if asleep(world, actor) && inside_entity(world, actor).is_some() {
-            Repose::Asleep
-        } else {
-            Repose::Resting
-        };
-    }
-    let in_bed = person.rest_rate >= HOME_REST_RATE;
-    if in_bed
-        && (super::calendar(world).2 || super::resident::in_block(world, actor, BlockKind::Sleep))
-    {
+    // Regional: asleep is the night's sleep in a bed, whatever the hour
+    // it started; any other rest is awake.
+    if asleep(world, actor) && inside_entity(world, actor).is_some() {
         Repose::Asleep
     } else {
         Repose::Resting

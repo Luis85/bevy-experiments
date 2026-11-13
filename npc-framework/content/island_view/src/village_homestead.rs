@@ -160,9 +160,6 @@ impl FarmFacts<'_, '_> {
 
 /// The parent installs this only for an expanded Living world. No sim systems are added.
 pub(super) fn plugin(app: &mut App) {
-    if !geography::is_expanded(app.world()) {
-        return;
-    }
     app.add_systems(Startup, prepare_assets)
         .add_systems(
             Update,
@@ -823,7 +820,7 @@ mod tests {
     fn native_farm_remembers_observed_foreign_crops_and_refreshes_owned_crops() {
         let mut app = App::new();
         app.insert_resource(island_content::world_runtime::ActiveWorld(
-            island_content::worlds::builtin_preset("living_island").unwrap(),
+            island_content::worlds::builtin_preset("living_world").unwrap(),
         ));
         let geography = *geography::for_world(app.world());
         let definition = geography.expansion_plots[0];

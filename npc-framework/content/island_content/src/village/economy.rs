@@ -243,10 +243,8 @@ pub fn trade(
     let sid = *world.get::<SimId>(seller).expect("sim seller");
     let mut receipt = json!({"buyer":bid,"seller":sid,"kind":kind,"quantity":n,"coins":cost});
     let mut sale_receipt = json!({"kind":kind,"quantity":n,"coins":cost});
-    if market::enabled(world) {
-        receipt["unit_price"] = json!(quoted.unit_price);
-        sale_receipt["unit_price"] = json!(quoted.unit_price);
-    }
+    receipt["unit_price"] = json!(quoted.unit_price);
+    sale_receipt["unit_price"] = json!(quoted.unit_price);
     record_effect(world, Some(bid), "VillageTrade", &receipt);
     // A controlled seller needs its own receipt: the agent event ring retains
     // controlled-unit effects, not the merchant buyer's private event stream.
@@ -264,16 +262,14 @@ pub fn merchant_check(
 ) -> Result<(), String> {
     // Public listing presence is stable knowledge; its current remaining stock
     // is only actionable when the two actors can physically trade.
-    if market::enabled(world) && !near(world, actor, trader) {
+    if !near(world, actor, trader) {
         return Err("move within 1.5 m of the trader".into());
     }
     let role = world
         .get::<Villager>(trader)
         .ok_or("target is not a villager")?
         .role;
-    if role == Role::Visitor
-        && !(market::enabled(world) && buy && market::sells(world, trader, kind))
-    {
+    if role == Role::Visitor && !(buy && market::sells(world, trader, kind)) {
         return Err("target is not a shopkeeper".into());
     }
     if buy {
@@ -296,20 +292,11 @@ pub fn merchant_check(
         if !near(world, actor, trader) {
             return Err("move within 1.5 m of the trader".into());
         }
-        let limit = if market::enabled(world) {
-            super::production::purchase_target(world, trader, kind)
-        } else {
-            catalog::stock_limit_in(world, kind)
-        };
+        let limit = super::production::purchase_target(world, trader, kind);
         if count(world, trader, kind).saturating_add(n) > limit {
-            return Err(if market::enabled(world) {
-                "the buyer has no open procurement demand for that quantity".into()
-            } else {
-                "the shop has enough stock".into()
-            });
+            return Err("the buyer has no open procurement demand for that quantity".into());
         }
-        if market::enabled(world)
-            && let Some(limit) = super::production::purchase_bid_limit(world, trader, kind)
+        if let Some(limit) = super::production::purchase_bid_limit(world, trader, kind)
             && market::quote(world, trader, actor, kind, n)?.unit_price > limit
         {
             return Err("this quote exceeds the buyer's current procurement bid limit".into());

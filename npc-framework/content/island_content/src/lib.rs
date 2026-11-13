@@ -42,7 +42,6 @@ pub mod commands;
 pub mod construction;
 pub mod content;
 pub mod layout;
-pub mod projection;
 pub mod replay;
 pub mod scenario;
 pub mod summary;

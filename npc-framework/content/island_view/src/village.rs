@@ -96,10 +96,8 @@ pub(crate) fn plugin(app: &mut App) {
     if !app.is_plugin_added::<bevy::ui_widgets::ScrollAreaPlugin>() {
         app.add_plugins(bevy::ui_widgets::ScrollAreaPlugin);
     }
-    if village::colony::enabled(app.world()) {
-        app.add_systems(Startup, load_colony_font)
-            .add_systems(Update, colony_typography.in_set(ViewSystems::Present));
-    }
+    app.add_systems(Startup, load_colony_font)
+        .add_systems(Update, colony_typography.in_set(ViewSystems::Present));
     app.init_resource::<InputFocus>()
         .init_resource::<Reader>()
         .init_resource::<ObserverFeedback>()
@@ -637,10 +635,9 @@ fn observer_feedback(world: &mut World) {
     let Some(entity) = world.resource::<SimIndex>().get(actor) else {
         return;
     };
-    let (activity, _, recovery) = village::activity(world, entity);
-    let colony = village::colony::enabled(world);
+    let (activity, _, _recovery) = village::activity(world, entity);
     let activity_name = activity;
-    let activity = if colony {
+    let activity = {
         match activity {
             "idle" => "Ready to explore",
             "awaiting_arrival" => "Ready to join",
@@ -656,8 +653,6 @@ fn observer_feedback(world: &mut World) {
             _ => "On the island",
         }
         .into()
-    } else {
-        format!("Activity: {activity}")
     };
     let dead = world
         .get::<Vitality>(entity)
@@ -672,29 +667,12 @@ fn observer_feedback(world: &mut World) {
                 && payload.get("unit").and_then(|v| v.as_u64()) == Some(u64::from(actor.0)))
         })
     });
-    let next = if colony {
-        player_recovery(activity_name, dead, pending, paused)
-    } else if dead {
-        "Operator / AI: choose New life, then enter_world and take_control.".into()
-    } else if pending && paused {
-        "Control queued. Operator: resume the world to apply it.".into()
-    } else if paused {
-        "World paused. Operator: resume to advance actions and needs.".into()
-    } else if pending {
-        "Control queued. Host: applying at the next simulation tick.".into()
-    } else {
-        format!("AI: {recovery}")
-    };
+    let next = player_recovery(activity_name, dead, pending, paused);
     let last_result = world
         .get_resource::<Journal>()
         .and_then(|j| {
             j.entries.iter().rev().find_map(|entry| {
-                (if colony {
-                    player_outcome(entry, actor)
-                } else {
-                    actor_outcome(entry, actor)
-                })
-                .map(|mut result| {
+                (player_outcome(entry, actor)).map(|mut result| {
                     if let JournalKind::ActionRejected {
                         controller,
                         verb,
@@ -718,21 +696,11 @@ fn observer_feedback(world: &mut World) {
                             details.map(|details| details.message.as_str()),
                         );
                     }
-                    if colony {
-                        compact(&result, 120)
-                    } else {
-                        format!("Last (tick {}): {}", entry.tick, compact(&result, 120))
-                    }
+                    compact(&result, 120)
                 })
             })
         })
-        .unwrap_or_else(|| {
-            if colony {
-                "Explore, meet your neighbours and choose a place to settle.".into()
-            } else {
-                "Last action: none recorded yet".into()
-            }
-        });
+        .unwrap_or_else(|| "Explore, meet your neighbours and choose a place to settle.".into());
     *world.resource_mut::<ObserverFeedback>() = ObserverFeedback {
         activity,
         next,
@@ -741,11 +709,7 @@ fn observer_feedback(world: &mut World) {
 }
 fn public_refusal(world: &World, verb: &str, reason: &str, details: Option<&str>) -> String {
     let Some(verb) = super::village_world::public_verb(world, verb) else {
-        return if village::colony::enabled(world) {
-            "That action is unavailable. Choose an activity in Home & farm.".into()
-        } else {
-            "Action rejected; AI: observe and choose an available action".into()
-        };
+        return "That action is unavailable. Choose an activity in Home & farm.".into();
     };
     // Handler errors may echo unknown argument keys/values, affordance IDs or input text.
     // Only exact static scene guidance is suitable for a public stream HUD. Full diagnostics
@@ -776,15 +740,9 @@ fn public_refusal(world: &World, verb: &str, reason: &str, details: Option<&str>
         "read_only" | "not_controller" | "not_attached" => "control is unavailable",
         _ => "unavailable",
     };
-    if village::colony::enabled(world) {
-        return format!(
-            "{} is unavailable: {}. Choose another activity in Home & farm.",
-            player_action_label(verb),
-            static_guidance.unwrap_or(category)
-        );
-    }
     format!(
-        "{verb} rejected: {}; AI: observe and retry",
+        "{} is unavailable: {}. Choose another activity in Home & farm.",
+        player_action_label(verb),
         static_guidance.unwrap_or(category)
     )
 }
@@ -1233,10 +1191,10 @@ fn paint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use npc_framework::prelude::{spawn_sim, state_hash};
+    use npc_framework::prelude::state_hash;
     #[test]
     fn colony_feedback_is_plain_read_only_and_does_not_echo_unknown_actions() {
-        let mut app = island_content::new_sim_app(7, "island_colony");
+        let mut app = island_content::new_sim_app(7, "living_world");
         app.init_resource::<Time<Real>>()
             .init_resource::<Reader>()
             .init_resource::<ObserverFeedback>();
@@ -1294,107 +1252,6 @@ mod tests {
         assert!(result.contains("Home & farm"));
         assert!(!result.contains("unknown-private-action") && !result.contains("private-argument"));
     }
-    fn app() -> App {
-        // Real hosts install the view before scenario entities / VillageState exist.
-        let mut app = island_content::try_new_sim_app_with(3, "ai_village", |app| {
-            app.add_plugins((
-                MinimalPlugins,
-                AssetPlugin::default(),
-                bevy::text::TextPlugin,
-            ))
-            .init_resource::<ButtonInput<KeyCode>>()
-            .init_resource::<Selected>()
-            .init_resource::<npc_framework::view_helpers::command_ui::DragBox>()
-            .configure_sets(
-                Update,
-                (
-                    ViewSystems::OverlayInput,
-                    ViewSystems::Input,
-                    ViewSystems::Present,
-                )
-                    .chain(),
-            );
-            app.world_mut().resource_mut::<SchedulerPolicy>().enabled = false;
-            scheduler::configure_host(
-                app.world_mut(),
-                std::env::temp_dir()
-                    .join(format!("village-ui-test-{}", std::process::id()))
-                    .join("absent-bindings.json"),
-            );
-            app.add_plugins(plugin);
-        })
-        .unwrap();
-        app.update();
-        app
-    }
-    fn press(app: &mut App, action: Action) {
-        let e = app
-            .world_mut()
-            .query::<(Entity, &Action)>()
-            .iter(app.world())
-            .find(|(_, a)| **a == action)
-            .unwrap()
-            .0;
-        app.world_mut().trigger(Activate { entity: e });
-        app.world_mut().flush();
-        app.update();
-    }
-    fn control(app: &mut App, wanted: Action) -> Entity {
-        app.world_mut()
-            .query::<(Entity, &Action)>()
-            .iter(app.world())
-            .find(|(_, action)| **action == wanted)
-            .unwrap()
-            .0
-    }
-    fn recovered_book(app: &mut App, title: &str, pages: usize) -> (SimId, Entity) {
-        let actor = app.world().resource::<VillageState>().played;
-        let holder = app.world().resource::<SimIndex>().get(actor).unwrap();
-        let (id, entity) = spawn_sim(
-            app.world_mut(),
-            (
-                npc_framework::interaction::Item::new(village::catalog::DIARY),
-                DroppedDiary {
-                    author: SimId(9999),
-                    author_name: title.into(),
-                    life: 1,
-                    died_at: 0,
-                    sealed: true,
-                    pages: (0..pages)
-                        .map(|n| village::DiaryPage {
-                            tick: 0,
-                            title: format!("{title} page {}", n + 1),
-                            body: "A recovered memory.".into(),
-                        })
-                        .collect(),
-                },
-            ),
-        );
-        npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, entity);
-        (id, entity)
-    }
-    #[test]
-    fn observer_reports_the_visitors_sale_from_the_buyers_effect_without_other_trades() {
-        let mut app = app();
-        let actor = app.world().resource::<VillageState>().played;
-        let buyer = SimId(u32::MAX - 1);
-        let mut journal = app.world_mut().resource_mut::<Journal>();
-        journal.enabled = true;
-        journal.push(1, Some(buyer), JournalKind::effect(
-            "VillageTrade",
-            &serde_json::json!({"buyer":buyer,"seller":actor,"kind":"log","quantity":2,"coins":6}),
-        ));
-        journal.push(2, Some(buyer), JournalKind::effect(
-            "VillageTrade",
-            &serde_json::json!({"buyer":buyer,"seller":SimId(u32::MAX),"kind":"ore","quantity":1,"coins":3}),
-        ));
-        let before = state_hash(app.world_mut());
-        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-        observer_feedback(app.world_mut());
-        let result = &app.world().resource::<ObserverFeedback>().last_result;
-        assert_eq!(result, "Last (tick 1): Sold 2 log for 6 coins");
-        assert_eq!(state_hash(app.world_mut()), before);
-    }
     #[test]
     fn observer_summarizes_needs_actions_without_diary_content() {
         let actor = SimId(1);
@@ -1446,186 +1303,6 @@ mod tests {
         );
     }
     #[test]
-    fn follow_hero_button_changes_view_intent_and_accessible_caption_without_changing_the_sim() {
-        let mut app = app();
-        let before = state_hash(app.world_mut());
-        assert!(
-            !app.world()
-                .resource::<super::super::village_world::FollowHero>()
-                .enabled
-        );
-        press(&mut app, Action::FollowHero);
-        assert!(
-            app.world()
-                .resource::<super::super::village_world::FollowHero>()
-                .enabled
-        );
-        let button = control(&mut app, Action::FollowHero);
-        assert!(
-            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Stop following")
-        );
-        press(&mut app, Action::FollowHero);
-        assert!(
-            !app.world()
-                .resource::<super::super::village_world::FollowHero>()
-                .enabled
-        );
-        assert!(
-            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Follow hero")
-        );
-        assert_eq!(state_hash(app.world_mut()), before);
-        press(&mut app, Action::Setup);
-        let node = app
-            .world_mut()
-            .query_filtered::<&Node, With<BookPanel>>()
-            .single(app.world())
-            .unwrap();
-        assert_eq!(
-            node.bottom,
-            px(44),
-            "scrolling setup/diary content must end above the AI footer"
-        );
-    }
-    #[test]
-    fn public_hud_never_echoes_unknown_verbs_affordances_or_argument_keys() {
-        let mut app = app();
-        app.world_mut().resource_mut::<Journal>().enabled = true;
-        let actor = app.world().resource::<VillageState>().played;
-        const CANARY: &str = "PRIVATE_NOTEBOOK_CREDENTIAL_CANARY";
-        let mut malformed =
-            serde_json::json!({"unit":actor.0,"controller":"visitor","verb":"eat","args":{}});
-        malformed["args"][CANARY] = serde_json::json!("private argument value");
-        for request in [
-            serde_json::json!({"unit":actor.0,"controller":"visitor","verb":CANARY}),
-            serde_json::json!({"unit":actor.0,"controller":"visitor","affordance":CANARY}),
-            malformed,
-        ] {
-            let before = state_hash(app.world_mut());
-            let response =
-                npc_framework::agent_io::api::call(app.world_mut(), "agent/act", Some(request))
-                    .unwrap();
-            assert_eq!(response["accepted"], false);
-            assert!(
-                response["message"]
-                    .as_str()
-                    .is_some_and(|message| message.contains(CANARY)),
-                "fixture must exercise an echoed private input"
-            );
-            app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-            observer_feedback(app.world_mut());
-            let feedback = &app.world().resource::<ObserverFeedback>().last_result;
-            assert!(
-                !feedback.contains(CANARY) && !feedback.contains("private argument value"),
-                "{feedback}"
-            );
-            assert!(feedback.contains("rejected"));
-            assert_eq!(state_hash(app.world_mut()), before);
-        }
-    }
-    #[test]
-    fn actual_action_refusal_keeps_its_concrete_message_in_host_feedback_only() {
-        let mut app = app();
-        app.world_mut().resource_mut::<Journal>().enabled = true;
-        let actor = app.world().resource::<VillageState>().played;
-        let before = state_hash(app.world_mut());
-        let result = npc_framework::agent_io::api::call(
-            app.world_mut(),
-            "agent/act",
-            Some(serde_json::json!({"unit":actor.0,"controller":"visitor","verb":"eat"})),
-        )
-        .unwrap();
-        assert_eq!(result["accepted"], false);
-        assert_eq!(result["message"], "buy bread first");
-        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-        observer_feedback(app.world_mut());
-        let feedback = &app.world().resource::<ObserverFeedback>().last_result;
-        assert!(
-            feedback.contains("eat rejected: buy bread first"),
-            "{feedback}"
-        );
-        assert_eq!(state_hash(app.world_mut()), before);
-        let report = app
-            .world()
-            .resource::<npc_framework::agent_io::stats::AgentStats>()
-            .report(None);
-        assert!(
-            !serde_json::to_string(&report)
-                .unwrap()
-                .contains("buy bread first")
-        );
-    }
-    #[test]
-    fn observer_feedback_names_work_and_only_the_current_actors_result() {
-        let mut app = app();
-        let actor = app.world().resource::<VillageState>().played;
-        let entity = app.world().resource::<SimIndex>().get(actor).unwrap();
-        app.world_mut()
-            .entity_mut(entity)
-            .insert(village::Gathering {
-                patch: actor,
-                ends: 100,
-            });
-        {
-            let mut journal = app.world_mut().resource_mut::<Journal>();
-            journal.enabled = true;
-            journal.push(
-                1,
-                Some(actor),
-                JournalKind::ActionRejected {
-                    controller: "visitor".into(),
-                    verb: "buy".into(),
-                    reason: "unavailable".into(),
-                },
-            );
-            journal.push(
-                2,
-                Some(SimId(u32::MAX)),
-                JournalKind::ActionRejected {
-                    controller: "someone else".into(),
-                    verb: "private-other-result".into(),
-                    reason: "not the visitor".into(),
-                },
-            );
-        }
-        let before = state_hash(app.world_mut());
-        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-        observer_feedback(app.world_mut());
-        let feedback = app.world().resource::<ObserverFeedback>();
-        assert_eq!(feedback.activity, "Activity: gathering");
-        assert!(feedback.next.contains("stop_work"));
-        assert!(feedback.last_result.contains("buy rejected: unavailable"));
-        assert!(!feedback.last_result.contains("private-other-result"));
-        assert_eq!(state_hash(app.world_mut()), before);
-    }
-    #[test]
-    fn queued_control_and_paused_world_explain_the_operators_next_step() {
-        use npc_framework::agent_io::control::{AttachController, ControlMode, IdlePolicy};
-        let mut app = app();
-        let actor = app.world().resource::<VillageState>().played;
-        app.insert_resource(npc_framework::prelude::SimControl {
-            paused: true,
-            ..Default::default()
-        });
-        submit(
-            app.world_mut(),
-            None,
-            SimCommand::content(&AttachController {
-                unit: actor.0,
-                controller: "playtest".into(),
-                mode: ControlMode::Direct,
-                on_idle: IdlePolicy::Idle,
-                force: true,
-            }),
-        )
-        .unwrap();
-        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-        observer_feedback(app.world_mut());
-        assert_eq!(
-            app.world().resource::<ObserverFeedback>().next,
-            "Control queued. Operator: resume the world to apply it."
-        );
-    }
-    #[test]
     fn supervisor_recovery_countdown_and_long_feedback_are_bounded() {
         let unlinked = supervisor_feedback("unlinked", 0, 120);
         assert!(unlinked.contains("F10: Start Codex / Start Claude"));
@@ -1642,161 +1319,5 @@ mod tests {
         assert_eq!(compact(&long, 40).chars().count(), 40);
         assert!(compact(&long, 40).ends_with('…'));
         assert!(supervisor_feedback(&long, 0, 120).chars().count() <= 100);
-    }
-    #[test]
-    fn diary_navigation_is_stable_bounded_and_resets_scroll() {
-        let mut app = app();
-        let (first, item) = recovered_book(&mut app, "First", 2);
-        let (second, _) = recovered_book(&mut app, "Second", 1);
-        let actor = app.world().resource::<VillageState>().played;
-        let holder = app.world().resource::<SimIndex>().get(actor).unwrap();
-        let other = app
-            .world()
-            .resource::<island_content::TestbedIds>()
-            .id("Ada");
-        let other = app.world().resource::<SimIndex>().get(other).unwrap();
-        // Changing archetype iteration order must not change book order or selection.
-        npc_framework::interaction::items::put_in_inventory(app.world_mut(), other, item);
-        npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, item);
-        press(&mut app, Action::Books);
-        assert_eq!(app.world().resource::<Reader>().selected_diary, Some(first));
-        let previous = control(&mut app, Action::Previous);
-        assert!(app.world().get::<InteractionDisabled>(previous).is_some());
-        let scroll = app
-            .world_mut()
-            .query_filtered::<Entity, With<BookScroll>>()
-            .single(app.world())
-            .unwrap();
-        app.world_mut()
-            .get_mut::<ScrollPosition>(scroll)
-            .unwrap()
-            .0
-            .y = 500.0;
-        press(&mut app, Action::Next);
-        assert_eq!(app.world().resource::<Reader>().page, 1);
-        assert_eq!(
-            app.world().get::<ScrollPosition>(scroll).unwrap().0,
-            Vec2::ZERO
-        );
-        let next = control(&mut app, Action::Next);
-        assert!(app.world().get::<InteractionDisabled>(next).is_some());
-        press(&mut app, Action::NextBook);
-        assert_eq!(
-            app.world().resource::<Reader>().selected_diary,
-            Some(second)
-        );
-        assert_eq!(app.world().resource::<Reader>().page, 0);
-    }
-    #[test]
-    fn a_single_page_book_has_no_unavailable_navigation_and_scheduler_controls_name_the_action() {
-        let mut app = app();
-        recovered_book(&mut app, "Only", 1);
-        press(&mut app, Action::Books);
-        for action in [Action::Previous, Action::Next, Action::NextBook] {
-            let button = control(&mut app, action);
-            assert!(app.world().get::<InteractionDisabled>(button).is_some());
-        }
-        press(&mut app, Action::Setup);
-        let button = control(&mut app, Action::PauseNudges);
-        assert!(
-            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Resume nudges")
-        );
-        press(&mut app, Action::PauseNudges);
-        assert!(
-            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Pause nudges")
-        );
-    }
-    #[test]
-    fn native_hud_and_setup_controls_are_semantic_and_never_change_the_sim() {
-        use bevy::a11y::AccessibilityNode;
-        let mut app = app();
-        let before = state_hash(app.world_mut());
-        press(&mut app, Action::Setup);
-        assert!(app.world().resource::<Reader>().open);
-        let focus = app.world().resource::<InputFocus>().get().unwrap();
-        assert_eq!(*app.world().get::<Action>(focus).unwrap(), Action::Close);
-        assert!(app.world().get::<AccessibilityNode>(focus).is_some());
-        assert!(app.world().get::<AccessibleLabel>(focus).is_some());
-        press(&mut app, Action::Close);
-        assert!(app.world().resource::<InputFocus>().get().is_none());
-        assert_eq!(state_hash(app.world_mut()), before);
-    }
-    #[test]
-    fn queued_successor_message_ends_when_the_actor_arrives_and_stays_gone_after_death() {
-        let mut app = app();
-        let old = app.world().resource::<VillageState>().played;
-        let entity = app.world().resource::<SimIndex>().get(old).unwrap();
-        app.world_mut().get_mut::<Vitality>(entity).unwrap().died_at = Some(0);
-        press(&mut app, Action::NewLife);
-        assert!(
-            app.world()
-                .resource::<Reader>()
-                .message
-                .contains("New life requested")
-        );
-        npc_framework::prelude::run_ticks(app.world_mut(), 1);
-        app.update();
-        let successor = app.world().resource::<VillageState>().played;
-        assert_ne!(successor, old);
-        assert!(app.world().resource::<Reader>().message.is_empty());
-        let entity = app.world().resource::<SimIndex>().get(successor).unwrap();
-        app.world_mut().get_mut::<Vitality>(entity).unwrap().died_at = Some(1);
-        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-        app.update();
-        let hud = app
-            .world_mut()
-            .query_filtered::<&Text, With<HudText>>()
-            .single(app.world())
-            .unwrap();
-        assert!(hud.0.contains("Permanently dead"));
-        assert!(!hud.0.contains("New life requested"));
-        assert!(!hud.0.contains("New life has arrived"));
-        assert!(!hud.0.contains("joining"));
-    }
-    #[test]
-    fn reader_shows_only_a_diary_carried_by_the_current_actor() {
-        let mut app = app();
-        let u = app.world().resource::<VillageState>().played;
-        let holder = app.world().resource::<SimIndex>().get(u).unwrap();
-        let (_, book) = spawn_sim(
-            app.world_mut(),
-            (
-                npc_framework::interaction::Item::new(village::catalog::DIARY),
-                DroppedDiary {
-                    author: SimId(9999),
-                    author_name: "A former traveller".into(),
-                    life: 1,
-                    died_at: 0,
-                    sealed: true,
-                    pages: vec![village::DiaryPage {
-                        tick: 0,
-                        title: "The mill".into(),
-                        body: "Grain sells here.".into(),
-                    }],
-                },
-            ),
-        );
-        npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, book);
-        press(&mut app, Action::Books);
-        let body = app
-            .world_mut()
-            .query_filtered::<&Text, With<BookText>>()
-            .single(app.world())
-            .unwrap();
-        assert!(body.0.contains("Grain sells here."));
-        let other = app
-            .world()
-            .resource::<island_content::TestbedIds>()
-            .id("Ada");
-        let other = app.world().resource::<SimIndex>().get(other).unwrap();
-        npc_framework::interaction::items::put_in_inventory(app.world_mut(), other, book);
-        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
-        app.update();
-        let body = app
-            .world_mut()
-            .query_filtered::<&Text, With<BookText>>()
-            .single(app.world())
-            .unwrap();
-        assert!(!body.0.contains("Grain sells here."));
     }
 }

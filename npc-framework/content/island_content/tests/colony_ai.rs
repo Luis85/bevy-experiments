@@ -3,13 +3,11 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use island_content::village::{self, catalog, economy, goap, production};
 use npc_framework::kernel::hash::state_hash;
-use npc_framework::needs::{NeedRegistry, Needs};
 use npc_framework::prelude::*;
-use serde_json::json;
 use std::collections::BTreeMap;
 
 fn scene() -> App {
-    island_content::new_sim_app(7, "island_colony")
+    island_content::new_sim_app(7, "living_world")
 }
 fn actor(app: &App, name: &str) -> Entity {
     let id = app
@@ -17,45 +15,6 @@ fn actor(app: &App, name: &str) -> Entity {
         .resource::<island_content::TestbedIds>()
         .id(name);
     app.world().resource::<SimIndex>().get(id).unwrap()
-}
-fn need(app: &mut App, person: Entity, name: &str, value: i32) {
-    let id = app.world().resource::<NeedRegistry>().id(name).unwrap();
-    app.world_mut().get_mut::<Needs>(person).unwrap().values[id.0 as usize].value = value;
-}
-
-#[test]
-fn authored_routine_changes_noncritical_priority_but_preserves_emergency_guards() {
-    let mut doc = island_content::scenario::scenario_doc("island_colony").unwrap();
-    doc.world["island_ai"] =
-        json!({"routine":["hunger","thirst","recovery","home","work"],"decision_ticks":40});
-    let mut app = island_content::load_scenario(&doc, 7).unwrap().app;
-    let ada = actor(&app, "Ada");
-    need(&mut app, ada, "Hunger", 40_000);
-    need(&mut app, ada, "Thirst", 40_000);
-    let water = economy::count(app.world(), ada, catalog::WATER);
-    run_ticks(app.world_mut(), 1);
-    let decision = app
-        .world()
-        .get::<village::behavior::LifeDecision>(ada)
-        .unwrap();
-    assert_eq!(decision.goal, village::behavior::LifeGoal::Hunger);
-    assert_eq!(decision.reconsider_at, 40);
-    assert_eq!(economy::count(app.world(), ada, catalog::WATER), water);
-    assert!(economy::need(app.world(), ada, "Hunger") > 80_000);
-
-    let mut critical = island_content::load_scenario(&doc, 7).unwrap().app;
-    let ada = actor(&critical, "Ada");
-    need(&mut critical, ada, "Hunger", 40_000);
-    need(&mut critical, ada, "Thirst", 10_000);
-    run_ticks(critical.world_mut(), 1);
-    assert_eq!(
-        critical
-            .world()
-            .get::<village::behavior::LifeDecision>(ada)
-            .unwrap()
-            .goal,
-        village::behavior::LifeGoal::Thirst
-    );
 }
 
 #[test]
@@ -155,23 +114,4 @@ fn configured_colony_decisions_resume_and_reproduce_exactly() {
     run_ticks(a.world_mut(), 1200);
     run_ticks(b.world_mut(), 1200);
     assert_eq!(state_hash(a.world_mut()), state_hash(b.world_mut()));
-}
-
-#[test]
-fn policy_values_are_hashed_and_saved_and_old_worlds_have_no_policy() {
-    let mut a = scene();
-    let before = state_hash(a.world_mut());
-    a.world_mut()
-        .resource_mut::<village::policy::IslandAiPolicy>()
-        .goap
-        .buy_cost = 2;
-    assert_ne!(state_hash(a.world_mut()), before);
-    let old = island_content::new_sim_app(7, "living_village");
-    assert!(village::policy::active(old.world()).is_none());
-    assert!(
-        serde_json::to_value(island_content::worlds::builtin_preset("living_island").unwrap())
-            .unwrap()
-            .get("island_ai")
-            .is_none()
-    );
 }

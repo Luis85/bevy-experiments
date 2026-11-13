@@ -41,7 +41,6 @@ mod command;
 mod field_clipboard;
 mod fog;
 pub mod game_ui;
-mod homestead_panel;
 mod island_alerts;
 mod island_atmosphere;
 mod island_audio;
@@ -201,7 +200,6 @@ impl Plugin for TestbedViewPlugin {
             assets::plugin,
             village_world::plugin,
             village::plugin,
-            homestead_panel::plugin,
             scene::plugin,
             camera::plugin,
             visuals::plugin,
@@ -269,7 +267,6 @@ pub fn perf_tags(tags: &mut npc_framework::perf::MechanicTags) {
         "shape_tools",
         "colony_panel",
         "colony_scene",
-        "homestead_panel",
         "game_ui",
     ] {
         tags.add(format!("island_view::{module}"), format!("view.{module}"));

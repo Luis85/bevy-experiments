@@ -96,7 +96,6 @@ pub fn activity(world: &World, entity: Entity) -> (&'static str, bool, &'static 
     } else if world
         .get::<npc_framework::interaction::Interacting>(entity)
         .is_some()
-        && super::colony::enabled(world)
     {
         (
             "working",
@@ -176,18 +175,12 @@ fn offer(
     kind: &str,
 ) -> serde_json::Value {
     let checked = trade_check(world, ctx, target, verb, kind);
-    let quantity = if super::needs_driven(world) {
-        super::market::available_to_sell(world, trader, kind)
-    } else {
-        econ::count(world, trader, kind)
-    };
+    let quantity = super::market::available_to_sell(world, trader, kind);
     let price =
         super::market::asking_price(world, if verb == "buy" { trader } else { ctx.entity }, kind);
-    let demand = if super::needs_driven(world) {
+    let demand = {
         super::production::purchase_target(world, trader, kind)
             .saturating_sub(econ::count(world, trader, kind))
-    } else {
-        catalog::stock_limit_in(world, kind).saturating_sub(quantity)
     };
     json!({"direction":verb,"kind":kind,"unit_price":price,
         "stock":if verb=="buy"{Some(quantity)}else{None},
@@ -243,7 +236,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
             continue;
         }
         let products = offered_kinds(world, e);
-        let stock:Vec<_>=products.iter().map(|kind|json!({"kind":kind,"quantity":if super::needs_driven(world){super::market::available_to_sell(world,e,kind)}else{econ::count(world,e,kind)},"price":super::market::asking_price(world,e,kind)})).collect();
+        let stock:Vec<_>=products.iter().map(|kind|json!({"kind":kind,"quantity":super::market::available_to_sell(world,e,kind),"price":super::market::asking_price(world,e,kind)})).collect();
         let offers: Vec<_> = products
             .iter()
             .map(|kind| offer(world, ctx, id, e, "buy", kind))
@@ -291,7 +284,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         "coins":coins,"needs":{"hunger":econ::need(world,ctx.entity,"Hunger"),"thirst":econ::need(world,ctx.entity,"Thirst"),"energy":econ::need(world,ctx.entity,"Energy")},
         "resting_until":person.resting_until,"exhaustion_episodes":vital.exhaustion_ticks,"decision":super::behavior::decision(world,ctx.entity),"activity":{"kind":activity_kind,"busy":busy,"recovery":recovery},
         "calendar":{"day":day+1,"season":season,"night":night,"days_per_season":days_per_season(world)},"nearby_market":market,"found_diaries":found,"heard_speech":heard_speech});
-    if super::needs_driven(world) {
+    {
         let mut news = super::market::public_book(world);
         for row in &mut news {
             if let Some(row) = row.as_object_mut() {
@@ -308,12 +301,8 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         value["cold"] = json!(super::living::cold(world));
         value["wearing_warm_clothes"] = json!(super::living::has_coat(world, ctx.entity));
     }
-    if super::colony::enabled(world) {
-        value["home_heating"] = json!(super::colony::home_heating(world, ctx.entity));
-    }
-    if super::colony::enabled(world)
-        && let Some(social) = world.get::<super::colony::SocialLife>(ctx.entity)
-    {
+    value["home_heating"] = json!(super::colony::home_heating(world, ctx.entity));
+    if let Some(social) = world.get::<super::colony::SocialLife>(ctx.entity) {
         // A relationship value is the observer's own state. Names/roles are
         // included only for identities already in their scoped knowledge; no
         // unseen position, stock, health or private resident state is exposed.
@@ -344,9 +333,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         if night { "night" } else { "day" }
     ));
     section = section.line(format!("Activity: {activity_kind}. {recovery}"));
-    if super::needs_driven(world) {
-        section = section.line("Living economy: read economy.market for published prices and financed demand. Hunt with a carried spear; craft finished meals and clothes from real inputs. offer_goods posts your carried goods so NPCs can buy them; withdraw_offer removes a listing. Trades are physical; limit_price protects a buy maximum or sell minimum at application. Warmth and equipped clothing matter in cold weather.");
-    }
+    section = section.line("Living economy: read economy.market for published prices and financed demand. Hunt with a carried spear; craft finished meals and clothes from real inputs. offer_goods posts your carried goods so NPCs can buy them; withdraw_offer removes a listing. Trades are physical; limit_price protects a buy maximum or sell minimum at application. Warmth and equipped clothing matter in cold weather.");
     section = section.line(format!("Your home is at [{}, {}] mm. rest_home gives free home recovery; rest_ground gives slower recovery anywhere. Known resources and workstation inputs/outputs are listed in environment. Use the advertised craft:<recipe> action to manufacture goods.", person.home.x, person.home.z));
     if !heard_speech.is_empty() {
         section =
@@ -365,13 +352,9 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
     }
     if vital.died_at.is_some() {
         section=section.line("You are dead permanently. Your diary and possessions remain in this world. new_life creates a new actor; enter_world again after its arrival.");
-    } else if super::needs_driven(world) {
+    } else {
         section = section.line("Gather or hunt, craft finished goods and trade at current quoted prices. NPCs buy what their planned needs require; offer_goods posts your carried stock for physical purchase. Equip warm clothes to protect Warmth. The finite community fund circulates existing money; visitors receive no stipend.")
             .line("Your physical Diary survives permanent death; private Memory, Proposals, map notes and credentials do not become world items.");
-    } else {
-        section=section.line(format!("Gather fallen wood or grain, or craft at village workstations, then sell to villagers who need the goods. Buy bread ({} coins) and clean water ({}); eat/drink from your pack. A bed at the inn costs {} coins. Water around the island cannot be crossed.", catalog::price_in(world, "bread").unwrap_or(0),catalog::price_in(world, catalog::WATER).unwrap_or(0),catalog::BED_PRICE))
-        .line("NPC shops have finite stock and money. Merchant surplus circulates through a finite community fund; visiting actors receive no stipend. Winter reduces farming supply.")
-        .line("Your Diary becomes a readable dropped item on permanent death. Memory, Proposals, map notes and credentials stay private. A successor is a different actor in the same continuing world.");
     }
     Some(section)
 }
@@ -420,7 +403,7 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
     ] {
         let mut cmd = VillageAct::new(ctx.unit, verb);
         let mut affordance = Affordance::new(verb, label);
-        if verb == "eat" && super::needs_driven(world) {
+        if verb == "eat" {
             affordance.label = "Eat a finished food from your pack".into();
             cmd.kind = [
                 super::roles::roles(world).baked,
@@ -438,7 +421,7 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
         }
         out.push(checked(affordance, cmd.check(world)));
     }
-    if super::needs_driven(world) {
+    {
         let mut post = VillageAct::new(ctx.unit, "offer_goods");
         post.kind = catalog::trade_kinds(world)
             .iter()

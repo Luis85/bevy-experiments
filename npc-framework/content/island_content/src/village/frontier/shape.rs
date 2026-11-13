@@ -92,9 +92,6 @@ fn hundred() -> u32 {
 impl PlaceResourcePatch {
     /// `(settlement, capacity, gather ticks)` of the new patch.
     fn plan(&self, world: &World) -> Result<(SimId, u32, u32), String> {
-        if !super::enabled(world) {
-            return Err("PlaceResourcePatch requires the regional living world".into());
-        }
         let def = super::economy_spec::registry(world)
             .and_then(|registry| {
                 registry
@@ -186,9 +183,6 @@ pub struct PlacePlot {
 }
 impl PlacePlot {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("plots are placed only in the living world".into());
-        }
         let def = crate::village::civic::definition(world, &self.plot)
             .filter(|def| def.field.is_some())
             .ok_or_else(|| {
@@ -247,9 +241,6 @@ pub struct RemovePlot {
 }
 impl RemovePlot {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("plots are placed only in the living world".into());
-        }
         let building = world
             .resource::<SimIndex>()
             .get(self.plot)
@@ -338,9 +329,6 @@ pub struct RemoveResourcePatch {
 }
 impl RemoveResourcePatch {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("RemoveResourcePatch requires the regional living world".into());
-        }
         let entity = world
             .resource::<SimIndex>()
             .get(self.patch)

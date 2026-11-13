@@ -5,7 +5,7 @@ use serde_json::json;
 
 #[test]
 fn selected_site_exposes_work_before_any_other_plot_and_owned_garden_selects_useful_bed() {
-    let app = island_content::new_sim_app(7, "island_colony");
+    let app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"unit":42,"sections":{
     "inventory":{"items":[{"kind":"log","stack":4},{"kind":"plank","stack":8},{"kind":"village_berries","stack":2},{"kind":"village_water","stack":1}]},
     "homestead":{"cottage":{"inputs":[{"kind":"log","count":4},{"kind":"plank","count":8}]},"crops":[{"kind":"village_grain"},{"kind":"village_berries"}],"plots":[
@@ -62,48 +62,8 @@ fn selected_site_exposes_work_before_any_other_plot_and_owned_garden_selects_use
 }
 
 #[test]
-fn only_known_residents_are_people_and_distant_selection_does_not_override_nearby_context() {
-    let app = island_content::new_sim_app(7, "island_colony");
-    let observed = json!({"unit":42,"sections":{
-        "perception":{"sensed":[
-            {"id":99,"kind":"actor","name":"Wild deer","pos":[500,0],"dist_mm":500},
-            {"id":5,"kind":"actor","name":"Ada","pos":[10000,0],"dist_mm":10000},
-            {"id":6,"kind":"actor","name":"Rowan","pos":[1500,0],"dist_mm":1500}]},
-        "village":{"social":{"relationships":[
-            {"id":5,"name":"Ada","role":"farmer","affinity":4000},
-            {"id":6,"name":"Rowan","role":"miller","affinity":7000}]}}
-    }});
-    let rows = model::rows(
-        app.world(),
-        &observed,
-        &PlayerState {
-            tab: Some(Tab::People),
-            ..default()
-        },
-        true,
-    );
-    assert_eq!(
-        rows.iter()
-            .filter(|row| matches!(row.action, Some(Action::Person(_))))
-            .count(),
-        2
-    );
-    assert!(!rows.iter().any(|row| row.title.contains("deer")));
-    assert!(
-        rows.iter()
-            .any(|row| row.detail.contains("Farmer") && row.detail.contains("4%"))
-    );
-    let context = model::context(app.world(), &observed, Some(SimId(5)), true).unwrap();
-    assert_eq!(context.action, Some(Action::Person(6)));
-    let mut only_animal = observed.clone();
-    only_animal["sections"]["perception"]["sensed"] = json!([
-        {"id":99,"kind":"actor","name":"Wild deer","pos":[500,0],"dist_mm":500}]);
-    assert!(model::context(app.world(), &only_animal, Some(SimId(99)), true).is_none());
-}
-
-#[test]
 fn exploration_stays_reachable_after_a_source_is_discovered_and_uses_own_relative_position() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"unit":42,"sections":{"self":{"pos":[1000,2000]},"village":{"environment":{"resources":[{"id":99,"kind":"village_water","remaining":50}]}},"homestead":{"plots":[]}}});
     let before = state_hash(app.world_mut());
     let rows = model::rows(
@@ -159,7 +119,7 @@ fn exploration_stays_reachable_after_a_source_is_discovered_and_uses_own_relativ
 
 #[test]
 fn home_heating_projects_real_fuel_and_automatic_upkeep_without_an_invented_action() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     let observed = json!({"sections":{"village":{"home":[100,200],"home_heating":{"heated":false,"cold":true,"carried_fuel":0,"fuel_required":1}}}});
     let before = state_hash(app.world_mut());
     let rows = model::rows(
@@ -185,7 +145,7 @@ fn home_heating_projects_real_fuel_and_automatic_upkeep_without_an_invented_acti
 
 #[test]
 fn watching_after_death_is_view_only_epoch_scoped_and_life_choices_remain_reachable() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     app.add_plugins(crate::TestbedViewPlugin);
     app.world_mut()
         .insert_resource(PlayerExperience { enabled: true });

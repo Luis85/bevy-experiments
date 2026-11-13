@@ -154,26 +154,6 @@ fn immutable_preset_and_scenario_describe_the_same_world() {
 }
 
 #[test]
-fn old_island_keeps_its_grid_and_has_no_regional_state() {
-    let mut app = island_content::new_sim_app(7, "island_colony");
-    assert!(!frontier::enabled(app.world()));
-    assert_eq!(
-        app.world().resource::<SpatialGrid>().bounds(),
-        GridBounds::centered(64, 64)
-    );
-    assert!(!app.world().contains_resource::<LivingWorldSpec>());
-    assert!(!app.world().contains_resource::<terrain::TerrainState>());
-    assert_eq!(
-        app.world_mut()
-            .query::<&Settlement>()
-            .iter(app.world())
-            .count(),
-        0
-    );
-    village::integrity::validate_colony(app.world()).unwrap();
-}
-
-#[test]
 fn regional_hash_and_snapshot_continue_the_same_world() {
     let mut first = scene();
     let mut second = scene();
@@ -533,37 +513,4 @@ fn wildlife_birth_defers_without_valid_land_and_resumes_after_clearance() {
             .iter()
             .any(|(_, _, at)| *at == vacant[0])
     );
-}
-
-#[test]
-fn regional_projection_uses_authored_settlement_names_and_positions() {
-    let mut spec = LivingWorldSpec::default();
-    let harbour = &mut spec.settlements[0];
-    harbour.label = "Dawn Harbour".into();
-    harbour.center.x += 2000;
-    for site in &mut harbour.sites {
-        site.position.x += 2000;
-    }
-    for home in &mut harbour.homes {
-        home.door.x += 2000;
-    }
-    spec.validate().unwrap();
-    let mut doc = island_content::scenario::scenario_doc("living_world").unwrap();
-    doc.world["living_world"] = serde_json::json!(spec);
-    let mut app = island_content::scenario::load_scenario(&doc, 7)
-        .unwrap()
-        .app;
-    let before = state_hash(app.world_mut());
-    let projection = island_content::projection::world_state(app.world_mut()).unwrap();
-    let districts = projection["terrain"]["districts"].as_array().unwrap();
-    assert_eq!(districts.len(), 3);
-    let harbour = districts
-        .iter()
-        .find(|district| district["id"] == "harbour")
-        .unwrap();
-    assert_eq!(harbour["label"], "Dawn Harbour");
-    assert_eq!(harbour["x"], 2000);
-    assert_eq!(harbour["z"], -30000);
-    assert_eq!(harbour["biome"], "coast");
-    assert_eq!(state_hash(app.world_mut()), before);
 }

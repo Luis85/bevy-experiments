@@ -41,9 +41,6 @@ pub const WORK_PACE_FASTEST: u32 = 90;
 /// Regional work duration multiplier from morale: 115% at zero morale down to
 /// 90% at full morale. Actors without social life, and other profiles, get 100.
 pub fn work_pace_percent(world: &World, actor: Entity) -> u32 {
-    if !super::super::frontier::enabled(world) {
-        return 100;
-    }
     let Some(social) = world.get::<SocialLife>(actor) else {
         return 100;
     };
@@ -95,7 +92,7 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
             if indoors.is_some() && indoors != super::super::indoors::inside_entity(world, actor) {
                 return None;
             }
-            let distance = if super::super::frontier::enabled(world) {
+            let distance = {
                 let route = super::super::frontier::routes::estimate(world, *pos, target)?;
                 // Leisure is local in walking distance too. A person across a
                 // pond must not keep winning over reachable nearby company.
@@ -103,8 +100,6 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
                     return None;
                 }
                 i64::from(route.distance_mm)
-            } else {
-                direct
             };
             Some((distance, *id, target))
         })

@@ -75,9 +75,6 @@ fn next_day(world: &World) -> u64 {
 /// Must run after the original island actors, stock and new professions spawn.
 /// Appending here preserves every incumbent SimId.
 pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
-    if !super::needs_driven(world) {
-        return;
-    }
     let renew_at = next_day(world);
     for (kind, capacity, gather_ticks) in [(catalog::FIBER, 80, 120), (catalog::BERRIES, 80, 80)] {
         let pos = super::geography::for_world(world)
@@ -127,9 +124,7 @@ pub fn available_prey(world: &World) -> Vec<(SimId, Entity, SimPos)> {
     let mut prey: Vec<(SimId, Entity, SimPos)> = query
         .iter(world)
         .filter(|(entity, id, ..)| {
-            alive_prey(world, *entity)
-                && (!super::frontier::enabled(world)
-                    || super::frontier::ecology::harvestable_prey(world, **id))
+            alive_prey(world, *entity) && (super::frontier::ecology::harvestable_prey(world, **id))
         })
         .map(|(entity, id, at, _)| (*id, entity, *at))
         .collect();
@@ -158,8 +153,7 @@ fn prey_check(world: &World, actor: Entity, target: SimId) -> Result<Entity, Str
     if prey == actor || !alive_prey(world, prey) {
         return Err("a living wild animal is required".into());
     }
-    if super::frontier::enabled(world) && !super::frontier::ecology::harvestable_prey(world, target)
-    {
+    if !super::frontier::ecology::harvestable_prey(world, target) {
         return Err(
             "Leave the breeding refuge undisturbed; this habitat needs its remaining adults".into(),
         );
@@ -171,9 +165,6 @@ fn prey_check(world: &World, actor: Entity, target: SimId) -> Result<Entity, Str
 }
 
 fn plan(world: &World, actor: Entity, target: SimId) -> Result<SimId, String> {
-    if !super::needs_driven(world) {
-        return Err("hunting is disabled in this world".into());
-    }
     if !living(world, actor) || world.get::<Villager>(actor).is_none() {
         return Err("only a living villager can hunt".into());
     }
@@ -305,9 +296,6 @@ fn finish_check(world: &World, actor: Entity, work: Hunting) -> Result<(), Strin
 
 /// The host calls once in sorted island Effects, before autonomous decisions.
 pub fn tick(world: &mut World) {
-    if !super::needs_driven(world) {
-        return;
-    }
     let now = world.resource::<SimClock>().tick;
     let hunters: Vec<_> = world
         .resource::<SimIndex>()
@@ -371,30 +359,7 @@ pub fn tick(world: &mut World) {
             &json!({"target":work.target,"meat":2,"hide":1,"spear_spent":true}),
         );
     }
-    if super::frontier::enabled(world) {
-        super::frontier::ecology::wildlife_tick(world);
-        return;
-    }
-    let habitats: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter_map(|(id, entity)| {
-            world
-                .get::<WildlifeHabitat>(*entity)
-                .map(|habitat| (*id, *entity, *habitat))
-        })
-        .collect();
-    for (id, entity, habitat) in habitats {
-        if habitat.renew_at > now {
-            continue;
-        }
-        replenish(world, id, habitat.home, habitat.capacity);
-        world
-            .get_mut::<WildlifeHabitat>(entity)
-            .expect("habitat")
-            .renew_at = next_day(world);
-    }
+    super::frontier::ecology::wildlife_tick(world);
 }
 
 fn replenish(world: &mut World, habitat: SimId, home: SimPos, capacity: u32) {

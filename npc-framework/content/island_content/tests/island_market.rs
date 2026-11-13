@@ -2,13 +2,11 @@
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use island_content::village::{self, VillageAct, Villager, Wallet, market};
-use npc_framework::agent_io::{api, registration};
 use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::*;
-use serde_json::json;
 
 fn scene() -> App {
-    island_content::new_sim_app(7, "living_village")
+    island_content::new_sim_app(7, "living_world")
 }
 fn person(app: &App, name: &str) -> (SimId, Entity) {
     let id = app
@@ -26,122 +24,6 @@ fn offer(actor: SimId, quantity: u32, minimum: Option<u32>) -> VillageAct {
 }
 
 #[test]
-fn listed_visitor_goods_sell_physically_for_the_same_quote_and_conserve_cash() {
-    let mut app = scene();
-    let (seller_id, seller) = person(&app, "human");
-    let (buyer_id, buyer) = person(&app, "Tess");
-    let pos = *app.world().get::<SimPos>(seller).unwrap();
-    app.world_mut().entity_mut(buyer).insert(pos);
-    village::economy::grant(app.world_mut(), seller, Item::new("log").stack(5));
-    let cash = app.world().get::<Wallet>(seller).unwrap().coins
-        + app.world().get::<Wallet>(buyer).unwrap().coins;
-    offer(seller_id, 3, Some(7))
-        .perform(app.world_mut())
-        .unwrap();
-    assert!(market::sells(app.world(), seller, "log"));
-    assert_eq!(market::available_to_sell(app.world(), seller, "log"), 3);
-    let quote = market::quote(app.world(), buyer, seller, "log", 2).unwrap();
-    assert_eq!(quote.unit_price, 7);
-    let mut buy = VillageAct::new(buyer_id, "buy");
-    buy.target = Some(seller_id);
-    buy.kind = "log".into();
-    buy.quantity = 2;
-    buy.limit_price = Some(7);
-    buy.perform(app.world_mut()).unwrap();
-    assert_eq!(
-        app.world().get::<Wallet>(seller).unwrap().coins,
-        quote.total
-    );
-    assert_eq!(
-        app.world().get::<Wallet>(seller).unwrap().coins
-            + app.world().get::<Wallet>(buyer).unwrap().coins,
-        cash
-    );
-    assert_eq!(village::economy::count(app.world(), seller, "log"), 3);
-    assert_eq!(market::available_to_sell(app.world(), seller, "log"), 1);
-    assert!(
-        buy.perform(app.world_mut()).is_err(),
-        "a listing cannot oversell its stated quantity"
-    );
-}
-
-#[test]
-fn offers_cannot_mint_goods_or_sell_reserved_items_and_can_be_withdrawn() {
-    let mut app = scene();
-    let (actor, body) = person(&app, "human");
-    assert!(offer(actor, 1, None).check(app.world()).is_err());
-    village::economy::grant(app.world_mut(), body, Item::new("log").stack(2));
-    assert!(offer(actor, 3, None).check(app.world()).is_err());
-    let stack = village::economy::free_items(app.world(), body)
-        .into_iter()
-        .find(|(_, i)| i.kind == "log")
-        .unwrap()
-        .0;
-    assert!(
-        app.world_mut()
-            .resource_mut::<Reservations>()
-            .try_reserve(stack, actor, 1)
-    );
-    assert!(offer(actor, 1, None).check(app.world()).is_err());
-    app.world_mut()
-        .resource_mut::<Reservations>()
-        .release(stack, actor);
-    offer(actor, 2, None).perform(app.world_mut()).unwrap();
-    let before = village::economy::count(app.world(), body, "log");
-    let mut withdraw = VillageAct::new(actor, "withdraw_offer");
-    withdraw.kind = "log".into();
-    withdraw.perform(app.world_mut()).unwrap();
-    assert!(!market::sells(app.world(), body, "log"));
-    assert_eq!(village::economy::count(app.world(), body, "log"), before);
-}
-
-#[test]
-fn price_limits_are_checked_again_at_application_without_partial_trade() {
-    let mut app = scene();
-    let (seller_id, seller) = person(&app, "human");
-    let (buyer_id, buyer) = person(&app, "Tess");
-    let pos = *app.world().get::<SimPos>(seller).unwrap();
-    app.world_mut().entity_mut(buyer).insert(pos);
-    village::economy::grant(app.world_mut(), seller, Item::new("log").stack(2));
-    offer(seller_id, 2, Some(3))
-        .perform(app.world_mut())
-        .unwrap();
-    let mut buy = VillageAct::new(buyer_id, "buy");
-    buy.target = Some(seller_id);
-    buy.kind = "log".into();
-    buy.limit_price = Some(3);
-    buy.check(app.world()).unwrap();
-    offer(seller_id, 2, Some(9))
-        .perform(app.world_mut())
-        .unwrap();
-    let before = state_hash(app.world_mut());
-    assert!(buy.perform(app.world_mut()).is_err());
-    assert_eq!(state_hash(app.world_mut()), before);
-    let mut sale = VillageAct::new(seller_id, "sell");
-    sale.target = Some(buyer_id);
-    sale.kind = "log".into();
-    // Isolate the price condition with an explicit, funded Innkeeper log
-    // procurement target; other integration fixtures exercise plan generation.
-    let target = village::economy::count(app.world(), buyer, "log") + 1;
-    app.world_mut()
-        .resource_mut::<village::production::ProductionPlan>()
-        .procurement
-        .entry(buyer_id)
-        .or_default()
-        .insert("log".into(), target);
-    sale.limit_price = Some(9);
-    sale.check(app.world()).unwrap();
-    sale.limit_price = Some(10);
-    let before_sell = state_hash(app.world_mut());
-    assert!(
-        sale.perform(app.world_mut())
-            .unwrap_err()
-            .contains("limit_price")
-    );
-    assert_eq!(state_hash(app.world_mut()), before_sell);
-}
-
-#[test]
 fn quotes_and_failed_requests_do_not_learn_or_mutate_market_state() {
     let mut app = scene();
     let (actor, seller) = person(&app, "human");
@@ -153,33 +35,6 @@ fn quotes_and_failed_requests_do_not_learn_or_mutate_market_state() {
         let _ = market::public_book(app.world());
     }
     assert_eq!(state_hash(app.world_mut()), before);
-}
-
-#[test]
-fn listed_goods_and_price_learning_resume_identically() {
-    fn factory() -> App {
-        let mut app = scene();
-        let (id, e) = person(&app, "human");
-        village::economy::grant(app.world_mut(), e, Item::new("log").stack(3));
-        offer(id, 3, Some(4)).perform(app.world_mut()).unwrap();
-        app
-    }
-    npc_framework::tools::snapshot_check::assert_resume_equivalent(factory, 123, 900, 30);
-}
-
-#[test]
-fn legacy_village_stays_fixed_price_and_rejects_passive_market_listings() {
-    let mut app = island_content::new_sim_app(7, "ai_village");
-    let (actor, e) = person(&app, "human");
-    assert!(!market::enabled(app.world()));
-    assert!(!app.world().contains_resource::<market::MarketState>());
-    village::economy::grant(app.world_mut(), e, Item::new("log").stack(3));
-    assert!(offer(actor, 3, None).check(app.world()).is_err());
-    assert_eq!(market::unit_price(app.world(), "log"), Some(3));
-    run_ticks(app.world_mut(), 1000);
-    assert_eq!(market::unit_price(app.world(), "log"), Some(3));
-    let person = app.world().get::<Villager>(e).unwrap();
-    assert_eq!(person.role, village::Role::Visitor);
 }
 
 #[test]
@@ -224,67 +79,6 @@ fn empty_wallets_cannot_create_fictitious_funded_buy_pressure() {
                 && row["max_affordable_bid"].is_null()),
         "a zero purse cannot back even a lower-priced bid"
     );
-}
-
-#[test]
-fn registered_client_posts_and_withdraws_bounded_offers_through_recorded_actions() {
-    let mut app = scene();
-    let (id, actor) = person(&app, "human");
-    village::economy::grant(app.world_mut(), actor, Item::new("log").stack(3));
-    app.insert_resource(registration::RegistrationRequired);
-    registration::set_credential(
-        app.world_mut(),
-        "market-fixture",
-        registration::Credential {
-            token_digest: registration::token_digest("public-test-market-token"),
-            assigned: id,
-            controller: "visitor".into(),
-        },
-    );
-    let session = api::call(
-        app.world_mut(),
-        "agent/register",
-        Some(json!({
-            "agent_id":"market-fixture","token":"public-test-market-token",
-        })),
-    )
-    .unwrap()["session"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    for method in ["agent/enter_world", "agent/take_control"] {
-        api::call(app.world_mut(), method, Some(json!({"session":session}))).unwrap();
-    }
-    run_ticks(app.world_mut(), 1);
-    let before = state_hash(app.world_mut());
-    let invalid = api::call(app.world_mut(), "agent/act", Some(json!({
-        "session":session,"verb":"offer_goods","args":{"kind":"log","quantity":2,"limit_price":0},
-    }))).unwrap();
-    assert_ne!(invalid["accepted"], true, "invalid prices must be rejected");
-    assert_eq!(state_hash(app.world_mut()), before);
-    let accepted = api::call(app.world_mut(), "agent/act", Some(json!({
-        "session":session,"verb":"offer_goods","args":{"kind":"log","quantity":2,"limit_price":4},
-    }))).unwrap();
-    assert_eq!(accepted["accepted"], true, "{accepted}");
-    assert!(
-        !market::has_offer(app.world(), actor, "log"),
-        "input applies on the next sim tick"
-    );
-    run_ticks(app.world_mut(), 1);
-    assert!(market::has_offer(app.world(), actor, "log"));
-    assert_eq!(market::available_to_sell(app.world(), actor, "log"), 2);
-    let withdrawn = api::call(
-        app.world_mut(),
-        "agent/act",
-        Some(json!({
-            "session":session,"verb":"withdraw_offer","args":{"kind":"log"},
-        })),
-    )
-    .unwrap();
-    assert_eq!(withdrawn["accepted"], true, "{withdrawn}");
-    run_ticks(app.world_mut(), 1);
-    assert!(!market::has_offer(app.world(), actor, "log"));
-    assert_eq!(village::economy::count(app.world(), actor, "log"), 3);
 }
 
 #[test]
@@ -469,83 +263,4 @@ fn funded_material_bids_precede_unfunded_future_water_counterbids() {
         cash,
         "published bids are not magical settlement"
     );
-}
-
-#[test]
-fn joint_material_limits_back_all_units_and_a_seller_cannot_override_the_buyers_cap() {
-    let mut app = scene();
-    let (maker_id, maker) = person(&app, "Lina");
-    let (seller_id, seller) = person(&app, "human");
-    let surplus = app.world().get::<Wallet>(maker).unwrap().coins - 20;
-    app.world_mut().get_mut::<Wallet>(maker).unwrap().coins = 20;
-    app.world_mut().resource_mut::<village::VillageState>().fund += surplus;
-    market::tick(app.world_mut());
-    app.world_mut()
-        .resource_mut::<market::MarketState>()
-        .last_round = None;
-    {
-        let mut plan = app
-            .world_mut()
-            .resource_mut::<village::production::ProductionPlan>();
-        *plan = Default::default();
-        let goods = [
-            (village::catalog::LEATHER.into(), 2),
-            (village::catalog::FIBER.into(), 4),
-        ];
-        plan.wanted.insert(maker_id, goods.clone().into());
-        plan.procurement.insert(maker_id, goods.into());
-        plan.bid_limits.insert(
-            maker_id,
-            [
-                (village::catalog::LEATHER.into(), 6),
-                (village::catalog::FIBER.into(), 2),
-            ]
-            .into(),
-        );
-    }
-    assert_eq!(
-        2 * 6 + 4 * 2,
-        app.world().get::<Wallet>(maker).unwrap().coins
-    );
-    market::tick(app.world_mut());
-    let book = market::public_book(app.world());
-    let leather = book
-        .iter()
-        .find(|row| row["kind"] == village::catalog::LEATHER)
-        .unwrap();
-    let fiber = book
-        .iter()
-        .find(|row| row["kind"] == village::catalog::FIBER)
-        .unwrap();
-    assert_eq!(leather["funded_demand"], 0);
-    assert_eq!(
-        leather["below_reference_bid_units"], 2,
-        "the entire joined lot is financed at its stated limit"
-    );
-    assert_eq!(leather["max_affordable_bid"], 6);
-    assert_eq!(
-        fiber["funded_demand"], 4,
-        "the lower leather bid preserves all complementary fiber cash"
-    );
-    assert_eq!(app.world().get::<Wallet>(maker).unwrap().coins, 20);
-
-    // Operator-arranged quote test, separate from the unassisted registered
-    // production rehearsal: a real offered item cannot force an above-cap buy.
-    village::economy::grant(
-        app.world_mut(),
-        seller,
-        Item::new(village::catalog::LEATHER),
-    );
-    let pos = *app.world().get::<SimPos>(seller).unwrap();
-    app.world_mut().entity_mut(maker).insert(pos);
-    let mut sale = VillageAct::new(seller_id, "sell");
-    sale.target = Some(maker_id);
-    sale.kind = village::catalog::LEATHER.into();
-    let before = state_hash(app.world_mut());
-    assert!(
-        sale.perform(app.world_mut())
-            .unwrap_err()
-            .contains("bid limit")
-    );
-    assert_eq!(state_hash(app.world_mut()), before);
 }

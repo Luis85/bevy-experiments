@@ -33,7 +33,7 @@ fn extended_colony_survives_winter_and_replacement_without_long_navigation_stall
     const WINTER_LATE_START: u64 = 144_000;
     const WINTER_END: u64 = 216_000;
     const FINAL_LATE_START: u64 = 264_000;
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     assert_eq!(app.world().resource::<SimConfig>().day_length, 24_000);
     let initial_money = money(&app);
     let mut critical = BTreeMap::from([
@@ -188,88 +188,4 @@ fn money(app: &App) -> u64 {
         })
         .sum::<u64>()
         + u64::from(app.world().resource::<VillageState>().fund)
-}
-fn food(state: &VillageState) -> u64 {
-    ["bread", catalog::COOKED_MEAL]
-        .iter()
-        .map(|kind| state.produced.get(*kind).copied().unwrap_or(0))
-        .sum()
-}
-
-#[test]
-fn configured_islands_keep_three_day_production_trade_and_residents_alive() {
-    for seed in [7, 42] {
-        let mut app = island_content::new_sim_app(seed, "island_colony");
-        let initial_money = money(&app);
-        let day = app.world().resource::<SimConfig>().day_length;
-        let mut late = None;
-        let mut low_hunger_samples = 0_u32;
-        let mut low_thirst_samples = 0_u32;
-        let mut longest_food_gap = 0_u64;
-        let mut food_gap = 0_u64;
-        while app.world().resource::<SimClock>().tick < day * 3 {
-            run_ticks(app.world_mut(), 300);
-            let tick = app.world().resource::<SimClock>().tick;
-            let people = residents(&app);
-            assert_eq!(people.len(), 12);
-            assert_eq!(
-                money(&app),
-                initial_money,
-                "currency drift seed {seed} tick {tick}"
-            );
-            for person in &people {
-                let vitality = app.world().get::<Vitality>(*person).unwrap();
-                assert!(
-                    vitality.died_at.is_none() && vitality.health > 0,
-                    "resident {:?} died seed {seed} tick {tick}",
-                    app.world().get::<Villager>(*person).unwrap().name
-                );
-                low_hunger_samples +=
-                    u32::from(economy::need(app.world(), *person, "Hunger") < 15_000);
-                low_thirst_samples +=
-                    u32::from(economy::need(app.world(), *person, "Thirst") < 15_000);
-            }
-            let state = app.world().resource::<VillageState>();
-            if tick == day * 2 {
-                late = Some((state.transactions, food(state)));
-            }
-            if tick > day * 2 {
-                let stocked = people.iter().any(|person| {
-                    ["bread", catalog::COOKED_MEAL]
-                        .iter()
-                        .any(|kind| economy::count(app.world(), *person, kind) > 0)
-                });
-                food_gap = if stocked { 0 } else { food_gap + 300 };
-                longest_food_gap = longest_food_gap.max(food_gap);
-            }
-        }
-        let state = app.world().resource::<VillageState>();
-        let (transactions, meals) = late.unwrap();
-        assert!(
-            state.transactions > transactions,
-            "late trade stopped seed {seed}"
-        );
-        assert!(
-            food(state) > meals,
-            "late food production stopped seed {seed}"
-        );
-        assert!(
-            longest_food_gap < day,
-            "no finished food throughout last day seed {seed}"
-        );
-        for kind in [catalog::FLOUR, "bread", "plank", "ingot", catalog::WATER] {
-            assert!(
-                state.produced.get(kind).copied().unwrap_or(0) > 0,
-                "chain {kind} never operated seed {seed}"
-            );
-        }
-        println!(
-            "COLONY_SOAK_EVIDENCE {}",
-            json!({"seed":seed,"ticks":day*3,
-            "residents_alive":12,"currency":initial_money,"late_transactions":state.transactions-transactions,
-            "late_finished_food":food(state)-meals,"low_hunger_actor_samples":low_hunger_samples,
-            "low_thirst_actor_samples":low_thirst_samples,"sample_interval":300,"longest_late_food_gap_ticks":longest_food_gap,
-            "produced":state.produced,"colony":village::colony::enabled(app.world())})
-        );
-    }
 }

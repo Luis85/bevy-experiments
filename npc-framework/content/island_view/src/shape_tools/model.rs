@@ -82,12 +82,6 @@ impl Limits {
         max_radius: 8,
         max_batch: island_content::village::frontier::terrain::MAX_TERRAFORM_CELLS,
     };
-    pub(crate) const LEGACY: Self = Self {
-        dry: (0, 3_000),
-        water: (-1_000, 0),
-        max_radius: 3,
-        max_batch: 0,
-    };
     /// The same ranges with every uneven edit sent cell by cell.
     pub(crate) fn per_cell(self) -> Self {
         Self {
@@ -922,20 +916,6 @@ mod tests {
             raised[0].after.height_mm, 0,
             "water never rises above sea level"
         );
-        let legacy = flat(2900, Grass, 3);
-        let capped = plan_dab(
-            &brush(Tool::Raise, 8, Falloff::Hard),
-            (0, 0),
-            0,
-            &Limits::LEGACY,
-            |x, z| legacy.get(&(x, z)).copied(),
-        );
-        assert!(capped.iter().all(|edit| edit.after.height_mm == 3000));
-        assert_eq!(
-            capped.len(),
-            29,
-            "the brush is clipped to the legacy radius 3"
-        );
     }
 
     #[test]
@@ -1080,7 +1060,7 @@ mod tests {
 
         // A profile without the batch command still goes cell by cell.
         let legacy = Limits::REGIONAL.per_cell();
-        assert_eq!(legacy.max_batch, Limits::LEGACY.max_batch);
+        assert_eq!(legacy.max_batch, 0);
         let commands = batch(&edits, (0, 0), 2, legacy.max_batch, read);
         assert_eq!(commands.len(), 13);
         assert!(

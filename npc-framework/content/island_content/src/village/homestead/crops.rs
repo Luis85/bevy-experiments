@@ -50,11 +50,7 @@ fn crops(world: &World) -> [CropDef; 2] {
 
 pub fn crop_catalog(world: &World) -> Vec<CropDef> {
     let all = crops(world);
-    if super::super::colony::enabled(world) {
-        all.to_vec()
-    } else {
-        all[..1].to_vec()
-    }
+    all.to_vec()
 }
 
 pub fn crop_definition(world: &World, kind: &str) -> Option<CropDef> {

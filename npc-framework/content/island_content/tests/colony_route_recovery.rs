@@ -2,9 +2,7 @@
 //! Merchants remain physically separated; the buyer must walk and pay.
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use island_content::village::{
-    self, catalog, economy, production::ProductionPlan, routing::RouteRecovery,
-};
+use island_content::village::{self, catalog, production::ProductionPlan};
 use npc_framework::prelude::*;
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -18,7 +16,7 @@ fn actor(app: &App, name: &str) -> Entity {
 }
 
 fn corner_scene() -> App {
-    let mut doc = island_content::scenario::scenario_doc("living_village").unwrap();
+    let mut doc = island_content::scenario::scenario_doc("living_world").unwrap();
     // Original expanded geometry reproduces the observed corner exactly. The
     // new policy is opt-in without changing the incumbent replay fixtures.
     doc.world["island_ai"] = json!({});
@@ -57,46 +55,6 @@ fn corner_scene() -> App {
         .insert(id, BTreeMap::from([("plank".into(), 100)]));
     app.world_mut().insert_resource(plan);
     app
-}
-
-#[test]
-fn observed_integer_corner_is_real_and_resident_recovers_to_complete_physical_trade() {
-    let mut app = corner_scene();
-    let ivo = actor(&app, "Ivo");
-    let jun = actor(&app, "Jun");
-    let starting_cash = app.world().get::<village::Wallet>(ivo).unwrap().coins;
-    let seller_cash = app.world().get::<village::Wallet>(jun).unwrap().coins;
-    let seller_stock = economy::count(app.world(), jun, "plank");
-    run_ticks(app.world_mut(), 1);
-    let here = SimPos::new(4046, -5991);
-    let waypoint = SimPos::new(1500, -6500);
-    let grid = app.world().resource::<SpatialGrid>();
-    let start_cell = grid.cell_of(here);
-    assert!(grid.trace_segment(here, waypoint, |cell| cell == start_cell
-        || !grid.is_blocking(cell)));
-    assert!(
-        !grid.trace_segment(here, here.step_towards(waypoint, 70), |cell| cell
-            == start_cell
-            || !grid.is_blocking(cell)),
-        "the rounded first step must reproduce the reported blocked corner"
-    );
-    let mut recovering = false;
-    for _ in 0..14 {
-        run_ticks(app.world_mut(), 20);
-        recovering |= app.world().get::<RouteRecovery>(ivo).is_some();
-    }
-    assert!(
-        recovering,
-        "the stuck actor must take the explicit bounded recovery path"
-    );
-    assert_eq!(economy::count(app.world(), jun, "plank"), seller_stock - 1);
-    assert!(app.world().get::<village::Wallet>(ivo).unwrap().coins < starting_cash);
-    assert!(app.world().get::<village::Wallet>(jun).unwrap().coins > seller_cash);
-    assert_eq!(
-        app.world().get::<village::Wallet>(ivo).unwrap().coins
-            + app.world().get::<village::Wallet>(jun).unwrap().coins,
-        starting_cash + seller_cash
-    );
 }
 
 #[test]

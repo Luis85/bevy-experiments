@@ -166,7 +166,7 @@ fn spawn(world: &mut World) {
         node.margin = UiRect::vertical(px(2));
     }
     // Resources: place and remove patches (the regional world only).
-    if island_content::village::frontier::enabled(world) {
+    {
         super::resources::rail_tiles(world, rail);
         super::placing::rail_tile(world, rail);
         let rule = w::divider(world, rail, Surface::Chrome, false);
@@ -202,7 +202,7 @@ fn spawn(world: &mut World) {
     // How many strokes can be taken back, of how many are kept.
     parts.history = Some(caption(world, rail, ""));
     // The footer: write the shaped world to a world file.
-    if island_content::village::frontier::enabled(world) {
+    {
         let rule = w::divider(world, rail, Surface::Chrome, false);
         if let Some(mut node) = world.get_mut::<Node>(rule) {
             node.width = percent(100);

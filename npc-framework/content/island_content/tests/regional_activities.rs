@@ -13,7 +13,7 @@ use island_content::village::{
 use npc_framework::{kernel::hash::state_hash, prelude::*, snapshot};
 
 fn scene() -> App {
-    let mut doc = island_content::scenario::scenario_doc("island_colony").unwrap();
+    let mut doc = island_content::scenario::scenario_doc("living_world").unwrap();
     let preset = island_content::worlds::builtin_preset("living_world").unwrap();
     island_content::construction::ExplorerContext::for_world(
         "human",

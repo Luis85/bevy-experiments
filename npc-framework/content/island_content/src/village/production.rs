@@ -299,10 +299,9 @@ pub fn food_preference(world: &World, actor: Entity) -> &'static str {
     }
     // Item/entity spawn counts must not accidentally give every customer the
     // same diet. Stable profession identities provide a genuine consumer mix.
-    if super::needs_driven(world)
-        && world
-            .get::<Villager>(actor)
-            .is_some_and(|person| person.role != Role::Visitor && person.role.tag() % 3 == 0)
+    if world
+        .get::<Villager>(actor)
+        .is_some_and(|person| person.role != Role::Visitor && person.role.tag() % 3 == 0)
     {
         roles(world).cooked
     } else {
@@ -521,13 +520,10 @@ struct MaterialBundle {
 }
 impl Builder<'_> {
     fn recipe_for(&self, actor: SimId, role: Role, kind: &str) -> Option<&RecipeDef> {
-        let mut recipes = catalog::recipes_for(self.world, role)
+        let recipes = catalog::recipes_for(self.world, role)
             .iter()
             .filter_map(|name| self.recipes.iter().find(|recipe| recipe.name == *name))
             .filter(|recipe| recipe.outputs.iter().any(|output| output.kind == kind));
-        if !super::frontier::enabled(self.world) {
-            return recipes.next();
-        }
         recipes.min_by_key(|recipe| {
             let unavailable = recipe
                 .inputs
@@ -981,12 +977,6 @@ impl Builder<'_> {
         }
         true
     }
-    fn producer(&self, kind: &str) -> Option<(SimId, Entity, Role)> {
-        self.people
-            .iter()
-            .copied()
-            .find(|(_, _, role)| catalog::outputs_for(self.world, *role).contains(&kind))
-    }
     fn reserve_working_capital(
         &mut self,
         needed: &BTreeSet<String>,
@@ -1068,58 +1058,51 @@ impl Builder<'_> {
         if self.stocked(kind) {
             return;
         }
-        if super::frontier::enabled(self.world) {
-            let mut producers: Vec<_> = self
-                .people
-                .iter()
-                .copied()
-                .filter(|(_, entity, role)| {
-                    catalog::outputs_for(self.world, *role).contains(&kind)
-                        && super::frontier::labor::work_feasible(self.world, *entity)
-                })
-                .collect();
-            producers.sort_by_key(|(id, _, _)| {
-                (
-                    self.plan
-                        .production
-                        .get(id)
-                        .map_or(0, |goods| goods.values().copied().sum::<u32>()),
-                    *id,
-                )
-            });
-            let mut remaining = missing;
-            let mut slots = producers.len() as u32;
-            for (id, entity, role) in producers {
-                if remaining == 0 {
-                    break;
-                }
-                let before = self
-                    .plan
+        let mut producers: Vec<_> = self
+            .people
+            .iter()
+            .copied()
+            .filter(|(_, entity, role)| {
+                catalog::outputs_for(self.world, *role).contains(&kind)
+                    && super::frontier::labor::work_feasible(self.world, *entity)
+            })
+            .collect();
+        producers.sort_by_key(|(id, _, _)| {
+            (
+                self.plan
                     .production
-                    .get(&id)
-                    .and_then(|goods| goods.get(kind))
-                    .copied()
-                    .unwrap_or(0);
-                let allocation = remaining.div_ceil(slots.max(1));
-                self.manufacture_for(id, entity, role, kind, allocation);
-                let after = self
-                    .plan
-                    .production
-                    .get(&id)
-                    .and_then(|goods| goods.get(kind))
-                    .copied()
-                    .unwrap_or(0);
-                // Recipe over-yield has already returned to the lot ledger.
-                // Do not credit those same units toward two different demands.
-                remaining = remaining.saturating_sub(after.saturating_sub(before).min(allocation));
-                slots = slots.saturating_sub(1);
+                    .get(id)
+                    .map_or(0, |goods| goods.values().copied().sum::<u32>()),
+                *id,
+            )
+        });
+        let mut remaining = missing;
+        let mut slots = producers.len() as u32;
+        for (id, entity, role) in producers {
+            if remaining == 0 {
+                break;
             }
-            return;
+            let before = self
+                .plan
+                .production
+                .get(&id)
+                .and_then(|goods| goods.get(kind))
+                .copied()
+                .unwrap_or(0);
+            let allocation = remaining.div_ceil(slots.max(1));
+            self.manufacture_for(id, entity, role, kind, allocation);
+            let after = self
+                .plan
+                .production
+                .get(&id)
+                .and_then(|goods| goods.get(kind))
+                .copied()
+                .unwrap_or(0);
+            // Recipe over-yield has already returned to the lot ledger.
+            // Do not credit those same units toward two different demands.
+            remaining = remaining.saturating_sub(after.saturating_sub(before).min(allocation));
+            slots = slots.saturating_sub(1);
         }
-        let Some((id, entity, role)) = self.producer(kind) else {
-            return;
-        };
-        self.manufacture_for(id, entity, role, kind, missing);
     }
     /// Regional: a gatherer whose good sells above its base price keeps a few
     /// units on hand beyond its orders. Everybody else works to order, so
@@ -1365,7 +1348,7 @@ fn forecast_amount(world: &World, actor: Entity, need: &str) -> u64 {
         .saturating_mul(u64::from(reserve_days));
     let depleted = (100_000 - econ::need(world, actor, need)).max(0) as u64;
     // Children eat from the packs of the household's adults (regional only).
-    let dependants = if need == "Hunger" && super::frontier::enabled(world) {
+    let dependants = if need == "Hunger" {
         super::demography::dependants_hunger(world, actor, horizon)
     } else {
         0
@@ -1449,9 +1432,6 @@ fn needed_materials(
 /// Shared reference prices and the existing finite world fund remain regional
 /// trade's common currency; they are not represented as separate local treasuries.
 pub fn economic_settlement(world: &World, actor: Entity) -> Option<SimId> {
-    if !super::frontier::enabled(world) {
-        return None;
-    }
     world
         .get::<Villager>(actor)
         .and_then(|person| world.resource::<SimIndex>().get(person.workplace))
@@ -1473,9 +1453,6 @@ pub fn economic_settlement(world: &World, actor: Entity) -> Option<SimId> {
 }
 
 fn compute(world: &World) -> ProductionPlan {
-    if !super::frontier::enabled(world) {
-        return compute_region(world, None);
-    }
     let mut combined = ProductionPlan {
         refreshed_at: Some(world.resource::<SimClock>().tick),
         ..Default::default()
@@ -1542,7 +1519,7 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         // requests use it.
         let mut reserved: BTreeMap<String, u32> = BTreeMap::new();
         for (_, item) in econ::free_items(world, *e) {
-            if super::frontier::enabled(world) && market::sells(world, *e, &item.kind) {
+            if market::sells(world, *e, &item.kind) {
                 builder.ledger.sellable.insert((*id, item.kind.clone()));
             }
             let mut stack = item.stack;
@@ -1616,16 +1593,14 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         {
             continue;
         }
-        {
-            for kind in catalog::trade_kinds(world) {
-                if market::asking_price(world, *e, kind) > market::unit_price(world, kind) {
-                    continue;
-                }
-                let amount = market::available_to_sell(world, *e, kind);
-                if amount > 0 {
-                    builder.ledger.add(*id, kind, amount);
-                    builder.ledger.sellable.insert((*id, (*kind).into()));
-                }
+        for kind in catalog::trade_kinds(world) {
+            if market::asking_price(world, *e, kind) > market::unit_price(world, kind) {
+                continue;
+            }
+            let amount = market::available_to_sell(world, *e, kind);
+            if amount > 0 {
+                builder.ledger.add(*id, kind, amount);
+                builder.ledger.sellable.insert((*id, (*kind).into()));
             }
         }
     }
@@ -1662,7 +1637,7 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             builder.request(*id, food, 1);
             critical.entry(*id).or_default().insert(food.into(), 1);
         }
-        if super::colony::enabled(world) {
+        {
             let threshold = super::policy::active(world).map_or_else(
                 || super::policy::IslandAiPolicy::default().critical_need,
                 |policy| policy.critical_need,
@@ -1841,9 +1816,6 @@ pub(super) fn invalidate(world: &mut World) {
 }
 
 pub fn refresh(world: &mut World) {
-    if !super::needs_driven(world) {
-        return;
-    }
     let now = world.resource::<SimClock>().tick;
     let interval = (world.resource::<SimConfig>().day_length / 8).clamp(40, 300);
     if world

@@ -346,9 +346,6 @@ pub fn replenish(world: &mut World, patch: Entity, units: u32) -> u32 {
     added
 }
 pub fn tick(world: &mut World) {
-    if !super::enabled(world) {
-        return;
-    }
     let now = world.resource::<SimClock>().tick;
     if !now.is_multiple_of(UPDATE_TICKS) {
         return;
@@ -430,9 +427,6 @@ fn living_animals(world: &World, habitat: SimId) -> Vec<(SimId, Entity)> {
     animals
 }
 pub fn harvestable_prey(world: &World, target: SimId) -> bool {
-    if !super::enabled(world) {
-        return true;
-    }
     let Some(animal) = world
         .resource::<SimIndex>()
         .get(target)
@@ -445,9 +439,6 @@ pub fn harvestable_prey(world: &World, target: SimId) -> bool {
     living_animals(world, animal.habitat).len() > 2
 }
 pub fn wildlife_tick(world: &mut World) {
-    if !super::enabled(world) {
-        return;
-    }
     let now = world.resource::<SimClock>().tick;
     let interval = (world.resource::<SimConfig>().day_length / 8).max(1);
     let habitats: Vec<_> = world
@@ -521,8 +512,7 @@ pub fn check_work(
     patch: SimId,
     kind: EcologyWorkKind,
 ) -> Result<(), String> {
-    if !super::enabled(world)
-        || !crate::village::living(world, actor)
+    if !crate::village::living(world, actor)
         || world.get::<colony::AwaitingArrival>(actor).is_some()
     {
         return Err("Restoration requires a living island resident".into());

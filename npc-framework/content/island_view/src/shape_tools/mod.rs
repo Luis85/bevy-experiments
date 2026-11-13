@@ -19,7 +19,6 @@ use crate::IslandMode;
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use island_content::village::{
-    colony,
     frontier::terrain::{TerraformCell, TerraformCells},
     terrain::{Terraform, TerrainSurface},
 };
@@ -235,9 +234,6 @@ impl ShapeTools {
 }
 
 pub(crate) fn plugin(app: &mut App) {
-    if !colony::enabled(app.world()) {
-        return;
-    }
     // Review aids, read once. Neither reaches the simulation.
     let mut tools = ShapeTools {
         per_cell: std::env::var("ISLAND_VIEW_SHAPE_BATCH").as_deref() == Ok("off"),

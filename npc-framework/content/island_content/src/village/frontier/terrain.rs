@@ -512,9 +512,6 @@ impl TerraformCells {
         Ok(edits)
     }
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("TerraformCells requires the regional living world".into());
-        }
         edits_check(world, &self.edits(world)?)
     }
     pub fn perform(&self, world: &mut World) -> Result<(), String> {

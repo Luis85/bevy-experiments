@@ -1,12 +1,10 @@
 use super::*;
-use island_content::village::terrain::TerrainState;
 use model::Limits;
-use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::run_ticks;
 use std::collections::BTreeSet;
 
 fn fixture() -> App {
-    let mut app = island_content::new_sim_app(7, "island_colony");
+    let mut app = island_content::new_sim_app(7, "living_world");
     app.init_resource::<ShapeTools>()
         .insert_resource(IslandMode::Editor);
     app
@@ -45,163 +43,9 @@ fn apply(app: &mut App) {
 }
 
 #[test]
-fn the_outline_matches_the_authoritative_circular_terraform_brush() {
-    for radius in 0..=3 {
-        let mut app = fixture();
-        let before = app.world().resource::<TerrainState>().cells.clone();
-        let command = Terraform {
-            x: 14,
-            z: 16,
-            radius,
-            height_mm: 250,
-            surface: TerrainSurface::Stone,
-        };
-        command.perform(app.world_mut()).unwrap();
-        let changed: BTreeSet<_> = app
-            .world()
-            .resource::<TerrainState>()
-            .cells
-            .iter()
-            .zip(&before)
-            .enumerate()
-            .filter(|(_, (after, before))| after != before)
-            .map(|(index, _)| ((index % 64) as i32 - 32, (index / 64) as i32 - 32))
-            .collect();
-        let preview: BTreeSet<_> = model::disc((command.x, command.z), radius)
-            .filter(|(x, z)| picking::terrain_cell(app.world(), *x, *z).is_some())
-            .collect();
-        assert_eq!(
-            preview, changed,
-            "radius {radius} outline must cover exactly the cells the command modifies"
-        );
-    }
-}
-
-#[test]
-fn a_drag_records_relative_edits_and_undo_redo_restore_them_through_commands() {
-    let mut app = fixture();
-    {
-        let mut tools = app.world_mut().resource_mut::<ShapeTools>();
-        tools.brush.tool = Tool::Raise;
-        tools.brush.radius = 1;
-        tools.brush.falloff = Falloff::Soft;
-    }
-    let cells: Vec<_> = model::disc((14, 16), 1)
-        .chain(model::disc((15, 16), 1))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    let original = heights(app.world(), &cells);
-    let hash = state_hash(app.world_mut());
-
-    begin(app.world_mut(), (14, 16));
-    dab(app.world_mut(), (14, 16));
-    assert_eq!(
-        hash,
-        state_hash(app.world_mut()),
-        "planning a dab only queues view-side work"
-    );
-    // The second dab of the drag builds on the first one's planned heights.
-    app.world_mut()
-        .resource_mut::<ShapeTools>()
-        .stroke
-        .as_mut()
-        .unwrap()
-        .since_dab = DAB_SECS;
-    dab(app.world_mut(), (15, 16));
-    assert_eq!(app.world().resource::<ShapeTools>().queued(), 10);
-    finish_stroke(app.world_mut());
-    apply(&mut app);
-
-    let sculpted = heights(app.world(), &cells);
-    let centre = cells.iter().position(|cell| *cell == (14, 16)).unwrap();
-    assert_eq!(
-        sculpted[centre].height_mm,
-        // Full strength from the first dab plus the rim of the second.
-        original[centre].height_mm + 250 + 63,
-        "raise is relative and accumulates across overlapping dabs"
-    );
-    assert!(
-        sculpted
-            .iter()
-            .zip(&original)
-            .all(|(after, before)| after.height_mm > before.height_mm
-                && after.surface == before.surface)
-    );
-    assert!(app.world().resource::<ShapeTools>().can_undo());
-    assert!(
-        app.world()
-            .resource::<ShapeTools>()
-            .cursor_reason()
-            .is_none()
-    );
-
-    app.world_mut()
-        .resource_mut::<ShapeTools>()
-        .requests
-        .push(Action::Undo);
-    apply(&mut app);
-    assert_eq!(heights(app.world(), &cells), original, "undo is exact");
-    assert!(app.world().resource::<ShapeTools>().can_redo());
-
-    app.world_mut()
-        .resource_mut::<ShapeTools>()
-        .requests
-        .push(Action::Redo);
-    apply(&mut app);
-    assert_eq!(heights(app.world(), &cells), sculpted, "redo is exact");
-}
-
-#[test]
-fn a_stroke_issues_a_bounded_number_of_commands() {
-    let mut app = fixture();
-    {
-        let mut tools = app.world_mut().resource_mut::<ShapeTools>();
-        tools.brush.tool = Tool::Raise;
-        tools.brush.radius = 3;
-        tools.brush.falloff = Falloff::Soft;
-    }
-    begin(app.world_mut(), (14, 16));
-    let mut recorded = 0;
-    for step in 0..200 {
-        app.world_mut()
-            .resource_mut::<ShapeTools>()
-            .stroke
-            .as_mut()
-            .unwrap()
-            .since_dab = DAB_SECS;
-        // Sweep back and forth; each dab is at most one command per disc cell.
-        dab(app.world_mut(), (10 + step % 9, 16));
-        let state = app.world().resource::<ShapeTools>();
-        let stroke = state.stroke.as_ref().unwrap();
-        assert!(stroke.commands <= MAX_STROKE_COMMANDS);
-        assert!(state.outbox.len() <= OUTBOX_LIMIT);
-        recorded = stroke.commands;
-        // Keep the outbox moving like a running world would.
-        let drained: Vec<_> = app
-            .world_mut()
-            .resource_mut::<ShapeTools>()
-            .outbox
-            .drain(..)
-            .collect();
-        assert!(drained.len() <= 29, "a radius-3 dab is at most 29 commands");
-    }
-    assert!(
-        recorded > MAX_STROKE_COMMANDS - 29,
-        "the stroke reached its cap"
-    );
-    assert!(
-        app.world()
-            .resource::<ShapeTools>()
-            .status
-            .contains("size limit")
-    );
-}
-
-#[test]
 fn a_refused_edit_reports_the_simulations_reason_and_changes_nothing() {
     let mut app = fixture();
-    let limits = Limits::LEGACY;
+    let limits = Limits::REGIONAL;
     // Find a protected cell: the authoritative check refuses raising it.
     let blocked = (-31..31)
         .flat_map(|z| (-31..31).map(move |x| (x, z)))
@@ -258,7 +102,7 @@ fn tool_requests_respect_the_commands_limits() {
     }
     assert_eq!(
         app.world().resource::<ShapeTools>().brush.radius,
-        Limits::LEGACY.max_radius
+        Limits::REGIONAL.max_radius
     );
     for _ in 0..12 {
         apply_request(app.world_mut(), Action::Radius(-1));

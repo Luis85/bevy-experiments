@@ -158,9 +158,6 @@ pub struct SetProfessionTarget {
 }
 impl SetProfessionTarget {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("profession targets exist only in the living world".into());
-        }
         if settlements::definition(world, self.settlement).is_none() {
             return Err(format!("{} is not a settlement", self.settlement.0));
         }
@@ -462,9 +459,6 @@ pub struct SetVillagePriority {
 }
 impl SetVillagePriority {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("village priorities exist only in the living world".into());
-        }
         if settlements::definition(world, self.settlement).is_none() {
             return Err(format!("{} is not a settlement", self.settlement.0));
         }

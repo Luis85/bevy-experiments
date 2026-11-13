@@ -75,7 +75,7 @@ pub fn register(app: &mut App) {
     }
 }
 fn check_site(world: &World, actor: Entity, target: SimId, verb: &str) -> Result<(), String> {
-    if !super::enabled(world) || !living(world, actor) || world.get::<Villager>(actor).is_none() {
+    if !living(world, actor) || world.get::<Villager>(actor).is_none() {
         return Err("restoration requires a living resident in the regional world".into());
     }
     let site = entity_of(world, target).ok_or("resource site is missing")?;

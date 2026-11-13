@@ -5,7 +5,7 @@
 //! tree is data (`super::resident`) made of granular leaves, each of which
 //! takes its step when it starts. Both share [`LifeDecision`], the guards'
 //! predicates, [`stop`] and [`advance`].
-use super::{VillageAct, Villager, ai, catalog, economy as econ, living};
+use super::{VillageAct, Villager, ai, economy as econ, living};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
@@ -14,8 +14,6 @@ use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub const TREE: &str = "island_life";
-const ACTION: &str = "IslandLifeDecision";
-const DECISION_TICKS: u64 = 20;
 const CRITICAL_NEED: i32 = 15_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
@@ -42,17 +40,6 @@ impl LifeGoal {
             Self::Work => "supply the village",
             Self::Leisure => "enjoy free time",
         }
-    }
-    fn parse(name: &str) -> Option<Self> {
-        Some(match name {
-            "thirst" => Self::Thirst,
-            "hunger" => Self::Hunger,
-            "busy" => Self::Busy,
-            "recovery" => Self::Recovery,
-            "home" => Self::Home,
-            "work" => Self::Work,
-            _ => return None,
-        })
     }
 }
 
@@ -84,8 +71,7 @@ pub fn decision(world: &World, actor: Entity) -> Option<&'static str> {
     }
     let decision = world.get::<LifeDecision>(actor)?;
     // Regional residents run granular leaves: name the leaf, not its class.
-    super::frontier::enabled(world)
-        .then(|| super::resident::label(world, actor))
+    true.then(|| super::resident::label(world, actor))
         .flatten()
         .or(Some(decision.goal.name()))
 }
@@ -99,12 +85,11 @@ pub(super) fn busy(world: &World, actor: Entity) -> bool {
         || world.get::<super::civic::SiteWork>(actor).is_some()
         || world.get::<super::live::UpgradeWork>(actor).is_some()
         || world.get::<super::fields::FieldWork>(actor).is_some()
-        || (super::needs_driven(world)
-            && (world.get::<super::hunting::Hunting>(actor).is_some()
-                || world.get::<super::homestead::CottageBuild>(actor).is_some()
-                || world
-                    .get::<npc_framework::interaction::Interacting>(actor)
-                    .is_some()))
+        || (world.get::<super::hunting::Hunting>(actor).is_some()
+            || world.get::<super::homestead::CottageBuild>(actor).is_some()
+            || world
+                .get::<npc_framework::interaction::Interacting>(actor)
+                .is_some())
         || world
             .get::<Villager>(actor)
             .is_some_and(|v| v.resting_until > world.resource::<SimClock>().tick)
@@ -126,8 +111,7 @@ fn can_satisfy(world: &World, actor: Entity, good: &str, role: super::Role) -> b
     if econ::count(world, actor, good) > 0 {
         return true;
     }
-    supplier(world, actor, role, good).is_some()
-        || (super::needs_driven(world) && super::ai::can_forage(world, actor, good))
+    supplier(world, actor, role, good).is_some() || (super::ai::can_forage(world, actor, good))
 }
 
 /// A real purchasable unit of supply, excluding only distance because the leaf
@@ -135,42 +119,10 @@ fn can_satisfy(world: &World, actor: Entity, good: &str, role: super::Role) -> b
 pub(super) fn supplier(
     world: &World,
     actor: Entity,
-    role: super::Role,
+    _role: super::Role,
     good: &str,
 ) -> Option<Entity> {
-    if super::needs_driven(world) {
-        return super::ai::market_supplier(world, actor, good);
-    }
-    let price = catalog::price_in(world, good)?;
-    if world
-        .get::<super::Wallet>(actor)
-        .is_none_or(|w| w.coins < price)
-    {
-        return None;
-    }
-    world
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .find(|seller| {
-            *seller != actor
-                && living(world, *seller)
-                && world
-                    .get::<Villager>(*seller)
-                    .is_some_and(|v| v.role == role)
-                && world
-                    .get::<super::Wallet>(*seller)
-                    .is_some_and(|w| w.coins.checked_add(price).is_some())
-                && econ::selected(world, *seller, good, 1).is_ok_and(|goods| {
-                    econ::fit(
-                        world,
-                        actor,
-                        &goods.into_iter().map(|(_, item)| item).collect::<Vec<_>>(),
-                    )
-                    .is_ok()
-                })
-        })
+    super::ai::market_supplier(world, actor, good)
 }
 
 pub(super) fn thirsty(world: &World, actor: Entity, threshold: i32) -> bool {
@@ -184,19 +136,10 @@ pub(super) fn thirsty(world: &World, actor: Entity, threshold: i32) -> bool {
         )
 }
 pub(super) fn hungry(world: &World, actor: Entity, threshold: i32) -> bool {
-    living(world, actor)
-        && econ::need(world, actor, "Hunger") < threshold
-        && if super::needs_driven(world) {
-            super::production::food_choice(world, actor).is_some()
-                || super::ai::can_forage(world, actor, super::roles::roles(world).foraged)
-        } else {
-            can_satisfy(
-                world,
-                actor,
-                super::roles::roles(world).baked,
-                super::Role::Baker,
-            )
-        }
+    living(world, actor) && econ::need(world, actor, "Hunger") < threshold && {
+        super::production::food_choice(world, actor).is_some()
+            || super::ai::can_forage(world, actor, super::roles::roles(world).foraged)
+    }
 }
 
 /// One colony warmth decision shared by the tree and its physical executor.
@@ -218,22 +161,10 @@ pub(super) fn needs_hearth_fuel(world: &World, actor: Entity) -> bool {
         .is_some_and(|home| !home.heated && home.carried_fuel < home.fuel_required)
 }
 
-fn needs_recovery(world: &World, actor: Entity) -> bool {
-    let policy = super::policy::active(world);
-    econ::need(world, actor, "Energy") < policy.map_or(30_000, |policy| policy.recovery_threshold)
-        || (super::calendar(world).2
-            && econ::need(world, actor, "Energy")
-                < policy.map_or(85_000, |policy| policy.night_recovery_threshold))
-        || warming_need(world, actor)
-            .is_some_and(|home| home.heated || home.carried_fuel >= home.fuel_required)
-        || freezing(world, actor)
-}
-
 /// Regional residents in deep cold shelter at home even without hearth fuel:
 /// an unheated cottage still warms them, a walk for fuel does not.
 pub(super) fn freezing(world: &World, actor: Entity) -> bool {
-    super::frontier::enabled(world)
-        && !super::living::has_coat(world, actor)
+    !super::living::has_coat(world, actor)
         && econ::need(world, actor, "Warmth")
             < super::policy::active(world).map_or(CRITICAL_NEED, |policy| policy.critical_need)
         && super::colony::home_heating(world, actor).is_some_and(|home| home.cold)
@@ -247,7 +178,7 @@ const WARM_REST_MAX_TICKS: u64 = 1_500;
 /// A cold resident without a coat stays by the hearth until warm, not only
 /// until rested. The ordinary home rest stays the minimum.
 pub(super) fn warming_rest_ticks(world: &World, actor: Entity) -> Option<u64> {
-    if !super::frontier::enabled(world) || super::living::has_coat(world, actor) {
+    if super::living::has_coat(world, actor) {
         return None;
     }
     let home = super::colony::home_heating(world, actor).filter(|home| home.cold)?;
@@ -266,178 +197,9 @@ pub(super) fn warming_rest_ticks(world: &World, actor: Entity) -> Option<u64> {
 
 pub fn register(app: &mut App) {
     super::policy::register(app);
-    if super::frontier::enabled(app.world()) {
-        // Data-authored tree, granular leaves and named conditions.
-        app.register_sim_component::<LifeDecision>();
-        super::resident::register(app);
-        return;
-    }
-    app.register_sim_component::<LifeDecision>()
-        .register_action(ACTION, start, stop)
-        .register_cond("island_critical_thirst", |w, e| {
-            can_interrupt(w, e)
-                && thirsty(
-                    w,
-                    e,
-                    super::policy::active(w).map_or(CRITICAL_NEED, |p| p.critical_need),
-                )
-        })
-        .register_cond("island_critical_hunger", |w, e| {
-            can_interrupt(w, e)
-                && hungry(
-                    w,
-                    e,
-                    super::policy::active(w).map_or(CRITICAL_NEED, |p| p.critical_need),
-                )
-        })
-        .register_cond("island_busy", busy)
-        .register_cond("island_thirsty", |w, e| {
-            !busy(w, e)
-                && thirsty(
-                    w,
-                    e,
-                    super::policy::active(w).map_or(55_000, |p| p.thirst_threshold),
-                )
-        })
-        .register_cond("island_hungry", |w, e| {
-            !busy(w, e)
-                && hungry(
-                    w,
-                    e,
-                    super::policy::active(w).map_or(50_000, |p| p.hunger_threshold),
-                )
-        })
-        .register_cond("island_needs_recovery", |w, e| {
-            !busy(w, e) && needs_recovery(w, e)
-        })
-        .register_cond("island_night", |w, e| {
-            !busy(w, e) && super::calendar(w).2 && !needs_hearth_fuel(w, e)
-        });
-    if super::policy::active(app.world()).is_some() {
-        app.register_cond("island_routine_0", |w, e| routine_passes(w, e, 0))
-            .register_cond("island_routine_1", |w, e| routine_passes(w, e, 1))
-            .register_cond("island_routine_2", |w, e| routine_passes(w, e, 2))
-            .register_cond("island_routine_3", |w, e| routine_passes(w, e, 3))
-            .register_tree(TREE, configured_tree);
-    } else {
-        app.register_tree(TREE, |b| {
-            b.selector("Daily life", |b| {
-                // Each guard implies the leaf can start, even while working:
-                // a critical need cancels only work owned by an aborted life leaf.
-                for (name, condition, goal) in [
-                    ("Critical thirst", "island_critical_thirst", "thirst"),
-                    ("Critical hunger", "island_critical_hunger", "hunger"),
-                ] {
-                    b.guard(name, condition, Abort::LowerPriority, |b| {
-                        b.leaf(name, ACTION, goal);
-                    });
-                }
-                b.guard("Player orders", HAS_UNIT_ORDER, Abort::LowerPriority, |b| {
-                    b.leaf("Execute orders", EXECUTE_ORDER_ACTION, ());
-                });
-                for (name, condition, goal) in [
-                    ("Current activity", "island_busy", "busy"),
-                    ("Thirst", "island_thirsty", "thirst"),
-                    ("Hunger", "island_hungry", "hunger"),
-                    ("Recovery", "island_needs_recovery", "recovery"),
-                    ("Night", "island_night", "home"),
-                ] {
-                    let abort = if goal == "busy" {
-                        Abort::None
-                    } else {
-                        Abort::LowerPriority
-                    };
-                    b.guard(name, condition, abort, |b| {
-                        b.leaf(name, ACTION, goal);
-                    });
-                }
-                b.leaf("Profession", ACTION, "work");
-            });
-        });
-    }
-}
-
-fn routine_goal(world: &World, index: usize) -> Option<LifeGoal> {
-    use super::policy::RoutineGoal;
-    Some(match super::policy::active(world)?.routine.get(index)? {
-        RoutineGoal::Thirst => LifeGoal::Thirst,
-        RoutineGoal::Hunger => LifeGoal::Hunger,
-        RoutineGoal::Recovery => LifeGoal::Recovery,
-        RoutineGoal::Home => LifeGoal::Home,
-        RoutineGoal::Work => LifeGoal::Work,
-    })
-}
-
-fn routine_passes(world: &World, actor: Entity, index: usize) -> bool {
-    let Some(policy) = super::policy::active(world) else {
-        return false;
-    };
-    if busy(world, actor) || !living(world, actor) {
-        return false;
-    }
-    match routine_goal(world, index) {
-        Some(LifeGoal::Thirst) => thirsty(world, actor, policy.thirst_threshold),
-        Some(LifeGoal::Hunger) => hungry(world, actor, policy.hunger_threshold),
-        Some(LifeGoal::Recovery) => needs_recovery(world, actor),
-        Some(LifeGoal::Home) => super::calendar(world).2 && !needs_hearth_fuel(world, actor),
-        _ => false,
-    }
-}
-
-fn configured_tree(b: &mut TreeBuilder) {
-    b.selector("Configured daily life", |b| {
-        for (name, condition, goal) in [
-            ("Critical thirst", "island_critical_thirst", "thirst"),
-            ("Critical hunger", "island_critical_hunger", "hunger"),
-        ] {
-            b.guard(name, condition, Abort::LowerPriority, |b| {
-                b.leaf(name, ACTION, goal);
-            });
-        }
-        b.guard("Player orders", HAS_UNIT_ORDER, Abort::LowerPriority, |b| {
-            b.leaf("Execute orders", EXECUTE_ORDER_ACTION, ());
-        });
-        b.guard("Current activity", "island_busy", Abort::None, |b| {
-            b.leaf("Current activity", ACTION, "busy");
-        });
-        for (name, condition, goal) in [
-            ("Routine priority 1", "island_routine_0", "routine_0"),
-            ("Routine priority 2", "island_routine_1", "routine_1"),
-            ("Routine priority 3", "island_routine_2", "routine_2"),
-            ("Routine priority 4", "island_routine_3", "routine_3"),
-        ] {
-            b.guard(name, condition, Abort::LowerPriority, |b| {
-                b.leaf(name, ACTION, goal);
-            });
-        }
-        b.leaf("Goal-oriented profession", ACTION, "work");
-    });
-}
-
-fn start(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
-    let Some(goal) = param.as_name().and_then(|name| {
-        name.strip_prefix("routine_")
-            .and_then(|index| index.parse::<usize>().ok())
-            .and_then(|index| routine_goal(world, index))
-            .or_else(|| LifeGoal::parse(name))
-    }) else {
-        return Status::Failure;
-    };
-    if !living(world, actor)
-        || world
-            .get::<Villager>(actor)
-            .is_none_or(|v| v.role == super::Role::Visitor)
-    {
-        return Status::Failure;
-    }
-    let reconsider_at = world.resource::<SimClock>().tick
-        + super::policy::active(world).map_or(DECISION_TICKS, |policy| policy.decision_ticks);
-    world.entity_mut(actor).insert(LifeDecision {
-        goal,
-        reconsider_at,
-        pending: true,
-    });
-    Status::Running
+    // Data-authored tree, granular leaves and named conditions.
+    app.register_sim_component::<LifeDecision>();
+    super::resident::register(app);
 }
 
 pub(super) fn stop(world: &mut World, actor: Entity, reason: StopReason) {
@@ -536,9 +298,7 @@ pub(super) fn advance(world: &mut World) {
         }
         let held = match decision.goal {
             LifeGoal::Work | LifeGoal::Recovery | LifeGoal::Busy => busy(world, actor),
-            LifeGoal::Thirst | LifeGoal::Hunger => {
-                super::needs_driven(world) && world.get::<super::Gathering>(actor).is_some()
-            }
+            LifeGoal::Thirst | LifeGoal::Hunger => world.get::<super::Gathering>(actor).is_some(),
             _ => false,
         };
         if !held

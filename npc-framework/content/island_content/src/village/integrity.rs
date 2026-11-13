@@ -5,7 +5,6 @@ use super::{
     colony::{AwaitingArrival, ColonyState, Household, SocialLife},
     homestead::{Cottage, HomesteadPlot},
     policy::IslandAiPolicy,
-    terrain::{MAX_HEIGHT_MM, TerrainState, TerrainSurface, WIDTH},
 };
 use bevy_ecs::prelude::*;
 use npc_framework::prelude::*;
@@ -153,16 +152,13 @@ fn mortal_and_gone(
 }
 
 pub fn validate_colony(world: &World) -> Result<(), String> {
-    if !super::colony::enabled(world) {
-        return Err("This save does not describe an island colony".into());
-    }
     let index = world
         .get_resource::<SimIndex>()
         .ok_or("Island identities are missing")?;
     let state = world
         .get_resource::<VillageState>()
         .ok_or("Island state is missing")?;
-    let ids = world
+    world
         .get_resource::<crate::TestbedIds>()
         .ok_or("Island anchors are missing")?;
     let played = index
@@ -184,38 +180,14 @@ pub fn validate_colony(world: &World) -> Result<(), String> {
     {
         return Err("The played identity has no visitor life or reserved arrival".into());
     }
-    if super::frontier::enabled(world) {
-        super::frontier::settlements::validate(world)?;
-        super::frontier::ecology::validate(world)?;
-        super::frontier::labor::validate(world)?;
-        super::civic::validate(world)?;
-    } else {
-        for role in Role::RESIDENTS
-            .into_iter()
-            .chain([Role::Hunter, Role::Tanner, Role::Tailor])
-        {
-            let entity = ids
-                .get(role.person())
-                .and_then(|id| index.get(id))
-                .ok_or_else(|| format!("Required resident {} is missing", role.person()))?;
-            if world
-                .get::<Villager>(entity)
-                .is_none_or(|person| person.role != role)
-            {
-                return Err(format!(
-                    "Required resident {} has no matching life",
-                    role.person()
-                ));
-            }
-        }
-    }
+    super::frontier::settlements::validate(world)?;
+    super::frontier::ecology::validate(world)?;
+    super::frontier::labor::validate(world)?;
+    super::civic::validate(world)?;
     let mut members = BTreeSet::new();
     for (id, entity) in &index.map {
         if let Some(work) = world.get::<super::frontier::activities::EcologyWork>(*entity) {
-            if !super::frontier::enabled(world)
-                || !super::living(world, *entity)
-                || world.get::<AwaitingArrival>(*entity).is_some()
-            {
+            if !super::living(world, *entity) || world.get::<AwaitingArrival>(*entity).is_some() {
                 return Err("Restoration work requires a living regional participant".into());
             }
             super::frontier::activities::validate_work(world, *entity, work)?;
@@ -302,31 +274,7 @@ pub fn validate_colony(world: &World) -> Result<(), String> {
             return Err("A housing project has missing participants".into());
         }
     }
-    if super::frontier::enabled(world) {
-        super::frontier::terrain::validate(world)?;
-    } else {
-        let terrain = world
-            .get_resource::<TerrainState>()
-            .ok_or("Island terrain is missing")?;
-        if terrain.cells.len() != WIDTH * WIDTH {
-            return Err("Island terrain has an invalid size".into());
-        }
-        let grid = world
-            .get_resource::<SpatialGrid>()
-            .ok_or("Island navigation is missing")?;
-        for z in -32..32 {
-            for x in -32..32 {
-                let cell = terrain.cell(x, z).expect("validated grid size");
-                if !(-1000..=MAX_HEIGHT_MM).contains(&cell.height_mm)
-                    || (cell.surface == TerrainSurface::Water && cell.height_mm > 0)
-                    || (cell.surface != TerrainSurface::Water && cell.height_mm < 0)
-                    || grid.static_cell(CellCoord::new(x, z)) != cell.navigation()
-                {
-                    return Err("Island terrain and navigation are inconsistent".into());
-                }
-            }
-        }
-    }
+    super::frontier::terrain::validate(world)?;
     if world
         .resource::<crate::world_runtime::ActiveWorld>()
         .0

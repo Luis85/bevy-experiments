@@ -12,7 +12,6 @@ use island_content::{
     },
 };
 use npc_framework::crafting::{CraftSource, Crafting, begin_craft, complete_craft};
-use npc_framework::kernel::hash::state_hash;
 use npc_framework::prelude::*;
 
 fn scene() -> App {
@@ -48,43 +47,6 @@ fn money(app: &App) -> u64 {
         })
         .sum::<u64>()
         + u64::from(app.world().resource::<village::VillageState>().fund)
-}
-
-#[test]
-fn regional_residents_have_independent_homes_and_persistent_identity() {
-    let mut app = scene();
-    let residents: Vec<_> = app
-        .world()
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .filter(|entity| app.world().get::<ResidentProfile>(*entity).is_some())
-        .collect();
-    assert_eq!(residents.len(), 42);
-    assert_eq!(money(&app), 42 * u64::from(village::NPC_SEED_COINS));
-    for resident in residents {
-        let id = *app.world().get::<SimId>(resident).unwrap();
-        let home = village::colony::home_of(app.world(), id).unwrap();
-        assert_ne!(
-            home,
-            app.world().get::<Villager>(resident).unwrap().workplace
-        );
-    }
-    village::integrity::validate_colony(app.world()).unwrap();
-    let before = state_hash(app.world_mut());
-    let jun = person(&app, "Jun");
-    assert!(labor::summary(app.world(), jun).is_some());
-    assert!(!labor::vacancies(app.world()).is_empty());
-    assert_eq!(state_hash(app.world_mut()), before);
-    let old = island_content::new_sim_app(7, "island_colony");
-    assert!(
-        old.world()
-            .resource::<SimIndex>()
-            .map
-            .values()
-            .all(|entity| old.world().get::<Employment>(*entity).is_none())
-    );
 }
 
 fn crafting_request() -> App {

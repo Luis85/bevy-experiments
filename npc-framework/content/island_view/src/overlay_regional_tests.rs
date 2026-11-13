@@ -5,7 +5,7 @@ use npc_framework::view_helpers::nav_gizmos::NavGizmos;
 
 #[test]
 fn colony_profiles_show_navigation_only_when_diagnostics_are_requested() {
-    for scene in ["island_colony", "living_world"] {
+    for scene in ["living_world", "living_world"] {
         let mut app = island_content::new_sim_app(7, scene);
         app.insert_resource(OverlayState { visible: false })
             .insert_resource(crate::IslandMode::Editor)

@@ -6,18 +6,17 @@ use bevy_ecs::prelude::*;
 use island_content::{
     TestbedIds,
     village::{
-        self, ResourcePatch, Role, VillageAct, VillageState, Villager, Vitality, Wallet, catalog,
-        colony, economy,
+        self, ResourcePatch, Role, VillageAct, VillageState, Villager, Wallet, catalog, colony,
+        economy,
         frontier::{
             labor::{self, Employment},
             settlements,
         },
-        goap, living,
+        goap,
         market::{Commodity, MarketState},
     },
 };
 use npc_framework::crafting::Durability;
-use npc_framework::needs::{NeedRegistry, Needs};
 use npc_framework::prelude::*;
 
 fn scene() -> App {
@@ -42,14 +41,6 @@ fn money(app: &App) -> u64 {
         })
         .sum::<u64>()
         + u64::from(app.world().resource::<VillageState>().fund)
-}
-fn set_need(app: &mut App, actor: Entity, name: &str, value: i32) {
-    let id = app.world().resource::<NeedRegistry>().id(name).unwrap();
-    app.world_mut()
-        .get_mut::<Needs>(actor)
-        .unwrap()
-        .get_mut(id)
-        .value = value;
 }
 fn set_price(app: &mut App, kind: &str, coins: u32) {
     let mut market = app.world_mut().resource_mut::<MarketState>();
@@ -178,69 +169,6 @@ fn fund_above_its_reserve_returns_as_an_equal_dividend_and_conserves_coins() {
 }
 
 #[test]
-fn founding_gatherers_carry_durable_tools_and_tools_set_gathering_speed() {
-    let mut app = scene();
-    for (name, tool, good) in [
-        ("Oak", "axe", "log"),
-        ("Piper", "axe", "log"),
-        ("Bram", "pickaxe", "ore"),
-        ("Ada", catalog::HOE, catalog::GRAIN),
-    ] {
-        let actor = person(&app, name);
-        let owned = tools(&app, actor, tool);
-        assert_eq!(owned.len(), 1, "{name} should start with one {tool}");
-        assert_eq!(
-            app.world().get::<Durability>(owned[0]).map(|d| d.current),
-            Some(catalog::TOOL_DURABILITY)
-        );
-        assert_eq!(catalog::gather_tool(good), Some(tool));
-    }
-    let oak = person(&app, "Oak");
-    app.world_mut()
-        .get_mut::<colony::SocialLife>(oak)
-        .unwrap()
-        .morale = 60_000;
-    // 115 - 60000 * 25 / 100000 = 100: a neutral pace isolates the tool effect.
-    assert_eq!(colony::work_pace_percent(app.world(), oak), 100);
-    assert_eq!(living::gather_ticks(app.world(), oak, "log", 240), 180);
-    assert_eq!(
-        living::gather_ticks(app.world(), oak, catalog::WATER, 100),
-        100
-    );
-    let axe = tools(&app, oak, "axe")[0];
-    app.world_mut().get_mut::<Durability>(axe).unwrap().current = 0;
-    assert_eq!(living::gather_ticks(app.world(), oak, "log", 240), 360);
-    // Morale moves the same work within the bounded 90%..115% band.
-    for (morale, pace) in [(0, 115), (100_000, 90), (250_000, 90), (-5, 115)] {
-        app.world_mut()
-            .get_mut::<colony::SocialLife>(oak)
-            .unwrap()
-            .morale = morale;
-        assert_eq!(colony::work_pace_percent(app.world(), oak), pace);
-        assert_eq!(
-            living::gather_ticks(app.world(), oak, catalog::WATER, 100),
-            pace
-        );
-    }
-    // The older colony profile keeps its exact base durations.
-    let old = island_content::new_sim_app(7, "island_colony");
-    let resident = old
-        .world()
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .find(|entity| {
-            old.world()
-                .get::<Villager>(*entity)
-                .is_some_and(|v| v.role == Role::Woodcutter)
-        })
-        .unwrap();
-    assert_eq!(colony::work_pace_percent(old.world(), resident), 100);
-    assert_eq!(living::gather_ticks(old.world(), resident, "log", 240), 240);
-}
-
-#[test]
 fn gathering_wears_the_tool_and_a_spent_tool_breaks() {
     let mut app = scene();
     let oak = person(&app, "Oak");
@@ -355,50 +283,6 @@ fn a_smith_forges_a_durable_axe_from_an_ingot_and_a_plank() {
     );
     assert_eq!(economy::count(app.world(), ivo, "ingot"), 0);
     assert_eq!(economy::count(app.world(), ivo, "plank"), 0);
-}
-
-#[test]
-fn deep_cold_drains_health_only_in_the_regional_profile() {
-    let mut app = scene();
-    let jun = person(&app, "Jun");
-    set_need(&mut app, jun, "Warmth", 2_000);
-    let before = app.world().get::<Vitality>(jun).unwrap().health;
-    living::climate_tick(app.world_mut());
-    assert_eq!(
-        app.world().get::<Vitality>(jun).unwrap().health,
-        before - living::COLD_HEALTH_DRAIN
-    );
-    let warm = person(&app, "Mira");
-    set_need(
-        &mut app,
-        warm,
-        "Warmth",
-        living::COLD_HEALTH_THRESHOLD + 5_000,
-    );
-    let before = app.world().get::<Vitality>(warm).unwrap().health;
-    living::climate_tick(app.world_mut());
-    assert_eq!(app.world().get::<Vitality>(warm).unwrap().health, before);
-
-    let mut old = island_content::new_sim_app(7, "island_colony");
-    let resident = old
-        .world()
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .find(|entity| {
-            old.world()
-                .get::<Villager>(*entity)
-                .is_some_and(|v| v.role != Role::Visitor)
-        })
-        .unwrap();
-    set_need(&mut old, resident, "Warmth", 2_000);
-    let before = old.world().get::<Vitality>(resident).unwrap().health;
-    living::climate_tick(old.world_mut());
-    assert_eq!(
-        old.world().get::<Vitality>(resident).unwrap().health,
-        before
-    );
 }
 
 #[test]
@@ -685,7 +569,7 @@ fn cached_plan_is_reused_until_its_first_step_precondition_fails() {
         goap::Recall::Failed(reason)
     );
     // A different world profile never caches.
-    let old = island_content::new_sim_app(7, "island_colony");
+    let old = island_content::new_sim_app(7, "living_world");
     let resident = *old
         .world()
         .resource::<SimIndex>()

@@ -604,7 +604,7 @@ pub struct PlaceBuilding {
 }
 impl PlaceBuilding {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !crate::village::frontier::enabled(world) || !world.contains_resource::<CivicState>() {
+        if !world.contains_resource::<CivicState>() {
             return Err("PlaceBuilding requires the regional living world".into());
         }
         placement_check(world, &self.building, self.x, self.z, self.rotation)

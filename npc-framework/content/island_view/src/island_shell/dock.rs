@@ -456,9 +456,6 @@ pub(crate) fn keys(world: &mut World) {
 }
 
 fn settlements(world: &World) -> Vec<(SimId, String, SimPos)> {
-    if !village::frontier::enabled(world) {
-        return Vec::new();
-    }
     village::frontier::settlements::all(world)
         .into_iter()
         .filter_map(|(id, entity)| {
@@ -761,7 +758,7 @@ mod tests {
 
     #[test]
     fn the_docks_belong_to_oversee_and_hide_under_a_menu() {
-        let mut app = fixture("island_colony");
+        let mut app = fixture("living_world");
         refresh(app.world_mut());
         assert!(shown(&mut app, Dock::Left) && shown(&mut app, Dock::Ledger));
         assert!(
@@ -816,7 +813,7 @@ mod tests {
 
     #[test]
     fn keys_open_popovers_and_are_consumed_only_while_overseeing() {
-        let mut app = fixture("island_colony");
+        let mut app = fixture("living_world");
         press(&mut app, KeyCode::KeyO);
         assert!(
             !app.world()
@@ -868,7 +865,7 @@ mod tests {
 
     #[test]
     fn overlays_list_what_exists_and_say_what_does_not() {
-        let mut app = fixture("island_colony");
+        let mut app = fixture("living_world");
         let world = app.world_mut();
         let rows: Vec<(Overlay, bool)> = world
             .query::<(&DockControl, Has<InteractionDisabled>)>()

@@ -110,9 +110,6 @@ pub enum Recall {
 }
 
 pub fn recall(world: &World, actor: Entity) -> Recall {
-    if !super::frontier::enabled(world) {
-        return Recall::Miss;
-    }
     let (Some(memo), Some(person)) = (world.get::<PlanMemo>(actor), world.get::<Villager>(actor))
     else {
         return Recall::Miss;
@@ -195,9 +192,6 @@ pub fn recall(world: &World, actor: Entity) -> Recall {
 }
 
 pub(super) fn remember(world: &mut World, actor: Entity, plan: &WorkPlan) {
-    if !super::frontier::enabled(world) {
-        return;
-    }
     let (Some(step), Some(person)) = (plan.steps.first(), world.get::<Villager>(actor)) else {
         return;
     };

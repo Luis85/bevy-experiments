@@ -2,7 +2,7 @@
 //!
 //! Terrain owns the static navigation layer. Structures retain their dynamic
 //! blockers. Edits never relocate actors and must keep all dry ground connected.
-use super::{ResourcePatch, VillagePlace, Villager, colony, geography, homestead};
+use super::geography;
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
@@ -10,8 +10,6 @@ use npc_framework::kernel::commands::CommandError;
 use npc_framework::kernel::hash::SimHashResource;
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::collections::{BTreeSet, VecDeque};
 
 pub const WIDTH: usize = 64;
 pub const MAX_HEIGHT_MM: i32 = 3000;
@@ -85,17 +83,12 @@ fn index(x: i32, z: i32) -> Option<usize> {
 }
 
 pub fn register(app: &mut App) {
-    if colony::enabled(app.world()) {
-        if !super::frontier::enabled(app.world()) {
-            app.register_sim_resource::<TerrainState>();
-        }
-        app.register_command::<Terraform>();
-    }
+    app.register_command::<Terraform>();
 }
 
 /// Replace just the known shoreline spans; keep all IDs and building blockers.
 pub fn spawn(world: &mut World) {
-    if !colony::enabled(world) || world.contains_resource::<TerrainState>() {
+    if world.contains_resource::<TerrainState>() {
         return;
     }
     let geo = *geography::for_world(world);
@@ -161,186 +154,25 @@ pub struct Terraform {
     pub surface: TerrainSurface,
 }
 impl Terraform {
-    fn brush(&self) -> Result<Vec<CellCoord>, String> {
-        if self.radius > 3 || !(-31..31).contains(&self.x) || !(-31..31).contains(&self.z) {
-            return Err("brush must be inside the island map with radius 0..3 cells".into());
-        }
-        if !(-1000..=MAX_HEIGHT_MM).contains(&self.height_mm) {
-            return Err("terrain height must be -1000..3000 millimetres".into());
-        }
-        if (self.surface == TerrainSurface::Water && self.height_mm > 0)
-            || (self.surface != TerrainSurface::Water && self.height_mm < 0)
-        {
-            return Err(
-                "water height must be at or below sea level; dry ground cannot be below sea level"
-                    .into(),
-            );
-        }
-        let radius = self.radius as i32;
-        let mut cells = Vec::new();
-        for z in self.z - radius..=self.z + radius {
-            for x in self.x - radius..=self.x + radius {
-                if (-31..31).contains(&x)
-                    && (-31..31).contains(&z)
-                    && (x - self.x).pow(2) + (z - self.z).pow(2) <= radius.pow(2)
-                {
-                    cells.push(CellCoord::new(x, z));
-                }
-            }
-        }
-        Ok(cells)
-    }
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if super::frontier::enabled(world) {
-            return super::frontier::terrain::terraform_check(
-                world,
-                self.x,
-                self.z,
-                self.radius,
-                self.height_mm,
-                self.surface,
-            );
-        }
-        let terrain = world
-            .get_resource::<TerrainState>()
-            .ok_or("terrain editing requires the island colony")?;
-        let brush = self.brush()?;
-        let value = TerrainCell {
-            height_mm: self.height_mm,
-            surface: self.surface,
-        };
-        let changed: Vec<_> = brush
-            .into_iter()
-            .filter(|cell| terrain.cell(cell.x, cell.z) != Some(&value))
-            .collect();
-        if changed.is_empty() {
-            return Ok(());
-        }
-        let grid = world.resource::<SpatialGrid>();
-        let mut dynamic = BTreeSet::new();
-        for entity in world.resource::<SimIndex>().map.values() {
-            let Some(pos) = world.get::<SimPos>(*entity).copied() else {
-                continue;
-            };
-            if let Some(blocker) = world.get::<GridBlocker>(*entity) {
-                dynamic.extend(grid.footprint_cells(pos, blocker.0));
-            }
-            let fixed = world.get::<VillagePlace>(*entity).is_some()
-                || world.get::<ResourcePatch>(*entity).is_some()
-                || world
-                    .get::<super::hunting::WildlifeHabitat>(*entity)
-                    .is_some()
-                || world.get::<homestead::HomesteadPlot>(*entity).is_some();
-            let occupied = world.get::<Villager>(*entity).is_some()
-                || world.get::<super::hunting::Wildlife>(*entity).is_some()
-                || world.get::<colony::AwaitingArrival>(*entity).is_some();
-            let protected = if fixed {
-                2200_i64.pow(2)
-            } else {
-                1000_i64.pow(2)
-            };
-            if (fixed || occupied)
-                && changed
-                    .iter()
-                    .any(|cell| grid.center(*cell).dist2(pos) <= protected)
-            {
-                return Err(
-                    "brush overlaps a resident, workplace, resource patch or homestead site".into(),
-                );
-            }
-            if let Some(plot) = homestead::definition(world, *entity)
-                && changed.iter().any(|cell| {
-                    let at = grid.center(*cell);
-                    i64::from(at.x).abs_diff(i64::from(plot.x)) <= (plot.width_mm / 2) as u64
-                        && i64::from(at.z).abs_diff(i64::from(plot.z)) <= (plot.depth_mm / 2) as u64
-                })
-            {
-                return Err("brush overlaps a reserved cottage or garden footprint".into());
-            }
-            if let Some(person) = world.get::<Villager>(*entity)
-                && changed
-                    .iter()
-                    .any(|cell| grid.center(*cell).dist2(person.home) <= 1000_i64.pow(2))
-            {
-                return Err("brush overlaps an assigned home entrance".into());
-            }
-        }
-        if changed.iter().any(|cell| dynamic.contains(cell)) {
-            return Err("brush overlaps a building or other solid object".into());
-        }
-        let mut candidate = terrain.clone();
-        for cell in &changed {
-            candidate.cells[index(cell.x, cell.z).expect("checked cell")] = value;
-        }
-        let passable = |cell: CellCoord| {
-            candidate
-                .cell(cell.x, cell.z)
-                .is_some_and(TerrainCell::walkable)
-                && !dynamic.contains(&cell)
-        };
-        let origin = CellCoord::new(0, 0);
-        if !passable(origin) {
-            return Err("the central village crossroads must remain open".into());
-        }
-        let mut reached = BTreeSet::from([origin]);
-        let mut queue = VecDeque::from([origin]);
-        while let Some(cell) = queue.pop_front() {
-            for (dx, dz) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
-                let next = CellCoord::new(cell.x + dx, cell.z + dz);
-                if passable(next) && reached.insert(next) {
-                    queue.push_back(next);
-                }
-            }
-        }
-        for z in -32..32 {
-            for x in -32..32 {
-                let cell = CellCoord::new(x, z);
-                if passable(cell) && !reached.contains(&cell) {
-                    return Err("terrain would disconnect walkable land from the village".into());
-                }
-            }
-        }
-        Ok(())
+        super::frontier::terrain::terraform_check(
+            world,
+            self.x,
+            self.z,
+            self.radius,
+            self.height_mm,
+            self.surface,
+        )
     }
     pub fn perform(&self, world: &mut World) -> Result<(), String> {
-        if super::frontier::enabled(world) {
-            return super::frontier::terrain::terraform(
-                world,
-                self.x,
-                self.z,
-                self.radius,
-                self.height_mm,
-                self.surface,
-            );
-        }
-        self.check(world)?;
-        let brush = self.brush()?;
-        let value = TerrainCell {
-            height_mm: self.height_mm,
-            surface: self.surface,
-        };
-        let mut changed = 0;
-        for cell in brush {
-            let index = index(cell.x, cell.z).expect("checked cell");
-            if world.resource::<TerrainState>().cells[index] != value {
-                world.resource_mut::<TerrainState>().cells[index] = value;
-                world
-                    .resource_mut::<SpatialGrid>()
-                    .set_static(cell, value.navigation());
-                changed += 1;
-            }
-        }
-        if changed > 0 {
-            let mut terrain = world.resource_mut::<TerrainState>();
-            terrain.revision = terrain.revision.saturating_add(1);
-            record_effect(
-                world,
-                None,
-                "IslandTerraformed",
-                &json!({"x":self.x,"z":self.z,"radius":self.radius,"height_mm":self.height_mm,"surface":self.surface,"cells":changed}),
-            );
-        }
-        Ok(())
+        super::frontier::terrain::terraform(
+            world,
+            self.x,
+            self.z,
+            self.radius,
+            self.height_mm,
+            self.surface,
+        )
     }
 }
 impl ContentCommand for Terraform {

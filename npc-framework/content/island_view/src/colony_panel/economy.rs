@@ -162,11 +162,9 @@ pub(crate) fn sample(world: &mut World) {
 
 pub(crate) fn scopes(world: &World) -> Vec<(Scope, String)> {
     let mut scopes = vec![(None, "All island".to_owned())];
-    if village::frontier::enabled(world) {
-        for (id, entity) in village::frontier::settlements::all(world) {
-            if let Some(place) = world.get::<village::frontier::Settlement>(entity) {
-                scopes.push((Some(id), place.label.clone()));
-            }
+    for (id, entity) in village::frontier::settlements::all(world) {
+        if let Some(place) = world.get::<village::frontier::Settlement>(entity) {
+            scopes.push((Some(id), place.label.clone()));
         }
     }
     scopes
@@ -244,11 +242,10 @@ pub(crate) fn days_words(days: Option<u32>) -> String {
 pub(crate) fn day_use(world: &World, scope: Scope) -> BTreeMap<String, (u32, u32)> {
     let settlements: Vec<SimId> = match scope {
         Some(id) => vec![id],
-        None if village::frontier::enabled(world) => village::frontier::settlements::all(world)
+        None => village::frontier::settlements::all(world)
             .into_iter()
             .map(|(id, _)| id)
             .collect(),
-        None => Vec::new(),
     };
     let mut out: BTreeMap<String, (u32, u32)> = BTreeMap::new();
     for settlement in settlements {
@@ -355,11 +352,7 @@ pub(crate) fn role_rows(world: &World, scope: Scope) -> Vec<RoleRow> {
             && (scope.is_none() || village::frontier::settlements::member(world, *entity) == scope))
             .then(|| person.role.name().to_owned())
     });
-    let vacancies = if village::frontier::enabled(world) {
-        village::frontier::labor::vacancies(world)
-    } else {
-        Vec::new()
-    };
+    let vacancies = village::frontier::labor::vacancies(world);
     role_table(
         workers,
         vacancies
@@ -820,29 +813,20 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
                 .collect(),
         ));
     }
-    let overseen = village::frontier::enabled(world);
     let mut pages = vec![
         ("Goods".to_owned(), Action::EconomyPage(EconomyPage::Goods)),
         ("Jobs".to_owned(), Action::EconomyPage(EconomyPage::Jobs)),
     ];
-    if overseen {
-        pages.push((
-            "Priorities".to_owned(),
-            Action::EconomyPage(EconomyPage::Priorities),
-        ));
-    }
+    pages.push((
+        "Priorities".to_owned(),
+        Action::EconomyPage(EconomyPage::Priorities),
+    ));
     rows.push(Entry::choices("economy_view", pages));
-    let page = if overseen || page != EconomyPage::Priorities {
-        page
-    } else {
-        EconomyPage::Goods
-    };
     if page == EconomyPage::Priorities {
         rows.extend(priority_entries(world, scope));
         return rows;
     }
     if page == EconomyPage::Jobs
-        && overseen
         && let Some(settlement) = scope
     {
         rows.extend(target_entries(world, settlement));
@@ -886,12 +870,10 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
             ),
             false,
         ));
-        if overseen {
-            rows.push(Entry::caption(
-                "roles_choose",
-                "Choose a village above to say how many of each trade it wants.",
-            ));
-        }
+        rows.push(Entry::caption(
+            "roles_choose",
+            "Choose a village above to say how many of each trade it wants.",
+        ));
         return rows;
     }
     rows.push(

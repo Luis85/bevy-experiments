@@ -236,9 +236,6 @@ pub struct PlaceProp {
 }
 impl PlaceProp {
     fn plan(&self, world: &World) -> Result<(PropDef, Plot, SimId), String> {
-        if !super::enabled(world) {
-            return Err("props exist only in the living world".into());
-        }
         let def = catalog(world)
             .into_iter()
             .find(|def| def.id == self.prop)
@@ -320,9 +317,6 @@ pub struct RemoveProp {
 }
 impl RemoveProp {
     pub fn check(&self, world: &World) -> Result<(), String> {
-        if !super::enabled(world) {
-            return Err("props exist only in the living world".into());
-        }
         world
             .resource::<SimIndex>()
             .get(self.prop)

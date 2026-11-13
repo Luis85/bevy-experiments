@@ -45,10 +45,7 @@ pub const COLONY_TOPICS: &[ConversationTopic] = &[
     },
 ];
 
-fn public_topic_reply(world: &World, text: &str) -> Option<String> {
-    if !super::colony::enabled(world) {
-        return None;
-    }
+fn public_topic_reply(_world: &World, text: &str) -> Option<String> {
     let topic = COLONY_TOPICS
         .iter()
         .find(|topic| topic.text.eq_ignore_ascii_case(text.trim()))?;

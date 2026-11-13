@@ -142,7 +142,7 @@ fn every_menu_control_with_words_to_add_has_its_tooltip() {
     use island_view::game_ui::tooltip::Tooltip;
     let (mut app, path) = fixture("tips");
     app.world_mut().resource_mut::<SceneReadiness>().ready = true;
-    session::new_game(app.world_mut(), "Robin").unwrap();
+    session::new_game(app.world_mut(), "Zephyrine").unwrap();
     for screen in [Screen::Title, Screen::Pause, Screen::Settings] {
         set_screen(app.world_mut(), screen);
         ui::refresh(app.world_mut());
