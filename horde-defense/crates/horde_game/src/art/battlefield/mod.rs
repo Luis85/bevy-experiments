@@ -23,6 +23,7 @@ mod batch;
 mod corpses;
 mod cue;
 mod enemies;
+mod explosion;
 mod fx;
 mod light;
 mod ordnance;
@@ -161,6 +162,7 @@ fn render(
     // 1. World pass.
     terrain::paint(p, arena, options.scene.theme_index, textures);
     fx::ambient(p, arena, &view.particles);
+    explosion::scorch(p, arena, view, reduced);
     ordnance::fire_zones(p, arena, view, reduced, textures);
     structures::paint(p, arena, view, textures);
     corpses::paint(p, arena, view, a, textures, options.blood);
@@ -172,6 +174,7 @@ fn render(
     }
     let muzzle = defender(p, arena, view, a, aim, reduced, equipment.as_ref());
     ordnance::thrown(p, arena, view, a, reduced, textures, equipment.as_ref());
+    explosion::paint(p, arena, view, reduced, textures);
     fx::events(p, arena, view, muzzle, &fx_options);
     fx::particles(p, arena, &view.particles);
     // 2. Grade, over the whole canvas. The sky pulse is the

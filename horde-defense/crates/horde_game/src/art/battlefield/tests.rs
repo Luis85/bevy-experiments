@@ -995,6 +995,7 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         seq: 0,
         volley: Some(crate::battle_view::Volley::SINGLE),
         source: Some(crate::art::FxSource::Turret),
+        ordnance: None,
     };
     let projection = ArenaProjection::for_attempt(arena(), a);
     let options = fx::FxOptions {
@@ -1007,6 +1008,7 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
     // Both halves of the event painters: the world pass and the cue pass.
     let both = |view: &BattleViewModel| {
         painted(|p| {
+            explosion::paint(p, projection, view, false, options.textures);
             fx::events(p, projection, view, None, &options);
             let mut batch = cue::CueBatch::new(0);
             fx::event_cues(&mut batch, projection, view, &options);
@@ -2436,6 +2438,7 @@ fn every_cue_view() -> (Game, BattleViewModel) {
         seq: 0,
         volley: Some(crate::battle_view::Volley::SINGLE),
         source: Some(crate::art::FxSource::Turret),
+        ordnance: None,
     };
     view.fx = [
         EventKind::BossWarning,

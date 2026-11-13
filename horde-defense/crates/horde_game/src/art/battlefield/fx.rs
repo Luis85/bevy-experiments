@@ -1,10 +1,10 @@
 //! Weather, impact particles and short-lived event effects. World pass
-//! ([`events`]): explosions, tracers, hit sparks. Cue pass ([`event_cues`],
+//! ([`events`]): tracers, hit sparks (bursts are in [`super::explosion`]). Cue pass ([`event_cues`],
 //! after the lighting grade): REINFORCEMENTS, the INCOMING spawn marker,
 //! contact damage and banked-coin numbers, each on its INK backing
 //! ([`super::cue`]). The boss warning and arrival are the wall-clock
 //! banner's (`ui::battle::boss_banner`, W3-14).
-use super::super::{AMBER, ArenaProjection, MUTED, RED, TEXT, box_at, line};
+use super::super::{AMBER, ArenaProjection, MUTED, RED, TEXT, line};
 use super::batch::MeshBuilder;
 use super::cue::{self, CueBatch, Label};
 use super::weapon_fx;
@@ -13,7 +13,7 @@ use crate::{
     battle_view::{BattleViewModel, FxView, Volley},
     visual_assets::{self, ArtTextures, PropMotion},
 };
-use bevy_egui::egui::{self, Align2, Color32 as C, Painter, Pos2, Rect, Stroke, Vec2, vec2};
+use bevy_egui::egui::{Align2, Color32 as C, Painter, Pos2, Rect, Vec2, vec2};
 use horde_core::{content::StructureKind, sim::EventKind};
 
 pub(super) struct FxOptions {
@@ -237,45 +237,6 @@ pub(super) fn events(
         let age = e.age;
         let alpha = (1.0 - age / fx_lifetime(e.kind)).clamp(0.0, 1.0);
         match e.kind {
-            EventKind::Explosion if age < fx_lifetime(EventKind::Explosion) => {
-                let at = arena.world(e.to[0], e.to[1]);
-                let progress = (age / fx_lifetime(EventKind::Explosion)).clamp(0., 1.);
-                let radius = (e.value as f32 / 100.).max(0.1);
-                let range = vec2(arena.yard_width(), sy) * radius;
-                let alpha = ((1. - progress) * if reduced { 105. } else { 190. }) as u8;
-                p.add(egui::Shape::ellipse_stroke(
-                    at,
-                    range * if reduced { 1. } else { 0.25 + progress * 0.75 },
-                    Stroke::new(
-                        if reduced { 1. } else { 2. },
-                        C::from_rgba_unmultiplied(239, 181, 82, alpha),
-                    ),
-                ));
-                let sprite = !reduced
-                    && visual_assets::ordnance_effect(
-                        p,
-                        textures,
-                        false,
-                        at,
-                        range * (0.9 + progress * 0.8),
-                        C::from_white_alpha(alpha),
-                    );
-                if !reduced && !sprite {
-                    for n in 0..15 {
-                        let theta = n as f32 * 2.399_963;
-                        let spread = ((n + 1) as f32 / 16.).sqrt() * (0.15 + progress * 0.85);
-                        let point =
-                            at + vec2(theta.cos() * range.x, theta.sin() * range.y) * spread;
-                        let size = sy * (0.10 + (1. - progress) * 0.14);
-                        box_at(
-                            p,
-                            point,
-                            vec2(size, size),
-                            C::from_rgba_unmultiplied(230, 152 + (n % 3) as u8 * 20, 65, alpha),
-                        );
-                    }
-                }
-            }
             EventKind::Shot => {
                 if let (Some(source), Some(from)) =
                     (e.source, shot_origin(arena, view, e, muzzle, textures))

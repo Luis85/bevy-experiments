@@ -427,14 +427,36 @@ pub fn ordnance_effect(
     size: Vec2,
     tint: Color32,
 ) -> bool {
+    ordnance_effect_flipped(p, textures, flame, center, size, tint, false)
+}
+/// [`ordnance_effect`], mirrored left to right when `mirror`.
+pub fn ordnance_effect_flipped(
+    p: &Painter,
+    textures: ArtTextures,
+    flame: bool,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+    mirror: bool,
+) -> bool {
     let Some(sheet) = textures.rig else {
         return false;
     };
     let source = sheet.atlas.cells[if flame { 13 } else { 12 }];
     rig_region(p, sheet, source, fit(center, size, source), tint, |point| {
-        point
+        if mirror {
+            pos2(2.0 * center.x - point.x, point.y)
+        } else {
+            point
+        }
     });
     true
+}
+/// The source size in texels of the flame (cell 13) or explosion (cell 12)
+/// icon; `None` without the rig sheet.
+pub fn ordnance_effect_texels(textures: ArtTextures, flame: bool) -> Option<Vec2> {
+    let [left, top, right, bottom] = textures.rig?.atlas.cells[if flame { 13 } else { 12 }];
+    Some(vec2(right - left, bottom - top))
 }
 pub fn actor(
     p: &Painter,

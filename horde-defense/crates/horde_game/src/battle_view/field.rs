@@ -377,6 +377,60 @@ pub struct FxView {
     pub volley: Option<Volley>,
     /// What fired a Shot event; `None` for a trap and for every other kind.
     pub source: Option<FxSource>,
+    /// What burst in an Explosion event ([`explosion_ordnance`]); `None`
+    /// for every other kind.
+    pub ordnance: Option<OrdnanceKind>,
+}
+/// The ground mark a burst leaves (W5-05): derived from an Explosion event
+/// still in the event log, aged in seconds up to [`SCORCH_SECONDS`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScorchView {
+    pub center: [f32; 2],
+    /// The blast radius in yards.
+    pub radius: f32,
+    pub age: f32,
+}
+/// How long a scorch mark stays, in seconds.
+pub const SCORCH_SECONDS: f32 = 3.0;
+/// The most scorch marks one frame draws: the newest ones.
+pub const SCORCH_MAX: usize = 8;
+/// What burst in `event`, an Explosion event of `a`: a Molotov when the log
+/// has a Burn event of the same projectile and tick, or burning ground with
+/// that id exists; otherwise a grenade. Presentation only: the event log
+/// carries no ordnance kind, and no saved field is added for it.
+fn explosion_ordnance(a: &Attempt, event: &Event) -> OrdnanceKind {
+    let burn = a.events.iter().any(|other| {
+        other.kind == EventKind::Burn
+            && other.tick == event.tick
+            && other.actor_id == event.actor_id
+    });
+    let zone = event
+        .actor_id
+        .is_some_and(|id| a.ordnance.fire_zones.iter().any(|zone| zone.id == id));
+    if burn || zone {
+        OrdnanceKind::Molotov
+    } else {
+        OrdnanceKind::Grenade
+    }
+}
+/// The scorch marks of `a`, oldest first: its newest [`SCORCH_MAX`]
+/// Explosion events no older than [`SCORCH_SECONDS`].
+fn scorch_views(a: &Attempt) -> Vec<ScorchView> {
+    let mut out: Vec<_> = a
+        .events
+        .iter()
+        .rev()
+        .filter(|e| e.kind == EventKind::Explosion)
+        .map(|e| ScorchView {
+            center: e.to,
+            radius: (e.value as f32 / 100.0).max(0.1),
+            age: a.tick.saturating_sub(e.tick) as f32 / 60.0,
+        })
+        .take_while(|scorch| scorch.age <= SCORCH_SECONDS)
+        .take(SCORCH_MAX)
+        .collect();
+    out.reverse();
+    out
 }
 /// The trigger pull a Shot event belongs to (W5-03). The survivor's Shot
 /// events of one tick are one volley (a shell's pellets); a turret's are
@@ -463,6 +517,7 @@ fn fx_views(a: &Attempt) -> Vec<FxView> {
             seq: e.seq,
             volley,
             source: shot.then(|| shot_source(a, e)).flatten(),
+            ordnance: (e.kind == EventKind::Explosion).then(|| explosion_ordnance(a, e)),
         });
     }
     out.reverse();
@@ -533,6 +588,8 @@ pub struct BattleViewModel {
     pub fire_zones: Vec<FireZoneView>,
     pub projectiles: Vec<ProjectileView>,
     pub fx: Vec<FxView>,
+    /// Scorch marks under the newest bursts, oldest first (W5-05).
+    pub scorch: Vec<ScorchView>,
     pub particles: Vec<Particle>,
     pub defender: DefenderView,
     /// The boss holding in a phase transition this tick, if any (W2-37).
@@ -653,6 +710,7 @@ impl BattleViewModel {
                 })
                 .collect(),
             fx: fx_views(a),
+            scorch: scorch_views(a),
             particles: std::mem::take(&mut motion.particles),
             defender: DefenderView {
                 position: a.defender_position(),

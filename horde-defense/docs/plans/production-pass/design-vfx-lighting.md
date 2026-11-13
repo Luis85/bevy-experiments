@@ -346,6 +346,15 @@ Usage rules:
 - Frozen when paused.
 - Reduced: 9 static frame-0 flames.
 
+**As built (W5-05):**
+- `explosion_ordnance(a, event)` in `battle_view/field.rs` is the Molotov detection above; `FxView.ordnance` carries it for Explosion events (`None` for every other kind). `BattleViewModel.scorch` (`ScorchView { center, radius, age }`) is the newest `SCORCH_MAX` = 8 Explosion events no older than `SCORCH_SECONDS` = 3 s, read from `a.events`; `fx_lifetime(Explosion)` stays 0.5 s.
+- `art/battlefield/explosion.rs`: `frame(age)` gives the frame (0..6) and the progress inside it; `prims(&Blast, reduced)` is the pure part list (`Part` names what a part is, `Geom` its shape) and `paint` draws the newest `EXPLOSIONS_MAX` = 8 bursts in three passes for all of them together (ground parts, rig icons, thrown and rising parts), called just before `fx::events`. `scorch` paints the marks on the ground before the fire zones.
+- Grenade parts by frame: Core; Core and ShockRing; ShockRing, Fireball and 8 Debris; ShockRing, Fireball at 1.3x alpha 178 and 5 Puffs; ShockRing and 5 Smoke; 5 Smoke. Molotov: Bloom and 6 Glints; Bloom and 5 Tongues; Fireball tinted (255,170,90) and Tongues; Tongues; Tongues and 3 dark Smoke banks; a dim Bloom and Smoke. A Molotov never has a ring.
+- The rig icon is clamped by `clamp_sprite` to `SPRITE_MAX_MAGNIFICATION` = 1.5 screen pixels per texel (it reads the painter's pixels per point); without the rig sheet the fireball is a disc and a tongue a box.
+- Reduced: `Part::SolidRing` (grenade) or 12 `Part::Dash` lines (Molotov) at the blast radius, alpha 150, the same for the whole 0.5 s; the scorch mark holds alpha 70 for its 3 s.
+- Fire zones: `ordnance::flame_frame(tick, index, reduced)` is frame `(tick/6 + index) % 4`: mirror on frames 1 and 3, the y-scale table above, tint (255,220,160) on frames 0-1 and (255,180,110) on 2-3; reduced holds frame 0. `FLAMES_PER_ZONE` = 21, `FLAMES_PER_ZONE_REDUCED` = 9; flames are drawn on the newest `FIRE_ZONES_DRAWN_MAX` = 8 zones (every zone keeps its ground and radius ring).
+- Not in this row: the PERF_BUDGET fx entries and the fx-stress scene (W5-09 to W5-11 read the constants above).
+
 **Hits** (fx.rs:293-345):
 - Spark length = sy·clamp(0.05 + 0.04·log2(1 + dmg/10), 0.06, 0.25).
 - Stroke width = clamp(sy·0.024, 1, 3).

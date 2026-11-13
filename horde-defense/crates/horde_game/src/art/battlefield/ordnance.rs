@@ -1,4 +1,5 @@
-//! Burning ground and thrown grenades/Molotovs in flight.
+//! Burning ground (its four-frame flames, W5-05) and thrown
+//! grenades/Molotovs in flight.
 use super::super::{AMBER, ArenaProjection, box_at, soft_shadow};
 use crate::{
     battle_view::BattleViewModel,
@@ -6,6 +7,42 @@ use crate::{
 };
 use bevy_egui::egui::{self, Color32 as C, Painter, Stroke, vec2};
 use horde_core::{ordnance::OrdnanceKind, sim::Attempt};
+
+/// Flames drawn on one burning zone, and in reduced effects.
+pub(crate) const FLAMES_PER_ZONE: usize = 21;
+pub(crate) const FLAMES_PER_ZONE_REDUCED: usize = 9;
+/// The most zones whose flames are drawn: the newest (highest id). Every
+/// zone keeps its ground and its radius ring.
+pub(crate) const FIRE_ZONES_DRAWN_MAX: usize = 8;
+/// Sim ticks one flame frame lasts.
+const FLAME_FRAME_TICKS: u64 = 6;
+const FLAME_Y_SCALE: [f32; 4] = [0.85, 1.0, 1.1, 0.95];
+const FLAME_TINTS: [[u8; 3]; 2] = [[255, 220, 160], [255, 180, 110]];
+
+/// One frame of a flame's four-frame cycle (W5-05): a mirror flip, a height
+/// scale and a tint over the one flame icon.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FlameFrame {
+    pub mirror: bool,
+    pub y_scale: f32,
+    pub tint: [u8; 3],
+}
+
+/// The frame of flame `index` at sim tick `tick`: `(tick / 6 + index) % 4`,
+/// so neighbours are out of step and the fire holds still while the sim is
+/// paused. Reduced effects hold frame 0.
+pub(crate) fn flame_frame(tick: u64, index: usize, reduced: bool) -> FlameFrame {
+    let frame = if reduced {
+        0
+    } else {
+        ((tick / FLAME_FRAME_TICKS + index as u64) % 4) as usize
+    };
+    FlameFrame {
+        mirror: matches!(frame, 1 | 3),
+        y_scale: FLAME_Y_SCALE[frame],
+        tint: FLAME_TINTS[frame / 2],
+    }
+}
 
 pub(super) fn fire_zones(
     p: &Painter,
@@ -36,34 +73,44 @@ pub(super) fn fire_zones(
             ),
         ));
     }
-    for zone in &view.fire_zones {
+    let mut burning: Vec<_> = view.fire_zones.iter().collect();
+    if burning.len() > FIRE_ZONES_DRAWN_MAX {
+        burning.sort_by_key(|zone| std::cmp::Reverse(zone.id));
+        burning.truncate(FIRE_ZONES_DRAWN_MAX);
+    }
+    for zone in burning {
         let at = arena.world(zone.center[0], zone.center[1]);
         let radii = unit * zone.radius;
         let fade = (zone.ticks_left as f32 / 45.).min(1.);
         // The authoritative radius remains readable; small pixel flames stay
         // sparse enough that hostiles and contact windups remain legible.
-        let count = if reduced { 9 } else { 21 };
+        let count = if reduced {
+            FLAMES_PER_ZONE_REDUCED
+        } else {
+            FLAMES_PER_ZONE
+        };
         for n in 0..count {
             let theta = n as f32 * 2.399_963 + (zone.id % 19) as f32 * 0.3;
             let spread = ((n + 1) as f32 / (count + 1) as f32).sqrt() * 0.83;
             let point = at + vec2(theta.cos() * radii.x, theta.sin() * radii.y) * spread;
-            let flicker = if reduced {
-                0.5
-            } else {
-                ((view.tick / 5 + n * 7) % 5) as f32 / 4.
-            };
+            let frame = flame_frame(view.tick, n, reduced);
             let px = (unit.y * 0.055).max(1.);
-            let height = px * (2. + flicker * 2.);
-            if visual_assets::ordnance_effect(
+            let height = px * 4. * frame.y_scale;
+            let [r, g, b] = frame.tint;
+            if visual_assets::ordnance_effect_flipped(
                 p,
                 textures,
                 true,
                 point - vec2(0., height * 0.4),
                 vec2(px * 4., height * 2.),
-                C::from_white_alpha((fade * 220.) as u8),
+                C::from_rgba_unmultiplied(r, g, b, (fade * 220.) as u8),
+                frame.mirror,
             ) {
                 continue;
             }
+            // No rig sheet: a two-box flame, its bright core leaning with
+            // the mirror flip.
+            let lean = if frame.mirror { px * 0.2 } else { -px * 0.2 };
             box_at(
                 p,
                 point - vec2(0., height * 0.5),
@@ -72,9 +119,9 @@ pub(super) fn fire_zones(
             );
             box_at(
                 p,
-                point - vec2(px * 0.2, height * 0.3),
+                point + vec2(lean, -height * 0.3),
                 vec2(px, height * 0.5),
-                C::from_rgba_unmultiplied(246, 187, 79, (fade * 200.) as u8),
+                C::from_rgba_unmultiplied(r, g, b, (fade * 200.) as u8),
             );
         }
     }
