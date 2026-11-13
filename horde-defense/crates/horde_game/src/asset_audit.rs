@@ -382,7 +382,7 @@ fn every_shipped_wav_is_loaded_and_matches_provenance() {
         orphans.len(),
         missing.len()
     );
-    assert_eq!(shipped.len(), 75, "shipped WAV count");
+    assert_eq!(shipped.len(), 281, "shipped WAV count");
     let problems = check_provenance(&shipped, audio_manifests());
     assert!(problems.is_empty(), "{problems:#?}");
 }

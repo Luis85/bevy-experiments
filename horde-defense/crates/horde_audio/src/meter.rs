@@ -134,6 +134,45 @@ pub fn true_peak(channels: &[&[f32]]) -> f32 {
     peak
 }
 
+/// Per input sample of one channel, the largest magnitude among the sample
+/// and the three points the 4x oversampler reconstructs after it. The largest
+/// entry is the channel's [`true_peak`]. The exporter's limiter reads this
+/// envelope; it scales linearly with the signal.
+pub fn oversampled_peaks(channel: &[f32]) -> Vec<f32> {
+    let phases = oversampling_phases();
+    let length = channel.len() as isize;
+    (0..length)
+        .map(|index| {
+            let mut peak = channel[index as usize].abs();
+            for taps in &phases {
+                let mut sum = 0.0_f64;
+                for (tap, weight) in taps.iter().enumerate() {
+                    let source = index + tap as isize - (TRUE_PEAK_HALF_TAPS - 1);
+                    if (0..length).contains(&source) {
+                        sum += f64::from(channel[source as usize]) * weight;
+                    }
+                }
+                peak = peak.max(sum.abs() as f32);
+            }
+            peak
+        })
+        .collect()
+}
+
+/// The loudest 400 ms block of `channels`, in LUFS: [`measure`]'s
+/// `momentary_max` without the true-peak pass.
+pub fn momentary_max(rate: u32, channels: &[&[f32]]) -> f64 {
+    let frames = channels
+        .iter()
+        .map(|channel| channel.len())
+        .min()
+        .unwrap_or(0);
+    let energy = weighted_energy_prefix(rate, channels, frames);
+    let block = window_frames(rate, MOMENTARY_SECONDS);
+    let step = window_frames(rate, STEP_SECONDS);
+    lufs(max_power(&window_powers(&energy, block, step)))
+}
+
 /// The interpolating phases 1..4 of the oversampler: a Hann-windowed sinc
 /// reaching six input samples to either side, each phase normalised to unity
 /// gain at DC. Phase 0 is the input itself and needs no filter.

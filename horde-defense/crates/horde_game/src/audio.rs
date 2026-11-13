@@ -10,14 +10,16 @@ pub use horde_audio::{bank::variant_path, cue::Cue, mix::MAX_EFFECT_VOICES, sele
 #[derive(bevy::prelude::Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CueRequest(pub Cue);
 
-/// Every WAV the runtime can load, relative to `assets/`: each live
-/// synthesized family's three variants (alias cues play these banks; retired
-/// cues are archived) plus the ambience beds. The asset audit holds
-/// `assets/audio` to exactly this set.
+/// Every WAV the runtime can load, relative to `assets/`: every variant of
+/// every shipped bank (alias cues play these banks; retired cues are
+/// archived) plus the ambience beds. The asset audit holds `assets/audio` to
+/// exactly this set. The wave-6 gun, enemy, boss and UI banks ship from A6-05
+/// on; the cues that play them arrive with A6-12 to A6-14.
 #[cfg(test)]
 pub(crate) fn runtime_wav_paths() -> Vec<String> {
-    let mut paths: Vec<String> = horde_audio::synth::legacy::shipped()
-        .flat_map(|cue| (0..3).map(move |variant| variant_path(cue, variant)))
+    let mut paths: Vec<String> = horde_audio::bank::BankId::shipped()
+        .into_iter()
+        .flat_map(|bank| (0..bank.variants()).map(move |variant| bank.variant_path(variant)))
         .collect();
     paths.extend(
         crate::atmosphere_audio::AmbienceChannel::ALL
@@ -43,7 +45,7 @@ mod tests {
         assert!(gate.accept(Cue::Fire, 2125, true));
         assert_eq!(
             variant_path(Cue::Explosion, 7),
-            "audio/survival_explosion_1.wav"
+            "audio/survival_explosion_2.wav"
         );
     }
     #[test]
@@ -61,7 +63,7 @@ mod tests {
                 "{alias:?} must not be re-synthesized"
             );
             assert!(LEGACY_FAMILIES.contains(&bank));
-            for variant in 0..3 {
+            for variant in 0..bank.bank().variants() {
                 let path = variant_path(alias, variant);
                 assert_eq!(path, variant_path(bank, variant));
                 assert!(assets.join(&path).is_file(), "missing {path}");

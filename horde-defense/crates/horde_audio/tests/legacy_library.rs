@@ -168,37 +168,3 @@ fn pcm16_header_describes_mono_44100() {
     // Out-of-range samples clamp instead of wrapping.
     assert_eq!(samples, vec![0, 32767, -32767, 32767]);
 }
-
-#[test]
-#[ignore = "Offline asset authoring: explicitly set LASTLIGHT_AUDIO_EXPORT to workspace root"]
-fn export_survival_audio_assets_and_audition() {
-    let root = PathBuf::from(
-        std::env::var_os("LASTLIGHT_AUDIO_EXPORT").expect("Set LASTLIGHT_AUDIO_EXPORT"),
-    );
-    let assets = root.join("assets/audio");
-    let audition = root.join("docs/audio");
-    std::fs::create_dir_all(&assets).unwrap();
-    std::fs::create_dir_all(&audition).unwrap();
-    let mut reel = Vec::new();
-    let mut index = String::from("cue,start_seconds,duration_seconds\n");
-    // Retired families are archived; the exporter never ships them again.
-    for cue in shipped() {
-        for variant in 0..VARIANTS {
-            let samples = synthesize(cue, variant);
-            let path = root.join("assets").join(variant_path(cue, variant));
-            wav::write_pcm16(&path, RATE, &samples).unwrap();
-            if variant == 0 {
-                index.push_str(&format!(
-                    "{:?},{:.3},{:.3}\n",
-                    cue,
-                    reel.len() as f32 / RATE as f32,
-                    samples.len() as f32 / RATE as f32
-                ));
-                reel.extend(samples);
-                reel.resize(reel.len() + RATE as usize / 3, 0.0);
-            }
-        }
-    }
-    wav::write_pcm16(&audition.join("survival-audition.wav"), RATE, &reel).unwrap();
-    std::fs::write(audition.join("survival-audition.csv"), index).unwrap();
-}

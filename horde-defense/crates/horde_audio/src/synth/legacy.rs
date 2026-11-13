@@ -1,8 +1,8 @@
 //! The v1 survival synthesis, moved verbatim from `horde_game::audio`.
 //!
 //! Synthesis is an offline authoring tool, never a packaged runtime write:
-//! the ignored export test in `tests/legacy_library.rs` regenerates the
-//! shipped files and the audition reel. `raw_synthesis_matches_v1_library`
+//! `examples/export_audio.rs` masters these raw clips into the shipped files
+//! (`crate::export`). `raw_synthesis_matches_v1_library`
 //! holds every sample of variants 0-2 to the sha256 recorded when the v1
 //! library was exported, so nothing in this file may change a produced sample.
 use crate::{bank::LEGACY_FAMILIES, cue::Cue};
@@ -10,8 +10,11 @@ use std::f32::consts::{PI, TAU};
 
 pub const RATE: u32 = 44_100;
 pub const PEAK: f32 = 0.18;
-/// Variants per v1 family.
+/// Variants per v1 family: the three the v1 library shipped.
 pub const VARIANTS: u64 = 3;
+/// The pitch shift of each variant. Variants 0-2 are the v1 shifts (0.96 +
+/// 0.04 per variant); 3 and 4 were added by the wave-6 exporter.
+pub const SHIFTS: [f32; 5] = [0.96, 1.00, 1.04, 0.92, 1.08];
 
 /// The synthesized families that ship: [`LEGACY_FAMILIES`] minus retired
 /// cues. `LEGACY_FAMILIES` keeps every family so seeds and the archived files
@@ -20,13 +23,13 @@ pub fn shipped() -> impl Iterator<Item = Cue> {
     LEGACY_FAMILIES.into_iter().filter(|cue| !cue.retired())
 }
 
-struct Noise {
-    state: u64,
-    low: f32,
-    mid: f32,
+pub(crate) struct Noise {
+    pub(crate) state: u64,
+    pub(crate) low: f32,
+    pub(crate) mid: f32,
 }
 impl Noise {
-    fn next(&mut self) -> [f32; 3] {
+    pub(crate) fn next(&mut self) -> [f32; 3] {
         self.state ^= self.state << 13;
         self.state ^= self.state >> 7;
         self.state ^= self.state << 17;
@@ -36,14 +39,14 @@ impl Noise {
         [white, self.low, self.mid]
     }
 }
-fn pulse(t: f32, onset: f32, decay: f32) -> f32 {
+pub(crate) fn pulse(t: f32, onset: f32, decay: f32) -> f32 {
     if t >= onset {
         (-(t - onset) / decay).exp()
     } else {
         0.0
     }
 }
-fn knock(t: f32, onset: f32, noise: f32, frequency: f32, decay: f32) -> f32 {
+pub(crate) fn knock(t: f32, onset: f32, noise: f32, frequency: f32, decay: f32) -> f32 {
     let age = (t - onset).max(0.0);
     pulse(t, onset, decay) * (0.65 * noise + 0.35 * (TAU * frequency * age).sin())
 }
@@ -98,17 +101,23 @@ fn gun(cue: Cue, t: f32, noise: [f32; 3], shift: f32) -> f32 {
 }
 /// One family's variant as mono samples at [`RATE`], peak-normalised to
 /// [`PEAK`]. `cue` is a synthesized family ([`LEGACY_FAMILIES`]); alias cues
-/// play their bank's files and are never synthesized.
+/// play their bank's files and are never synthesized. `variant` indexes
+/// [`SHIFTS`]; variants 0-2 are the v1 library, sample for sample.
 pub fn synthesize(cue: Cue, variant: u64) -> Vec<f32> {
     let seconds = duration(cue);
     let count = (seconds * RATE as f32).round() as usize;
     let mut source = Noise {
-        state: 0x85eb_ca6b_u64.wrapping_mul(1 + cue.bank().ordinal() * 17 + variant % VARIANTS),
+        state: crate::bank::seed(cue.bank(), variant),
         low: 0.0,
         mid: 0.0,
     };
-    let variation = (variant % VARIANTS) as f32;
-    let shift = 0.96 + variation * 0.04;
+    let variation = variant as f32;
+    // The v1 expression for variants 0-2, kept so their samples cannot move.
+    let shift = if variant < VARIANTS {
+        0.96 + variation * 0.04
+    } else {
+        SHIFTS[variant as usize]
+    };
     let mut result = Vec::with_capacity(count);
     for index in 0..count {
         let t = index as f32 / RATE as f32;

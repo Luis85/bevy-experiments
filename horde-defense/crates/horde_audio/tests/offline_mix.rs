@@ -197,8 +197,9 @@ fn single_cue_renders_dual_mono_at_bus_times_row_gain() {
         * clip_peak;
     let peak = out.loudness().sample_peak;
     assert!((peak - expected).abs() < 1e-6, "{peak} is not {expected}");
-    // The v1 library peaks at 0.18, so one voice at the v1 defaults is tiny.
-    assert!((0.04..0.07).contains(&peak), "{peak}");
+    // A mastered clip peaks at 0.4 to 0.8 (the v1 library peaked at 0.18), so one
+    // voice at the v1 defaults is a tenth to a quarter of full scale.
+    assert!((0.10..0.25).contains(&peak), "{peak}");
     // The cue starts on its frame's first sample.
     let first = |samples: &[f32]| samples.iter().position(|s| *s != 0.0);
     assert_eq!(first(&out.left), first(clip));

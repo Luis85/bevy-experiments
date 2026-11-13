@@ -1,6 +1,6 @@
 # Survival sound effects
 
-The new `assets/audio/survival_*_[0–2].wav` library contains 23 shipped original effects with three repeatable variations each (69 files). A 24th family, NpcShot, retired on 2026-11-06 (W1-58, user decision 2026-11-04; NPC defenders now sound like their weapon class); its three files are archived in `archive/audio/`. Files are mono 44.1 kHz PCM16 WAV. No recordings, external samples or additional runtime libraries are required. Original audio files and their attribution remain intact. `assets/audio/SURVIVAL_PROVENANCE.json` records every new file's SHA-256, duration, peak and RMS level.
+Since the wave-6 exporter (A6-05, 13 November 2026) the `assets/audio/survival_*.wav` library holds 275 files in 63 banks: the 23 shipped v1 effects with three or five repeatable variations each (103 files), and new gun-handling, enemy-voice, boss and interface families (172 files). No music is shipped. A 24th family, NpcShot, retired on 2026-11-06 (W1-58, user decision 2026-11-04; NPC defenders now sound like their weapon class); its three files are archived in `archive/audio/`. Files are mono 44.1 kHz PCM16 WAV. No recordings, external samples or additional runtime libraries are required. Original audio files and their attribution remain intact. `assets/audio/SURVIVAL_PROVENANCE.json` (schema 2) records every file's seed, SHA-256, frames, peak, true peak, momentary-max loudness, mastering target and limiter gain reduction; the v1 manifest is kept verbatim as `archive/audio/SURVIVAL_PROVENANCE.v1.json`. `docs/audio/survival-audition.wav` and `.csv` are the v1 reel (pre-production-pass); new reels are written only to `target/audio-audition/` and are never committed.
 
 Listen to [the v1 audition reel (pre-production-pass)](audio/survival-audition.wav). Its [CSV timeline](audio/survival-audition.csv) identifies each cue; the reel plays variant zero with a third-second gap. It is not the current library: the committed reel and CSV were exported before NpcShot retired, so they still play that archived family at 4.81 s. A re-export iterates only the shipped families and drops it. Production-pass ruling S19 keeps this v1 reel in `docs/audio/` and, from wave 6, sends new reels only to the uncommitted `target/audio-audition/`. The reel is an authoring comparison at the library's recorded level, before the in-game master, effects and cue gains.
 
@@ -35,7 +35,7 @@ The Bevy-free crate `crates/horde_audio` defines the cue list (`cue.rs`), the ba
 
 The mixer caps effects at six concurrent voices and selects at most two new cues per update. Real-time per-cue gates suppress repeated damage/arrival/fire feedback when many simulation ticks advance together. Important warnings retain their existing visual equivalents. Pending and playing voices follow master/effects changes, including immediate mute; reduced effects lowers individual gains and increases minimum repeat intervals. The existing separate ambience bus continues to crossfade the six scene/biome/weather layers, including quieter menu and paused contexts.
 
-Each waveform peaks at no more than 0.18 full scale. At the maximum effects bus gain of 0.7, six perfectly aligned effects contribute no more than 0.756 full scale before the quieter ambience bed. Normal per-cue gains reduce this further. This is conservative digital headroom, not a loudness standard or a guarantee about a listener's hardware gain.
+Each raw synthesis peaks at no more than 0.18 full scale. The exporter then masters every clip offline (`synth/master.rs`): to -21 LUFS momentary-max under a 0.80 true-peak ceiling, with a lookahead limiter that may take at most 5 dB. Sixteen v1 families are short clicks and cracks that cannot reach -21 LUFS inside that bound; each is mastered to the loudest half-LU step its variants reach (-21.5 to -25.5 LUFS), recorded per file as `target_mmax_lufs`. The runtime mix is calibrated against these mastered levels in the later wave-6 steps; until then the v1 mix numbers apply to louder files.
 
 ## Reproduce and verify
 
@@ -43,12 +43,12 @@ From the Horde Defense workspace, run the synthesis tests through Cargo. They li
 
 ```powershell
 cargo test --locked -p horde_audio
-$env:LASTLIGHT_AUDIO_EXPORT = (Get-Location).Path
-cargo test --locked -p horde_audio --test legacy_library export_survival_audio_assets_and_audition -- --ignored --exact
+cargo run --locked -p horde_audio --example export_audio              # check, writes nothing
+cargo run --locked -p horde_audio --example export_audio -- --write   # regenerate
 ```
 
-The export explicitly regenerates the 69 shipped files and audition reel (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. The normal workspace tests include the `horde_audio` tests and the gain and gate tests in the game's `audio::tests`; the export test remains ignored unless explicitly invoked.
+The exporter checks by default: it renders the library in memory, compares it with the shipped files and the manifest, and exits 1 on a difference. `--write` regenerates the 275 shipped files, the manifest and the audition reel in `target/audio-audition/` (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Run `--write` after changing a generator source (`generator_sources` in the manifest), then the ignored `asset_audit::regenerate_credits_index`. The normal workspace tests include the `horde_audio` tests and the gain and gate tests in the game's `audio::tests`; `export_check_is_idempotent` holds the shipped files to the export.
 
-Tests check deterministic variants, distinct weapon decay/energy profiles, finite samples, DC offset, zero-valued endpoints, useful RMS levels, effect headroom and repeat gating. Independent WAV inspection confirmed all 69 shipped encoded files have the expected format and endpoints; their peak is at most 0.179998 and RMS spans 0.008312–0.057572 before mixer gains.
+Tests check deterministic variants, distinct weapon decay/energy profiles, finite samples, DC offset, zero-valued endpoints, useful RMS levels, effect headroom and repeat gating. Independent WAV inspection of the 69 v1 files (before mastering) confirmed the expected format and endpoints; their peak was at most 0.179998 and RMS spanned 0.008312–0.057572 before mixer gains.
 
 These checks verify synthesis and scheduling properties. A human listening pass, device output, spatial perception and balance against real gameplay remain separate validation. No listening or device-output result is inferred from compilation or waveform inspection.

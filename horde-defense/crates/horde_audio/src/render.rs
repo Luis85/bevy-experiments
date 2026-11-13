@@ -41,8 +41,6 @@ use std::{collections::BTreeMap, path::Path};
 pub const RATE: u32 = 44_100;
 /// Samples per frame: one 60 Hz tick.
 pub const FRAME_SAMPLES: usize = (RATE / TICKS_PER_SECOND) as usize;
-/// The runtime's variants per bank.
-const VARIANTS: u64 = 3;
 /// The adapter's ambience crossfade.
 pub const CROSSFADE_SECONDS: f32 = 1.2;
 
@@ -141,7 +139,7 @@ impl Library {
         };
         let mut clips = BTreeMap::new();
         for cue in Cue::ALL.into_iter().filter(|cue| !cue.retired()) {
-            for variant in 0..VARIANTS {
+            for variant in 0..cue.bank().variants() {
                 let path = variant_path(cue, variant);
                 if !clips.contains_key(&path) {
                     let samples = read(&path, false)?;

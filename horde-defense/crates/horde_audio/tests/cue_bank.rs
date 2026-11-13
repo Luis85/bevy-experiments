@@ -83,7 +83,7 @@ fn cue_discriminants_are_append_only() {
 
 #[test]
 fn legacy_family_order_is_frozen() {
-    let names: Vec<&str> = LEGACY_FAMILIES
+    let names: Vec<String> = LEGACY_FAMILIES
         .into_iter()
         .map(|family| BankId::Legacy(family).name())
         .collect();
@@ -133,14 +133,76 @@ fn alias_cues_play_their_family_bank() {
             assert_eq!(variant_path(alias, variant), variant_path(family, variant));
         }
     }
+    // Variants wrap at the bank's own count: five for a frequent family,
+    // three for a rare one.
     assert_eq!(
         variant_path(Cue::Explosion, 7),
-        "audio/survival_explosion_1.wav"
+        "audio/survival_explosion_2.wav"
     );
+    assert_eq!(variant_path(Cue::Boss, 7), "audio/survival_boss_1.wav");
     let retired: Vec<Cue> = Cue::ALL.into_iter().filter(|cue| cue.retired()).collect();
     assert_eq!(retired, vec![Cue::NpcShot]);
     for cue in Cue::ALL {
         // No live cue plays a retired bank.
         assert!(cue.retired() || !cue.legacy_family().retired(), "{cue:?}");
     }
+}
+
+/// The wave-6 banks take the ordinals after the v1 families. An ordinal seeds
+/// a bank's synthesis, so a moved one would change every file of the bank.
+#[test]
+fn wave6_bank_ordinals_and_names_are_frozen() {
+    use horde_audio::bank::{BossStage, EnemyStage, EnemyVoice, GunStage, UiFamily, seed};
+    use horde_core::content::BossKind;
+    let pinned = [
+        (BankId::Gun(GunStage::DryFire), 24, "gun_dryfire"),
+        (BankId::Gun(GunStage::BoltCycle), 28, "gun_bolt_cycle"),
+        (
+            BankId::Enemy(EnemyVoice::Shambler, EnemyStage::Windup),
+            29,
+            "enemy_shambler_windup",
+        ),
+        (
+            BankId::Enemy(EnemyVoice::Exploder, EnemyStage::Death),
+            52,
+            "enemy_exploder_death",
+        ),
+        (
+            BankId::Boss(BossKind::Breacher, BossStage::Arrival),
+            53,
+            "boss_breacher_arrival",
+        ),
+        (
+            BankId::Boss(BossKind::SiegeBrute, BossStage::Death),
+            61,
+            "boss_siege_brute_death",
+        ),
+        (BankId::Ui(UiFamily::LootReveal), 62, "ui_loot_reveal"),
+        (BankId::Ui(UiFamily::CoinBatch), 63, "ui_coin_batch"),
+    ];
+    for (bank, ordinal, name) in pinned {
+        assert_eq!(bank.ordinal(), ordinal, "{bank:?}");
+        assert_eq!(bank.name(), name);
+    }
+    // The shipped banks are ordinals 0..=63 without the retired NpcShot (6),
+    // each with its own name, and every variant has its own seed.
+    let shipped = BankId::shipped();
+    let ordinals: Vec<u64> = shipped.iter().map(|bank| bank.ordinal()).collect();
+    let expected: Vec<u64> = (0..=63).filter(|ordinal| *ordinal != 6).collect();
+    assert_eq!(ordinals, expected);
+    let names: std::collections::BTreeSet<String> =
+        shipped.iter().map(|bank| bank.name()).collect();
+    assert_eq!(names.len(), shipped.len());
+    let files: usize = shipped.iter().map(|bank| bank.variants() as usize).sum();
+    assert_eq!(files, 275);
+    let seeds: std::collections::BTreeSet<u64> = shipped
+        .iter()
+        .flat_map(|bank| (0..bank.variants()).map(|variant| seed(*bank, variant)))
+        .collect();
+    assert_eq!(seeds.len(), files);
+    // The v1 seed of the v1 variants.
+    assert_eq!(
+        seed(BankId::Legacy(Cue::Smg), 2),
+        0x85eb_ca6b_u64 * (1 + 17 + 2)
+    );
 }

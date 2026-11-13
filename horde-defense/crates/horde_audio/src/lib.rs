@@ -18,6 +18,7 @@
 pub mod bank;
 pub mod cue;
 pub mod events;
+pub mod export;
 pub mod meter;
 pub mod mix;
 pub mod render;
