@@ -47,7 +47,26 @@ const RENDER: &[&str] = &[
 
 /// Our presentation crates (the BRP methods are `npc_tools`' `remote`
 /// feature, covered by [`RENDER`] through `bevy_remote`).
-const VIEW: &[&str] = &["npc_view_helpers", "village_view", "testbed_view"];
+const VIEW: &[&str] = &[
+    "npc_view_helpers",
+    "village_view",
+    "testbed_view",
+    "island_view",
+];
+
+/// The island game's crates: no other content reaches them, and they reach
+/// no other content (the island split).
+const ISLAND: &[&str] = &["island_content", "island_view", "island_game"];
+
+/// The framework's example content that the island must not reach.
+const LEGACY_CONTENT: &[&str] = &[
+    "testbed_content",
+    "testbed_view",
+    "actor_testbed",
+    "village_content",
+    "village_view",
+    "village",
+];
 
 /// The framework's generic crates: content reaches them only through the
 /// facade `npc_framework`.
@@ -422,6 +441,86 @@ const RULES: &[Rule] = &[
         why: "the testbed's content is sim code: headless; its view is testbed_view",
     },
     Rule {
+        krate: "island_content",
+        forbidden: &[RENDER, VIEW],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::AsBuilt(None),
+        why: "the island's content is sim code: headless; its view is island_view",
+    },
+    Rule {
+        krate: "island_content",
+        forbidden: &[LEGACY_CONTENT],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the island stands alone: no testbed or village crate",
+    },
+    Rule {
+        krate: "island_view",
+        forbidden: &[LEGACY_CONTENT],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the island stands alone: no testbed or village crate",
+    },
+    Rule {
+        krate: "island_game",
+        forbidden: &[LEGACY_CONTENT],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the island stands alone: no testbed or village crate",
+    },
+    Rule {
+        krate: "testbed_content",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the Actor Testbed does not reach the island",
+    },
+    Rule {
+        krate: "testbed_view",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the Actor Testbed does not reach the island",
+    },
+    Rule {
+        krate: "actor_testbed",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the Actor Testbed does not reach the island",
+    },
+    Rule {
+        krate: "game_menu",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the developer menu does not reach the island",
+    },
+    Rule {
+        krate: "village_content",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the village does not reach the island",
+    },
+    Rule {
+        krate: "village_view",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the village does not reach the island",
+    },
+    Rule {
         krate: "npcctl",
         forbidden: &[RENDER, VIEW],
         no_content: false,
@@ -440,6 +539,9 @@ const MUST_REACH: &[(&str, &str)] = &[
     ("village", "village_view"),
     ("actor_testbed", "testbed_view"),
     ("testbed_view", "bevy_render"),
+    ("island_game", "island_view"),
+    ("island_view", "bevy_render"),
+    ("island_view", "island_content"),
 ];
 
 /// Canaries for the as-built resolver: `(crate, root features, must reach)`.
@@ -449,6 +551,7 @@ const MUST_REACH_AS_BUILT: &[(&str, Option<&[&str]>, &str)] = &[
     ("village", None, "bevy_render"),
     ("village", None, "bevy_remote"),
     ("village", None, "npc_view_helpers"),
+    ("npcctl", None, "island_content"),
     ("npc_tools", Some(&["remote"]), "bevy_remote"),
     ("npc_framework", Some(&["remote"]), "bevy_remote"),
     ("npc_framework", Some(&["view-helpers"]), "npc_view_helpers"),
@@ -852,6 +955,9 @@ const VIEW_CONTENT: &[&str] = &[
     "testbed_content",
     "testbed_view",
     "actor_testbed",
+    "island_content",
+    "island_view",
+    "island_game",
     "npcctl",
 ];
 

@@ -26,6 +26,7 @@ pub fn loaders() -> ScenarioLoaders {
     let mut l = ScenarioLoaders::default();
     village_content::agent::register_scenario_loader(&mut l);
     testbed_content::register_scenario_loader(&mut l);
+    island_content::register_scenario_loader(&mut l);
     l
 }
 

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "content": "island",
+  "name": "island_colony",
+  "seed": 7,
+  "world": {
+    "layout": "island",
+    "economy": "needs_driven",
+    "island_geography": "expanded",
+    "colony": true,
+    "island_ai": {},
+    "furnish": false,
+    "store_locked": false,
+    "detection": "automatic"
+  },
+  "actors": [
+    {
+      "kind": "unit",
+      "name": "human",
+      "template": "scout",
+      "pos": [
+        500,
+        -1500
+      ],
+      "preset": "human",
+      "facing": [
+        0,
+        1
+      ]
+    }
+  ],
+  "controllers": []
+}

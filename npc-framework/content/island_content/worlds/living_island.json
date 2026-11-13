@@ -1,0 +1,19 @@
+{
+  "name":"Living Island Village",
+  "description":"A needs-driven island economy in late autumn. Gather, hunt, craft, trade and offer goods. Food, clean water and warmth drive physical production chains and adaptive market prices.",
+  "scene":"island_village",
+  "economy":"needs_driven",
+  "island_geography":"expanded",
+  "ai_scheduler":{"enabled":true,"idle_seconds":120,"cooldown_seconds":180,"poll_seconds":1,"max_nudges_per_hour":6,"runner_timeout_seconds":900,"max_concurrent":1,"skip_paused":true},
+  "needs":{
+    "hunger":{"on":true,"rise_milli_per_tick":2,"low_milli":60000,"out_milli":100000,"low_speed_pct":75},
+    "thirst":{"on":true,"rise_milli_per_tick":3,"low_milli":60000,"out_milli":100000,"low_speed_pct":60},
+    "energy":{"on":true,"rise_milli_per_tick":2,"low_milli":60000,"out_milli":100000,"low_speed_pct":50},
+    "battery":{"on":false,"rise_milli_per_tick":0,"low_milli":60000,"out_milli":100000,"low_speed_pct":100}
+  },
+  "day_night":{"on":true,"cycle_ticks":24000,"night_vision_pct":50},
+  "detection":"automatic",
+  "perception":{"forget_after_ticks":1200,"memory_capacity":128},
+  "systems":{"map":true,"crafting":true,"vehicles":false,"locked_doors":false,"progression":true},
+  "inhabitants":{"workers":0,"skeletons":0}
+}

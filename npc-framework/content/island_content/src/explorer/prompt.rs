@@ -1,0 +1,386 @@
+//! The prompt the game shows the dev to paste into an AI tool (spec §6).
+//!
+//! Templates live in `content/island_content/prompts/*.md` and are embedded
+//! with `include_str!`; rendering fills the `{PLACEHOLDER}`s in one pass
+//! ([`fill`]). The prompts are short: they send the agent to `AGENTS.md`
+//! ([`super::workspace`]), which holds the mission, the character, the notes
+//! and the rules.
+//! Pure string work: no clock, no I/O.
+
+use std::path::PathBuf;
+
+/// The controller name the explorer scenario attaches.
+pub const CONTROLLER: &str = "explorer";
+
+const START: &str = include_str!("../../prompts/start.md");
+const RESUME: &str = include_str!("../../prompts/resume.md");
+const RESUME_CHANGED: &str = include_str!("../../prompts/resume_changed.md");
+const RESUME_REBUILT: &str = include_str!("../../prompts/resume_rebuilt.md");
+const COMMON: &str = include_str!("../../prompts/common.md");
+
+/// Which opening the prompt gets; the common body follows every one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PromptKind {
+    /// A new world.
+    Start,
+    /// A saved world, loaded.
+    Resume,
+    /// A saved world from an older game version, loaded anyway.
+    ResumeChanged,
+    /// The world was rebuilt from scratch; the diary was kept.
+    ResumeRebuilt,
+}
+
+/// Everything the game fills in.
+#[derive(Clone, Debug)]
+pub struct PromptVars {
+    /// The explorer's name.
+    pub agent: String,
+    /// The world's name.
+    pub world: String,
+    /// The game's remote URL.
+    pub url: String,
+    /// The controlled unit's id.
+    pub unit: u32,
+    /// Absolute path of the `npcctl` binary.
+    pub npcctl: PathBuf,
+    /// The agent's directory (diary and proposals live in it).
+    pub dir: PathBuf,
+    /// `npcctl` is not built yet.
+    pub npcctl_missing: bool,
+    pub map_enabled: bool,
+}
+
+/// Render the prompt for `kind` with every placeholder filled: the kind's
+/// opening, then the common part (both short: they send the agent to
+/// `AGENTS.md`, [`super::workspace`]).
+pub fn render_prompt(kind: PromptKind, v: &PromptVars) -> String {
+    let head = match kind {
+        PromptKind::Start => START,
+        PromptKind::Resume => RESUME,
+        PromptKind::ResumeChanged => RESUME_CHANGED,
+        PromptKind::ResumeRebuilt => RESUME_REBUILT,
+    };
+    normalize_prompt(&fill(
+        &format!("{}\n\n{}", head.trim_end(), COMMON.trim_start()),
+        &prompt_values(v),
+    ))
+}
+
+/// Canonical text shared by the shown/copied prompt and its saved body. Remove
+/// transport/formatting controls, not Unicode spelling: NBSP and other genuine
+/// spaces, combining marks, joiners used by scripts/emoji and literal paths stay
+/// intact. In particular, words separated by NBSP must never be concatenated.
+pub fn normalize_prompt(text: &str) -> String {
+    let mut normalized = String::with_capacity(text.len());
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '\r' => {
+                if characters.peek() == Some(&'\n') {
+                    characters.next();
+                }
+                normalized.push('\n');
+            }
+            '\u{85}' | '\u{2028}' | '\u{2029}' => normalized.push('\n'),
+            '\n' | '\t' => normalized.push(character),
+            '\u{ad}'
+            | '\u{61c}'
+            | '\u{200b}'
+            | '\u{200e}'
+            | '\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2060}'
+            | '\u{2066}'..='\u{206f}'
+            | '\u{feff}' => {}
+            _ if character.is_control() => {}
+            _ => normalized.push(character),
+        }
+    }
+    normalized
+}
+
+/// A path with forward slashes: command lines and paths in the text work in
+/// bash, PowerShell and cmd, while a backslash path is mangled by bash.
+fn slashed(p: &std::path::Path) -> String {
+    p.display().to_string().replace('\\', "/")
+}
+
+/// The values of the `{PLACEHOLDER}`s every template may use.
+pub(crate) fn prompt_values(v: &PromptVars) -> Vec<(&'static str, String)> {
+    let note = if v.npcctl_missing {
+        "npcctl is not built yet; the user must run `cargo build -p npcctl`.\n\n"
+    } else {
+        ""
+    };
+    vec![
+        ("NPCCTL_NOTE", note.to_string()),
+        ("NPCCTL", slashed(&v.npcctl)),
+        ("DIR", slashed(&v.dir)),
+        ("AGENTS_MD", slashed(&v.dir.join("AGENTS.md"))),
+        ("AGENT", v.agent.clone()),
+        ("WORLD", v.world.clone()),
+        ("URL", v.url.clone()),
+        ("UNIT", v.unit.to_string()),
+        ("CONTROLLER", CONTROLLER.to_string()),
+        (
+            "RESUME_MAP",
+            if v.map_enabled {
+                ", then your landmarks (`map_list`)".into()
+            } else {
+                String::new()
+            },
+        ),
+    ]
+}
+
+/// Replaces every `{NAME}` of `template` whose `NAME` is in `values`, in one
+/// pass: a filled-in value is never scanned again, so an agent or world name
+/// that looks like a placeholder stays as typed. Other braces (JSON examples)
+/// are kept.
+pub(crate) fn fill(template: &str, values: &[(&str, String)]) -> String {
+    let mut out = String::with_capacity(template.len() + 256);
+    let mut rest = template;
+    while let Some(i) = rest.find('{') {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + 1..];
+        let value = after.find('}').and_then(|end| {
+            let name = &after[..end];
+            values
+                .iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| (v, end))
+        });
+        match value {
+            Some((v, end)) => {
+                out.push_str(v);
+                rest = &after[end + 1..];
+            }
+            None => {
+                out.push('{');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ALL: [PromptKind; 4] = [
+        PromptKind::Start,
+        PromptKind::Resume,
+        PromptKind::ResumeChanged,
+        PromptKind::ResumeRebuilt,
+    ];
+
+    fn vars(missing: bool) -> PromptVars {
+        PromptVars {
+            agent: "Wren Ashdown".into(),
+            world: "Hollowmere".into(),
+            url: "http://127.0.0.1:15702".into(),
+            unit: 33,
+            npcctl: PathBuf::from(r"C:\games\npcctl.exe"),
+            dir: PathBuf::from(r"C:\agents\wren-ashdown"),
+            npcctl_missing: missing,
+            map_enabled: true,
+        }
+    }
+
+    #[test]
+    fn prompt_normalization_removes_format_controls_and_preserves_unicode_paths_and_spacing() {
+        let raw = "\u{feff}Read\u{200b} this\u{ad}\r\n\u{202e}C:/Zoë/👩\u{200d}💻/نامه\u{200c}ها\u{2069}\rNext\u{85}one\u{a0}two\t`markdown`\0";
+        let normalized = normalize_prompt(raw);
+        assert_eq!(
+            normalized,
+            "Read this\nC:/Zoë/👩\u{200d}💻/نامه\u{200c}ها\nNext\none\u{a0}two\t`markdown`"
+        );
+        assert_eq!(normalize_prompt(&normalized), normalized);
+    }
+
+    #[test]
+    fn start_resume_and_all_other_variants_use_the_same_clean_final_render_boundary() {
+        let mut v = vars(false);
+        v.agent = "\u{feff}Her\u{200b}p".into();
+        v.world = "Café\u{2066} Island\u{2069}".into();
+        v.dir = PathBuf::from("C:/agents/Zoë 🌊/one\u{a0}two");
+        for kind in ALL {
+            let prompt = render_prompt(kind, &v);
+            assert_eq!(prompt, normalize_prompt(&prompt), "{kind:?} final boundary");
+            assert!(prompt.contains("Herp") && prompt.contains("Café Island"));
+            assert!(prompt.contains("C:/agents/Zoë 🌊/one\u{a0}two/AGENTS.md"));
+            assert!(
+                !prompt
+                    .chars()
+                    .any(|c| matches!(c, '\u{feff}' | '\u{200b}' | '\u{2066}' | '\u{2069}' | '\r'))
+            );
+        }
+    }
+
+    /// The first `{UPPER_NAME}` still in `s`, if any.
+    fn placeholder_left(s: &str) -> Option<String> {
+        s.match_indices('{').find_map(|(i, _)| {
+            let rest = &s[i + 1..];
+            let name = &rest[..rest.find('}')?];
+            (!name.is_empty() && name.bytes().all(|c| c.is_ascii_uppercase() || c == b'_'))
+                .then(|| name.to_string())
+        })
+    }
+
+    #[test]
+    fn every_variant_fills_every_placeholder() {
+        for missing in [false, true] {
+            for k in ALL {
+                let p = render_prompt(k, &vars(missing));
+                assert!(p.len() > 300, "{k:?} is empty");
+                assert_eq!(placeholder_left(&p), None, "{k:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn fill_is_one_pass_and_keeps_other_braces() {
+        let vals = [("A", "{B}".to_string()), ("B", "b".to_string())];
+        assert_eq!(
+            fill("{A} {B} {c} {\"k\": 1} {", &vals),
+            "{B} b {c} {\"k\": 1} {"
+        );
+        let mut v = vars(false);
+        v.agent = "{URL}".into();
+        let p = render_prompt(PromptKind::Start, &v);
+        assert!(p.contains("{URL}, you arrive"), "{p}");
+    }
+
+    #[test]
+    fn prompts_point_at_agents_md() {
+        for k in ALL {
+            let p = render_prompt(k, &vars(false));
+            for s in [
+                "Wren Ashdown",
+                "Hollowmere",
+                "`C:/agents/wren-ashdown/AGENTS.md`",
+                "Epoch 1",
+                "map",
+                "the `notes_*` tools",
+                "trust this folder",
+            ] {
+                assert!(p.contains(s), "{k:?} misses {s:?}");
+            }
+            let folded = p.to_ascii_lowercase();
+            for requirement in [
+                "survive",
+                "learn",
+                "explore",
+                "register",
+                "enter the world",
+                "take control",
+            ] {
+                assert!(folded.contains(requirement), "{k:?} misses {requirement}");
+            }
+            // AGENTS.md is read before anything is done.
+            let read = p.find("AGENTS.md").unwrap();
+            assert!(read < p.find("observe").unwrap(), "{k:?}");
+            assert!(!p.contains('\\'), "{k:?} has a backslash");
+            // A mission brief, not a manual: the agent finds out how the
+            // tools work itself.
+            for s in ["act_and_wait", "expect_tick", "since_seq"] {
+                assert!(!p.contains(s), "{k:?} teaches {s:?}");
+            }
+            assert!(p.len() < 1500, "{k:?} is {} bytes", p.len());
+        }
+    }
+
+    #[test]
+    fn resume_lists_memory_first() {
+        for k in [
+            PromptKind::Resume,
+            PromptKind::ResumeChanged,
+            PromptKind::ResumeRebuilt,
+        ] {
+            let p = render_prompt(k, &vars(false));
+            let agents = p.find("AGENTS.md").expect("agents");
+            let memory = p
+                .find(r#"notes_list` with `book: "memory"`"#)
+                .expect("memory");
+            let diary = p.find(r#"`book: "diary"`"#).expect("diary");
+            let proposals = p.find(r#"`book: "proposals"`"#).expect("proposals");
+            let observe = p
+                .find("Then observe")
+                .or_else(|| p.find("then observe"))
+                .expect("then observe");
+            assert!(agents < memory && memory < diary, "{k:?}");
+            assert!(diary < proposals && proposals < observe, "{k:?}");
+        }
+        let c = render_prompt(PromptKind::ResumeChanged, &vars(false));
+        assert!(c.contains("saved by another version of the game and may have changed"));
+        let r = render_prompt(PromptKind::ResumeRebuilt, &vars(false));
+        assert!(r.contains("rebuilt from scratch"));
+        let s = render_prompt(PromptKind::Start, &vars(false));
+        assert!(!s.contains("notes_list"), "{s}");
+    }
+
+    #[test]
+    fn resume_lists_map_after_memory_only_when_enabled() {
+        for kind in [
+            PromptKind::Resume,
+            PromptKind::ResumeChanged,
+            PromptKind::ResumeRebuilt,
+        ] {
+            let on = render_prompt(kind, &vars(false));
+            assert!(on.find("book: \"memory\"").unwrap() < on.find("map_list").unwrap());
+            assert!(on.find("map_list").unwrap() < on.find("book: \"diary\"").unwrap());
+            let mut off = vars(false);
+            off.map_enabled = false;
+            assert!(!render_prompt(kind, &off).contains("map_list"));
+        }
+    }
+
+    #[test]
+    fn no_file_writing_instructions_remain() {
+        for missing in [false, true] {
+            for k in ALL {
+                let p = render_prompt(k, &vars(missing));
+                for s in [
+                    "diary.md",
+                    "memory.md",
+                    "proposals/",
+                    "Create the file",
+                    "Append-only",
+                    "NNN-",
+                    "write it down as one file",
+                ] {
+                    assert!(!p.contains(s), "{k:?} still says {s:?}");
+                }
+                assert!(p.contains("never in files"), "{k:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn prompts_are_a_briefing_without_connection_details_or_credentials() {
+        let v = vars(false);
+        for kind in ALL {
+            let p = render_prompt(kind, &v);
+            for forbidden in [
+                v.url.as_str(),
+                "npcctl",
+                "controller",
+                "actor #33",
+                "--unit",
+            ] {
+                assert!(
+                    !p.contains(forbidden),
+                    "{kind:?}: contains a private bootstrap detail"
+                );
+            }
+            assert!(
+                p.contains("Epoch 1")
+                    && (p.contains("story") || p.contains("chapter"))
+                    && p.contains("MCP")
+            );
+        }
+    }
+}

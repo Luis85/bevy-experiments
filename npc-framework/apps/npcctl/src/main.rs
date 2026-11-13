@@ -547,6 +547,7 @@ fn main() -> ExitCode {
             let mut tags = MechanicTags::default_npc();
             village_content::perf_tags(&mut tags);
             testbed_content::perf_tags(&mut tags);
+            island_content::perf_tags(&mut tags);
             collector.set_tags(tags);
             Some(collector)
         }
@@ -624,6 +625,7 @@ type CmdResult = Result<u8, Failure>;
 fn content_summary(scenario: &Scenario, world: &bevy_ecs::world::World) -> Option<Value> {
     match scenario.content() {
         "testbed" => Some(testbed_content::summary::summary_json(world)),
+        "island" => Some(island_content::summary::summary_json(world)),
         _ => None,
     }
 }
