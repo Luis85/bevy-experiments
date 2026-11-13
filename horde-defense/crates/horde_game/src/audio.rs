@@ -3,7 +3,9 @@
 //! `horde_audio`. Only presentation time selects/coalesces variants.
 //! No combat RNG is read.
 
-pub use horde_audio::{bank::variant_path, cue::Cue, select::CueGate};
+#[cfg(test)]
+pub use horde_audio::bank::variant_path;
+pub use horde_audio::{cue::Cue, select::CueGate};
 
 /// One requested cue, written by the runner and the UI and played by
 /// `SfxPlugin`.
@@ -16,6 +18,10 @@ pub struct CueRequest {
     /// The root defender's own shot: it starts on the reserved
     /// player-weapon lane (`horde_audio::select::Lane::PlayerWeapon`).
     pub player_weapon: bool,
+    /// The bank and tone of the request (`horde_audio::voicing`): an
+    /// enemy's voice, a boss's kind, a gun's quality. `None` plays the cue's
+    /// own bank as mastered.
+    pub voicing: Option<horde_audio::voicing::Voicing>,
 }
 impl CueRequest {
     /// A cue without a place: interface sounds, stingers, the defender.
@@ -24,6 +30,7 @@ impl CueRequest {
             cue,
             place: None,
             player_weapon: false,
+            voicing: None,
         }
     }
     /// A cue at its place in `places`, if it has one.
@@ -32,6 +39,7 @@ impl CueRequest {
             cue,
             place: places.of(cue),
             player_weapon: places.player_shot() == Some(cue),
+            voicing: places.voiced(cue),
         }
     }
 }
@@ -40,7 +48,8 @@ impl CueRequest {
 /// every shipped bank (alias cues play these banks; retired cues are
 /// archived) plus the ambience beds. The asset audit holds `assets/audio` to
 /// exactly this set. The wave-6 gun, enemy, boss and UI banks ship from A6-05
-/// on; the cues that play them arrive with A6-12 to A6-14.
+/// on; the enemy and boss cues play theirs from A6-12, the gun and UI cues
+/// arrive with A6-13 and A6-14.
 #[cfg(test)]
 pub(crate) fn runtime_wav_paths() -> Vec<String> {
     let mut paths: Vec<String> = horde_audio::bank::BankId::shipped()
@@ -108,11 +117,11 @@ mod tests {
     #[test]
     fn retired_cues_have_no_runtime_path_and_no_shipped_file() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let every: Vec<Cue> = LEGACY_FAMILIES
-            .into_iter()
-            .chain([Cue::Kill, Cue::Victory, Cue::Defeat, Cue::Confirm])
-            .collect();
+        let every = Cue::ALL;
         assert_eq!(every.len(), CUE_COUNT);
+        for family in LEGACY_FAMILIES {
+            assert!(every.contains(&family));
+        }
         let retired: Vec<Cue> = every.iter().copied().filter(|cue| cue.retired()).collect();
         assert_eq!(retired, vec![Cue::NpcShot]);
         let runtime = runtime_wav_paths();

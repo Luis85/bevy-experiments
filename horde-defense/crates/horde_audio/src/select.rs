@@ -35,6 +35,7 @@ pub const fn start_budget(bus: Bus) -> usize {
 pub const SUBSUMES: &[(Cue, Cue)] = &[
     (Cue::Wave, Cue::Incoming),
     (Cue::Kill, Cue::Impact),
+    (Cue::EnemyDeath, Cue::Impact),
     (Cue::Defeat, Cue::Structure),
     (Cue::Victory, Cue::Wave),
 ];
@@ -71,15 +72,24 @@ impl Start {
 
 /// Coalesce repeated ticks and accelerated observation into a restrained real-
 /// time soundscape. A cue dropped by the gate never delays a simulation action.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CueGate {
+    /// By [`Cue::gate_key`]: cues that share a gate share a slot.
     last_started: [Option<u64>; CUE_COUNT],
     /// The last start on the player-weapon lane.
     last_player: Option<(Cue, u64)>,
 }
+impl Default for CueGate {
+    fn default() -> Self {
+        Self {
+            last_started: [None; CUE_COUNT],
+            last_player: None,
+        }
+    }
+}
 impl CueGate {
     pub fn accept(&mut self, cue: Cue, now_ms: u64, reduced: bool) -> bool {
-        let last = &mut self.last_started[cue as usize];
+        let last = &mut self.last_started[cue.gate_key() as usize];
         if last.is_some_and(|previous| held(cue, previous, now_ms, reduced)) {
             return false;
         }
@@ -97,7 +107,7 @@ impl CueGate {
             return false;
         }
         self.last_player = Some((cue, now_ms));
-        self.last_started[cue as usize] = Some(now_ms);
+        self.last_started[cue.gate_key() as usize] = Some(now_ms);
         true
     }
     /// The gate of `start`'s lane.
@@ -111,7 +121,7 @@ impl CueGate {
 
 /// Whether `cue`, last started at `previous`, is still inside its cooldown.
 fn held(cue: Cue, previous: u64, now_ms: u64, reduced: bool) -> bool {
-    now_ms >= previous && now_ms - previous < mix(cue).cooldown(reduced)
+    now_ms >= previous && now_ms - previous < mix(cue.gate_key()).cooldown(reduced)
 }
 
 fn rank(cue: Cue) -> u8 {

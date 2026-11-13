@@ -15,7 +15,10 @@
 //! `D` is [`PAN_DEPTH`], [`PAN_DEPTH_REDUCED`] in reduced effects, and 0 with
 //! the "Mono audio" setting, which plays every voice centred.
 
-use crate::cue::{CUE_COUNT, Cue};
+use crate::{
+    cue::{CUE_COUNT, Cue},
+    voicing::Voicing,
+};
 
 /// The listener's x in yards: `Attempt::defender_position()[0]`.
 pub const DEFENDER_X: f32 = 0.5;
@@ -85,6 +88,10 @@ pub const fn positional(cue: Cue) -> bool {
             | Cue::Trap
             | Cue::Incoming
             | Cue::Kill
+            | Cue::EnemyWindup
+            | Cue::EnemyContact
+            | Cue::EnemyDeath
+            | Cue::Block
     )
 }
 
@@ -95,29 +102,76 @@ pub const fn positional(cue: Cue) -> bool {
 /// It also carries the frame's player-weapon lane: the cue of the root
 /// defender's own shot, which selection starts outside the bus budgets
 /// (`select::select_starts`).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Places([Option<f32>; CUE_COUNT], Option<Cue>);
+///
+/// And each cue's [`Voicing`] this frame: the bank and tone of the request
+/// that stands (an enemy's voice, a boss's kind, a gun's quality). A cue
+/// without one plays its own bank as mastered.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Places {
+    at: [Option<f32>; CUE_COUNT],
+    voicing: [Option<Voicing>; CUE_COUNT],
+    player: Option<Cue>,
+}
+impl Default for Places {
+    fn default() -> Self {
+        Self {
+            at: [None; CUE_COUNT],
+            voicing: [None; CUE_COUNT],
+            player: None,
+        }
+    }
+}
 impl Places {
     /// Records that the root defender fired `cue` this frame. The first
     /// shot stands.
     pub fn mark_player_shot(&mut self, cue: Cue) {
-        self.1.get_or_insert(cue);
+        self.player.get_or_insert(cue);
     }
     /// The cue of the root defender's own shot this frame, if he fired.
     pub fn player_shot(&self) -> Option<Cue> {
-        self.1
+        self.player
     }
     /// Places `cue` at pan position `p` unless it already has a place. A cue
     /// that is not [`positional`] stays centred.
     pub fn place(&mut self, cue: Cue, p: f32) {
-        let slot = &mut self.0[cue as usize];
+        let slot = &mut self.at[cue as usize];
         if positional(cue) && slot.is_none() && p.is_finite() {
             *slot = Some(p.clamp(0.0, 1.0));
         }
     }
     /// The pan position of `cue`; `None` is centred.
     pub fn of(&self, cue: Cue) -> Option<f32> {
-        self.0[cue as usize]
+        self.at[cue as usize]
+    }
+    /// Voices `cue` with `voicing` unless it already has one: the first
+    /// request of a cue stands.
+    pub fn voice(&mut self, cue: Cue, voicing: Voicing) {
+        self.voicing[cue as usize].get_or_insert(voicing);
+    }
+    /// What `cue` plays this frame: its request's voicing, or its own bank
+    /// as mastered.
+    pub fn voicing(&self, cue: Cue) -> Voicing {
+        self.voiced(cue).unwrap_or(Voicing::of(cue))
+    }
+    /// The voicing a request gave `cue` this frame, if any.
+    pub fn voiced(&self, cue: Cue) -> Option<Voicing> {
+        self.voicing[cue as usize]
+    }
+    /// A warning's request at `p` with `voicing`: among a frame's requests
+    /// of one warning cue, the one nearest the defender (the smallest `p`)
+    /// stands, with its place and its voice.
+    pub fn warn(&mut self, cue: Cue, p: Option<f32>, voicing: Voicing) {
+        let slot = cue as usize;
+        let p = p.filter(|p| p.is_finite()).map(|p| p.clamp(0.0, 1.0));
+        let nearer = match (self.voicing[slot], self.at[slot], p) {
+            (None, ..) => true,
+            (Some(_), Some(held), Some(p)) => p < held,
+            (Some(_), ..) => false,
+        };
+        if nearer {
+            self.voicing[slot] = Some(voicing);
+            self.at[slot] = if positional(cue) { p } else { None };
+        }
     }
 }
 

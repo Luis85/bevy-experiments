@@ -33,15 +33,16 @@
 //! 22.05 kHz loops) are resampled linearly on load.
 
 use crate::{
-    bank::{AMBIENCE_FILES, variant_path},
+    bank::{AMBIENCE_FILES, BankId},
     cue::Cue,
     duck::Ducker,
-    events::{push_cue, root_event_sound},
+    events::{EventContext, event_requests, push_cue},
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, mix},
     pan::{self, Places},
     select::{CueGate, Jitter, Variety, select_starts},
     voices::{Admission, LiveVoice, Ramp, VoiceControl, admit},
+    voicing::{EnemyVoiceIndex, Voicing, lowpassed},
     wav,
 };
 use horde_core::sim::{BattleId, Game, TICKS_PER_SECOND, smoke_input};
@@ -135,7 +136,7 @@ pub struct Library {
     loops: [Vec<f32>; 6],
 }
 impl Library {
-    /// Loads every runtime variant of every live cue and the ambience loops
+    /// Loads every variant of every shipped bank and the ambience loops
     /// from `assets`.
     pub fn load(assets: &Path) -> Result<Self, String> {
         let read = |relative: &str, wrap: bool| -> Result<Vec<f32>, String> {
@@ -145,13 +146,11 @@ impl Library {
             Ok(resample(&clip.mono(), clip.rate, RATE, wrap))
         };
         let mut clips = BTreeMap::new();
-        for cue in Cue::ALL.into_iter().filter(|cue| !cue.retired()) {
-            for variant in 0..cue.bank().variants() {
-                let path = variant_path(cue, variant);
-                if !clips.contains_key(&path) {
-                    let samples = read(&path, false)?;
-                    clips.insert(path, samples);
-                }
+        for bank in BankId::shipped() {
+            for variant in 0..bank.variants() {
+                let path = bank.variant_path(variant);
+                let samples = read(&path, false)?;
+                clips.insert(path, samples);
             }
         }
         let mut loops: [Vec<f32>; 6] = Default::default();
@@ -164,9 +163,13 @@ impl Library {
         Ok(Self { clips, loops })
     }
 
-    /// The samples `cue` plays for `variant` (variants wrap).
+    /// The samples `cue`'s own bank plays for `variant` (variants wrap).
     pub fn clip(&self, cue: Cue, variant: u64) -> &[f32] {
-        &self.clips[&variant_path(cue, variant)]
+        self.bank_clip(cue.bank(), variant)
+    }
+    /// The samples of `bank`'s `variant` (variants wrap).
+    pub fn bank_clip(&self, bank: BankId, variant: u64) -> &[f32] {
+        &self.clips[&bank.variant_path(variant)]
     }
 }
 
@@ -219,7 +222,11 @@ pub struct VoiceStart {
     /// Unique per policy; a later [`FrameActions::fades`] names it.
     pub voice: u64,
     pub cue: Cue,
-    /// The bank variant to play: the bank's round-robin pick.
+    /// The bank and tone of the request: the executor plays `voicing.bank`
+    /// at `voicing.speed` times the jitter's speed, through its low-pass,
+    /// and multiplies in its gain.
+    pub voicing: Voicing,
+    /// The variant of `voicing.bank` to play: the bank's round-robin pick.
     pub variant: u64,
     pub priority: u8,
     /// The cue's row gain in the current effects mode. The executor multiplies
@@ -264,21 +271,41 @@ impl VoicePolicy {
         self.frame_requests(cues, None, now_ms, reduced, bus_gains, live)
     }
 
-    /// One frame. `cues` are the frame's requests, `player_shot` the cue of
-    /// the root defender's own shot (the player-weapon lane), `bus_gains` is
-    /// [`Sliders::bus_gains`], and `live` lists the sounding voices, without
-    /// the fading ones. A cue whose bus is muted is dropped before
-    /// selection: it takes no start slot and leaves its cooldown untouched.
-    /// So does a start the voice caps refuse.
+    /// [`Self::frame_places`] for requests that all play their own banks as
+    /// mastered.
     pub fn frame_requests(
         &mut self,
-        mut cues: Vec<Cue>,
+        cues: Vec<Cue>,
         player_shot: Option<Cue>,
         now_ms: u64,
         reduced: bool,
         bus_gains: &[f32; 5],
         live: &[LiveVoice],
     ) -> FrameActions {
+        let mut places = Places::default();
+        if let Some(shot) = player_shot {
+            places.mark_player_shot(shot);
+        }
+        self.frame_places(cues, &places, now_ms, reduced, bus_gains, live)
+    }
+
+    /// One frame. `cues` are the frame's requests and `places` holds their
+    /// voicings and the cue of
+    /// the root defender's own shot (the player-weapon lane), `bus_gains` is
+    /// [`Sliders::bus_gains`], and `live` lists the sounding voices, without
+    /// the fading ones. A cue whose bus is muted is dropped before
+    /// selection: it takes no start slot and leaves its cooldown untouched.
+    /// So does a start the voice caps refuse.
+    pub fn frame_places(
+        &mut self,
+        mut cues: Vec<Cue>,
+        places: &Places,
+        now_ms: u64,
+        reduced: bool,
+        bus_gains: &[f32; 5],
+        live: &[LiveVoice],
+    ) -> FrameActions {
+        let player_shot = places.player_shot();
         let rotation = self.rotation;
         self.rotation = self
             .rotation
@@ -301,10 +328,12 @@ impl VoicePolicy {
             let voice = self.next_voice;
             self.next_voice += 1;
             // Only a start that plays advances its bank.
-            let pick = self.variety.pick_cue(cue);
+            let voicing = places.voicing(cue);
+            let pick = self.variety.pick(voicing.bank, mix(cue).jitter);
             actions.starts.push(VoiceStart {
                 voice,
                 cue,
+                voicing,
                 variant: pick.variant,
                 priority,
                 gain: mix(cue).level(reduced),
@@ -419,9 +448,9 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
             })
             .collect();
         let now_ms = index as u64 * 1000 / u64::from(TICKS_PER_SECOND);
-        let actions = policy.frame_requests(
+        let actions = policy.frame_places(
             frame.cues.clone(),
-            frame.places.player_shot(),
+            &frame.places,
             now_ms,
             scene.reduced,
             &bus_gains,
@@ -442,11 +471,16 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
                 control: VoiceControl::default(),
                 ramp: Ramp::new(RATE),
                 clip: {
-                    let clip = library.clip(start.cue, start.variant);
-                    if start.jitter.speed == 1.0 {
+                    let clip = library.bank_clip(start.voicing.bank, start.variant);
+                    let speed = start.jitter.speed * start.voicing.speed;
+                    let clip = if speed == 1.0 {
                         Cow::Borrowed(clip)
                     } else {
-                        Cow::Owned(pitched(clip, start.jitter.speed))
+                        Cow::Owned(pitched(clip, speed))
+                    };
+                    match start.voicing.lowpass_hz {
+                        Some(cutoff) => Cow::Owned(lowpassed(&clip, cutoff, RATE)),
+                        None => clip,
                     }
                 },
                 position: 0,
@@ -455,6 +489,7 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
                         side * bus_gains[mix(start.cue).bus as usize]
                             * start.gain
                             * start.jitter.gain
+                            * start.voicing.gain()
                     },
                 ),
             });
@@ -531,20 +566,38 @@ pub fn fire_bed_x(zones: &[horde_core::ordnance::FireZone]) -> Option<f32> {
 
 /// Ticks `game`'s battle `ticks` times with [`smoke_input`], one frame per
 /// tick, and returns the cues each tick requests: the root battle's events
-/// through [`event_sound`], plus the fire bed while a fire zone burns, as the
-/// runner's `tick_sounds` does. A tick without an attempt is a paused frame.
+/// through [`event_requests`], plus the fire bed while a fire zone burns, as
+/// the runner's `tick_sounds` does. A tick without an attempt is a paused
+/// frame.
 pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
+    let mut voices = EnemyVoiceIndex::default();
     (0..ticks)
         .map(|_| {
             let input = smoke_input(game);
             let in_battle = game.attempt().is_some();
             let width = game.attempt().map(|attempt| attempt.width_yards);
+            // Before the tick, so this tick's kills still have their voices.
+            if let Some(attempt) = game.attempt() {
+                voices.sync(BattleId::Root, attempt);
+            }
             game.tick(input);
+            if let Some(attempt) = game.attempt() {
+                voices.sync(BattleId::Root, attempt);
+            }
             let mut cues = Vec::new();
             let mut places = Places::default();
-            for record in game.drain_events() {
+            let records: Vec<_> = game.drain_events().collect();
+            let ctx = EventContext {
+                battle: BattleId::Root,
+                width_yards: width,
+                distant: false,
+                corpses: game
+                    .attempt()
+                    .map_or(&[], |attempt| attempt.corpses.as_slice()),
+            };
+            for record in records {
                 if record.battle == BattleId::Root {
-                    root_event_sound(&mut cues, &mut places, &record.event, width);
+                    event_requests(&mut cues, &mut places, &mut voices, &record.event, &ctx);
                 }
             }
             if let Some(attempt) = game.attempt()

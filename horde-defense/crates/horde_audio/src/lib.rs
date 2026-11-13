@@ -27,4 +27,5 @@ pub mod render;
 pub mod select;
 pub mod synth;
 pub mod voices;
+pub mod voicing;
 pub mod wav;

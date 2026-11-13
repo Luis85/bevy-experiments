@@ -3,6 +3,7 @@
 //! executes it.
 
 use horde_audio::{
+    bank::BankId,
     cue::Cue,
     mix::{self, Bus, CONTEXT_GAIN, GateGroup, MIX_CALIBRATION_DB, VisualTwin, WARNING_TWINS, mix},
 };
@@ -79,7 +80,8 @@ const V1_ROWS: [(Cue, f32, u32, u8, bool); 28] = [
 
 #[test]
 fn mix_rows_keep_the_v1_numbers() {
-    assert_eq!(V1_ROWS.map(|row| row.0), Cue::ALL);
+    // The v1 cues are the first 28; later cues have rows of their own.
+    assert_eq!(V1_ROWS.map(|row| row.0)[..], Cue::ALL[..V1_ROWS.len()]);
     for (cue, gain, cooldown_ms, priority, fire) in V1_ROWS {
         let row = mix(cue);
         assert_eq!(row.gain, gain, "{cue:?} gain");
@@ -125,9 +127,117 @@ fn every_cue_has_one_mix_row_bank_and_bus() {
         );
         assert_eq!(row.retired, cue.retired(), "{cue:?}");
         assert!(row.gain > 0.0 && row.gain <= 1.0, "{cue:?}");
-        // The bank is the cue's own or its alias family's.
-        assert_eq!(cue.bank(), cue.legacy_family().bank(), "{cue:?}");
+        // The bank is the cue's own or its alias family's; an enemy or boss
+        // voice cue has a wave-6 bank and a v1 fallback family.
+        match cue.bank() {
+            BankId::Legacy(family) => {
+                assert_eq!(family, cue.legacy_family(), "{cue:?}");
+                assert_eq!(cue.bank(), cue.legacy_family().bank(), "{cue:?}");
+            }
+            BankId::Enemy(..) | BankId::Boss(..) => {
+                assert!(matches!(cue.legacy_family().bank(), BankId::Legacy(_)));
+            }
+            BankId::Gun(_) | BankId::Ui(_) => panic!("{cue:?} plays {:?}", cue.bank()),
+        }
     }
+}
+
+/// The rows of the enemy and boss voice cues (A6-12): linear gain, cooldown
+/// in ms, priority.
+#[test]
+fn enemy_and_boss_voice_rows() {
+    let rows = [
+        (Cue::EnemyWindup, 0.55, 300, 3),
+        (Cue::EnemyContact, 0.5, 260, 5),
+        (Cue::EnemyDeath, 0.5, 160, 6),
+        (Cue::BossArrival, 1.0, 3000, 0),
+        (Cue::BossPhase, 0.9, 1500, 1),
+        (Cue::BossDeath, 0.9, 1500, 2),
+        (Cue::BossExposed, 0.55, 400, 4),
+        (Cue::Block, 0.32, 140, 7),
+        (Cue::Ability, 0.45, 400, 6),
+    ];
+    assert_eq!(rows.map(|row| row.0)[..], Cue::ALL[28..]);
+    for (cue, gain, cooldown_ms, priority) in rows {
+        let row = mix(cue);
+        assert_eq!(
+            (row.gain, row.cooldown_ms, row.priority),
+            (gain, cooldown_ms, priority),
+            "{cue:?}"
+        );
+        assert_eq!(row.bus, Bus::Effects, "{cue:?}");
+        assert_eq!(row.gate, GateGroup::General, "{cue:?}");
+        // Reduced effects softens every one of them and removes none.
+        assert_eq!(row.level(true), gain * 0.65, "{cue:?}");
+        assert!(row.level(true) > 0.0, "{cue:?}");
+    }
+    // A death in its own voice is as loud as the legacy kill, the boss's
+    // arrival as the legacy boss; a block sits 3 dB under Armor and the
+    // exposure 2 dB over Ready (to the table's two decimals).
+    assert_eq!(mix(Cue::EnemyDeath).gain, mix(Cue::Kill).gain);
+    assert_eq!(mix(Cue::BossArrival).gain, mix(Cue::Boss).gain);
+    let db = |cue: Cue, against: Cue| 20.0 * (mix(cue).gain / mix(against).gain).log10();
+    assert!((db(Cue::Block, Cue::Armor) + 3.0).abs() < 0.1);
+    assert!((db(Cue::BossExposed, Cue::Ready) - 2.0).abs() < 0.3);
+    assert_eq!(mix(Cue::Ability).gain, mix(Cue::Ready).gain);
+    // The duck rows: the arrival as the legacy boss, the phase its own.
+    assert_eq!(mix::duck(Cue::BossArrival), mix::duck(Cue::Boss));
+    let phase = mix::duck(Cue::BossPhase).unwrap();
+    assert_eq!(
+        (
+            phase.atmosphere_db,
+            phase.music_db,
+            phase.attack_ms,
+            phase.release_ms
+        ),
+        (-4.0, 0.0, 30, 500)
+    );
+    assert_eq!(phase.hold, mix::DuckHold::Ms(600));
+}
+
+/// The warning cues and their twins, both ways: every cue classed as a
+/// warning has a twin row that names it, every twin row names a cue classed
+/// as a warning, and a warning rides the Effects bus (only Master and Combat
+/// effects can mute it) and survives reduced effects.
+#[test]
+fn warning_cue_table_has_a_visual_twin() {
+    let warnings: Vec<Cue> = Cue::ALL
+        .into_iter()
+        .filter(|cue| mix(*cue).warning.is_some())
+        .collect();
+    assert_eq!(warnings, vec![Cue::EnemyWindup, Cue::BossPhase]);
+    for cue in warnings {
+        let twin = mix(cue).warning.unwrap();
+        assert!(
+            WARNING_TWINS
+                .iter()
+                .any(|row| row.cue == cue && row.twin == twin),
+            "{cue:?} has no {twin:?} row"
+        );
+        assert_eq!(mix(cue).bus, Bus::Effects, "{cue:?}");
+        assert!(mix(cue).level(true) > 0.0, "{cue:?}");
+        assert!(!cue.retired(), "{cue:?}");
+    }
+    for row in WARNING_TWINS {
+        assert!(
+            mix(row.cue).warning.is_some(),
+            "{row:?}: {:?} is not classed as a warning",
+            row.cue
+        );
+    }
+    // The windup has its ring and, when ranged, the aim line.
+    let twins = |cue: Cue| -> Vec<VisualTwin> {
+        WARNING_TWINS
+            .iter()
+            .filter(|row| row.cue == cue)
+            .map(|row| row.twin)
+            .collect()
+    };
+    assert_eq!(
+        twins(Cue::EnemyWindup),
+        vec![VisualTwin::WindupRing, VisualTwin::AimLine]
+    );
+    assert_eq!(twins(Cue::BossPhase), vec![VisualTwin::BossPhaseRing]);
 }
 
 #[test]

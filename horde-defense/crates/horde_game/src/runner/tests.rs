@@ -1326,6 +1326,7 @@ fn root_battle_cues_carry_their_lane_pan_place() {
     game.set_paused(false);
     let width = game.attempt().unwrap().width_yards;
     let mut heard = std::collections::BTreeMap::new();
+    let mut voices = horde_audio::voicing::EnemyVoiceIndex::default();
     for _ in 0..60 * 60 {
         if game.attempt().is_none() {
             break;
@@ -1333,7 +1334,7 @@ fn root_battle_cues_carry_their_lane_pan_place() {
         let input = horde_core::sim::smoke_input(&game);
         game.tick(input);
         let (mut cues, mut places) = (Vec::new(), Places::default());
-        tick_sounds(&mut game, None, &mut cues, &mut places);
+        tick_sounds(&mut game, None, &mut cues, &mut places, &mut voices);
         for cue in cues {
             let place = places.of(cue);
             assert!(positional(cue) || place.is_none(), "{cue:?} is centred");
@@ -1346,9 +1347,178 @@ fn root_battle_cues_carry_their_lane_pan_place() {
     // Enemies enter at the far end; kills and impacts happen on the field.
     let incoming = heard["Incoming"];
     assert!(incoming > lane_position(width - 3.0, width), "{heard:?}");
+    // An enemy dies in its own voice, where it stood.
     assert!(
-        heard.contains_key("Kill") && heard.contains_key("Impact"),
+        heard.contains_key("EnemyDeath") && heard.contains_key("Impact"),
         "{heard:?}"
     );
-    assert!(heard["Kill"] < incoming, "{heard:?}");
+    assert!(heard["EnemyDeath"] < incoming, "{heard:?}");
+}
+
+/// The view of `a` a frame draws at this tick.
+fn twin_view(a: &horde_core::sim::Attempt, reduced: bool) -> crate::battle_view::BattleViewModel {
+    use crate::{animation::SceneAnimation, battle_view::SceneBlend};
+    crate::battle_view::BattleViewModel::build(
+        a,
+        SceneAnimation::sample(a, reduced),
+        SceneBlend::NONE,
+        reduced,
+    )
+}
+/// One runner tick's cues and their places.
+fn twin_tick(
+    game: &mut Game,
+    voices: &mut horde_audio::voicing::EnemyVoiceIndex,
+) -> (Vec<SoundCue>, horde_audio::pan::Places) {
+    sync_voices(game, None, voices);
+    game.tick(Input::default());
+    let (mut cues, mut places) = (Vec::new(), horde_audio::pan::Places::default());
+    tick_sounds(game, None, &mut cues, &mut places, voices);
+    (cues, places)
+}
+
+/// The windup warning and its twins (A6-12, `WARNING_TWINS`): on the tick
+/// the runner requests `EnemyWindup`, the frame's view shows the windup
+/// ring of an enemy winding up against the defender, in normal and reduced
+/// effects, and a ranged windup also shows its aim line. A windup against a
+/// structure requests no cue and still shows its ring.
+#[test]
+fn warning_twin_enemy_windup() {
+    use horde_core::{
+        balance::BalanceSettings, content::EnemyKind, kind_map::KindMap, sim::EventKind,
+    };
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings::legacy())
+        .unwrap();
+    game.campaign_mut().attempts = 1;
+    game.deploy(0, Mode::Personal).unwrap();
+    game.campaign_mut().legacy_features = true;
+    game.campaign_mut().blueprints = KindMap::filled(true);
+    let a = game.attempt_mut().unwrap();
+    (a.max_hp, a.hp) = (1_000_000, 1_000_000);
+    game.set_paused(true);
+    game.place(StructureKind::Wall, 1, 0).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    for (lane, x) in [(0, 6.0), (3, 2.5), (6, 9.0), (1, 12.0)] {
+        game.spawn_enemy(&mut a, EnemyKind::Shambler, lane, false);
+        a.enemies.last_mut().unwrap().x = x;
+    }
+    for (lane, x) in [(5, 8.0), (2, 9.0)] {
+        game.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
+        let e = a.enemies.last_mut().unwrap();
+        let mut profile = horde_core::enemy_catalog::resolve_kind(EnemyKind::Runner);
+        profile.archetype_id = "test-spitter".into();
+        profile.reach = 4.0;
+        profile.validate().unwrap();
+        e.resolved = Some(profile);
+        e.x = x;
+    }
+    a.paused = false;
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    let mut voices = horde_audio::voicing::EnemyVoiceIndex::default();
+    let (mut seen, mut warned, mut ranged, mut structure_only) = (0, 0, 0, 0);
+    for _ in 0..2400 {
+        let (cues, places) = twin_tick(&mut game, &mut voices);
+        let Some(a) = game.attempt() else {
+            break;
+        };
+        let fresh: Vec<_> = a
+            .events
+            .iter()
+            .filter(|e| e.seq >= seen && e.kind == EventKind::Windup)
+            .cloned()
+            .collect();
+        seen = a.events.back().map_or(seen, |e| e.seq + 1);
+        // The cue is requested exactly when a windup targets the defender.
+        let at_defender: Vec<_> = fresh.iter().filter(|e| e.target_id.is_none()).collect();
+        assert_eq!(
+            cues.contains(&SoundCue::EnemyWindup),
+            !at_defender.is_empty(),
+            "tick {}",
+            a.tick
+        );
+        if !fresh.is_empty() && at_defender.is_empty() {
+            structure_only += 1;
+        }
+        if at_defender.is_empty() {
+            continue;
+        }
+        warned += 1;
+        assert!(
+            horde_audio::mix::mix(SoundCue::EnemyWindup)
+                .warning
+                .is_some()
+        );
+        assert!(matches!(
+            places.voicing(SoundCue::EnemyWindup).bank,
+            horde_audio::bank::BankId::Enemy(_, horde_audio::bank::EnemyStage::Windup)
+        ));
+        for reduced in [false, true] {
+            let view = twin_view(a, reduced);
+            for event in &at_defender {
+                let id = event.actor_id.expect("a windup names its hostile");
+                let e = a.enemies.iter().find(|e| e.id == id).unwrap();
+                let drawn = view.enemies.iter().find(|v| v.id == id).unwrap();
+                // The twin: `EnemyView.windup.is_some()`.
+                assert!(
+                    drawn.windup.is_some(),
+                    "reduced {reduced}: the windup of {id} sounds without its ring"
+                );
+                // A ranged windup: `EnemyView.aim_target.is_some()` too.
+                if a.spit_target(e).is_some() {
+                    assert!(drawn.aim_target.is_some(), "reduced {reduced}: {id}");
+                    ranged += usize::from(!reduced);
+                }
+            }
+        }
+    }
+    assert!(warned >= 3, "{warned} defender windups sounded");
+    assert!(ranged >= 1, "no ranged windup sounded");
+    assert!(structure_only >= 1, "no structure-only windup tick");
+}
+
+/// The boss-phase warning and its twin (A6-12, `WARNING_TWINS`): on the
+/// tick the runner requests `BossPhase`, in the boss kind's bank, the
+/// frame's view holds `BattleView.boss_phase`, in normal and reduced
+/// effects.
+#[test]
+fn warning_twin_boss_phase() {
+    use horde_audio::bank::{BankId, BossStage};
+    use horde_core::{balance::BalanceSettings, content::EnemyKind};
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings::legacy())
+        .unwrap();
+    game.deploy(0, Mode::Personal).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    (a.max_hp, a.hp) = (1_000_000, 1_000_000);
+    a.progression.boss_phases = 1;
+    game.spawn_enemy(&mut a, EnemyKind::Brute, 4, true);
+    let boss = a.enemies.last_mut().expect("a boss");
+    boss.x = a.width_yards * 0.6;
+    boss.hp = boss.max_hp / 2;
+    let kind = boss.boss_kind.expect("a boss of a kind");
+    a.paused = false;
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    let mut voices = horde_audio::voicing::EnemyVoiceIndex::default();
+    let (cues, places) = twin_tick(&mut game, &mut voices);
+    assert!(cues.contains(&SoundCue::BossPhase), "{cues:?}");
+    assert!(horde_audio::mix::mix(SoundCue::BossPhase).warning.is_some());
+    assert_eq!(
+        places.voicing(SoundCue::BossPhase).bank,
+        BankId::Boss(kind, BossStage::Phase)
+    );
+    let a = game.attempt().unwrap();
+    for reduced in [false, true] {
+        // The twin: `BattleView.boss_phase.is_some()`.
+        assert!(
+            twin_view(a, reduced).boss_phase.is_some(),
+            "reduced {reduced}: the phase sounds without its label and ring"
+        );
+    }
 }

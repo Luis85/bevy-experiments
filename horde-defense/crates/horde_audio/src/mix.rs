@@ -61,6 +61,8 @@ impl VisualTwin {
 /// One warning and the view-model predicate that is its visual twin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WarningTwin {
+    /// The warning cue.
+    pub cue: Cue,
     /// The `SimEvent` the warning cue announces.
     pub event: &'static str,
     pub twin: VisualTwin,
@@ -74,11 +76,13 @@ pub struct WarningTwin {
 
 const BATTLE_VIEW_FIELDS: &str = "crates/horde_game/src/battle_view/field.rs";
 
-/// Every audio warning's visual twin. The twins exist before the cues do: the
-/// windup and boss-phase cues join the cue list with the event mapping, and a
-/// cue row classed as a warning must name one of these.
+/// Every audio warning's visual twin: a cue row classed as a warning names
+/// one of these twins, and each row here names its warning cue
+/// (`warning_cue_table_has_a_visual_twin`). A ranged windup has two twins,
+/// the ring and the aim line.
 pub const WARNING_TWINS: &[WarningTwin] = &[
     WarningTwin {
+        cue: Cue::EnemyWindup,
         event: "Windup",
         twin: VisualTwin::WindupRing,
         predicate: "EnemyView.windup.is_some()",
@@ -86,6 +90,7 @@ pub const WARNING_TWINS: &[WarningTwin] = &[
         declaration: "pub windup: Option<f32>",
     },
     WarningTwin {
+        cue: Cue::EnemyWindup,
         event: "Windup (ranged)",
         twin: VisualTwin::AimLine,
         predicate: "EnemyView.aim_target.is_some()",
@@ -93,6 +98,7 @@ pub const WARNING_TWINS: &[WarningTwin] = &[
         declaration: "pub aim_target: Option<[f32; 2]>",
     },
     WarningTwin {
+        cue: Cue::BossPhase,
         event: "BossPhase",
         twin: VisualTwin::BossPhaseRing,
         predicate: "BattleView.boss_phase.is_some()",
@@ -220,6 +226,21 @@ const fn hit(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
     }
 }
 
+/// An enemy's windup, contact or death voice.
+const fn voice(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
+    CueMix {
+        jitter: JitterBounds::ENEMY_VOCALS,
+        ..row(gain, cooldown_ms, priority)
+    }
+}
+/// A boss moment.
+const fn boss(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
+    CueMix {
+        jitter: JitterBounds::BOSS,
+        ..row(gain, cooldown_ms, priority)
+    }
+}
+
 /// The mix row of a cue.
 pub const fn mix(cue: Cue) -> CueMix {
     match cue {
@@ -258,6 +279,26 @@ pub const fn mix(cue: Cue) -> CueMix {
         Cue::Victory => stinger(0.8, 3000, 0),
         Cue::Defeat => stinger(0.8, 3000, 0),
         Cue::Confirm => interface(0.45, 250, 3),
+        // The enemy and boss voices (A6-12). The gains keep the design's
+        // distance to their neighbours: a windup at an impact's level, a
+        // contact and a death at the kill's.
+        Cue::EnemyWindup => CueMix {
+            warning: Some(VisualTwin::WindupRing),
+            ..voice(0.55, 300, 3)
+        },
+        Cue::EnemyContact => voice(0.5, 260, 5),
+        Cue::EnemyDeath => voice(0.5, 160, 6),
+        Cue::BossArrival => boss(1.0, 3000, 0),
+        Cue::BossPhase => CueMix {
+            warning: Some(VisualTwin::BossPhaseRing),
+            ..boss(0.9, 1500, 1)
+        },
+        Cue::BossDeath => boss(0.9, 1500, 2),
+        // The Ready bank, 2 dB up (the voicing lowers its pitch).
+        Cue::BossExposed => row(0.55, 400, 4),
+        // The Armor bank, 3 dB down.
+        Cue::Block => hit(0.32, 140, 7),
+        Cue::Ability => row(0.45, 400, 6),
     }
 }
 
@@ -417,13 +458,14 @@ pub const fn duck(cue: Cue) -> Option<Duck> {
             release_ms: 600,
         }),
         // The boss arrival.
-        Cue::Boss => Some(Duck {
+        Cue::Boss | Cue::BossArrival => Some(Duck {
             atmosphere_db: -6.0,
             music_db: -9.0,
             attack_ms: 30,
             hold: DuckHold::Ms(1200),
             release_ms: 800,
         }),
+        Cue::BossPhase => ducks(-4.0, 600, 500),
         Cue::Wave => ducks(-4.0, 600, 400),
         Cue::Explosion => ducks(-3.0, 300, 400),
         Cue::Pistol
@@ -447,7 +489,14 @@ pub const fn duck(cue: Cue) -> Option<Duck> {
         | Cue::Trap
         | Cue::Incoming
         | Cue::Kill
-        | Cue::Confirm => None,
+        | Cue::Confirm
+        | Cue::EnemyWindup
+        | Cue::EnemyContact
+        | Cue::EnemyDeath
+        | Cue::BossDeath
+        | Cue::BossExposed
+        | Cue::Block
+        | Cue::Ability => None,
     }
 }
 

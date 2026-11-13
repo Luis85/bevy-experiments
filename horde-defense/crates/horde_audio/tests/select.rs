@@ -209,6 +209,7 @@ fn stingers_and_kills_replace_the_cues_they_subsume() {
         [
             (Cue::Wave, Cue::Incoming),
             (Cue::Kill, Cue::Impact),
+            (Cue::EnemyDeath, Cue::Impact),
             (Cue::Defeat, Cue::Structure),
             (Cue::Victory, Cue::Wave),
         ]

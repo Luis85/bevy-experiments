@@ -55,12 +55,20 @@ fn duck_rows_match_the_design_table() {
     for cue in Cue::ALL {
         let expected = match cue {
             Cue::Victory | Cue::Defeat | Cue::Retreat => stinger,
-            Cue::Boss => Some(Duck {
+            // The boss arrival, of a known kind or not.
+            Cue::Boss | Cue::BossArrival => Some(Duck {
                 atmosphere_db: -6.0,
                 music_db: -9.0,
                 attack_ms: 30,
                 hold: DuckHold::Ms(1200),
                 release_ms: 800,
+            }),
+            Cue::BossPhase => Some(Duck {
+                atmosphere_db: -4.0,
+                music_db: 0.0,
+                attack_ms: mix::DUCK_ATTACK_MS,
+                hold: DuckHold::Ms(600),
+                release_ms: 500,
             }),
             Cue::Wave => Some(Duck {
                 atmosphere_db: -4.0,
@@ -318,7 +326,11 @@ fn density_compensation_caps_effects_rms_growth_and_exempts_warnings() {
     // Who is compensated.
     for cue in Cue::ALL {
         let row = mix(cue);
-        let warning = row.warning.is_some() || matches!(cue, Cue::Boss | Cue::Wave | Cue::Incoming);
+        let warning = row.warning.is_some()
+            || matches!(
+                cue,
+                Cue::Boss | Cue::BossArrival | Cue::Wave | Cue::Incoming
+            );
         assert_eq!(
             compensated(Start::bus(cue)),
             row.bus == Bus::Effects && !warning,

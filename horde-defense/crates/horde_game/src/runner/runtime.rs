@@ -11,9 +11,10 @@ use horde_core::command::Command;
 #[cfg(test)]
 pub(super) use horde_audio::events::event_sound;
 use horde_audio::{
-    events::{event_sound_at, root_event_sound},
+    events::{EventContext, event_requests},
     pan::{self, Places},
     render::fire_bed_x,
+    voicing::EnemyVoiceIndex,
 };
 use horde_core::sim::{BattleId, Game, Input, SimEvent};
 #[cfg(feature = "review")]
@@ -44,6 +45,10 @@ pub struct Runtime {
     /// Lane pan places of the cues drained since the runner last forwarded
     /// its cues (`RuntimeParams::run` takes them).
     pub(super) cue_places: Places,
+    /// The voices of the live enemies (`horde_audio::voicing`), synced
+    /// around every tick. Presentation only: never saved, rebuilt from the
+    /// attempt after a load.
+    pub(super) enemy_voices: EnemyVoiceIndex,
     pub(super) dirty: bool,
     pub(super) save_ticks: u64,
     pub(super) retry_save_at: u64,
@@ -291,6 +296,8 @@ impl Runtime {
             recorder.input(self.simulated_ticks, &input);
         }
         let had_attempt = game.attempt().is_some();
+        // Before the tick: the enemies this tick kills still have voices.
+        sync_voices(game, self.observed_battle, &mut self.enemy_voices);
         game.tick(input);
         self.simulated_ticks += 1;
         self.save_ticks += 1;
@@ -311,7 +318,13 @@ impl Runtime {
     /// does a command that finishes the attempt outside a tick (`Withdraw`
     /// pauses the game, so its terminal event would otherwise wait).
     pub(super) fn drain_sounds(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) {
-        let newest_event = tick_sounds(game, self.observed_battle, cues, &mut self.cue_places);
+        let newest_event = tick_sounds(
+            game,
+            self.observed_battle,
+            cues,
+            &mut self.cue_places,
+            &mut self.enemy_voices,
+        );
         #[cfg(feature = "dev")]
         {
             self.last_event_seq = newest_event.or(self.last_event_seq);
@@ -419,22 +432,50 @@ pub(super) fn merge_actions(into: &mut Input, from: &Input) {
     }
 }
 
+/// Brings `voices` up to the battles that can be heard in full: the root
+/// attempt, and from camp the observed expedition. The voices of every other
+/// battle are dropped.
+pub(super) fn sync_voices(game: &Game, observed: Option<u64>, voices: &mut EnemyVoiceIndex) {
+    let heard = if let Some(attempt) = game.attempt() {
+        voices.sync(BattleId::Root, attempt);
+        Some(BattleId::Root)
+    } else {
+        let battle = observed.and_then(|id| {
+            game.battles()
+                .iter()
+                .find(|battle| battle.id == id && !battle.settled)
+        });
+        battle.and_then(|battle| {
+            let attempt = battle.game().attempt()?;
+            let key = BattleId::Expedition(battle.id);
+            voices.sync(key, attempt);
+            Some(key)
+        })
+    };
+    voices.retain(|battle| Some(battle) == heard);
+}
+
 /// Sounds for one tick's drained events. The main deployment is always
 /// audible; camp observation hears the observed expedition in full and only
 /// important cues from the others, without multiplying ordinary shots.
 /// The root battle's positional cues get their lane pan place in `places`;
-/// an expedition heard from camp is centred.
+/// an expedition heard from camp is centred and its shots are distant.
+/// `voices` gives enemies their voices (`horde_audio::voicing`); it is
+/// synced here again, for the enemies the tick spawned.
 /// Returns the newest root event sequence number it drained.
 pub(super) fn tick_sounds(
     game: &mut Game,
     observed: Option<u64>,
     cues: &mut Vec<SoundCue>,
     places: &mut Places,
+    voices: &mut EnemyVoiceIndex,
 ) -> Option<u64> {
     let camp = game.attempt().is_none();
     let root_width = game.attempt().map(|a| a.width_yards);
     let mut newest = None;
-    for record in game.drain_events() {
+    sync_voices(game, observed, voices);
+    let records: Vec<_> = game.drain_events().collect();
+    for record in records {
         if record.battle == BattleId::Root {
             newest = Some(record.seq);
         }
@@ -452,12 +493,28 @@ pub(super) fn tick_sounds(
             }
         };
         if audible {
-            if record.battle == BattleId::Root {
-                // The root defender's own shot also takes the player-weapon lane.
-                root_event_sound(cues, places, &record.event, root_width);
-            } else {
-                event_sound_at(cues, places, &record.event, None);
-            }
+            // The root defender's own shot also takes the player-weapon lane.
+            let ctx = match record.battle {
+                BattleId::Root => EventContext {
+                    battle: BattleId::Root,
+                    width_yards: root_width,
+                    distant: false,
+                    // A same-tick spawn and kill resolves from its corpse.
+                    corpses: game.attempt().map_or(&[], |a| a.corpses.as_slice()),
+                },
+                BattleId::Expedition(id) => EventContext {
+                    battle: record.battle,
+                    width_yards: None,
+                    distant: true,
+                    corpses: game
+                        .battles()
+                        .iter()
+                        .find(|battle| battle.id == id)
+                        .and_then(|battle| battle.game().attempt())
+                        .map_or(&[], |a| a.corpses.as_slice()),
+                },
+            };
+            event_requests(cues, places, voices, &record.event, &ctx);
         }
     }
     let fire = match game.attempt() {

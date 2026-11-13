@@ -1,14 +1,25 @@
-//! Simulation events to cues. This is the v1 mapping, moved here unchanged so
-//! the runtime and the offline renderer hear the same battle.
+//! Simulation events to cues: [`event_requests`], the one mapping the
+//! runtime and the offline renderer share.
+//!
+//! The mapping is exhaustive. It names every `SimEvent` variant and has no
+//! wildcard arm, so a new variant does not compile until its sound (or its
+//! silence) is decided here.
+//!
+//! A request is its cue, queued once per batch, plus what [`Places`] holds
+//! for the cue: the lane pan place of the event and the [`Voicing`] (an
+//! enemy's voice by catalogue id, a boss's kind, the tone of a gun's
+//! quality).
 
 use crate::{
+    bank::{BossStage, EnemyStage},
     cue::Cue,
     pan::{self, Places},
+    voicing::{EnemyVoiceIndex, EnemyVoiceRef, Tone, Voicing, boss_voicing},
 };
 use horde_core::{
     content::StructureKind,
     ordnance::OrdnanceKind,
-    sim::{Actor, Outcome, SimEvent},
+    sim::{Actor, BattleId, CorpseRecord, Outcome, SimEvent, Strike},
     weapons::WeaponClass,
 };
 
@@ -45,78 +56,261 @@ pub fn defender_shot(event: &SimEvent) -> Option<Cue> {
     }
 }
 
-/// Queues the cues of one simulation event.
-pub fn event_sound(cues: &mut Vec<Cue>, event: &SimEvent) {
-    if let SimEvent::Hit(strike)
-    | SimEvent::Armor(strike)
-    | SimEvent::Miss(strike)
-    | SimEvent::Defended(strike) = event
-        && matches!(
+/// The Block cue plays the Armor bank at this speed (its mix row is 3 dB
+/// under Armor's).
+pub const BLOCK_SPEED: f32 = 0.85;
+/// The Ability cue plays the Ready bank at this speed.
+pub const ABILITY_SPEED: f32 = 0.92;
+/// The BossExposed cue plays the Ready bank at this speed (its mix row is
+/// 2 dB over Ready's).
+pub const BOSS_EXPOSED_SPEED: f32 = 0.9;
+
+/// Where and how a batch of events is heard.
+#[derive(Clone, Copy, Debug)]
+pub struct EventContext<'a> {
+    /// The battle the events come from. The root battle's defender shot
+    /// takes the player-weapon lane.
+    pub battle: BattleId,
+    /// The width of the battle's field; `None` (no attempt, or an expedition
+    /// heard from camp) leaves every cue centred.
+    pub width_yards: Option<f32>,
+    /// An expedition watched from camp: its shots are [`Tone::DISTANT`].
+    pub distant: bool,
+    /// The battle's corpse records: the voice of an enemy that spawned and
+    /// died inside one tick, which the index never saw.
+    pub corpses: &'a [CorpseRecord],
+}
+
+/// One batch's cues and their places and voices.
+struct Batch<'a> {
+    cues: &'a mut Vec<Cue>,
+    places: &'a mut Places,
+    width_yards: Option<f32>,
+}
+impl Batch<'_> {
+    /// The pan place of `cue` for `event`, on a field with a width.
+    fn place(&self, cue: Cue, event: &SimEvent) -> Option<f32> {
+        let width = self.width_yards?;
+        event_x(cue, event).map(|x| pan::lane_position(x, width))
+    }
+    /// Queues `cue` at `event`'s place, with `voicing` if it names one.
+    fn push(&mut self, cue: Cue, event: &SimEvent, voicing: Option<Voicing>) {
+        push_cue(self.cues, cue);
+        if let Some(p) = self.place(cue, event) {
+            self.places.place(cue, p);
+        }
+        if let Some(voicing) = voicing {
+            self.places.voice(cue, voicing);
+        }
+    }
+    /// Queues a warning: of a batch's requests of `cue`, the one nearest
+    /// the defender stands.
+    fn warn(&mut self, cue: Cue, event: &SimEvent, voicing: Voicing) {
+        push_cue(self.cues, cue);
+        let place = self.place(cue, event);
+        self.places.warn(cue, place, voicing);
+    }
+    /// A trap's strike is the trap's snap, whatever came of it.
+    fn trap(&mut self, event: &SimEvent, strike: &Strike) {
+        if matches!(
             strike.attacker,
             Actor::Structure {
                 kind: StructureKind::Trap,
                 ..
             }
-        )
-    {
-        push_cue(cues, Cue::Trap);
+        ) {
+            self.push(Cue::Trap, event, None);
+        }
     }
-    let cue = match event {
-        SimEvent::Boss { .. } => Some(Cue::Boss),
-        SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => Some(Cue::Wave),
-        SimEvent::BossExposure { .. } | SimEvent::CooldownReady => Some(Cue::Ready),
-        SimEvent::StructureLost { .. } => Some(Cue::Structure),
-        SimEvent::Damage(_) => Some(Cue::Damage),
-        SimEvent::Melee(_) => Some(Cue::Melee),
-        SimEvent::Reload => Some(Cue::Reload),
+}
+
+/// Queues the requests of one simulation event: its cues in `cues`, their
+/// places and voices in `places`. `voices` resolves an enemy id to its
+/// voice; a kill takes its enemy out of it.
+pub fn event_requests(
+    cues: &mut Vec<Cue>,
+    places: &mut Places,
+    voices: &mut EnemyVoiceIndex,
+    event: &SimEvent,
+    ctx: &EventContext,
+) {
+    let battle = ctx.battle;
+    let mut batch = Batch {
+        cues,
+        places,
+        width_yards: ctx.width_yards,
+    };
+    match event {
         SimEvent::Shot { shooter, .. } => match *shooter {
+            // Either mode sounds like its weapon class, in the tone of the
+            // gun's quality; NpcShot is retired.
+            Actor::Defender { weapon, .. } => {
+                let cue = weapon_cue(weapon);
+                let tone = if ctx.distant {
+                    Some(Tone::DISTANT)
+                } else {
+                    voices.shot_tone(battle)
+                };
+                batch.push(cue, event, tone.map(|tone| Voicing::toned(cue, tone)));
+                if battle == BattleId::Root {
+                    batch.places.mark_player_shot(cue);
+                }
+            }
             Actor::Structure {
                 kind: StructureKind::Trap,
                 ..
-            } => Some(Cue::Trap),
+            } => batch.push(Cue::Trap, event, None),
             Actor::Structure {
                 kind: StructureKind::Turret,
                 ..
-            } => Some(Cue::TurretShot),
-            // Either mode sounds like its weapon; NpcShot is retired.
-            Actor::Defender { weapon, .. } => Some(weapon_cue(weapon)),
-            // A source that no longer exists has no reliable timbre.
-            _ => None,
+            } => batch.push(Cue::TurretShot, event, None),
+            // A wall fires nothing, enemies and ordnance have their own
+            // cues, and a source that no longer exists has no timbre.
+            Actor::Structure {
+                kind: StructureKind::Wall,
+                ..
+            }
+            | Actor::Enemy { .. }
+            | Actor::Ordnance { .. }
+            | Actor::Unknown { .. } => {}
         },
-        SimEvent::Throw { .. } => Some(Cue::Throw),
-        SimEvent::Explosion {
-            ordnance: OrdnanceKind::Molotov,
+        SimEvent::Hit(strike) | SimEvent::WeakPoint(strike) => {
+            batch.trap(event, strike);
+            batch.push(Cue::Impact, event, None);
+        }
+        SimEvent::Armor(strike) => {
+            batch.trap(event, strike);
+            batch.push(Cue::Armor, event, None);
+        }
+        // Silent: the tracer is a miss's twin.
+        SimEvent::Miss(strike) => batch.trap(event, strike),
+        SimEvent::Defended(strike) => {
+            batch.trap(event, strike);
+            // The defender defended (no target id is the defender).
+            if strike.target_id.is_none() {
+                let voicing = Voicing::tuned(Cue::Block.bank(), BLOCK_SPEED, 0.0);
+                batch.push(Cue::Block, event, Some(voicing));
+            }
+        }
+        SimEvent::Damage(_) => batch.push(Cue::Damage, event, None),
+        SimEvent::Melee(_) => batch.push(Cue::Melee, event, None),
+        SimEvent::Kill { enemy_id, .. } => {
+            let voice = voices.remove(battle, *enemy_id).or_else(|| {
+                ctx.corpses
+                    .iter()
+                    .find(|corpse| corpse.id == *enemy_id)
+                    .map(EnemyVoiceRef::of_corpse)
+            });
+            match voice {
+                Some(EnemyVoiceRef {
+                    boss: Some(kind), ..
+                }) => {
+                    let voicing = boss_voicing(kind, BossStage::Death, voices.capstone(battle));
+                    batch.push(Cue::BossDeath, event, Some(voicing));
+                }
+                Some(voice) => {
+                    let voicing = voice.voicing(EnemyStage::Death);
+                    batch.push(Cue::EnemyDeath, event, Some(voicing));
+                }
+                // Nothing resolves the enemy: the legacy kill.
+                None => batch.push(Cue::Kill, event, None),
+            }
+        }
+        SimEvent::Reload => batch.push(Cue::Reload, event, None),
+        SimEvent::Spawn { .. } => batch.push(Cue::Incoming, event, None),
+        SimEvent::Boss { enemy_id, .. } => {
+            match voices.get(battle, *enemy_id).and_then(|voice| voice.boss) {
+                Some(kind) => {
+                    let voicing = boss_voicing(kind, BossStage::Arrival, voices.capstone(battle));
+                    batch.push(Cue::BossArrival, event, Some(voicing));
+                }
+                // A boss without a kind: the legacy arrival.
+                None => batch.push(Cue::Boss, event, None),
+            }
+        }
+        SimEvent::StructureLost { .. } => batch.push(Cue::Structure, event, None),
+        SimEvent::Ability { .. } => {
+            let voicing = Voicing::tuned(Cue::Ability.bank(), ABILITY_SPEED, 0.0);
+            batch.push(Cue::Ability, event, Some(voicing));
+        }
+        // On the defender and on a structure alike.
+        SimEvent::Contact { enemy_id, .. } => {
+            let voicing = voices
+                .get(battle, *enemy_id)
+                .map(|voice| voice.voicing(EnemyStage::Contact));
+            batch.push(Cue::EnemyContact, event, voicing);
+        }
+        SimEvent::Windup {
+            enemy_id,
+            structure_id,
             ..
-        } => Some(Cue::Molotov),
-        SimEvent::Explosion { .. } => Some(Cue::Explosion),
-        SimEvent::Burn { .. } => Some(Cue::Fire),
-        SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(Cue::Impact),
-        SimEvent::Armor(_) => Some(Cue::Armor),
-        SimEvent::Spawn { .. } => Some(Cue::Incoming),
-        SimEvent::Kill { .. } => Some(Cue::Kill),
-        SimEvent::AttemptFinished { outcome, .. } => Some(match outcome {
-            Outcome::Victory => Cue::Victory,
-            Outcome::Defeat => Cue::Defeat,
-            Outcome::Withdrawal => Cue::Retreat,
-        }),
-        // Enemy-side events have no cue until audio's exhaustive SimEvent
-        // mapping in wave 6 (A6-12). Their visual twins already exist: the
-        // W2-28 aim line for a ranged windup and the W2-37 phase label and
-        // ring for a boss phase.
-        SimEvent::Spit(_)
-        | SimEvent::Detonation { .. }
-        | SimEvent::Split { .. }
-        | SimEvent::BossPhase { .. } => None,
-        _ => None,
-    };
-    if let Some(cue) = cue {
-        push_cue(cues, cue);
+        } => {
+            // A windup against a structure stays visual: its ring.
+            if structure_id.is_none() {
+                let voicing = voices
+                    .get(battle, *enemy_id)
+                    .map_or(Voicing::of(Cue::EnemyWindup), |voice| {
+                        voice.voicing(EnemyStage::Windup)
+                    });
+                batch.warn(Cue::EnemyWindup, event, voicing);
+            }
+        }
+        SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => {
+            batch.push(Cue::Wave, event, None);
+        }
+        SimEvent::BossExposure { exposed, .. } => {
+            // The weak point opening is the news; its closing is silent.
+            if *exposed {
+                let voicing = Voicing::tuned(Cue::BossExposed.bank(), BOSS_EXPOSED_SPEED, 0.0);
+                batch.push(Cue::BossExposed, event, Some(voicing));
+            }
+        }
+        SimEvent::Throw { .. } => batch.push(Cue::Throw, event, None),
+        SimEvent::Explosion { ordnance, .. } => match ordnance {
+            OrdnanceKind::Molotov => batch.push(Cue::Molotov, event, None),
+            OrdnanceKind::Grenade => batch.push(Cue::Explosion, event, None),
+        },
+        // Silent per event: the fire bed sounds while a zone burns.
+        SimEvent::Burn { .. } => {}
+        SimEvent::CooldownReady => batch.push(Cue::Ready, event, None),
+        // Log prose.
+        SimEvent::RuleResolved { .. } => {}
+        SimEvent::AttemptFinished { outcome, .. } => {
+            let cue = match outcome {
+                Outcome::Victory => Cue::Victory,
+                Outcome::Defeat => Cue::Defeat,
+                Outcome::Withdrawal => Cue::Retreat,
+            };
+            batch.push(cue, event, None);
+        }
+        // A ranged enemy's strike is its contact, in its voice.
+        SimEvent::Spit(strike) => {
+            let voicing = match strike.attacker {
+                Actor::Enemy { id } => voices
+                    .get(battle, id)
+                    .map(|voice| voice.voicing(EnemyStage::Contact)),
+                Actor::Defender { .. }
+                | Actor::Structure { .. }
+                | Actor::Ordnance { .. }
+                | Actor::Unknown { .. } => None,
+            };
+            batch.push(Cue::EnemyContact, event, voicing);
+        }
+        // An exploder's blast is a blast.
+        SimEvent::Detonation { .. } => batch.push(Cue::Explosion, event, None),
+        // Silent: the parent's death and the children's arrival sound.
+        SimEvent::Split { .. } => {}
+        SimEvent::BossPhase { kind, .. } => {
+            let voicing = boss_voicing(*kind, BossStage::Phase, voices.capstone(battle));
+            batch.warn(Cue::BossPhase, event, voicing);
+        }
     }
 }
 
 /// The x in yards a cue of `event` sounds from, when the event has a place:
-/// a trap or turret at its own position, an impact where it lands, a kill, a
-/// spawn, a blast, a burn and a lost structure where they happen.
+/// a trap or turret at its own position, an impact where it lands, a death,
+/// a spawn, a blast and a lost structure where they happen, an enemy's
+/// windup and contact where the enemy stands, a block at the defender.
 pub fn event_x(cue: Cue, event: &SimEvent) -> Option<f32> {
     let at = match (cue, event) {
         (Cue::Trap | Cue::TurretShot, SimEvent::Shot { from, .. }) => from,
@@ -131,14 +325,29 @@ pub fn event_x(cue: Cue, event: &SimEvent) -> Option<f32> {
             Cue::Impact | Cue::Armor,
             SimEvent::Hit(strike) | SimEvent::WeakPoint(strike) | SimEvent::Armor(strike),
         ) => &strike.to,
-        (Cue::Kill, SimEvent::Kill { at, .. })
+        (Cue::Block, SimEvent::Defended(strike)) => &strike.to,
+        (Cue::EnemyContact, SimEvent::Spit(strike)) => &strike.from,
+        (Cue::EnemyWindup, SimEvent::Windup { from, .. }) => from,
+        (Cue::Kill | Cue::EnemyDeath, SimEvent::Kill { at, .. })
+        | (Cue::EnemyContact, SimEvent::Contact { at, .. })
         | (Cue::Incoming, SimEvent::Spawn { at, .. })
         | (Cue::Explosion | Cue::Molotov, SimEvent::Explosion { at, .. })
-        | (Cue::Fire, SimEvent::Burn { at, .. })
+        | (Cue::Explosion, SimEvent::Detonation { at, .. })
         | (Cue::Structure, SimEvent::StructureLost { at, .. }) => at,
         _ => return None,
     };
     Some(at[0])
+}
+
+/// A battle that is never the root and never indexed: the context of the
+/// mappings below, which resolve no enemy.
+const UNINDEXED: BattleId = BattleId::Expedition(u64::MAX);
+
+/// [`event_requests`] without a battle: nothing resolves an enemy or a
+/// gun's quality, so deaths and boss arrivals are the legacy cues and shots
+/// play as mastered. For callers that have only the event.
+pub fn event_sound(cues: &mut Vec<Cue>, event: &SimEvent) {
+    event_sound_at(cues, &mut Places::default(), event, None);
 }
 
 /// [`event_sound`], and the pan place of every cue the event newly queued.
@@ -150,14 +359,13 @@ pub fn event_sound_at(
     event: &SimEvent,
     width_yards: Option<f32>,
 ) {
-    let queued = cues.len();
-    event_sound(cues, event);
-    let Some(width) = width_yards else { return };
-    for cue in &cues[queued..] {
-        if let Some(x) = event_x(*cue, event) {
-            places.place(*cue, pan::lane_position(x, width));
-        }
-    }
+    let ctx = EventContext {
+        battle: UNINDEXED,
+        width_yards,
+        distant: false,
+        corpses: &[],
+    };
+    event_requests(cues, places, &mut EnemyVoiceIndex::default(), event, &ctx);
 }
 
 /// [`event_sound_at`] for an event of the root battle: the root defender's
@@ -168,8 +376,11 @@ pub fn root_event_sound(
     event: &SimEvent,
     width_yards: Option<f32>,
 ) {
-    event_sound_at(cues, places, event, width_yards);
-    if let Some(shot) = defender_shot(event) {
-        places.mark_player_shot(shot);
-    }
+    let ctx = EventContext {
+        battle: BattleId::Root,
+        width_yards,
+        distant: false,
+        corpses: &[],
+    };
+    event_requests(cues, places, &mut EnemyVoiceIndex::default(), event, &ctx);
 }

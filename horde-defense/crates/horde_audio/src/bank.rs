@@ -284,9 +284,19 @@ impl BankId {
 
 const fn legacy_name(family: Cue) -> &'static str {
     match family {
-        Cue::Kill | Cue::Victory | Cue::Defeat | Cue::Confirm => {
-            legacy_name(family.legacy_family())
-        }
+        Cue::Kill
+        | Cue::Victory
+        | Cue::Defeat
+        | Cue::Confirm
+        | Cue::EnemyWindup
+        | Cue::EnemyContact
+        | Cue::EnemyDeath
+        | Cue::BossArrival
+        | Cue::BossPhase
+        | Cue::BossDeath
+        | Cue::BossExposed
+        | Cue::Block
+        | Cue::Ability => legacy_name(family.legacy_family()),
         Cue::Pistol => "pistol",
         Cue::Smg => "smg",
         Cue::Shotgun => "shotgun",

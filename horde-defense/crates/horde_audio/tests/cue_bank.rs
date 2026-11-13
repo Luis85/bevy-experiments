@@ -8,7 +8,7 @@ use horde_audio::{
 };
 
 /// The v1 cue order, by discriminant. Later rows append below the last line.
-const FROZEN_CUES: [(Cue, &str); 28] = [
+const FROZEN_CUES: [(Cue, &str); 37] = [
     (Cue::Pistol, "Pistol"),
     (Cue::Smg, "Smg"),
     (Cue::Shotgun, "Shotgun"),
@@ -37,6 +37,16 @@ const FROZEN_CUES: [(Cue, &str); 28] = [
     (Cue::Victory, "Victory"),
     (Cue::Defeat, "Defeat"),
     (Cue::Confirm, "Confirm"),
+    // A6-12.
+    (Cue::EnemyWindup, "EnemyWindup"),
+    (Cue::EnemyContact, "EnemyContact"),
+    (Cue::EnemyDeath, "EnemyDeath"),
+    (Cue::BossArrival, "BossArrival"),
+    (Cue::BossPhase, "BossPhase"),
+    (Cue::BossDeath, "BossDeath"),
+    (Cue::BossExposed, "BossExposed"),
+    (Cue::Block, "Block"),
+    (Cue::Ability, "Ability"),
 ];
 
 /// The v1 synthesized families: file stem by bank ordinal.
@@ -115,7 +125,9 @@ fn bank_ordinals_are_append_only() {
             assert_eq!(previous, bank, "ordinal {} is shared", bank.ordinal());
         }
     }
-    assert_eq!(seen.len(), LEGACY_FAMILIES.len());
+    // The 24 families, and the default banks of the six enemy and boss
+    // voice cues (their requests name the voice's or the kind's bank).
+    assert_eq!(seen.len(), LEGACY_FAMILIES.len() + 6);
 }
 
 #[test]

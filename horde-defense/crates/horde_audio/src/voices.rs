@@ -50,10 +50,17 @@ pub enum Family {
     Reload,
     /// The radio warnings: Wave and Incoming.
     Radio,
+    /// The boss arrival, of a known kind or not.
     Boss,
+    /// Enemy windups.
+    Windup,
+    /// Enemy contacts.
+    Contact,
+    BossPhase,
+    BossDeath,
 }
 impl Family {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 15] = [
         Self::Guns,
         Self::Turret,
         Self::Death,
@@ -65,18 +72,29 @@ impl Family {
         Self::Reload,
         Self::Radio,
         Self::Boss,
+        Self::Windup,
+        Self::Contact,
+        Self::BossPhase,
+        Self::BossDeath,
     ];
     /// Voices of the family that may sound at once.
     pub const fn cap(self) -> usize {
         match self {
-            Self::Guns | Self::Death | Self::Impact | Self::Explosion => 2,
+            Self::Guns
+            | Self::Death
+            | Self::Impact
+            | Self::Explosion
+            | Self::Windup
+            | Self::Contact => 2,
             Self::Turret
             | Self::Armor
             | Self::Molotov
             | Self::Fire
             | Self::Reload
             | Self::Radio
-            | Self::Boss => 1,
+            | Self::Boss
+            | Self::BossPhase
+            | Self::BossDeath => 1,
         }
     }
     /// Whether a start of this family may steal a voice exactly as important
@@ -98,15 +116,19 @@ pub const fn family(cue: Cue) -> Option<Family> {
         | Cue::MachineGun
         | Cue::NpcShot => Some(Family::Guns),
         Cue::TurretShot => Some(Family::Turret),
-        Cue::Kill => Some(Family::Death),
+        Cue::Kill | Cue::EnemyDeath => Some(Family::Death),
         Cue::Impact => Some(Family::Impact),
-        Cue::Armor => Some(Family::Armor),
+        Cue::Armor | Cue::Block => Some(Family::Armor),
         Cue::Explosion => Some(Family::Explosion),
         Cue::Molotov => Some(Family::Molotov),
         Cue::Fire => Some(Family::Fire),
         Cue::Reload => Some(Family::Reload),
         Cue::Wave | Cue::Incoming => Some(Family::Radio),
-        Cue::Boss => Some(Family::Boss),
+        Cue::Boss | Cue::BossArrival => Some(Family::Boss),
+        Cue::EnemyWindup => Some(Family::Windup),
+        Cue::EnemyContact => Some(Family::Contact),
+        Cue::BossPhase => Some(Family::BossPhase),
+        Cue::BossDeath => Some(Family::BossDeath),
         Cue::Throw
         | Cue::Retreat
         | Cue::Damage
@@ -116,7 +138,9 @@ pub const fn family(cue: Cue) -> Option<Family> {
         | Cue::Trap
         | Cue::Victory
         | Cue::Defeat
-        | Cue::Confirm => None,
+        | Cue::Confirm
+        | Cue::BossExposed
+        | Cue::Ability => None,
     }
 }
 

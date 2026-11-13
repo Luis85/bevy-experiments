@@ -18,6 +18,11 @@
 //! gains of its lane pan (`horde_audio::pan`; centred with "Mono audio"). A
 //! variant whose WAV has not loaded yet plays as a plain centred
 //! `AudioSource`, so no cue is lost.
+//!
+//! A request's voicing (`horde_audio::voicing`) names the bank the voice
+//! plays and its tone: an enemy's voice, a boss's kind, a gun's quality. The
+//! tone's speed and gain join the jitter's; its low-pass runs in the
+//! `PannedClip` decoder (the plain fallback player plays unfiltered).
 use crate::{
     audio::{Cue as SoundCue, CueRequest},
     runner::RuntimeSet,
@@ -34,6 +39,7 @@ use horde_audio::{
     render::audible,
     select::{Variety, select_starts},
     voices::{Admission, LiveVoice, Ramp, VoiceControl, admit},
+    voicing::OnePole,
 };
 use std::sync::Arc;
 
@@ -83,8 +89,8 @@ pub struct EffectVoice {
     /// to the plain player: stolen, it is cut at once.
     control: Option<Arc<VoiceControl>>,
     last_gain: f32,
-    /// The start's gain jitter: the voice keeps it while its bus gain and the
-    /// effects mode change.
+    /// The start's gain jitter times its voicing's gain: the voice keeps it
+    /// while its bus gain and the effects mode change.
     jitter_gain: f32,
     cue: SoundCue,
     /// The `[left, right]` pan gains the voice started with; a voice that
@@ -111,6 +117,8 @@ pub struct PannedClip {
     pub gains: [f32; 2],
     /// Fades the voice out and ends it (`horde_audio::voices`).
     pub control: Arc<VoiceControl>,
+    /// The tone's low-pass cutoff (`horde_audio::voicing`), if it has one.
+    pub lowpass_hz: Option<f32>,
 }
 impl Decodable for PannedClip {
     type Decoder = PannedDecoder;
@@ -120,6 +128,10 @@ impl Decodable for PannedClip {
             channels: inner.channels().get(),
             ramp: Ramp::new(inner.sample_rate().get()),
             control: self.control.clone(),
+            lowpass: self.lowpass_hz.map(|cutoff| {
+                let filter = OnePole::new(cutoff, inner.sample_rate().get());
+                [filter, filter]
+            }),
             inner,
             gains: self.gains,
             right: None,
@@ -137,6 +149,8 @@ pub struct PannedDecoder {
     control: Arc<VoiceControl>,
     /// One gain per frame; it ends the voice when its fade is over.
     ramp: Ramp,
+    /// The tone's low-pass, one state per channel.
+    lowpass: Option<[OnePole; 2]>,
 }
 impl Iterator for PannedDecoder {
     type Item = Sample;
@@ -145,13 +159,17 @@ impl Iterator for PannedDecoder {
             return Some(right);
         }
         let ramp = self.ramp.next(&self.control)?;
-        let left = self.inner.next()?;
+        let mut left = self.inner.next()?;
         let mut right = left;
         for channel in 1..self.channels {
             let sample = self.inner.next().unwrap_or_default();
             if channel == 1 {
                 right = sample;
             }
+        }
+        if let Some([low_left, low_right]) = &mut self.lowpass {
+            left = low_left.next(left);
+            right = low_right.next(right);
         }
         self.right = Some(right * self.gains[1] * ramp);
         Some(left * self.gains[0] * ramp)
@@ -201,6 +219,9 @@ fn play_sounds(
             if let Some(place) = request.place {
                 places.place(request.cue, place);
             }
+            if let Some(voicing) = request.voicing {
+                places.voice(request.cue, voicing);
+            }
             if request.player_weapon {
                 player_shot.get_or_insert(request.cue);
             }
@@ -247,13 +268,15 @@ fn play_sounds(
                 }
             }
         }
-        // The bank's next variant, and this start's speed and gain jitter.
-        let pick = state.variety.pick_cue(cue);
+        // The request's bank and tone, the bank's next variant, and this
+        // start's speed and gain jitter.
+        let voicing = places.voicing(cue);
+        let pick = state.variety.pick(voicing.bank, mix(cue).jitter);
         ducking.ducker.trigger(cue);
-        let voice_gain = bus_gain(sliders, cue) * mix(cue).level(reduced) * pick.jitter.gain;
+        let tuned_gain = pick.jitter.gain * voicing.gain();
+        let voice_gain = bus_gain(sliders, cue) * mix(cue).level(reduced) * tuned_gain;
         let gains = pan::voice_gains(cue, &places, reduced, settings.mono_audio);
-        let handle: Handle<AudioSource> =
-            assets.load(crate::audio::variant_path(cue, pick.variant));
+        let handle: Handle<AudioSource> = assets.load(voicing.bank.variant_path(pick.variant));
         let source = sources.get(&handle);
         let control = source.map(|_| Arc::new(VoiceControl::default()));
         let voice = (
@@ -261,14 +284,14 @@ fn play_sounds(
                 started_ms: now_ms,
                 control: control.clone(),
                 last_gain: voice_gain,
-                jitter_gain: pick.jitter.gain,
+                jitter_gain: tuned_gain,
                 cue,
                 pan: gains,
                 compensated: horde_audio::duck::compensated(start),
             },
             PlaybackSettings::DESPAWN
                 .with_volume(bevy::audio::Volume::Linear(voice_gain))
-                .with_speed(pick.jitter.speed),
+                .with_speed(pick.jitter.speed * voicing.speed),
         );
         let entity = match (source, control.clone()) {
             (Some(source), Some(control)) => commands.spawn((
@@ -277,6 +300,7 @@ fn play_sounds(
                     source: source.clone(),
                     gains,
                     control,
+                    lowpass_hz: voicing.lowpass_hz,
                 })),
             )),
             // Not loaded yet: the plain player waits for the load and plays
@@ -586,7 +610,7 @@ mod tests {
         CueRequest {
             cue,
             place: Some(1.0),
-            player_weapon: false,
+            ..CueRequest::centred(cue)
         }
     }
 
@@ -663,6 +687,7 @@ mod tests {
                 source,
                 gains,
                 control: Arc::default(),
+                lowpass_hz: None,
             }
             .decoder();
             assert_eq!(decoder.channels().get(), 2);
@@ -717,6 +742,85 @@ mod tests {
         assert_eq!(clip.gains, entity.get::<EffectVoice>().unwrap().pan);
         assert_eq!(clip.source.bytes, wav.bytes);
         drop(handles);
+    }
+
+    /// A voiced request (A6-12) plays the bank its voicing names, at the
+    /// voicing's speed and gain on top of the jitter's, through the
+    /// voicing's low-pass; the gain survives a slider move.
+    #[test]
+    fn a_voiced_request_plays_its_voicings_bank_speed_gain_and_lowpass() {
+        use horde_audio::{
+            bank::{BankId, EnemyStage, EnemyVoice},
+            voicing::{Tone, Voicing},
+        };
+        let mut app = pan_app(Settings::default());
+        app.add_systems(Update, update_effects_gain.after(play_sounds));
+        // A brute's death, lower and louder.
+        let bank = BankId::Enemy(EnemyVoice::Brute, EnemyStage::Death);
+        let voicing = Voicing::tuned(bank, 0.9, 1.0);
+        let cue = SoundCue::EnemyDeath;
+        let entity = start(
+            &mut app,
+            CueRequest {
+                voicing: Some(voicing),
+                ..CueRequest::centred(cue)
+            },
+        );
+        let pick = Variety::default().pick(bank, mix(cue).jitter);
+        let sliders = app.world().resource::<Settings>().sliders();
+        let voice = app.world().entity(entity);
+        let playback = voice.get::<PlaybackSettings>().unwrap();
+        assert_eq!(playback.speed, pick.jitter.speed * 0.9);
+        let tuned = pick.jitter.gain * voicing.gain();
+        assert!(voicing.gain() > 1.0);
+        let expected = sliders.bus_gain(mix(cue).bus) * mix(cue).level(false) * tuned;
+        assert_eq!(playback.volume, bevy::audio::Volume::Linear(expected));
+        let handle = voice.get::<AudioPlayer<AudioSource>>().unwrap().0.clone();
+        let path = app
+            .world()
+            .resource::<AssetServer>()
+            .get_path(handle.id())
+            .unwrap()
+            .to_string();
+        assert_eq!(path, bank.variant_path(pick.variant));
+        assert!(
+            path.starts_with("audio/survival_enemy_brute_death_"),
+            "{path}"
+        );
+        // A slider move keeps the voicing's gain.
+        app.world_mut().resource_mut::<Settings>().effects = 0.4;
+        app.update();
+        let sliders = app.world().resource::<Settings>().sliders();
+        let voice = app.world().get::<EffectVoice>(entity).unwrap();
+        assert_eq!(
+            voice.last_gain,
+            sliders.bus_gain(mix(cue).bus) * mix(cue).level(false) * tuned
+        );
+        // The decoder runs the tone's low-pass: a 10 kHz tone through the
+        // distant tone's 3.5 kHz comes out well under the unfiltered clip.
+        let rate = 44_100_u32;
+        let samples: Vec<f32> = (0..rate / 10)
+            .map(|n| 0.5 * (std::f32::consts::TAU * 10_000.0 * n as f32 / rate as f32).sin())
+            .collect();
+        let peak = |lowpass_hz: Option<f32>| {
+            let source = AudioSource {
+                bytes: horde_audio::wav::pcm16_bytes(rate, &samples).into(),
+            };
+            PannedClip {
+                source,
+                gains: pan::CENTRE,
+                control: Arc::default(),
+                lowpass_hz,
+            }
+            .decoder()
+            .skip(200)
+            .fold(0.0_f32, |peak, sample| peak.max(sample.abs()))
+        };
+        let (plain, distant) = (peak(None), peak(Tone::DISTANT.lowpass_hz));
+        assert!(plain > 0.45, "{plain}");
+        assert!(distant < 0.5 * plain, "{distant} of {plain}");
+        // And passes what lies under the cutoff: the filter is no gain.
+        assert!(distant > 0.1 * plain, "{distant} of {plain}");
     }
 
     /// The adapter plays what `Variety` picks: the bank's round-robin variant,
@@ -907,6 +1011,7 @@ mod tests {
             source,
             gains: pan::CENTRE,
             control: control.clone(),
+            lowpass_hz: None,
         }
         .decoder();
         // Ten control periods at full gain; the stop lands on a control read.

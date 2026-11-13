@@ -34,8 +34,8 @@ fn frequent_cues_have_at_least_five_variants() {
     // Ready itself restarts every 400 ms; its bank is frequent through the
     // Confirm alias (250 ms).
     assert_eq!(
-        frequent, 18,
-        "16 families plus the Kill and Confirm aliases"
+        frequent, 20,
+        "16 families, the Kill and Confirm aliases, EnemyDeath and Block"
     );
     assert_eq!(Cue::Confirm.bank(), Cue::Ready.bank());
 }

@@ -231,8 +231,10 @@ fn jitter_rows_follow_the_group_table() {
             | Cue::Explosion
             | Cue::Molotov
             | Cue::Structure
-            | Cue::Trap => JitterBounds::IMPACTS,
-            Cue::Boss => JitterBounds::BOSS,
+            | Cue::Trap
+            | Cue::Block => JitterBounds::IMPACTS,
+            Cue::EnemyWindup | Cue::EnemyContact | Cue::EnemyDeath => JitterBounds::ENEMY_VOCALS,
+            Cue::Boss | Cue::BossArrival | Cue::BossPhase | Cue::BossDeath => JitterBounds::BOSS,
             Cue::Confirm => JitterBounds::UI,
             // Stingers, the radio warnings, the ready chirp and the fire bed
             // keep their pitch and level.

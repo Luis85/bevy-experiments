@@ -209,6 +209,12 @@ fn defender_ui_stinger_ambience_centred() {
         Cue::Trap,
         Cue::Incoming,
         Cue::Kill,
+        // An enemy's voice sounds where the enemy stands; a block where the
+        // strike lands.
+        Cue::EnemyWindup,
+        Cue::EnemyContact,
+        Cue::EnemyDeath,
+        Cue::Block,
     ];
     let mut places = Places::default();
     for cue in Cue::ALL {
