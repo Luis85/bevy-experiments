@@ -6,7 +6,7 @@ reason for a bad file, the export toast clear of the Resources panel at
 and 1024x768.
 
 Make the saves and build first, then run from npc-framework:
-  cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 5
+  cargo test --locked -p island_content --test island_capture_fixtures -- --ignored --test-threads 5
   cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live6.py [--only settings,worlds,summary,upgrade,alerts]
 

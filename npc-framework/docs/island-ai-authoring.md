@@ -5,15 +5,12 @@ Ridge) run a behaviour tree that is data. You change what residents do by
 editing JSON: the tree, the daily schedule, the trait ranges and a few
 thresholds. No Rust is involved. This guide lists everything a tree can name.
 
-The older island profiles (`island_village`, `living_island`, `island_colony`)
-keep their built-in tree; see [Older profiles](#older-profiles).
-
 ## Where the data lives
 
 | What | File | Block |
 |---|---|---|
-| The resident tree | `content/testbed_content/trees/resident.json` | whole file |
-| Schedule, traits, places, tree overrides | `content/testbed_content/worlds/living_world.json` | `living_world.behavior` |
+| The resident tree | `content/island_content/trees/resident.json` | whole file |
+| Schedule, traits, places, tree overrides | `content/island_content/worlds/living_world.json` | `living_world.behavior` |
 | Need thresholds, decision interval, GOAP limits | same world file | `island_ai` |
 | Goods, recipes, professions, prices | same world file | `living_world.economy` ([economy guide](island-economy-authoring.md)) |
 
@@ -41,11 +38,11 @@ validated and stored but nothing runs them yet.
 ## The edit, new world, look loop
 
 1. Edit `trees/resident.json`, or the `behavior` block of the world file.
-2. Start a new world. From source: `cargo run --locked -p game_menu`, then New.
-   Headless: `cargo run --locked -p npcctl -- run --scenario testbed:living_world --ticks 2400`.
+2. Start a new world. From source: `cargo run --locked -p island_game`, then New.
+   Headless: `cargo run --locked -p npcctl -- run --scenario island:living_world --ticks 2400`.
    The tree file is embedded at build time, so Cargo rebuilds the content crate.
-   An explorer installation with an editable world-preset folder needs no
-   build: put the tree in the preset's `behavior.trees` and create a new world.
+   The installed game needs no build: put the tree in the `behavior.trees` of
+   its rules file (`<home>/island-village/living_world.json`) and start a new world.
 3. A mistake stops the world from loading with a message that names the file,
    the node number and the node name. Node numbers count the nodes in file
    order from 0, the same numbering decision records use.
@@ -395,8 +392,8 @@ entries may share a key; a resident walks to the nearest one.
 
 Need values are remaining wellbeing from 0 to 100000. The conditions above
 read these thresholds; an empty object selects the values shown. `routine` is
-the priority list of the older profiles. In `living_world` the tree file
-orders the branches, so a `routine` other than the default is refused there.
+a leftover of the removed older profiles. The tree file orders the branches,
+so a `routine` other than the default is refused.
 
 ## Decision records
 
@@ -406,7 +403,7 @@ and nothing at all while the journal is off. Records never influence the
 simulation: the state hash is identical with the journal on or off.
 
 ```sh
-cargo run --locked -p npcctl -- journal --scenario testbed:living_world --seed 7 --ticks 600 --kind Effect --unit 236
+cargo run --locked -p npcctl -- journal --scenario island:living_world --seed 7 --ticks 600 --kind Effect --unit 236
 ```
 
 A record from seed 7, tick 21 (a Harbour carpenter; the nine false need and
@@ -531,17 +528,6 @@ search finds nothing the leaf fails and the tree tries `life.craft`,
 `life.hunt`, `life.buy inputs` and `life.gather outputs` in turn, so a search
 budget never turns a viable worker into an idle one.
 
-## Older profiles
-
-`island_village`, `living_island` and `island_colony` keep one decision leaf,
-`IslandLifeDecision`, behind a tree built in code. `island_colony` orders its
-routine with `island_ai.routine` (`thirst`, `hunger`, `recovery`, `home`,
-`work`: each once, recovery before home, work last) and uses the thresholds
-above; the developer menu's **Worlds → Resident AI** form edits the same
-block. Their production, heating, clothing forecast and route-recovery rules
-are unchanged and are described in [colony management](island-colony.md) and
-the [architecture notes](architecture-island.md).
-
 ## What is still code
 
 - What each action does, and each condition tests. A new action or condition
@@ -553,9 +539,9 @@ the [architecture notes](architecture-island.md).
 ## Tests
 
 ```text
-cargo test --locked -p testbed_content --test island_resident_trees
-cargo test --locked -p testbed_content --test island_resident_traits
-cargo test --locked -p testbed_content --test island_decision_records
+cargo test --locked -p island_content --test island_resident_trees
+cargo test --locked -p island_content --test island_resident_traits
+cargo test --locked -p island_content --test island_decision_records
 ```
 
 `island_resident_trees` covers the shipped file, refusal messages, hashing,

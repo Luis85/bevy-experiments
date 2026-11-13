@@ -3,7 +3,7 @@
 How to build island UI with the shared design system. The design itself is
 [`superpowers/specs/2026-11-11-island-ui-redesign.md`](superpowers/specs/2026-11-11-island-ui-redesign.md);
 the decision record is [ADR 0039](adr/0039-island-ui-design-system.md). Code lives in
-`content/testbed_view/src/game_ui/`.
+`content/island_view/src/game_ui/`.
 
 Status: phases 1 to 3 of the spec are in (tokens, widgets, icons, interface size,
 the Oversee shell; then the resident inspector, the building card, the build
@@ -255,14 +255,14 @@ view state or one recorded command. Add a variant rather than a second queue.
 ## Host screens, toasts and tips
 
 - Title, new game, pause, settings and the guide live in
-  `apps/actor_testbed/src/frontend/ui.rs` and are built from the kit: chrome
+  `apps/island_game/src/frontend/ui.rs` and are built from the kit: chrome
   on the title's gradient, paper panels elsewhere, so they follow the panel
   style. `button(...)` keeps the screen's Tab order; `rename(...)` gives a
   control the name automation knows when its words differ.
 - A setting is a `settings::Change`. Sliders send `Set...` changes, which are
   `continuous()`: they are applied and stored but do not rebuild the screen;
   `refresh` writes the value back into the slider and its text.
-- Host notices go through `testbed_view::island_toast(world, tone, text,
+- Host notices go through `island_view::island_toast(world, tone, text,
   lasting, retry)` and `clear_island_toast`; a "Try again" press is read with
   `take_island_toast_retry`. A toast with another button uses
   `island_toast_with(world, tone, text, lasting, label)` (it stays 12 s);
@@ -404,8 +404,7 @@ unchanged. Because widgets read roles, a screen needs no code for it.
 
 ## The gallery
 
-`--ui-gallery tokens|controls|data|messages|icons` on the host (after
-`--front-end`) opens a developer screen with every widget and icon in every state,
+`island_game --ui-gallery tokens|controls|data|messages|icons` opens a developer screen with every widget and icon in every state,
 and a Parchment / Dusk switch. It is for screenshot checks and is never offered in
 a menu. `scripts/playtest/capture_ui_redesign.py` captures it and the Oversee
 shell at 1280×720 and 1024×768 into `target/npc-out/ui-redesign-p2/`;
@@ -432,7 +431,7 @@ Tab presses, measures the UI scale at 1920x1080, and checks that every tooltip
 it raises lies inside the window at 1280x720 and 1024x768 (`tooltips_inside`).
 `capture_ui_live2.py` covers Live's depth (`--only people,live,calendar,oversee`).
 `capture_ui_live3.py` starts from prepared saves (`target/npc-out/fixtures/`,
-written by `cargo test --locked -p testbed_content --test island_capture_fixtures
+written by `cargo test --locked -p island_content --test island_capture_fixtures
 -- --ignored --test-threads 1`): `cottage-evening` (a built cottage at dusk,
 three known neighbours, one a friend), `upgrade-underway` (a larger cottage
 half carried in, the rest ordered and a builder hired, nobody yet on the

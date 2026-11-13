@@ -54,7 +54,7 @@ on a ground heightfield, with no stacked floors or navigable tunnels.
 
 ## Prices, tools and hardship
 
-These rules apply to the coastal world only; older island profiles keep theirs.
+These rules apply to the coastal world, the only island.
 
 - **Levy, not a cap.** Each day a resident pays 10% of the coins held above 200
   into the community fund. Anyone below 40 coins is topped up to 40 while the fund
@@ -108,7 +108,7 @@ These rules apply to the coastal world only; older island profiles keep theirs.
   the `economy` block of the world file: see
   [Authoring the coastal world's economy](island-economy-authoring.md).
 - **Behaviour.** Residents run a behaviour tree that is data
-  (`content/testbed_content/trees/resident.json`): needs first, then chores, leisure
+  (`content/island_content/trees/resident.json`): needs first, then chores, leisure
   and the profession. Each resident has four seeded traits. Diligent residents start
   their evening leisure later, sociable ones spend it meeting neighbours or strolling
   to the square, larks and owls shift their whole day by up to 600 ticks, and thrifty
@@ -310,7 +310,7 @@ visit with its totals (`VillageMerchantArrived`, `VillageMerchantVisit`,
   the catalogue cottage, 4 x 5 m with two beds, behind the plot's door; a plot
   takes a cottage only when the family house also fits there (the claim's
   build is refused with the reason). `view::home` reports the body, door and
-  beds. Older profiles keep the 2 x 2 m cottage with three beds.
+  beds.
 - **Gatherings and grief.** On the harvest feast and at midwinter every free
   resident whose needs are all above 50,000 walks to the square of its
   settlement and gains heart (`view::gatherings`); a hungry or cold resident
@@ -338,7 +338,7 @@ visit with its totals (`VillageMerchantArrived`, `VillageMerchantVisit`,
 - **Inns by night.** A guest who rents a bed in its sleep block sleeps there
   until morning; the number of guest beds is data.
 
-Views read all of this through `testbed_content::village::view`: activity label,
+Views read all of this through `island_content::village::view`: activity label,
 latest decision, effective schedule, season effects, household and family,
 weather and forecast, boat status, field plots, who is inside which building,
 each home's entrance, footprint, facing and beds, and whether a resident is
@@ -362,18 +362,12 @@ the view hides it or draws it inside.
 
 ## Saves and authoring
 
-Normal play uses `living-world.world.json` in the configured agents folder and
-`living_world.json` in its worlds folder. The old `local-island.world.json` is
-preserved. Open it explicitly with:
-
-```powershell
-.\target\debug\game_menu.exe --front-end --island-save "C:\path\local-island.world.json"
-```
+Normal play uses `<home>/island-village/island.world.json` and the world rules
+`living_world.json` beside it. Saves of earlier versions are refused; nothing is
+migrated (ADR 0044).
 
 Continue reconstructs the saved immutable profile. New Game in that loaded session
 uses the same profile. Editing preset files does not migrate existing saves.
-Explicit lower-level legacy constructors remain legacy; select living-world rules
-when creating a regional world.
 
 The preset declares dimensions, arrival, settlements, homes and sites. Separate
 content contexts own mechanics, as documented in [ADR 0037](adr/0037-regional-living-world.md).

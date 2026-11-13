@@ -8,7 +8,7 @@ its Reduce-motion steady edge, the unaffordable build card, a failed save's
 "Try again"). Each part at 1280x720 and 1024x768.
 
 Make the saves and build first, then run from npc-framework:
-  cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 1
+  cargo test --locked -p island_content --test island_capture_fixtures -- --ignored --test-threads 1
   cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live3.py [--only menus,cottage,upgrade,hard]
 

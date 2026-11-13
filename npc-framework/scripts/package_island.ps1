@@ -7,7 +7,8 @@
   (for example target\release) and writes:
 
     <OutDir>\island_game.exe   the game (title, play, pause: one process)
-    <OutDir>\assets\           models, textures, audio, fonts
+    <OutDir>\assets\           models, textures, audio, fonts (not the retired
+                               assets\audio\ folder)
     <OutDir>\LICENSE.txt       the repository licence
     <OutDir>\CREDITS.md        asset sources and licences
     <OutDir>\licenses\         the asset packs' own licence texts
@@ -72,7 +73,13 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $OutDir = (Resolve-Path -LiteralPath $OutDir).Path
 
 Copy-Item -LiteralPath $game -Destination (Join-Path $OutDir $Executable)
-Copy-Item -LiteralPath $assets -Destination (Join-Path $OutDir "assets") -Recurse
+# Everything in assets except the retired, untracked top-level `audio` folder:
+# no code or manifest reads it (the island's sounds are in assets\living\audio).
+$assetsOut = Join-Path $OutDir "assets"
+New-Item -ItemType Directory -Force -Path $assetsOut | Out-Null
+Get-ChildItem -LiteralPath $assets -Force |
+    Where-Object { -not ($_.PSIsContainer -and $_.Name -eq "audio") } |
+    ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $assetsOut -Recurse }
 Copy-Item -LiteralPath $licence -Destination (Join-Path $OutDir "LICENSE.txt")
 Copy-Item -LiteralPath $credits -Destination (Join-Path $OutDir "CREDITS.md")
 Copy-Item -LiteralPath $packLicences -Destination (Join-Path $OutDir "licenses") -Recurse

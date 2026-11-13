@@ -15,7 +15,8 @@ spec (`…/2026-10-23-agent-control-design.md`), ADRs 0006 and 0010. Agent exper
 [`agent-experiments.md`](agent-experiments.md); integrating the framework into a game is
 [`using-npc-framework.md`](using-npc-framework.md).
 
-The [Island Village guide](ai-village.md) covers its economy, permanent death/diaries and scene AI
+The island game is covered by [Life on Island Village](island-life.md) and [the coastal world](living-world.md);
+the testbed explorer's scene AI
 supervision (`npcctl scheduler bind|unbind|status`, real-time idle/cooldown policy and owned fake-runner checks).
 The [AI Agent Game Client guide](ai-agent-game-client.md) describes automatic
 Codex/Claude session creation, game-supplied prompts, native Start/Stop controls,
@@ -406,6 +407,7 @@ Result shapes are in §4; the workflow is in [agent-experiments.md](agent-experi
 |---|---|---|
 | `apps/village` | `cargo run -p village -- [--seed N] [--speed N] [--screenshot PATH --after-secs S] [--panels journal,perf] [--journal FILE] [--record FILE] [--remote \| --no-remote] [--remote-port N] [--render-remote-port N \| --no-render-remote] [--out-dir DIR]` | `npc/*` (no `npc/sheet`), `npc/screenshot`, `app/quit`, `agent/*` read-only (no `AgentIoPlugin`: list, observe, events; attach is rejected) |
 | `apps/actor_testbed` | `cargo run -p actor_testbed -- [--scenario NAME\|FILE] [--seed N] [--speed N] [--paused] [--player N] [--select ID,..] [--camera X,Z,DIST[,YAW,PITCH]] [--commands FILE] [--screenshot PATH --after-secs S] [--panels journal,perf,sheet,perception] [--journal FILE] [--record FILE] [--remote \| --no-remote] [--remote-port N] [--render-remote-port N \| --no-render-remote] [--out-dir DIR]` | `npc/*` incl. `npc/sheet`, `npc/screenshot`, `app/quit`, `agent/*`, `world/state` |
+| `apps/island_game` | `cargo run -p island_game -- [--front-end] [--island-save FILE] [--island-rules FILE] [--dev-keys] [--seed N] [--speed N] [--mute] [--screenshot PATH --after-secs S] [--ui-gallery PAGE] [remote flags]` (the player flow, the default); `cargo run -p island_game -- --scenario NAME\|FILE \| --island-save FILE [--island-new] [--island-mode inspector\|character\|editor] [--select ID,..] [--camera X,Z,DIST[,YAW,PITCH]] [--commands FILE] [--panels journal,perf,sheet,perception] [--journal FILE] [--record FILE] [--paused] [--perf-warn]` (the developer host) | `npc/*` incl. `npc/sheet`, `npc/screenshot`, `app/quit` (saves the local island first), `agent/*`, `world/state` |
 | `apps/rts_units_demo` | `cargo run -p rts_units_demo -- [--units N] [--seed N] [--idle] [--screenshot PATH --after-secs S] [--panels journal,perf]`; `--headless-ticks N` prints a JSON summary without a window | none (it is the portability proof: facade + `bevy` only) |
 
 The BRP server listens on `127.0.0.1:15702` (Bevy's render-app server on the next port, 15703) with the default
@@ -414,7 +416,7 @@ feature `debug-tools`, **on by default in dev builds and off in release builds**
 neither the remote interface nor the profiler (`--remote` is then a usage error). RPC file paths are relative to
 the output root `--out-dir` (default `target/npc-out`). The names and `SimId`s of what a testbed scenario spawned
 are logged at startup. The testbed's `--scenario` takes a file when one exists at that path, else an embedded
-name.
+name. `island_game`'s keys are in [Life on Island Village](island-life.md).
 
 | Key | village | actor_testbed | rts_units_demo |
 |---|---|---|---|
@@ -422,7 +424,7 @@ name.
 | `.` | one tick (while paused) | one tick | one tick |
 | speed | 1 / 2 / 3 / 4 = 1×, 3×, 10×, 0× | `-` / `=` slower / faster (1×, 3×, 10×) | – |
 | F1 | overlay (needs, tree path, target, reservations, state hash) | overlay (pose, interaction, crafting, ride, needs, tree path, order queue, equipment, inventory) | – |
-| F2 | – | Home & farm (expanded Living island): native plot/build/crop, supplies and food/trade controls | path gizmos |
+| F2 | – | – | path gizmos |
 | F3 / F4 | journal / perf panel | journal / perf panel | journal / perf panel |
 | F5 / F6 | – | character sheet / perception (cone, LOS, memory) | – |
 | mouse | left click selects a villager | select / box (Shift adds), right click context order (Shift queues), Ctrl+1–9 / 1–9 groups, Z/X/C/V formations, H/B/U hold/stop/unload | select / box, right click `Move` (A: `AttackMove`, P: `Patrol`, Shift: queue), Ctrl+1–9 / 1–9, Z/X/C/V, S/H |
@@ -471,7 +473,7 @@ do not browse untrusted sites while a game with BRP is running.
 | `npc/record/start` | `{every=100}` | `{recording, started_at, every}` |
 | `npc/record/stop` | `{path?, overwrite?=false}` | the `Replay` (also written to `path`, relative to the output root, `.json`; a refused path is a `-32602` error before the recording stops; on a write error the replay is in the error's `data`) |
 | `npc/screenshot` (village, testbed) | `{path, overwrite?=false}` | `{path (absolute), pending: true}`; `path` is relative to the output root (`.png` forced); the PNG appears 1–2 frames later |
-| `app/quit` (village, testbed) | `{pid?}` | `{quitting: true, pid}`; the app exits 0 about 200 ms later through its ordinary exit (an explorer window saves and removes `run.json`, as when closed with "No"); a `pid` that is not the app's is a `-32602` error and nothing happens. The game menu's Quit sends it to the explorer windows it started (`apps/game_menu/src/quit.rs`); the Village and testbed scenarios have nothing to save and are killed instead |
+| `app/quit` (village, testbed, island_game) | `{pid?}` | `{quitting: true, pid}`; the app exits 0 about 200 ms later through its ordinary exit (an explorer window saves and removes `run.json`, as when closed with "No"); a `pid` that is not the app's is a `-32602` error and nothing happens. The game menu's Quit sends it to the explorer windows it started (`apps/game_menu/src/quit.rs`); the Village and testbed scenarios have nothing to save and are killed instead |
 | `npc/sheet` (feature `rules`: the testbed) | `{unit}` | `{unit, tick, sheet: SheetView}` (attributes, secondary, traits, skills with effective levels, points) |
 | `npc/methods` | – | the `npc/*` method names |
 

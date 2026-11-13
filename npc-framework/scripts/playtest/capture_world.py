@@ -1444,9 +1444,6 @@ def fixture_flow(binary, base, report, name, label, extra_env=None):
     shutil.copy2(source, run / "living-world.world.json")
     # Settings of the run's own, as `capture_ui_redesign.launch` writes them:
     # the title then offers Continue for the copied save.
-    settings = run / "settings.json"
-    settings.write_text(json.dumps({"agents_dir": str(run / "agents"),
-        "worlds_dir": str(run / "rules"), "fog_of_war": True}), encoding="utf-8")
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -1456,7 +1453,6 @@ def fixture_flow(binary, base, report, name, label, extra_env=None):
     environment["ISLAND_TIPS_SEEN"] = "all"
     environment.update(extra_env or {})
     log = (run / "native.log").open("wb")
-    # `--settings` belongs to the game_menu launcher, not to actor_testbed.
     child = subprocess.Popen([str(binary), "--front-end", "--island-save",
         str(run / "living-world.world.json"), "--remote", "--remote-port", str(port), "--no-render-remote",
         "--out-dir", str(run)], cwd=ROOT,

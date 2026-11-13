@@ -2,12 +2,10 @@
 
 The coastal world (`living_world`) reads its goods, recipes, professions, resource
 patches, buildings, founding endowments and tuning from data. The block is `economy` inside
-`living_world`, in both shipped files:
-
-- `content/testbed_content/worlds/living_world.json` (the world preset)
-- `content/testbed_content/scenarios/living_world.json` (the direct scenario)
-
-Older island profiles do not read it and keep their Rust tables.
+`living_world`, in the shipped world preset
+`content/island_content/worlds/living_world.json`. The scenario file
+(`content/island_content/scenarios/living_world.json`) carries no `living_world`
+block; every construction takes it from the world preset (ADR 0044).
 
 Like `island_ai` (see [Authoring Island Village life](island-ai-authoring.md)), the
 block is validated before the world is built, copied into the save's immutable

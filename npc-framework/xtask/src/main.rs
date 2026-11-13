@@ -1,7 +1,7 @@
 //! Repo automation. One command matters: `cargo xtask verify`.
 //!
 //! ```text
-//! cargo xtask verify [--quick] [--pretty]
+//! cargo xtask verify [--quick | --island] [--pretty]
 //! ```
 //!
 //! Runs, in order: `fmt` (`cargo fmt --check`), `clippy` (`-D warnings`, all
@@ -20,6 +20,14 @@
 //! corpus is still verified by `content/village_content/tests/corpus.rs` inside `test`)
 //! and the slow test binaries in [`SLOW_TESTS`]. A full run fails when the
 //! replay corpus is empty.
+//!
+//! `--island` checks only the island game ([`ISLAND_PACKAGES`]) and cannot be
+//! combined with `--quick`. Same seven steps, same JSON: `fmt` and `goldens`
+//! as above, `clippy` and `test` on the island crates only (`-p ..`, minus
+//! [`ISLAND_SLOW`]), `arch_fitness` as above, `replays` on the island's
+//! replays only (`island_*.json` in `tests/replays/` and, while staged, in
+//! `tests/replays.next/`; none yet is a note, not a failure), `deny` skipped.
+//! It replaces neither `--quick` nor the full gate.
 //!
 //! A missing optional tool (cargo-nextest, cargo-deny) is never a failure: the
 //! step says `skipped: ...` (or names the fallback) with an install hint.
@@ -43,6 +51,21 @@ const SLOW_TESTS: &[(&str, &str, &str)] = &[
     ("village_content", "content/village_content", "properties"),
     ("village_content", "content/village_content", "shuffle"),
 ];
+
+/// The island game's crates: what `--island` lints and tests.
+const ISLAND_PACKAGES: &[&str] = &["island_content", "island_view", "island_game"];
+
+/// Test binaries `--island` skips: `(package, test binary)`. Put a binary
+/// here when it takes more than about 30 s under nextest; `--quick` and the
+/// full gate still run it. `#[ignore]`d tests never run in any tier.
+const ISLAND_SLOW: &[(&str, &str)] = &[];
+
+/// Island replays have this file-name prefix, like `village_` and `testbed_`.
+const ISLAND_REPLAY_PREFIX: &str = "island_";
+
+/// Island replays (file stems) `--island` skips: only the full gate's
+/// `replays` step verifies them.
+const ISLAND_LONG_REPLAYS: &[&str] = &["island_seed7_1day"];
 
 /// Lines kept in `log_tail` for a failed / passed step.
 const TAIL_FAILED: usize = 40;
@@ -81,11 +104,13 @@ struct Ctx {
     root: PathBuf,
     cargo: String,
     quick: bool,
+    island: bool,
 }
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut quick = false;
+    let mut island = false;
     let mut pretty = false;
     match args.first().map(String::as_str) {
         Some("verify") => {}
@@ -105,6 +130,7 @@ fn main() -> ExitCode {
     for arg in &args[1..] {
         match arg.as_str() {
             "--quick" => quick = true,
+            "--island" => island = true,
             "--pretty" => pretty = true,
             "-h" | "--help" => {
                 eprintln!("{}", usage());
@@ -116,11 +142,16 @@ fn main() -> ExitCode {
             }
         }
     }
+    if quick && island {
+        eprintln!("`--quick` and `--island` cannot be combined\n\n{}", usage());
+        return ExitCode::from(2);
+    }
 
     let ctx = Ctx {
         root: workspace_root(),
         cargo: std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned()),
         quick,
+        island,
     };
     let steps = verify(&ctx);
     let ok = steps.iter().all(|s| s.ok);
@@ -133,10 +164,11 @@ fn main() -> ExitCode {
 }
 
 fn usage() -> &'static str {
-    "usage: cargo xtask verify [--quick] [--pretty]\n\n\
+    "usage: cargo xtask verify [--quick | --island] [--pretty]\n\n\
      Runs fmt, clippy, tests, arch_fitness, replays, goldens and cargo-deny and\n\
      prints one JSON verdict {ok, steps:[{name, ok, ms, summary, log_tail}]}.\n\
      --quick   skip cargo-deny, the CLI replay pass and the slow test binaries\n\
+     --island  only the island game (island crates, island replays); not with --quick\n\
      --pretty  indent the JSON"
 }
 
@@ -222,19 +254,23 @@ fn step_fmt(ctx: &Ctx) -> Outcome {
 }
 
 fn step_clippy(ctx: &Ctx) -> Outcome {
-    let out = cargo(
-        ctx,
-        &[
-            "clippy",
-            "--workspace",
+    let mut args = vec!["clippy".to_owned()];
+    if ctx.island {
+        args.extend(island_package_args());
+    } else {
+        args.push("--workspace".to_owned());
+    }
+    args.extend(
+        [
             "--all-targets",
             "--message-format=short",
             "--",
             "-D",
             "warnings",
-        ],
-        &[],
+        ]
+        .map(String::from),
     );
+    let out = cargo_owned(ctx, &args, &[]);
     if out.text.contains("no such command") {
         return Outcome::new(
             false,
@@ -243,7 +279,12 @@ fn step_clippy(ctx: &Ctx) -> Outcome {
         );
     }
     if out.ok {
-        return Outcome::new(true, "no warnings", out.text);
+        let summary = if ctx.island {
+            format!("no warnings in {}", ISLAND_PACKAGES.join(", "))
+        } else {
+            "no warnings".to_owned()
+        };
+        return Outcome::new(true, summary, out.text);
     }
     let diags: Vec<&str> = out
         .text
@@ -260,6 +301,9 @@ fn step_clippy(ctx: &Ctx) -> Outcome {
 
 fn step_test(ctx: &Ctx) -> Outcome {
     let envs = [("INSTA_UPDATE", "no")];
+    if ctx.island {
+        return step_test_island(ctx, &envs);
+    }
     if has_cargo_subcommand(ctx, "nextest") {
         let filter = nextest_filter(ctx.quick);
         let args = [
@@ -335,6 +379,67 @@ fn step_test(ctx: &Ctx) -> Outcome {
     Outcome::new(ok, summary, log)
 }
 
+/// `--island`: the island crates' tests and doc tests, minus [`ISLAND_SLOW`].
+fn step_test_island(ctx: &Ctx, envs: &[(&str, &str)]) -> Outcome {
+    let scope = ISLAND_PACKAGES.join(", ");
+    let slow = island_slow_names();
+    if has_cargo_subcommand(ctx, "nextest") {
+        let mut args: Vec<String> = ["nextest", "run"].map(String::from).to_vec();
+        args.extend(island_package_args());
+        args.extend(["--no-fail-fast", "--color", "never", "-E"].map(String::from));
+        args.push(island_nextest_filter(ISLAND_SLOW));
+        let nextest = cargo_owned(ctx, &args, envs);
+        // nextest does not run doc tests.
+        let mut args: Vec<String> = vec!["test".to_owned()];
+        args.extend(island_package_args());
+        args.extend(["--doc", "--no-fail-fast"].map(String::from));
+        let doc = cargo_owned(ctx, &args, envs);
+        let doc_counts = cargo_test_counts(&doc.text);
+        let ok = nextest.ok && doc.ok;
+        let mut summary = match nextest_summary(&nextest.text) {
+            Some(s) => format!("{scope}: nextest: {s}"),
+            None => format!("{scope}: nextest failed: {}", first_error(&nextest.text)),
+        };
+        let _ = write!(summary, "; doc tests: {}", doc_counts.describe());
+        let mut failed = nextest_failures(&nextest.text);
+        failed.extend(cargo_test_failures(&doc.text));
+        if !failed.is_empty() {
+            let _ = write!(summary, "; failed: {}", short_list(&failed, 10));
+        }
+        if !slow.is_empty() {
+            let _ = write!(summary, "; --island skipped {slow}");
+        }
+        // nextest last, so the tail shows its failures and summary.
+        let log = format!("{}\n{}", doc.text, nextest.text);
+        return Outcome::new(ok, summary, log);
+    }
+
+    // Without nextest: the island packages in full (unit, integration and
+    // doc tests). The slow binaries are not filtered out on this path.
+    let hint =
+        "cargo-nextest not installed, ran cargo test (hint: cargo install cargo-nextest --locked)";
+    let mut args: Vec<String> = vec!["test".to_owned()];
+    args.extend(island_package_args());
+    args.push("--no-fail-fast".to_owned());
+    let run = cargo_owned(ctx, &args, envs);
+    let counts = cargo_test_counts(&run.text);
+    let failed = cargo_test_failures(&run.text);
+    let mut summary = if counts.results == 0 && !run.ok {
+        format!("{scope}: cargo test failed: {}", first_error(&run.text))
+    } else {
+        format!("{scope}: cargo test: {}", counts.describe())
+    };
+    if !failed.is_empty() {
+        let _ = write!(summary, "; failed: {}", short_list(&failed, 10));
+    }
+    if !slow.is_empty() {
+        let _ = write!(summary, "; {slow} ran too (no nextest to filter)");
+    }
+    let _ = write!(summary, " ({hint})");
+    let log = format!("{}\n{}", run.text, libtest_failure_excerpt(&run.text));
+    Outcome::new(run.ok, summary, log)
+}
+
 /// libtest's `failures:` sections (panic messages, then the failed names).
 fn libtest_failure_excerpt(text: &str) -> String {
     let mut out = Vec::new();
@@ -392,7 +497,8 @@ fn step_arch_fitness(ctx: &Ctx) -> Outcome {
 
 /// What a corpus file is, from its text (xtask has no JSON parser): an
 /// agent session record (`"replay": {..}` next to a scenario document), a
-/// testbed replay (`"scenario": "testbed[:<name>]"`) or a village replay.
+/// testbed replay (`"scenario": "testbed[:<name>]"`), an island replay
+/// (`"scenario": "island:<name>"`) or a village replay.
 /// `npcctl replay verify` dispatches on the same thing.
 fn corpus_kind(text: &str) -> &'static str {
     let squeezed: String = text.chars().filter(|c| !c.is_whitespace()).collect();
@@ -400,12 +506,147 @@ fn corpus_kind(text: &str) -> &'static str {
         "session"
     } else if squeezed.contains("\"scenario\":\"testbed") {
         "testbed"
+    } else if squeezed.contains("\"scenario\":\"island") {
+        "island"
     } else {
         "village"
     }
 }
 
+/// Whether a file in `tests/replays/` or `tests/replays.next/` is an island
+/// replay: `island_<name>.json` (an `.idmap.json` is evidence, not a replay).
+fn is_island_replay_name(name: &str) -> bool {
+    name.starts_with(ISLAND_REPLAY_PREFIX)
+        && name.ends_with(".json")
+        && !name.ends_with(".idmap.json")
+}
+
+/// The island replays in `dir`, sorted; none when `dir` does not exist.
+fn island_replay_files(dir: &Path) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .is_some_and(|n| is_island_replay_name(&n.to_string_lossy()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    files
+}
+
+/// `--island`: `npcctl replay verify` on the island's replays only, in the
+/// corpus and (staged, awaiting approval) in `tests/replays.next/`. The
+/// island has no approved replays until its first baseline is swapped in, so
+/// finding none is a note, not a failure; the full gate's rule for an empty
+/// corpus is unchanged.
+fn step_island_replays(ctx: &Ctx) -> Outcome {
+    let tests = ctx.root.join("tests");
+    let mut files: Vec<(PathBuf, bool)> = Vec::new();
+    for (dir, staged) in [("replays", false), ("replays.next", true)] {
+        files.extend(
+            island_replay_files(&tests.join(dir))
+                .into_iter()
+                .map(|p| (p, staged)),
+        );
+    }
+    let mut long = Vec::new();
+    files.retain(|(p, _)| {
+        let is_long = p
+            .file_stem()
+            .is_some_and(|s| ISLAND_LONG_REPLAYS.iter().any(|l| s == *l));
+        if is_long {
+            long.push(rel(&ctx.root, p));
+        }
+        !is_long
+    });
+    let mut notes = String::new();
+    if !long.is_empty() {
+        let _ = write!(
+            notes,
+            "; skipped {} long (full gate only): {}",
+            long.len(),
+            short_list(&long, 4)
+        );
+    }
+    if files.is_empty() {
+        return Outcome::new(
+            true,
+            format!(
+                "0 island replays (note: no tests/replays/{ISLAND_REPLAY_PREFIX}*.json yet, \
+                 nothing verified){notes}"
+            ),
+            "",
+        );
+    }
+    let build = cargo(ctx, &["build", "--locked", "-p", "npcctl"], &[]);
+    if !build.ok {
+        return Outcome::new(
+            false,
+            format!("building npcctl failed: {}", first_error(&build.text)),
+            build.text,
+        );
+    }
+    let mut log = String::new();
+    let mut failed = Vec::new();
+    let mut staged_count = 0;
+    for (file, staged) in &files {
+        let kind = std::fs::read_to_string(file).map_or("unreadable", |t| corpus_kind(&t));
+        let file_arg = file.to_string_lossy();
+        let out = cargo(
+            ctx,
+            &[
+                "run", "--locked", "-q", "-p", "npcctl", "--", "replay", "verify", &file_arg,
+            ],
+            &[],
+        );
+        let name = rel(&tests, file);
+        let state = if *staged {
+            staged_count += 1;
+            ", staged"
+        } else {
+            ""
+        };
+        let _ = writeln!(
+            log,
+            "== {name} ({kind}{state}): {}",
+            if out.ok { "ok" } else { "FAILED" }
+        );
+        log.push_str(&out.text);
+        log.push('\n');
+        if !out.ok {
+            failed.push(name);
+        }
+    }
+    if staged_count > 0 {
+        notes.insert_str(
+            0,
+            &format!(" ({staged_count} staged in tests/replays.next, not approved yet)"),
+        );
+    }
+    let summary = if failed.is_empty() {
+        format!(
+            "{} island replay(s) verified with npcctl{notes}",
+            files.len()
+        )
+    } else {
+        format!(
+            "{}/{} island replay(s) failed: {}{notes}",
+            failed.len(),
+            files.len(),
+            short_list(&failed, 10)
+        )
+    };
+    Outcome::new(failed.is_empty(), summary, log)
+}
+
 fn step_replays(ctx: &Ctx) -> Outcome {
+    if ctx.island {
+        return step_island_replays(ctx);
+    }
     if ctx.quick {
         return Outcome::skipped(
             "--quick (tests/replays is still verified by the corpus test in `test`)",
@@ -528,6 +769,9 @@ fn step_deny(ctx: &Ctx) -> Outcome {
     if ctx.quick {
         return Outcome::skipped("--quick");
     }
+    if ctx.island {
+        return Outcome::skipped("--island");
+    }
     if !has_cargo_subcommand(ctx, "deny") {
         return Outcome::skipped(
             "cargo-deny not installed (hint: cargo install cargo-deny --locked)",
@@ -576,6 +820,40 @@ fn nextest_filter(quick: bool) -> String {
         );
     }
     format!("not ({})", excluded.join(" | "))
+}
+
+/// `-p island_content -p island_view -p island_game`.
+/// `--locked -p island_content -p island_view -p island_game`: the island
+/// tier builds with the committed lock file.
+fn island_package_args() -> Vec<String> {
+    std::iter::once("--locked".to_owned())
+        .chain(
+            ISLAND_PACKAGES
+                .iter()
+                .flat_map(|p| ["-p".to_owned(), (*p).to_owned()]),
+        )
+        .collect()
+}
+
+/// The nextest filter of `--island`: the packages come from `-p`, so only
+/// the slow binaries are named.
+fn island_nextest_filter(slow: &[(&str, &str)]) -> String {
+    if slow.is_empty() {
+        return "all()".to_owned();
+    }
+    let excluded: Vec<String> = slow
+        .iter()
+        .map(|(pkg, bin)| format!("binary_id({pkg}::{bin})"))
+        .collect();
+    format!("not ({})", excluded.join(" | "))
+}
+
+fn island_slow_names() -> String {
+    ISLAND_SLOW
+        .iter()
+        .map(|(pkg, bin)| format!("{pkg}::{bin}"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn slow_test_names() -> String {
@@ -1020,5 +1298,55 @@ mod tests {
         assert!(f.contains("binary_id(xtask::arch_fitness)"));
         assert!(f.contains("binary_id(village_content::determinism)"));
         assert!(!nextest_filter(false).contains("determinism"));
+    }
+
+    #[test]
+    fn island_tier_names_its_packages_and_slow_binaries() {
+        assert_eq!(
+            island_package_args(),
+            [
+                "--locked",
+                "-p",
+                "island_content",
+                "-p",
+                "island_view",
+                "-p",
+                "island_game"
+            ]
+        );
+        assert_eq!(island_nextest_filter(&[]), "all()");
+        assert_eq!(
+            island_nextest_filter(&[("island_content", "a"), ("island_view", "b")]),
+            "not (binary_id(island_content::a) | binary_id(island_view::b))"
+        );
+        // Every slow binary belongs to an island package.
+        assert!(
+            ISLAND_SLOW
+                .iter()
+                .all(|(pkg, _)| ISLAND_PACKAGES.contains(pkg))
+        );
+    }
+
+    #[test]
+    fn island_replays_are_found_by_prefix_and_kind() {
+        assert!(is_island_replay_name("island_seed7_halfday.json"));
+        assert!(!is_island_replay_name("island_seed7_halfday.idmap.json"));
+        assert!(!is_island_replay_name("island_notes.md"));
+        assert!(!is_island_replay_name("village_orders.json"));
+        assert!(!is_island_replay_name("testbed_vehicles.json"));
+        assert!(
+            ISLAND_LONG_REPLAYS
+                .iter()
+                .all(|stem| stem.starts_with(ISLAND_REPLAY_PREFIX))
+        );
+        let island = r#"{"version":2,"seed":7,"scenario":"island:living_world","ticks":600}"#;
+        assert_eq!(corpus_kind(island), "island");
+        assert_eq!(
+            corpus_kind(r#"{ "scenario": "testbed:smithy" }"#),
+            "testbed"
+        );
+        assert_eq!(corpus_kind(r#"{ "scenario": "village" }"#), "village");
+        let session = r#"{"scenario": {"content": "island"}, "replay": {"seed": 1}}"#;
+        assert_eq!(corpus_kind(session), "session");
     }
 }

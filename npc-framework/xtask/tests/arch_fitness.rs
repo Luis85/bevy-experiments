@@ -513,6 +513,14 @@ const RULES: &[Rule] = &[
         why: "the village does not reach the island",
     },
     Rule {
+        krate: "village",
+        forbidden: &[ISLAND],
+        no_content: false,
+        include_dev: true,
+        resolve: Resolve::Unified,
+        why: "the village does not reach the island",
+    },
+    Rule {
         krate: "village_view",
         forbidden: &[ISLAND],
         no_content: false,

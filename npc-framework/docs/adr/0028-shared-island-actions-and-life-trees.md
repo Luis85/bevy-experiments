@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
+- Superseded in part by [ADR 0044](0044-island-crates-split.md): the Rust `island_life` tree and the older tiers are removed.
 
 Island residents previously had no `Brain`: a sorted Effects loop chose survival and profession actions directly. That duplicated policy and made NPC-only free home recovery unavailable to player clients.
 

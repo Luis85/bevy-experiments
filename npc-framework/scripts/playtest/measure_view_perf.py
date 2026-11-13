@@ -2,7 +2,7 @@
 
 Build first, then run from npc-framework:
   python scripts/playtest/measure_view_perf.py [--binary target/debug/island_game.exe]
-      [--match homestead_panel] [--seconds 6] [--running]
+      [--match living_scene] [--seconds 6] [--running]
       [--camera 0,0,330] [--no-dressing] [--size 2560x1440]
 
 Launches a disposable developer scenario (no save, no player session), frames
@@ -31,10 +31,9 @@ from capture_native import ROOT, WINDOW, query, rpc
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
-    parser.add_argument("--match", default="homestead_panel")
+    parser.add_argument("--match", default="living_scene")
     parser.add_argument("--seconds", type=float, default=6.0)
     parser.add_argument("--running", action="store_true", help="sample with the world running at 1x")
-    parser.add_argument("--open-panel", action="store_true", help="open Home & farm before sampling")
     parser.add_argument("--camera", default="65,40,62", help="X,Z,DIST of the view to measure")
     parser.add_argument("--no-dressing", action="store_true", help="leave out rocks and bushes")
     parser.add_argument("--size", help="WIDTHxHEIGHT window size in physical pixels")
@@ -86,10 +85,6 @@ def main():
                 row = query(url, [WINDOW], ["bevy_window::window::PrimaryWindow"])[0]
                 now = row["components"][WINDOW]["resolution"]
                 print("window", now["physical_width"], "x", now["physical_height"])
-            if args.open_panel:
-                from capture_native import click
-                click(url, "Home & farm [F2]")
-                time.sleep(1)
             if args.running:
                 rpc(url, "npc/resume")
             rpc(url, "npc/perf/reset")

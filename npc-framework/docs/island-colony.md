@@ -6,15 +6,14 @@ This guide covers the colony ledger, terrain editor and developer entry points.
 Run from `npc-framework/`:
 
 ```powershell
-cargo build --locked -p game_menu -p actor_testbed -p npcctl
-.\target\debug\game_menu.exe
+cargo build --locked -p island_game
+.\target\debug\island_game.exe
 ```
 
 The normal title offers **New game** and **Continue**. In play, the bar at the top
 switches between **Live** (key 1, your character), **Oversee** (key 2, this guide's
 colony view) and **Shape** (key 3, terrain tools). These modes share the same local
-island, saved as `living-world.world.json` in the configured agents folder (an older
-`local-island.world.json` is preserved; see [the coastal world](living-world.md)). During
+island, saved as `<home>/island-village/island.world.json` (see [the coastal world](living-world.md)). During
 play it saves every minute, on **Ctrl+S** (or **F9**), and when leaving through the
 pause menu or closing the window. A save you ask for is confirmed by a short notice,
 bottom left, that fades after a few seconds; the minute's own save says nothing. A
@@ -26,7 +25,7 @@ select **Oversee the village**. The colony runs without beginning that visitor's
 mortal life. With an existing save, **Oversee the village** is also available on the
 title. **Live** in the top bar performs the actual arrival when needed.
 
-`cargo run --locked -p game_menu` remains the development entry point. Running the
+`cargo run --locked -p island_game` is the development entry point. Running the
 already-built executable avoids recompiling a different Cargo feature combination.
 
 If the Windows renderer exits with `DeviceLost`, Vulkan was verified during the
@@ -34,7 +33,7 @@ November 8 colony iteration. Select it for the current PowerShell session:
 
 ```powershell
 $env:WGPU_BACKEND = "vulkan"
-.\target\debug\game_menu.exe
+.\target\debug\island_game.exe
 ```
 
 This is a process/session setting, not a global driver or Rust configuration change.
@@ -42,19 +41,19 @@ This is a process/session setting, not a global driver or Rust configuration cha
 **New game** keeps the previous save as a numbered `.previous-N.json` backup and
 uses the world's loaded immutable rules. **Continue** keeps the current island.
 Backups are never overwritten. To change the rules of a new world, use a separate
-save path with `--island-rules`, or the developer toolbox's fresh-island workflow.
+save path with `--island-rules`, or `--island-new`.
 
 For a disposable world without persistence:
 
 ```powershell
-cargo run --locked -p actor_testbed -- --scenario island_colony --island-mode inspector
+cargo run --locked -p island_game -- --scenario living_world --island-mode inspector
 ```
 
 Use `--island-mode character` or `editor` for the other entry points. Add
 `--island-save C:/NPC/my-island.world.json` to create or resume a separate persistent
 island. Existing saves retain their construction rules. Use a new path to start a
 fresh world with edited rules; incompatible saves are preserved and refused.
-Add `--island-rules C:/NPC/worlds/island_colony.json` to use your edited preset for a
+Add `--island-rules C:/NPC/worlds/living_world.json` to use your edited preset for a
 new local island, or `--island-new` to start fresh with a backup at the same path.
 
 ## The Oversee screen
@@ -294,9 +293,7 @@ the first tick at the critical level (health starts to fall 600 ticks later), an
 patch is "depleted" when its last unit is taken. Someone already starving or
 thirsty when the session opens is listed once at that point. A resident without a
 home and a village-wide shortage have no such event and are found by looking at
-the village twice a second. The older `island_colony` world journals none of
-these, and there the same look also finds hunger, thirst (after 100 ticks at the
-critical level) and empty patches. No condition is reported by both routes.
+the village twice a second. No condition is reported by both routes.
 
 At the zooms where residents carry a coloured dot, a small **Resident markers**
 key appears bottom left and names the trade of each colour present on the
@@ -618,8 +615,7 @@ does not leave an unseen visitor starving before you join.
 walk. Normal player mode has **Pouch, Craft, Build, Garden, Trade, People and Explore**
 workspaces. **F2** opens Pouch or closes a workspace. Gathering, crafting, food,
 water, rest, trade, cottage building and grain/berry gardening use real possessions
-and the same action validation as NPCs. Direct developer scenario launches retain
-the older **Home & farm** panel. Click the world or close a panel to return keyboard
+and the same action validation as NPCs. Click the world or close a panel to return keyboard
 focus to movement.
 
 Returning to Inspector changes the view immediately. Committed gathering, crafting,
@@ -694,17 +690,14 @@ to be tried again. Water stays at or below sea level and dry ground at or above
 it: paint a surface first to cross the shoreline. Developer launches keep a
 Landscape tab that points at the same tools.
 
-The older `island_colony` world has no batch command: there a soft or uneven dab
-still records one `Terraform` per changed cell, at most six a tick, and a large
-stroke lags behind the cursor. `ISLAND_VIEW_SHAPE_BATCH=off` makes the living world
-record the same way, for comparison; see
+`ISLAND_VIEW_SHAPE_BATCH=off` makes the living world record one `Terraform` per
+changed cell (at most six a tick), for comparison; see
 [the measurement](island-atmosphere.md#shape-strokes).
 
 
 The map uses one-metre cells. In the normal living world dry ground ranges from 0 to
 12 metres and water from -2 to 0; dry ground cannot be below sea level, and water
-cannot be above it. The legacy `island_colony` map ranges from -1 to 3 metres, and its
-ground above 1.5 metres is impassable. Editing protects residents, worksites, resources, home entrances and
+cannot be above it. Editing protects residents, worksites, resources, home entrances and
 plot sites, and rejects changes that disconnect passable land. Terrain changes
 update navigation and persist in the save. The undo history is view-side and
 lasts for the session; it is not saved with the world.
@@ -726,21 +719,16 @@ worked cannot be taken back. Both are part of the exported world (plots in
 
 ## Author the simulation
 
-The shipped rules are in `content/testbed_content/worlds/island_colony.json`.
-Open the developer toolbox with `cargo run --locked -p game_menu -- --developer-menu`.
-Its World rules editor edits copied presets, including the **Resident AI**
-tab for routine priorities, need thresholds and bounded GOAP settings. Saved worlds
-keep their original rules. See [NPC AI authoring](island-ai-authoring.md) for exact
-units, JSON and validation, and [Living Island economy](living-island-economy.md)
-for the production model.
+The shipped rules are in `content/island_content/worlds/living_world.json`; the game
+installs them as `<home>/island-village/living_world.json`. Edit that file before a
+**New game**, or pass `--island-rules FILE` with a new `--island-save`. Saved worlds
+keep their original rules. The developer menu's Worlds editor no longer edits island
+rules. See [NPC AI authoring](island-ai-authoring.md) for exact units, JSON and
+validation, and [economy authoring](island-economy-authoring.md) for the production
+model.
 
-The developer toolbox's local entry buttons use the `island_colony` preset. Edit that preset before
-**Start a fresh island** there. Other authored files can be selected explicitly with
-`--island-rules`, or through the AI explorer's New-world selection.
-
-The AI explorer workflow remains available for a separately saved agent world.
-Choose the Island Village preset; a newly assigned visitor uses `join_island`
-before ordinary gameplay. Starting an external AI provider is still explicit.
+The AI explorer no longer hosts an island (ADR 0044). An AI agent reaches the island
+through `island_game --remote` (`npc/*`, `agent/*`, `world/state`).
 
 The normal living world provides 42 established residents in three settlements,
 housing commissions and profession assignment to open vacancies.
@@ -755,8 +743,7 @@ settlement, the nearest settlement within 60 m; `RemoveResourcePatch {patch}`,
 never the last of its good in its settlement), and `frontier::shape::export_world`
 writes the current terrain, patches and buildings as a `living_world` block in the
 shipped schema (the host writes the file). Trees and rocks are view dressing, not
-simulation data, so there is no prop command. Historical scenarios remain available
-through developer CLI commands and tests, outside the showcase launcher.
+simulation data, so there is no prop command. There are no other island scenarios.
 
 The [simulation research brief](research/2026-11-09-simulation-research.md) records
 why steady-state survival and bounded replenishment recovery do not establish

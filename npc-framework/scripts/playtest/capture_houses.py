@@ -277,15 +277,9 @@ def main():
     environment.pop("ISLAND_VIEW_DAY_PHASE", None)
     if args.pin_night:
         environment["ISLAND_VIEW_DAY_PHASE"] = "0.85"
-    # The front end of actor_testbed starts the coastal world from its rules file.
+    # The front end of island_game starts the coastal world from its rules file.
     shipped = ROOT / "content/island_content/worlds/living_world.json"
     rules = ["--island-rules", str(shipped if args.skip_build or args.pin_night else cheap_cottage(run))]
-    host = []
-    if binary.name.lower().startswith("game_menu"):
-        settings = run / "settings.json"
-        settings.write_text(json.dumps({"agents_dir": str(run / "agents"),
-            "worlds_dir": str(run / "rules"), "fog_of_war": True}), encoding="utf-8")
-        host = ["--island-rules", str(run / "rules" / "living_world.json")]
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),
         "pinned_night": args.pin_night,
         "rules": "shipped" if args.skip_build or args.pin_night else
@@ -297,7 +291,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", *host,
+            child = subprocess.Popen([str(binary), "--front-end",
                 "--island-save", str(save), *rules, "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

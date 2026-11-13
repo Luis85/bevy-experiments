@@ -179,9 +179,6 @@ def launch(binary, run, extra, phase=None, save=None):
     run.mkdir(parents=True)
     if save is not None:
         shutil.copy2(save, run / "living-world.world.json")
-    settings = run / "settings.json"
-    settings.write_text(json.dumps({"agents_dir": str(run / "agents"),
-        "worlds_dir": str(run / "rules"), "fog_of_war": True}), encoding="utf-8")
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]

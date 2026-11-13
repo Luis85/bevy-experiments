@@ -2,6 +2,8 @@
 
 Status: accepted for the 2026-11-09 iteration.
 
+Superseded in part by [ADR 0044](0044-island-crates-split.md): the older profiles are removed and old saves are refused, not loaded.
+
 The larger coastal world is an opt-in content construction profile, `living_world`,
 whose complete validated definition is frozen into a save. The original island
 profile and its registered state remain compatible. The normal entry uses a new

@@ -10,7 +10,7 @@ adds no component to a simulation entity, and changes no hash, replay or schedul
 installed only when the regional living world is active (`frontier::enabled`); the old
 village, the testbed scenarios and the explorer look and animate as before.
 
-| Concern | Module (`content/testbed_view/src/`) |
+| Concern | Module (`content/island_view/src/`) |
 |---|---|
 | Day curve shared by sun, lamps, smoke and ambience | `island_atmosphere/daylight.rs` |
 | Sun, sky light and haze through the day | `island_atmosphere/sky.rs` |
@@ -1198,7 +1198,7 @@ sight only when the camera or the character has moved).
 
 ## Sound
 
-`island_audio` (`content/testbed_view/src/island_audio/`) is the island's one sound
+`island_audio` (`content/island_view/src/island_audio/`) is the island's one sound
 system. It loads only the manifest's `living/audio/{ambience,work,ui,music}/` files that
 exist (`catalog`). The older, unlisted `assets/audio/` folder is retired: no code loads
 it. Hosts without Bevy's audio plugin (every headless test) and runs with
@@ -1375,14 +1375,14 @@ profile, paused, camera 62 m above Stone Ridge, 2560 x 1440 window:
 - 84 point lights exist; 39 are lit at dawn, none at noon.
 - Mean frame 31.6 ms over four seconds; `npc/perf` median 38 ms with the profiler and
   the remote interface on. The render schedule takes 24 ms of that and the largest
-  view system was the Home and farm panel refresh at 7.9 ms (see below; it no longer
-  runs while the panel is closed). These figures predate the outcrop rocks, bushes
+  view system was the Home and farm panel refresh at 7.9 ms (see below; the panel
+  was removed later, ADR 0044). These figures predate the outcrop rocks, bushes
   and shore slopes; see the re-measurement below. All of `island_atmosphere`
   is 0.19 ms and the terrain systems 0.19 ms. Transform propagation, visibility and
   animation over all entities come to about 2.5 ms.
 
-The Home and farm panel belongs to developer launches (the player session hides it).
-Its refresh built a full actor observation every frame, open or closed. It now builds
+The Home and farm panel (removed since, ADR 0044) belonged to developer launches.
+The measurement below is kept as history. Its refresh built a full actor observation every frame, open or closed. It now builds
 nothing while closed and, while open, only when one of its inputs changed: a
 simulation tick, the control state, the clock's pause state, a pending action or a
 choice in the panel, with a rebuild once a second as a bound on staleness. Measured

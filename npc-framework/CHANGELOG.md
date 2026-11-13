@@ -8,6 +8,116 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Island Village in its own crates; older island tiers removed
+
+No backwards compatibility: read the "not kept" bullets before updating.
+
+- The island is three new crates: `content/island_content` (the
+  `living_world` simulation, its scenario, world rules, resident tree and
+  tests), `content/island_view` (presentation) and `apps/island_game` (the
+  shipped game). They were split out of `testbed_content`, `testbed_view`
+  and `actor_testbed`. No island crate depends on a testbed or village
+  crate, and the reverse; `arch_fitness` enforces both directions.
+  ADR 0044.
+- `island_game` is the game binary: `cargo run --locked -p island_game`
+  opens the title (New/Continue, play, pause in one window). `--scenario`,
+  a bare `--island-save`, `--island-new`, `--commands` or `--record` select
+  the developer host; `--front-end` keeps the player flow with a custom
+  save. `scripts/package_island.ps1` ships `island_game.exe` and leaves out
+  the retired, untracked `assets/audio/` folder.
+- `game_menu` is the developer menu only (Actor Testbed, village, RTS demo,
+  editors, AI explorer). With no flag it opens that menu; `--developer-menu`
+  is still accepted. It no longer depends on the `actor_testbed` library and
+  has no island entry, island quit path or Resident AI page.
+- `actor_testbed` hosts the testbed only: default scenario `testbed`; the
+  flags `--front-end`, `--dev-keys`, `--island-*`, `--ui-gallery`, `--mute`
+  and `--world-state-*` are gone.
+- `npcctl` knows three contents: `village`, `testbed[:<name>]` and
+  `island:<name>` (a bare `living_world` qualifies to `island:living_world`,
+  also in `npcctl replay record`).
+- Island saves live in the island's own folder:
+  `<home>/island-village/island.world.json`, rules beside it as
+  `living_world.json` (`island_game::{ISLAND_HOME_DIR, SAVE_FILE,
+  RULES_FILE, island_home}`).
+- One construction: `island_content::construction::shipped()` (the
+  embedded `living_world` scenario with the built-in world's descriptor) is
+  what `try_new_sim_app`, every test and the replay factory build; New Game
+  builds `construction::from_preset` of the chosen world. Headless
+  perception memory goes from 128 to 256 entries and the headless world
+  gains `RevealsFog`. `worlds/living_island.json` and the scenario file's
+  inline `living_world` block are removed; an island scenario without its
+  construction is refused.
+- The island's content hash and every island state hash change once.
+  Dropped inherited registrations: the `TestbedDrive` command, the wander
+  and worker trees, the walk/wander/tool-work actions and `TbWalking`, the
+  `book`, `scroll` and `store_key` item kinds and the study table, the
+  skeleton sheet templates, the fog-statics and LIDAR-obstacle shaping.
+  Renamed: `ExplorerContext` to `construction::Construction` (JSON
+  `explorer_context` to `construction`); `TestbedPlugin`,
+  `TestbedAgentPlugin`, `TestbedViewPlugin`, `TestbedPanels`, `TestbedIds`,
+  `TestbedUnit`, `TbIdling` to `IslandBasePlugin`, `IslandAgentPlugin`,
+  `IslandViewPlugin`, `IslandPanels`, `IslandIds`, `IslandUnit`,
+  `IslandIdling`; stable names `testbed_unit`, `testbed_prop`,
+  `testbed_ids`, `tb_idling` to `island_unit`, `island_prop`, `island_ids`,
+  `island_idling`; action `TbIdle` to `IslandIdle`, tree `testbed_idle` to
+  `island_idle`; verb gates `testbed.allowed_actions` and
+  `testbed.world_rules` to `island.allowed_actions` and
+  `island.world_rules`. `ISLAND_SAVE_VERSION` is 3.
+- Removed, older island tiers: scenarios `ai_village`, `living_village`,
+  `island_colony`; world presets `island_village`, `living_island`,
+  `living_homestead`, `island_colony`; the profile gates
+  (`frontier::enabled`, `needs_driven`, `geography::is_expanded`,
+  `colony::enabled`, `market::enabled`, `catalog::frontier_profile`) and
+  the code only they reached: the fixed economy, the Rust `island_life`
+  tree, the fixed spawn tables, compact geography, the Rust recipe and item
+  tables, the legacy 64x64 terrain brush, the legacy hunting, repose and
+  production paths. `living_world` is the only island construction.
+- Removed from the island view: the Home & farm panel (`homestead_panel`,
+  F2), the legacy terrain picking, robot bodies, the key and scroll models
+  and the fog toggle (F8, `--fog`; the island's fog is always off).
+  `island_game` does not accept `--panels explorer|map`.
+- Removed: islands in the explorer and AI-agent hosts. `actor_testbed
+  --explorer-home`, `npcctl serve --explorer-home` and the developer menu's
+  explorer serve testbed worlds only (default `plain_explorer`). The island
+  briefing, the village frame and notes bridge in `explorer::host`, and the
+  world projection file (`--world-state-out`, `projection.rs` in both hosts,
+  the run-file handover) are gone. An agent reaches the island through
+  `island_game --remote` (`npc/*`, `agent/*`, `world/state`).
+- Removed from `testbed_content`: `village/**`, `Layout::Island`, the island
+  fields of `WorldSpec` and `WorldPreset` (`living_world`, `colony`,
+  `island_ai`, `economy`, `island_geography`, `scene`), `EconomyModel`,
+  `IslandGeography`, `WorldScene`. Explorer documents serialize as before.
+- Not kept: saves. A save of an older tier or an earlier build, including
+  any save made before the renames above, is refused with one sentence and
+  never migrated (ADR 0042). `living-world.world.json` and
+  `local-island.world.json` in the agents folder are not read.
+- Not kept: names. The removed scenario and world names load nowhere;
+  `testbed:living_world` is now `island:living_world`; island reflect type
+  paths and perf tags start with `island_view::` / `island_content::`.
+  Explorer workspaces created on an island world cannot be resumed.
+- Tests: the island tests moved to `content/island_content/tests`. Deleted
+  with no replacement: `world_projection`, `island_scheduler_events`,
+  `island_notes_lifecycle`, `npcctl`'s `island_playtest`, the island
+  briefing tests, explorer credential succession on an island, the
+  explorer-built short-year and three-seed seasonal fixtures. Older-tier
+  tests were swapped to `living_world` by name; the 228 that then failed
+  (or were older-tier by fixture) were deleted, emptying 18 test files; the
+  lost coverage is listed in ADR 0044. New:
+  `content/island_view/tests/plugin.rs` (the whole island view, headless).
+  The 8 replays, 6 snapshots, proptest regressions and `bench/baseline.json`
+  of the village and the Actor Testbed are unchanged. The island has no
+  protected replay or golden yet.
+- Docs and scripts: removed `docs/ai-village.md`, `living-homestead.md`,
+  `living-island-economy.md`, `island-village-playtest.md`,
+  `island-village-stream.md` and seven older capture and smoke scripts in
+  `scripts/playtest/` (`capture_island_colony`, `capture_colony_menu`,
+  `capture_menu`, `capture_sessions`, `client_smoke`, `live_smoke`,
+  `test_client_smoke`); `capture_native.py` and
+  `capture_native_homestead.py` stay as the kept scripts' helper modules.
+  The kept capture scripts start `island_game.exe`;
+  `capture_player_flow.py` now passes its own `--island-save` so it never
+  opens the player's real save.
+
 ### Living world: Oversee targets and priorities, Shape plots and props, trades from data
 
 - Profession targets: `SetProfessionTarget { settlement, profession, wanted }`

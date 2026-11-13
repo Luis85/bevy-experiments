@@ -10,11 +10,12 @@ The published settlement chart contains immutable public destinations, while all
 live resources, residents and property retain actor-scoped observation rules.
 
 Island Village is content built on the framework's existing capabilities. Its
-composition root is `content/testbed_content/src/village/mod.rs`; the generic
+composition root is `content/island_content/src/village/mod.rs`; the generic
 crates do not know about residents, cottages, island terrain or colony policy.
-The opt-in `colony` and `island_ai` descriptors are validated before registration
-and frozen into the world's construction data. Older scenarios retain their
-registrations and numerical model. See [ADR 0035](adr/0035-island-colony-showcase.md).
+`living_world` is the only construction (`island_content::construction::shipped()`);
+its descriptors are validated before registration and frozen into the world's
+construction data. The older island tiers are removed. See
+[ADR 0035](adr/0035-island-colony-showcase.md) and [ADR 0044](adr/0044-island-crates-split.md).
 
 ## Ownership
 
@@ -42,18 +43,15 @@ registrations and numerical model. See [ADR 0035](adr/0035-island-colony-showcas
 | Learned island places | `village/discovery.rs` | Island-only known-target and position providers over the actor's existing `SeenStatics`; immutable-place identity is distinct from unseen live state |
 | Terrain | `village/terrain.rs` | Integer cells, static navigation, atomic brush validation and recorded editing |
 | Save integrity | `village/integrity.rs` | Read-only content validation after load; the host owns I/O and reports failures |
-| Native control coordination | `testbed_view/island_control.rs` | Latest desired mode, recorded attach/detach receipts, actor/epoch scoping, deferred release during committed work, movement input and one-shot hero selection |
-| Native action adapter | `testbed_view/player_actions.rs`, `player_actions/progress_feedback.rs` | Actor-scoped shared action requests, approach continuations, cancellation and receipt/event-scoped result feedback |
-| UI read models | `testbed_view/player_hud/model.rs`, colony and homestead models | Pure projections of live state and valid choices; no command application |
-| Native widgets | `testbed_view/player_hud`, colony and legacy homestead panels | Presentation state, focus, input feedback and recorded civic/terrain/action requests |
-| Shared game UI | `testbed_view/game_ui.rs` | Typography, semantic buttons and focus/hover/disabled states; no feature behavior or simulation state |
-| Shared panel scrolling | `testbed_view/panel_scroll.rs` | Scrollbar, bounded paging and overflow hints; callers retain focus/input ownership |
-| Camera and rendering | `testbed_view/island_camera.rs`, `colony_scene.rs` | Usable-area framing and separate visuals; no authoritative state writes |
-| Local persistence | `actor_testbed/island.rs` | File lock, immutable construction, strict restore, atomic writes, backups and save-before-quit acknowledgement |
-| Player application lifecycle | `actor_testbed/frontend`, `island/session.rs` | One-window title/New/Continue/Pause flow, modal input gate, staged world replacement and recoverable save transitions |
-| Normal entry dispatch | `game_menu/frontend_dispatch.rs` | Invoke the actor host library directly, forwarding configured save/rules paths before creating any launcher window |
-| Developer launcher lifecycle | `game_menu/run.rs`, `quit.rs` | Explicit toolbox's owned child process and endpoint; require matching saved/PID acknowledgement, preserve the host on refusal |
-| Blueprint authoring | `game_menu/worlds.rs` | Validated preset drafts; saved worlds retain their immutable copies |
+| Native control coordination | `island_view/island_control.rs` | Latest desired mode, recorded attach/detach receipts, actor/epoch scoping, deferred release during committed work, movement input and one-shot hero selection |
+| Native action adapter | `island_view/player_actions.rs`, `player_actions/progress_feedback.rs` | Actor-scoped shared action requests, approach continuations, cancellation and receipt/event-scoped result feedback |
+| UI read models | `island_view/player_hud/model.rs`, colony models | Pure projections of live state and valid choices; no command application |
+| Native widgets | `island_view/player_hud`, colony panels | Presentation state, focus, input feedback and recorded civic/terrain/action requests |
+| Shared game UI | `island_view/game_ui.rs` | Typography, semantic buttons and focus/hover/disabled states; no feature behavior or simulation state |
+| Shared panel scrolling | `island_view/panel_scroll.rs` | Scrollbar, bounded paging and overflow hints; callers retain focus/input ownership |
+| Camera and rendering | `island_view/island_camera.rs`, `colony_scene.rs` | Usable-area framing and separate visuals; no authoritative state writes |
+| Local persistence | `island_game/island.rs` | File lock, immutable construction, strict restore, atomic writes, backups and save-before-quit acknowledgement |
+| Player application lifecycle | `island_game/frontend`, `island/session.rs` | One-window title/New/Continue/Pause flow, modal input gate, staged world replacement and recoverable save transitions |
 
 `colony/mod.rs` composes the private colony modules and preserves the public
 `village::colony::*` paths. Its registration is opt-in and its upkeep has one
@@ -201,8 +199,7 @@ work cannot earn meeting effects merely by sharing a location. These pure querie
 must not consume fuel, reserve objects, steer movement or settle a social effect.
 
 View optimization starts with avoiding unused projections: no full observation for
-an unselected construction preview, and no hidden legacy Home & farm observation
-while the player experience owns that interface. Existing profiler tags attribute
+an unselected construction preview. Existing profiler tags attribute
 the HUD, colony UI/scene, island control and shared UI separately. These gates reduce
 derived work only; they do not change simulation ticks, perception or domain rules.
 No frame-rate improvement follows without a measured before/after comparison.
@@ -215,8 +212,7 @@ reconstruct registries; the snapshot describes the current simulation. Content
 integrity belongs to `village::integrity`, so the host does not need to encode
 household or terrain rules itself.
 
-Normal play enters that host in-process through the `actor_testbed` application
-library. `frontend` owns menu transitions; `FrontendGate` suppresses underlying
+`island_game` is the host; with no flag it opens the player flow. `frontend` owns menu transitions; `FrontendGate` suppresses underlying
 input and presentation, and `PlayerMenuRequest` carries the view's request to the
 host. Opening the title does not advance or write a saved world. New constructs
 and validates an isolated world before replacement; replacement renews host-side
@@ -244,8 +240,8 @@ removes them: an animal (hunted or died), a resident laid to rest (named in
 still serves its settlement, and a building site laid out from an exported world
 and cancelled. Anything else missing is refused as a truncated or edited save.
 
-There is no historical local-island schema migration implemented in this
-iteration. Strict compatibility and the local format discriminator are explicit
+Nothing is migrated. A save of another build or an older tier is refused
+(ADR 0042, ADR 0044). Strict compatibility and the local format discriminator are explicit
 contracts. When a real schema change is needed, implement a versioned transform
 of a copy before loading, test representative previous versions, then validate
 the resulting content. Keep the original until the new save succeeds. Do not use
@@ -265,8 +261,8 @@ Feed new household demands into funded production rather than granting materials
 from policy code. A view submits recorded commands and never executes a domain
 operation directly.
 
-The focused boundary tests are `colony_architecture`; existing `island_colony`,
-`colony_ai` and `colony_route_recovery` cover physical execution, interruption,
+The focused boundary tests are `colony_architecture`; `island_colony`,
+`colony_ai` and `colony_route_recovery` (in `content/island_content/tests`, now on `living_world`) cover physical execution, interruption,
 determinism, observer purity and snapshot continuation. Economy soak tests give
 bounded survival/production evidence. The complete workspace gate and native
 visual verification remain separate requirements; this document makes no claim

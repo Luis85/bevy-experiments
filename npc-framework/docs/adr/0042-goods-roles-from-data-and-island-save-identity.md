@@ -2,6 +2,8 @@
 
 Date: 2026-11-13. Status: accepted for the living world (`living_world`).
 
+Superseded in part by [ADR 0044](0044-island-crates-split.md): the island and the testbed each carry their own copy of the role code.
+
 ## Context
 
 The roadmap's phase 2 asks for a catalog defined in data with no hard-coded

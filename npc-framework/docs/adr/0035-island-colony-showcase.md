@@ -2,6 +2,8 @@
 
 Date: 2026-11-08. Status: accepted.
 
+Superseded in part by [ADR 0044](0044-island-crates-split.md): `island_colony` is removed; the island lives in `island_content`, `island_view` and `island_game`.
+
 ## Context
 
 The user wants Island Village to be the playable showcase, with autonomous production,

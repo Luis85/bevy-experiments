@@ -213,9 +213,6 @@ def main():
         parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-view-wiring-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
-    settings = run / "settings.json"
-    settings.write_text(json.dumps({"agents_dir": str(run / "agents"),
-        "worlds_dir": str(run / "rules"), "fog_of_war": True}), encoding="utf-8")
     save = run / "living-world.world.json"
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))

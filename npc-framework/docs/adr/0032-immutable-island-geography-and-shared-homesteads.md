@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-02
+- Superseded in part by [ADR 0044](0044-island-crates-split.md): `living_homestead` and compact geography are removed.
 
 The Living Village needs clearer economic routes and room for future growth. The player also needs a small material-backed home/garden loop using the same public actions as other actors.
 

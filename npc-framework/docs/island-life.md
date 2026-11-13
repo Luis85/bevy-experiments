@@ -10,11 +10,11 @@ warmth; death is permanent.
 Run these commands from `npc-framework/`:
 
 ```powershell
-cargo build --locked -p game_menu -p actor_testbed -p npcctl
-.\target\debug\game_menu.exe
+cargo build --locked -p island_game
+.\target\debug\island_game.exe
 ```
 
-`cargo run --locked -p game_menu` also starts the game. The title, character setup,
+`cargo run --locked -p island_game` also starts the game. The title, character setup,
 island, pause menu and return to title share one window and process.
 
 - **New game** opens **A new beginning**. Enter your character's name (up to 32
@@ -256,8 +256,7 @@ needs take priority over the proximity-based familiarity gain.
 
 ## A day in Live mode (living world)
 
-These parts of Live mode belong to the regional `living_world`; the older
-island profiles do not have them.
+These parts of Live mode belong to the regional `living_world`, the only island.
 
 **Sleep to morning and the day summary.** From six tenths of the day on, at the
 door of your own home (within 4 m), **Sleep** puts you to bed until the next
@@ -346,13 +345,13 @@ failure keeps the application open with a recoverable error. The three ways to
 play are not in this menu: they are in the top bar, in every mode.
 
 A save remembers which version of the island made it. Continuing a save from
-an older version says so plainly: it is brought up to date when the change
-since was only additive, otherwise it asks you to start a new island; a save
-from a newer version asks you to update (`village::island_save`, ADR 0042).
+an older version says so plainly and asks you to start a new island; nothing is
+upgraded or migrated. A save from a newer version asks you to update
+(`village::island_save`, ADR 0042, ADR 0044).
 
-Normal play now uses `living-world.world.json` in the configured agents folder.
-The previous `local-island.world.json` is preserved and can be opened explicitly;
-see [the coastal world](living-world.md) for regional play and compatibility. During
+Normal play uses `<home>/island-village/island.world.json`, with the world rules
+beside it as `living_world.json`. Saves of earlier versions, in any location, are
+not read; see [the coastal world](living-world.md) for regional play. During
 play it autosaves every minute; **Ctrl+S** or **F9** saves immediately. The minute's
 own save is silent. A save you ask for is confirmed once, in every mode, by a
 toast under the top bar: **Island saved**, with a tick, for three seconds. A
@@ -419,22 +418,19 @@ the Shape tools and their keys.
 
 ## Developer entry points
 
-The old launcher toolbox remains explicit:
+The developer menu (`cargo run --locked -p game_menu`) serves the framework
+examples (Actor Testbed, village, RTS demo, editors, AI explorer), not the island.
+For a separate local playtest, use a different save path (`--front-end` keeps the
+title; a bare `--island-save` opens the developer host):
 
 ```powershell
-cargo run --locked -p game_menu -- --developer-menu
+.\target\debug\island_game.exe --front-end --island-save C:/NPC/playtest.world.json
 ```
 
-It provides Settings, world-rule editing, actor editing and separately saved AI
-explorers. For a separate local playtest, use a different save path:
-
-```powershell
-.\target\debug\game_menu.exe --front-end --island-save C:/NPC/playtest.world.json
-```
-
-Add `--island-rules C:/NPC/worlds/island_colony.json` when creating a new world from
-edited rules. Use a new save path to adopt those rules. Direct `actor_testbed`
-scenario commands remain available for development without this player frontend.
+Add `--island-rules C:/NPC/worlds/living_world.json` when creating a new world from
+edited rules. Use a new save path to adopt those rules.
+`cargo run --locked -p island_game -- --scenario living_world` is the developer host,
+without this player frontend.
 See [NPC AI authoring](island-ai-authoring.md) and
 [architecture ownership](architecture-island.md).
 

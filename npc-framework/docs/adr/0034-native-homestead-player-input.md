@@ -2,6 +2,8 @@
 
 Date: 2026-11-04. Status: accepted.
 
+Superseded in part by [ADR 0044](0044-island-crates-split.md): the Home & farm panel is removed.
+
 ## Context
 
 The larger Living island already has recorded, needs-driven homestead and production actions, but a human needs CLI/MCP calls to use them. Native controls must use the same ownership, reach, life, materials, reservation and economic rules. The existing RTS UI alone does not execute a directly controlled visitor's queued movement or offer homestead/gathering controls.

@@ -817,7 +817,7 @@ Advisor-mode plans (orders). `register_perception(name, fn)` makes observations 
 (`omniscient: false`; the perception glue does this). Serve it: windowed with feature `remote`
 (`AgentRemotePlugin` on BRP, after `NpcRemotePlugin`), or headless with `npc_agent_io::session::Session` and a
 scenario loader (`ScenarioLoaders::add("my_game", fn(&ScenarioDoc, seed) -> Result<LoadedScenario, String>)`;
-`npcctl` registers the village's and the testbed's, `content/testbed_content/src/scenario.rs` is the pattern).
+`npcctl` registers the village's, the testbed's and the island's, `content/testbed_content/src/scenario.rs` is the pattern).
 
 ## 7. Glue: what happens when two capabilities meet
 

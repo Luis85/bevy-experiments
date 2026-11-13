@@ -8,7 +8,7 @@ Workers and guests tab, its building title and the civic fund chip. Each at
 1280x720 and 1024x768.
 
 Make the saves and build first, then run from npc-framework:
-  cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 5
+  cargo test --locked -p island_content --test island_capture_fixtures -- --ignored --test-threads 5
   cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live5.py [--only worlds,summary,gift,upgrade,inn]
 

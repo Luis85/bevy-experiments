@@ -11,7 +11,7 @@ ban**.
 
 ```toml
 { crate = "bevy", wrappers = ["npc_view_helpers", "village_view", "npc_tools", "village",
-  "testbed_view", "actor_testbed", "rts_units_demo", "game_menu"], reason = "..." }
+  "testbed_view", "actor_testbed", "island_view", "island_game", "rts_units_demo", "game_menu"], reason = "..." }
 ```
 
 The umbrella pulls the renderer, and the point of the ban is that no core or headless crate (`npc_ai`,

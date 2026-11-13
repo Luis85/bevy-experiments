@@ -1291,10 +1291,7 @@ def main():
         parser.error("--binary must name a built island_game executable")
     run = ROOT / "target" / ("playtest-player-flow-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
-    settings = run / "settings.json"
-    settings.write_text(json.dumps({"agents_dir": str(run / "agents"),
-        "worlds_dir": str(run / "rules"), "fog_of_war": True}), encoding="utf-8")
-    save = run / "agents" / "local-island.world.json"
+    save = run / "living-world.world.json"
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),
         "input": "enabled native widgets; view-only resize; optional bounded clock steps",
         "physical_input_tested": False, "provider": False, "screenshots": {}, "checks": [],
@@ -1305,7 +1302,7 @@ def main():
         "grants": 0, "teleports": 0}
     original_save = args.resume_save.resolve() if args.resume_save else None
     if original_save:
-        save.parent.mkdir(parents=True)
+        save.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(original_save, save)
         report["compatibility"] = {"source": str(original_save), "source_sha256": file_hash(original_save),
             "copied_sha256": file_hash(save), "copied_to": str(save), "source_written": False}
@@ -1323,7 +1320,8 @@ def main():
     report["renderer_override"] = environment.get("WGPU_BACKEND")
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-save", str(save),
+                "--island-rules", str(run / "rules" / "living_world.json"),
                 "--remote", "--remote-port", str(port), "--no-render-remote", "--out-dir", str(run)],
                 cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

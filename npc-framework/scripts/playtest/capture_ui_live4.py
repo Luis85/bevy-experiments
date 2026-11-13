@@ -7,7 +7,7 @@ gift toast, the inn card with its guest and the Departed list. Each at
 1280x720 and 1024x768.
 
 Make the saves and build first, then run from npc-framework:
-  cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 2
+  cargo test --locked -p island_content --test island_capture_fixtures -- --ignored --test-threads 2
   cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live4.py [--only menus,shape,cottage,upgrade,village]
 
