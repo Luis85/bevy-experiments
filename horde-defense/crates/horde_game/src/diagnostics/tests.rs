@@ -274,20 +274,107 @@ fn close_keeps_the_slowest_present_since_the_previous_close() {
     assert_eq!(idle.slowest_present, None);
 }
 
+/// Where the egui_pass span stands in the running frame, read from the
+/// probe's own counters: the frame's `Main` mark is older than an `EguiPass`
+/// mark of this frame, and the span total is non-zero once the span closed
+/// (`close_frame` takes it back to zero).
+#[cfg(feature = "review")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EguiSpan {
+    NotOpened,
+    Open,
+    Closed,
+}
+#[cfg(feature = "review")]
+fn egui_span(probe: &PerfProbe) -> EguiSpan {
+    if probe.0.egui_pass_ns.load(Ordering::Relaxed) != 0 {
+        EguiSpan::Closed
+    } else if probe.mark_ns(Mark::EguiPass) > probe.mark_ns(Mark::Main) {
+        EguiSpan::Open
+    } else {
+        EguiSpan::NotOpened
+    }
+}
+
+/// What the unrelated PostUpdate system of
+/// `egui_pass_excludes_unrelated_post_update_systems` saw, per case.
+#[cfg(feature = "review")]
+#[derive(Debug, Default)]
+struct BystanderLog {
+    /// Ran to its end before the span opened.
+    before: AtomicU64,
+    /// Started beside an open span, which closed while it was still running.
+    beside: AtomicU64,
+    /// Started after the span closed.
+    after: AtomicU64,
+    /// The span opened while it was running: the open is not exclusive.
+    opened_under: AtomicU64,
+    /// The span stayed open until it gave up: the span waits for it.
+    waited_for: AtomicU64,
+    /// The in-span work ran with the span open.
+    inside_open: AtomicU64,
+}
+/// How long the bystander holds its thread for a span that is open beside it
+/// before it reports that the span waits for it. Only a failing run takes
+/// this long; a passing one never reads the clock for a bound.
+#[cfg(feature = "review")]
+const BYSTANDER_GIVES_UP_AFTER: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// W1-33 review: egui_pass_ms opens only when bevy_egui's exclusive pass loop
-/// can start, so a PostUpdate system running beside the probe (here 8 ms,
-/// unordered against `EguiPostUpdateSet`) is never counted as egui work, in
-/// either registration order, while work inside `EndPass` (5 ms) is.
+/// can start, so a PostUpdate system running beside the probe (unordered
+/// against `EguiPostUpdateSet`) is never counted as egui work, in either
+/// registration order, while work inside `EndPass` (5 ms) is.
+///
+/// W5-11: the proof is structural, not a wall-clock bound. The old assert
+/// `egui_pass_ms + 8.0 <= main_cpu_ms` had no slack when the 8 ms sleeper ran
+/// beside the span's close, so machine load (a late close) could break it.
+/// The bystander now reads the span's state itself. Started before the open,
+/// it holds its thread for 8 ms and the span must still be unopened when it
+/// ends (the open is exclusive, so it cannot start under a running system).
+/// Started beside an open span, it does not return until the span has closed,
+/// so a span that waited for it (an open before it, a close ordered after it
+/// or exclusive) never closes and fails after `BYSTANDER_GIVES_UP_AFTER`.
+/// Load only delays these observations; it cannot change them.
 #[cfg(feature = "review")]
 #[test]
 fn egui_pass_excludes_unrelated_post_update_systems() {
     use bevy_egui::{EguiPostUpdateSet, end_pass_system, run_egui_context_pass_loop_system};
+    use std::sync::Arc;
+    fn bystander(log: Arc<BystanderLog>) -> impl FnMut(Res<PerfProbe>) + Send + Sync + 'static {
+        move |probe: Res<PerfProbe>| {
+            let case = match egui_span(&probe) {
+                EguiSpan::NotOpened => {
+                    sleep_ms(8);
+                    if egui_span(&probe) == EguiSpan::NotOpened {
+                        &log.before
+                    } else {
+                        &log.opened_under
+                    }
+                }
+                EguiSpan::Open => {
+                    let start = std::time::Instant::now();
+                    while egui_span(&probe) != EguiSpan::Closed
+                        && start.elapsed() < BYSTANDER_GIVES_UP_AFTER
+                    {
+                        sleep_ms(1);
+                    }
+                    if egui_span(&probe) == EguiSpan::Closed {
+                        &log.beside
+                    } else {
+                        &log.waited_for
+                    }
+                }
+                EguiSpan::Closed => &log.after,
+            };
+            case.fetch_add(1, Ordering::Relaxed);
+        }
+    }
     for sleeper_first in [true, false] {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
-        let sleeper = || sleep_ms(8);
+        let log = Arc::new(BystanderLog::default());
         if sleeper_first {
-            app.add_systems(PostUpdate, sleeper);
+            app.add_systems(PostUpdate, bystander(log.clone()));
         }
         install(&mut app, &config(&[("LASTLIGHT_PERF_REPORT", "perf.json")]));
         app.configure_sets(
@@ -307,29 +394,46 @@ fn egui_pass_excludes_unrelated_post_update_systems() {
                 .in_set(EguiPostUpdateSet::EndPass),
         );
         // 5 ms of egui work (or a descheduling) inside the span. Exclusive,
-        // so the sleeper never runs beside it.
+        // so the bystander never runs beside it.
+        let inside = log.clone();
         app.add_systems(
             PostUpdate,
-            (|_: &mut World| sleep_ms(5))
-                .in_set(EguiPostUpdateSet::EndPass)
-                .after(run_egui_context_pass_loop_system)
-                .before(end_pass_system),
+            (move |world: &mut World| {
+                if egui_span(world.resource::<PerfProbe>()) == EguiSpan::Open {
+                    inside.inside_open.fetch_add(1, Ordering::Relaxed);
+                }
+                sleep_ms(5);
+            })
+            .in_set(EguiPostUpdateSet::EndPass)
+            .after(run_egui_context_pass_loop_system)
+            .before(end_pass_system),
         );
         if !sleeper_first {
-            app.add_systems(PostUpdate, sleeper);
+            app.add_systems(PostUpdate, bystander(log.clone()));
         }
-        for _ in 0..3 {
+        for frames in 1..=3 {
             app.update();
             let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
-            // Relative bounds, not absolute ones: a descheduling inside the
-            // span inflates the span and the frame alike (W1 review).
-            assert!(
-                frame.egui_pass_ms >= 5.0,
-                "sleeper first {sleeper_first}: {frame:?}"
+            let at = format!("sleeper first {sleeper_first}, frame {frames}: {log:?} {frame:?}");
+            let count = |case: &AtomicU64| case.load(Ordering::Relaxed);
+            // A lower bound only: a sleep is never shorter than asked, and a
+            // descheduling inside the span only lengthens it.
+            assert!(frame.egui_pass_ms >= 5.0, "{at}");
+            assert_eq!(
+                count(&log.inside_open),
+                frames,
+                "the work is in the span: {at}"
             );
-            assert!(
-                frame.egui_pass_ms + 8.0 <= frame.main_cpu_ms,
-                "sleeper first {sleeper_first}: the 8 ms sleeper is outside the span: {frame:?}"
+            assert_eq!(count(&log.opened_under), 0, "the open is exclusive: {at}");
+            assert_eq!(
+                count(&log.waited_for),
+                0,
+                "the span never waits for the bystander: {at}"
+            );
+            assert_eq!(
+                count(&log.before) + count(&log.beside) + count(&log.after),
+                frames,
+                "the bystander ran once a frame, outside the span's wait: {at}"
             );
         }
     }
