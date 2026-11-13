@@ -7,7 +7,7 @@ use crate::{
     art::{AMBER, MUTED, RED, TEXT},
     battle_view::{self, BattleScreen},
     settings::Action,
-    ui::UiCtx,
+    ui::{UiCtx, chrome},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Stroke, pos2, vec2};
 
@@ -166,35 +166,13 @@ pub(super) fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx, view: &Batt
     );
 }
 
+/// The personal buttons of the control bar: Emergency aid and Brace the line.
 pub(super) fn personal_controls(
     ui: &mut egui::Ui,
     f: &mut UiCtx,
-    ctx: &egui::Context,
     view: &BattleScreen,
     rows: &mut BarRows,
 ) {
-    f.battle.pending.reload |= rows.widget(ui.button("Reload")).clicked();
-    if rows
-        .widget(ui.button("Strike contact lane"))
-        .on_hover_text("Strike the selected contact lane. Melee cancels an unfinished reload.")
-        .clicked()
-    {
-        let aim = assisted_aim(f, Some(view));
-        f.battle.pending.melee = true;
-        f.battle.pending.aim = aim;
-        f.battle.pending_attack_aims.melee.get_or_insert(aim);
-    }
-    if f.battle.attack_selection == AttackSelection::Gun
-        && rows
-            .widget(ui.button(if f.battle.fire_latched {
-                "Stop firing"
-            } else {
-                "Toggle firing"
-            }))
-            .clicked()
-    {
-        f.toggle_fire(ctx);
-    }
     if view.heal {
         f.battle.pending.heal |= rows
             .widget(ui.button("Emergency aid"))
@@ -206,5 +184,41 @@ pub(super) fn personal_controls(
             .widget(ui.button("Brace the line"))
             .on_hover_text(&f.settings.bindings[Action::Brace as usize])
             .clicked();
+    }
+}
+
+/// Management > Field actions (C-10): Reload, Strike contact lane and Toggle
+/// firing, each with its bound key. They left the control bar so it fits two
+/// rows; their keys and the legend are unchanged. A click closes the menu,
+/// which hands the keyboard back to the field.
+pub(super) fn field_actions(
+    ui: &mut egui::Ui,
+    f: &mut UiCtx,
+    ctx: &egui::Context,
+    view: &BattleScreen,
+) {
+    let action = |ui: &mut egui::Ui, f: &UiCtx, label: &str, action: Action| {
+        ui.add(egui::Button::new(label).shortcut_text(&f.settings.bindings[action as usize]))
+    };
+    chrome::section(ui, "Field actions");
+    f.battle.pending.reload |= action(ui, f, "Reload", Action::Reload).clicked();
+    if action(ui, f, "Strike contact lane", Action::Melee)
+        .on_hover_text("Strike the selected contact lane. Melee cancels an unfinished reload.")
+        .clicked()
+    {
+        let aim = assisted_aim(f, Some(view));
+        f.battle.pending.melee = true;
+        f.battle.pending.aim = aim;
+        f.battle.pending_attack_aims.melee.get_or_insert(aim);
+    }
+    if f.battle.attack_selection == AttackSelection::Gun {
+        let label = if f.battle.fire_latched {
+            "Stop firing"
+        } else {
+            "Toggle firing"
+        };
+        if action(ui, f, label, Action::Toggle).clicked() {
+            f.toggle_fire(ctx);
+        }
     }
 }

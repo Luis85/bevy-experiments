@@ -28,18 +28,15 @@ const STACK_WIDTH: f32 = 280.0;
 /// The queue holds at most this many toasts; older ones give way.
 const QUEUE_CAP: usize = 8;
 
+/// How the status line of a save that kept recovery copies begins
+/// (`notices.rs`).
+pub(super) const RECOVERY_COPIES: &str = "Recovery copies:";
+
 /// What a toast reports, which sets its colour and its default lifetime.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ToastKind {
     Info,
     Success,
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "W3-12 sends the battle status line's errors to the toast"
-        )
-    )]
     Error,
 }
 impl ToastKind {
@@ -177,6 +174,32 @@ pub(super) fn toast_layer(ctx: &egui::Context, f: &mut UiCtx) {
     if let Some(text) = hovered {
         f.status.toasts.hold(&text, now);
     }
+}
+
+/// The battle has no status line (C-10): a status message the battle has not
+/// shown yet becomes a toast, once; an error is an Error toast. The recovery
+/// copies' paths are not one: the save's own toast already says copies were
+/// kept, and the paths stay on the status line of every other screen.
+pub(super) fn status_toast(f: &mut UiCtx) {
+    let status = &mut *f.status;
+    if status.message.is_empty() || status.message.starts_with(RECOVERY_COPIES) {
+        return;
+    }
+    let key = (
+        status.message.clone(),
+        status.feedback_revision,
+        status.message_error,
+    );
+    if status.toasted.as_ref() == Some(&key) {
+        return;
+    }
+    let kind = if status.message_error {
+        ToastKind::Error
+    } else {
+        ToastKind::Info
+    };
+    status.toasts.push(&*status.message, kind);
+    status.toasted = Some(key);
 }
 
 /// The battle's one toast, the newest, drawn in `slot` (the receipt slot).

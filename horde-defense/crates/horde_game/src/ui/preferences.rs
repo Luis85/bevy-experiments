@@ -189,7 +189,7 @@ fn combat_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     ui.checkbox(&mut settings.toggle_fire, "Primary click toggles fire");
     muted(
         ui,
-        "Melee interrupts an unfinished reload. Toggle firing is also available on the field.",
+        "Melee interrupts an unfinished reload. In a defense, Management lists Reload, Strike and Toggle firing.",
     );
 }
 fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {

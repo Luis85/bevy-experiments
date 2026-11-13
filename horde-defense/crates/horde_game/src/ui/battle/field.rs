@@ -1,10 +1,10 @@
 use super::{
     BarRows, BattleFrame, BattleLayout,
-    attack::{attack_selector, ordnance_cursor, personal_controls},
+    attack::{attack_selector, field_actions, ordnance_cursor, personal_controls},
     construction::{construction_controls, placement_cursor},
     details::field_details,
     input::{preview_aim, reticle_ownership},
-    layout::{PANEL_FILL_ALPHA, occluded_spawn_cues},
+    layout::{BAR_BUTTON_PADDING_Y, BAR_ROW_GAP, PANEL_FILL_ALPHA, occluded_spawn_cues},
     overlays::{corner_hud, field_hint_callout, incoming_cues, pause_banner},
     projection,
 };
@@ -12,7 +12,7 @@ use crate::{
     art::{self, INK, MUTED, TEXT},
     diagnostics::{self, InterfaceSpan},
     runner::SaveIntent,
-    ui::{Screen, UiCtx, armory, damage, loot, policy, primary_action, reticle, status, toast},
+    ui::{Screen, UiCtx, armory, damage, loot, policy, primary_action, reticle, toast},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke};
 use horde_core::{command::Command, content::Mode};
@@ -144,7 +144,10 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 field_hint_callout(ui, layout.hint_callout, f, view);
             }
             corner_hud(ui, &layout, f, hud_view);
-            // The battle's one toast takes the slot over the loot receipt.
+            // The battle has no status line (C-10): a new status message is
+            // a toast. The battle's one toast takes the slot over the loot
+            // receipt.
+            toast::status_toast(f);
             if !toast::battle_toast(ui, layout.receipt_slot, f)
                 && let Some(receipt) = &view.last_loot
             {
@@ -201,7 +204,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             // The controls are always named; a new player has no other
             // place to learn the defaults.
             {
-                ui.painter().text(
+                f.battle.legend_rect = Some(ui.painter().text(
                     layout.legend_anchor,
                     Align2::LEFT_BOTTOM,
                     format!(
@@ -214,13 +217,16 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     ),
                     FontId::proportional(10.),
                     MUTED,
-                );
+                ));
             }
             let bar = layout.bar;
             let observed = view.mode == Mode::Npc;
             // Every bar widget is counted into this frame's rows (C-10).
             let mut rows = BarRows::default();
             ui.scope_builder(egui::UiBuilder::new().max_rect(bar), |ui| {
+                // Two rows end above the key legend (CF-1-08).
+                ui.spacing_mut().item_spacing.y = BAR_ROW_GAP;
+                ui.spacing_mut().button_padding.y = BAR_BUTTON_PADDING_Y;
                 ui.horizontal_wrapped(|ui| {
                     let paused = view.paused;
                     let label = if !paused {
@@ -243,7 +249,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                         f.battle.fire_latched = false;
                     }
                     if view.personal() && !f.battle.construction {
-                        personal_controls(ui, f, &ctx, view, &mut rows);
+                        personal_controls(ui, f, view, &mut rows);
                     }
                     if view.any_blueprint
                         && rows
@@ -320,6 +326,9 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                             f.battle.fire_latched = false;
                             f.request_save(SaveIntent::Menu);
                         }
+                        if view.personal() && !f.battle.construction {
+                            field_actions(ui, f, &ctx, view);
+                        }
                         ui.separator();
                         ui.checkbox(&mut f.battle.inspect_log, "Combat log");
                         egui::ScrollArea::vertical()
@@ -328,17 +337,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     });
                     rows.add(management.response.rect);
                 });
-                if !f.status.message.is_empty() {
-                    // The status line is one row under the buttons.
-                    let top = ui.cursor().top();
-                    status(ui, f);
-                    let drawn = ui.min_rect();
-                    rows.add(egui::Rect::from_min_max(
-                        egui::pos2(drawn.left(), top),
-                        drawn.right_bottom(),
-                    ));
-                }
             });
             f.battle.bar_rows = rows.rows();
+            f.battle.bar_bounds = rows.bounds();
         });
 }

@@ -189,6 +189,12 @@ impl BattleLayout {
     }
 }
 
+/// The gap between the control bar's two rows, and its buttons' vertical
+/// padding: two rows of buttons end above the key legend drawn at
+/// `legend_anchor` (CF-1-08), inside the unchanged `bar` rect.
+pub(super) const BAR_ROW_GAP: f32 = 3.0;
+pub(super) const BAR_BUTTON_PADDING_Y: f32 = 4.0;
+
 /// Counts the rows the control bar takes in one frame (C-10). The bar adds
 /// each widget's rect in layout order, so left to right and top to bottom: a
 /// rect whose vertical centre lies below the current row's bottom starts the
@@ -197,18 +203,21 @@ impl BattleLayout {
 pub(in crate::ui) struct BarRows {
     rows: u8,
     bottom: f32,
+    bounds: Rect,
 }
 impl Default for BarRows {
     fn default() -> Self {
         Self {
             rows: 0,
             bottom: f32::NEG_INFINITY,
+            bounds: Rect::NOTHING,
         }
     }
 }
 impl BarRows {
     /// Counts the widget at `rect`.
     pub(in crate::ui) fn add(&mut self, rect: Rect) {
+        self.bounds |= rect;
         if rect.center().y > self.bottom {
             self.rows = self.rows.saturating_add(1);
             self.bottom = rect.bottom();
@@ -224,6 +233,10 @@ impl BarRows {
     /// The rows counted so far.
     pub(in crate::ui) fn rows(&self) -> u8 {
         self.rows
+    }
+    /// The rect around every widget counted so far (`None` before the first).
+    pub(in crate::ui) fn bounds(&self) -> Option<Rect> {
+        (self.rows > 0).then_some(self.bounds)
     }
 }
 

@@ -78,6 +78,9 @@ pub(crate) struct StatusUi {
     pub(super) save_pending: bool,
     /// Short non-blocking feedback (ui/toast.rs), oldest first.
     pub(super) toasts: super::toast::Toasts,
+    /// The status message the battle last turned into a toast, with its
+    /// revision and error flag (`toast::status_toast`).
+    pub(super) toasted: Option<(String, u64, bool)>,
     /// The one application modal slot (ui/modal.rs).
     pub(super) modal: Option<super::modal::AppModal>,
     /// The storage modal's note: "Path copied." or why the folder could not
@@ -159,10 +162,15 @@ pub(crate) struct BattleUi {
     /// order: written each frame construction is open, cleared when it closes
     /// (presentation only; the INCOMING chevrons mark them).
     pub(super) occluded_lanes: Vec<u8>,
-    /// The rows the control bar took in the last drawn battle frame, the
-    /// status row included (`battle::BarRows`); 0 before any battle frame
+    /// The rows the control bar took in the last drawn battle frame
+    /// (`battle::BarRows`); 0 before any battle frame
     /// (presentation only; review captures report it as `hud_rows`).
     pub(super) bar_rows: u8,
+    /// The rect around every widget of that bar, and the key legend's drawn
+    /// rect under it (presentation only; the legend stays clear of the bar,
+    /// CF-1-08). `None` before any battle frame.
+    pub(super) bar_bounds: Option<Rect>,
+    pub(super) legend_rect: Option<Rect>,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -189,6 +197,8 @@ impl BattleUi {
             observer_arena_rect: None,
             occluded_lanes: Vec::new(),
             bar_rows: 0,
+            bar_bounds: None,
+            legend_rect: None,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,

@@ -5,7 +5,7 @@ use super::{
     battle::AttackSelection,
     damage, loot,
     modal::{AppModal, StorageError},
-    toast::{TOAST_LONG_SECS, ToastKind},
+    toast::{RECOVERY_COPIES, TOAST_LONG_SECS, ToastKind},
 };
 use crate::{
     audio::Cue as SoundCue,
@@ -163,7 +163,7 @@ impl UiCtx<'_> {
                                     TOAST_LONG_SECS,
                                 );
                                 self.status.message =
-                                    format!("Recovery copies: {}", self.status.recovery_notice);
+                                    format!("{RECOVERY_COPIES} {}", self.status.recovery_notice);
                             }
                             self.status.message_error = false;
                         }

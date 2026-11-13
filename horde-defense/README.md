@@ -74,7 +74,7 @@ Mara/advanced controls appear through learned feature nodes and existing liberat
 | F | Toggle firing |
 | F12 | Capture the native framebuffer to the save directory's screenshots folder |
 
-The settings screen supports rebinding all essential actions, toggle firing, automatic reload, aim assistance, outlines, damage numbers, text scaling, reduced effects, blood and separate sound levels. Mouse controls provide essential combat alternatives. Fire cadence is simulation-limited; rapidly clicking cannot increase it. Melee commits to recovery, blocks firing and reloading during that recovery, and cancels an unfinished personal reload without granting ammunition.
+The settings screen supports rebinding all essential actions, toggle firing, automatic reload, aim assistance, outlines, damage numbers, text scaling, reduced effects, blood and separate sound levels. Mouse controls provide essential combat alternatives: in a defense, Management > Field actions lists Reload, Strike contact lane and Toggle firing with their keys. Fire cadence is simulation-limited; rapidly clicking cannot increase it. Melee commits to recovery, blocks firing and reloading during that recovery, and cancels an unfinished personal reload without granting ammunition.
 
 ## Equipment, training and construction
 

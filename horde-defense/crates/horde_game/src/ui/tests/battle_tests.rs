@@ -97,6 +97,8 @@ fn mouse_reload_button_queues_a_legal_reload_without_firing() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.attempt_mut().unwrap().ammo = 3;
+    // W3-12: the button is under Management > Field actions.
+    h.click(f, View::Battle, "Management");
     h.click(f, View::Battle, "Reload");
     assert!(f.battle.pending.reload);
     f.game.tick(f.battle.pending.clone());
@@ -308,6 +310,8 @@ fn sidebar_strike_button_uses_the_actual_selected_outer_contact_lane() {
     let f = &mut fixture.frontend;
     input_enemy(f, 0, horde_core::sim::DEFENSE_LINE);
     f.battle.aim = [1.5, 0.5];
+    // W3-12: the button is under Management > Field actions.
+    h.click(f, View::Battle, "Management");
     h.click(f, View::Battle, "Strike contact lane");
     assert!(f.battle.pending.melee);
     h.publish_combat(f, vec![]);
@@ -912,11 +916,14 @@ fn review_frame_facts_report_arena_rect_and_hud_rows() {
     }
 }
 
-/// Characterisation of today's control bar (UX-14, C-10): the fullest personal
-/// bar is 2 button rows at 1050x700@1.35 (777.8 pt wide) and 1 at 1440x900,
-/// and a status message adds its row under them, so the small bar is 3 rows.
-/// The observed bar fits one button row at both sizes. W3-12 brings the small
-/// bar to 2.
+/// The control bar's row count (UX-14, C-10). W3-11 pinned the bar before
+/// W3-12 at 3 rows at 1050x700@1.35 (777.8 pt wide): 2 button rows and a
+/// status row. Since W3-12 the fullest personal bar (heal, brace and a
+/// blueprint owned, paused before the first tick so the first button reads
+/// "Begin defense") is 2 rows there and 1 at 1440x900: Reload, Strike contact
+/// lane and Toggle firing are Management field actions, and a status message
+/// is the battle toast, not a row. The running bar ("Pause") and the observed
+/// bar fit one row at both sizes.
 #[test]
 fn battle_bar_rows_measure_todays_bar() {
     let [large, small] = target_sizes();
@@ -929,14 +936,14 @@ fn battle_bar_rows_measure_todays_bar() {
         assert_eq!(f.battle.bar_rows, 0, "no battle frame has drawn a bar yet");
         let profile = &mut f.game.attempt_mut().unwrap().profile;
         (profile.heal, profile.brace) = (true, true);
+        h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.bar_rows, 1, "{size:?}: the running bar");
+        f.game.set_paused(true);
         let output = h.frame_size(f, View::Battle, vec![], size);
         let canvas = h.ctx.content_rect().size();
         assert!((canvas - size).length() < 0.5, "{canvas:?} is not {size:?}");
         for label in [
-            "Pause",
-            "Reload",
-            "Strike contact lane",
-            "Toggle firing",
+            "Begin defense",
             "Emergency aid",
             "Brace the line",
             "Build defenses",
@@ -948,7 +955,7 @@ fn battle_bar_rows_measure_todays_bar() {
         assert_eq!(f.battle.bar_rows, buttons, "{size:?}: buttons");
         f.status.message = "Rewards retained. Rest, train, and retry.".into();
         h.frame_size(f, View::Battle, vec![], size);
-        assert_eq!(f.battle.bar_rows, buttons + 1, "{size:?}: with status");
+        assert_eq!(f.battle.bar_rows, buttons, "{size:?}: with status");
         // The capture sidecar reports the same count.
         #[cfg(feature = "review")]
         assert_eq!(
@@ -961,7 +968,7 @@ fn battle_bar_rows_measure_todays_bar() {
                 &f.battle
             )
             .hud_rows,
-            Some(buttons + 1),
+            Some(buttons),
             "{size:?}"
         );
         // The observed bar is counted by the same accumulator.
@@ -1340,4 +1347,309 @@ fn cycle_attack_key_cycles_unlocked_attacks() {
     f.game.campaign_mut().coins = 10_000;
     h.key(f, View::Battle, Key::Q);
     assert_eq!(f.battle.attack_selection, Gun);
+}
+
+/// W3-12 (C-10, UX-14, CF-1-08): the control bar takes at most two rows at
+/// 1050x700@1.35 and one at 1440x900 in every bar state: personal and
+/// observed, running, "Begin defense" and "Resume defense", construction open
+/// or closed, firing latched or not, with or without a status message. The
+/// status message is the battle toast in the receipt slot and never a bar
+/// row, Reload, Strike contact lane and Toggle firing are not bar buttons,
+/// and the key legend under the bar is clear of every bar widget.
+#[test]
+fn battle_bar_stays_within_two_rows_at_small_size() {
+    #[derive(Clone, Copy, Debug)]
+    enum Clock {
+        Running,
+        Begin,
+        Resume,
+    }
+    const MESSAGE: &str = "Rest and retry.";
+    let [large, small] = target_sizes();
+    let mut cases = 0;
+    for (h, size, most) in [(Harness::small(), small, 2), (Harness::large(), large, 1)] {
+        for mode in [Mode::Personal, Mode::Npc] {
+            for clock in [Clock::Running, Clock::Begin, Clock::Resume] {
+                for (construction, latched) in [(false, false), (false, true), (true, false)] {
+                    for status in [None, Some(false), Some(true)] {
+                        let label = format!(
+                            "{size:?} {mode:?} {clock:?} construction {construction} \
+                             latched {latched} status {status:?}"
+                        );
+                        let mut fixture = fresh_battle(mode, true);
+                        let f = &mut fixture.frontend;
+                        let profile = &mut f.game.attempt_mut().unwrap().profile;
+                        (profile.heal, profile.brace) = (true, true);
+                        match clock {
+                            Clock::Running => {}
+                            Clock::Begin => f.game.set_paused(true),
+                            Clock::Resume => {
+                                f.game.tick(Input::default());
+                                f.game.set_paused(true);
+                            }
+                        }
+                        f.battle.construction = construction;
+                        f.battle.fire_latched = latched;
+                        if let Some(error) = status {
+                            f.status.message = MESSAGE.into();
+                            f.status.message_error = error;
+                            f.status.feedback_revision += 1;
+                        }
+                        let output = h.frame_size(f, View::Battle, vec![], size);
+                        let canvas = h.ctx.content_rect();
+                        assert!((canvas.size() - size).length() < 0.5, "{label}");
+                        let a = f.game.attempt().unwrap();
+                        let layout =
+                            battle::BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+                        // The bar names its state and keeps every other button.
+                        let pause = match clock {
+                            Clock::Running => "Pause",
+                            Clock::Begin => "Begin defense",
+                            Clock::Resume => "Resume defense",
+                        };
+                        let kept: &[&str] = match (mode, construction) {
+                            (Mode::Personal, false) => &[
+                                "Emergency aid",
+                                "Brace the line",
+                                "Build defenses",
+                                "Retreat & train",
+                                "Management",
+                            ],
+                            (Mode::Personal, true) => {
+                                &["Close construction", "Retreat & train", "Management"]
+                            }
+                            (_, false) => &[
+                                "Build defenses",
+                                "Observe",
+                                "Survivor",
+                                "Recall & train",
+                                "Management",
+                            ],
+                            (_, true) => &[
+                                "Close construction",
+                                "Observe",
+                                "Survivor",
+                                "Recall & train",
+                                "Management",
+                            ],
+                        };
+                        for kept in kept.iter().chain([&pause]) {
+                            assert_eq!(text_count(&output, kept), 1, "{label}: {kept}");
+                        }
+                        for moved in [
+                            "Reload",
+                            "Strike contact lane",
+                            "Toggle firing",
+                            "Stop firing",
+                        ] {
+                            assert_eq!(text_count(&output, moved), 0, "{label}: {moved}");
+                        }
+                        let rows = f.battle.bar_rows;
+                        assert!((1..=most).contains(&rows), "{label}: {rows} bar rows");
+                        let bounds = f.battle.bar_bounds.expect("the bar drew");
+                        assert!(
+                            layout.bar.expand(0.5).contains_rect(bounds),
+                            "{label}: the bar {bounds:?} leaves {:?}",
+                            layout.bar
+                        );
+                        // CF-1-08: the legend is drawn whole and under the bar.
+                        let legend = f.battle.legend_rect.expect("the legend drew");
+                        assert!(
+                            legend.top() >= bounds.bottom() && !legend.intersects(bounds),
+                            "{label}: the legend {legend:?} lies under the bar {bounds:?}"
+                        );
+                        assert!(canvas.contains_rect(legend), "{label}: legend {legend:?}");
+                        // The status message is the toast, never a bar row.
+                        let toast = clipped_bounds(&output, MESSAGE);
+                        assert_eq!(toast.is_some(), status.is_some(), "{label}: toast");
+                        if let Some((text, clip)) = toast {
+                            assert_eq!(text_count(&output, MESSAGE), 1, "{label}");
+                            assert!(
+                                layout.receipt_slot.contains_rect(text) && clip.contains_rect(text),
+                                "{label}: the toast {text:?} leaves the receipt slot"
+                            );
+                            let color = output
+                                .shapes
+                                .iter()
+                                .find_map(|c| text_color(&c.shape, MESSAGE));
+                            let expected = if status == Some(true) {
+                                art::RED
+                            } else {
+                                art::TEXT
+                            };
+                            assert_eq!(color, Some(expected), "{label}: toast colour");
+                        }
+                        // The status line's idle text is gone with its row.
+                        assert_eq!(
+                            text_count(&output, "Coins and equipment bank as they are earned."),
+                            0,
+                            "{label}"
+                        );
+                        // A second frame of the same message adds no toast.
+                        h.frame_size(f, View::Battle, vec![], size);
+                        assert_eq!(
+                            f.status.toasts.len(),
+                            usize::from(status.is_some()),
+                            "{label}"
+                        );
+                        assert_eq!(f.battle.bar_rows, rows, "{label}: second frame");
+                        cases += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 2 * 2 * 3 * 3 * 3);
+}
+
+/// W3-12: Reload, Strike contact lane and Toggle firing left the bar for
+/// Management > Field actions. Their keys work as before and the legend still
+/// names them; the menu shows each action with its bound key, a click does
+/// what the bar button did and closes the menu so the keys return to the
+/// field. Construction and an observed battle offer no field actions.
+#[test]
+fn field_actions_keep_their_keys() {
+    const ACTIONS: [&str; 3] = ["Reload", "Strike contact lane", "Toggle firing"];
+    let painted = |output: &FullOutput, text: &str| {
+        output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
+    };
+    // The bound key is painted on the action's own menu row.
+    let key_beside = |output: &FullOutput, action: &str, key: &str| {
+        let (action, _) = clipped_bounds(output, action).expect("the action is listed");
+        output.shapes.iter().any(|clipped| {
+            labeled_bounds(&clipped.shape, key).is_some_and(|key| {
+                key.left() > action.right() && action.y_range().contains(key.center().y)
+            })
+        })
+    };
+    let open_menu = |h: &Harness, f: &mut FrontendParts| {
+        let closed = h.frame(f, View::Battle, vec![]);
+        assert_eq!(text_count(&closed, "Field actions"), 0, "the menu is shut");
+        assert_eq!(text_count(&closed, "Settings"), 0, "the menu is shut");
+        h.click(f, View::Battle, "Management");
+        h.frame(f, View::Battle, vec![])
+    };
+    let mut fixture = fresh_battle(Mode::Personal, true);
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    input_enemy(f, 0, horde_core::sim::DEFENSE_LINE);
+
+    // The bar has none of the three; the legend names the keys.
+    let output = h.frame(f, View::Battle, vec![]);
+    for action in ACTIONS {
+        assert_eq!(text_count(&output, action), 0, "{action} left the bar");
+    }
+    assert!(painted(
+        &output,
+        "Mouse1 fire · Mouse2 melee · R reload · B build · Escape pause"
+    ));
+
+    // The keys work with no button on screen.
+    assert!(h.combat_input(f, vec![key_event(Key::R, true)]).reload);
+    h.combat_input(f, vec![key_event(Key::R, false)]);
+    let arena = f.battle.arena_rect.unwrap();
+    f.battle.arena_hover = true;
+    h.combat_input(
+        f,
+        vec![attack_pointer(
+            arena.center(),
+            PointerButton::Secondary,
+            true,
+        )],
+    );
+    assert!(f.battle.pending.melee, "Mouse2 strikes");
+    h.combat_input(
+        f,
+        vec![attack_pointer(
+            arena.center(),
+            PointerButton::Secondary,
+            false,
+        )],
+    );
+    f.battle.arena_hover = false;
+    f.battle.pending = Input::default();
+    f.battle.pending_attack_aims = AttackAims::default();
+    h.key(f, View::Battle, Key::F);
+    assert!(f.battle.fire_latched, "F toggles firing");
+    h.key(f, View::Battle, Key::F);
+    assert!(!f.battle.fire_latched);
+
+    // Management > Field actions lists each with its key.
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Field actions"), 1);
+    for (action, key) in ACTIONS.into_iter().zip(["R", "Mouse2", "F"]) {
+        assert_eq!(text_count(&output, action), 1, "{action}");
+        assert!(key_beside(&output, action, key), "{action} shows {key}");
+    }
+
+    // Each click does what the bar button did, and closes the menu.
+    f.game.attempt_mut().unwrap().ammo = 3;
+    h.click(f, View::Battle, "Reload");
+    assert!(f.battle.pending.reload);
+    assert!(!f.battle.pending.melee && !f.battle.pending.fire);
+    f.battle.pending = Input::default();
+
+    open_menu(&h, f);
+    f.battle.aim = [1.5, 0.5];
+    h.click(f, View::Battle, "Strike contact lane");
+    assert!(f.battle.pending.melee);
+    assert_eq!(f.battle.pending.aim[1], 0.5, "the selected contact lane");
+    assert!(f.battle.pending_attack_aims.melee.is_some());
+    f.battle.pending = Input::default();
+    f.battle.pending_attack_aims = AttackAims::default();
+
+    open_menu(&h, f);
+    h.click(f, View::Battle, "Toggle firing");
+    assert!(f.battle.fire_latched);
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Toggle firing"), 0);
+    assert!(key_beside(&output, "Stop firing", "F"));
+    h.click(f, View::Battle, "Stop firing");
+    assert!(!f.battle.fire_latched);
+
+    // A rebound key follows into the menu and the legend, and it works.
+    f.settings.bindings[Action::Reload as usize] = "Q".into();
+    let output = open_menu(&h, f);
+    assert!(key_beside(&output, "Reload", "Q"));
+    assert!(painted(&output, "Q reload"));
+    h.click(f, View::Battle, "Reload");
+    assert!(f.battle.pending.reload);
+    f.battle.pending = Input::default();
+    let closed = h.frame(f, View::Battle, vec![]);
+    assert_eq!(text_count(&closed, "Field actions"), 0);
+    assert!(!h.combat_input(f, vec![key_event(Key::R, true)]).reload);
+    h.combat_input(f, vec![key_event(Key::R, false)]);
+    assert!(h.combat_input(f, vec![key_event(Key::Q, true)]).reload);
+    h.combat_input(f, vec![key_event(Key::Q, false)]);
+
+    // A throwable has no firing latch to toggle.
+    f.battle.attack_selection = battle::AttackSelection::Grenade;
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Field actions"), 1);
+    assert_eq!(text_count(&output, "Reload"), 1);
+    assert_eq!(text_count(&output, "Strike contact lane"), 1);
+    assert_eq!(text_count(&output, "Toggle firing"), 0);
+    h.click(f, View::Battle, "Reload");
+    f.battle.pending = Input::default();
+    f.battle.attack_selection = battle::AttackSelection::Gun;
+
+    // Construction hides the personal controls, as the bar did.
+    f.battle.construction = true;
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Settings"), 1, "the menu is open");
+    assert_eq!(text_count(&output, "Field actions"), 0);
+    for action in ACTIONS {
+        assert_eq!(text_count(&output, action), 0, "{action} in construction");
+    }
+
+    // An observed battle has no field actions.
+    let mut fixture = fresh_battle(Mode::Npc, true);
+    let f = &mut fixture.frontend;
+    let h = Harness::new();
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Settings"), 1, "the menu is open");
+    assert_eq!(text_count(&output, "Field actions"), 0);
+    for action in ACTIONS {
+        assert_eq!(text_count(&output, action), 0, "{action} when observing");
+    }
 }
