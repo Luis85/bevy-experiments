@@ -112,7 +112,7 @@ The game serializes campaign, armory, active encounters, action timers, random s
 
 ## Logging and crash reports
 
-The game logs through Bevy's `LogPlugin` to the console and to a plain-text file, `<save dir>\logs\lastlight-<unix-timestamp>.log` (the save directory is described above; the newest 10 log files are kept). The default filter is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`. Set `RUST_LOG` (for example `RUST_LOG=horde_core=debug,warn`) to replace it entirely. A panic also writes `<save dir>\logs\crash-<unix-timestamp>.txt` with the version, OS, panic message and location, a backtrace and the last 200 log lines. An isolated review launch (a `review` build with a staged scenario, outside practice, without `LASTLIGHT_SAVE_DIR`) never writes into the player's profile: its logs and crash reports go to `%TEMP%\lastlight-review-<pid>\logs\` instead. Attach the newest crash file and log to any bug report. `--smoke` keeps its plain stdout report, which `scripts/verify_playtest.ps1` reads.
+The game logs through Bevy's `LogPlugin` to the console and to a plain-text file, `<save dir>\logs\lastlight-<unix-timestamp>.log` (the save directory is described above; the newest 10 log files are kept). The default filter is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`. Set `RUST_LOG` (for example `RUST_LOG=horde_core=debug,warn`) to replace it entirely. A panic also writes `<save dir>\logs\crash-<unix-timestamp>.txt` with the version, the build stamp (`build: v0.1.0 (dev build)`, or the commit a playtest package was built from), OS, panic message and location, a backtrace and the last 200 log lines; every log also starts with a `Lastlight <stamp>` line, and the menu footer shows the same stamp. An isolated review launch (a `review` build with a staged scenario, outside practice, without `LASTLIGHT_SAVE_DIR`) never writes into the player's profile: its logs and crash reports go to `%TEMP%\lastlight-review-<pid>\logs\` instead. Attach the newest crash file and log to any bug report. `--smoke` keeps its plain stdout report, which `scripts/verify_playtest.ps1` reads.
 
 ## Develop and verify
 
@@ -137,7 +137,7 @@ Every option the game reads is parsed once at startup; print the full list with:
 cargo run --locked -p horde-defense -- --help
 ```
 
-Arguments are `--smoke`, `--help` and (with the `dev` feature) `--record <file>` / `--replay <file>`; everything else is a `LASTLIGHT_*` environment variable (empty values count as unset). Incompatible combinations, such as a capture sequence outside an isolated motion review, exit with an error before a window opens.
+Arguments are `--smoke`, `--help`, `--version` (prints `Lastlight: Horde Defense <stamp>`), `--list-scenes` and (with the `dev` feature) `--record <file>` / `--replay <file>`; everything else is a `LASTLIGHT_*` environment variable (empty values count as unset). Incompatible combinations, such as a capture sequence outside an isolated motion review, exit with an error before a window opens.
 
 Cargo features of `horde-defense`:
 

@@ -7,6 +7,7 @@ mod asset_audit;
 mod atmosphere_audio;
 mod audio;
 mod battle_view;
+mod build_info;
 #[cfg(feature = "review")]
 mod capture_sequence;
 #[cfg(feature = "dev")]
@@ -67,6 +68,10 @@ fn main() -> AppExit {
     };
     if config.action == launch::LaunchAction::Help {
         print!("{}", launch::HELP);
+        return AppExit::Success;
+    }
+    if config.action == launch::LaunchAction::Version {
+        println!("{}", build_info::version_line());
         return AppExit::Success;
     }
     if config.action == launch::LaunchAction::ListScenes {
@@ -145,8 +150,11 @@ fn main() -> AppExit {
     app.run()
 }
 
-/// Parse warnings are collected before logging exists; report them once it does.
+/// Logs the build stamp, then the parse warnings collected before logging
+/// existed.
 fn log_launch_warnings(config: Res<launch::LaunchConfig>) {
+    // Every log names the build it came from.
+    info!("Lastlight {}", build_info::stamp());
     for warning in &config.warnings {
         warn!("{warning}");
     }

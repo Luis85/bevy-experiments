@@ -20,6 +20,8 @@ pub enum LaunchAction {
     Help,
     /// `--list-scenes`: print the review scene registry as TSV and exit.
     ListScenes,
+    /// `--version`: print `Lastlight: Horde Defense <stamp>` and exit.
+    Version,
     /// `--replay <path>` (`dev` feature): headless replay of a recording.
     #[cfg(feature = "dev")]
     Replay,
@@ -175,13 +177,14 @@ pub const HELP: &str = "\
 Lastlight: Horde Defense
 
 USAGE:
-    horde-defense [--smoke | --help | --list-scenes]
+    horde-defense [--smoke | --help | --version | --list-scenes]
     horde-defense [--record <file>]        (`dev` feature)
     horde-defense --replay <file>          (`dev` feature)
 
 OPTIONS:
     --smoke    Validate catalogues, run a headless campaign self-check and exit
     -h, --help Print this help and exit
+    -V, --version  Print the version and build stamp and exit
     --list-scenes  Print every LASTLIGHT_REVIEW_SCREEN name as TSV and exit
                    (a build without `review` lists only practice scenes)
     --record <file>  Record commands and per-tick input to a JSONL file (F7 toggles in game)
@@ -324,6 +327,12 @@ impl LaunchConfig {
             match arg.to_str() {
                 Some("--smoke") => action = LaunchAction::Smoke,
                 Some("--help" | "-h") => return Ok(Self::help()),
+                Some("--version" | "-V") => {
+                    return Ok(Self {
+                        action: LaunchAction::Version,
+                        ..Self::default()
+                    });
+                }
                 Some("--list-scenes") => {
                     return Ok(Self {
                         action: LaunchAction::ListScenes,
@@ -696,6 +705,22 @@ mod tests {
         assert_eq!(parse(&["-h"], &[]).unwrap().action, LaunchAction::Help);
         assert!(parse(&["--bogus"], &[]).is_err());
         assert!(HELP.contains("LASTLIGHT_REVIEW_SCREEN"));
+    }
+    #[test]
+    fn version_flag_selects_version_action() {
+        assert_eq!(
+            parse(&["--version"], &[]).unwrap().action,
+            LaunchAction::Version
+        );
+        assert_eq!(parse(&["-V"], &[]).unwrap().action, LaunchAction::Version);
+        // Like --help and --list-scenes it never validates the rest of the launch.
+        assert_eq!(
+            parse(&["--version"], &[("LASTLIGHT_REVIEW_SCREEN", "camp-hmoe")])
+                .unwrap()
+                .action,
+            LaunchAction::Version
+        );
+        assert!(HELP.contains("--version"));
     }
     #[test]
     fn list_scenes_is_a_launch_action() {

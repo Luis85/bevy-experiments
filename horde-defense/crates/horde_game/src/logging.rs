@@ -271,8 +271,9 @@ fn crash_report(
     tail: &Result<Vec<String>, TailUnavailable>,
 ) -> String {
     let mut report = format!(
-        "Lastlight crash report\nversion: {}\nos: {} {}\npanic: {panic}\n\nbacktrace:\n{backtrace}\n",
+        "Lastlight crash report\nversion: {}\nbuild: {}\nos: {} {}\npanic: {panic}\n\nbacktrace:\n{backtrace}\n",
         env!("CARGO_PKG_VERSION"),
+        crate::build_info::stamp(),
         std::env::consts::OS,
         std::env::consts::ARCH,
     );
@@ -323,6 +324,20 @@ mod tests {
         assert!(report.contains(std::env::consts::OS));
         assert!(report.contains("boom at x.rs:1"));
         assert!(report.contains("frame 0"));
+    }
+
+    #[test]
+    fn crash_report_names_build_stamp() {
+        let report = crash_report("boom at x.rs:1", "frame 0", &Ok(Vec::new()));
+        let line = format!("build: {}", crate::build_info::stamp());
+        assert!(
+            report.lines().any(|l| l == line),
+            "missing {line:?} in:\n{report}"
+        );
+        // The header order is version, build, os, panic.
+        let at = |key: &str| report.find(key).unwrap_or_else(|| panic!("{key}"));
+        assert!(at("\nversion: ") < at("\nbuild: "));
+        assert!(at("\nbuild: ") < at("\nos: "));
     }
 
     #[test]

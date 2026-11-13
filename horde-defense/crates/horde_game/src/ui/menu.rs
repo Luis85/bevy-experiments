@@ -11,6 +11,8 @@ use horde_core::{
     survivors::{Appearance, SurvivorId},
 };
 
+const FOOTER_LINE: &str = "A BEVY EXPERIMENT  /  LOCAL CAMPAIGN  /  NO OFFLINE EARNINGS";
+
 fn title_galley(ui: &egui::Ui, width: f32) -> std::sync::Arc<egui::Galley> {
     let mut size = (width * 0.205).clamp(52.0, 88.0);
     let mut galley = ui.painter().layout_no_wrap(
@@ -215,7 +217,15 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
             ui.painter().text(
                 all.left_bottom() + vec2(24.0, -20.0),
                 Align2::LEFT_BOTTOM,
-                "A BEVY EXPERIMENT  /  LOCAL CAMPAIGN  /  NO OFFLINE EARNINGS",
+                FOOTER_LINE,
+                FontId::proportional(10.0),
+                MUTED,
+            );
+            // The build stamp a playtester quotes with feedback.
+            ui.painter().text(
+                all.right_bottom() + vec2(-24.0, -20.0),
+                Align2::RIGHT_BOTTOM,
+                crate::build_info::stamp(),
                 FontId::proportional(10.0),
                 MUTED,
             );
@@ -553,6 +563,51 @@ mod tests {
                 } else {
                     "New game"
                 };
+                // The footer: the build stamp sits right-aligned inside the
+                // window and clear of the left-aligned footer line.
+                let footer_rect = |label: &str| {
+                    output
+                        .shapes
+                        .iter()
+                        .find_map(|clipped| {
+                            text_shape(&clipped.shape, label).map(|text| {
+                                (
+                                    clipped.clip_rect,
+                                    text.galley.rect.translate(text.pos.to_vec2()),
+                                )
+                            })
+                        })
+                        .unwrap_or_else(|| panic!("Missing menu footer text: {label}"))
+                };
+                let stamp = crate::build_info::stamp();
+                let (stamp_clip, stamp_rect) = footer_rect(&stamp);
+                let (_, line_rect) = footer_rect(FOOTER_LINE);
+                assert!(
+                    stamp_clip.intersect(viewport).contains_rect(stamp_rect),
+                    "Clipped stamp: {stamp_rect:?} / {stamp_clip:?}"
+                );
+                assert!((stamp_rect.right() - (viewport.right() - 24.0)).abs() < 1.0);
+                assert!((stamp_rect.bottom() - (viewport.bottom() - 20.0)).abs() < 1.0);
+                assert!(
+                    !stamp_rect.expand(8.0).intersects(line_rect),
+                    "Stamp {stamp_rect:?} overlaps the footer line {line_rect:?}"
+                );
+                // The longest stamp a package can carry still clears the line.
+                let longest = crate::build_info::stamp_from(
+                    env!("CARGO_PKG_VERSION"),
+                    Some("0123456789abcdef0123+dirty"),
+                );
+                assert!(longest.ends_with("+dirty)"), "{longest}");
+                let longest_width = ctx.fonts_mut(|fonts| {
+                    fonts
+                        .layout_no_wrap(longest, FontId::proportional(10.0), MUTED)
+                        .size()
+                        .x
+                });
+                assert!(
+                    viewport.right() - 24.0 - longest_width > line_rect.right() + 8.0,
+                    "Longest stamp ({longest_width}) overlaps the footer line {line_rect:?}"
+                );
                 for label in ["LASTLIGHT", launch, "Settings", "Save and quit"] {
                     let (clip, text) = output
                         .shapes
