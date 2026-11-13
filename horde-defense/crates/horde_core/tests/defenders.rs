@@ -4384,3 +4384,46 @@ fn service_record_is_derived_from_run_history_and_containments() {
     assert_eq!(theirs.last_outcome, Some(Outcome::Victory));
     assert_eq!(g.service_record(99), Err(CommandError::UnknownSurvivor));
 }
+
+/// A service record is "since records began" exactly when the recruit's own
+/// attempt counter runs ahead of the runs the history names it on: runs
+/// fought before the history carried `recruit_id` (design 1.10, W3-02).
+/// Every v7 run, takeover or expedition stage, is recorded, so a recruit
+/// that only fought under v7 never shows the label. A pure read.
+#[test]
+fn service_record_since_records_began_only_when_runs_predate_the_history() {
+    let (mut g, country, id) = game_with_alex();
+    let fresh = g.service_record(id).unwrap();
+    assert_eq!((fresh.npc_attempts, fresh.deployments), (0, 0));
+    assert!(!fresh.since_records_began());
+
+    // An expedition stage, settled: one attempt, one record.
+    let b = g.deploy_survivor(id, &country, 0).unwrap();
+    win_stage(&mut g, b);
+    assert!(battle(&g, b).settled);
+    let record = g.service_record(id).unwrap();
+    assert_eq!(
+        (record.npc_attempts, record.deployments, record.expeditions),
+        (1, 1, 1)
+    );
+    assert!(
+        !record.since_records_began(),
+        "expedition stages are recorded"
+    );
+
+    // A takeover win: two attempts, two records.
+    take_over(&mut g, id);
+    win_main(&mut g);
+    let record = g.service_record(id).unwrap();
+    assert_eq!((record.npc_attempts, record.deployments), (2, 2));
+    assert!(!record.since_records_began(), "takeovers are recorded");
+    assert!(!reload(&g).service_record(id).unwrap().since_records_began());
+
+    // Attempts the history never named: the record starts mid-career.
+    roster_npc_mut(&mut g, id).attempts += 3;
+    let before = serde_json::to_value(&g).unwrap();
+    let record = g.service_record(id).unwrap();
+    assert!(record.since_records_began());
+    assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
+    assert!(reload(&g).service_record(id).unwrap().since_records_began());
+}

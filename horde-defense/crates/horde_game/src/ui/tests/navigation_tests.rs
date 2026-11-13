@@ -19,36 +19,30 @@ fn between_runs(fixture: &mut IsolatedFrontend) -> &mut FrontendParts {
     f
 }
 
+/// W3-02 rewrite (design-ux-flow decision 5): the row was the hub first and
+/// then every unlocked feature (seven entries with Mara and Operations). It
+/// is now six entries with Camp home first; Mara and Operations are
+/// drill-downs under Camp home whatever is unlocked.
 #[test]
-fn one_camp_row_lists_the_hub_first_and_unlocked_features_only() {
+fn one_camp_row_lists_camp_home_first_in_six_entries() {
+    let six = [
+        "Camp",
+        "Journey upgrades",
+        "Briefing",
+        "Equipment",
+        "Character",
+        "World map",
+    ];
     let mut fixture = IsolatedFrontend::new();
     let f = between_runs(&mut fixture);
     f.game.campaign_mut().legacy_features = false;
-    assert_eq!(
-        labels(f),
-        [
-            "Journey upgrades",
-            "Briefing",
-            "Equipment",
-            "Character",
-            "World map"
-        ]
-    );
-    // Legacy campaigns with an attempt behind them unlock Mara and Operations.
+    assert_eq!(labels(f), six);
+    // Legacy campaigns with an attempt behind them unlock Mara and
+    // Operations; neither joins the row.
     f.game.campaign_mut().legacy_features = true;
     f.game.campaign_mut().attempts = 1;
-    assert_eq!(
-        labels(f),
-        [
-            "Journey upgrades",
-            "Briefing",
-            "Equipment",
-            "Character",
-            "Mara",
-            "World map",
-            "Operations"
-        ]
-    );
+    assert!(f.game.operations_available());
+    assert_eq!(labels(f), six);
     let h = Harness::new();
     f.act(|c| c.open_preparation(Tab::Armory));
     let output = h.frame(f, View::Camp, vec![]);
@@ -62,6 +56,8 @@ fn one_camp_row_lists_the_hub_first_and_unlocked_features_only() {
         "Prepare",
         "Campaign",
         "Back to journey upgrades",
+        "Mara",
+        "Operations",
     ] {
         assert_eq!(text_count(&output, gone), 0, "{gone} is no longer a route");
     }
@@ -73,7 +69,8 @@ fn a_live_main_attempt_hides_the_hub_tab() {
     fixture.deploy();
     let f = &mut fixture.frontend;
     assert!(!labels(f).contains(&"Journey upgrades"));
-    assert_eq!(labels(f).first(), Some(&"Briefing"));
+    // W3-02 rewrite: Camp home leads the row, so Briefing follows it.
+    assert_eq!(labels(f)[..2], ["Camp", "Briefing"]);
 }
 
 #[test]
@@ -154,9 +151,17 @@ fn prepare_footers_lead_to_the_briefing_never_back_to_the_map() {
     }
 }
 
+/// W3-02 rewrite (decision 6): the clock was on every camp footer; Camp
+/// home now owns it, so only Home shows it beside the one return.
 #[test]
 fn an_active_camp_shows_exactly_one_return_and_an_honest_clock_label() {
-    for tab in [Tab::Armory, Tab::Briefing, Tab::World, Tab::Operations] {
+    for tab in [
+        Tab::Home,
+        Tab::Armory,
+        Tab::Briefing,
+        Tab::World,
+        Tab::Operations,
+    ] {
         let mut fixture = IsolatedFrontend::new();
         fixture.deploy();
         let h = Harness::new();
@@ -172,7 +177,11 @@ fn an_active_camp_shows_exactly_one_return_and_an_honest_clock_label() {
         );
         assert_eq!(text_count(&output, "Return and resume defense"), 0);
         assert_eq!(text_count(&output, "Resume defense"), 0);
-        assert_eq!(text_count(&output, "Resume world clock"), 1, "{tab:?}");
+        assert_eq!(
+            text_count(&output, "Resume world clock"),
+            usize::from(tab == Tab::Home),
+            "{tab:?}"
+        );
     }
 }
 
@@ -212,7 +221,8 @@ fn the_single_row_stays_one_line_inside_the_minimum_window() {
     f.game.campaign_mut().legacy_features = true;
     f.game.campaign_mut().attempts = 1;
     f.act(|c| c.open_preparation(Tab::Armory));
-    assert_eq!(labels(f).len(), 7, "every destination unlocked");
+    // W3-02 rewrite: six entries (was seven with Mara and Operations).
+    assert_eq!(labels(f).len(), 6, "every destination unlocked");
     let size = vec2(1050.0, 700.0);
     let output = h.frame_size(f, View::Camp, vec![], size);
     let bounds: Vec<Rect> = labels(f)
@@ -246,10 +256,11 @@ fn the_single_row_stays_one_line_inside_the_minimum_window() {
         .textures_delta
         .clear();
     let (shipped, default_face) = (width(&h.ctx), width(&fallback));
+    // "Journey upgrades" follows Camp in the row.
     assert!(
-        (bounds[0].width() - shipped).abs() < 0.5,
+        (bounds[1].width() - shipped).abs() < 0.5,
         "row measured with the shipped face: {} vs {shipped}",
-        bounds[0].width()
+        bounds[1].width()
     );
     assert!(
         (shipped - default_face).abs() > 1.0,
@@ -260,7 +271,7 @@ fn the_single_row_stays_one_line_inside_the_minimum_window() {
     for rect in &bounds {
         assert!(area.contains_rect(*rect), "{rect:?} inside {area:?}");
     }
-    // The old layout needed two rows; all seven destinations share one line.
+    // The old layout needed two rows; all six destinations share one line.
     assert!(
         bottom - top < bounds[0].height() * 1.5,
         "one line at 1050x700@1.35: {top}..{bottom}"

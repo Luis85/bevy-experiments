@@ -190,6 +190,9 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                 if recruit.status == RecruitStatus::Guarding && ui.button("Release guard").clicked() { f.dispatch(Command::ReleaseGuard(recruit.id), "Guard recalled and recovered."); }
             });
             if let Ok(readiness) = f.game.strategy().readiness(f.game.campaign(), recruit.id) { muted(ui, &readiness.summary); }
+            if let Ok(record) = f.game.service_record(recruit.id) {
+                service_record(ui, &record);
+            }
             if recruit.status == RecruitStatus::Ready {
                 ui.horizontal_wrapped(|ui| {
                     let stage = f.game.campaign().world.completed(&f.campaign.selected_country).min(world().country(&f.campaign.selected_country).map(|c| c.level_count().saturating_sub(1)).unwrap_or(0));
@@ -366,4 +369,49 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             muted(ui, line);
         }
     });
+}
+
+/// A recruit's service record (`Game::service_record`, design 1.10): one
+/// summary line, the detail once it has served, and "(since records began)"
+/// when its runs predate the history (`ServiceRecord::since_records_began`).
+fn service_record(ui: &mut egui::Ui, record: &horde_core::defenders::ServiceRecord) {
+    chrome::row(ui, |ui| {
+        muted(
+            ui,
+            format!(
+                "Service record · {} · {} · {}",
+                chrome::count_noun(record.deployments as usize, "deployment", "deployments"),
+                chrome::count_noun(record.victories as usize, "victory", "victories"),
+                chrome::count_noun(record.kills as usize, "kill", "kills"),
+            ),
+        );
+        if record.since_records_began() {
+            ui.label(egui::RichText::new("(since records began)").color(art::MUTED))
+                .on_hover_text("This survivor fought before the run history named its defenders; earlier runs are not counted.");
+        }
+    });
+    if record.deployments > 0 || record.containments > 0 {
+        muted(
+            ui,
+            format!(
+                "{} · {} · {} · {} · {} · {} · {} · {} coins",
+                chrome::count_noun(record.takeovers as usize, "takeover", "takeovers"),
+                chrome::count_noun(record.expeditions as usize, "expedition", "expeditions"),
+                chrome::count_noun(record.defeats as usize, "defeat", "defeats"),
+                chrome::count_noun(record.withdrawals as usize, "withdrawal", "withdrawals"),
+                chrome::count_noun(
+                    record.stages_cleared as usize,
+                    "stage cleared",
+                    "stages cleared"
+                ),
+                chrome::count_noun(record.liberations as usize, "liberation", "liberations"),
+                chrome::count_noun(
+                    record.containments as usize,
+                    "outbreak contained",
+                    "outbreaks contained"
+                ),
+                record.coins,
+            ),
+        );
+    }
 }

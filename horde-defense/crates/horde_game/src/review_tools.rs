@@ -63,7 +63,7 @@ fn record_frame_facts(
         &config,
         &settings,
         *screen.get(),
-        tab.map_or(ui::Tab::World, |tab| *tab.get()),
+        tab.map_or(ui::Tab::default(), |tab| *tab.get()),
         &battle,
     );
     next.canvas_rect = contexts.ctx_mut().ok().map(|ctx| {

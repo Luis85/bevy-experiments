@@ -444,6 +444,17 @@ pub struct ServiceRecord {
     /// Outbreaks the recruit contained while guarding.
     pub containments: u32,
 }
+impl ServiceRecord {
+    /// Whether the record starts mid-career and is labelled "since records
+    /// began" (design 1.10): the recruit's own attempt counter runs ahead of
+    /// the runs the history names it on. Every v7 run, a takeover or an
+    /// expedition stage, appends a record carrying `recruit_id` as it counts
+    /// the attempt, so only runs from before the history named its recruit
+    /// can make the difference. A pure read; nothing is saved for it.
+    pub fn since_records_began(&self) -> bool {
+        self.npc_attempts > u64::from(self.deployments)
+    }
+}
 
 /// The HUD form of a defender name: its first word in upper case.
 pub fn hud_name(name: &str) -> String {

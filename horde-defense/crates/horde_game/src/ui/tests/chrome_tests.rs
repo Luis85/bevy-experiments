@@ -111,13 +111,8 @@ fn camp_rows_keep_labels_on_their_buttons_centre_line() {
             &output,
             &context,
             "Journey upgrades",
-            &[
-                "Briefing",
-                "Equipment",
-                "Character",
-                "World map",
-                "Operations",
-            ],
+            // W3-02 rewrite: Camp leads the row; Operations is a drill-down.
+            &["Camp", "Briefing", "Equipment", "Character", "World map"],
         );
 
         // Briefing loadout heading beside its button.

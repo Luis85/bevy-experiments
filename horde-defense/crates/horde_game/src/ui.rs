@@ -27,7 +27,8 @@ use primary_action::primary;
 pub(crate) use primary_action::{PrimaryRecord, Surface, frame_primaries};
 pub use screen::{Screen, ScreenAmbience, Tab};
 pub(crate) use state::{
-    ArmoryUi, BattleUi, CampaignUi, FrontendParts, MenuUi, Navigation, SettingsUi, StatusUi,
+    ArmoryUi, BattleUi, CampaignUi, FrontendParts, HomeFocus, MenuUi, Navigation, SettingsUi,
+    StatusUi,
 };
 
 fn status(ui: &mut egui::Ui, f: &mut UiCtx) {
@@ -199,6 +200,7 @@ mod briefing;
 mod camp;
 mod camp_prices;
 mod chrome;
+mod home;
 mod navigation;
 use self::camp::camp;
 #[cfg(test)]

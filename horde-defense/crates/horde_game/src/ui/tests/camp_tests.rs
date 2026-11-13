@@ -49,6 +49,8 @@ fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
         .with_strategy(|strategy, campaign| strategy.recruit(campaign, "DEU"))
         .unwrap();
     f.game.deploy_survivor(recruit, "POL", 0).unwrap();
+    // W3-02 rewrite: Camp home owns the clock and its key (decision 6).
+    f.nav.tab = Tab::Home;
     h.key(f, View::Camp, Key::Escape);
     assert!(f.game.global_paused());
     let frozen = serde_json::to_value(&f.game).unwrap();
@@ -109,6 +111,8 @@ fn camp_observation_speed_never_offers_a_hidden_speedup_to_personal_combat() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.screen = Screen::Camp;
+    // W3-02 rewrite: the clock's speed controls live on Camp home only.
+    f.nav.tab = Tab::Home;
     f.game.set_paused(true);
     f.game.strategy_mut().peak_freed = 4;
     let before = serde_json::to_value(&f.game).unwrap();

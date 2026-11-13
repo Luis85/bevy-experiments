@@ -5,7 +5,7 @@ use crate::{
     runner::SaveIntent,
 };
 use bevy_egui::egui::{self, Align, Color32, FontId, Layout, RichText, Stroke, pos2};
-use horde_core::{command::Command, content::Mode, skill_catalog::CampaignFeature};
+use horde_core::{command::Command, content::Mode};
 
 pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
     let header = egui::Panel::top("header")
@@ -97,6 +97,7 @@ impl NavEntry {
             NavEntry::Tab(Tab::Briefing) => "Briefing",
             NavEntry::Tab(Tab::Armory) => "Equipment",
             NavEntry::Tab(Tab::Character) => "Character",
+            NavEntry::Tab(Tab::Home) => "Camp",
             NavEntry::Tab(Tab::Survivor) => "Mara",
             NavEntry::Tab(Tab::World) => "World map",
             NavEntry::Tab(Tab::Operations) => "Operations",
@@ -106,25 +107,32 @@ impl NavEntry {
     }
 }
 
-/// The single camp navigation row, in order. The upgrade home is listed while
-/// no main attempt is live (and on the home itself); Mara and Operations
-/// follow their unlocks.
+/// The single camp navigation row, in order: Camp home, the upgrade home,
+/// then the Prepare pages and the world map (design-ux-flow decision 5). The
+/// upgrade home is listed while no main attempt is live (and on the home
+/// itself). Mara and Operations are drill-downs under Camp home, not entries.
 /// The complete upgrade tree has exactly one route: the home.
 pub(super) fn camp_entries(f: &UiCtx) -> Vec<NavEntry> {
-    let mut entries = Vec::with_capacity(7);
+    let mut entries = Vec::with_capacity(6);
+    entries.push(NavEntry::Tab(Tab::Home));
     // On the home itself the tab stays listed so the row shows where you are.
     if f.game.attempt().is_none() || f.screen == Screen::Results {
         entries.push(NavEntry::Upgrades);
     }
-    entries.extend([Tab::Briefing, Tab::Armory, Tab::Character].map(NavEntry::Tab));
-    if f.game.campaign().has_feature(CampaignFeature::Companion) {
-        entries.push(NavEntry::Tab(Tab::Survivor));
-    }
-    entries.push(NavEntry::Tab(Tab::World));
-    if f.operations_available() {
-        entries.push(NavEntry::Tab(Tab::Operations));
-    }
+    entries.extend([Tab::Briefing, Tab::Armory, Tab::Character, Tab::World].map(NavEntry::Tab));
     entries
+}
+
+/// Whether `entry` is the selected row entry. Camp stays selected on its
+/// drill-downs (Mara, Operations).
+fn entry_selected(f: &UiCtx, entry: NavEntry) -> bool {
+    match entry {
+        NavEntry::Upgrades => f.screen == Screen::Results,
+        NavEntry::Tab(Tab::Home) => {
+            f.screen == Screen::Camp && (f.tab == Tab::Home || f.tab.is_home_drill_down())
+        }
+        NavEntry::Tab(tab) => f.screen == Screen::Camp && f.tab == tab,
+    }
 }
 
 pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
@@ -140,15 +148,16 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
         .show(root, |ui| {
             super::chrome::row(ui, |ui| {
                 for entry in camp_entries(f) {
-                    let selected = match entry {
-                        NavEntry::Upgrades => f.screen == Screen::Results,
-                        NavEntry::Tab(tab) => f.screen == Screen::Camp && f.tab == tab,
-                    };
+                    let selected = entry_selected(f, entry);
                     let label = entry.label();
                     let response = ui.selectable_label(selected, label);
-                    if response.clicked() && !selected {
+                    // Camp also leads back to Home from its drill-downs.
+                    let home_from_drill_down =
+                        entry == NavEntry::Tab(Tab::Home) && f.tab != Tab::Home;
+                    if response.clicked() && (!selected || home_from_drill_down) {
                         match entry {
                             NavEntry::Upgrades => f.open_upgrades(),
+                            NavEntry::Tab(Tab::Home) => f.open_camp_home(None),
                             // After a round, Equipment opens on the newest find.
                             NavEntry::Tab(Tab::Armory) if f.screen == Screen::Results => {
                                 f.campaign.mode =

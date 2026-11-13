@@ -117,7 +117,7 @@ fn scene_audio_inputs_changed(
 ) -> bool {
     let key = (
         *screen.get(),
-        tab.map_or(Tab::World, |tab| *tab.get()),
+        tab.map_or(Tab::default(), |tab| *tab.get()),
         campaign.observed,
         campaign.selected_country.clone(),
         campaign.stage,
@@ -139,7 +139,7 @@ fn publish_scene_audio(
     *target = super::ambience_target(
         &session.game,
         *screen.get(),
-        tab.map_or(Tab::World, |tab| *tab.get()),
+        tab.map_or(Tab::default(), |tab| *tab.get()),
         &campaign,
         &settings,
     );

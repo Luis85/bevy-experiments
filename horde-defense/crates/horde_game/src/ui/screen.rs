@@ -66,15 +66,35 @@ impl Screen {
 #[derive(SubStates, Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[source(Screen = Screen::Camp)]
 pub enum Tab {
+    /// Camp home: the next defense, the roster, alerts and the world clock
+    /// (design-ux-flow decision 5). The default camp tab.
     #[default]
+    Home,
     World,
     Briefing,
     Character,
+    /// Mara's training: a drill-down from Camp home, not a row entry.
     Survivor,
     Armory,
     Skills,
     Engineering,
+    /// Expeditions, outbreaks and roster orders: a drill-down from Camp home.
     Operations,
+}
+impl Tab {
+    /// Whether the tab is a drill-down under Camp home: it renders the
+    /// "‹ Camp home" breadcrumb and the row keeps Camp selected.
+    pub fn is_home_drill_down(self) -> bool {
+        matches!(self, Tab::Survivor | Tab::Operations)
+    }
+    /// The drill-down's name in its breadcrumb.
+    pub fn drill_down_name(self) -> Option<&'static str> {
+        match self {
+            Tab::Survivor => Some("Mara"),
+            Tab::Operations => Some("Operations"),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

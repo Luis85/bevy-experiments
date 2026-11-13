@@ -171,6 +171,15 @@ const MATRIX: &[(&str, fn(&mut IsolatedFrontend), Screen, Expect)] = &[
         Expect::Label("Start journey"),
     ),
     (
+        "camp-home",
+        |x| {
+            between_runs(x);
+            x.frontend.nav.tab = Tab::Home;
+        },
+        Screen::Camp,
+        Expect::Label("Go to briefing"),
+    ),
+    (
         "camp-briefing",
         |x| {
             between_runs(x);

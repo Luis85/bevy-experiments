@@ -1,5 +1,5 @@
 //! A planned deployment is UI intent, never an extra authoritative attempt.
-use super::{Screen, Tab, UiCtx, chrome, muted, primary};
+use super::{Tab, UiCtx, chrome, muted, primary};
 use crate::art::{self, AMBER, GREEN, RED};
 use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
 use horde_core::{
@@ -235,35 +235,38 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
         );
     }
 }
-/// The camp footer's primary action. A live main defense always offers the
-/// one return to it; other Prepare pages lead to the briefing, and only the
-/// briefing deploys.
+/// The camp footer's primary action. It follows Camp home's rule
+/// (`home::home_primary`): a live main defense always offers the one return
+/// to it, a liberation still to be closed offers "Choose next country", and
+/// other Prepare pages lead to the briefing, where only the briefing deploys.
 pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
-    if f.game.attempt().is_some() {
-        if primary(ui, "Return to active defense").clicked() {
-            f.go(Screen::Battle);
-            f.battle.fire_latched = false;
-        }
-        return;
-    }
-    let Some(country) = f.game.campaign().world.active_country() else {
-        if primary(ui, "Choose a country").clicked() {
-            f.open_campaign();
-        }
-        return;
-    };
-    if f.tab != Tab::Briefing {
+    let action = super::home::home_primary(f.game);
+    let country = f.game.campaign().world.active_country();
+    let deploys = f.tab == Tab::Briefing
+        && country.is_some()
+        && matches!(
+            action,
+            super::home::HomePrimary::GoToBriefing | super::home::HomePrimary::ChooseNextCountry
+        );
+    if !deploys {
         ui.horizontal_wrapped(|ui| {
-            if primary(ui, "Go to briefing").clicked() {
-                f.open_preparation(Tab::Briefing);
+            if primary(ui, action.label()).clicked() {
+                super::home::run_home_primary(f, action);
             }
-            muted(
-                ui,
-                format!("{} · {}", country.name, chrome::defender_name(f)),
-            );
+            if action == super::home::HomePrimary::GoToBriefing
+                && let Some(country) = country
+            {
+                muted(
+                    ui,
+                    format!("{} · {}", country.name, chrome::defender_name(f)),
+                );
+            }
         });
         return;
     }
+    let Some(country) = country else {
+        return;
+    };
     let name = country.name.clone();
     f.campaign.stage = f.campaign.stage.min(
         f.game

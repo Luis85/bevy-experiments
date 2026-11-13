@@ -96,6 +96,8 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         return;
     }
     if screen == "world" {
+        // Before the first start the camp is the world map (no Camp home yet).
+        f.nav.tab = Tab::World;
         f.game.set_paused(true);
         return;
     }

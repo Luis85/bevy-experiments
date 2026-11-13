@@ -35,17 +35,34 @@ pub(crate) struct Navigation {
     pub(super) return_world_paused: bool,
     /// Set when a new deployment starts; `OnEnter(Screen::Battle)` consumes it.
     pub(super) battle_reset: bool,
+    /// What Camp home highlights when it opens (`open_camp_home`).
+    pub(super) home_focus: Option<HomeFocus>,
+}
+
+/// What Camp home highlights when a route opens it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HomeFocus {
+    /// The roster row of this recruit (a recruit who just joined).
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "W3-19's Recruit modal (\"Back to camp\") is its first caller"
+        )
+    )]
+    Recruit(u64),
 }
 impl Default for Navigation {
     fn default() -> Self {
         Self {
-            tab: Tab::World,
+            tab: Tab::Home,
             last_prepare_tab: Tab::Briefing,
             history_return: Screen::Menu,
             history_world_paused: true,
             return_screen: Screen::Menu,
             return_world_paused: false,
             battle_reset: false,
+            home_focus: None,
         }
     }
 }

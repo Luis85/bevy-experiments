@@ -182,7 +182,11 @@ impl UiCtx<'_> {
         }
     }
     /// Requests camp tab `tab` (remembered while the camp is not shown).
+    /// Leaving Home drops its one-shot highlight.
     pub(super) fn go_tab(&mut self, tab: Tab) {
+        if tab != Tab::Home {
+            self.nav.home_focus = None;
+        }
         self.nav.tab = tab;
         self.next_tab.set(tab);
     }
@@ -355,6 +359,20 @@ impl UiCtx<'_> {
             self.dispatch(Command::SetPaused(true), "");
         }
     }
+    /// Camp home, highlighting `focus` there. Before the first start there
+    /// is no home yet, so the request opens the world map.
+    pub(super) fn open_camp_home(&mut self, focus: Option<super::HomeFocus>) {
+        if self.game.campaign().world.start.is_none() {
+            self.open_campaign();
+            return;
+        }
+        self.preserve_debrief_pause();
+        self.go_tab(Tab::Home);
+        self.nav.home_focus = focus;
+        self.go(Screen::Camp);
+        self.battle.fire_latched = false;
+        self.runtime.clear_input();
+    }
     pub(super) fn open_campaign(&mut self) {
         self.preserve_debrief_pause();
         self.go_tab(Tab::World);
@@ -393,7 +411,8 @@ impl UiCtx<'_> {
             self.focus_next_upgrade();
             self.go(Screen::Results);
         } else {
-            self.go_tab(Tab::World);
+            // Camp home; before the first start the camp shows the world map.
+            self.go_tab(Tab::Home);
             self.go(Screen::Camp);
         }
         self.battle.fire_latched = false;

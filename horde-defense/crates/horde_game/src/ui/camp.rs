@@ -1,6 +1,6 @@
 //! Campaign selection and the persistent preparation shell.
 use super::{
-    Screen, Tab, UiCtx, armory, briefing, character, chrome, feedback, muted, navigation,
+    Screen, Tab, UiCtx, armory, briefing, character, chrome, feedback, home, muted, navigation,
     operations, primary, progress, status, survivor,
 };
 use crate::{
@@ -17,6 +17,12 @@ use horde_core::{
 };
 
 pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
+    if f.tab == Tab::Home && f.game.campaign().world.start.is_none() {
+        // There is no camp home before the first start: the world map is
+        // where the journey begins. This pass already draws it.
+        f.go_tab(Tab::World);
+        f.tab = Tab::World;
+    }
     camp_controls(root.ctx(), f);
     if matches!(f.tab, Tab::Skills | Tab::Engineering) {
         // The complete tree has one home. Old tab routes (remembered tabs,
@@ -37,10 +43,11 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
                 .inner_margin(egui::Margin::symmetric(18, 10)),
         )
         .show(root, |ui| {
-            if f.tab == Tab::World {
-                country_action(ui, f);
-            } else if f.tab != Tab::Operations || f.game.attempt().is_some() {
-                briefing::mission_actions(ui, f);
+            match f.tab {
+                Tab::World => country_action(ui, f),
+                Tab::Home => home::home_footer(ui, f),
+                Tab::Operations if f.game.attempt().is_none() => {}
+                _ => briefing::mission_actions(ui, f),
             }
             ui.add_space(5.0);
             if f.game.campaign().world.start.is_some() {
@@ -48,7 +55,8 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
                     if ui.button("Save campaign").clicked() {
                         f.request_save(SaveIntent::Manual);
                     }
-                    if f.operations_available() {
+                    // Camp home owns the world clock (decision 6).
+                    if f.tab == Tab::Home && f.operations_available() {
                         time_controls(ui, f);
                     }
                 });
@@ -69,17 +77,38 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
             egui::ScrollArea::vertical()
                 .id_salt(("camp_page", f.tab as u8))
                 .auto_shrink([false, false])
-                .show(ui, |ui| match f.tab {
-                    Tab::World => world_ui(ui, f),
-                    Tab::Briefing => briefing::briefing(ui, f),
-                    Tab::Character => character(ui, f),
-                    Tab::Survivor => survivor(ui, f),
-                    Tab::Armory => armory(ui, f),
-                    // Redirected to the upgrade home above.
-                    Tab::Skills | Tab::Engineering => {}
-                    Tab::Operations => operations(ui, f),
+                .show(ui, |ui| {
+                    if f.tab.is_home_drill_down() {
+                        breadcrumb(ui, f);
+                    }
+                    match f.tab {
+                        Tab::Home => home::home(ui, f),
+                        Tab::World => world_ui(ui, f),
+                        Tab::Briefing => briefing::briefing(ui, f),
+                        Tab::Character => character(ui, f),
+                        Tab::Survivor => survivor(ui, f),
+                        Tab::Armory => armory(ui, f),
+                        // Redirected to the upgrade home above.
+                        Tab::Skills | Tab::Engineering => {}
+                        Tab::Operations => operations(ui, f),
+                    }
                 });
         });
+}
+/// "‹ Camp home · Mara" above a drill-down page; the link opens Home.
+fn breadcrumb(ui: &mut egui::Ui, f: &mut UiCtx) {
+    chrome::row(ui, |ui| {
+        if ui
+            .add(egui::Button::new("‹ Camp home").frame(false))
+            .on_hover_text("Back to Camp home")
+            .clicked()
+        {
+            f.open_camp_home(None);
+        }
+        if let Some(name) = f.tab.drill_down_name() {
+            muted(ui, format!("· {name}"));
+        }
+    });
 }
 fn world_ui(ui: &mut egui::Ui, f: &mut UiCtx) {
     let compact = ui.available_width() < 900.0;
@@ -310,9 +339,10 @@ fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
         return;
     }
     // The camp's pause key drives the world clock only where the clock is
-    // shown, and never resumes a waiting main defense from here: that has
-    // its own "Return to active defense".
-    if f.operations_available()
+    // shown (Camp home, decision 6), and never resumes a waiting main
+    // defense from here: that has its own "Return to active defense".
+    if f.tab == Tab::Home
+        && f.operations_available()
         && f.game.attempt().is_none()
         && f.settings.pressed(ctx, Action::Pause, false)
     {

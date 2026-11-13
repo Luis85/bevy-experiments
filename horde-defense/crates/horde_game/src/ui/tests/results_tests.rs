@@ -122,8 +122,10 @@ fn retreat_opens_retained_reward_skill_tree_and_retry_starts_live() {
     assert!(!f.game.attempt().unwrap().paused);
 }
 
+/// W3-02 rewrite: resuming a left journey lands on Camp home (it was the
+/// world map); `resume()` falls back to Home (design-ux-flow §4).
 #[test]
-fn defeat_and_withdraw_each_reach_upgrade_home_and_leave_resume_returns_to_the_map() {
+fn defeat_and_withdraw_each_reach_upgrade_home_and_leave_resume_returns_to_camp_home() {
     let mut fixture = IsolatedFrontend::new();
     fixture.deploy();
     let h = Harness::new();
@@ -154,7 +156,7 @@ fn defeat_and_withdraw_each_reach_upgrade_home_and_leave_resume_returns_to_the_m
     assert!(!f.game.campaign().journey_active);
     f.game = Game::load(&f.paths.campaign()).unwrap();
     h.click(f, View::Menu, "Resume journey");
-    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::World);
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Home);
     assert_eq!(f.game.campaign().coins, coins);
     assert_eq!(f.game.campaign().run_history.len(), records);
 }
