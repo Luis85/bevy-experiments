@@ -304,3 +304,26 @@ fn headroom_popups_never_overlap_hud_rects() {
     }
     assert!(checked > 1000, "only {checked} shapes drawn");
 }
+
+/// `BarRows` starts a row when a rect's centre lies below the row so far: a
+/// shorter widget centred in a row, and a taller one that deepens it, join
+/// the row; nothing counted is 0 rows.
+#[test]
+fn bar_rows_count_rows_by_vertical_centre() {
+    let rect =
+        |x: f32, top: f32, bottom: f32| Rect::from_min_max(pos2(x, top), pos2(x + 40.0, bottom));
+    let mut rows = BarRows::default();
+    assert_eq!(rows.rows(), 0);
+    rows.add(rect(0.0, 100.0, 132.0));
+    rows.add(rect(50.0, 101.0, 131.0));
+    rows.add(rect(100.0, 96.0, 140.0));
+    assert_eq!(rows.rows(), 1);
+    // Its centre is still inside the deepened first row.
+    rows.add(rect(150.0, 124.0, 150.0));
+    assert_eq!(rows.rows(), 1);
+    rows.add(rect(0.0, 157.0, 189.0));
+    rows.add(rect(50.0, 157.0, 189.0));
+    assert_eq!(rows.rows(), 2);
+    rows.add(rect(0.0, 196.0, 218.0));
+    assert_eq!(rows.rows(), 3);
+}

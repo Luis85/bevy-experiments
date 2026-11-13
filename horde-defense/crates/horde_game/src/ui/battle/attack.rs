@@ -1,4 +1,5 @@
 use super::{
+    BarRows,
     input::{AttackSelection, assisted_aim, select_attack, target_cell},
     projection,
 };
@@ -170,10 +171,11 @@ pub(super) fn personal_controls(
     f: &mut UiCtx,
     ctx: &egui::Context,
     view: &BattleScreen,
+    rows: &mut BarRows,
 ) {
-    f.battle.pending.reload |= ui.button("Reload").clicked();
-    if ui
-        .button("Strike contact lane")
+    f.battle.pending.reload |= rows.widget(ui.button("Reload")).clicked();
+    if rows
+        .widget(ui.button("Strike contact lane"))
         .on_hover_text("Strike the selected contact lane. Melee cancels an unfinished reload.")
         .clicked()
     {
@@ -183,25 +185,25 @@ pub(super) fn personal_controls(
         f.battle.pending_attack_aims.melee.get_or_insert(aim);
     }
     if f.battle.attack_selection == AttackSelection::Gun
-        && ui
-            .button(if f.battle.fire_latched {
+        && rows
+            .widget(ui.button(if f.battle.fire_latched {
                 "Stop firing"
             } else {
                 "Toggle firing"
-            })
+            }))
             .clicked()
     {
         f.toggle_fire(ctx);
     }
     if view.heal {
-        f.battle.pending.heal |= ui
-            .button("Emergency aid")
+        f.battle.pending.heal |= rows
+            .widget(ui.button("Emergency aid"))
             .on_hover_text(&f.settings.bindings[Action::Heal as usize])
             .clicked();
     }
     if view.brace {
-        f.battle.pending.brace |= ui
-            .button("Brace the line")
+        f.battle.pending.brace |= rows
+            .widget(ui.button("Brace the line"))
             .on_hover_text(&f.settings.bindings[Action::Brace as usize])
             .clicked();
     }

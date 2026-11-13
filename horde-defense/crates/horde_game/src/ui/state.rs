@@ -159,6 +159,10 @@ pub(crate) struct BattleUi {
     /// order: written each frame construction is open, cleared when it closes
     /// (presentation only; the INCOMING chevrons mark them).
     pub(super) occluded_lanes: Vec<u8>,
+    /// The rows the control bar took in the last drawn battle frame, the
+    /// status row included (`battle::BarRows`); 0 before any battle frame
+    /// (presentation only; review captures report it as `hud_rows`).
+    pub(super) bar_rows: u8,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -184,6 +188,7 @@ impl BattleUi {
             effects_keep_clear: [Rect::NOTHING; 4],
             observer_arena_rect: None,
             occluded_lanes: Vec::new(),
+            bar_rows: 0,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,

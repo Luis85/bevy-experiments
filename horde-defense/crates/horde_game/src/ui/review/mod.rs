@@ -143,7 +143,8 @@ pub(crate) fn schedule_motion_release(
 /// points. The battle field and its effects clip come from the rects the
 /// battle frame recorded (`BattleUi::arena_rect` / `effects_rect`), the
 /// worker observer's from `observer_arena_rect`; nothing is re-measured here.
-/// `hud_rows` stays None until ux-flow's bar measurement lands (C-10, wave 3).
+/// `hud_rows` is the control bar's rows as the battle frame counted them
+/// (`BattleUi::bar_rows`, C-10), reported on the battle screen only.
 /// The review tools fill `canvas_rect` and `windows_scale` from the window,
 /// and own all of the IO.
 #[cfg(feature = "review")]
@@ -203,7 +204,7 @@ impl ReviewFrameFacts {
             observer_arena_rect: observer.map(corners),
             lanes: attempt.map(|a| a.lane_count),
             width_yards: attempt.map(|a| a.width_yards),
-            hud_rows: None,
+            hud_rows: in_battle.then_some(battle.bar_rows),
             reduced_effects: settings.reduced_effects,
             ui_scale: crate::settings::applied_scale(settings.scale),
             windows_scale: 1.0,

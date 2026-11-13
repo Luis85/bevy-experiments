@@ -852,8 +852,8 @@ fn construction_toggle_keeps_arena_rect() {
 }
 
 /// The capture sidecar reports the rects the battle frame recorded, as
-/// `[left, top, right, bottom]` points; `hud_rows` stays None until ux-flow's
-/// bar measurement lands (C-10, wave 3).
+/// `[left, top, right, bottom]` points, and the bar rows it counted as
+/// `hud_rows` (C-10).
 #[cfg(feature = "review")]
 #[test]
 fn review_frame_facts_report_arena_rect_and_hud_rows() {
@@ -892,7 +892,8 @@ fn review_frame_facts_report_arena_rect_and_hud_rows() {
             (facts.lanes, facts.width_yards),
             (Some(a.lane_count), Some(a.width_yards))
         );
-        assert_eq!(facts.hud_rows, None, "ux-flow W3 measures the bar rows");
+        assert!(f.battle.bar_rows > 0, "{size:?}: no bar rows counted");
+        assert_eq!(facts.hud_rows, Some(f.battle.bar_rows), "{size:?}");
         assert_eq!(facts.reduced_effects, f.settings.reduced_effects);
         assert_eq!(facts.ui_scale, f.settings.scale);
         // Off the battle screen a stale field is never reported.
@@ -907,6 +908,70 @@ fn review_frame_facts_report_arena_rect_and_hud_rows() {
         );
         assert_eq!((facts.arena_rect, facts.effects_rect), (None, None));
         assert_eq!((facts.lanes, facts.overlays.len()), (None, 0));
+        assert_eq!(facts.hud_rows, None, "{size:?}: no bar off the battle");
+    }
+}
+
+/// Characterisation of today's control bar (UX-14, C-10): the fullest personal
+/// bar is 2 button rows at 1050x700@1.35 (777.8 pt wide) and 1 at 1440x900,
+/// and a status message adds its row under them, so the small bar is 3 rows.
+/// The observed bar fits one button row at both sizes. W3-12 brings the small
+/// bar to 2.
+#[test]
+fn battle_bar_rows_measure_todays_bar() {
+    let [large, small] = target_sizes();
+    for (h, size, buttons, observed) in [
+        (Harness::small(), small, 2, 1),
+        (Harness::large(), large, 1, 1),
+    ] {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let f = &mut fixture.frontend;
+        assert_eq!(f.battle.bar_rows, 0, "no battle frame has drawn a bar yet");
+        let profile = &mut f.game.attempt_mut().unwrap().profile;
+        (profile.heal, profile.brace) = (true, true);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let canvas = h.ctx.content_rect().size();
+        assert!((canvas - size).length() < 0.5, "{canvas:?} is not {size:?}");
+        for label in [
+            "Pause",
+            "Reload",
+            "Strike contact lane",
+            "Toggle firing",
+            "Emergency aid",
+            "Brace the line",
+            "Build defenses",
+            "Retreat & train",
+            "Management",
+        ] {
+            assert_eq!(text_count(&output, label), 1, "{size:?}: {label}");
+        }
+        assert_eq!(f.battle.bar_rows, buttons, "{size:?}: buttons");
+        f.status.message = "Rewards retained. Rest, train, and retry.".into();
+        h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.bar_rows, buttons + 1, "{size:?}: with status");
+        // The capture sidecar reports the same count.
+        #[cfg(feature = "review")]
+        assert_eq!(
+            review::ReviewFrameFacts::collect(
+                &f.game,
+                &f.launch,
+                &f.settings,
+                f.screen,
+                f.nav.tab,
+                &f.battle
+            )
+            .hud_rows,
+            Some(buttons + 1),
+            "{size:?}"
+        );
+        // The observed bar is counted by the same accumulator.
+        let mut fixture = fresh_battle(Mode::Npc, true);
+        let f = &mut fixture.frontend;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        for label in ["Pause", "Observe", "Survivor", "Recall & train"] {
+            assert_eq!(text_count(&output, label), 1, "{size:?}: {label}");
+        }
+        assert_eq!(f.battle.bar_rows, observed, "{size:?}: observed");
     }
 }
 

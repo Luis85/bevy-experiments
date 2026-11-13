@@ -1,5 +1,5 @@
 use super::{
-    BattleFrame, BattleLayout,
+    BarRows, BattleFrame, BattleLayout,
     attack::{attack_selector, ordnance_cursor, personal_controls},
     construction::{construction_controls, placement_cursor},
     details::field_details,
@@ -218,6 +218,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             }
             let bar = layout.bar;
             let observed = view.mode == Mode::Npc;
+            // Every bar widget is counted into this frame's rows (C-10).
+            let mut rows = BarRows::default();
             ui.scope_builder(egui::UiBuilder::new().max_rect(bar), |ui| {
                 ui.horizontal_wrapped(|ui| {
                     let paused = view.paused;
@@ -230,37 +232,41 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     };
                     // Amber only while paused: Begin or Resume is the
                     // battle's one primary; a running battle has none.
-                    let response = if paused {
+                    let response = rows.widget(if paused {
                         primary_action::primary_in_bar(ui, label)
                     } else {
                         ui.button(RichText::new(label).strong())
-                    };
+                    });
                     if response.clicked() {
                         f.dispatch(Command::SetPaused(!paused), "");
                         f.battle.set_construction(false);
                         f.battle.fire_latched = false;
                     }
                     if view.personal() && !f.battle.construction {
-                        personal_controls(ui, f, &ctx, view);
+                        personal_controls(ui, f, &ctx, view, &mut rows);
                     }
                     if view.any_blueprint
-                        && ui
-                            .button(if f.battle.construction {
+                        && rows
+                            .widget(ui.button(if f.battle.construction {
                                 "Close construction"
                             } else {
                                 "Build defenses"
-                            })
+                            }))
                             .clicked()
                     {
                         f.battle.set_construction(!f.battle.construction);
                         f.battle.fire_latched = false;
                     }
                     if observed {
-                        ui.label("Observe");
+                        rows.widget(ui.label("Observe"));
                         for speed in [1, 2, 4] {
-                            ui.selectable_value(&mut f.battle.speed, speed, format!("{speed}×"));
+                            rows.widget(ui.selectable_value(
+                                &mut f.battle.speed,
+                                speed,
+                                format!("{speed}×"),
+                            ));
                         }
-                        let response = ui.button("Survivor");
+                        let response = rows.widget(ui.button("Survivor"));
                         let mut popup = egui::Popup::menu(&response)
                             .width(300.0)
                             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
@@ -283,12 +289,12 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                                 });
                         });
                     }
-                    if ui
-                        .button(if observed {
+                    if rows
+                        .widget(ui.button(if observed {
                             "Recall & train"
                         } else {
                             "Retreat & train"
-                        })
+                        }))
                         .on_hover_text(
                             "Withdraw to Journey upgrades. Every earned coin and item is retained.",
                         )
@@ -300,7 +306,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                             "Rewards retained. Rest, train, and retry.",
                         );
                     }
-                    ui.menu_button("Management", |ui| {
+                    let management = ui.menu_button("Management", |ui| {
                         ui.set_max_width(320.);
                         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                         if ui.button("Settings").clicked() {
@@ -320,10 +326,19 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                             .max_height(280.)
                             .show(ui, |ui| field_details(ui, f, view, hud_view));
                     });
+                    rows.add(management.response.rect);
                 });
                 if !f.status.message.is_empty() {
+                    // The status line is one row under the buttons.
+                    let top = ui.cursor().top();
                     status(ui, f);
+                    let drawn = ui.min_rect();
+                    rows.add(egui::Rect::from_min_max(
+                        egui::pos2(drawn.left(), top),
+                        drawn.right_bottom(),
+                    ));
                 }
             });
+            f.battle.bar_rows = rows.rows();
         });
 }

@@ -13,7 +13,7 @@ use crate::{
     art::{self, FieldFit, camera::REFERENCE_LANES},
     battle_view::EnemyView,
 };
-use bevy_egui::egui::{Pos2, Rect, Vec2, pos2, vec2};
+use bevy_egui::egui::{Pos2, Rect, Response, Vec2, pos2, vec2};
 
 /// Canvas rows above the arena: the corner HUD, the attack selector and the
 /// loot receipt.
@@ -186,6 +186,44 @@ impl BattleLayout {
             self.selector,
             self.receipt_slot,
         ]
+    }
+}
+
+/// Counts the rows the control bar takes in one frame (C-10). The bar adds
+/// each widget's rect in layout order, so left to right and top to bottom: a
+/// rect whose vertical centre lies below the current row's bottom starts the
+/// next row, and anything else joins the current row.
+#[derive(Clone, Copy, Debug)]
+pub(in crate::ui) struct BarRows {
+    rows: u8,
+    bottom: f32,
+}
+impl Default for BarRows {
+    fn default() -> Self {
+        Self {
+            rows: 0,
+            bottom: f32::NEG_INFINITY,
+        }
+    }
+}
+impl BarRows {
+    /// Counts the widget at `rect`.
+    pub(in crate::ui) fn add(&mut self, rect: Rect) {
+        if rect.center().y > self.bottom {
+            self.rows = self.rows.saturating_add(1);
+            self.bottom = rect.bottom();
+        } else {
+            self.bottom = self.bottom.max(rect.bottom());
+        }
+    }
+    /// Counts the widget of `response` and hands the response back.
+    pub(in crate::ui) fn widget(&mut self, response: Response) -> Response {
+        self.add(response.rect);
+        response
+    }
+    /// The rows counted so far.
+    pub(in crate::ui) fn rows(&self) -> u8 {
+        self.rows
     }
 }
 
