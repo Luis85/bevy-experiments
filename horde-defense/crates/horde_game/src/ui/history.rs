@@ -1,5 +1,5 @@
 //! Read-only run analysis from the authoritative, persistent settlement ledger.
-use super::{UiCtx, armory, chrome, muted};
+use super::{UiCtx, chrome, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, PANEL, RED};
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke, pos2, vec2};
 use horde_core::stats::RunRecord;
@@ -81,11 +81,11 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
             if ui.available_width() >= 760.0 {
                 ui.columns(2, |cols| {
                     run_list(&mut cols[0], &rows, &mut state.selected);
-                    if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(&mut cols[1], run); }
+                    if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(&mut cols[1], run, f.settings); }
                 });
             } else {
                 run_list(ui, &rows, &mut state.selected);
-                if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(ui, run); }
+                if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(ui, run, f.settings); }
             }
             chrome::section(ui, "Run trends");
             muted(ui, "Last 40 matching runs · oldest to newest · simulation seconds, including at 4× playback");
@@ -144,7 +144,7 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
             }
         });
 }
-fn detail(ui: &mut egui::Ui, r: &RunRecord) {
+fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings) {
     chrome::section(ui, &format!("Run #{} · {}", r.id, r.outcome.label()));
     ui.label(format!(
         "{} · {} · defense {} · template {}",
@@ -230,16 +230,18 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
         .default_open(true)
         .show(ui, |ui| {
             for gear in &r.gear {
-                ui.colored_label(
-                    armory::quality_color(gear.quality),
-                    format!(
-                        "{} · {} · Lv{} · {:?}",
-                        gear.name,
-                        gear.quality.name(),
-                        gear.level,
-                        gear.slot
-                    ),
-                );
+                chrome::with_quality_shape(ui, gear.quality, settings, |ui| {
+                    ui.colored_label(
+                        chrome::quality_colour(gear.quality, settings.palette),
+                        format!(
+                            "{} · {} · Lv{} · {:?}",
+                            gear.name,
+                            gear.quality.name(),
+                            gear.level,
+                            gear.slot
+                        ),
+                    );
+                });
                 if let Some(class) = gear.weapon_class {
                     muted(ui, format!("{} proficiency", class.name()));
                 }
@@ -251,8 +253,9 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
     ui.horizontal_wrapped(|ui| {
         for quality in horde_core::quality::Quality::ALL {
             if r.loot_by_quality[quality] > 0 {
+                chrome::quality_shape_icon(ui, quality, settings);
                 ui.colored_label(
-                    armory::quality_color(quality),
+                    chrome::quality_colour(quality, settings.palette),
                     format!("{} {}", r.loot_by_quality[quality], quality.name()),
                 );
             }

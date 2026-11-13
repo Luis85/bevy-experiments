@@ -958,3 +958,334 @@ fn scale_applies_only_on_release() {
     assert_eq!(f.prefs.scale_draft, None);
     assert_eq!(f.settings.scale, committed);
 }
+
+/// A window tall enough that no Settings row is scrolled out of the frame
+/// (a row outside the clip paints nothing).
+const TALL: Vec2 = vec2(1440.0, 2400.0);
+
+/// Presses and releases the rail of the slider labelled `label` near its low
+/// end, in a `TALL` frame.
+fn press_slider_low_end(h: &Harness, f: &mut FrontendParts, label: &str) {
+    let texts = text_rects(&h.frame_size(f, View::Settings, vec![], TALL));
+    let (_, label_rect) = texts
+        .iter()
+        .find(|(text, _)| text == label)
+        .unwrap_or_else(|| panic!("Slider not found: {label}"));
+    let value_left = texts
+        .iter()
+        .filter(|(_, r)| {
+            (r.center().y - label_rect.center().y).abs() < 2.0 && r.max.x < label_rect.min.x
+        })
+        .map(|(_, r)| r.min.x)
+        .min_by(f32::total_cmp)
+        .expect("slider value field");
+    // The rail is 100 points wide and ends just left of the value field.
+    h.press_at(
+        f,
+        View::Settings,
+        pos2(value_left - 90.0, label_rect.center().y),
+        TALL,
+    );
+}
+
+/// W3-09 (decision 18): the Audio section has the five bus sliders, and the
+/// two new ones each move their own volume and no other.
+#[test]
+fn settings_show_music_and_stingers_and_interface_sounds_sliders() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    for label in [
+        "Master",
+        "Combat effects",
+        "Atmosphere",
+        "Music & stingers",
+        "Interface sounds",
+    ] {
+        assert_eq!(text_count(&output, label), 1, "{label}");
+    }
+    let volumes = |s: &Settings| [s.master, s.effects, s.ambience, s.music, s.ui];
+    for (label, index) in [("Music & stingers", 3), ("Interface sounds", 4)] {
+        let before = volumes(&f.settings);
+        press_slider_low_end(&h, f, label);
+        let after = volumes(&f.settings);
+        assert!(
+            after[index] < before[index] && (0.0..=1.0).contains(&after[index]),
+            "{label}: {before:?} -> {after:?}"
+        );
+        for other in (0..5).filter(|other| *other != index) {
+            assert_eq!(after[other], before[other], "{label} moved bus {other}");
+        }
+    }
+}
+
+/// W3-09 (design-ux-flow S3): Low latency reads "(applies after restart)"
+/// exactly while the setting asks for a pipelined state other than the one
+/// this process started with. The other Display rows apply live (W1-34).
+#[test]
+fn low_latency_row_shows_restart_note_exactly_when_pipelined_differs() {
+    use crate::render_plan::{PIPELINED_DEFAULT, pipelined_for};
+    use crate::settings::WindowModeSetting;
+    const PLAIN: &str = "Low latency";
+    const PENDING: &str = "Low latency (applies after restart)";
+    let h = Harness::new();
+    for plan_pipelined in [true, false] {
+        for low_latency in [false, true] {
+            let mut fixture = IsolatedFrontend::new();
+            let f = &mut fixture.frontend;
+            f.screen = Screen::Settings;
+            f.plan_pipelined = plan_pipelined;
+            f.settings.low_latency = low_latency;
+            let output = h.frame_size(f, View::Settings, vec![], TALL);
+            let pending = pipelined_for(low_latency, None) != plan_pipelined;
+            assert_eq!(
+                (text_count(&output, PENDING), text_count(&output, PLAIN)),
+                (usize::from(pending), usize::from(!pending)),
+                "started pipelined {plan_pipelined}, low latency {low_latency}"
+            );
+        }
+    }
+
+    // The note follows the checkbox within one process.
+    let mut fixture = IsolatedFrontend::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    assert_eq!(f.plan_pipelined, PIPELINED_DEFAULT);
+    assert!(!f.settings.low_latency);
+    h.click_size(f, View::Settings, PLAIN, TALL);
+    assert!(f.settings.low_latency);
+    h.click_size(f, View::Settings, PENDING, TALL);
+    assert!(!f.settings.low_latency);
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    assert_eq!(text_count(&output, PLAIN), 1);
+
+    // Window mode and VSync are plain rows.
+    assert_eq!(f.settings.window_mode, WindowModeSetting::Windowed);
+    h.click_size(f, View::Settings, "Fullscreen (borderless)", TALL);
+    assert_eq!(
+        f.settings.window_mode,
+        WindowModeSetting::BorderlessFullscreen
+    );
+    h.click_size(f, View::Settings, "Fullscreen (borderless)", TALL);
+    assert_eq!(f.settings.window_mode, WindowModeSetting::Windowed);
+    assert!(f.settings.vsync);
+    h.click_size(f, View::Settings, "VSync", TALL);
+    assert!(!f.settings.vsync);
+    // Low latency picks the present mode, so VSync cannot be changed under it.
+    f.settings.low_latency = true;
+    h.click_size(f, View::Settings, "VSync", TALL);
+    assert!(!f.settings.vsync);
+}
+
+/// What one painted, non-text shape is: its kind and its colour.
+fn painted(shape: &egui::epaint::Shape, out: &mut Vec<(String, Color32)>) {
+    use egui::epaint::{ColorMode, Shape};
+    match shape {
+        Shape::Vec(shapes) => shapes.iter().for_each(|shape| painted(shape, out)),
+        Shape::Circle(circle) => out.push(("disc".into(), circle.fill)),
+        Shape::Rect(rect) => out.push(("rect".into(), rect.fill)),
+        Shape::Path(path) => {
+            let stroke = match &path.stroke.color {
+                ColorMode::Solid(colour) => *colour,
+                ColorMode::UV(_) => Color32::TRANSPARENT,
+            };
+            if path.fill == Color32::TRANSPARENT {
+                out.push((format!("outline{}", path.points.len()), stroke));
+            } else {
+                out.push((format!("fill{}", path.points.len()), path.fill));
+            }
+        }
+        Shape::Mesh(mesh) => out.push((
+            format!("fan{}", mesh.vertices.len()),
+            mesh.vertices
+                .first()
+                .map_or(Color32::TRANSPARENT, |v| v.color),
+        )),
+        _ => {}
+    }
+}
+/// Every visible non-text shape of a frame.
+fn painted_shapes(output: &FullOutput) -> Vec<(String, Color32)> {
+    let mut out = Vec::new();
+    output
+        .shapes
+        .iter()
+        .for_each(|clipped| painted(&clipped.shape, &mut out));
+    out.retain(|(_, colour)| *colour != Color32::TRANSPARENT);
+    out
+}
+/// The colour of the text run reading `label`.
+fn colour_of(output: &FullOutput, label: &str) -> Color32 {
+    output
+        .shapes
+        .iter()
+        .find_map(|clipped| text_color(&clipped.shape, label))
+        .unwrap_or_else(|| panic!("Text not found: {label}"))
+}
+
+/// W3-09 (decision 18): the colour-blind palette is Okabe-Ito, every quality
+/// has its own painted shape, and both settings change the markers on the
+/// Settings preview.
+#[test]
+fn colour_blind_palette_changes_marker_colours_and_shapes() {
+    use crate::settings::{Palette, QualityMarkers};
+    use crate::ui::chrome;
+    use horde_core::quality::Quality;
+
+    // The palette's colours.
+    let okabe_ito = [
+        Color32::from_rgb(120, 120, 120),
+        art::TEXT,
+        Color32::from_rgb(0, 158, 115),
+        Color32::from_rgb(86, 180, 233),
+        Color32::from_rgb(204, 121, 167),
+        Color32::from_rgb(230, 159, 0),
+    ];
+    for (quality, expected) in Quality::ALL.into_iter().zip(okabe_ito) {
+        assert_eq!(
+            chrome::quality_colour(quality, Palette::ColorBlind),
+            expected,
+            "{quality:?}"
+        );
+        let [r, g, b, _] = quality.color();
+        assert_eq!(
+            chrome::quality_colour(quality, Palette::Standard),
+            Color32::from_rgb(
+                (r * 255.0).round() as u8,
+                (g * 255.0).round() as u8,
+                (b * 255.0).round() as u8
+            ),
+            "{quality:?}"
+        );
+    }
+    // The hues that the standard palette leaves close move.
+    for quality in [
+        Quality::Uncommon,
+        Quality::Rare,
+        Quality::Epic,
+        Quality::Legendary,
+    ] {
+        assert_ne!(
+            chrome::quality_colour(quality, Palette::ColorBlind),
+            chrome::quality_colour(quality, Palette::Standard),
+            "{quality:?}"
+        );
+    }
+
+    // One marker alone: its shape is one painted shape in the palette's
+    // colour, a different kind for every quality, and absent without shape
+    // markers.
+    let h = Harness::new();
+    let marker = |quality: Quality, settings: &Settings| {
+        let mut output = h.ctx.run_ui(
+            RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 200.0))),
+                ..RawInput::default()
+            },
+            |ui| {
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::NONE)
+                    .show(ui, |ui| {
+                        chrome::quality_marker(ui, quality, settings);
+                    });
+            },
+        );
+        output.textures_delta.clear();
+        output
+    };
+    let kinds = ["outline3", "disc", "fill4", "rect", "fill3", "fan11"];
+    for palette in [Palette::Standard, Palette::ColorBlind] {
+        for (quality, kind) in Quality::ALL.into_iter().zip(kinds) {
+            let colour = chrome::quality_colour(quality, palette);
+            for markers in QualityMarkers::ALL {
+                let settings = Settings {
+                    palette,
+                    quality_markers: markers,
+                    ..Settings::default()
+                };
+                let output = marker(quality, &settings);
+                assert_eq!(colour_of(&output, quality.name()), colour);
+                let expected = if markers.shape() {
+                    vec![(kind.to_owned(), colour)]
+                } else {
+                    Vec::new()
+                };
+                assert_eq!(
+                    painted_shapes(&output),
+                    expected,
+                    "{quality:?} {palette:?} {markers:?}"
+                );
+            }
+        }
+    }
+    // Text markers name the quality where colour alone carried it.
+    let rare = |markers| {
+        let settings = Settings {
+            quality_markers: markers,
+            ..Settings::default()
+        };
+        chrome::quality_item_text("Rifle #3", Quality::Rare, &settings)
+            .text()
+            .to_owned()
+    };
+    assert_eq!(rare(QualityMarkers::ColorOnly), "Rifle #3");
+    assert_eq!(rare(QualityMarkers::Shape), "Rifle #3");
+    assert_eq!(rare(QualityMarkers::Text), "Rifle #3 · Rare");
+    assert_eq!(rare(QualityMarkers::TextAndShape), "Rifle #3 · Rare");
+
+    // The Settings rows: the preview shows the six qualities, and the two
+    // rows change it.
+    let mut fixture = IsolatedFrontend::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    let star = |output: &FullOutput| {
+        painted_shapes(output)
+            .iter()
+            .filter(|(kind, _)| kind == "fan11")
+            .count()
+    };
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    for quality in Quality::ALL {
+        assert_eq!(text_count(&output, quality.name()), 1, "{quality:?}");
+        assert_eq!(
+            colour_of(&output, quality.name()),
+            chrome::quality_colour(quality, Palette::Standard)
+        );
+    }
+    assert_eq!(star(&output), 0);
+
+    h.click_size(f, View::Settings, "Colour-blind quality palette", TALL);
+    assert_eq!(f.settings.palette, Palette::ColorBlind);
+    assert_eq!(f.settings.quality_markers, QualityMarkers::ColorOnly);
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    for (quality, expected) in Quality::ALL.into_iter().zip(okabe_ito) {
+        assert_eq!(colour_of(&output, quality.name()), expected, "{quality:?}");
+    }
+    assert_eq!(star(&output), 0);
+
+    for markers in [
+        QualityMarkers::Shape,
+        QualityMarkers::TextAndShape,
+        QualityMarkers::Text,
+        QualityMarkers::ColorOnly,
+    ] {
+        h.click_size(f, View::Settings, markers.label(), TALL);
+        assert_eq!(f.settings.quality_markers, markers);
+        let output = h.frame_size(f, View::Settings, vec![], TALL);
+        assert_eq!(star(&output), usize::from(markers.shape()), "{markers:?}");
+        let legendary = chrome::quality_colour(Quality::Legendary, Palette::ColorBlind);
+        assert_eq!(
+            painted_shapes(&output)
+                .iter()
+                .filter(|(kind, colour)| kind == "fan11" && *colour == legendary)
+                .count(),
+            usize::from(markers.shape())
+        );
+    }
+    assert_eq!(f.settings.palette, Palette::ColorBlind);
+
+    h.click_size(f, View::Settings, "Colour-blind quality palette", TALL);
+    assert_eq!(f.settings.palette, Palette::Standard);
+}

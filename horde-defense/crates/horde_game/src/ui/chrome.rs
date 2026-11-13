@@ -1,8 +1,11 @@
 //! Shared native presentation grammar. No simulation or persistence operations.
 use super::UiCtx;
-use crate::art::MUTED;
-use bevy_egui::egui::{self, FontId, RichText};
-use horde_core::{content::Mode, survivors::SurvivorId};
+use crate::{
+    art::{MUTED, TEXT},
+    settings::{Palette, Settings},
+};
+use bevy_egui::egui::{self, Color32, FontId, Pos2, RichText, Sense, Stroke, vec2};
+use horde_core::{content::Mode, quality::Quality, survivors::SurvivorId};
 
 pub(super) fn page_title(ui: &mut egui::Ui, title: &str, description: &str) {
     ui.label(
@@ -83,6 +86,184 @@ pub(super) fn row<R>(
         begin_filter_row(ui);
         add(ui)
     })
+}
+/// The colour a quality is drawn in. The standard palette is the quality
+/// catalogue's; the colour-blind one is Okabe-Ito, whose hues stay apart
+/// under the common colour-vision deficiencies.
+pub(super) fn quality_colour(quality: Quality, palette: Palette) -> Color32 {
+    match palette {
+        Palette::Standard => {
+            let [r, g, b, a] = quality.color();
+            Color32::from_rgba_unmultiplied(
+                (r * 255.0).round() as u8,
+                (g * 255.0).round() as u8,
+                (b * 255.0).round() as u8,
+                (a * 255.0).round() as u8,
+            )
+        }
+        Palette::ColorBlind => match quality {
+            Quality::Poor => Color32::from_rgb(120, 120, 120),
+            Quality::Common => TEXT,
+            Quality::Uncommon => Color32::from_rgb(0, 158, 115),
+            Quality::Rare => Color32::from_rgb(86, 180, 233),
+            Quality::Epic => Color32::from_rgb(204, 121, 167),
+            Quality::Legendary => Color32::from_rgb(230, 159, 0),
+        },
+    }
+}
+/// The shape that marks a quality without colour: one per quality, painted,
+/// never a font glyph.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum QualityShape {
+    /// Poor: the only outline, pointing down.
+    HollowTriangleDown,
+    /// Common.
+    Disc,
+    /// Uncommon.
+    Diamond,
+    /// Rare.
+    Square,
+    /// Epic.
+    TriangleUp,
+    /// Legendary.
+    Star,
+}
+pub(super) fn quality_shape(quality: Quality) -> QualityShape {
+    match quality {
+        Quality::Poor => QualityShape::HollowTriangleDown,
+        Quality::Common => QualityShape::Disc,
+        Quality::Uncommon => QualityShape::Diamond,
+        Quality::Rare => QualityShape::Square,
+        Quality::Epic => QualityShape::TriangleUp,
+        Quality::Legendary => QualityShape::Star,
+    }
+}
+/// Side of the square a quality shape is drawn in beside text.
+pub(super) const QUALITY_SHAPE_SIDE: f32 = 12.0;
+/// Paints `quality`'s shape as one egui shape inside the `side`-wide square
+/// at `center`. Static: nothing here animates, so reduced effects needs no
+/// second form.
+pub(super) fn paint_quality_shape(
+    painter: &egui::Painter,
+    quality: Quality,
+    center: Pos2,
+    side: f32,
+    colour: Color32,
+) {
+    let r = side * 0.5;
+    // A point on the circle of radius `radius`, `turn` of a turn clockwise
+    // from straight up.
+    let at = |turn: f32, radius: f32| {
+        let angle = turn * std::f32::consts::TAU;
+        center + vec2(angle.sin(), -angle.cos()) * radius
+    };
+    match quality_shape(quality) {
+        QualityShape::HollowTriangleDown => {
+            painter.add(egui::Shape::closed_line(
+                vec![
+                    at(0.5, r - 1.0),
+                    at(1.0 / 6.0, r - 1.0),
+                    at(5.0 / 6.0, r - 1.0),
+                ],
+                Stroke::new(1.5, colour),
+            ));
+        }
+        QualityShape::Disc => {
+            painter.circle_filled(center, r * 0.8, colour);
+        }
+        QualityShape::Diamond => {
+            painter.add(egui::Shape::convex_polygon(
+                vec![at(0.0, r), at(0.25, r * 0.8), at(0.5, r), at(0.75, r * 0.8)],
+                colour,
+                Stroke::NONE,
+            ));
+        }
+        QualityShape::Square => {
+            painter.rect_filled(
+                egui::Rect::from_center_size(center, egui::Vec2::splat(side * 0.78)),
+                0.0,
+                colour,
+            );
+        }
+        QualityShape::TriangleUp => {
+            painter.add(egui::Shape::convex_polygon(
+                vec![at(0.0, r), at(1.0 / 3.0, r), at(2.0 / 3.0, r)],
+                colour,
+                Stroke::NONE,
+            ));
+        }
+        QualityShape::Star => {
+            // A star is not convex: a triangle fan from its centre is.
+            let mut mesh = egui::Mesh::default();
+            mesh.colored_vertex(center, colour);
+            for point in 0..10u8 {
+                let radius = if point % 2 == 0 { r } else { r * 0.45 };
+                mesh.colored_vertex(at(f32::from(point) / 10.0, radius), colour);
+            }
+            for point in 0..10u32 {
+                mesh.add_triangle(0, 1 + point, 1 + (point + 1) % 10);
+            }
+            painter.add(egui::Shape::mesh(mesh));
+        }
+    }
+}
+/// The quality's shape beside the text that follows, when the player chose
+/// shape markers; nothing otherwise.
+pub(super) fn quality_shape_icon(ui: &mut egui::Ui, quality: Quality, settings: &Settings) {
+    if !settings.quality_markers.shape() {
+        return;
+    }
+    let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(QUALITY_SHAPE_SIDE), Sense::hover());
+    paint_quality_shape(
+        ui.painter(),
+        quality,
+        rect.center(),
+        QUALITY_SHAPE_SIDE,
+        quality_colour(quality, settings.palette),
+    );
+}
+/// A quality as the player's settings show it: its name in the palette's
+/// colour, behind its shape when shape markers are on.
+pub(super) fn quality_marker(
+    ui: &mut egui::Ui,
+    quality: Quality,
+    settings: &Settings,
+) -> egui::Response {
+    with_quality_shape(ui, quality, settings, |ui| {
+        ui.label(RichText::new(quality.name()).color(quality_colour(quality, settings.palette)))
+    })
+}
+/// Lays `add` out behind the quality's shape when shape markers are on.
+/// Without them `add` runs in `ui` itself, so the default layout is the one
+/// it had before markers existed.
+pub(super) fn with_quality_shape<R>(
+    ui: &mut egui::Ui,
+    quality: Quality,
+    settings: &Settings,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    if !settings.quality_markers.shape() {
+        return add(ui);
+    }
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        quality_shape_icon(ui, quality, settings);
+        add(ui)
+    })
+    .inner
+}
+/// An item label in its quality's colour. Where colour alone carries the
+/// quality, text markers add its name.
+pub(super) fn quality_item_text(
+    text: impl Into<String>,
+    quality: Quality,
+    settings: &Settings,
+) -> RichText {
+    let mut text = text.into();
+    if settings.quality_markers.text() {
+        text = format!("{text} · {}", quality.name());
+    }
+    RichText::new(text).color(quality_colour(quality, settings.palette))
 }
 /// `count` followed by the singular or plural noun: `1 alert`, `2 alerts`.
 pub(super) fn count_noun(count: usize, singular: &str, plural: &str) -> String {

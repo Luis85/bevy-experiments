@@ -156,7 +156,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                             .size(10.0)
                             .color(MUTED),
                     );
-                    armory::loot_receipt(ui, receipt);
+                    armory::loot_receipt(ui, receipt, f.settings);
                 });
             }
             if view.personal() && !f.battle.construction {

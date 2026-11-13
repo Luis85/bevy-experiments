@@ -1,6 +1,6 @@
 //! Bounded, real-time feedback for already-banked model receipts. No rewards
 //! or authoritative random state are produced by this presentation cache.
-use super::{UiCtx, armory, battle::keep_clear_shift, review};
+use super::{UiCtx, armory, battle::keep_clear_shift, chrome, review};
 use crate::art;
 use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
 use horde_core::quality::{LootEvent, Quality};
@@ -147,6 +147,7 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         &mut f.battle.loot_feedback,
         capture,
         &f.battle.effects_keep_clear,
+        f.settings.palette,
     ) {
         f.notify_rare_loot();
     }
@@ -203,6 +204,7 @@ pub(super) fn draw_for(
     state: &mut Feedback,
     capture: review::LootCaptureMode,
     keep_clear: &[Rect],
+    palette: crate::settings::Palette,
 ) -> bool {
     let ready = textures.actors.is_some()
         && textures.props.is_some()
@@ -225,7 +227,7 @@ pub(super) fn draw_for(
         let fade = (1.0 - age).powf(0.65);
         let origin = drop_origin(attempt, &entry.receipt);
         let at = drop_icon_center(projection, origin, entry.receipt.item_id, age);
-        let color = armory::quality_color(entry.receipt.quality).gamma_multiply(fade);
+        let color = chrome::quality_colour(entry.receipt.quality, palette).gamma_multiply(fade);
         let text = if entry.receipt.quality >= Quality::Rare {
             format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
         } else {

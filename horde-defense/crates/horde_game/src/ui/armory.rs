@@ -45,27 +45,30 @@ impl ArmorySort {
     }
 }
 
-pub(super) fn quality_color(quality: horde_core::quality::Quality) -> Color32 {
-    let [r, g, b, a] = quality.color();
-    Color32::from_rgba_unmultiplied(
-        (r * 255.0).round() as u8,
-        (g * 255.0).round() as u8,
-        (b * 255.0).round() as u8,
-        (a * 255.0).round() as u8,
-    )
-}
-pub(super) fn loot_receipt(ui: &mut egui::Ui, receipt: &horde_core::quality::LootEvent) {
+pub(super) fn loot_receipt(
+    ui: &mut egui::Ui,
+    receipt: &horde_core::quality::LootEvent,
+    settings: &crate::settings::Settings,
+) {
     let text = format!(
         "{} · {} · Lv {}",
         receipt.quality.name(),
         receipt.name,
         receipt.level
     );
-    ui.add(egui::Label::new(RichText::new(&text).color(quality_color(receipt.quality))).truncate())
+    chrome::with_quality_shape(ui, receipt.quality, settings, |ui| {
+        ui.add(
+            egui::Label::new(
+                RichText::new(&text)
+                    .color(chrome::quality_colour(receipt.quality, settings.palette)),
+            )
+            .truncate(),
+        )
         .on_hover_text(format!(
             "{text} · owned #{} · already banked",
             receipt.item_id
         ));
+    });
 }
 pub(super) fn paint_item_icon(
     p: &egui::Painter,
@@ -109,12 +112,21 @@ fn slot_art(
         rect.shrink(3.0),
         Color32::WHITE,
     );
+    let colour = chrome::quality_colour(quality, f.settings.palette);
     ui.painter().rect_stroke(
         rect,
         0.0,
-        Stroke::new(1.5, quality_color(quality)),
+        Stroke::new(1.5, colour),
         egui::StrokeKind::Inside,
     );
+    if f.settings.quality_markers.shape() {
+        // The frame's colour alone carried the quality: its shape sits in
+        // the corner on an ink backing, clear of the icon.
+        let side = chrome::QUALITY_SHAPE_SIDE;
+        let corner = Rect::from_min_size(rect.right_bottom() - vec2(side, side), vec2(side, side));
+        ui.painter().rect_filled(corner, 0.0, INK);
+        chrome::paint_quality_shape(ui.painter(), quality, corner.center(), side - 2.0, colour);
+    }
 }
 fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
     let Some(item) = f.game.campaign().item(id) else {
@@ -131,9 +143,12 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
         slot_art(ui, f, item.definition_index(), quality);
         ui.vertical(|ui| {
             ui.label(
-                RichText::new(format!("{} #{} · Lv {}", definition.name, id, item.level))
-                    .strong()
-                    .color(quality_color(quality)),
+                chrome::quality_item_text(
+                    format!("{} #{} · Lv {}", definition.name, id, item.level),
+                    quality,
+                    f.settings,
+                )
+                .strong(),
             );
             muted(
                 ui,
@@ -462,7 +477,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         egui::ComboBox::from_id_salt("armory_quality")
             .selected_text(f.armory.quality.map_or_else(
                 || RichText::new("All qualities"),
-                |quality| RichText::new(quality.name()).color(quality_color(quality)),
+                |quality| {
+                    RichText::new(quality.name())
+                        .color(chrome::quality_colour(quality, f.settings.palette))
+                },
             ))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.armory.quality, None, "All qualities");
@@ -470,7 +488,8 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     ui.selectable_value(
                         &mut f.armory.quality,
                         Some(quality),
-                        RichText::new(quality.name()).color(quality_color(quality)),
+                        RichText::new(quality.name())
+                            .color(chrome::quality_colour(quality, f.settings.palette)),
                     );
                 }
             });
@@ -558,7 +577,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             ui.label(
                 RichText::new(format!("Selected: {name} #{id} · {}", quality.name()))
                     .strong()
-                    .color(quality_color(quality)),
+                    .color(chrome::quality_colour(quality, f.settings.palette)),
             );
             selected_actions(ui, f);
             egui::CollapsingHeader::new("Compare complete loadout")
@@ -585,7 +604,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         let item = &offer.item;
         ui.horizontal(|ui| {
             slot_art(ui, f, offer.definition, item.base_quality);
-            ui.label(RichText::new(format!("{} · {} · {:?} · Lv {}", item.name, item.base_quality.name(), item.slot, offer.level)).color(quality_color(item.base_quality))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", item.personal.damage, item.personal.armor, item.personal.health, item.npc.damage_dice, item.npc.damage_add, item.npc.armor));
+            ui.label(RichText::new(format!("{} · {} · {:?} · Lv {}", item.name, item.base_quality.name(), item.slot, offer.level)).color(chrome::quality_colour(item.base_quality, f.settings.palette))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", item.personal.damage, item.personal.armor, item.personal.health, item.npc.damage_dice, item.npc.damage_add, item.npc.armor));
             if let Some((class, training)) = weapon {
                 ui.label(format!("{} · {}", class.name(), match training { OfferTraining::NpcIssued => "NPC issued gear", OfferTraining::Trained => "trained", OfferTraining::TrainingRequired => "training required" }));
             }
@@ -702,11 +721,14 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize], viewport:
                                 if ui
                                     .selectable_label(
                                         f.armory.selected_item == Some(item.id),
-                                        RichText::new(format!(
-                                            "{} #{} · Lv {}",
-                                            definition.name, item.id, item.level
-                                        ))
-                                        .color(quality_color(quality)),
+                                        chrome::quality_item_text(
+                                            format!(
+                                                "{} #{} · Lv {}",
+                                                definition.name, item.id, item.level
+                                            ),
+                                            quality,
+                                            f.settings,
+                                        ),
                                     )
                                     .clicked()
                                 {

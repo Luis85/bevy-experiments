@@ -245,6 +245,9 @@ pub(crate) struct FrontendParts {
     pub(super) menu: MenuUi,
     pub(super) cues: Vec<SoundCue>,
     pub(super) notices: Vec<RuntimeNotice>,
+    /// Stands in for `RenderPlan::pipelined`, which the App's widget pass
+    /// reads from the display plugin's resource.
+    pub(super) plan_pipelined: bool,
 }
 impl FrontendParts {
     /// Production startup: reads the save beside the one startup settings
@@ -354,6 +357,7 @@ impl FrontendParts {
             menu: MenuUi::default(),
             cues: Vec::new(),
             notices: Vec::new(),
+            plan_pipelined: crate::render_plan::PIPELINED_DEFAULT,
         }
     }
     /// Lends every part to widget code, as the draw system does with resources.
@@ -379,6 +383,7 @@ impl FrontendParts {
             menu: &mut self.menu,
             cues: &mut self.cues,
             perf: None,
+            plan_pipelined: self.plan_pipelined,
         }
     }
     /// Lends the runner's view of the parts; notices collect in `self.notices`.
@@ -417,6 +422,7 @@ impl FrontendParts {
             menu,
             cues: _,
             notices: _,
+            plan_pipelined: _,
         } = self;
         // A pending sub-state value is used when the camp first exists.
         let tab = nav.tab;

@@ -7,7 +7,7 @@ use super::{
 use crate::{
     art::{AMBER, INK, RED},
     runner::SaveIntent,
-    settings::{Action, Settings},
+    settings::{Action, Palette, QualityMarkers, Settings, WindowModeSetting},
 };
 use bevy_egui::egui;
 use horde_core::{campaign::Campaign, command::Command};
@@ -46,13 +46,15 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
                 gameplay_settings(ui, f);
                 if ui.available_width() >= 800.0 {
                     ui.columns(2, |columns| {
-                        display_settings(&mut columns[0], f.settings, &mut f.prefs.scale_draft);
+                        display_settings(&mut columns[0], f.settings, f.plan_pipelined);
+                        readability_settings(&mut columns[0], f.settings, &mut f.prefs.scale_draft);
                         combat_settings(&mut columns[0], f.settings);
-                        audio_settings(&mut columns[0], f.settings);
                         remap_settings(&mut columns[1], f, &ctx);
+                        audio_settings(&mut columns[1], f.settings);
                     });
                 } else {
-                    display_settings(ui, f.settings, &mut f.prefs.scale_draft);
+                    display_settings(ui, f.settings, f.plan_pipelined);
+                    readability_settings(ui, f.settings, &mut f.prefs.scale_draft);
                     combat_settings(ui, f.settings);
                     audio_settings(ui, f.settings);
                     remap_settings(ui, f, &ctx);
@@ -71,7 +73,54 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
 /// The interface-scale slider's label (UX-10).
 pub(super) const SCALE_LABEL: &str = "Interface scale (applies on release)";
 
-fn display_settings(ui: &mut egui::Ui, settings: &mut Settings, scale_draft: &mut Option<f32>) {
+/// The Low latency row's label while the setting matches how this process
+/// started.
+const LOW_LATENCY_LABEL: &str = "Low latency";
+/// The Low latency row's label while its pipelined half waits for a restart.
+const LOW_LATENCY_PENDING_LABEL: &str = "Low latency (applies after restart)";
+/// Why VSync is disabled under Low latency.
+const VSYNC_UNDER_LOW_LATENCY: &str =
+    "Low latency chooses how frames are presented, so VSync has no effect while it is on.";
+
+/// Window mode, VSync and Low latency. The widgets only edit `Settings`:
+/// `render_plan::apply_display_settings` applies window and present mode
+/// live. Pipelined rendering is fixed when the process starts
+/// (`plan_pipelined`), so Low latency is marked while it asks for the other
+/// state.
+fn display_settings(ui: &mut egui::Ui, settings: &mut Settings, plan_pipelined: bool) {
+    chrome::section(ui, "Display");
+    let mut fullscreen = settings.window_mode == WindowModeSetting::BorderlessFullscreen;
+    if ui
+        .checkbox(&mut fullscreen, "Fullscreen (borderless)")
+        .changed()
+    {
+        settings.window_mode = if fullscreen {
+            WindowModeSetting::BorderlessFullscreen
+        } else {
+            WindowModeSetting::Windowed
+        };
+    }
+    ui.add_enabled(
+        !settings.low_latency,
+        egui::Checkbox::new(&mut settings.vsync, "VSync"),
+    )
+    .on_disabled_hover_text(VSYNC_UNDER_LOW_LATENCY);
+    let pending = crate::render_plan::pipelined_for(settings.low_latency, None) != plan_pipelined;
+    ui.checkbox(
+        &mut settings.low_latency,
+        if pending {
+            LOW_LATENCY_PENDING_LABEL
+        } else {
+            LOW_LATENCY_LABEL
+        },
+    )
+    .on_hover_text(
+        "Presents each frame as soon as it is ready. Its render-thread change applies at the \
+         next start.",
+    );
+}
+
+fn readability_settings(ui: &mut egui::Ui, settings: &mut Settings, scale_draft: &mut Option<f32>) {
     chrome::section(ui, "Readability & effects");
     scale_slider(ui, settings, scale_draft);
     ui.checkbox(&mut settings.outlines, "Outline enemy silhouettes");
@@ -82,6 +131,29 @@ fn display_settings(ui: &mut egui::Ui, settings: &mut Settings, scale_draft: &mu
         "Show contextual field guidance",
     );
     ui.checkbox(&mut settings.blood, "Blood effects");
+    chrome::row(ui, |ui| {
+        ui.label("Quality markers");
+        for markers in QualityMarkers::ALL {
+            ui.selectable_value(&mut settings.quality_markers, markers, markers.label());
+        }
+    });
+    let mut colour_blind = settings.palette == Palette::ColorBlind;
+    if ui
+        .checkbox(&mut colour_blind, "Colour-blind quality palette")
+        .changed()
+    {
+        settings.palette = if colour_blind {
+            Palette::ColorBlind
+        } else {
+            Palette::Standard
+        };
+    }
+    // The six qualities as every item list now shows them.
+    chrome::row(ui, |ui| {
+        for quality in horde_core::quality::Quality::ALL {
+            chrome::quality_marker(ui, quality, settings);
+        }
+    });
 }
 /// The scale slider edits `scale_draft`; `Settings::scale`, which
 /// `draw_screen` applies every frame, takes the value when the drag ends, so
@@ -125,6 +197,16 @@ fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     ui.add(egui::Slider::new(&mut settings.master, 0.0..=1.0).text("Master"));
     ui.add(egui::Slider::new(&mut settings.effects, 0.0..=1.0).text("Combat effects"));
     ui.add(egui::Slider::new(&mut settings.ambience, 0.0..=1.0).text("Atmosphere"));
+    ui.add(egui::Slider::new(&mut settings.music, 0.0..=1.0).text("Music & stingers"));
+    ui.add(egui::Slider::new(&mut settings.ui, 0.0..=1.0).text("Interface sounds"));
+}
+/// The Controls row label of a core action. Pause is the battle's pause: the
+/// camp's world clock has its own key.
+fn binding_label(action: Action) -> &'static str {
+    match action {
+        Action::Pause => "Pause (battle)",
+        action => action.name(),
+    }
 }
 fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
     chrome::section(ui, "Controls");
@@ -138,7 +220,7 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
         .spacing([24.0, 6.0])
         .show(ui, |ui| {
             for action in Action::ALL {
-                ui.label(action.name());
+                ui.label(binding_label(action));
                 if ui
                     .button(if f.prefs.rebind == Some(action) {
                         "Press key or mouse button…".into()

@@ -102,6 +102,26 @@ pub enum QualityMarkers {
     Shape,
     TextAndShape,
 }
+impl QualityMarkers {
+    pub const ALL: [Self; 4] = [Self::ColorOnly, Self::Text, Self::Shape, Self::TextAndShape];
+    /// The Settings chip for this choice.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::ColorOnly => "Colour only",
+            Self::Text => "Text",
+            Self::Shape => "Shape",
+            Self::TextAndShape => "Text and shape",
+        }
+    }
+    /// An item label that shows quality by colour alone also names it.
+    pub fn text(self) -> bool {
+        matches!(self, Self::Text | Self::TextAndShape)
+    }
+    /// A quality is drawn with its shape beside it.
+    pub fn shape(self) -> bool {
+        matches!(self, Self::Shape | Self::TextAndShape)
+    }
+}
 
 /// Variants are append-only.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]

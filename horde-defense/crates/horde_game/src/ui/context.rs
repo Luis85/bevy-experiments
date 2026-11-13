@@ -43,6 +43,11 @@ pub(crate) struct UiCtx<'a> {
     pub(super) cues: &'a mut Vec<SoundCue>,
     /// Perf launches only: sub-spans and scene counts inside `ui::draw`.
     pub(super) perf: Option<&'a crate::diagnostics::PerfProbe>,
+    /// Whether this process started with pipelined rendering
+    /// (`RenderPlan::pipelined`). It never changes live, so Settings marks
+    /// Low latency "(applies after restart)" while the setting asks for the
+    /// other state.
+    pub(super) plan_pipelined: bool,
 }
 
 /// Per-screen UI state resources, grouped to keep `UiParams` within Bevy's
@@ -73,10 +78,17 @@ pub(crate) struct UiParams<'w> {
     next_screen: ResMut<'w, NextState<Screen>>,
     next_tab: ResMut<'w, NextState<Tab>>,
     state: ScreenState<'w>,
+    /// Absent in a headless App without the display plugin.
+    plan: Option<Res<'w, crate::render_plan::RenderPlan>>,
 }
 impl UiParams<'_> {
     pub(crate) fn ctx<'a>(&'a mut self, cues: &'a mut Vec<SoundCue>) -> UiCtx<'a> {
         let state = &mut self.state;
+        // Without a plan nothing is pending a restart.
+        let plan_pipelined = self.plan.as_ref().map_or_else(
+            || crate::render_plan::pipelined_for(self.settings.low_latency, None),
+            |plan| plan.pipelined,
+        );
         UiCtx {
             game: &self.session.game,
             runtime: &mut self.runtime,
@@ -98,6 +110,7 @@ impl UiParams<'_> {
             menu: &mut state.menu,
             cues,
             perf: None,
+            plan_pipelined,
         }
     }
 }
