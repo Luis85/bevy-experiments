@@ -2,7 +2,7 @@
 //! grenades/Molotovs in flight.
 use super::super::{AMBER, ArenaProjection, box_at, soft_shadow};
 use crate::{
-    battle_view::BattleViewModel,
+    battle_view::{BattleViewModel, FireZoneView},
     visual_assets::{self, ArtTextures},
 };
 use bevy_egui::egui::{self, Color32 as C, Painter, Stroke, vec2};
@@ -44,6 +44,26 @@ pub(crate) fn flame_frame(tick: u64, index: usize, reduced: bool) -> FlameFrame 
     }
 }
 
+/// The zones whose flames a frame draws: every burning zone, or the newest
+/// [`FIRE_ZONES_DRAWN_MAX`] of them.
+pub(super) fn burning(view: &BattleViewModel) -> Vec<&FireZoneView> {
+    let mut burning: Vec<_> = view.fire_zones.iter().collect();
+    if burning.len() > FIRE_ZONES_DRAWN_MAX {
+        burning.sort_by_key(|zone| std::cmp::Reverse(zone.id));
+        burning.truncate(FIRE_ZONES_DRAWN_MAX);
+    }
+    burning
+}
+
+/// The flames one drawn zone shows.
+pub(super) fn flames_per_zone(reduced: bool) -> usize {
+    if reduced {
+        FLAMES_PER_ZONE_REDUCED
+    } else {
+        FLAMES_PER_ZONE
+    }
+}
+
 pub(super) fn fire_zones(
     p: &Painter,
     arena: ArenaProjection,
@@ -73,22 +93,13 @@ pub(super) fn fire_zones(
             ),
         ));
     }
-    let mut burning: Vec<_> = view.fire_zones.iter().collect();
-    if burning.len() > FIRE_ZONES_DRAWN_MAX {
-        burning.sort_by_key(|zone| std::cmp::Reverse(zone.id));
-        burning.truncate(FIRE_ZONES_DRAWN_MAX);
-    }
-    for zone in burning {
+    for zone in burning(view) {
         let at = arena.world(zone.center[0], zone.center[1]);
         let radii = unit * zone.radius;
         let fade = (zone.ticks_left as f32 / 45.).min(1.);
         // The authoritative radius remains readable; small pixel flames stay
         // sparse enough that hostiles and contact windups remain legible.
-        let count = if reduced {
-            FLAMES_PER_ZONE_REDUCED
-        } else {
-            FLAMES_PER_ZONE
-        };
+        let count = flames_per_zone(reduced);
         for n in 0..count {
             let theta = n as f32 * 2.399_963 + (zone.id % 19) as f32 * 0.3;
             let spread = ((n + 1) as f32 / (count + 1) as f32).sqrt() * 0.83;

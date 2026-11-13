@@ -2790,3 +2790,22 @@ fn cue_bars_and_labels_scale_with_zoom_inside_their_clamps() {
         assert_eq!((cue::font(sy) * 2.0).fract(), 0.0, "half-point steps");
     }
 }
+
+/// Design-vfx-lighting §13 (W5-09): every `perf_budget::FX_BUDGET` row equals
+/// the presentation cap the painters enforce, so neither side changes alone.
+#[test]
+fn fx_budget_matches_presentation_caps() {
+    let caps = [
+        ("lights", light::LIGHTS_MAX),
+        ("decals", decals::BLOOD_DECALS_MAX),
+        ("scorch", crate::battle_view::SCORCH_MAX),
+        ("explosions_concurrent", explosion::EXPLOSIONS_MAX),
+        ("hit_events", hits::HIT_EVENTS_MAX),
+        ("flames_per_zone", ordnance::flames_per_zone(false)),
+        ("flames_per_zone_reduced", ordnance::flames_per_zone(true)),
+        ("fire_zones_drawn", ordnance::FIRE_ZONES_DRAWN_MAX),
+        ("elite_tells", elite::ELITE_TELLS_MAX),
+        ("particles", crate::animation::MAX_PARTICLES),
+    ];
+    assert_eq!(crate::perf_budget::FX_BUDGET, caps);
+}

@@ -204,6 +204,7 @@ One row per module. Paths are relative to the crate's `src/` (`crates/horde_core
 | `scripts/measure_performance.ps1` | Native frame evidence against `docs/PERF_BUDGET.json`: peak, progressed-peak and stress scenes, `-Profile`, `-VsyncOff`, `-Repeat`, budget exit codes | Building or gating outside its own run | `-Scene`, `-Profile`, `-SelfTest` | `scripts/tests/run_script_tests.ps1`, `perf_scenes_agree_across_script_budget_and_review_matrix` |
 | `scripts/lib/Native.ps1` | The shared Windows PowerShell 5.1 harness: `Invoke-Native` and target resolution through `CARGO_TARGET_DIR` | PowerShell 7 APIs | `Invoke-Native`, `Resolve-HordeTarget` | `scripts/tests/run_script_tests.ps1`, `powershell_scripts_are_51_safe` |
 | `scripts/check_views.py` | The View graph check and this table's coverage gate | Rust behaviour | `check`, `check_architecture` | `scripts/tests/test_check_views.py` |
+| `scripts/measure_field_luminance.py` | The capture-level luminance gates (W5-09): field mean of a still from its sidecar `arena_rect`, the night/dawn ratio, the reduced MOTION gate and the storm MOTION gate | Taking captures; the model-level gates in `art/lighting.rs` | `mean`, `ratio`, `motion`, `storm` | `scripts/tests/test_measure_field_luminance.py` |
 
 ## Mutation path
 

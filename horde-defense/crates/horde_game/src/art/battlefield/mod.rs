@@ -142,6 +142,66 @@ pub fn battlefield(
     }
 }
 
+/// What one frame draws of each budgeted effect class
+/// (`perf_budget::FX_BUDGET`), counted by the collectors the painter itself
+/// calls.
+#[cfg(all(test, feature = "review"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FxCounts {
+    pub lights: usize,
+    pub blood_decals: usize,
+    pub scorch: usize,
+    pub explosions: usize,
+    pub hit_events: usize,
+    pub fire_zones: usize,
+    pub flames_per_zone: usize,
+    pub elite_tells: usize,
+    pub particles: usize,
+}
+#[cfg(all(test, feature = "review"))]
+impl FxCounts {
+    /// Each count with its `FX_BUDGET` row.
+    pub(crate) fn rows(&self) -> [(&'static str, usize); 9] {
+        [
+            ("lights", self.lights),
+            ("decals", self.blood_decals),
+            ("scorch", self.scorch),
+            ("explosions_concurrent", self.explosions),
+            ("hit_events", self.hit_events),
+            ("fire_zones_drawn", self.fire_zones),
+            ("flames_per_zone", self.flames_per_zone),
+            ("elite_tells", self.elite_tells),
+            ("particles", self.particles),
+        ]
+    }
+}
+/// The effect counts of the frame `battlefield` paints of `view` in `r`.
+#[cfg(all(test, feature = "review"))]
+pub(crate) fn fx_counts(
+    r: Rect,
+    view: &BattleViewModel,
+    a: &Attempt,
+    blood: bool,
+    reduced: bool,
+) -> FxCounts {
+    let arena = ArenaProjection::for_attempt(r, a);
+    let muzzle = arena.world(view.defender.position[0], view.defender.position[1]);
+    FxCounts {
+        lights: light::collect(arena, view, Some(muzzle), Default::default(), reduced).len(),
+        blood_decals: decals::decals(a, blood, reduced).len(),
+        scorch: view.scorch.len(),
+        explosions: explosion::blasts(arena, view).len(),
+        hit_events: hits::drawn(view).count(),
+        fire_zones: ordnance::burning(view).len(),
+        flames_per_zone: ordnance::flames_per_zone(reduced),
+        elite_tells: elite::drawn(view)
+            .into_iter()
+            .filter(|drawn| *drawn)
+            .count(),
+        particles: view.particles.len(),
+    }
+}
+
 /// `a` is read only where the survivor rig resolves poses from the attempt:
 /// the defender's action sample and projectile release origins. Returns what
 /// the hostiles' layers drew.

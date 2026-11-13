@@ -46,6 +46,25 @@ pub const CORPSES_COLLAPSING_DRAWN: usize = 64;
 /// Longest any battlefield effect stays on screen.
 pub const FX_LIFETIME_MAX_SECONDS: f64 = 2.0;
 
+/// Per-frame effect caps (design-vfx-lighting §13, W5-09): the most of each
+/// effect class one battlefield frame draws. The presentation constants equal
+/// these rows (`art::battlefield` test `fx_budget_matches_presentation_caps`)
+/// and the fx-stress scene stays within them
+/// (`fx_stress_shape_counts_within_perf_budget`). W5-11 mirrors the table
+/// into `docs/PERF_BUDGET.json`.
+pub const FX_BUDGET: &[(&str, usize)] = &[
+    ("lights", 24),
+    ("decals", 64),
+    ("scorch", 8),
+    ("explosions_concurrent", 8),
+    ("hit_events", 64),
+    ("flames_per_zone", 21),
+    ("flames_per_zone_reduced", 9),
+    ("fire_zones_drawn", 8),
+    ("elite_tells", 48),
+    ("particles", 128),
+];
+
 /// egui gates for the battlefield painter: the measured maximum x 1.25
 /// (W1-51, `PERF_BUDGET.json` `evidence.egui_measured`), never above the
 /// W1-32 hard ceilings (48 primitives; 40,000 / 72,000 vertices) and, by

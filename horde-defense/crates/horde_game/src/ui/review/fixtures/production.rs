@@ -23,6 +23,7 @@ use horde_core::{
     command::{Command, CommandOutcome},
     content::{Mode, Slot, StructureKind, content},
     defenders::DefenderId,
+    enemy_catalog::{ResolvedEnemy, enemy_catalog},
     quality::Quality,
     sim::{Actor, Attempt, DEFENSE_LINE, EnemyPhase, Input, Outcome, SimEvent},
     skill_catalog::{CampaignFeature, SkillEffect, skills},
@@ -106,6 +107,8 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "equipment-autosell" => prepare_equipment_autosell(f),
         "results-liberation-recruit" => prepare_results_liberation_recruit(f),
         "takeover-battle" => prepare_takeover_battle(f),
+        "dawn-reference" => prepare_dawn_reference(f),
+        "elite-tells" => prepare_elite_tells(f),
         _ => {
             let Some(&(_, class, item)) = WEAPON_CLASS_SCENES
                 .iter()
@@ -826,4 +829,188 @@ fn prepare_takeover_battle(f: &mut FrontendParts) {
     f.campaign.stage = 0;
     f.campaign.mode = Mode::Npc;
     f.screen = Screen::Battle;
+}
+
+// ----- W5-09: the wave-5 graphics scenes (design-vfx-lighting §12, §14) -----
+
+/// The elite-tells rank: the spitter-windup rank, whose stage-0 waves field
+/// enough archetypes for every affix to be offered to one.
+pub(in crate::ui::review) const ELITE_TELLS_RANK: u64 = SPITTER_WINDUP_RANK;
+/// Hostiles for every affix plus a plain one walk in well inside two minutes.
+const ELITE_TELLS_TICK_CAP: u32 = 60 * 120;
+/// The share of fx-stress hostiles that are elite, in percent.
+#[cfg(feature = "review")]
+pub(in crate::ui::review) const FX_STRESS_ELITE_PCT: usize = 30;
+
+/// The country and stage of the night-checkpoint scene.
+fn night_checkpoint_stage() -> (String, usize) {
+    first_stage_where(|_, _, theme| theme.lighting == "night" && theme.id == "checkpoint")
+        .expect("world.json has a night checkpoint stage")
+}
+
+/// The night-checkpoint scene's dawn pair for the luminance gate: the first
+/// dawn stage of the same country, deployed paused the same way, so the same
+/// biome and field geometry at tick 0 with no hostile.
+fn prepare_dawn_reference(f: &mut FrontendParts) {
+    let (country, _) = night_checkpoint_stage();
+    let (_, stage) = first_stage_where(|c, _, theme| c.id == country && theme.lighting == "dawn")
+        .unwrap_or_else(|| panic!("{country} has a dawn stage"));
+    entitle_start(f, &country);
+    entitle_clears(f, stage);
+    deploy(f, stage, Mode::Personal);
+    pause(f);
+}
+
+/// For every shipped affix, in catalogue order, a hostile inside the field
+/// and the elite profile `elite_profile` gives it for that affix. A hostile
+/// that already rolled an affix covers it. None until the field holds a
+/// hostile for every affix and one more that stays plain.
+fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
+    let catalog = enemy_catalog();
+    let rolled = |affix: &str| {
+        a.enemies.iter().any(|e| {
+            e.resolved
+                .as_ref()
+                .and_then(|profile| profile.elite.as_ref())
+                .is_some_and(|mark| mark.affix_id == affix)
+        })
+    };
+    let mut cast: Vec<(u64, ResolvedEnemy)> = Vec::new();
+    for affix in catalog.elite_affix_ids().filter(|affix| !rolled(affix)) {
+        let pick = a
+            .enemies
+            .iter()
+            .filter(|e| !e.boss && !e.split_child && e.x < a.width_yards - 1.0)
+            .filter(|e| cast.iter().all(|(id, _)| *id != e.id))
+            .find_map(|e| {
+                let base = e.resolved.as_ref().filter(|base| base.elite.is_none())?;
+                (0..1024)
+                    .filter_map(|key| catalog.elite_profile(base, key))
+                    .find(|profile| {
+                        profile
+                            .elite
+                            .as_ref()
+                            .is_some_and(|mark| mark.affix_id == affix)
+                    })
+                    .map(|profile| (e.id, profile))
+            })?;
+        cast.push(pick);
+    }
+    let plain = a.enemies.iter().any(|e| {
+        !e.boss
+            && e.x < a.width_yards - 1.0
+            && cast.iter().all(|(id, _)| *id != e.id)
+            && e.resolved.as_ref().is_none_or(|p| p.elite.is_none())
+    });
+    plain.then_some(cast)
+}
+
+/// The cast hostiles as elites: each takes the catalogue's own elite profile
+/// for its affix (presentation staging; hit points stay as spawned).
+fn entitle_elites(f: &mut FrontendParts, cast: Vec<(u64, ResolvedEnemy)>) {
+    let a = f.game.staging().attempt().expect("a live defense");
+    for (id, profile) in cast {
+        let enemy = a
+            .enemies
+            .iter_mut()
+            .find(|e| e.id == id)
+            .expect("a cast hostile");
+        enemy.resolved = Some(profile);
+    }
+}
+
+/// One live elite of every shipped affix beside plain hostiles: a real
+/// stage-0 defense at `ELITE_TELLS_RANK`, played with the smoke input until
+/// the field can cast every affix, then paused.
+fn prepare_elite_tells(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    entitle_victories(f, ELITE_TELLS_RANK);
+    deploy(f, 0, Mode::Personal);
+    let mut cast = None;
+    for _ in 0..ELITE_TELLS_TICK_CAP {
+        cast = elite_tell_casting(f.game.attempt().expect("the defense stands"));
+        if cast.is_some() {
+            break;
+        }
+        let input = horde_core::sim::smoke_input(&f.game);
+        f.game.tick(input);
+    }
+    let cast = cast.unwrap_or_else(|| {
+        panic!("no hostile for every affix within {ELITE_TELLS_TICK_CAP} ticks")
+    });
+    entitle_elites(f, cast);
+    pause(f);
+}
+
+/// The fx-stress effect load on top of the stress fixture: blood decals on,
+/// a fourth burning zone with its Molotov burst, a grenade burst, and
+/// `FX_STRESS_ELITE_PCT` percent elites spread over the crowd. Review-only
+/// staging on a game that never saves; the `stress` perf scene stays bare.
+#[cfg(feature = "review")]
+pub(in crate::ui::review) fn entitle_fx_stress_load(f: &mut FrontendParts) {
+    use horde_core::ordnance::{self, OrdnanceKind};
+    use horde_core::sim::{Event, EventKind};
+    f.settings.blood = true;
+    let catalog = enemy_catalog();
+    let a = f.game.staging().attempt().expect("the stress field");
+    let centre = a.lane_count / 2;
+    let mut zone = a.ordnance.fire_zones[0].clone();
+    zone.id = a.next_id;
+    zone.cell = [zone.cell[0] + 9, centre + 2];
+    a.next_id += 2;
+    let grenade = ordnance::catalog().definition(OrdnanceKind::Grenade);
+    // A burst names its projectile: burning ground with that id is a
+    // Molotov's, anything else a grenade's (`battle_view` rule).
+    let bursts = [
+        (zone.id, ordnance::cell_center(zone.cell), zone.radius),
+        (
+            zone.id + 1,
+            ordnance::cell_center([zone.cell[0] - 4, centre.saturating_sub(2)]),
+            grenade.radius,
+        ),
+    ];
+    a.ordnance.fire_zones.push(zone);
+    for (projectile, to, radius) in bursts {
+        let seq = a.events.iter().map(|e| e.seq).max().unwrap_or(0) + 1;
+        a.events.push_back(Event {
+            kind: EventKind::Explosion,
+            from: a.defender_position(),
+            to,
+            value: (radius * 100.0) as i32,
+            tick: a.tick,
+            actor_id: Some(projectile),
+            target_id: None,
+            lane: None,
+            duration_ticks: 0,
+            seq,
+        });
+    }
+    let hostiles = a.enemies.iter().filter(|e| !e.boss).count();
+    let wanted = (hostiles * FX_STRESS_ELITE_PCT).div_ceil(100);
+    let is_elite = |e: &horde_core::sim::Enemy| {
+        e.resolved
+            .as_ref()
+            .is_some_and(|profile| profile.elite.is_some())
+    };
+    let mut elites = a.enemies.iter().filter(|e| !e.boss && is_elite(e)).count();
+    // Every third hostile first, so the elites spread over the whole crowd.
+    for pass in 0..3 {
+        for e in a.enemies.iter_mut().skip(pass).step_by(3) {
+            if elites >= wanted {
+                return;
+            }
+            if e.boss || e.split_child || is_elite(e) {
+                continue;
+            }
+            let Some(profile) = e
+                .resolved
+                .as_ref()
+                .and_then(|base| catalog.elite_profile(base, e.id))
+            else {
+                continue;
+            };
+            e.resolved = Some(profile);
+            elites += 1;
+        }
+    }
 }

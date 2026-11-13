@@ -120,6 +120,19 @@ const fn wave3_still(
     }
 }
 
+/// A wave-5 graphics still (W5-09, design-vfx-lighting §14).
+const fn wave5_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    motion: bool,
+) -> ReviewScene {
+    ReviewScene {
+        since_wave: 5,
+        ..wave1_still(name, owner, before_proxy, motion)
+    }
+}
+
 /// Every named scene. Workshop prefixes are in `WORKSHOP_PREFIXES`.
 pub const REVIEW_SCENES: &[ReviewScene] = &[
     // The 41 wave-0 capture_review.ps1 stills, in that script's order.
@@ -233,6 +246,10 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
         Some("Choose next country"),
     ),
     wave3_still("takeover-battle", "campaign-defenders", "npc", None),
+    // W5-09 (design-vfx-lighting §12, §14): the night-checkpoint scene's dawn
+    // pair for the luminance gate, and one elite of every shipped affix.
+    wave5_still("dawn-reference", "vfx-lighting", "arid", false),
+    wave5_still("elite-tells", "vfx-lighting", "battle", false),
 ];
 
 /// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
@@ -755,7 +772,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 3 + 6
+            46 + 13 + 3 + 6 + 2
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

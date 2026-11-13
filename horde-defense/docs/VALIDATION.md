@@ -1298,6 +1298,7 @@ cargo test --locked -p horde-defense --features dev
 cargo run --locked -p horde-defense -- --smoke
 python -I -B scripts/check_views.py
 python -I -B scripts/tests/test_check_views.py
+python -I -B scripts/tests/test_measure_field_luminance.py
 python -I -B scripts/generate_audio.py --check
 python -I -B scripts/generate_atmosphere_audio.py --check
 python -I -B scripts/generate_world.py --check

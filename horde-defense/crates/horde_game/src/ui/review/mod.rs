@@ -161,6 +161,10 @@ pub(crate) struct ReviewFrameFacts {
     pub(crate) lanes: Option<u8>,
     pub(crate) width_yards: Option<f32>,
     pub(crate) hud_rows: Option<u8>,
+    /// The battle stage's lighting ("night", "dawn", ...) and whether it is a
+    /// storm stage, read by `scripts/measure_field_luminance.py` (W5-09).
+    pub(crate) lighting: Option<String>,
+    pub(crate) storm: Option<bool>,
     pub(crate) reduced_effects: bool,
     pub(crate) ui_scale: f32,
     pub(crate) windows_scale: f32,
@@ -205,6 +209,9 @@ impl ReviewFrameFacts {
             lanes: attempt.map(|a| a.lane_count),
             width_yards: attempt.map(|a| a.width_yards),
             hud_rows: in_battle.then_some(battle.bar_rows),
+            lighting: attempt
+                .map(|a| format!("{:?}", crate::art::scene_look(a).lighting).to_lowercase()),
+            storm: attempt.map(|a| crate::art::scene_look(a).storm),
             reduced_effects: settings.reduced_effects,
             ui_scale: crate::settings::applied_scale(settings.scale),
             windows_scale: 1.0,

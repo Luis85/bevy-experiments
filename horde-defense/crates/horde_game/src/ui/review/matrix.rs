@@ -63,7 +63,8 @@ fn stage(f: &mut FrontendParts) {
     }
     // The unsaveable 400-enemy perf fixture (launch refuses it as practice):
     // it never submits a save, so no autosave can fail on it. fx-stress is
-    // the same fixture registered as a still (one fixture, two names).
+    // the same fixture registered as a still (one fixture, two names), plus
+    // its effect load.
     #[cfg(feature = "review")]
     if matches!(screen.as_str(), "stress" | "fx-stress") {
         f.game = horde_core::sim::stress_render_fixture().expect("stress render fixture");
@@ -76,6 +77,11 @@ fn stage(f: &mut FrontendParts) {
             .and_then(|a| a.country_id.clone())
             .expect("stress country stage");
         f.status.message = "Synthetic stress fixture · 400 drawn + 3 expeditions · perf headroom, not a gameplay claim".into();
+        // The still also carries the wave-5 effect load (W5-09); the perf
+        // scene stays the bare fixture.
+        if screen == "fx-stress" {
+            production::entitle_fx_stress_load(f);
+        }
         return;
     }
     if matches!(screen.as_str(), "peak" | "progressed-peak" | "max-lanes") {

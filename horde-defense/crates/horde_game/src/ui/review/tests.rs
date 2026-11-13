@@ -275,6 +275,9 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("equipment-autosell", Screen::Camp, Some(Tab::Armory)),
     ("results-liberation-recruit", Screen::Results, None),
     ("takeover-battle", Screen::Battle, None),
+    // W5-09.
+    ("dawn-reference", Screen::Battle, None),
+    ("elite-tells", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -2026,4 +2029,247 @@ fn save_error_fixture_opens_retry_modal() {
         "the modal shows the OS error"
     );
     assert!(!f.paths.campaign().exists(), "no save was attempted");
+}
+
+// ----- W5-09: the wave-5 graphics review scenes -----
+
+/// Design-vfx-lighting §12 (night gate): dawn-reference is the dawn stage of
+/// the night-checkpoint scene's own country, on the same field geometry,
+/// paused at tick 0 with no hostile, so the two captures differ by the stage
+/// theme alone.
+#[test]
+fn dawn_reference_pairs_the_night_checkpoint_field() {
+    use crate::art::lighting::Lighting;
+    let night = staged("night-checkpoint");
+    let dawn = staged("dawn-reference");
+    assert!(dawn.screen == Screen::Battle, "{:?}", dawn.screen);
+    let (n, d) = (
+        night.game.attempt().expect("the night stage"),
+        dawn.game.attempt().expect("a deployed dawn stage"),
+    );
+    assert!(d.paused && dawn.game.global_paused(), "deployed paused");
+    assert_eq!((d.tick, d.enemies.len()), (0, 0), "tick 0, no hostile");
+    assert_eq!((n.tick, n.enemies.len()), (0, 0));
+    assert_eq!(d.country_id, n.country_id, "the same country and biome");
+    assert_ne!(d.stage, n.stage);
+    assert_eq!(
+        (d.lane_count, d.width_yards),
+        (n.lane_count, n.width_yards),
+        "the same lanes and width"
+    );
+    let (night_look, dawn_look) = (crate::art::scene_look(n), crate::art::scene_look(d));
+    assert!(dawn_look.lighting == Lighting::Dawn, "a dawn stage");
+    assert!(night_look.lighting == Lighting::Night, "a night stage");
+    assert_eq!(dawn_look.theme_index, night_look.theme_index);
+    assert!(!dawn_look.storm && !night_look.storm, "no lightning");
+}
+
+/// Design-vfx-lighting §14: elite-tells holds a live elite of every shipped
+/// affix on the visible field, paused, and the view gives each its tell.
+#[test]
+fn elite_tells_fixture_fields_every_shipped_affix() {
+    let f = staged("elite-tells");
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    let a = f.game.attempt().expect("a live defense");
+    assert!(a.paused && f.game.global_paused(), "paused");
+    let catalog = horde_core::enemy_catalog::enemy_catalog();
+    let affixes: Vec<&str> = catalog.elite_affix_ids().collect();
+    assert!(!affixes.is_empty(), "the catalogue ships affixes");
+    for affix in &affixes {
+        let elite = a.enemies.iter().find(|e| {
+            e.resolved
+                .as_ref()
+                .and_then(|profile| profile.elite.as_ref())
+                .is_some_and(|mark| mark.affix_id == *affix)
+        });
+        let elite = elite.unwrap_or_else(|| panic!("no {affix} elite on the field"));
+        assert!(
+            !elite.boss && elite.x < a.width_yards,
+            "{affix}: a hostile inside the field (x {})",
+            elite.x
+        );
+    }
+    let view = fx_view(&f, false);
+    let tells = view.enemies.iter().filter(|e| e.elite.is_some()).count();
+    assert!(tells >= affixes.len(), "{tells} tells");
+    assert!(
+        view.enemies.iter().any(|e| e.elite.is_none()),
+        "a plain hostile stays for comparison"
+    );
+}
+
+fn fx_view(f: &FrontendParts, reduced: bool) -> crate::battle_view::BattleViewModel {
+    let a = f.game.attempt().expect("a live field");
+    crate::battle_view::BattleViewModel::build(
+        a,
+        crate::animation::SceneAnimation::sample(a, reduced),
+        crate::battle_view::SceneBlend::NONE,
+        reduced,
+    )
+}
+
+#[cfg(feature = "review")]
+fn fx_stress_counts(f: &FrontendParts, reduced: bool) -> crate::art::FxCounts {
+    let arena = egui::Rect::from_min_size(egui::pos2(24.0, 124.0), egui::vec2(1392.0, 692.0));
+    crate::art::fx_counts(
+        arena,
+        &fx_view(f, reduced),
+        f.game.attempt().unwrap(),
+        f.settings.blood,
+        reduced,
+    )
+}
+
+/// Design-vfx-lighting §14: fx-stress is the stress field (17 lanes, night, a
+/// boss, the machine-gun Npc and the turrets) carrying the effect load: four
+/// burning zones, a grenade and a Molotov burst, blood decals on and at least
+/// 30% elites. The `stress` perf scene carries none of the extra load.
+#[cfg(feature = "review")]
+#[test]
+fn fx_stress_fixture_carries_the_effect_load() {
+    use crate::art::lighting::Lighting;
+    use horde_core::{content::StructureKind, ordnance::OrdnanceKind, weapons::WeaponClass};
+    let f = staged("fx-stress");
+    let a = f.game.attempt().expect("the stress field");
+    assert!(a.paused);
+    assert_eq!(a.lane_count, 17);
+    assert!(
+        crate::art::scene_look(a).lighting == Lighting::Night,
+        "night"
+    );
+    assert!(a.enemies.iter().any(|e| e.boss), "a boss");
+    assert!(
+        a.structures.iter().any(|s| s.kind == StructureKind::Turret),
+        "a turret"
+    );
+    assert!(
+        a.gear_snapshot
+            .iter()
+            .any(|record| record.weapon_class == Some(WeaponClass::MachineGun)),
+        "the machine gun"
+    );
+    assert!(f.settings.blood, "blood decals on");
+    assert_eq!(a.ordnance.fire_zones.len(), 4, "four burning zones");
+    let view = fx_view(&f, false);
+    let blasts: Vec<_> = view.fx.iter().filter_map(|e| e.ordnance).collect();
+    assert_eq!(blasts.len(), 2, "two bursts: {blasts:?}");
+    assert!(blasts.contains(&OrdnanceKind::Grenade) && blasts.contains(&OrdnanceKind::Molotov));
+    let hostiles = a.enemies.iter().filter(|e| !e.boss).count();
+    let elites = a
+        .enemies
+        .iter()
+        .filter(|e| !e.boss && e.resolved.as_ref().is_some_and(|p| p.elite.is_some()))
+        .count();
+    assert!(
+        elites * 10 >= hostiles * 3,
+        "{elites} of {hostiles} hostiles are elite"
+    );
+    // The perf scene keeps the bare fixture.
+    let stress = staged("stress");
+    let s = stress.game.attempt().unwrap();
+    assert_eq!(s.ordnance.fire_zones.len(), 3);
+    assert!(s.events.is_empty() && !stress.settings.blood);
+}
+
+/// Acceptance G7.5 (design-vfx-lighting §13): every budgeted effect class of
+/// the fx-stress frame stays within `perf_budget::FX_BUDGET`, paused and over
+/// 96 live ticks, with normal and reduced effects; the paused still reaches
+/// the caps the load is built to reach.
+#[cfg(feature = "review")]
+#[test]
+fn fx_stress_shape_counts_within_perf_budget() {
+    use horde_core::{command::Command, sim::Input};
+    let budget = |name: &str| {
+        crate::perf_budget::FX_BUDGET
+            .iter()
+            .find(|(row, _)| *row == name)
+            .unwrap_or_else(|| panic!("no fx budget row {name}"))
+            .1
+    };
+    for reduced in [false, true] {
+        let mut f = staged("fx-stress");
+        let still = fx_stress_counts(&f, reduced);
+        assert_eq!(still.fire_zones, 4, "reduced {reduced}");
+        assert_eq!(still.explosions, 2, "reduced {reduced}");
+        assert_eq!(
+            still.elite_tells,
+            budget("elite_tells"),
+            "the tell cap is reached"
+        );
+        assert_eq!(
+            still.blood_decals,
+            budget("decals"),
+            "the decal cap is reached"
+        );
+        assert_eq!(still.lights == 0, reduced, "pools only with normal effects");
+        f.game.apply(&Command::SetPaused(false)).expect("unpause");
+        for tick in 0..=96 {
+            let counts = fx_stress_counts(&f, reduced);
+            for (name, drawn) in counts.rows() {
+                assert!(
+                    drawn <= budget(name),
+                    "tick {tick} reduced {reduced}: {name} {drawn} > {}",
+                    budget(name)
+                );
+            }
+            f.game.tick(Input::default());
+        }
+    }
+}
+
+/// The additive colours of one frame's shapes: mesh vertices and the fills
+/// and strokes of the plain shapes (egui's additive colours have alpha 0).
+#[cfg(feature = "review")]
+fn additive_colors(shape: &egui::Shape) -> usize {
+    use egui::Shape;
+    let additive = |c: egui::Color32| usize::from(c.a() == 0 && c != egui::Color32::TRANSPARENT);
+    match shape {
+        Shape::Vec(shapes) => shapes.iter().map(additive_colors).sum(),
+        Shape::Mesh(mesh) => mesh.vertices.iter().map(|v| additive(v.color)).sum(),
+        Shape::Circle(c) => additive(c.fill) + additive(c.stroke.color),
+        Shape::Ellipse(e) => additive(e.fill) + additive(e.stroke.color),
+        Shape::Rect(r) => additive(r.fill) + additive(r.stroke.color),
+        Shape::LineSegment { stroke, .. } => additive(stroke.color),
+        _ => 0,
+    }
+}
+
+/// The additive colours of each of 96 live fx-stress frames, drawn as the
+/// App draws them (one tick a frame).
+#[cfg(feature = "review")]
+fn fx_stress_sequence(reduced: bool) -> Vec<usize> {
+    use horde_core::{command::Command, sim::Input};
+    let mut f = staged("fx-stress");
+    f.settings.reduced_effects = reduced;
+    f.game.apply(&Command::SetPaused(false)).expect("unpause");
+    (0..96)
+        .map(|_| {
+            f.game.tick(Input::default());
+            let output = one_frame(&mut f);
+            output
+                .shapes
+                .iter()
+                .map(|clipped| additive_colors(&clipped.shape))
+                .sum()
+        })
+        .collect()
+}
+
+/// Acceptance G7.4 (reduced MOTION gate, the headless half): 96 live frames
+/// of fx-stress in reduced effects paint no additive vertex, so no light
+/// pool, muzzle flash, burst glow or sky flash. The same 96 frames with
+/// normal effects paint additive vertices in every frame, which proves the
+/// detector sees them. The pixel half (frame-to-frame luminance) is
+/// `scripts/measure_field_luminance.py motion` on a capture_motion export.
+#[cfg(feature = "review")]
+#[test]
+fn reduced_96_frame_fx_stress_sequence_has_no_additive_vertex() {
+    let normal = fx_stress_sequence(false);
+    assert_eq!(normal.len(), 96);
+    assert!(
+        normal.iter().all(|&additive| additive > 0),
+        "normal effects light every frame: {normal:?}"
+    );
+    let reduced = fx_stress_sequence(true);
+    assert_eq!(reduced, [0; 96], "reduced effects paint no additive vertex");
 }
