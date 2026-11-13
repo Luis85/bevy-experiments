@@ -7,6 +7,7 @@ use super::{
     layout::{BAR_BUTTON_PADDING_Y, BAR_ROW_GAP, PANEL_FILL_ALPHA, occluded_spawn_cues},
     overlays::{corner_hud, field_hint_callout, incoming_cues, pause_banner},
     projection,
+    retreat::retreat_button,
 };
 use crate::{
     art::{self, INK, MUTED, TEXT},
@@ -295,23 +296,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                                 });
                         });
                     }
-                    if rows
-                        .widget(ui.button(if observed {
-                            "Recall & train"
-                        } else {
-                            "Retreat & train"
-                        }))
-                        .on_hover_text(
-                            "Withdraw to Journey upgrades. Every earned coin and item is retained.",
-                        )
-                        .clicked()
-                    {
-                        f.battle.fire_latched = false;
-                        f.dispatch(
-                            Command::Withdraw,
-                            "Rewards retained. Rest, train, and retry.",
-                        );
-                    }
+                    // Withdraws only after a 0.8 s hold (UX-13).
+                    retreat_button(ui, f, observed, &mut rows);
                     let management = ui.menu_button("Management", |ui| {
                         ui.set_max_width(320.);
                         ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);

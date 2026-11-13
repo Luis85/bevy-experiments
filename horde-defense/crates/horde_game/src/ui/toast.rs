@@ -103,6 +103,20 @@ impl Toasts {
             self.queue.pop_front();
         }
     }
+    /// `push_for` from inside a pass at input-clock second `now`: the toast's
+    /// life begins at once, not on the next frame.
+    pub(crate) fn push_at(
+        &mut self,
+        text: impl Into<String>,
+        kind: ToastKind,
+        secs: f64,
+        now: f64,
+    ) {
+        self.push_for(text, kind, secs);
+        if let Some(toast) = self.queue.back_mut() {
+            toast.shown_at = Some(now);
+        }
+    }
     /// Starts the clock of every new toast and drops every expired one.
     pub(super) fn advance(&mut self, now: f64) {
         for toast in &mut self.queue {

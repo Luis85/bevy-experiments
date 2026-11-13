@@ -229,6 +229,27 @@ impl Harness {
         events: Vec<Event>,
         size: Vec2,
     ) -> FullOutput {
+        self.frame_timed(f, view, events, size, None)
+    }
+    /// One frame at the harness target with the input clock at `time`
+    /// (seconds): the wall clock a hold or a toast reads.
+    fn frame_at(
+        &self,
+        f: &mut FrontendParts,
+        view: View,
+        events: Vec<Event>,
+        time: f64,
+    ) -> FullOutput {
+        self.frame_timed(f, view, events, self.target.pixels, Some(time))
+    }
+    fn frame_timed(
+        &self,
+        f: &mut FrontendParts,
+        view: View,
+        events: Vec<Event>,
+        size: Vec2,
+        time: Option<f64>,
+    ) -> FullOutput {
         f.runtime.begin_frame(self.ctx.cumulative_frame_nr() as u32);
         if matches!(view, View::Full) {
             f.settings.scale = self.target.scale;
@@ -240,6 +261,7 @@ impl Harness {
                 RawInput {
                     screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
                     events,
+                    time,
                     ..RawInput::default()
                 },
                 |ui| match view {
@@ -313,6 +335,28 @@ impl Harness {
             ],
             size,
         );
+    }
+    /// Presses the primary button on the text run reading `label` and keeps
+    /// it down for `secs` of the input clock, a frame every 0.05 s, without
+    /// releasing: how the battle bar's hold-to-retreat is driven (W3-13).
+    fn hold(&self, f: &mut FrontendParts, view: View, label: &str, secs: f64) {
+        let output = self.frame(f, view, vec![]);
+        let position = output
+            .shapes
+            .iter()
+            .find_map(|clipped| text_position(&clipped.shape, label))
+            .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+        let start = self.ctx.input(|input| input.time) + 1.0;
+        self.frame_at(f, view, pointer_at(position, true), start);
+        let frames = (secs / 0.05).ceil() as u32;
+        for frame in 1..=frames {
+            self.frame_at(
+                f,
+                view,
+                vec![Event::PointerMoved(position)],
+                start + 0.05 * f64::from(frame),
+            );
+        }
     }
     fn key(&self, f: &mut FrontendParts, view: View, key: Key) {
         self.frame(f, view, vec![key_event(key, true)]);
@@ -410,6 +454,19 @@ fn partial_view(ui: &mut egui::Ui, f: &mut UiCtx, view: View) {
             egui::CentralPanel::default().show(ui, |ui| status(ui, f));
         }
     }
+}
+/// The pointer moving to `position` with the primary button pressed or
+/// released there.
+fn pointer_at(position: Pos2, pressed: bool) -> Vec<Event> {
+    vec![
+        Event::PointerMoved(position),
+        Event::PointerButton {
+            pos: position,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        },
+    ]
 }
 fn key_event(key: Key, pressed: bool) -> Event {
     Event::Key {
@@ -549,6 +606,7 @@ mod operations_tests;
 mod primary_tests;
 mod progression_tests;
 mod results_tests;
+mod retreat_tests;
 mod settings_tests;
 mod storage_tests;
 mod toast_tests;

@@ -9,7 +9,7 @@
 //! The topmost overlay answers first, in [`Overlay`]'s order. With no overlay
 //! the screen answers: the menu asks to quit, a camp tab goes back to Camp
 //! home, Camp home and Results ask to return to the main menu, and the battle
-//! closes construction or, only when Pause is bound to Escape (decision 18),
+//! cancels a retreat hold, else closes construction or, only when Pause is bound to Escape (decision 18),
 //! passes the press on to the Pause binding. Settings saves and returns,
 //! unless the difficulty draft is unapplied: then the press opens the draft
 //! warning, and the next one closes it ("Keep editing").
@@ -44,6 +44,8 @@ pub(super) struct EscapeContext {
     pub(super) draft_dirty: bool,
     /// `bindings[Pause] == "Escape"`.
     pub(super) pause_is_escape: bool,
+    /// The battle's retreat button is being held (`BattleUi::retreat_holding`).
+    pub(super) retreat_hold: bool,
     /// The battle's construction overlay is open.
     pub(super) construction: bool,
 }
@@ -82,6 +84,8 @@ pub(super) enum EscapeAction {
     CloseDetails,
     CloseObserver,
     CancelArmoryConfirm,
+    /// Cancels the battle's retreat hold; nothing closes and nothing pauses.
+    CancelRetreat,
     /// Closes the construction overlay without pausing (decision 18).
     CloseConstruction,
     GoTab(Tab),
@@ -154,6 +158,7 @@ fn screen_action(cx: &EscapeContext) -> EscapeAction {
             }
         }
         Screen::Camp => A::GoTab(Tab::Home),
+        Screen::Battle if cx.retreat_hold => A::CancelRetreat,
         Screen::Battle if cx.construction => A::CloseConstruction,
         Screen::Battle if cx.pause_is_escape => A::PassToPause,
         Screen::Battle => A::Ignore,
@@ -231,6 +236,8 @@ pub(super) fn escape_context(ctx: &egui::Context, f: &UiCtx) -> EscapeContext {
             || f.status.save_pending,
         draft_dirty: f.screen == Screen::Settings && f.balance_draft_state() != DraftState::Clean,
         pause_is_escape: f.settings.bindings[Action::Pause as usize] == "Escape",
+        retreat_hold: f.screen == Screen::Battle
+            && f.battle.retreat_holding(ctx.cumulative_frame_nr()),
         construction: f.battle.construction,
     }
 }
@@ -309,6 +316,7 @@ fn apply(action: EscapeAction, f: &mut UiCtx) {
             f.armory.sell_confirm = false;
             f.armory.pending_sale = None;
         }
+        A::CancelRetreat => f.battle.cancel_retreat_hold(),
         A::CloseConstruction => f.battle.set_construction(false),
         A::GoTab(Tab::Home) => f.open_camp_home(None),
         A::GoTab(tab) => f.go_tab(tab),

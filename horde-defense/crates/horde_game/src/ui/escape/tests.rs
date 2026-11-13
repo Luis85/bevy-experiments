@@ -17,6 +17,7 @@ fn on(screen: Screen) -> EscapeContext {
         durable_pending: false,
         draft_dirty: false,
         pause_is_escape: true,
+        retreat_hold: false,
         construction: false,
     }
 }
@@ -38,6 +39,13 @@ fn pending(cx: EscapeContext) -> EscapeContext {
 fn building(cx: EscapeContext) -> EscapeContext {
     EscapeContext {
         construction: true,
+        ..cx
+    }
+}
+/// The battle's retreat button is being held.
+fn holding(cx: EscapeContext) -> EscapeContext {
+    EscapeContext {
+        retreat_hold: true,
         ..cx
     }
 }
@@ -275,6 +283,33 @@ fn matrix_table() {
             pause_on_p(building(on(Screen::Battle))),
             A::CloseConstruction,
         ),
+        // The retreat hold (W3-13): Escape cancels it before anything else
+        // the battle itself would do.
+        (
+            "a retreat hold is cancelled, not paused",
+            holding(on(Screen::Battle)),
+            A::CancelRetreat,
+        ),
+        (
+            "a retreat hold is cancelled when Pause is rebound",
+            pause_on_p(holding(on(Screen::Battle))),
+            A::CancelRetreat,
+        ),
+        (
+            "a retreat hold is cancelled before construction closes",
+            holding(building(on(Screen::Battle))),
+            A::CancelRetreat,
+        ),
+        (
+            "a retreat hold is cancelled while a save is pending",
+            pending(holding(on(Screen::Battle))),
+            A::CancelRetreat,
+        ),
+        (
+            "details over a retreat hold close first",
+            with(Overlay::Details, holding(on(Screen::Battle))),
+            A::CloseDetails,
+        ),
         (
             "the management menu is egui's",
             with(Overlay::Popup, building(on(Screen::Battle))),
@@ -403,7 +438,7 @@ fn every_context() -> Vec<EscapeContext> {
     for screen in Screen::ALL {
         for tab in TABS {
             for overlay in OVERLAYS {
-                for bits in 0u16..256 {
+                for bits in 0u16..512 {
                     let bit = |n: u16| bits & (1 << n) != 0;
                     all.push(EscapeContext {
                         screen,
@@ -417,6 +452,7 @@ fn every_context() -> Vec<EscapeContext> {
                         pause_is_escape: bit(5),
                         construction: bit(6),
                         draft_dirty: bit(7),
+                        retreat_hold: bit(8),
                     });
                 }
             }
@@ -438,7 +474,7 @@ fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
 #[test]
 fn properties() {
     let all = every_context();
-    assert_eq!(all.len(), 7 * 9 * 12 * 256);
+    assert_eq!(all.len(), 7 * 9 * 12 * 512);
     for cx in all {
         let action = escape_action(&cx);
         // A focused text field and an open popup keep Escape for egui, and
@@ -466,12 +502,35 @@ fn properties() {
             action == A::PassToPause,
             cx.screen == Screen::Battle
                 && cx.overlay == Overlay::None
+                && !cx.retreat_hold
                 && !cx.construction
                 && cx.pause_is_escape,
             "{cx:?} -> {action:?}"
         );
+        // A retreat hold is cancelled exactly in a battle with nothing over
+        // the field, and it answers before construction (W3-13).
+        assert_eq!(
+            action == A::CancelRetreat,
+            cx.screen == Screen::Battle && cx.overlay == Overlay::None && cx.retreat_hold,
+            "{cx:?} -> {action:?}"
+        );
+        // The hold matters nowhere else.
+        if cx.screen != Screen::Battle || cx.overlay != Overlay::None {
+            assert_eq!(
+                action,
+                escape_action(&EscapeContext {
+                    retreat_hold: false,
+                    ..cx
+                }),
+                "{cx:?}"
+            );
+        }
         // Construction closes without pausing.
-        if cx.screen == Screen::Battle && cx.overlay == Overlay::None && cx.construction {
+        if cx.screen == Screen::Battle
+            && cx.overlay == Overlay::None
+            && cx.construction
+            && !cx.retreat_hold
+        {
             assert_eq!(action, A::CloseConstruction, "{cx:?}");
         }
         // The router consumes exactly what it acts on.

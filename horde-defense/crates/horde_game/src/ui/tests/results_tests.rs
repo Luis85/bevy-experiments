@@ -113,7 +113,7 @@ fn retreat_opens_retained_reward_skill_tree_and_retry_starts_live() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.campaign_mut().reward(25, 0, Mode::Personal);
-    h.click(f, View::Battle, "Retreat & train");
+    h.hold(f, View::Battle, "Retreat & train", 0.9);
     assert!(f.screen == Screen::Results);
     assert!(f.game.attempt().is_none());
     assert_eq!(f.game.campaign().coins, 25);
@@ -146,7 +146,7 @@ fn defeat_and_withdraw_each_reach_upgrade_home_and_leave_resume_returns_to_camp_
     h.click(f, View::Results, "Try again");
     assert!(f.screen == Screen::Battle);
     assert_eq!(f.game.attempt().unwrap().stage, 0);
-    h.click(f, View::Battle, "Retreat & train");
+    h.hold(f, View::Battle, "Retreat & train", 0.9);
     assert!(f.screen == Screen::Results);
     assert_eq!(f.game.last_result().unwrap().outcome, Outcome::Withdrawal);
     let coins = f.game.campaign().coins;

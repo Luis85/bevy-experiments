@@ -171,6 +171,15 @@ pub(crate) struct BattleUi {
     /// CF-1-08). `None` before any battle frame.
     pub(super) bar_bounds: Option<Rect>,
     pub(super) legend_rect: Option<Rect>,
+    /// The wall-clock seconds the bar's retreat button has been held, `None`
+    /// while it is not (presentation only; `battle::retreat`, UX-13).
+    pub(super) retreat_hold: Option<f64>,
+    /// This press of the retreat button already withdrew or was cancelled by
+    /// Escape: it holds nothing more until the button is released.
+    pub(super) retreat_hold_spent: bool,
+    /// The egui frame the retreat button last drew in. A hold older than the
+    /// frame before this one belongs to a battle that ended under it.
+    pub(super) retreat_hold_frame: u64,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -199,6 +208,9 @@ impl BattleUi {
             bar_rows: 0,
             bar_bounds: None,
             legend_rect: None,
+            retreat_hold: None,
+            retreat_hold_spent: false,
+            retreat_hold_frame: u64::MAX,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
@@ -207,6 +219,17 @@ impl BattleUi {
     }
     /// Opens or closes the construction overlay. Closing clears
     /// `occluded_lanes` at once, whether or not a battle frame follows.
+    /// Whether the retreat button is being held as of egui frame `frame`: a
+    /// hold the bar drew in this frame or the one before.
+    pub(super) fn retreat_holding(&self, frame: u64) -> bool {
+        self.retreat_hold.is_some() && frame.wrapping_sub(self.retreat_hold_frame) <= 1
+    }
+    /// Escape during a hold: the hold ends, and the press that began it holds
+    /// nothing more.
+    pub(super) fn cancel_retreat_hold(&mut self) {
+        self.retreat_hold = None;
+        self.retreat_hold_spent = true;
+    }
     pub(super) fn set_construction(&mut self, open: bool) {
         self.construction = open;
         if !open {

@@ -14,6 +14,7 @@ mod frame;
 mod input;
 mod layout;
 mod overlays;
+mod retreat;
 #[cfg(test)]
 mod tests;
 
