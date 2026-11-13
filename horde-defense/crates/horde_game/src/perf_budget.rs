@@ -61,7 +61,8 @@ pub const BATTLEFIELD_PRIMITIVES_MAX: usize = 23;
 /// Most extra primitives 400 enemies may cost over 52.
 pub const PRIMITIVE_GROWTH_52_TO_400_MAX: usize = 2;
 /// Battlefield vertex gates per measured scene. The W5-01 re-measure (cue
-/// halos) reaches progressed-peak 39,444 and stress 56,345; neither gate
+/// halos) reaches progressed-peak 39,444 and stress 56,345, and the W5-04
+/// one (light pools) 39,495 and 56,396; neither gate
 /// moves, by the same reasoning as before it. The W2 review re-measure
 /// (776075c, the W2-47 stress fixture) reaches progressed-peak 38,524
 /// (x 1.25 is above its 40,000 ceiling) and stress 52,325 with the corpse

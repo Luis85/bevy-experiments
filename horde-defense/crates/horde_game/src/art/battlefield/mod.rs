@@ -6,9 +6,11 @@
 //!    particles.
 //! 2. Grade: the stage's lighting over-rect across the whole canvas
 //!    (`super::lighting`), the forest backdrop included.
-//! 3. Vignette: the canvas edge falloff.
-//! 4. Construction grid, while construction is on.
-//! 5. Cues: every warning, gauge and label on its INK backing (`cue`), so
+//! 3. Lights: the additive light pools of explosions, burning ground and
+//!    muzzle flashes (`light`), one mesh, none in reduced effects.
+//! 4. Vignette: the canvas edge falloff.
+//! 5. Construction grid, while construction is on.
+//! 6. Cues: every warning, gauge and label on its INK backing (`cue`), so
 //!    no grade or vignette dims a cue.
 //!
 //! Anything drawn per hostile, per body or per particle is batched into
@@ -22,6 +24,7 @@ mod corpses;
 mod cue;
 mod enemies;
 mod fx;
+mod light;
 mod ordnance;
 mod structures;
 pub(crate) use enemies::body_box as enemy_body_box;
@@ -171,7 +174,7 @@ fn render(
     ordnance::thrown(p, arena, view, a, reduced, textures, equipment.as_ref());
     fx::events(p, arena, view, muzzle, &fx_options);
     fx::particles(p, arena, &view.particles);
-    // 2. Grade and 3. vignette, over the whole canvas. The sky pulse is the
+    // 2. Grade, over the whole canvas. The sky pulse is the
     // wall-clock lightning of a storm stage: under the vignette and every
     // cue, and silent near a boss or attack cue.
     // (`with_clip_rect` would intersect with the arena clip `p` carries.)
@@ -180,12 +183,17 @@ fn render(
     let pulse = lighting::sky_pulse(options.scene, options.sky, a, reduced);
     let (grade, sky) = lighting::scene_grade(options.scene, reduced, pulse);
     lighting::paint_grade(&canvas, options.canvas, grade, sky);
+    // 3. Lights: additive pools on the field, over the grade so a dark
+    // stage shows them strongest (the grade's light gain).
+    let pools = light::collect(arena, view, muzzle, textures, reduced);
+    light::paint_pools(p, &pools, grade.light_gain);
+    // 4. Vignette.
     backdrop::edge_shade(&canvas, options.canvas);
-    // 4. Construction grid.
+    // 5. Construction grid.
     if options.construction {
         terrain::construction_grid(p, arena, view, options.occluder);
     }
-    // 5. Cue pass.
+    // 6. Cue pass.
     collect_cues(&mut batch, arena, view, options, &fx_options);
     batch.paint(p);
     hostiles

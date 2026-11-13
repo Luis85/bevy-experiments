@@ -312,7 +312,7 @@ Usage rules:
 - `battle_view::first_of_volley(a, index)` (no earlier Shot of the same tick and actor in the log) is shared by the view model and the casing sampler, so it does not depend on `Event.seq` (zero in hand-built logs). A turret volley has ordinal 0.
 - Flash polygons: 4 corners a kite, 5 a blunt wedge, 6 a long spike. The flash shrinks from full to half length over its life; alpha runs 230 to 0. Tracers fade linearly over `tracer_life_ticks`; the dim machine-gun tracer is at half of that alpha.
 - Reduced: one static 1-pt line per volley (a nine-pellet shell draws one line, to its first pellet's end point), full alpha for the tracer's life.
-- `light_radius` and `light_intensity` are table data only until W5-04 reads them.
+- `light_radius` and `light_intensity` are read by the W5-04 light pools (section 6).
 
 ## 6. Light, explosions, fire, hits, decals, wave 5
 
@@ -323,6 +323,15 @@ Usage rules:
 - Painted as one Mesh of 16-segment fans: centre `Color32::from_rgb_additive(rgb·intensity·grade.light_gain)`, rim TRANSPARENT.
 - Explosions: radius 1.2x blast, intensity 0.8, life 0.35 s. Fire: radius 1.0x zone, intensity 0.35 ± 0.05 flicker by (tick/6)%2.
 - Reduced: none.
+
+**As built (W5-04):**
+- `art/battlefield/light.rs`: `collect(arena, view, muzzle, textures, reduced) -> Vec<LightPool>` and `paint_pools(p, &pools, grade.light_gain)`, called from `render` as pass 3: after `paint_grade`, before `edge_shade` and the cue pass. The mesh is clipped to the field (the arena painter), not the canvas.
+- Order: explosions, fire zones (highest id first), survivor volleys, turret shots; `view.fx` newest first inside each class; then `truncate(LIGHTS_MAX)`.
+- Explosion: `EXPLOSION_LIGHT_RGB` (255,190,110), radii 1.2 x blast in yards and lanes, intensity 0.8 falling linearly to 0 over 0.35 s (no hard cut-off).
+- Fire: `FIRE_LIGHT_RGB` (255,150,70), the zone's radii, 0.40 or 0.30 by `(tick/6) % 2`, times the zone's last-45-tick fade. It reads the sim tick, so it holds still while paused.
+- Muzzle and turret: the profile's `flash_rgb`, a circle of `light_radius` lane heights at the drawn muzzle (`fx::shot_origin`, shared with the tracer), `light_intensity` while the flash shows and then a linear fade over `MUZZLE_LIGHT_TAIL_TICKS` = 4. Only a volley's first event lights a pool; a trap lights none.
+- Centre colour: `Color32::from_rgb_additive(rgb * min(intensity * light_gain, 1))`; the 16 rim vertices are `TRANSPARENT`.
+- Not in this row: a `SceneDraw` light counter and the PERF_BUDGET cap entry (W5-09 to W5-11 read `light::LIGHTS_MAX`).
 
 **Molotov detection.** `FxView.ordnance` = Molotov when `a.events` has a Burn with the same actor_id and tick (sim/manual.rs:352-399), or a fire zone with that id exists. Otherwise it is Grenade. No saved field.
 

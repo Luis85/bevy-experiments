@@ -10,7 +10,7 @@ use super::cue::{self, CueBatch, Label};
 use super::weapon_fx;
 use crate::{
     animation::{Particle, ParticleKind},
-    battle_view::{BattleViewModel, Volley},
+    battle_view::{BattleViewModel, FxView, Volley},
     visual_assets::{self, ArtTextures, PropMotion},
 };
 use bevy_egui::egui::{self, Align2, Color32 as C, Painter, Pos2, Rect, Stroke, Vec2, vec2};
@@ -169,6 +169,55 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
     mesh.paint(p);
 }
 
+/// A Shot event's age in 60 Hz ticks.
+pub(super) fn shot_age_ticks(e: &FxView) -> u32 {
+    (e.age * 60.0).round() as u32
+}
+
+/// Where a Shot event's flash, tracer and light start: the drawn survivor's
+/// `muzzle` socket (when the rig resolved) for the survivor, the drawn
+/// barrel for a turret, else the event's own origin. `None` for a trap and
+/// for an event without a source: neither draws a shot.
+pub(super) fn shot_origin(
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    e: &FxView,
+    muzzle: Option<Pos2>,
+    textures: ArtTextures,
+) -> Option<Pos2> {
+    e.source?;
+    let Some(id) = e.actor_id else {
+        return Some(muzzle.unwrap_or_else(|| arena.world(e.from[0], e.from[1])));
+    };
+    let structure = view.structure(id);
+    if structure.is_some_and(|s| s.kind == StructureKind::Trap) {
+        return None;
+    }
+    Some(
+        structure
+            .filter(|s| s.kind == StructureKind::Turret)
+            .filter(|_| textures.props.is_some())
+            .map_or_else(
+                || arena.world(e.from[0], e.from[1]),
+                |s| {
+                    let pose = &s.pose;
+                    visual_assets::turret_muzzle(
+                        arena.world(s.position[0], s.position[1]),
+                        vec2(
+                            arena.yard_width() * s.footprint_width,
+                            arena.lane_height() * 0.88,
+                        ),
+                        PropMotion {
+                            target: Some(arena.world(pose.target[0], pose.target[1])),
+                            recoil: pose.recoil,
+                            ..Default::default()
+                        },
+                    )
+                },
+            ),
+    )
+}
+
 /// `muzzle` is the drawn survivor's muzzle socket, when the rig resolved.
 pub(super) fn events(
     p: &Painter,
@@ -227,37 +276,10 @@ pub(super) fn events(
                     }
                 }
             }
-            EventKind::Shot
-                if e.source.is_some()
-                    && !e.actor_id.is_some_and(|id| {
-                        view.structure(id)
-                            .is_some_and(|s| s.kind == StructureKind::Trap)
-                    }) =>
-            {
-                let from = if e.actor_id.is_none() {
-                    muzzle.unwrap_or_else(|| arena.world(e.from[0], e.from[1]))
-                } else {
-                    e.actor_id
-                        .and_then(|id| view.structure(id))
-                        .filter(|s| s.kind == StructureKind::Turret)
-                        .filter(|_| textures.props.is_some())
-                        .map_or_else(
-                            || arena.world(e.from[0], e.from[1]),
-                            |s| {
-                                let pose = &s.pose;
-                                visual_assets::turret_muzzle(
-                                    arena.world(s.position[0], s.position[1]),
-                                    vec2(arena.yard_width() * s.footprint_width, sy * 0.88),
-                                    PropMotion {
-                                        target: Some(arena.world(pose.target[0], pose.target[1])),
-                                        recoil: pose.recoil,
-                                        ..Default::default()
-                                    },
-                                )
-                            },
-                        )
-                };
-                if let Some(source) = e.source {
+            EventKind::Shot => {
+                if let (Some(source), Some(from)) =
+                    (e.source, shot_origin(arena, view, e, muzzle, textures))
+                {
                     weapon_fx::paint_shot(
                         p,
                         weapon_fx::weapon_fx(source),
@@ -265,7 +287,7 @@ pub(super) fn events(
                             from,
                             to: arena.world(e.to[0], e.to[1]),
                             lane: sy,
-                            age_ticks: (age * 60.0).round() as u32,
+                            age_ticks: shot_age_ticks(e),
                             volley: e.volley.unwrap_or(Volley::SINGLE),
                             reduced,
                         },

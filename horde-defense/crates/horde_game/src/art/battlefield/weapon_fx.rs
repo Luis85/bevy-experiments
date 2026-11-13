@@ -54,10 +54,9 @@ pub struct WeaponFx {
     pub pellet_streak: Option<f32>,
     /// Flash size on odd volley ordinals.
     pub odd_volley_scale: f32,
-    /// The muzzle light pool, in lanes (W5-04 reads it).
-    #[allow(dead_code)]
+    /// The muzzle light pool (`super::light`): its radius in lane heights
+    /// and its strength before the grade's light gain.
     pub light_radius: f32,
-    #[allow(dead_code)]
     pub light_intensity: f32,
     /// Suffix of the `rook.` / `june.` attachment skin that gives the class
     /// its silhouette.
