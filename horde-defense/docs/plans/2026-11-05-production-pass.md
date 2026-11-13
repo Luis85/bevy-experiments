@@ -318,6 +318,7 @@ One wave-2 finding is not ruled, because it would change a user decision: R30's 
 | `defender_power` misses its cost target (W2 review, 2026-11-10; design-campaign-defenders §8 "Numbers to measure", as-built row). The W2-21 commit (bc85bf7) measured, in release over 2,000 rounds, 6.9 µs per call and 90 µs for 13 defenders against the "< 50 µs total, recorded" target, and 105-110 µs for `available_defenders`; the time is `Campaign::profile_for_loadout`, which the deploy shares. `outbreak_plan` fills `recommended_defender` through `available_defenders`, so every `outbreak_plan` call pays the cost again (a frame reading the picker and an outbreak plan pays it twice; not measured on its own). The target is "recorded", and no waves.md row owns a fix. Accept the recorded cost, or have a later row cache the power per frame or per state change? Orchestrator or user decides. **Answered by R41 (2026-11-13, orchestrator ruling):** the default is kept: the cost is accepted as recorded and nothing caches it; a frame report that shows `available_defenders` or `outbreak_plan` in a gated span is a finding for the review that sees it | Accept it as recorded: no cache until a frame report shows `available_defenders` or `outbreak_plan` in a gated span |
 | Auto-sold line ties after `absorb` (W2 review, 2026-11-10). design-loot-economy line 66 says the receipt's lines keep the 12 highest-coin sales with "ties go to ascending id". A single settlement (`sim/auto_sell.rs`) does sort ties by item id. `AutoSoldReceipt::absorb` (`campaign/auto_sell.rs:82-93`), which merges an expedition's final sweep into the run's receipt, re-sorts the merged lines by coins with a stable sort, so on a tie the earlier receipt's line comes first, whatever the ids. `AutoSoldLine` has no item id in the frozen v7 schema ("no item_id by design"), so `absorb` cannot break ties by id. No waves.md row owns it. Amend the design to the as-built order, or rule otherwise? Orchestrator or user decides. **Answered by R42 (2026-11-13, orchestrator ruling):** the default is kept, and design-loot-economy §2 now states the as-built order | Amend design-loot-economy to the as-built order: within one settlement ties go to ascending item id; on `absorb` the earlier receipt's lines come first on a tie. No schema, save or digest change |
 | A foreign build that starts during a perf pass (W2 review, 2026-11-10; VALIDATION.md "R30 landed"). R30 waits for a quiet machine before a pass, and a run is invalid only on a load sample of 90% or more. A foreign cargo or rustc build that starts after the pre-flight can raise p99 in runs that still count as valid, as long as no 5 s sample reaches 90%. Rejecting runs that see a foreign build process start would change user decision R30. Change R30, or keep it? User decides | R30 is unchanged. The closing phase is the only builder while it measures, so the remaining risk is a build from another project on the machine |
+| G6.11 and G6.12 stay red after the listed enemy levers (W4-04..n, 2026-11-13; §9.6, "W4-04..n tuning loop, resumed on the repriced tree"). On the repriced tree `goal6_defeat_rate_windows` leaves 32 of 38 windows outside 10-25% (0.0% from the window at offset 14) and `goal6_no_15_streak_after_run_10` has a median 49-win streak. None of the row's levers (`health_per_rank_late`, the `boss_health` slope, `front_ramp_max` in [0.17, 0.25], affixes, capstone HP), alone or combined, moves either while boss TTK p90 stays at or under 60 s (G6.17): 32-33 windows out and a 46-50 streak in every variant. The survivor takes no archetype damage in the median run from run 11 and loses no run after run 20; its power stops growing at about run 30 while the rank rises by one per victory and never falls, so a steeper slope produces a wall (0% defeats, then nearly 100% at one rank), not a steady 10-25%. `damage_per_rank_late` and `arrival_per_rank`, measured outside the list, do not move them either. The loop shipped no data change. Which way? (a) Allow levers outside the row's list that add variance or act on the survivor's late power: the arrival rate and population caps, the pressure floors' `rate_cap`, gear growth (`max_item_level`, `damage_per_level`), or a rank rule that eases after a defeat; each needs its own measurement and moves GOLDEN. (b) Change the acceptance bot: G6.11 and G6.12 are measured with expert-deu, which aims almost perfectly (design-enemy-balance §14), so measure them with a weaker registered profile. (c) Narrow G6.11 and G6.12 to the runs before the tree is exhausted, or accept them red for this pass with the human playtest pending. User decides | Accept G6.11 and G6.12 red for this pass (c): the shipped enemy curve stays, the two rows stay listed as failing in the closing report, and the human difficulty playtest of §11 stays pending |
 
 ---
 
@@ -1260,6 +1261,66 @@ The calibration, each step a full price set checked against the six tree rules a
 - Shipped (structure step 140, recruitment_network 1,700; T 2,030 / 8,700 / 19,830): the After column.
 
 Digests: none moved (tests/determinism.rs, the continuation pins and the save fixtures are green), so `PROVISIONAL` stays None. Default `pacing 60 --runs` and smoke move with the prices; their before/after files are closing-phase items (R36).
+
+W4-04..n tuning loop, resumed on the repriced tree (2026-11-13, at 9e0cf56). Same command and sweep as the W4-p block. Each variant is the bundled `progression.json` (or `enemy_catalog.json` for the affix rows) with the named key changed, loaded through `LASTLIGHT_PROGRESSION` / `LASTLIGHT_ENEMIES` by the same release test binary. Cells: defeat windows outside 10-25% (of 38; the lowest window is 0.0% in every row but one), the highest window, the median longest win streak from run 11, boss TTK median [p90], LUX Easy / Normal / Hard medians. Every row keeps the first victory at 3 [3, 4], the AUT / BGD starts at 3 [3, 5] / 3 [3, 4] and coverage at 18 of 18; the goal-5 rows pass unless noted.
+
+| Lever (row order) | Value | Windows out | Highest | Streak | Boss TTK | LUX E / N / H | Note |
+|---|---|---|---|---|---|---|---|
+| Baseline | shipped | 32 | 25.0% | 49 | 31.4 s [47.5] | 5 / 9 / 13 | G6.11 and G6.12 fail |
+| 1 `health_per_rank_late` (0.04) | 0.05 | 33 | 26.0% | 48 | 34.4 s [51.9] | 5 / 9 / 13 | |
+| | 0.06 | 33 | 26.5% | 48 | 36.7 s [58.5] | 5 / 9 / 13 | |
+| | 0.07 | 33 | 26.5% | 46 | 40.7 s [68.8] | 5 / 9 / 13 | TTK p90 past 60 s |
+| | 0.10 | 33 | 29.2% | 43 | 49.5 s [117.9] | 5 / 9 / 13 | |
+| | 0.14 | 29 | 32.5% | 35 | 58.1 s [152.7] | 5 / 9 / 13 | |
+| | 0.25 (the bound) | 27 | 94.6% (lowest 6.0%) | 21 | 58.6 s [110.2] | 5 / 9 / 13 | unlock order fails (Mara 19, Operations 19) |
+| 2 `boss_health` slope past rank 4 (600 per rank) | 750 | 33 | 25.5% | 49 | 35.1 s [53.5] | 5 / 9 / 13 | |
+| | 900 | 33 | 26.8% | 47 | 39.3 s [62.3] | 5 / 9 / 13 | TTK p90 past 60 s |
+| | 1,200 | 32 | 30.8% | 41 | 46.2 s [82.8] | 5 / 9 / 13 | |
+| | 1,800 | 31 | 34.5% | 42 | 61.5 s [129.4] | 5 / 9 / 13 | G6.17 fails |
+| 3 `front_ramp_max` (0.18) | 0.17 | 32 | 23.8% | 49 | 31.5 s [47.1] | 5 / 8 / 12 | |
+| | 0.20 | 33 | 22.2% | 49 | 32.5 s [48.9] | 6 / 9 / 12 | |
+| | 0.22 | 33 | 25.8% | 49 | 33.0 s [49.5] | 6 / 9 / 12 | |
+| | 0.25 | 33 | 25.2% | 47 | 32.8 s [49.8] | 6 / 9 / 11 | Easy on its cap of 6 |
+| 4 Affixes: elite `end_bp` (1500) | 3000 | 33 | 25.2% | 48 | 30.9 s [47.1] | 5 / 9 / 13 | |
+| | 6000 | 32 | 24.5% | 49 | 30.5 s [47.5] | 5 / 9 / 13 | |
+| 4 Affixes: Hardened health 2.0 (1.6), Vicious damage 2.0 (1.5) | | 33 | 27.8% | 48 | 31.5 s [47.3] | 5 / 9 / 13 | |
+| | with `end_bp` 3000 | 33 | 27.2% | 47 | 31.5 s [47.5] | 5 / 9 / 13 | |
+| 4 Affixes: Vicious damage 2.0, weight 40 (20) | | 33 | 22.2% | 50 | 31.8 s [47.5] | 5 / 9 / 13 | |
+| 5 Capstone `health` (1.4) | 1.2 | 32 | 25.0% | 49 | 30.0 s [46.7] | 5 / 8 / 13 | Hard fails (above 12) |
+| | 1.6 | 33 | 27.0% | 47 | 33.2 s [51.1] | 6 / 9 / 13 | |
+| | 1.8 | 33 | 29.8% | 43 | 34.2 s [57.0] | 6 / 9 / 14 | Hard fails (above 13.5) |
+| Combined: late health 0.05, front ramp 0.25 | | 33 | 25.2% | 47 | 34.9 s [56.5] | 6 / 9 / 11 | |
+| Combined: `end_bp` 3000, front ramp 0.25 | | 32 | 23.8% | 48 | 32.2 s [49.5] | 6 / 9 / 11 | |
+| Combined: late health 0.10, boss slope 300 | | 33 | 25.5% | 47 | 36.0 s [58.1] | 5 / 9 / 13 | |
+| Combined: late health 0.14, boss slope 0 | | 32 | 24.2% | 50 | 28.0 s [47.7] | 5 / 9 / 13 | |
+| Combined: late health 0.20, boss slope 0 | | 32 | 28.5% | 44 | 35.5 s [98.7] | 5 / 9 / 13 | |
+| Combined: late health 0.25, boss slope 0 | | 30 | 34.8% | 38 | 42.0 s [124.9] | 5 / 9 / 13 | unlock order fails (18 / 18) |
+| Combined: late health 0.25, boss slope 0, front ramp 0.25 | | 26 | 35.5% | 32 | 41.4 s [126.1] | 6 / 9 / 11 | unlock order fails (19 / 19) |
+
+Result: no listed lever is kept, and `progression.json` and `enemy_catalog.json` are unchanged. Inside the G6.17 band (TTK p90 at most 60 s) every variant leaves 32 or 33 windows out and a 46-50 win streak, the baseline's own numbers. Raising a lever only lifts the first windows past 25% (the early runs, where the survivor is weak) and leaves the late windows at 0%. `front_ramp_max` 0.25 is not shipped: `goal6_lux_hard_at_most_1_5x_normal` is green since W4-p at 0.18 (Hard 13 against Normal 9), and 0.25 turns no red row green, puts one more window out (33) and moves the Easy median onto its cap of 6. The front-ramp pins (`front_ramp_final_over_first_normal_is_at_least_1_35`, the 1.3924 Normal ratio) therefore stay as they are. No digest moves, so `PROVISIONAL` stays None.
+
+Why the levers do not reach G6.11 and G6.12 (the `pacing` example, `60 --csv --profile expert-deu --seeds 20`, 100 runs per bucket):
+
+| Runs | Shipped: defeats | Shipped: rank after (median) | Shipped: damage dealt to the survivor per run (median) | Late health 0.25: defeats | Late health 0.25: rank after (median) |
+|---|---|---|---|---|---|
+| 1-5 | 67 | 0 | 71 | 67 | 0 |
+| 6-10 | 58 | 3 | 48 | 58 | 3 |
+| 11-15 | 19 | 6 | 0 | 35 | 5.5 |
+| 16-20 | 7 | 11 | 0 | 47 | 8 |
+| 21-25 | 0 | 16 | 0 | 8 | 12 |
+| 26-30 | 0 | 21 | 0 | 1 | 17 |
+| 31-35 | 0 | 26 | 0 | 0 | 22 |
+| 36-40 | 0 | 31 | 0 | 14 | 27 |
+| 41-45 | 0 | 36 | 0 | 82 | 29 |
+| 46-50 | 0 | 41 | 0 | 98 | 29 |
+| 51-55 | 0 | 46 | 0 | 100 | 29 |
+| 56-60 | 0 | 51 | 0 | 98 | 29 |
+
+- On the shipped data the expert survivor takes no archetype damage in the median run from run 11 (runs 11-15: level 28, rank 6) and loses no run after run 20. The rank still rises by one per victory, to 51 at run 60, where enemy health is 2.9x. Elites, affixes, the front ramp and the capstone change runs the survivor already wins without being hit.
+- A steeper slope does not give a steady defeat share. It gives a wall. The survivor's power stops growing at about run 30 (level 50, tree exhausted at 28), the rank rises on a victory and never falls on a defeat, so the campaign climbs until the next rank cannot be beaten and then loses nearly every run there (late health 0.25: the median campaign stops at rank 29 and loses 98-100% of its runs from run 46; boss TTK p90 110 s). With the boss floors held flat past rank 4 the same slope moves the wall out of the 60 runs again (lowest window 0.0%, streak 38), so inside 60 runs the wall is mostly the boss fight, which G6.17 caps.
+- The same holds outside the row's list, measured only to inform the decision and not shipped: `damage_per_rank_late` 0.05 / 0.10 / 0.20 (0.018) leaves 32 / 33 / 33 windows out and a 49 / 47 / 45 streak, and `arrival_per_rank` 0.02 / 0.04 (0.01) leaves 33 / 32 out with a 49 streak (TTK p90 99.7 s at 0.04).
+
+G6.11 and G6.12 need a user decision (§2.5, "G6.11 and G6.12 stay red after the listed enemy levers"). Smoke before and after the loop is a closing-phase item (R36); with no data change the two runs are the same build.
 
 ### 9.3 Audio
 
