@@ -123,7 +123,7 @@ In strategic practice, resume the world clock and inspect the active outbreak. R
 
 Default keys: primary mouse fires the equipped gun (or a press throws the selected throwable), secondary mouse uses contact melee, **R** reloads, **1/2** use purchased personal abilities, **B** opens/closes live construction, **Escape** pauses, **F** toggles fire, and **F12** captures the native framebuffer. Settings remap essential actions and offer toggle fire, aim assistance, text scaling, outlines, reduced effects, optional blood and independent sound levels. Combat hints reflect the saved bindings.
 
-Save and return to the menu, quit, and continue the same deployment. Reload progress, actions, positions, RNG and banked rewards should resume together. A save failure keeps the application open and reports the failure. Never remove a save to test recovery. Use separate practice or `LASTLIGHT_SAVE_DIR` instead.
+Save and return to the menu, quit, and continue the same deployment. Reload progress, actions, positions, RNG and banked rewards should resume together. A save failure keeps the application open and opens a "Save failed" window with Retry, Open folder, Copy path and Dismiss; an unreadable save or settings file opens the same kind of window at startup. Manual check: Open folder shows the save folder in the file manager (if it does not, Copy path still gives the folder). Never remove a save to test recovery. Use separate practice or `LASTLIGHT_SAVE_DIR` instead.
 
 ## Logs and crash reports
 

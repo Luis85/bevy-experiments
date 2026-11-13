@@ -11,7 +11,10 @@
 //! home, Camp home and Results ask to return to the main menu, and the battle
 //! closes construction or, only when Pause is bound to Escape (decision 18),
 //! passes the press on to the Pause binding.
-use super::{Screen, Tab, UiCtx, modal::ModalKind};
+use super::{
+    Screen, Tab, UiCtx,
+    modal::{AppModal, ModalKind},
+};
 use crate::{runner::SaveIntent, settings::Action};
 use bevy_egui::egui;
 
@@ -183,7 +186,7 @@ fn overlay(ctx: &egui::Context, f: &UiCtx) -> Overlay {
         Overlay::Rebind
     } else if ctx.text_edit_focused() {
         Overlay::TextFocus
-    } else if let Some(modal) = f.status.modal {
+    } else if let Some(modal) = &f.status.modal {
         Overlay::AppModal(modal.kind())
     } else if f.screen == Screen::Menu && f.menu.new_journey_confirm {
         Overlay::NewJourneyModal
@@ -286,7 +289,7 @@ fn apply(action: EscapeAction, f: &mut UiCtx) {
     match action {
         A::LeaveToEgui | A::PassToPause | A::Ignore => {}
         A::CancelRebind => f.prefs.rebind = None,
-        A::CloseModal => f.status.modal = None,
+        A::CloseModal => f.status.close_modal(),
         A::CloseNewJourney => f.menu.new_journey_confirm = false,
         A::CloseDetails => f.status.feedback.details_open = false,
         A::CloseObserver => {
@@ -306,7 +309,11 @@ fn apply(action: EscapeAction, f: &mut UiCtx) {
         A::Go(Screen::Menu) => f.save_settings_to_menu(),
         A::Go(Screen::Results) => f.open_upgrades(),
         A::Go(screen) => f.go(screen),
-        A::OpenModal(kind) => f.status.modal = Some(kind.into()),
+        A::OpenModal(kind) => {
+            if let Some(modal) = AppModal::confirmation(kind) {
+                f.status.modal = Some(modal);
+            }
+        }
         A::CloseHistory => f.close_history(),
         A::SettingsBack => f.request_save(SaveIntent::SettingsBack),
     }

@@ -4,11 +4,14 @@ use super::{
     BattleUi, CampaignUi, Navigation, Screen, Tab, UiCtx, UiParams,
     battle::AttackSelection,
     damage, loot,
+    modal::{AppModal, StorageError},
     toast::{TOAST_LONG_SECS, ToastKind},
 };
 use crate::{
     audio::Cue as SoundCue,
-    runner::{AppCommand, AppOutcome, GameSession, Runtime, RuntimeNotice, SaveIntent},
+    runner::{
+        AppCommand, AppOutcome, GameSession, Runtime, RuntimeNotice, SAVE_SUPERSEDED, SaveIntent,
+    },
 };
 use bevy::prelude::*;
 use horde_core::{
@@ -136,6 +139,15 @@ impl UiCtx<'_> {
                 match result {
                     Ok(()) => {
                         self.status.profile_exists = true;
+                        // A save went through: the failure is over.
+                        self.status.dismissed_save_error = None;
+                        if matches!(
+                            self.status.modal,
+                            Some(AppModal::Storage(StorageError::Save { .. }))
+                        ) {
+                            self.status.modal = None;
+                            self.status.storage_note.clear();
+                        }
                         if intent != SaveIntent::Autosave {
                             // The toast says "Saved"; the status line keeps
                             // only what must stay findable (the copies' paths).
@@ -163,6 +175,7 @@ impl UiCtx<'_> {
                         self.status.message =
                             format!("Save failed: {error}. Retry saving before closing.");
                         self.status.message_error = true;
+                        self.save_failed(intent, error);
                     }
                 }
             }
@@ -180,6 +193,16 @@ impl UiCtx<'_> {
                 );
                 self.status.message_error = true;
             }
+            RuntimeNotice::SaveFolderOpened(result) => {
+                self.status.storage_note = match result {
+                    Ok(()) => String::new(),
+                    Err(error) => format!(
+                        "The folder could not be opened ({}). Use Copy path.",
+                        error.trim_end_matches('.')
+                    ),
+                };
+            }
+            RuntimeNotice::ProfileReloaded(result) => self.profile_reloaded(result),
             RuntimeNotice::RecoveryCopies(paths) => {
                 self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
                 self.status.recovery_notice = paths
@@ -211,6 +234,91 @@ impl UiCtx<'_> {
                 self.go(Screen::Results);
                 self.battle.fire_latched = false;
                 self.runtime.clear_input();
+            }
+        }
+    }
+
+    /// A save of `intent` failed: the storage modal opens (UX-08), taking
+    /// the slot from any open modal. A save a confirmed new journey replaced
+    /// is not a storage failure. A failed autosave neither takes the modal
+    /// from a failed save the player asked for (that modal's Retry keeps its
+    /// intent) nor reopens an error the player already dismissed.
+    fn save_failed(&mut self, intent: SaveIntent, error: String) {
+        if error == SAVE_SUPERSEDED {
+            return;
+        }
+        let autosave = intent == SaveIntent::Autosave;
+        let asked_for_open = matches!(
+            &self.status.modal,
+            Some(AppModal::Storage(StorageError::Save { intent, .. }))
+                if *intent != SaveIntent::Autosave
+        );
+        let dismissed = self.status.dismissed_save_error.as_deref() == Some(error.as_str());
+        if autosave && (asked_for_open || dismissed) {
+            return;
+        }
+        self.status.dismissed_save_error = None;
+        self.status
+            .open_storage(StorageError::Save { intent, error });
+        // The modal takes the keyboard, so a live defense must not run on
+        // behind it: pause through the runtime, as the menu routes do.
+        if self.screen == Screen::Battle && self.game.attempt().is_some_and(|a| !a.paused) {
+            self.dispatch(Command::SetPaused(true), "");
+            self.battle.fire_latched = false;
+            self.runtime.clear_input();
+        }
+    }
+
+    /// `AppCommand::ReloadProfile` finished. On success the journey read from
+    /// the save replaced the in-memory one, so the selections startup derives
+    /// from the game are derived again; on failure the load modal shows the
+    /// new error.
+    fn profile_reloaded(&mut self, result: Result<(), String>) {
+        self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
+        let open = match self.status.modal.take() {
+            Some(AppModal::Storage(StorageError::Load { settings, .. })) => Some(settings),
+            other => {
+                self.status.modal = other;
+                None
+            }
+        };
+        match result {
+            Ok(()) => {
+                self.status.storage_note.clear();
+                // The settings warning of the same startup still stands.
+                if let Some(Some(warning)) = open {
+                    self.status.modal = Some(AppModal::Storage(StorageError::Settings { warning }));
+                }
+                let campaign = self.game.campaign();
+                self.status.profile_exists = campaign.selected_survivor.is_some()
+                    || campaign.attempts > 0
+                    || campaign.world.start.is_some();
+                self.campaign.selected_country = campaign
+                    .world
+                    .active
+                    .clone()
+                    .unwrap_or_else(|| "DEU".into());
+                self.campaign.preview_survivor =
+                    campaign.selected_survivor.unwrap_or(SurvivorId::Rook);
+                self.campaign.stage = 0;
+                self.campaign.observed = None;
+                self.campaign.improvement_focus = None;
+                self.armory.selected_item = None;
+                self.armory.pending_sale = None;
+                if let Some(a) = self.game.attempt() {
+                    self.battle.aim = [a.width_yards * 0.5, a.defender_position()[1]];
+                    self.campaign.mode = a.mode;
+                }
+                self.status.message = crate::profile::CAMPAIGN_RESTORED.into();
+                self.status.message_error = false;
+            }
+            Err(error) => {
+                self.status.message = format!("Save could not be read: {error}.");
+                self.status.message_error = true;
+                if let Some(settings) = open {
+                    self.status
+                        .open_storage(StorageError::Load { error, settings });
+                }
             }
         }
     }

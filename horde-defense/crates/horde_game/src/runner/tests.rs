@@ -1185,3 +1185,132 @@ fn same_batch_new_journey_then_native_close_preserves_quit_for_the_fresh_paused_
     assert!(saved.global_paused());
     assert!(saved.campaign().selected_survivor.is_none());
 }
+
+/// W3-06 (UX-08): "Open folder" runs in the runner, through the injectable
+/// opener, and shows the profile directory.
+#[test]
+fn open_save_folder_uses_profile_directory() {
+    let mut host = Host::new();
+    let opener = RecordingOpener::default();
+    host.runtime.set_folder_opener(opener.clone());
+    std::fs::create_dir_all(&host.directory).unwrap();
+    let before = state(&host.game);
+    host.runtime.begin_frame(1);
+    assert!(host.runtime.enqueue(AppCommand::OpenSaveFolder, ""));
+    assert!(!flush(&mut host.ctx()));
+    assert_eq!(host.paths.directory(), host.directory);
+    assert_eq!(opener.opened(), vec![host.directory.clone()]);
+    assert!(
+        matches!(
+            host.notices.as_slice(),
+            [RuntimeNotice::SaveFolderOpened(Ok(()))]
+        ),
+        "{:?}",
+        host.notices
+    );
+    // Showing the folder is not gameplay and not a save.
+    assert_eq!(state(&host.game), before);
+    assert!(!host.runtime.commands_applied_since_load());
+    assert!(!host.runtime.saved_since_load());
+    assert!(!host.runtime.durable_transition_pending());
+
+    // An opener that cannot start reports why; nothing else changes.
+    host.notices.clear();
+    host.runtime.set_folder_opener(RecordingOpener::failing(
+        "explorer.exe could not be started: not found",
+    ));
+    host.runtime.begin_frame(2);
+    assert!(host.runtime.enqueue(AppCommand::OpenSaveFolder, ""));
+    flush(&mut host.ctx());
+    assert!(
+        matches!(
+            host.notices.as_slice(),
+            [RuntimeNotice::SaveFolderOpened(Err(error))] if error.contains("not found")
+        ),
+        "{:?}",
+        host.notices
+    );
+
+    // Before the first save creates the profile directory, its nearest
+    // existing ancestor is shown instead of a path the file manager lacks.
+    let mut fresh = Host::new();
+    assert!(!fresh.directory.exists());
+    let opener = RecordingOpener::default();
+    fresh.runtime.set_folder_opener(opener.clone());
+    fresh.runtime.begin_frame(1);
+    fresh.runtime.enqueue(AppCommand::OpenSaveFolder, "");
+    flush(&mut fresh.ctx());
+    assert_eq!(
+        opener.opened(),
+        vec![fresh.directory.parent().unwrap().to_path_buf()]
+    );
+    assert!(
+        !fresh.directory.exists(),
+        "showing a folder creates nothing"
+    );
+}
+
+/// W3-06: `ReloadProfile` reads the save again only while neither the
+/// in-memory journey nor the files changed since the load.
+#[test]
+fn reload_profile_reads_the_save_until_the_journey_or_the_files_change() {
+    let reload = |host: &mut Host, frame: u32| -> Result<(), String> {
+        host.notices.clear();
+        host.runtime.begin_frame(frame);
+        assert!(host.runtime.enqueue(AppCommand::ReloadProfile, ""));
+        flush(&mut host.ctx());
+        match host.notices.as_slice() {
+            [RuntimeNotice::ProfileReloaded(result)] => result.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let mut host = Host::new();
+    std::fs::create_dir_all(&host.directory).unwrap();
+    let path = host.directory.join("campaign.json");
+    // Unreadable: the in-memory journey stays, and nothing is written.
+    std::fs::write(&path, b"not a save").unwrap();
+    let before = state(&host.game);
+    assert!(reload(&mut host, 1).is_err());
+    assert_eq!(state(&host.game), before);
+    assert_eq!(std::fs::read(&path).unwrap(), b"not a save");
+    // Readable: it replaces the in-memory journey.
+    std::fs::remove_file(&path).unwrap();
+    let mut saved = Game::default();
+    saved.campaign_mut().coins = 77;
+    saved.save(&path).unwrap();
+    assert_eq!(reload(&mut host, 2), Ok(()));
+    assert_eq!(host.game.campaign().coins, 77);
+    assert!(host.runtime.reload_allowed());
+    // A pause is not progress.
+    host.runtime.begin_frame(3);
+    host.runtime.enqueue(Command::SetPaused(true), "");
+    host.runtime.enqueue(Command::SetPaused(false), "");
+    flush(&mut host.ctx());
+    assert!(!host.runtime.commands_applied_since_load());
+    // A gameplay command is: the save is not read over it.
+    host.runtime.begin_frame(4);
+    host.runtime.enqueue(
+        Command::ChooseSurvivor(horde_core::survivors::SurvivorId::Rook),
+        "",
+    );
+    flush_for_test(&mut host.ctx());
+    assert!(host.runtime.commands_applied_since_load());
+    assert!(
+        host.runtime.saved_since_load(),
+        "the autosave replaced the file"
+    );
+    assert!(!host.runtime.reload_allowed());
+    let played = state(&host.game);
+    assert_eq!(reload(&mut host, 5), Err(RELOAD_REFUSED.into()));
+    assert_eq!(state(&host.game), played);
+
+    // A save alone closes the door too, with no command applied.
+    let mut host = Host::new();
+    host.runtime.begin_frame(1);
+    host.runtime
+        .enqueue(AppCommand::Save(SaveIntent::Manual), "");
+    flush_for_test(&mut host.ctx());
+    assert!(!host.runtime.commands_applied_since_load());
+    assert!(host.runtime.saved_since_load());
+    assert_eq!(reload(&mut host, 2), Err(RELOAD_REFUSED.into()));
+}

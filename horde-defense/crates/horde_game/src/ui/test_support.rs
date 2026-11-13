@@ -29,6 +29,8 @@ pub(super) fn test_frontend() -> FrontendParts {
         game: Game::default(),
         settings: Settings::default(),
         warning: String::new(),
+        load_error: None,
+        settings_warning: None,
         settings_at_risk: false,
     };
     FrontendParts::new(profile, &LaunchConfig::default(), &paths)

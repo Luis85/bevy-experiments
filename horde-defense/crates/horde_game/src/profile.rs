@@ -34,6 +34,13 @@ impl ProfilePaths {
             config.practice,
         ))
     }
+    /// The profile directory: where `campaign.json` lives.
+    pub fn directory(&self) -> PathBuf {
+        self.campaign
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or_default()
+    }
     pub fn campaign(&self) -> PathBuf {
         self.campaign.clone()
     }
@@ -47,12 +54,7 @@ impl LoadedProfile {
     /// degrade to a fresh in-memory game plus a warning, so loading itself
     /// cannot fail.
     pub fn load(paths: &ProfilePaths, settings: SettingsLoad) -> Self {
-        let directory = paths
-            .campaign
-            .parent()
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        load_profile(directory, settings)
+        load_profile(paths.directory(), settings)
     }
 }
 
@@ -60,6 +62,12 @@ pub struct LoadedProfile {
     pub game: Game,
     pub settings: Settings,
     pub warning: String,
+    /// Why the save could not be read; the game is then a fresh in-memory
+    /// one. The storage modal (ui/modal.rs) offers "Retry load" for it.
+    pub load_error: Option<String>,
+    /// The startup settings read's warning (`SettingsLoad::warning`): some or
+    /// all settings fell back to defaults. The storage modal shows it.
+    pub settings_warning: Option<String>,
     /// The startup read could neither use nor copy `settings.json`, so the
     /// first save must copy it before replacing it (`SettingsLoad::original_at_risk`).
     pub settings_at_risk: bool,
@@ -81,29 +89,32 @@ pub fn profile_directory(base: PathBuf, scenario: Option<&str>, practice: bool) 
         base
     }
 }
+/// The status text of a journey read from its save.
+pub const CAMPAIGN_RESTORED: &str = "Campaign restored. Continue to resume the exact deployment.";
 /// Startup read service, separate from widget layout and the command runner.
 /// Reads only `campaign.json`; `settings` is the one startup settings read.
 pub fn load_profile(directory: PathBuf, settings: SettingsLoad) -> LoadedProfile {
     let campaign_path = directory.join("campaign.json");
-    let (game, warning) = if campaign_path.exists() || campaign_path.with_extension("bak").exists()
+    let (game, warning, load_error) = if campaign_path.exists()
+        || campaign_path.with_extension("bak").exists()
     {
         match Game::load(&campaign_path) {
-            Ok(game) => (
-                game,
-                "Campaign restored. Continue to resume the exact deployment.".into(),
-            ),
+            Ok(game) => (game, CAMPAIGN_RESTORED.into(), None),
             Err(error) => (
                 Game::default(),
                 format!(
                     "Save could not be read: {error}. Starting fresh in memory. Original files remain unchanged; unreadable generations will be preserved as recovery copies before any new save replaces them."
                 ),
+                Some(error.to_string()),
             ),
         }
     } else {
-        (Game::default(), String::new())
+        (Game::default(), String::new(), None)
     };
     LoadedProfile {
         game,
+        load_error,
+        settings_warning: settings.warning.clone(),
         settings_at_risk: settings.original_at_risk(),
         settings: settings.settings,
         warning,

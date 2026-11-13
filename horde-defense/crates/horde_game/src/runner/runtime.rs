@@ -46,6 +46,14 @@ pub struct Runtime {
     /// Review-only: the staged game can never be saved (the stress fixture),
     /// so no save is ever submitted. See [`Runtime::forbid_saves`].
     pub(super) unsaveable: bool,
+    /// What `AppCommand::OpenSaveFolder` runs through.
+    pub(super) folder_opener: super::folder::FolderOpenerSlot,
+    /// A gameplay command other than a pause changed the game since startup
+    /// (or since the last successful `ReloadProfile`).
+    pub(super) commands_applied: bool,
+    /// A save or a journey reset was handed to storage since startup, so the
+    /// profile files may no longer be the ones the startup load read.
+    pub(super) saved: bool,
     pub fixed_calls: u64,
     pub simulated_ticks: u64,
     /// `dev`: command/input recording in progress.
@@ -76,8 +84,31 @@ impl Runtime {
     pub fn forbid_saves(&mut self) {
         self.unsaveable = true;
     }
-    /// Called on each egui pass with the native FrameCount. Repeated layout
-    /// passes share a command identity set, preventing duplicate purchases.
+    /// Replaces the opener `AppCommand::OpenSaveFolder` runs through.
+    #[cfg(test)]
+    pub(crate) fn set_folder_opener(&mut self, opener: impl super::folder::FolderOpener) {
+        self.folder_opener = super::folder::FolderOpenerSlot(Box::new(opener));
+    }
+    /// A gameplay command changed the in-memory journey since it was loaded.
+    /// Pausing is not progress and does not count.
+    pub fn commands_applied_since_load(&self) -> bool {
+        self.commands_applied
+    }
+    /// A save or a journey reset reached storage since the journey was loaded.
+    pub fn saved_since_load(&self) -> bool {
+        self.saved
+    }
+    /// Whether `AppCommand::ReloadProfile` may replace the in-memory journey
+    /// (design-ux-flow §3 "Runner"): nothing was played and nothing was saved
+    /// since the load. After a save the unreadable file has been replaced
+    /// (after its recovery copy), so there is nothing left to read again.
+    pub fn reload_allowed(&self) -> bool {
+        !self.commands_applied_since_load()
+            && !self.saved_since_load()
+            && self.simulated_ticks == 0
+            && !self.unsaveable
+            && !self.durable_transition_pending()
+    }
     pub fn durable_transition_pending(&self) -> bool {
         self.storage.blocks_gameplay()
             || self.save_requests.iter().any(|i| {
@@ -126,6 +157,8 @@ impl Runtime {
     pub fn reset_in_progress(&self) -> bool {
         self.storage.reset_pending()
     }
+    /// Called on each egui pass with the native FrameCount. Repeated layout
+    /// passes share a command identity set, preventing duplicate purchases.
     pub fn begin_frame(&mut self, frame: u32) {
         if self.frame != Some(frame) {
             self.frame = Some(frame);
@@ -138,7 +171,10 @@ impl Runtime {
             return false;
         }
         if self.durable_transition_pending()
-            && !matches!(command, AppCommand::Save(_) | AppCommand::NewJourney)
+            && !matches!(
+                command,
+                AppCommand::Save(_) | AppCommand::NewJourney | AppCommand::OpenSaveFolder
+            )
         {
             return false;
         }

@@ -550,4 +550,5 @@ mod primary_tests;
 mod progression_tests;
 mod results_tests;
 mod settings_tests;
+mod storage_tests;
 mod toast_tests;

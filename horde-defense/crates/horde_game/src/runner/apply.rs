@@ -39,6 +39,16 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
                 ctx.runtime.request_save(intent);
                 continue;
             }
+            AppCommand::OpenSaveFolder => {
+                let result = open_save_folder(ctx);
+                ctx.notice(RuntimeNotice::SaveFolderOpened(result));
+                continue;
+            }
+            AppCommand::ReloadProfile => {
+                let result = reload_profile(ctx);
+                ctx.notice(RuntimeNotice::ProfileReloaded(result));
+                continue;
+            }
             AppCommand::NewJourney => {
                 if let Err(error) = begin_new_journey(ctx, queued.success.clone()) {
                     ctx.notice(RuntimeNotice::CommandCompleted {
@@ -80,6 +90,8 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
         ctx.game_changed = true;
         if result.is_ok() {
             ctx.runtime.dirty = true;
+            // A pause is not progress: `ReloadProfile` stays possible.
+            ctx.runtime.commands_applied |= !matches!(command, Command::SetPaused(_));
             if matches!(command, Command::LeaveJourney) {
                 ctx.runtime.request_save(SaveIntent::Menu);
             }
@@ -102,6 +114,40 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
     }
     persist_pending(ctx)
 }
+/// `AppCommand::OpenSaveFolder`: the profile directory (or, before the first
+/// save creates it, its nearest existing ancestor) through the runtime's
+/// `FolderOpener`. Runner-side IO; the game is not touched.
+fn open_save_folder(ctx: &mut RuntimeCtx) -> Result<(), String> {
+    let directory = super::folder::folder_to_open(&ctx.paths.directory());
+    ctx.runtime.folder_opener.0.open(&directory)
+}
+/// `AppCommand::ReloadProfile`: reads `campaign.json` (or its backup) again
+/// and swaps the in-memory journey for it. Refused once that journey or the
+/// files changed since startup (`Runtime::reload_allowed`); a failed read
+/// leaves the in-memory journey as it was.
+fn reload_profile(ctx: &mut RuntimeCtx) -> Result<(), String> {
+    if !ctx.runtime.reload_allowed() {
+        return Err(RELOAD_REFUSED.into());
+    }
+    let game = Game::load(&ctx.paths.campaign()).map_err(|error| error.to_string())?;
+    // The swap happens at a tick a recording cannot place.
+    #[cfg(feature = "dev")]
+    ctx.runtime
+        .stop_recording(ctx.game, "a profile reload cannot be replayed");
+    *ctx.game = game;
+    ctx.game_changed = true;
+    let runtime = &mut *ctx.runtime;
+    runtime.clear_input();
+    runtime.controls = ControlFrame::default();
+    runtime.observed_battle = None;
+    runtime.dirty = false;
+    runtime.save_ticks = 0;
+    runtime.retry_save_at = 0;
+    Ok(())
+}
+/// Why `AppCommand::ReloadProfile` was refused.
+pub(super) const RELOAD_REFUSED: &str =
+    "The journey changed since it was loaded, so the save is not read again";
 /// Camp purchases, training and equipment changes that earn a confirmation cue.
 fn confirms_purchase(command: &Command) -> bool {
     matches!(
@@ -165,6 +211,8 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
         let mut cancelled = runtime.storage.reset(old, fresh, path)?;
         persistence::dedup(&mut cancelled, std::mem::take(&mut runtime.save_requests));
         runtime.reset_success = Some(success);
+        runtime.commands_applied = true;
+        runtime.saved = true;
         runtime.seen.clear();
         runtime.seen.push(AppCommand::NewJourney);
         runtime.clear_input();
@@ -173,7 +221,7 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
     for intent in cancelled {
         ctx.notice(RuntimeNotice::Saved {
             intent,
-            result: Err("Save superseded by the confirmed new journey".into()),
+            result: Err(SAVE_SUPERSEDED.into()),
         });
     }
     Ok(())
@@ -341,6 +389,7 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         if result.is_ok() {
             runtime.dirty = false;
             runtime.save_ticks = 0;
+            runtime.saved = true;
         } else {
             runtime.dirty = true;
             runtime.retry_save_at = runtime.simulated_ticks + 600;

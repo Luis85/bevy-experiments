@@ -113,6 +113,11 @@ fn save_failure_notice_keeps_details_and_dismiss_inside_the_window_at_both_sizes
         });
         f.apply_notices();
         assert!(f.status.message_error, "{:?}", f.status.message);
+        // W3-06: the failure also opens the storage modal, with a "Dismiss"
+        // of its own. This pins the status-line notice that stays once the
+        // modal is closed.
+        assert!(f.status.modal.is_some());
+        f.status.modal = None;
         let ctx = egui::Context::default();
         settings::install_font(&ctx);
         settings::configure(&ctx, scale);

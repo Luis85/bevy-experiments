@@ -80,6 +80,12 @@ pub(crate) struct StatusUi {
     pub(super) toasts: super::toast::Toasts,
     /// The one application modal slot (ui/modal.rs).
     pub(super) modal: Option<super::modal::AppModal>,
+    /// The storage modal's note: "Path copied." or why the folder could not
+    /// be opened. Cleared when the modal opens or closes.
+    pub(super) storage_note: String,
+    /// The save error the player dismissed: the same autosave failure does
+    /// not reopen the modal until a save succeeds.
+    pub(super) dismissed_save_error: Option<String>,
     pub(super) practice_profile: bool,
     pub(super) profile_exists: bool,
 }
@@ -276,8 +282,13 @@ impl FrontendParts {
             game,
             settings,
             warning: message,
+            load_error,
+            settings_warning,
             settings_at_risk,
         } = profile;
+        // A startup storage failure opens the storage modal (UX-08): the
+        // load failure first, with the settings warning behind it.
+        let modal = super::modal::startup_modal(load_error, settings_warning);
         let mut runtime = Runtime::default();
         if settings_at_risk {
             runtime.guard_settings_original();
@@ -318,6 +329,7 @@ impl FrontendParts {
                 // An isolated review stages a throwaway profile, not a practice save.
                 practice_profile: config.practice,
                 profile_exists,
+                modal,
                 ..StatusUi::default()
             },
             campaign: CampaignUi {

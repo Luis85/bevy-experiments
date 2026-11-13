@@ -68,11 +68,12 @@ const TABS: [Tab; 9] = [
     Tab::Engineering,
     Tab::Operations,
 ];
-const OVERLAYS: [Overlay; 10] = [
+const OVERLAYS: [Overlay; 11] = [
     Overlay::Rebind,
     Overlay::TextFocus,
     Overlay::AppModal(ModalKind::Quit),
     Overlay::AppModal(ModalKind::ReturnToMenu),
+    Overlay::AppModal(ModalKind::Storage),
     Overlay::NewJourneyModal,
     Overlay::Details,
     Overlay::Popup,
@@ -98,6 +99,19 @@ fn matrix_table() {
         (
             "quit modal closes",
             with(Overlay::AppModal(QUIT), on(Screen::Menu)),
+            A::CloseModal,
+        ),
+        (
+            "storage modal over a battle closes",
+            with(Overlay::AppModal(ModalKind::Storage), on(Screen::Battle)),
+            A::CloseModal,
+        ),
+        (
+            "storage modal closes while a save is pending",
+            pending(with(
+                Overlay::AppModal(ModalKind::Storage),
+                on(Screen::Menu),
+            )),
             A::CloseModal,
         ),
         (
@@ -374,7 +388,7 @@ fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
 #[test]
 fn properties() {
     let all = every_context();
-    assert_eq!(all.len(), 7 * 9 * 10 * 128);
+    assert_eq!(all.len(), 7 * 9 * 11 * 128);
     for cx in all {
         let action = escape_action(&cx);
         // A focused text field and an open popup keep Escape for egui, and
