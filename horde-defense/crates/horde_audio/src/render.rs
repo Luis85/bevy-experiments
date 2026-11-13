@@ -10,7 +10,8 @@
 //!
 //! - **Effects.** [`VoicePolicy`] is the voice policy of `horde_game`'s
 //!   `SfxPlugin`: the per-bus start budgets and the player-weapon lane, a
-//!   rotation that picks the variant, and the bus and family caps of
+//!   per-bank round-robin that picks the variant and the jitter of the
+//!   start's speed and gain ([`Variety`]), and the bus and family caps of
 //!   [`crate::voices`], where a start at a cap fades its victim out over
 //!   [`crate::voices::FADE_MS`]. A voice plays its mono clip at
 //!   `bus gain x row gain`, where the bus gain is
@@ -33,12 +34,12 @@ use crate::{
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, mix},
     pan::{self, Places},
-    select::{CueGate, select_starts},
+    select::{CueGate, Jitter, Variety, select_starts},
     voices::{Admission, LiveVoice, Ramp, VoiceControl, admit},
     wav,
 };
 use horde_core::sim::{BattleId, Game, TICKS_PER_SECOND, smoke_input};
-use std::{collections::BTreeMap, path::Path};
+use std::{borrow::Cow, collections::BTreeMap, path::Path};
 
 /// The render's sample rate, the rate of the shipped effect clips.
 pub const RATE: u32 = 44_100;
@@ -188,18 +189,38 @@ fn resample(samples: &[f32], from: u32, to: u32, wrap: bool) -> Vec<f32> {
         .collect()
 }
 
+/// `samples` played at `speed`, as the runtime's sink plays a jittered voice:
+/// read by linear interpolation at `speed` source samples per output sample.
+pub fn pitched(samples: &[f32], speed: f32) -> Vec<f32> {
+    if speed == 1.0 || samples.is_empty() {
+        return samples.to_vec();
+    }
+    let step = f64::from(speed);
+    let count = (samples.len() as f64 / step) as usize;
+    (0..count)
+        .map(|index| {
+            let position = index as f64 * step;
+            let at = (position as usize).min(samples.len() - 1);
+            let next = samples.get(at + 1).copied().unwrap_or(0.0);
+            samples[at] + (next - samples[at]) * (position - at as f64) as f32
+        })
+        .collect()
+}
+
 /// One voice to start.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VoiceStart {
     /// Unique per policy; a later [`FrameActions::fades`] names it.
     pub voice: u64,
     pub cue: Cue,
-    /// The bank variant to play (variants wrap).
+    /// The bank variant to play: the bank's round-robin pick.
     pub variant: u64,
     pub priority: u8,
     /// The cue's row gain in the current effects mode. The executor multiplies
-    /// in the gain of the cue's bus.
+    /// in the gain of the cue's bus and the jitter's gain.
     pub gain: f32,
+    /// The start's playback speed and gain factor.
+    pub jitter: Jitter,
 }
 
 /// What the executor does this frame: fade first, then start.
@@ -216,8 +237,10 @@ pub struct FrameActions {
 /// [`CueGate`].
 #[derive(Debug, Default)]
 pub struct VoicePolicy {
+    /// Counts the frames with requests: fire sources take turns by it.
     rotation: u64,
     gate: CueGate,
+    variety: Variety,
     next_voice: u64,
 }
 impl VoicePolicy {
@@ -269,12 +292,15 @@ impl VoicePolicy {
             }
             let voice = self.next_voice;
             self.next_voice += 1;
+            // Only a start that plays advances its bank.
+            let pick = self.variety.pick_cue(cue);
             actions.starts.push(VoiceStart {
                 voice,
                 cue,
-                variant: rotation,
+                variant: pick.variant,
                 priority,
                 gain: mix(cue).level(reduced),
+                jitter: pick.jitter,
             });
             live.push(LiveVoice {
                 id: voice,
@@ -347,7 +373,8 @@ struct Voice<'a> {
     /// The fade of a stolen voice, as the runtime's decoder runs it.
     control: VoiceControl,
     ramp: Ramp,
-    clip: &'a [f32],
+    /// The clip at the start's jittered speed.
+    clip: Cow<'a, [f32]>,
     position: usize,
     /// Left and right.
     gains: [f32; 2],
@@ -400,10 +427,22 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
                 started_ms: now_ms,
                 control: VoiceControl::default(),
                 ramp: Ramp::new(RATE),
-                clip: library.clip(start.cue, start.variant),
+                clip: {
+                    let clip = library.clip(start.cue, start.variant);
+                    if start.jitter.speed == 1.0 {
+                        Cow::Borrowed(clip)
+                    } else {
+                        Cow::Owned(pitched(clip, start.jitter.speed))
+                    }
+                },
                 position: 0,
-                gains: pan::voice_gains(start.cue, &frame.places, scene.reduced, scene.mono)
-                    .map(|side| side * bus_gains[mix(start.cue).bus as usize] * start.gain),
+                gains: pan::voice_gains(start.cue, &frame.places, scene.reduced, scene.mono).map(
+                    |side| {
+                        side * bus_gains[mix(start.cue).bus as usize]
+                            * start.gain
+                            * start.jitter.gain
+                    },
+                ),
             });
         }
         for voice in &mut voices {

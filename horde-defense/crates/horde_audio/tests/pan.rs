@@ -6,7 +6,7 @@
 use horde_audio::{
     cue::Cue,
     events::{event_sound, event_sound_at, event_x},
-    mix::{Sliders, calibration_gain, mix},
+    mix::{Sliders, calibration_gain, db_to_linear, mix},
     pan::{
         self, CENTRE, DEFENDER_X, PAN_DEPTH, PAN_DEPTH_REDUCED, Places, depth, gains,
         lane_position, mono_fold_db, positional, voice_gains,
@@ -269,7 +269,8 @@ fn defender_ui_stinger_ambience_centred() {
 }
 
 /// Headroom of one voice: at the maximum sliders, the loudest variant of the
-/// loudest row, on its louder (near) channel, peaks at or below 0.75.
+/// loudest row, at the top of its gain jitter, on its louder (near) channel,
+/// peaks at or below 0.75.
 #[test]
 fn single_voice_peak_at_max_sliders_le_0_75() {
     let library = library();
@@ -285,6 +286,7 @@ fn single_voice_peak_at_max_sliders_le_0_75() {
                 assert_eq!(near, 1.0, "{cue:?}");
                 let level = peak(library.clip(cue, u64::from(variant)))
                     * mix(cue).level(false)
+                    * db_to_linear(mix(cue).jitter.gain_db)
                     * bus
                     * near;
                 if level > worst.0 {

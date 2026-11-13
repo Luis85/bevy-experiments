@@ -16,7 +16,7 @@ use horde_audio::{
         self, Context, FRAME_SAMPLES, Frame, Library, RAIN_WEIGHTS, RATE, REFERENCE_WEIGHTS, Scene,
         Sliders, Stereo, VoicePolicy,
     },
-    select::select_sounds,
+    select::{Variety, select_sounds},
     voices::{LiveVoice, bus_cap},
     wav,
 };
@@ -109,7 +109,12 @@ fn legacy_policy_starts_its_budget_per_frame_and_rotates_only_on_frames_with_req
         select_sounds(requests, 0)
     );
     assert_eq!(first.starts.len(), 3);
-    assert!(first.starts.iter().all(|start| start.variant == 0));
+    // Each start plays its bank's own round-robin pick (`tests/variety.rs`).
+    let mut variety = Variety::default();
+    for start in &first.starts {
+        let pick = variety.pick_cue(start.cue);
+        assert_eq!((start.variant, start.jitter), (pick.variant, pick.jitter));
+    }
     assert_eq!(first.starts[0].gain, mix(Cue::Boss).level(false));
     assert_eq!(first.starts[0].priority, mix(Cue::Boss).priority);
     assert_ne!(first.starts[0].voice, first.starts[1].voice);
@@ -120,8 +125,17 @@ fn legacy_policy_starts_its_budget_per_frame_and_rotates_only_on_frames_with_req
             .starts
             .is_empty()
     );
-    let second = policy.frame(vec![Cue::Kill], 34, false, &AUDIBLE, &[]);
-    assert_eq!(second.starts[0].variant, 1);
+    let second = policy.frame(
+        vec![Cue::Kill, Cue::Smg, Cue::Pistol],
+        34,
+        false,
+        &AUDIBLE,
+        &[],
+    );
+    assert_eq!(
+        second.starts.iter().map(|s| s.cue).collect::<Vec<_>>(),
+        select_sounds(vec![Cue::Kill, Cue::Smg, Cue::Pistol], 1)
+    );
     // The repeat gate holds a cue back inside its cooldown.
     let gated = policy.frame(vec![Cue::Boss], 1_000, false, &AUDIBLE, &[]);
     assert!(gated.starts.is_empty(), "{gated:?}");
@@ -163,7 +177,7 @@ fn policy_caps_at_eight_effects_and_fades_the_least_important() {
     let free = policy.frame(vec![Cue::Explosion], 40, false, &AUDIBLE, &live[..7]);
     assert!(free.fades.is_empty());
     assert_eq!(free.starts.len(), 1);
-    // A muted bus starts nothing but still turns the rotation.
+    // A muted bus starts nothing and leaves its banks where they were.
     let mut muted = VoicePolicy::default();
     assert!(
         muted
@@ -176,7 +190,7 @@ fn policy_caps_at_eight_effects_and_fades_the_least_important() {
             .frame(vec![Cue::Boss], 20, false, &AUDIBLE, &[])
             .starts[0]
             .variant,
-        1
+        Variety::default().pick_cue(Cue::Boss).variant
     );
 }
 
@@ -199,12 +213,21 @@ fn single_cue_renders_dual_mono_at_bus_times_row_gain() {
     let out = render::render(&library, &frames, &scene);
     assert_eq!(out.left.len(), 120 * FRAME_SAMPLES);
     assert_eq!(out.left, out.right);
-    let clip = library.clip(Cue::Explosion, 0);
+    // The explosion bank's first pick: its variant, at the pick's speed and
+    // gain jitter.
+    let pick = Variety::default().pick_cue(Cue::Explosion);
+    assert_ne!((pick.jitter.speed, pick.jitter.gain), (1.0, 1.0));
+    let clip = render::pitched(
+        library.clip(Cue::Explosion, pick.variant),
+        pick.jitter.speed,
+    );
+    let clip = clip.as_slice();
     let clip_peak = clip.iter().fold(0.0_f32, |peak, s| peak.max(s.abs()));
     let expected = mix::DEFAULT_MASTER
         * mix::DEFAULT_EFFECTS
         * mix::calibration_gain()
         * mix(Cue::Explosion).gain
+        * pick.jitter.gain
         * clip_peak;
     let peak = out.loudness().sample_peak;
     assert!((peak - expected).abs() < 1e-6, "{peak} is not {expected}");

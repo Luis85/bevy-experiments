@@ -106,6 +106,36 @@ pub const REDUCED_GAIN: f32 = 0.65;
 /// Reduced effects: every cooldown is 3/2 as long, rounded down.
 pub const REDUCED_COOLDOWN: (u64, u64) = (3, 2);
 
+/// How far a start's playback speed and gain may stray from the clip's own,
+/// so a repeated cue is not heard as one sample. `select::jitter` draws
+/// inside the bounds from a presentation counter. Jitter stays on in reduced
+/// effects: it adds no intensity.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct JitterBounds {
+    /// The playback speed strays by up to this share either way.
+    pub speed: f32,
+    /// The gain strays by up to this many dB either way.
+    pub gain_db: f32,
+}
+impl JitterBounds {
+    /// Gunfire and weapon handling.
+    pub const GUNS: Self = Self::new(0.02, 0.75);
+    /// Enemy windup, contact and death voices.
+    pub const ENEMY_VOCALS: Self = Self::new(0.04, 1.0);
+    /// Impacts and deaths.
+    pub const IMPACTS: Self = Self::new(0.03, 1.0);
+    /// Boss cues: a slight detune, the level untouched.
+    pub const BOSS: Self = Self::new(0.01, 0.0);
+    /// Interface sounds: the pitch untouched.
+    pub const UI: Self = Self::new(0.0, 0.3);
+    /// Stingers and warnings play as mastered.
+    pub const NONE: Self = Self::new(0.0, 0.0);
+
+    const fn new(speed: f32, gain_db: f32) -> Self {
+        Self { speed, gain_db }
+    }
+}
+
 /// One cue's mix numbers.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CueMix {
@@ -122,6 +152,8 @@ pub struct CueMix {
     pub retired: bool,
     /// Set for a warning cue: the twin that shows it.
     pub warning: Option<VisualTwin>,
+    /// The jitter group of the cue's starts.
+    pub jitter: JitterBounds,
 }
 impl CueMix {
     /// The per-voice gain in normal or reduced effects.
@@ -149,6 +181,7 @@ const fn row(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
         reduced_gain: REDUCED_GAIN,
         retired: false,
         warning: None,
+        jitter: JitterBounds::NONE,
     }
 }
 /// An attempt stinger: it rides the Music bus.
@@ -162,12 +195,27 @@ const fn stinger(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
 const fn interface(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
     CueMix {
         bus: Bus::Ui,
+        jitter: JitterBounds::UI,
         ..row(gain, cooldown_ms, priority)
     }
 }
 const fn fire(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
     CueMix {
         gate: GateGroup::Fire,
+        ..handling(gain, cooldown_ms, priority)
+    }
+}
+/// Handling a weapon: it varies like firing one.
+const fn handling(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
+    CueMix {
+        jitter: JitterBounds::GUNS,
+        ..row(gain, cooldown_ms, priority)
+    }
+}
+/// An impact or a death.
+const fn hit(gain: f32, cooldown_ms: u32, priority: u8) -> CueMix {
+    CueMix {
+        jitter: JitterBounds::IMPACTS,
         ..row(gain, cooldown_ms, priority)
     }
 }
@@ -186,24 +234,27 @@ pub const fn mix(cue: Cue) -> CueMix {
             ..fire(0.75, 100, 10)
         },
         Cue::TurretShot => fire(0.65, 150, 11),
-        Cue::Impact => row(0.55, 85, 7),
-        Cue::Armor => row(0.45, 140, 7),
-        Cue::Reload => row(0.55, 180, 5),
-        Cue::Throw => row(0.55, 180, 4),
-        Cue::Explosion => row(1.0, 180, 2),
-        Cue::Molotov => row(0.65, 180, 2),
+        Cue::Impact => hit(0.55, 85, 7),
+        Cue::Armor => hit(0.45, 140, 7),
+        Cue::Reload => handling(0.55, 180, 5),
+        Cue::Throw => handling(0.55, 180, 4),
+        Cue::Explosion => hit(1.0, 180, 2),
+        Cue::Molotov => hit(0.65, 180, 2),
         Cue::Fire => row(0.3, 850, 13),
         Cue::Retreat => stinger(0.65, 1500, 0),
-        Cue::Boss => row(1.0, 3000, 0),
+        Cue::Boss => CueMix {
+            jitter: JitterBounds::BOSS,
+            ..row(1.0, 3000, 0)
+        },
         Cue::Wave => row(0.65, 1800, 1),
-        Cue::Damage => row(0.75, 240, 3),
-        Cue::Melee => row(0.65, 180, 4),
+        Cue::Damage => hit(0.75, 240, 3),
+        Cue::Melee => hit(0.65, 180, 4),
         Cue::Ready => row(0.45, 400, 6),
-        Cue::Structure => row(0.75, 550, 2),
-        Cue::Trap => row(0.75, 220, 8),
+        Cue::Structure => hit(0.75, 550, 2),
+        Cue::Trap => hit(0.75, 220, 8),
         Cue::Incoming => row(0.3, 2400, 12),
         // Quieter than a hit: a horde's kills must not mask the guns.
-        Cue::Kill => row(0.5, 160, 6),
+        Cue::Kill => hit(0.5, 160, 6),
         Cue::Victory => stinger(0.8, 3000, 0),
         Cue::Defeat => stinger(0.8, 3000, 0),
         Cue::Confirm => interface(0.45, 250, 3),

@@ -6,10 +6,17 @@
 //! 1), plus the root defender's own shot on the reserved player-weapon lane
 //! ([`Lane::PlayerWeapon`]): that shot takes no slot of any budget and starts
 //! whenever its own gate passes.
+//!
+//! Variety: each bank keeps a [`RoundRobin`] and a trigger counter
+//! ([`Variety`]). A start's variant and its [`Jitter`] come from a hash of
+//! the bank's ordinal and that counter, so they depend on how often the bank
+//! has played and on nothing of the game: no game state or simulation
+//! randomness is read.
 
 use crate::{
+    bank::BankId,
     cue::{CUE_COUNT, Cue},
-    mix::{Bus, GateGroup, mix},
+    mix::{Bus, GateGroup, JitterBounds, db_to_linear, mix},
 };
 
 /// Cues that may start in one frame on each bus, indexed by [`Bus`]. Master
@@ -183,4 +190,117 @@ pub fn select_sounds(sounds: Vec<Cue>, rotation: u64) -> Vec<Cue> {
         .into_iter()
         .map(|start| start.cue)
         .collect()
+}
+
+/// The SplitMix64 step: a counter in, 64 well-mixed bits out.
+pub const fn splitmix64(state: u64) -> u64 {
+    let mut z = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
+/// One bank's variant rotation: the next variant is never the last one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RoundRobin {
+    /// The variant played last; `u8::MAX` before the first (and after load).
+    last: u8,
+}
+impl Default for RoundRobin {
+    fn default() -> Self {
+        Self { last: u8::MAX }
+    }
+}
+impl RoundRobin {
+    /// The next of `variants` variants for the hash `h`:
+    /// `(last + 1 + h % (n - 1)) % n`, which skips `last` for `n >= 2`. The
+    /// first pick is `h % n`.
+    pub const fn next(&mut self, variants: u64, h: u64) -> u64 {
+        let last = self.last as u64;
+        let next = if variants <= 1 {
+            0
+        } else if last >= variants {
+            h % variants
+        } else {
+            (last + 1 + h % (variants - 1)) % variants
+        };
+        self.last = next as u8;
+        next
+    }
+}
+
+/// How one start strays from its clip: both are linear factors.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Jitter {
+    /// The playback speed.
+    pub speed: f32,
+    /// Multiplies the voice's gain.
+    pub gain: f32,
+}
+impl Jitter {
+    pub const NONE: Self = Self {
+        speed: 1.0,
+        gain: 1.0,
+    };
+}
+
+/// 24 bits of a hash as a point in -1..=1.
+fn unit(bits: u64) -> f32 {
+    const MAX: u64 = (1 << 24) - 1;
+    (bits & MAX) as f32 / MAX as f32 * 2.0 - 1.0
+}
+
+/// The jitter inside `bounds` for the hash `h`: the speed from bits 16-39,
+/// the gain from bits 40-63 (the variant reads `h` whole, modulo a small
+/// count).
+pub fn jitter(bounds: JitterBounds, h: u64) -> Jitter {
+    Jitter {
+        speed: 1.0 + bounds.speed * unit(h >> 16),
+        gain: db_to_linear(bounds.gain_db * unit(h >> 40)),
+    }
+}
+
+/// Round-robin slots: one per bank ordinal.
+pub const BANK_SLOTS: usize = 64;
+
+/// What one start of a bank plays.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pick {
+    pub variant: u64,
+    pub jitter: Jitter,
+}
+
+/// The variety state: per bank, the rotation and how often it has played.
+/// Presentation only; it is not saved and starts over on load.
+#[derive(Clone, Debug)]
+pub struct Variety {
+    banks: [RoundRobin; BANK_SLOTS],
+    counters: [u64; BANK_SLOTS],
+}
+impl Default for Variety {
+    fn default() -> Self {
+        Self {
+            banks: [RoundRobin::default(); BANK_SLOTS],
+            counters: [0; BANK_SLOTS],
+        }
+    }
+}
+impl Variety {
+    /// The next start of `bank`: its variant and its jitter inside `bounds`,
+    /// from `splitmix64((ordinal << 32) ^ the bank's trigger count)`.
+    pub fn pick(&mut self, bank: BankId, bounds: JitterBounds) -> Pick {
+        let ordinal = bank.ordinal();
+        let slot = ordinal as usize;
+        let counter = self.counters[slot];
+        self.counters[slot] = counter.wrapping_add(1);
+        let h = splitmix64((ordinal << 32) ^ counter);
+        Pick {
+            variant: self.banks[slot].next(bank.variants(), h),
+            jitter: jitter(bounds, h),
+        }
+    }
+    /// The next start of `cue`: its bank, at its mix row's jitter group.
+    pub fn pick_cue(&mut self, cue: Cue) -> Pick {
+        self.pick(cue.bank(), mix(cue).jitter)
+    }
 }

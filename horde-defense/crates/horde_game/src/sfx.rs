@@ -6,6 +6,10 @@
 //! names the voice a start steals. A stolen voice is not cut: its decoder
 //! fades it out over 40 ms on the audio thread and ends ([`Fading`]).
 //!
+//! Each start plays its bank's round-robin variant at a jittered speed and
+//! gain (`horde_audio::select::Variety`): presentation counters only, so no
+//! bank repeats a variant back to back and nothing reads the simulation.
+//!
 //! A voice plays as a [`PannedClip`]: the cue's WAV into two channels at the
 //! gains of its lane pan (`horde_audio::pan`; centred with "Mono audio"). A
 //! variant whose WAV has not loaded yet plays as a plain centred
@@ -23,7 +27,7 @@ use horde_audio::{
     mix::{Sliders, mix},
     pan::{self, Places},
     render::audible,
-    select::select_starts,
+    select::{Variety, select_starts},
     voices::{Admission, LiveVoice, Ramp, VoiceControl, admit},
 };
 use std::sync::Arc;
@@ -45,11 +49,13 @@ impl Plugin for SfxPlugin {
     }
 }
 
-/// Variant rotation and per-cue rate limiting across frames.
+/// Fire rotation, per-cue rate limiting and per-bank variety across frames.
 #[derive(Resource, Default)]
 struct SfxState {
+    /// Counts the frames with requests: fire sources take turns by it.
     rotation: u64,
     gate: crate::audio::CueGate,
+    variety: Variety,
 }
 
 #[derive(Component)]
@@ -60,7 +66,9 @@ pub struct EffectVoice {
     /// to the plain player: stolen, it is cut at once.
     control: Option<Arc<VoiceControl>>,
     last_gain: f32,
-    cue_gain: f32,
+    /// The start's gain jitter: the voice keeps it while its bus gain and the
+    /// effects mode change.
+    jitter_gain: f32,
     cue: SoundCue,
     /// The `[left, right]` pan gains the voice started with; a voice that
     /// fell back to the plain player sounds centred whatever this says.
@@ -218,10 +226,12 @@ fn play_sounds(
                 }
             }
         }
-        let cue_gain = mix(cue).level(reduced);
-        let voice_gain = bus_gain(sliders, cue) * cue_gain;
+        // The bank's next variant, and this start's speed and gain jitter.
+        let pick = state.variety.pick_cue(cue);
+        let voice_gain = bus_gain(sliders, cue) * mix(cue).level(reduced) * pick.jitter.gain;
         let gains = pan::voice_gains(cue, &places, reduced, settings.mono_audio);
-        let handle: Handle<AudioSource> = assets.load(crate::audio::variant_path(cue, rotation));
+        let handle: Handle<AudioSource> =
+            assets.load(crate::audio::variant_path(cue, pick.variant));
         let source = sources.get(&handle);
         let control = source.map(|_| Arc::new(VoiceControl::default()));
         let voice = (
@@ -229,11 +239,13 @@ fn play_sounds(
                 started_ms: now_ms,
                 control: control.clone(),
                 last_gain: voice_gain,
-                cue_gain,
+                jitter_gain: pick.jitter.gain,
                 cue,
                 pan: gains,
             },
-            PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(voice_gain)),
+            PlaybackSettings::DESPAWN
+                .with_volume(bevy::audio::Volume::Linear(voice_gain))
+                .with_speed(pick.jitter.speed),
         );
         let entity = match (source, control.clone()) {
             (Some(source), Some(control)) => commands.spawn((
@@ -269,8 +281,8 @@ fn update_effects_gain(
     let sliders = settings.sliders();
     let reduced = settings.reduced_effects;
     for (mut voice, mut playback, sink) in &mut voices {
-        voice.cue_gain = mix(voice.cue).level(reduced);
-        let voice_gain = bus_gain(sliders, voice.cue) * voice.cue_gain;
+        let voice_gain =
+            bus_gain(sliders, voice.cue) * mix(voice.cue).level(reduced) * voice.jitter_gain;
         if (voice.last_gain - voice_gain).abs() > 0.00001 {
             playback.volume = bevy::audio::Volume::Linear(voice_gain);
             if let Some(mut sink) = sink {
@@ -301,7 +313,7 @@ mod tests {
                     started_ms: 0,
                     control: None,
                     last_gain: 0.7,
-                    cue_gain: 1.0,
+                    jitter_gain: 1.0,
                     cue: SoundCue::Explosion,
                     pan: pan::CENTRE,
                 },
@@ -388,7 +400,7 @@ mod tests {
                         started_ms: 0,
                         control: None,
                         last_gain: -1.0,
-                        cue_gain: mix(cue).level(false),
+                        jitter_gain: 1.0,
                         cue,
                         pan: pan::CENTRE,
                     },
@@ -453,18 +465,18 @@ mod tests {
         assert_eq!(started(&mut app, SoundCue::Explosion), 0);
         assert_eq!(started(&mut app, SoundCue::Confirm), 1);
         assert_eq!(started(&mut app, SoundCue::Victory), 1);
-        let gains: Vec<(SoundCue, f32)> = {
+        let gains: Vec<(SoundCue, f32, f32)> = {
             let mut voices = app.world_mut().query::<&EffectVoice>();
             voices
                 .iter(app.world())
-                .map(|voice| (voice.cue, voice.last_gain))
+                .map(|voice| (voice.cue, voice.last_gain, voice.jitter_gain))
                 .collect()
         };
         let settings = app.world().resource::<Settings>().sliders();
-        for (cue, gain) in gains {
+        for (cue, gain, jitter) in gains {
             assert_eq!(
                 gain,
-                settings.bus_gain(mix(cue).bus) * mix(cue).level(false),
+                settings.bus_gain(mix(cue).bus) * mix(cue).level(false) * jitter,
                 "{cue:?}"
             );
             assert!(gain > 0.0, "{cue:?}");
@@ -662,6 +674,61 @@ mod tests {
         assert_eq!(clip.gains, entity.get::<EffectVoice>().unwrap().pan);
         assert_eq!(clip.source.bytes, wav.bytes);
         drop(handles);
+    }
+
+    /// The adapter plays what `Variety` picks: the bank's round-robin variant,
+    /// at the pick's speed, with the pick's gain kept through a slider move.
+    #[test]
+    fn starts_play_the_banks_pick_at_its_jittered_speed_and_gain() {
+        let mut app = pan_app(Settings::default());
+        app.add_systems(Update, update_effects_gain.after(play_sounds));
+        let mut variety = Variety::default();
+        let mut paths = Vec::new();
+        for _ in 0..6 {
+            let entity = start(&mut app, CueRequest::centred(SoundCue::Explosion));
+            let pick = variety.pick_cue(SoundCue::Explosion);
+            let sliders = app.world().resource::<Settings>().sliders();
+            let world = app.world();
+            let voice = world.entity(entity);
+            let playback = voice.get::<PlaybackSettings>().unwrap();
+            assert_eq!(playback.speed, pick.jitter.speed);
+            let expected = sliders.bus_gain(mix(SoundCue::Explosion).bus)
+                * mix(SoundCue::Explosion).level(false)
+                * pick.jitter.gain;
+            assert_eq!(playback.volume, bevy::audio::Volume::Linear(expected));
+            assert_eq!(
+                voice.get::<EffectVoice>().unwrap().jitter_gain,
+                pick.jitter.gain
+            );
+            let handle = voice.get::<AudioPlayer<AudioSource>>().unwrap().0.clone();
+            let path = world
+                .resource::<AssetServer>()
+                .get_path(handle.id())
+                .unwrap()
+                .to_string();
+            assert_eq!(
+                path,
+                crate::audio::variant_path(SoundCue::Explosion, pick.variant)
+            );
+            paths.push(path);
+            clear(&mut app);
+        }
+        assert!(paths.windows(2).all(|pair| pair[0] != pair[1]), "{paths:?}");
+        // A slider move keeps the start's gain jitter.
+        let entity = start(&mut app, CueRequest::centred(SoundCue::Explosion));
+        let jitter = app.world().get::<EffectVoice>(entity).unwrap().jitter_gain;
+        assert_ne!(jitter, 1.0);
+        app.world_mut().resource_mut::<Settings>().effects = 0.4;
+        app.update();
+        let sliders = app.world().resource::<Settings>().sliders();
+        assert_eq!(
+            app.world().get::<PlaybackSettings>(entity).unwrap().volume,
+            bevy::audio::Volume::Linear(
+                sliders.bus_gain(mix(SoundCue::Explosion).bus)
+                    * mix(SoundCue::Explosion).level(false)
+                    * jitter
+            )
+        );
     }
 
     /// The root defender's shot starts in a frame whose Effects budget is
