@@ -278,6 +278,8 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     // W5-09.
     ("dawn-reference", Screen::Battle, None),
     ("elite-tells", Screen::Battle, None),
+    // W5-10.
+    ("storm", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1144,6 +1146,17 @@ fn weapon_classes_fixtures_equip_and_fire_their_class() {
             "{scene}: the player fired"
         );
         assert!(f.battle.fire_latched, "{scene}: motion keeps firing");
+        // Decision 16 (W5-10): the class the weapon effects draw is the one
+        // frozen in the deploy's gear snapshot, not a later re-read of the
+        // equipped item.
+        let ranged: Vec<_> = a
+            .gear_snapshot
+            .iter()
+            .filter(|record| record.slot == Slot::Ranged)
+            .map(|record| record.weapon_class)
+            .collect();
+        assert_eq!(ranged, [Some(class)], "{scene}: the snapshot's class");
+        assert_eq!(crate::art::shooter_class(a), class, "{scene}");
     }
     let f = staged("weapon-classes-turret");
     assert!(f.screen == Screen::Battle, "{:?}", f.screen);
@@ -2272,4 +2285,141 @@ fn reduced_96_frame_fx_stress_sequence_has_no_additive_vertex() {
     );
     let reduced = fx_stress_sequence(true);
     assert_eq!(reduced, [0; 96], "reduced effects paint no additive vertex");
+}
+
+// ----- W5-10: the storm scene and the motion manifest's flash counters -----
+
+/// Design-qa-captures 1.8 (ruling W-8): the storm scene is a real storm
+/// stage, deployed and played calm up to a tick from which the motion
+/// export's 24 frames hold one whole lightning pulse; the still is paused
+/// there (a paused field never flashes).
+#[cfg(feature = "review")]
+#[test]
+fn storm_fixture_is_a_storm_tagged_stage() {
+    use crate::art::lighting::{self, Lighting};
+    use crate::capture_sequence::{FIRST, LAST};
+    let f = staged("storm");
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    let a = f.game.attempt().expect("a deployed storm stage");
+    assert!(a.paused && f.game.global_paused(), "paused");
+    let country = horde_core::world::world()
+        .country(a.country_id.as_deref().expect("a country stage"))
+        .expect("a world country");
+    assert!(
+        lighting::is_storm(&country.stage_theme(a.stage)),
+        "a storm-tagged stage theme"
+    );
+    let look = crate::art::scene_look(a);
+    assert!(look.storm && look.lighting == Lighting::Storm, "{look:?}");
+    // The whole pulse (rise and decay) lies inside the export's captured
+    // ticks: a tick is 1000/60 ms of the export's lightning clock.
+    let ms = |tick: u64| tick * 1000 / 60;
+    let window = ms(a.tick + u64::from(FIRST))..ms(a.tick + u64::from(LAST));
+    let start = lighting::first_pulse_after(look.seed, window.start);
+    assert!(
+        window.contains(&start)
+            && window.contains(&(start + lighting::SKY_RISE_MS + lighting::SKY_DECAY_MS)),
+        "pulse at {start} ms, window {window:?}"
+    );
+    // The pulse starts on frame 8 of the export's 24.
+    assert_eq!(
+        (start * 60).div_ceil(1000),
+        a.tick + u64::from(FIRST + 8 * crate::capture_sequence::STEP)
+    );
+    let reduced = crate::art::flash_facts(a, crate::art::SkyClock::of_tick(a.tick, 1), true);
+    assert_eq!(reduced, crate::art::FlashFacts::default(), "reduced");
+}
+
+/// The flash facts of the 24 frames a motion export of `scene` captures,
+/// stepped as the export steps them (a live fixture from startup, one tick a
+/// native frame, the lightning clock on the tick).
+#[cfg(feature = "review")]
+fn motion_flash_facts(scene: &str, reduced: bool) -> Vec<crate::art::FlashFacts> {
+    use crate::capture_sequence::{LAST, frame_index};
+    let mut vars = vec![
+        ("LASTLIGHT_REVIEW_SCREEN", scene),
+        ("LASTLIGHT_REVIEW_MOTION", "1"),
+        ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
+    ];
+    if reduced {
+        vars.push(("LASTLIGHT_REVIEW_REDUCED", "1"));
+    }
+    let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+        vars.iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| (*value).into())
+    })
+    .expect("valid export launch");
+    let mut f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
+    assert_eq!(f.settings.reduced_effects, reduced, "{scene}");
+    let mut frames = Vec::new();
+    for frame in 1..=LAST {
+        f.flush();
+        f.step();
+        if frame_index(frame).is_some() {
+            let a = f.game.attempt().expect("the defense stands");
+            assert!(!a.paused, "{scene}: the export runs live");
+            frames.push(crate::art::flash_facts(
+                a,
+                crate::art::SkyClock::of_tick(a.tick, f.battle.speed),
+                f.settings.reduced_effects,
+            ));
+        }
+        schedule_motion_release(&config, &mut f.runtime, frame);
+        // The battle screen's egui pass publishes the controls it holds.
+        one_frame(&mut f);
+    }
+    frames
+}
+
+/// Design-qa-captures 1.9 (W5): a normal storm export shows the pulse (at
+/// least one frame with sky_flash > 0, frame-to-frame delta below 0.2), a
+/// normal machine-gun export shows muzzle flashes, and the reduced exports
+/// of storm, fx-stress and weapon-classes-machine-gun are all zeros.
+#[cfg(feature = "review")]
+#[test]
+fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
+    use crate::art::FlashFacts;
+    let storm = motion_flash_facts("storm", false);
+    assert_eq!(storm.len(), 24);
+    assert!(
+        storm.iter().any(|facts| facts.sky_flash > 0.0),
+        "the pulse is captured: {storm:?}"
+    );
+    assert!(
+        storm
+            .windows(2)
+            .all(|pair| (pair[1].sky_flash - pair[0].sky_flash).abs() < 0.2),
+        "{storm:?}"
+    );
+    assert!(storm.iter().all(|f| f.flash_alpha_max >= f.sky_flash));
+    // The machine gun fires every eighth tick and its flash polygon lives
+    // three, so the export's every-fourth-tick frames catch the muzzle
+    // light's tail, not the polygon; the still, paused on the shot, has it.
+    let gun = motion_flash_facts("weapon-classes-machine-gun", false);
+    assert!(
+        gun.iter().all(|f| f.flash_alpha_max > 0.0),
+        "the machine gun lights every frame: {gun:?}"
+    );
+    assert!(gun.iter().all(|f| f.sky_flash == 0.0), "no storm in DEU 0");
+    let still = staged("weapon-classes-machine-gun");
+    let a = still.game.attempt().expect("a live battle");
+    let clock = crate::art::SkyClock::of_tick(a.tick, 1);
+    let shot = crate::art::flash_facts(a, clock, false);
+    assert_eq!(shot.muzzle_flash_count, 1, "{shot:?}");
+    assert!(
+        shot.flash_alpha_max >= 0.9 && shot.sky_flash == 0.0,
+        "{shot:?}"
+    );
+    assert_eq!(
+        crate::art::flash_facts(a, clock, true),
+        FlashFacts::default()
+    );
+    for scene in ["storm", "fx-stress", "weapon-classes-machine-gun"] {
+        assert_eq!(
+            motion_flash_facts(scene, true),
+            [FlashFacts::default(); 24],
+            "{scene}: reduced effects never flash"
+        );
+    }
 }

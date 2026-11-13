@@ -411,6 +411,29 @@ try {
         Assert-True (-not $hungLeft) "profile left after a timeout: $hung"
     }
 
+    Test-Case 'Get-MotionFlashProblem requires the flash fields, zeros in reduced effects and a storm pulse' {
+        $frame = { param($alpha, $sky, $muzzle) [pscustomobject]@{ file = 'frame.png'; flash_alpha_max = $alpha; sky_flash = $sky; muzzle_flash_count = $muzzle } }
+        $dark = @((& $frame 0.0 0.0 0), (& $frame 0.0 0.0 0))
+        Assert-True ($null -eq (Get-MotionFlashProblem -Frames $dark)) 'a calm normal export passes'
+        Assert-True ($null -eq (Get-MotionFlashProblem -Frames $dark -ReducedEffects)) 'a reduced export of zeros passes'
+        Assert-True ($null -eq (Get-MotionFlashProblem -Frames $dark -ReducedEffects -Storm)) 'a reduced storm export of zeros passes'
+        # The manifest as the game writes it: JSON numbers, parsed by ConvertFrom-Json.
+        $parsed = @(('[{"flash_alpha_max":0.9,"sky_flash":0.0,"muzzle_flash_count":2},{"flash_alpha_max":0.14,"sky_flash":0.14,"muzzle_flash_count":0}]' | ConvertFrom-Json))
+        Assert-True ($null -eq (Get-MotionFlashProblem -Frames $parsed -Storm)) 'a normal storm export with a pulse passes'
+        Assert-True ((Get-MotionFlashProblem -Frames $parsed -ReducedEffects) -like 'Reduced effects must not flash: frame 0 has flash_alpha_max*') 'a reduced export that flashes fails'
+        $muzzle = @((& $frame 0.0 0.0 1))
+        Assert-True ((Get-MotionFlashProblem -Frames $muzzle -ReducedEffects) -like '*muzzle_flash_count 1') 'a reduced muzzle flash fails'
+        $sky = @((& $frame 0.0 0.01 0))
+        Assert-True ((Get-MotionFlashProblem -Frames $sky -ReducedEffects) -like '*sky_flash 0.01') 'a reduced sky flash fails'
+        Assert-True ((Get-MotionFlashProblem -Frames $dark -Storm) -like 'The storm export captured no lightning pulse*') 'a storm export without a pulse fails'
+        $jump = @((& $frame 0.0 0.0 0), (& $frame 0.25 0.25 0))
+        Assert-True ((Get-MotionFlashProblem -Frames $jump -Storm) -like 'sky_flash moves by 0.25 between frames 0 and 1*') 'a sky flash step of 0.2 or more fails'
+        $old = @([pscustomobject]@{ file = 'frame.png'; native_frame = 60 })
+        Assert-Equal 'Frame 0 has no numeric flash_alpha_max' (Get-MotionFlashProblem -Frames $old) 'a manifest without the fields fails'
+        $text = @((& $frame 0.0 '0' 0))
+        Assert-Equal 'Frame 0 has no numeric sky_flash' (Get-MotionFlashProblem -Frames $text) 'a text field fails'
+    }
+
     Test-Case 'Get-ReviewSceneList parses the --list-scenes TSV and reports a build without it' {
         $list = Get-ReviewSceneList -Executable $helper -LogStem (Join-Path $temporary 'logs\list-scenes') -WorkingDirectory $temporary
         Assert-Equal 0 $list.ExitCode ('exit code; err: ' + (Read-Log $list.Err))

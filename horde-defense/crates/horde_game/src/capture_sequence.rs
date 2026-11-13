@@ -39,7 +39,7 @@ pub struct SequenceCapture {
     records: Vec<SequenceFrame>,
     done: bool,
 }
-#[derive(Serialize)]
+#[derive(Default, Serialize)]
 struct SequenceFrame {
     file: String,
     native_frame: u32,
@@ -58,13 +58,19 @@ struct SequenceFrame {
     reload_left: Option<u32>,
     melee_commit: Option<u32>,
     corpse_count: usize,
+    /// `flash_alpha_max`, `sky_flash` and `muzzle_flash_count` of the frame
+    /// (all zero outside a battle): capture_motion requires zeros in every
+    /// frame of a reduced-effects export and a pulse in a storm export.
+    #[serde(flatten)]
+    flash: crate::art::FlashFacts,
 }
 /// The shortest decimal of an `f32`, so a JSON reader sees `1.35`, not
 /// `1.350000023841858` (a `serde_json::Value` holds every number as `f64`).
 fn decimal(value: f32) -> f64 {
     value.to_string().parse().unwrap_or(f64::from(value))
 }
-/// The motion `manifest.json`, version 2: version 1 plus the run's effective
+/// The motion `manifest.json`, version 2: version 1 plus the three flash
+/// facts of every frame (W5-10; see [`crate::art::FlashFacts`]), the run's effective
 /// reduced-effects setting, the logical window size in points, the UI scale
 /// egui draws at (`settings::applied_scale` of the live settings, never the
 /// raw saved or requested value) and the Windows display scale (PNG pixels per
@@ -181,6 +187,9 @@ pub fn capture_frames(
             reload_left: attempt.map(|a| a.reload_left),
             melee_commit: attempt.map(|a| a.melee_commit),
             corpse_count: attempt.map_or(0, |a| a.corpses.len()),
+            flash: attempt.map_or_else(Default::default, |a| {
+                crate::art::flash_facts(a, battle.sky_clock(), settings.reduced_effects)
+            }),
         });
     }
     if frame >= LAST + 32 {
@@ -261,6 +270,39 @@ mod tests {
             (1440.into(), 900.into())
         );
         assert_eq!(normal["scale"], 1.0);
+    }
+    /// Design-qa-captures 1.9 (W5): every frame record carries the three
+    /// flash facts of the frame, so capture_motion can prove a reduced
+    /// export never flashed and a storm export did.
+    #[test]
+    fn manifest_v2_records_flash_counters() {
+        let frame = |flash| SequenceFrame {
+            file: "frame-0000.png".into(),
+            flash,
+            ..default()
+        };
+        let frames = [
+            frame(crate::art::FlashFacts {
+                flash_alpha_max: 0.5,
+                sky_flash: 0.125,
+                muzzle_flash_count: 3,
+            }),
+            frame(crate::art::FlashFacts::default()),
+        ];
+        let settings = crate::settings::Settings::default();
+        let manifest = sequence_manifest(Some("storm"), &settings, (1440, 900), 1.0, &frames);
+        assert_eq!(manifest["version"], 2);
+        let lit = &manifest["frames"][0];
+        assert_eq!(lit["flash_alpha_max"], 0.5);
+        assert_eq!(lit["sky_flash"], 0.125);
+        assert_eq!(lit["muzzle_flash_count"], 3);
+        // Flattened beside the version-2 frame fields, not nested.
+        assert_eq!(lit["file"], "frame-0000.png");
+        assert!(lit.get("flash").is_none());
+        let dark = &manifest["frames"][1];
+        assert_eq!(dark["flash_alpha_max"], 0.0);
+        assert_eq!(dark["sky_flash"], 0.0);
+        assert_eq!(dark["muzzle_flash_count"], 0);
     }
     #[test]
     fn manifest_scale_is_the_drawn_scale_not_the_saved_value() {

@@ -11,6 +11,8 @@ mod tests;
 
 pub use backdrop::world_backdrop;
 use backdrop::{box_at, line, paint_ground};
+#[cfg(feature = "review")]
+pub use battlefield::{FlashFacts, flash_facts};
 #[cfg(all(test, feature = "review"))]
 pub(crate) use battlefield::{FxCounts, fx_counts};
 pub use battlefield::{FxSource, shooter_class};

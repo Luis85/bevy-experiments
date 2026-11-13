@@ -120,7 +120,7 @@ const fn wave3_still(
     }
 }
 
-/// A wave-5 graphics still (W5-09, design-vfx-lighting §14).
+/// A wave-5 graphics still (W5-09 and W5-10, design-vfx-lighting §14).
 const fn wave5_still(
     name: &'static str,
     owner: &'static str,
@@ -250,6 +250,9 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     // pair for the luminance gate, and one elite of every shipped affix.
     wave5_still("dawn-reference", "vfx-lighting", "arid", false),
     wave5_still("elite-tells", "vfx-lighting", "battle", false),
+    // W5-10 (design-qa-captures 1.8, ruling W-8): the first storm stage of
+    // the world, staged so a motion export holds one lightning pulse.
+    wave5_still("storm", "vfx-lighting", "battle", true),
 ];
 
 /// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
@@ -772,7 +775,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 3 + 6 + 2
+            46 + 13 + 3 + 6 + 3
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

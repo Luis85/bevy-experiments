@@ -5,6 +5,8 @@
 # process logs, cargo log and the isolated LASTLIGHT_SAVE_DIR go to the sibling folder <OutputDirectory>.logs.
 # -Viewport normal is 1440x900 at UI scale 1.0, small is 1050x700 at 1.35 (capture_review's two sizes). The
 # version-2 manifest must report the requested reduced_effects, width, height and scale, plus windows_scale.
+# Every frame carries flash_alpha_max, sky_flash and muzzle_flash_count: with -ReducedEffects all three must be 0 in
+# every frame; a normal storm export must show a pulse (sky_flash > 0) that moves by less than 0.2 a frame.
 # A relative -OutputDirectory or -Executable resolves against the workspace, never the caller's directory.
 [CmdletBinding()]
 param(
@@ -61,6 +63,8 @@ try {
     for ($i = 1; $i -lt $manifest.frames.Count; $i++) {
         if ($manifest.frames[$i].native_frame -le $manifest.frames[$i - 1].native_frame) { throw 'Native animation frames did not increase' }
     }
+    $flashProblem = Get-MotionFlashProblem -Frames @($manifest.frames) -ReducedEffects:$ReducedEffects -Storm:($Scene -eq 'storm')
+    if ($flashProblem) { throw $flashProblem }
     $menuScene = $Scene -in @('menu', 'menu-female', 'survivor-select')
     $hashes = @($manifest.frames | ForEach-Object { Get-FileSha256 -Path (Join-Path $directory $_.file) } | Sort-Object -Unique)
     if ($menuScene) {

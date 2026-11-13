@@ -267,6 +267,27 @@ fn rgba([r, g, b]: [u8; 3], alpha: f32) -> C {
     C::from_rgba_unmultiplied(r, g, b, (alpha.clamp(0.0, 1.0) * 255.0) as u8)
 }
 
+/// How much of its life (1 down to 0) the muzzle flash of a Shot event of
+/// `fx` has left at `age_ticks`, or `None` when the event draws no flash:
+/// only a volley's first event flashes, for the profile's flash life, and
+/// never in reduced effects.
+fn muzzle_flash_left(fx: &WeaponFx, age_ticks: u32, volley: Volley, reduced: bool) -> Option<f32> {
+    let flash_life = u32::from(fx.flash_life_ticks);
+    (!reduced && volley.first && age_ticks < flash_life)
+        .then(|| 1.0 - age_ticks as f32 / flash_life as f32)
+}
+
+/// The alpha of that muzzle flash's polygon.
+#[cfg(feature = "review")]
+pub(crate) fn muzzle_flash_alpha(
+    fx: &WeaponFx,
+    age_ticks: u32,
+    volley: Volley,
+    reduced: bool,
+) -> Option<f32> {
+    muzzle_flash_left(fx, age_ticks, volley, reduced).map(|left| left * 230.0 / 255.0)
+}
+
 /// Paints one Shot event with the profile `fx`.
 ///
 /// Normal effects: the volley's first event draws the flash (so a nine-pellet
@@ -292,9 +313,9 @@ pub(crate) fn paint_shot(p: &Painter, fx: &WeaponFx, shot: Shot) {
     }
     let scale = width_scale(lane);
     let path = to - from;
-    let flash_life = u32::from(fx.flash_life_ticks);
-    if volley.first && age_ticks < flash_life && path.length_sq() > 0.0 {
-        let left = 1.0 - age_ticks as f32 / flash_life as f32;
+    if let Some(left) =
+        muzzle_flash_left(fx, age_ticks, volley, reduced).filter(|_| path.length_sq() > 0.0)
+    {
         let size = if volley.ordinal % 2 == 1 {
             fx.odd_volley_scale
         } else {

@@ -252,6 +252,36 @@ function Get-ReviewSceneList {
     }
 }
 
+function Get-MotionFlashProblem {
+    # The flash gate of a motion manifest's frames (design-qa-captures 1.9, W5-10). Every frame must carry the numeric
+    # fields flash_alpha_max, sky_flash and muzzle_flash_count. With -ReducedEffects all three are 0 in every frame.
+    # With -Storm (the storm scene, normal effects) at least one frame has sky_flash > 0 and sky_flash moves by less
+    # than 0.2 between neighbouring frames. Returns the first problem as a string, or $null.
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Frames,
+        [switch]$ReducedEffects,
+        [switch]$Storm
+    )
+    $fields = @('flash_alpha_max', 'sky_flash', 'muzzle_flash_count')
+    for ($i = 0; $i -lt $Frames.Count; $i++) {
+        foreach ($field in $fields) {
+            $property = $Frames[$i].PSObject.Properties[$field]
+            if ($null -eq $property -or $null -eq $property.Value -or $property.Value -is [string] -or $property.Value -is [bool]) { return "Frame $i has no numeric $field" }
+            if ([double]$property.Value -lt 0) { return "Frame $i has a negative $field" }
+            if ($ReducedEffects -and [double]$property.Value -ne 0) { return "Reduced effects must not flash: frame $i has $field $($property.Value)" }
+        }
+    }
+    if ($Storm -and -not $ReducedEffects) {
+        if (@($Frames | Where-Object { [double]$_.sky_flash -gt 0 }).Count -eq 0) { return 'The storm export captured no lightning pulse (sky_flash is 0 in every frame)' }
+        for ($i = 1; $i -lt $Frames.Count; $i++) {
+            $delta = [Math]::Abs([double]$Frames[$i].sky_flash - [double]$Frames[$i - 1].sky_flash)
+            if ($delta -ge 0.2) { return "sky_flash moves by $delta between frames $($i - 1) and $i (limit 0.2)" }
+        }
+    }
+    return $null
+}
+
 function Remove-ReviewProfile {
     # profile.rs keeps a review build's settings and logs in <temp>\lastlight-review-<pid> and never deletes them.
     # A failed removal only warns, so cleanup never hides the run's own outcome.

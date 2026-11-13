@@ -192,7 +192,7 @@ pub struct SceneBlend<'a> {
 }
 impl SceneBlend<'_> {
     /// Draw authoritative positions exactly.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "review"))]
     pub const NONE: SceneBlend<'static> = SceneBlend {
         fraction: 1.0,
         previous: None,

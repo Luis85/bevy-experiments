@@ -109,6 +109,7 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "takeover-battle" => prepare_takeover_battle(f),
         "dawn-reference" => prepare_dawn_reference(f),
         "elite-tells" => prepare_elite_tells(f),
+        "storm" => prepare_storm(f),
         _ => {
             let Some(&(_, class, item)) = WEAPON_CLASS_SCENES
                 .iter()
@@ -858,6 +859,48 @@ fn prepare_dawn_reference(f: &mut FrontendParts) {
     entitle_start(f, &country);
     entitle_clears(f, stage);
     deploy(f, stage, Mode::Personal);
+    pause(f);
+}
+
+/// Ticks from the staged tick to the pulse's start in a motion export: the
+/// 60 native frames before frame-0000 (`capture_sequence::FIRST`, a module
+/// only review builds compile) and eight captured frames of four ticks, so
+/// the pulse (16 ticks) spans frames 8 to 12 of the 24.
+/// `storm_fixture_is_a_storm_tagged_stage` holds it to the export's window.
+const STORM_LEAD_TICKS: u64 = 60 + 8 * 4;
+
+/// The start in ms of the pulse the storm scene captures on a stage with
+/// lightning seed `seed`: the first one a motion export can lead into.
+fn storm_pulse_start(seed: u64) -> u64 {
+    crate::art::lighting::first_pulse_after(seed, STORM_LEAD_TICKS * 1000 / 60)
+}
+
+/// The first storm stage of the world (ruling W-8: the presentation's storm
+/// table, no content field) whose lightning strikes in its first eight
+/// seconds, before an unanswered horde reaches the line (an attack cue
+/// silences the sky). It is deployed and left unanswered up to the tick
+/// from which a motion export captures that pulse whole: the export runs
+/// one tick a native frame from the staged tick and reads its lightning
+/// clock from the tick. The still is paused there, on the static storm
+/// grade (a paused field never flashes). The pulse schedule is the
+/// presentation's (`lighting::first_pulse_after`); only the search is the
+/// fixture's.
+fn prepare_storm(f: &mut FrontendParts) {
+    use crate::art::lighting;
+    let (country, stage) = first_stage_where(|_, _, theme| {
+        lighting::is_storm(theme) && storm_pulse_start(theme.variation) < lighting::SKY_SLOT_MS
+    })
+    .expect("world.json has a storm stage with an early pulse");
+    entitle_start(f, &country);
+    entitle_clears(f, stage);
+    deploy(f, stage, Mode::Personal);
+    let seed = crate::art::scene_look(f.game.attempt().expect("deployed")).seed;
+    // The first tick whose clock has reached the pulse's start.
+    let start_tick = (storm_pulse_start(seed) * 60).div_ceil(1000);
+    for _ in 0..start_tick - STORM_LEAD_TICKS {
+        f.game.tick(Input::default());
+    }
+    assert!(f.game.attempt().is_some(), "the storm stage stays live");
     pause(f);
 }
 

@@ -142,6 +142,75 @@ pub fn battlefield(
     }
 }
 
+/// The flashes of one frame, as the motion manifest records them
+/// (design-qa-captures 1.9, W5-10). All three are zero in reduced effects,
+/// which draws no sky flash, no muzzle flash and no light pool.
+#[cfg(feature = "review")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize)]
+pub struct FlashFacts {
+    /// The largest alpha among the frame's flash shapes: the sky-flash
+    /// over-rect, every muzzle flash polygon and the centre of every
+    /// additive light pool (its strength after the grade's light gain).
+    pub flash_alpha_max: f32,
+    /// The alpha of the storm sky-flash over-rect (0 without a pulse).
+    pub sky_flash: f32,
+    /// The muzzle flash polygons drawn: one per volley inside its flash life.
+    pub muzzle_flash_count: u32,
+}
+
+/// The [`FlashFacts`] of the frame the painter draws of `a` on the lightning
+/// clock `sky`: the same rules [`render`] paints with (`lighting::sky_pulse`
+/// and `scene_grade`, `weapon_fx::muzzle_flash_alpha`, `light::collect`),
+/// on the attempt's own tick without frame blending. Alphas do not depend
+/// on the window size, so the field is projected on a nominal rect.
+#[cfg(feature = "review")]
+pub fn flash_facts(a: &Attempt, sky: SkyClock, reduced: bool) -> FlashFacts {
+    let view = BattleViewModel::build(
+        a,
+        SceneAnimation::sample(a, reduced),
+        SceneBlend::NONE,
+        reduced,
+    );
+    let arena = ArenaProjection::for_attempt(
+        Rect::from_min_size(pos2(24.0, 124.0), vec2(1392.0, 692.0)),
+        a,
+    );
+    let textures = ArtTextures::default();
+    let muzzle = Some(arena.world(view.defender.position[0], view.defender.position[1]));
+    let look = super::scene_look(a);
+    let (grade, pulse) =
+        lighting::scene_grade(look, reduced, lighting::sky_pulse(look, sky, a, reduced));
+    let sky_flash = lighting::sky_alpha(pulse);
+    let muzzle_flashes: Vec<f32> = view
+        .fx
+        .iter()
+        .filter(|e| e.kind == horde_core::sim::EventKind::Shot)
+        .filter_map(|e| {
+            let from = fx::shot_origin(arena, &view, e, muzzle, textures)?;
+            let alpha = weapon_fx::muzzle_flash_alpha(
+                weapon_fx::weapon_fx(e.source?),
+                fx::shot_age_ticks(e),
+                e.volley.unwrap_or(crate::battle_view::Volley::SINGLE),
+                reduced,
+            )?;
+            (arena.world(e.to[0], e.to[1]) != from).then_some(alpha)
+        })
+        .collect();
+    let pools = light::collect(arena, &view, muzzle, textures, reduced);
+    let lights = pools
+        .iter()
+        .map(|pool| (pool.intensity * grade.light_gain).clamp(0.0, 1.0));
+    FlashFacts {
+        flash_alpha_max: muzzle_flashes
+            .iter()
+            .copied()
+            .chain(lights)
+            .fold(sky_flash, f32::max),
+        sky_flash,
+        muzzle_flash_count: muzzle_flashes.len() as u32,
+    }
+}
+
 /// What one frame draws of each budgeted effect class
 /// (`perf_budget::FX_BUDGET`), counted by the collectors the painter itself
 /// calls.

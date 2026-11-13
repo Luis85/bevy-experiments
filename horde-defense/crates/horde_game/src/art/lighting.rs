@@ -248,6 +248,16 @@ pub fn sky_pulse_start(seed: u64, wall_ms: u64) -> Option<u64> {
     (h % 100 < SKY_FIRE_PERCENT).then(|| slot * SKY_SLOT_MS + (h >> 8) % SKY_OFFSET_RANGE_MS)
 }
 
+/// The start of the first pulse that starts at or after `wall_ms` (the storm
+/// review scene stages its motion window around it). The schedule fires 60%
+/// of its slots, so the search ends within a few of them.
+pub fn first_pulse_after(seed: u64, wall_ms: u64) -> u64 {
+    (wall_ms / SKY_SLOT_MS..)
+        .filter_map(|slot| sky_pulse_start(seed, slot * SKY_SLOT_MS))
+        .find(|&start| start >= wall_ms)
+        .expect("the schedule fires 60% of its slots")
+}
+
 /// SplitMix64's finaliser: the schedule's own hash of the presentation seed
 /// and the slot.
 fn splitmix(mut z: u64) -> u64 {
@@ -314,6 +324,11 @@ fn over(rgb: [u8; 3], alpha: f32) -> C {
     )
 }
 
+/// The alpha of the sky-flash over-rect at pulse intensity `sky` (0..=1).
+pub fn sky_alpha(sky: f32) -> f32 {
+    SKY_PEAK_ALPHA * sky.clamp(0.0, 1.0)
+}
+
 /// The grade pass's shapes over `canvas`: the grade over-rect (none for a
 /// zero-alpha grade), then the sky flash, only while `sky` > 0.
 pub fn grade_shapes(canvas: Rect, g: Grade, sky: f32) -> Vec<Shape> {
@@ -325,7 +340,7 @@ pub fn grade_shapes(canvas: Rect, g: Grade, sky: f32) -> Vec<Shape> {
         shapes.push(Shape::rect_filled(
             canvas,
             0.0,
-            over(SKY_RGB, SKY_PEAK_ALPHA * sky),
+            over(SKY_RGB, sky_alpha(sky)),
         ));
     }
     shapes
