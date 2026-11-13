@@ -166,10 +166,23 @@ impl CueBatch {
 
     /// An ellipse outline of `width` centred on `radii`.
     pub(super) fn ellipse(&mut self, center: Pos2, radii: Vec2, width: f32, color: C) {
+        self.ellipse_of(center, radii, width, RING_SEGMENTS, color);
+    }
+
+    /// [`Self::ellipse`] with `segments` sides, for a ring many hostiles
+    /// may carry at once (an elite's ground ring).
+    pub(super) fn ellipse_of(
+        &mut self,
+        center: Pos2,
+        radii: Vec2,
+        width: f32,
+        segments: u32,
+        color: C,
+    ) {
         let backing = halo(color);
         self.halo
-            .ring(center, radii, width + HALO_STROKE, RING_SEGMENTS, backing);
-        self.fill.ring(center, radii, width, RING_SEGMENTS, color);
+            .ring(center, radii, width + HALO_STROKE, segments, backing);
+        self.fill.ring(center, radii, width, segments, color);
         self.record(CueKind::Ellipse, color, backing);
     }
 

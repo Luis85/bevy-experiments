@@ -2,7 +2,7 @@ use super::interpolation::SceneBlend;
 use crate::{
     animation::{ActorPose, Appearance, DefenderPose, Particle, SceneAnimation, StructurePose},
     art::{FxSource, shooter_class},
-    visual_assets::enemy_visuals::{self, EnemySprite, EnemyVisualCatalog},
+    visual_assets::enemy_visuals::{self, EliteTell, EnemySprite, EnemyVisualCatalog},
 };
 use horde_core::{
     content::{EnemyKind, Mode, StructureKind, content},
@@ -127,6 +127,18 @@ pub struct EnemyView {
     pub stunned: bool,
     pub health: HealthView,
     pub label: Option<&'static str>,
+    /// The tell of an elite (W5-07), from its baked affix
+    /// (`ResolvedEnemy.elite`); None for every other hostile.
+    pub elite: Option<EliteView>,
+}
+/// How an elite reads this frame: its affix's tell and how far its body
+/// tint leans toward the tell's colour.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EliteView {
+    pub tell: &'static EliteTell,
+    /// [`EliteTell::glow_at`] the attempt's tick: pulsing on sim ticks,
+    /// static in reduced effects.
+    pub glow: f32,
 }
 impl EnemyView {
     /// Where the painters draw the feet: `position` plus the crowd stagger.
@@ -840,5 +852,16 @@ fn enemy_view(
         stunned: e.injury.stunned,
         health,
         label,
+        elite: e
+            .resolved
+            .as_ref()
+            .and_then(|profile| profile.elite.as_ref())
+            .map(|mark| {
+                let tell = catalog.elite_tell(Some(&mark.affix_id));
+                EliteView {
+                    tell,
+                    glow: tell.glow_at(a.tick, reduced),
+                }
+            }),
     }
 }

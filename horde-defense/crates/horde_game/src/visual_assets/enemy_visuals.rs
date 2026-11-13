@@ -135,6 +135,19 @@ pub struct EliteTell {
     /// Pulse frequency in Hz, 0..=2.0.
     pub pulse_hz: f32,
 }
+impl EliteTell {
+    /// How far an elite's body tint leans toward `outline_rgb` at sim tick
+    /// `tick` (W5-07): `glow x (0.5 + 0.5 sin(2 pi x tick / 60 x pulse_hz))`,
+    /// so the pulse holds still while the simulation is paused. Reduced
+    /// effects hold `glow x 0.5`: no pulse.
+    pub fn glow_at(&self, tick: u64, reduced: bool) -> f32 {
+        if reduced {
+            return self.glow * 0.5;
+        }
+        let turn = (tick as f64 / 60.0 * f64::from(self.pulse_hz)).fract();
+        self.glow * (0.5 + 0.5 * (turn * std::f64::consts::TAU).sin() as f32)
+    }
+}
 /// A tell for one elite affix id.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -621,11 +634,20 @@ mod tests {
         assert_eq!(volatile.marker, TellMarker::Spark);
         assert_eq!(volatile.outline_rgb, [213, 94, 0]);
         assert_eq!(volatile.ring_px, 3);
-        // The bundled file is schema 2 with the default tell only.
+        // The bundled file is schema 2 with the default tell and, since
+        // W5-07, one tell for each of core's affixes.
         assert_eq!(bundled()["schema_version"], 2);
         let shipped = active();
         assert_eq!(shipped.elite_tell(None), &BUILTIN_ELITE_TELL);
-        assert!(shipped.elite_affixes.is_empty());
+        let told: Vec<&str> = shipped
+            .elite_affixes
+            .iter()
+            .map(|known| known.affix.as_str())
+            .collect();
+        assert_eq!(
+            told,
+            ["hardened", "frenzied", "vicious", "shielded", "volatile"]
+        );
         // Schema 2 without the table also gets the built-in tell.
         let mut bare = bundled();
         bare.as_object_mut().unwrap().remove("elite_tells");

@@ -15,6 +15,7 @@ mod screen;
 #[cfg(test)]
 mod tests;
 
+pub use field::EliteView;
 pub use field::FxView;
 pub use field::{BattleViewModel, BossPhaseView, ContactView, CorpseView, EnemyView, HealthView};
 pub use field::{FigureHeight, crowd_stagger, enemy_height, health_view, struck_stagger};

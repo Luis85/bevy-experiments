@@ -399,6 +399,15 @@ Usage rules:
 - Reduced: static glow·0.5, no pulse.
 - Affix tells are appended to enemy_visuals.json in wave 5.
 
+**As built (W5-07):**
+- `EnemyView.elite: Option<EliteView { tell: &'static EliteTell, glow: f32 }>` (not the bare tell): `enemy_view` takes the tell from `ResolvedEnemy.elite.affix_id` through `EnemyVisualCatalog::elite_tell` and sets `glow` to `EliteTell::glow_at(a.tick, reduced)`, so the painters read no tick.
+- `EliteTell::glow_at(tick, reduced)` is `glow x (0.5 + 0.5 sin(2 pi x tick / 60 x pulse_hz))`, and `glow x 0.5` at every tick in reduced effects.
+- `art/battlefield/elite.rs`. World pass: `glow_tint` leans the archetype tint toward `outline_rgb` by the glow (`enemies::body_tint`, batched and rejected-art paths; the procedural fallback figure has no tint). Cue pass, through `CueBatch` and so on the INK backing: a 12-sided ground ring `ring_px` wide with radii 0.44 by 0.16 lanes on the windup ring's centre (0.3 lanes under the feet anchor), collected before the body's other cues so a windup ring paints over it; and the shape marker, half-size `clamp(0.085 x lane, 4, 7)` pt, centred so its backing clears the health bar's (or the CRIT callout's plate) by 1 pt. The ring and the marker are static, the same in reduced effects.
+- Marker shapes (`marker_triangles`, 2 to 6 triangles): Chevron a V of two arms, Crown three spikes on one base line, Pips1 to Pips3 diamonds in a row, Shield a slab over a point, Spark a four-point star.
+- Cap: `ELITE_TELLS_MAX` = 48 rings and markers a frame, the elites nearest the defence line (lowest x, then lowest id); every elite keeps its tint.
+- `assets/art/enemy_visuals.json` affix tells (Okabe-Ito colours, each at least 3:1 against INK; the default stays AMBER, Chevron, 2 px, glow 0.15, 1.2 Hz): hardened (86,180,233) Pips3 3 px 0.15 0.6 Hz; frenzied (240,228,66) Pips1 2 px 0.2 2.0 Hz; vicious (204,121,167) Crown 2 px 0.2 1.2 Hz; shielded (0,158,115) Shield 3 px 0.15 0.8 Hz; volatile (213,94,0) Spark 2 px 0.25 1.6 Hz.
+- Not in this row: the `elite-tells` review scene and the PERF_BUDGET `elite_tells` cap entry (W5-09 to W5-11 read `ELITE_TELLS_MAX`).
+
 ## 8. Drops: quality glint (ui/loot.rs:153-230)
 
 - `draw_for` gains `reduced: bool`. Callers: ui/loot.rs:134-151 and ui/operations.rs.

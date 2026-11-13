@@ -24,6 +24,7 @@ mod batch;
 mod corpses;
 mod cue;
 mod decals;
+mod elite;
 mod enemies;
 mod explosion;
 mod fx;

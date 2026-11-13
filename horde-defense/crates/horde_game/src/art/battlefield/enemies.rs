@@ -7,7 +7,8 @@
 //! Cue pass ([`cues`], after the lighting grade): contact bands and gauges,
 //! windup rings and bars, a ranged windup's dashed aim line, outlines, stun
 //! rings, health bars, a holding boss's phase ring, then the callouts, each
-//! on its INK backing ([`super::cue`]).
+//! on its INK backing ([`super::cue`]). An elite's body tint, ground ring
+//! and shape marker are [`super::elite`] (W5-07).
 use super::super::{AMBER, ArenaProjection, GREEN, RED, figure, soft_shadow};
 use super::batch::FieldMeshes;
 use super::cue::{self, CueBatch, Label};
@@ -34,6 +35,15 @@ pub(crate) fn body_box(
         arena.world(drawn[0], drawn[1]),
         body_size(height.pixels(arena.lane_height())),
     )
+}
+
+/// The tint of a hostile's body: its archetype tint, leaned toward its
+/// tell's colour by the view's glow when it is an elite (W5-07).
+pub(super) fn body_tint(e: &EnemyView) -> C {
+    let base = tint(e.tint);
+    e.elite
+        .as_ref()
+        .map_or(base, |elite| super::elite::glow_tint(base, elite))
 }
 
 pub(super) fn tint(rgba: Option<[f32; 4]>) -> C {
@@ -132,7 +142,7 @@ pub(super) fn bodies(
             0.7,
         );
         let quad = actor.and_then(|actor| {
-            visual_assets::actor_quad(textures, actor, painted_at, size, tint(e.tint), pose)
+            visual_assets::actor_quad(textures, actor, painted_at, size, body_tint(e), pose)
         });
         match (quad, actor) {
             (Some(quad), Some(actor)) => {
@@ -204,9 +214,13 @@ pub(super) fn cues(
             AMBER,
         );
     }
-    for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
+    let tells = super::elite::drawn(view);
+    for ((e, ring), tell) in view.enemies.iter().zip(windup_rings(view)).zip(tells) {
         let [x, y] = e.drawn();
         let at = arena.world(x, y);
+        if tell {
+            super::elite::ring(batch, e, at, sy);
+        }
         if ring {
             batch.ellipse(at + vec2(0., sy * 0.3), vec2(sy * 0.36, sy * 0.13), 2., RED);
         }
@@ -245,6 +259,9 @@ pub(super) fn cues(
             )),
             HealthView::Hidden => {}
         }
+        if tell {
+            super::elite::marker(batch, e, at, sy);
+        }
         if let Some(label) = e.label
             && stacked != Some(e.id)
         {
@@ -280,7 +297,7 @@ pub(super) fn cues(
 }
 
 /// The CRIT callout's size, as a fraction of the cue font.
-const CRIT_FONT: f32 = 0.8;
+pub(super) const CRIT_FONT: f32 = 0.8;
 
 /// How far over its feet, in lane heights, a hostile's name callout is
 /// centred.
@@ -465,7 +482,7 @@ fn enemy(p: &Painter, arena: ArenaProjection, e: &EnemyView, textures: ArtTextur
             actor,
             painted_at,
             body_size(figure_height),
-            tint(e.tint),
+            body_tint(e),
             pose,
         )
     });
