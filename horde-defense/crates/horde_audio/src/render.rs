@@ -37,6 +37,7 @@ use crate::{
     cue::Cue,
     duck::Ducker,
     events::{EventContext, event_requests, push_cue},
+    gun::GunTracker,
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, mix},
     pan::{self, Places},
@@ -567,10 +568,12 @@ pub fn fire_bed_x(zones: &[horde_core::ordnance::FireZone]) -> Option<f32> {
 /// Ticks `game`'s battle `ticks` times with [`smoke_input`], one frame per
 /// tick, and returns the cues each tick requests: the root battle's events
 /// through [`event_requests`], plus the fire bed while a fire zone burns, as
-/// the runner's `tick_sounds` does. A tick without an attempt is a paused
-/// frame.
+/// the runner's `tick_sounds` does, then the gun's handling through the
+/// [`GunTracker`], as the runner's `run_tick` does. A tick without an
+/// attempt is a paused frame.
 pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
     let mut voices = EnemyVoiceIndex::default();
+    let mut guns = GunTracker::default();
     (0..ticks)
         .map(|_| {
             let input = smoke_input(game);
@@ -580,7 +583,7 @@ pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
             if let Some(attempt) = game.attempt() {
                 voices.sync(BattleId::Root, attempt);
             }
-            game.tick(input);
+            game.tick(input.clone());
             if let Some(attempt) = game.attempt() {
                 voices.sync(BattleId::Root, attempt);
             }
@@ -605,6 +608,9 @@ pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
             {
                 push_cue(&mut cues, Cue::Fire);
                 places.place(Cue::Fire, pan::lane_position(x, attempt.width_yards));
+            }
+            if let Some(attempt) = game.attempt() {
+                guns.observe(BattleId::Root, attempt, &input, &mut cues, &mut places);
             }
             Frame {
                 cues,

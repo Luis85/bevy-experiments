@@ -122,7 +122,8 @@ pub const fn family(cue: Cue) -> Option<Family> {
         Cue::Explosion => Some(Family::Explosion),
         Cue::Molotov => Some(Family::Molotov),
         Cue::Fire => Some(Family::Fire),
-        Cue::Reload => Some(Family::Reload),
+        // One reload-stage voice at a time: a stage takes over from the last.
+        Cue::Reload | Cue::ReloadOut | Cue::ReloadIn | Cue::ShellInsert => Some(Family::Reload),
         Cue::Wave | Cue::Incoming => Some(Family::Radio),
         Cue::Boss | Cue::BossArrival => Some(Family::Boss),
         Cue::EnemyWindup => Some(Family::Windup),
@@ -140,7 +141,9 @@ pub const fn family(cue: Cue) -> Option<Family> {
         | Cue::Defeat
         | Cue::Confirm
         | Cue::BossExposed
-        | Cue::Ability => None,
+        | Cue::Ability
+        | Cue::DryFire
+        | Cue::BoltCycle => None,
     }
 }
 

@@ -88,7 +88,12 @@ fn duration(cue: Cue) -> f32 {
         | Cue::BossDeath
         | Cue::BossExposed
         | Cue::Block
-        | Cue::Ability => duration(cue.legacy_family()),
+        | Cue::Ability
+        | Cue::DryFire
+        | Cue::ReloadOut
+        | Cue::ReloadIn
+        | Cue::ShellInsert
+        | Cue::BoltCycle => duration(cue.legacy_family()),
     }
 }
 fn gun(cue: Cue, t: f32, noise: [f32; 3], shift: f32) -> f32 {
@@ -254,7 +259,12 @@ pub fn synthesize(cue: Cue, variant: u64) -> Vec<f32> {
             | Cue::BossDeath
             | Cue::BossExposed
             | Cue::Block
-            | Cue::Ability => {
+            | Cue::Ability
+            | Cue::DryFire
+            | Cue::ReloadOut
+            | Cue::ReloadIn
+            | Cue::ShellInsert
+            | Cue::BoltCycle => {
                 unreachable!("alias cues play their bank's files and are never synthesized")
             }
             Cue::Structure => [0.001, 0.14, 0.29, 0.51]

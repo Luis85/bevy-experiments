@@ -48,8 +48,8 @@ impl CueRequest {
 /// every shipped bank (alias cues play these banks; retired cues are
 /// archived) plus the ambience beds. The asset audit holds `assets/audio` to
 /// exactly this set. The wave-6 gun, enemy, boss and UI banks ship from A6-05
-/// on; the enemy and boss cues play theirs from A6-12, the gun and UI cues
-/// arrive with A6-13 and A6-14.
+/// on; the enemy and boss cues play theirs from A6-12, the gun-handling cues
+/// from A6-13 (`horde_audio::gun`), and the UI cues arrive with A6-14.
 #[cfg(test)]
 pub(crate) fn runtime_wav_paths() -> Vec<String> {
     let mut paths: Vec<String> = horde_audio::bank::BankId::shipped()

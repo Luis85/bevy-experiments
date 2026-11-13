@@ -20,6 +20,7 @@ pub mod cue;
 pub mod duck;
 pub mod events;
 pub mod export;
+pub mod gun;
 pub mod meter;
 pub mod mix;
 pub mod pan;

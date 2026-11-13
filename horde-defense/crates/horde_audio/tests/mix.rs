@@ -134,10 +134,11 @@ fn every_cue_has_one_mix_row_bank_and_bus() {
                 assert_eq!(family, cue.legacy_family(), "{cue:?}");
                 assert_eq!(cue.bank(), cue.legacy_family().bank(), "{cue:?}");
             }
-            BankId::Enemy(..) | BankId::Boss(..) => {
+            // A gun-handling cue (A6-13) falls back to the v1 Reload.
+            BankId::Enemy(..) | BankId::Boss(..) | BankId::Gun(_) => {
                 assert!(matches!(cue.legacy_family().bank(), BankId::Legacy(_)));
             }
-            BankId::Gun(_) | BankId::Ui(_) => panic!("{cue:?} plays {:?}", cue.bank()),
+            BankId::Ui(_) => panic!("{cue:?} plays {:?}", cue.bank()),
         }
     }
 }
@@ -157,7 +158,7 @@ fn enemy_and_boss_voice_rows() {
         (Cue::Block, 0.32, 140, 7),
         (Cue::Ability, 0.45, 400, 6),
     ];
-    assert_eq!(rows.map(|row| row.0)[..], Cue::ALL[28..]);
+    assert_eq!(rows.map(|row| row.0)[..], Cue::ALL[28..37]);
     for (cue, gain, cooldown_ms, priority) in rows {
         let row = mix(cue);
         assert_eq!(

@@ -222,7 +222,13 @@ fn jitter_rows_follow_the_group_table() {
         let expected = match cue {
             _ if row.gate == GateGroup::Fire => JitterBounds::GUNS,
             // Handling a weapon varies like firing it.
-            Cue::Reload | Cue::Throw => JitterBounds::GUNS,
+            Cue::Reload
+            | Cue::Throw
+            | Cue::DryFire
+            | Cue::ReloadOut
+            | Cue::ReloadIn
+            | Cue::ShellInsert
+            | Cue::BoltCycle => JitterBounds::GUNS,
             Cue::Impact
             | Cue::Armor
             | Cue::Kill

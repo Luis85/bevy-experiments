@@ -1,7 +1,7 @@
 //! The cue list. Append-only: a cue's discriminant indexes the gate tables,
 //! and the synthesized families' discriminants seed their synthesis.
 
-use crate::bank::{BankId, BossStage, EnemyStage, EnemyVoice};
+use crate::bank::{BankId, BossStage, EnemyStage, EnemyVoice, GunStage};
 use horde_core::content::BossKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,6 +61,19 @@ pub enum Cue {
     Block,
     /// A heal or a brace (the Ready bank, lower).
     Ability,
+    // Wave 6 (A6-13): handling the gun, heard by `gun::GunTracker`. Each
+    // plays its `GunStage` bank at the speed of the weapon class. A reload's
+    // finishing stage is `Reload`.
+    /// The trigger pulled on an empty gun with auto reload off.
+    DryFire,
+    /// A reload begins: the magazine out.
+    ReloadOut,
+    /// Half way through a reload: the magazine in.
+    ReloadIn,
+    /// One shell pushed into a shotgun.
+    ShellInsert,
+    /// The marksman rifle's bolt, after a shot.
+    BoltCycle,
 }
 
 /// Number of cues; sizes every per-cue table.
@@ -68,7 +81,7 @@ pub const CUE_COUNT: usize = Cue::ALL.len();
 
 impl Cue {
     /// Every cue, in discriminant order.
-    pub const ALL: [Self; 37] = [
+    pub const ALL: [Self; 42] = [
         Self::Pistol,
         Self::Smg,
         Self::Shotgun,
@@ -106,6 +119,11 @@ impl Cue {
         Self::BossExposed,
         Self::Block,
         Self::Ability,
+        Self::DryFire,
+        Self::ReloadOut,
+        Self::ReloadIn,
+        Self::ShellInsert,
+        Self::BoltCycle,
     ];
 
     /// The synthesized family whose WAV variants this cue plays. Alias cues
@@ -123,6 +141,11 @@ impl Cue {
             Self::EnemyWindup => Self::Incoming,
             Self::EnemyContact => Self::Melee,
             Self::BossArrival | Self::BossPhase => Self::Boss,
+            Self::DryFire
+            | Self::ReloadOut
+            | Self::ReloadIn
+            | Self::ShellInsert
+            | Self::BoltCycle => Self::Reload,
             cue => cue,
         }
     }
@@ -138,6 +161,11 @@ impl Cue {
             Self::BossArrival => BankId::Boss(BossKind::Breacher, BossStage::Arrival),
             Self::BossPhase => BankId::Boss(BossKind::Breacher, BossStage::Phase),
             Self::BossDeath => BankId::Boss(BossKind::Breacher, BossStage::Death),
+            Self::DryFire => BankId::Gun(GunStage::DryFire),
+            Self::ReloadOut => BankId::Gun(GunStage::ReloadOut),
+            Self::ReloadIn => BankId::Gun(GunStage::ReloadIn),
+            Self::ShellInsert => BankId::Gun(GunStage::ShellInsert),
+            Self::BoltCycle => BankId::Gun(GunStage::BoltCycle),
             cue => BankId::Legacy(cue.legacy_family()),
         }
     }

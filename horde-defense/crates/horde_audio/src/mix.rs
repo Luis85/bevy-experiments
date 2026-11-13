@@ -299,6 +299,17 @@ pub const fn mix(cue: Cue) -> CueMix {
         // The Armor bank, 3 dB down.
         Cue::Block => hit(0.32, 140, 7),
         Cue::Ability => row(0.45, 400, 6),
+        // Handling the gun (A6-13). The stages sit 2 dB under the reload's
+        // finish and the dry trigger 6.5 dB under it, as in the design's
+        // table (-7.5 and -12 against Reload's -5.5).
+        Cue::DryFire => handling(0.26, 350, 6),
+        // Three variants each, so no restart inside 250 ms
+        // (`frequent_cues_have_at_least_five_variants`).
+        Cue::ReloadOut => handling(0.44, 300, 5),
+        Cue::ReloadIn => handling(0.44, 300, 5),
+        // Five variants, and short enough for six shells of a quick reload.
+        Cue::ShellInsert => handling(0.44, 80, 5),
+        Cue::BoltCycle => handling(0.44, 300, 6),
     }
 }
 
@@ -496,7 +507,12 @@ pub const fn duck(cue: Cue) -> Option<Duck> {
         | Cue::BossDeath
         | Cue::BossExposed
         | Cue::Block
-        | Cue::Ability => None,
+        | Cue::Ability
+        | Cue::DryFire
+        | Cue::ReloadOut
+        | Cue::ReloadIn
+        | Cue::ShellInsert
+        | Cue::BoltCycle => None,
     }
 }
 

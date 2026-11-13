@@ -12,6 +12,7 @@ use horde_core::command::Command;
 pub(super) use horde_audio::events::event_sound;
 use horde_audio::{
     events::{EventContext, event_requests},
+    gun::GunTracker,
     pan::{self, Places},
     render::fire_bed_x,
     voicing::EnemyVoiceIndex,
@@ -49,6 +50,12 @@ pub struct Runtime {
     /// around every tick. Presentation only: never saved, rebuilt from the
     /// attempt after a load.
     pub(super) enemy_voices: EnemyVoiceIndex,
+    /// The root defender's gun (`horde_audio::gun`): reload stages, shell
+    /// inserts, the bolt and the dry trigger, heard after every tick with
+    /// that tick's input. Presentation only: never saved; it primes on an
+    /// attempt it has not seen, so a load plays no stage burst. An
+    /// expedition watched from camp has no gun handling.
+    pub(super) guns: GunTracker,
     pub(super) dirty: bool,
     pub(super) save_ticks: u64,
     pub(super) retry_save_at: u64,
@@ -298,10 +305,19 @@ impl Runtime {
         let had_attempt = game.attempt().is_some();
         // Before the tick: the enemies this tick kills still have voices.
         sync_voices(game, self.observed_battle, &mut self.enemy_voices);
-        game.tick(input);
+        game.tick(input.clone());
         self.simulated_ticks += 1;
         self.save_ticks += 1;
         self.drain_sounds(game, cues);
+        // After the tick's events, so the tracker can tune the Reload the
+        // core announced.
+        match game.attempt() {
+            Some(attempt) => {
+                self.guns
+                    .observe(BattleId::Root, attempt, &input, cues, &mut self.cue_places);
+            }
+            None => self.guns.retain(|_| false),
+        }
         if self.save_ticks >= 600 {
             self.dirty = true;
         }

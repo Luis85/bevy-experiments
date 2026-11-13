@@ -564,6 +564,72 @@ fn pressed_reload_is_consumed_once_across_fixed_ticks_and_speed() {
     assert_eq!(attempt.ammo, 0);
     assert_eq!(attempt.reload_left, 0);
 }
+/// The runner feeds the gun tracker (A6-13) after every tick with that
+/// tick's input: the dry trigger, then the stages of the reload, each at the
+/// speed of the weapon class, at 1x and 4x.
+#[test]
+fn run_tick_hears_the_dry_trigger_and_the_reload_stages() {
+    use horde_audio::{
+        bank::{BankId, GunStage},
+        gun::stage_speed,
+    };
+    for speed in [1, 4] {
+        let mut host = Host::new();
+        host.deploy();
+        let dry = Input {
+            fire: true,
+            auto_reload: false,
+            ..Input::default()
+        };
+        let frame = |held: Input, pressed: Input| ControlFrame {
+            enabled: true,
+            speed,
+            held,
+            pressed,
+            pressed_aims: AttackAims::default(),
+        };
+        let idle = Input {
+            auto_reload: false,
+            ..Input::default()
+        };
+        // The first tick primes the tracker: nothing sounds.
+        host.runtime.publish(frame(idle.clone(), idle.clone()));
+        step(&mut host.ctx());
+        host.game.attempt_mut().unwrap().ammo = 0;
+        step(&mut host.ctx());
+        assert!(!host.cues.contains(&SoundCue::DryFire), "speed {speed}");
+        host.runtime.publish(frame(dry.clone(), idle.clone()));
+        step(&mut host.ctx());
+        assert!(host.cues.contains(&SoundCue::DryFire), "speed {speed}");
+        let class = host.game.attempt().unwrap().profile.weapon.class;
+        let click = host.runtime.cue_places.voicing(SoundCue::DryFire);
+        assert_eq!(click.bank, BankId::Gun(GunStage::DryFire));
+        assert_eq!(click.speed, stage_speed(class));
+        // The reload, pressed once.
+        host.cues.clear();
+        host.runtime.publish(frame(
+            idle.clone(),
+            Input {
+                reload: true,
+                ..idle.clone()
+            },
+        ));
+        step(&mut host.ctx());
+        assert!(host.cues.contains(&SoundCue::ReloadOut), "speed {speed}");
+        assert!(!host.cues.contains(&SoundCue::ReloadIn), "speed {speed}");
+        while host.game.attempt().unwrap().reload_left > 0 {
+            step(&mut host.ctx());
+        }
+        for cue in [SoundCue::ReloadOut, SoundCue::ReloadIn, SoundCue::Reload] {
+            assert!(host.cues.contains(&cue), "speed {speed}: {cue:?}");
+        }
+        // No core event carries any of it.
+        assert_eq!(
+            host.runtime.cue_places.voicing(SoundCue::Reload).speed,
+            stage_speed(class)
+        );
+    }
+}
 #[test]
 fn pause_freezes_main_parallel_and_strategy_without_catch_up() {
     let mut host = Host::new();
