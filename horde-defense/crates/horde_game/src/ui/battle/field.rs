@@ -28,6 +28,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
     let (Some(views), Some(a)) = (views, game.attempt()) else {
         f.battle.occluded_lanes.clear();
         f.battle.boss_banner_rect = None;
+        f.battle.pause_banner_rect = None;
         f.battle.low_hp = false;
         f.go(Screen::Results);
         return;
@@ -155,9 +156,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             }
             damage::draw(ui, r, f);
             loot::draw(ui, r, f);
-            if view.paused && !f.battle.construction {
-                pause_banner(ui, &layout, view, &f.settings.bindings);
-            }
+            f.battle.pause_banner_rect = (view.paused && !f.battle.construction)
+                .then(|| pause_banner(ui, &layout, view, &f.settings.bindings));
             // The callout sits in the reserved band over a zoomed field.
             let callout = f.settings.show_guidance && view.first_deployment && view.personal();
             if callout {

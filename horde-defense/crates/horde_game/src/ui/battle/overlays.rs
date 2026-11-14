@@ -1,6 +1,6 @@
 use super::{
     BattleLayout,
-    layout::{CHEVRON_BACKING, cue_chevron},
+    layout::{CHEVRON_BACKING, PAUSE_BANNER_FONT, cue_chevron},
     low_hp::hp_text,
 };
 use crate::{
@@ -175,29 +175,33 @@ pub(super) fn field_hint_callout(
             });
     });
 }
-/// Names the paused state on the field, so a frozen field never reads as a
-/// hang.
+/// Names the paused state beside the field, so a frozen field never reads as
+/// a hang: centred in the layout's banner slot, which never meets the field
+/// (CF-1-01), at the size that slot holds. Returns the painted backing.
 pub(super) fn pause_banner(
     ui: &egui::Ui,
     layout: &BattleLayout,
     view: &BattleScreen,
     bindings: &[String],
-) {
+) -> Rect {
     let pause = bindings.get(6).map_or("Escape", String::as_str);
     let text = if view.tick == 0 {
         format!("READY · Begin defense or {pause}")
     } else {
         format!("PAUSED · {pause} to resume")
     };
-    let painter = ui.painter_at(layout.arena);
-    let galley = painter.layout_no_wrap(text, FontId::proportional(18.0), AMBER);
-    let at = layout.pause_banner_center - galley.size() * 0.5;
-    painter.rect_filled(
-        Rect::from_min_size(at - vec2(10.0, 5.0), galley.size() + vec2(20.0, 10.0)),
-        0.0,
-        Color32::from_black_alpha(200),
-    );
-    painter.galley(at, galley, AMBER);
+    let slot = layout.pause_banner_slot;
+    let painter = ui.painter_at(slot);
+    let full = FontId::proportional(PAUSE_BANNER_FONT);
+    let mut galley = painter.layout_no_wrap(text.clone(), full, AMBER);
+    let (font, padding) = layout.pause_banner_fit(galley.size());
+    if font < PAUSE_BANNER_FONT {
+        galley = painter.layout_no_wrap(text, FontId::proportional(font), AMBER);
+    }
+    let backing = Rect::from_center_size(slot.center(), galley.size() + 2.0 * padding);
+    painter.rect_filled(backing, 0.0, Color32::from_black_alpha(200));
+    painter.galley(backing.min + padding, galley, AMBER);
+    backing
 }
 
 /// The INCOMING cues over the construction overlay's left edge: a static

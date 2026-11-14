@@ -1,7 +1,40 @@
 //! Ground, the contact line and the construction grid.
 use super::super::{ArenaProjection, GREEN, MUTED, line, paint_ground};
+use super::fx::OCCLUDER_GAP;
 use crate::{battle_view::BattleViewModel, visual_assets::ArtTextures};
-use bevy_egui::egui::{Align2, Color32 as C, FontId, Painter, Rect};
+use bevy_egui::egui::{Align2, Color32 as C, FontId, Painter, Pos2, Rect};
+
+/// The construction grid's label right of the last build column.
+pub(crate) const MIDPOINT_LABEL: &str = "NO BUILDING BEYOND MIDPOINT";
+/// Its type size.
+pub(crate) const MIDPOINT_LABEL_SIZE: f32 = 10.0;
+/// The narrowest column the label wraps into: its longest word fits, so no
+/// word is broken.
+pub(crate) const MIDPOINT_LABEL_MIN_WRAP: f32 = 64.0;
+
+/// The midpoint label's left-top anchor and wrap width: 0.2 yd right of the
+/// build zone's right edge `build_right` and 0.2 lanes under the field top,
+/// on one line. Under an `occluder` (the open construction panel) it wraps
+/// into the room left of it, ending [`OCCLUDER_GAP`] short (CF-1-02); where
+/// that room is narrower than [`MIDPOINT_LABEL_MIN_WRAP`] the anchor moves
+/// left to make it.
+pub(crate) fn midpoint_label_place(
+    arena: ArenaProjection,
+    build_right: f32,
+    occluder: Option<Rect>,
+) -> (Pos2, f32) {
+    let mut at = arena.world(build_right + 0.2, 0.2);
+    let Some(occluder) = occluder else {
+        return (at, f32::INFINITY);
+    };
+    let limit = occluder.left() - OCCLUDER_GAP;
+    let room = limit - at.x;
+    if room >= MIDPOINT_LABEL_MIN_WRAP {
+        return (at, room);
+    }
+    at.x = limit - MIDPOINT_LABEL_MIN_WRAP;
+    (at, MIDPOINT_LABEL_MIN_WRAP)
+}
 
 pub fn paint(p: &Painter, arena: ArenaProjection, theme: usize, textures: ArtTextures) {
     let r = arena.rect;
@@ -17,7 +50,12 @@ pub fn paint(p: &Painter, arena: ArenaProjection, theme: usize, textures: ArtTex
     );
 }
 
-pub(super) fn construction_grid(p: &Painter, arena: ArenaProjection, view: &BattleViewModel) {
+pub(super) fn construction_grid(
+    p: &Painter,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    occluder: Option<Rect>,
+) {
     let [build_left, build_right] = view.construction_bounds;
     let cell_width = view.construction_cell_width;
     p.rect_filled(
@@ -56,11 +94,12 @@ pub(super) fn construction_grid(p: &Painter, arena: ArenaProjection, view: &Batt
             MUTED,
         );
     }
-    p.text(
-        arena.world(build_right + 0.2, 0.2),
-        Align2::LEFT_TOP,
-        "NO BUILDING BEYOND MIDPOINT",
-        FontId::proportional(10.0),
+    let (at, wrap) = midpoint_label_place(arena, build_right, occluder);
+    let galley = p.layout(
+        MIDPOINT_LABEL.to_owned(),
+        FontId::proportional(MIDPOINT_LABEL_SIZE),
         MUTED,
+        wrap,
     );
+    p.galley(at, galley, MUTED);
 }

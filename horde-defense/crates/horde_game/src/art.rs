@@ -13,6 +13,10 @@ pub use backdrop::{world_atmosphere, world_backdrop};
 #[cfg(test)]
 pub(crate) use battlefield::reinforcements_anchor;
 pub(crate) use battlefield::{HEALTH_BAR_LIFT, OCCLUDER_GAP, fx_lifetime};
+#[cfg(test)]
+pub(crate) use battlefield::{
+    MIDPOINT_LABEL, MIDPOINT_LABEL_MIN_WRAP, MIDPOINT_LABEL_SIZE, midpoint_label_place,
+};
 pub use battlefield::{RenderOptions, battlefield, battlefield_for_attempt, sample_motion};
 pub use camera::{FieldFit, fit_field};
 pub use figures::{bar, figure, structure};

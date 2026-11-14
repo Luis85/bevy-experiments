@@ -20,6 +20,10 @@ pub(crate) use enemies::HEALTH_BAR_LIFT;
 pub(crate) use fx::reinforcements_anchor;
 pub(crate) use fx::{OCCLUDER_GAP, fx_lifetime};
 #[cfg(test)]
+pub(crate) use terrain::{
+    MIDPOINT_LABEL, MIDPOINT_LABEL_MIN_WRAP, MIDPOINT_LABEL_SIZE, midpoint_label_place,
+};
+#[cfg(test)]
 mod tests;
 
 use super::{ArenaProjection, RED, soft_shadow};
@@ -125,7 +129,7 @@ fn render(
     fx::ambient(p, arena, &view.particles);
     ordnance::fire_zones(p, arena, view, reduced, textures);
     if options.construction {
-        terrain::construction_grid(p, arena, view);
+        terrain::construction_grid(p, arena, view, options.occluder);
     }
     structures::paint(p, arena, view, textures);
     corpses::paint(p, arena, view, a, textures, options.blood);

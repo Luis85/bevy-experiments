@@ -43,6 +43,20 @@ pub(super) const PANEL_TOP_GAP: f32 = 8.0;
 pub(super) const PANEL_MIN_HEIGHT: f32 = 180.0;
 /// The construction panel's black fill alpha.
 pub(in crate::ui) const PANEL_FILL_ALPHA: u8 = 235;
+/// The READY / PAUSED banner's height at full size: 18 pt type on a 5 pt
+/// padded backing. A bottom letterbox this tall holds the banner under the
+/// field.
+pub(super) const PAUSE_BANNER_HEIGHT: f32 = 36.0;
+/// The banner's full type size and backing padding.
+pub(super) const PAUSE_BANNER_FONT: f32 = 18.0;
+pub(super) const PAUSE_BANNER_PADDING: Vec2 = vec2(10.0, 5.0);
+/// The backing padding of the compact banner, in the tag slot under the
+/// battle HUD.
+pub(super) const PAUSE_TAG_PADDING: Vec2 = vec2(6.0, 2.0);
+/// The tag slot's gap under the battle HUD and over the arena, and its gap
+/// right of the attack selector's column.
+pub(super) const PAUSE_TAG_GAP: f32 = 3.0;
+pub(super) const PAUSE_TAG_LEFT_GAP: f32 = 8.0;
 /// How far left of the construction panel an INCOMING chevron's centre sits.
 pub(super) const CHEVRON_GAP: f32 = 10.0;
 /// The INCOMING chevron's width and height.
@@ -79,12 +93,18 @@ pub(in crate::ui) struct BattleLayout {
     pub(in crate::ui) receipt_slot: Rect,
     /// The construction overlay panel.
     pub(in crate::ui) construction_panel: Rect,
-    /// The READY / PAUSED banner's centre.
+    /// The READY / PAUSED banner's centre: the centre of
+    /// `pause_banner_slot`.
     pub(in crate::ui) pause_banner_center: Pos2,
     /// The control bar.
     pub(in crate::ui) bar: Rect,
     /// The key legend's left-bottom anchor.
     pub(in crate::ui) legend_anchor: Pos2,
+    /// The rect the READY / PAUSED banner is fitted into and centred on
+    /// (CF-1-01). It never meets the field: the arena's bottom 36 pt where
+    /// the field leaves that letterbox, and otherwise the strip between the
+    /// battle HUD and the arena.
+    pub(in crate::ui) pause_banner_slot: Rect,
 }
 impl BattleLayout {
     /// The layout of a `lanes` x `width_yards` battle in `canvas`.
@@ -117,6 +137,31 @@ impl BattleLayout {
         };
         let callout_width = (arena.width() - 24.0).clamp(160.0, 620.0);
         let panel_width = PANEL_MAX_WIDTH.min(canvas.width() * 0.5 - 32.0);
+        let hud_right = Rect::from_min_size(
+            pos2(canvas.right() - 206., canvas.top() + 12.),
+            vec2(192., 86.),
+        );
+        // The banner never lies on a lane (CF-1-01). A bottom letterbox that
+        // holds it keeps today's place, bottom-centre of the arena. A field
+        // that reaches the arena bottom (the height-limited 7x16, a first
+        // defense under its hint band, every filling field) has no free row
+        // in the arena, so the banner becomes a compact tag in the one free
+        // strip beside it: under the battle HUD, over the arena, right of
+        // the selector and receipt column.
+        let pause_banner_slot = if arena.bottom() - field.rect.bottom() >= PAUSE_BANNER_HEIGHT {
+            Rect::from_min_max(
+                pos2(arena.left(), arena.bottom() - PAUSE_BANNER_HEIGHT),
+                arena.max,
+            )
+        } else {
+            Rect::from_min_max(
+                pos2(
+                    canvas.right() - 222.0 + PAUSE_TAG_LEFT_GAP,
+                    hud_right.bottom() + PAUSE_TAG_GAP,
+                ),
+                pos2(hud_right.right(), arena.top() - PAUSE_TAG_GAP),
+            )
+        };
         Self {
             canvas,
             arena,
@@ -134,10 +179,7 @@ impl BattleLayout {
                 arena.max,
             ),
             hud_left: Rect::from_min_size(canvas.min + vec2(14., 12.), vec2(322., 108.)),
-            hud_right: Rect::from_min_size(
-                pos2(canvas.right() - 206., canvas.top() + 12.),
-                vec2(192., 86.),
-            ),
+            hud_right,
             selector: Rect::from_min_max(
                 pos2(canvas.left() + 350.0, canvas.top() + 12.0),
                 pos2(canvas.right() - 222.0, arena.top() - 12.0),
@@ -158,7 +200,8 @@ impl BattleLayout {
                     (arena.height() - 2.0 * PANEL_TOP_GAP).max(PANEL_MIN_HEIGHT),
                 ),
             ),
-            pause_banner_center: pos2(arena.center().x, arena.bottom() - 18.0),
+            pause_banner_center: pause_banner_slot.center(),
+            pause_banner_slot,
             bar: Rect::from_min_max(
                 pos2(canvas.left() + 12., canvas.bottom() - 76.),
                 pos2(canvas.right() - 12., canvas.bottom() - 5.),
@@ -189,6 +232,22 @@ impl BattleLayout {
             top,
             construction.then_some(self.construction_panel),
         )
+    }
+    /// The READY / PAUSED banner's type size and backing padding for a text
+    /// that measures `text` at [`PAUSE_BANNER_FONT`]: full size where the
+    /// slot holds it, and otherwise the largest half-point size whose padded
+    /// backing stays inside the slot.
+    pub(in crate::ui) fn pause_banner_fit(&self, text: Vec2) -> (f32, Vec2) {
+        let slot = self.pause_banner_slot.size();
+        let fits = |pad: Vec2| text.x + 2.0 * pad.x <= slot.x && text.y + 2.0 * pad.y <= slot.y;
+        if fits(PAUSE_BANNER_PADDING) {
+            return (PAUSE_BANNER_FONT, PAUSE_BANNER_PADDING);
+        }
+        let room = slot - 2.0 * PAUSE_TAG_PADDING;
+        let scale = (room.x / text.x).min(room.y / text.y).min(1.0);
+        // Half a point of slack covers glyph rounding at the smaller size.
+        let font = ((PAUSE_BANNER_FONT * scale * 2.0).floor() * 0.5 - 0.5).max(1.0);
+        (font, PAUSE_TAG_PADDING)
     }
     /// The forest dressing's size cap: a lane of the arena's reference
     /// clearing, so zoomed fields never grow props past today's size.
@@ -448,7 +507,24 @@ mod tests {
                     assert_eq!(layout.hud_right, old.hud_right, "{label}: right HUD");
                     assert_eq!(layout.selector, old.selector, "{label}: selector");
                     assert_eq!(layout.receipt_slot, old.receipt, "{label}: receipt");
-                    assert_eq!(layout.pause_banner_center, old.banner, "{label}: banner");
+                    // W3-29 (CF-1-01): a filling field has no letterbox for
+                    // the banner, which leaves the bottom lane for the tag
+                    // slot over the arena. A letterboxed field in the same
+                    // canvas keeps today's centre.
+                    assert_eq!(
+                        layout.pause_banner_center,
+                        layout.pause_banner_slot.center(),
+                        "{label}: banner"
+                    );
+                    assert!(
+                        layout.pause_banner_slot.bottom() <= layout.arena.top(),
+                        "{label}: banner over the arena"
+                    );
+                    assert_eq!(
+                        BattleLayout::new(canvas, 3, 12.0, false).pause_banner_center,
+                        old.banner,
+                        "{label}: letterboxed banner"
+                    );
                     assert_eq!(layout.bar, old.bar, "{label}: bar");
                     assert_eq!(layout.legend_anchor, old.legend, "{label}: legend");
                     // The effects clip only gains headroom above the arena.
@@ -470,6 +546,194 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Whether two rects share area (egui's `intersects` also counts a shared
+    /// edge).
+    fn overlaps(a: Rect, b: Rect) -> bool {
+        let shared = a.intersect(b);
+        shared.width() > 0.0 && shared.height() > 0.0
+    }
+
+    /// CF-1-01 (W3-29): the READY / PAUSED banner never lies on a lane. On
+    /// the zoomed 7x16 field and the 3x12 first defense under its hint band,
+    /// at both target sizes, its slot is clear of the bottom lane; and at
+    /// every geometry and canvas the slot is clear of the whole field, the
+    /// corner HUDs, the selector, the receipt, the hint callout, the boss
+    /// banner and the bar. A field with a 36 pt bottom letterbox keeps
+    /// today's place under it.
+    #[test]
+    fn pause_banner_never_covers_the_bottom_lane() {
+        for canvas in target_canvases() {
+            for (lanes, width, band) in [(7u8, 16.0, false), (3, 12.0, true)] {
+                let layout = BattleLayout::new(canvas, lanes, width, band);
+                assert!(layout.field.zoom > 1.0, "{lanes}x{width}: zoomed");
+                let field = art::ArenaProjection::with_geometry(layout.field.rect, lanes, width);
+                let bottom_lane = Rect::from_min_max(
+                    field.world(0.0, f32::from(lanes - 1)),
+                    field.world(width, f32::from(lanes)),
+                );
+                assert!(
+                    !overlaps(layout.pause_banner_slot, bottom_lane),
+                    "{lanes}x{width} band {band} in {:?}: the banner slot {:?} covers the bottom lane {bottom_lane:?}",
+                    canvas.size(),
+                    layout.pause_banner_slot
+                );
+            }
+        }
+        let (mut letterboxed, mut tagged) = (0, 0);
+        for canvas in canvases() {
+            for (lanes, width) in geometries() {
+                for band in [false, true] {
+                    let layout = BattleLayout::new(canvas, lanes, width, band);
+                    let slot = layout.pause_banner_slot;
+                    let name = format!("{lanes}x{width} band {band} in {canvas:?}: slot {slot:?}");
+                    assert_eq!(layout.pause_banner_center, slot.center(), "{name}");
+                    assert!(canvas.contains_rect(slot), "{name}");
+                    assert!(slot.width() >= 190.0 && slot.height() >= 18.0, "{name}");
+                    assert!(!overlaps(slot, layout.field.rect), "{name} on the field");
+                    for (what, rect) in [
+                        ("left HUD", layout.hud_left),
+                        ("right HUD", layout.hud_right),
+                        ("selector", layout.selector),
+                        ("receipt", layout.receipt_slot),
+                        ("hint callout", layout.hint_callout),
+                        ("boss banner", layout.boss_banner(false, false)),
+                        (
+                            "boss banner under the callout",
+                            layout.boss_banner(true, false),
+                        ),
+                        ("bar", layout.bar),
+                    ] {
+                        assert!(!overlaps(slot, rect), "{name} on the {what} {rect:?}");
+                    }
+                    let letterbox = layout.arena.bottom() - layout.field.rect.bottom();
+                    if letterbox >= PAUSE_BANNER_HEIGHT {
+                        // Today's place: bottom-centre of the arena.
+                        assert_eq!(
+                            slot.center(),
+                            pos2(layout.arena.center().x, layout.arena.bottom() - 18.0),
+                            "{name}"
+                        );
+                        letterboxed += 1;
+                    } else {
+                        // The tag slot between the battle HUD and the arena.
+                        assert!(
+                            slot.top() >= layout.hud_right.bottom()
+                                && slot.bottom() <= layout.arena.top(),
+                            "{name}"
+                        );
+                        tagged += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            letterboxed > 100 && tagged > 100,
+            "{letterboxed} / {tagged}"
+        );
+    }
+
+    /// The banner fit: full size where the slot holds the text, and in the
+    /// tag slot a size whose padded backing stays inside the slot.
+    #[test]
+    fn pause_banner_fit_keeps_the_backing_inside_the_slot() {
+        for canvas in target_canvases() {
+            for text in [vec2(215.0, 22.0), vec2(270.0, 22.0), vec2(520.0, 24.0)] {
+                let under = BattleLayout::new(canvas, 3, 12.0, false);
+                assert_eq!(
+                    under.pause_banner_fit(text),
+                    (PAUSE_BANNER_FONT, PAUSE_BANNER_PADDING),
+                    "{text:?} under a letterboxed field"
+                );
+                let tag = BattleLayout::new(canvas, 7, 16.0, false);
+                let (font, padding) = tag.pause_banner_fit(text);
+                assert!((9.0..PAUSE_BANNER_FONT).contains(&font) || text.x > 400.0);
+                assert_eq!(padding, PAUSE_TAG_PADDING);
+                let drawn = text * (font / PAUSE_BANNER_FONT) + 2.0 * padding;
+                let slot = tag.pause_banner_slot.size();
+                assert!(
+                    drawn.x <= slot.x && drawn.y <= slot.y,
+                    "{text:?} at {font} pt draws {drawn:?} in {slot:?}"
+                );
+            }
+        }
+    }
+
+    /// CF-1-02 (W3-29): the construction grid's midpoint label ends at least
+    /// `OCCLUDER_GAP` left of the open construction panel at every geometry
+    /// and canvas, wrapped into the room it has without breaking a word; with
+    /// no panel over it, it keeps its field point on one line.
+    #[test]
+    fn midpoint_label_stays_left_of_the_panel_at_every_geometry() {
+        use bevy_egui::egui::{Color32, FontId};
+        let mut cases = Vec::new();
+        for lanes in (3..=17u8).step_by(2) {
+            for width in [8u8, 12, 16, 20, 24, 30] {
+                let mut game = Game::default();
+                game.campaign_mut()
+                    .set_balance_settings(BalanceSettings {
+                        start_lanes: lanes,
+                        max_lanes: lanes,
+                        start_width: width,
+                        max_width: width,
+                        ..Default::default()
+                    })
+                    .unwrap();
+                game.deploy(0, Mode::Personal).unwrap();
+                let a = game.attempt().unwrap();
+                for canvas in canvases() {
+                    let layout = BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+                    let field = art::ArenaProjection::for_attempt(layout.field.rect, a);
+                    let build_right = a.construction_bounds()[1];
+                    cases.push((
+                        format!("{lanes}x{width} in {canvas:?}"),
+                        field.world(build_right + 0.2, 0.2),
+                        art::midpoint_label_place(field, build_right, None),
+                        art::midpoint_label_place(
+                            field,
+                            build_right,
+                            Some(layout.construction_panel),
+                        ),
+                        layout.construction_panel,
+                    ));
+                }
+            }
+        }
+        assert!(cases.len() > 200);
+        let ctx = bevy_egui::egui::Context::default();
+        let mut wrapped = 0;
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let measure = |wrap: f32| {
+                ui.painter().layout(
+                    art::MIDPOINT_LABEL.to_owned(),
+                    FontId::proportional(art::MIDPOINT_LABEL_SIZE),
+                    Color32::WHITE,
+                    wrap,
+                )
+            };
+            for (name, point, open, built, panel) in &cases {
+                assert_eq!(*open, (*point, f32::INFINITY), "{name}: no panel");
+                let (at, wrap) = *built;
+                assert!(wrap >= art::MIDPOINT_LABEL_MIN_WRAP, "{name}: wrap {wrap}");
+                let galley = measure(wrap);
+                let text = Rect::from_min_size(at, galley.size());
+                assert!(
+                    text.right() <= panel.left() - art::OCCLUDER_GAP && !text.intersects(*panel),
+                    "{name}: the midpoint label {text:?} lies under the panel {panel:?}"
+                );
+                // Four words: more rows would break one.
+                assert!(galley.rows.len() <= 4, "{name}: {} rows", galley.rows.len());
+                assert_eq!(at.y, point.y, "{name}");
+                if galley.rows.len() == 1 {
+                    assert_eq!(at, *point, "{name}: one line keeps the field point");
+                } else {
+                    wrapped += 1;
+                }
+            }
+        });
+        output.textures_delta.clear();
+        assert!(wrapped > 0, "some panel wraps the label");
     }
 
     /// The fix: construction no longer shrinks the arena by the panel width.

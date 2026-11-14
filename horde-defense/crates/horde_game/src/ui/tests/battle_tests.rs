@@ -1653,3 +1653,126 @@ fn field_actions_keep_their_keys() {
         assert_eq!(text_count(&output, action), 0, "{action} when observing");
     }
 }
+
+/// A paused, undeployed-to-running personal battle on a `lanes` x `width`
+/// field (fresh balance otherwise). A `veteran` campaign has finished an
+/// attempt; otherwise the battle is a first deployment with its hint band.
+fn sized_battle(lanes: u8, width: u8, veteran: bool) -> IsolatedFrontend {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.unlock_trap();
+    let campaign = fixture.frontend.game.campaign_mut();
+    campaign
+        .set_balance_settings(horde_core::balance::BalanceSettings {
+            start_lanes: lanes,
+            max_lanes: lanes,
+            start_width: width,
+            max_width: width,
+            ..Default::default()
+        })
+        .unwrap();
+    campaign.choose_start_country("DEU").unwrap();
+    fixture
+        .frontend
+        .game
+        .deploy_country_stage(0, Mode::Personal)
+        .unwrap();
+    fixture.frontend.game.campaign_mut().attempts = u64::from(veteran);
+    fixture.frontend.game.set_paused(true);
+    fixture.frontend.screen = Screen::Battle;
+    let a = fixture.frontend.game.attempt().unwrap();
+    assert!(a.paused && a.tick == 0);
+    assert_eq!((a.lane_count, a.width_yards), (lanes, f32::from(width)));
+    fixture
+}
+
+/// CF-1-01 (W3-29): on the zoomed 7x16 field and the 3x12 first defense, at
+/// both target sizes, the painted READY and PAUSED banners lie inside the
+/// layout's banner slot, whole and unclipped, and share no area with the
+/// field. The open construction overlay still hides the banner.
+#[test]
+fn pause_banner_is_painted_beside_the_field_at_both_sizes() {
+    for size in target_sizes() {
+        for (lanes, width, veteran) in [(7, 16, true), (3, 12, false)] {
+            let mut fixture = sized_battle(lanes, width, veteran);
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            let name = format!("{lanes}x{width} at {size:?}");
+            for text in [
+                "READY · Begin defense or Escape",
+                "PAUSED · Escape to resume",
+            ] {
+                let output = h.frame_size(f, View::Battle, vec![], size);
+                let a = f.game.attempt().unwrap();
+                let layout = battle::BattleLayout::new(
+                    h.ctx.content_rect(),
+                    a.lane_count,
+                    a.width_yards,
+                    !veteran,
+                );
+                assert_eq!(layout.hint_band.is_some(), !veteran, "{name}");
+                assert_eq!(f.battle.arena_rect, Some(layout.field.rect), "{name}");
+                let slot = layout.pause_banner_slot;
+                let banner = f.battle.pause_banner_rect.expect("the banner drew");
+                assert!(
+                    slot.expand(0.01).contains_rect(banner),
+                    "{name}: {text}: the banner {banner:?} leaves its slot {slot:?}"
+                );
+                // The compact tag stays legible: 10 pt type or larger.
+                assert!(banner.height() >= 16.0, "{name}: {text}: {banner:?}");
+                let shared = banner.intersect(layout.field.rect);
+                assert!(
+                    shared.width() <= 0.0 || shared.height() <= 0.0,
+                    "{name}: {text}: the banner {banner:?} lies on the field {:?}",
+                    layout.field.rect
+                );
+                let (drawn, clip) = clipped_bounds(&output, text)
+                    .unwrap_or_else(|| panic!("{name}: {text} is not painted"));
+                assert!(
+                    banner.expand(0.5).contains_rect(drawn) && clip.contains_rect(drawn),
+                    "{name}: {text} at {drawn:?} leaves its backing {banner:?}"
+                );
+                // The second pass: a battle paused after its first tick.
+                f.game.set_paused(false);
+                f.game.tick(Input::default());
+                f.game.set_paused(true);
+            }
+            f.battle.construction = true;
+            h.frame_size(f, View::Battle, vec![], size);
+            assert_eq!(f.battle.pause_banner_rect, None, "{name}: construction");
+        }
+    }
+}
+
+/// CF-1-02 (W3-29): with construction open on the 7x16 field, the painted
+/// "NO BUILDING BEYOND MIDPOINT" label and `construction_panel` do not
+/// intersect at 1050x700@1.35 (nor at 1440x900, where it keeps its one line
+/// at its field point).
+#[test]
+fn midpoint_label_clears_the_construction_panel() {
+    for size in target_sizes() {
+        let mut fixture = sized_battle(7, 16, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let layout = field_layout(&h, f);
+        let panel = layout.construction_panel;
+        let (label, clip) =
+            clipped_bounds(&output, art::MIDPOINT_LABEL).expect("the midpoint label drew");
+        assert!(
+            !label.intersects(panel) && label.right() <= panel.left() - art::OCCLUDER_GAP,
+            "{size:?}: the midpoint label {label:?} lies under the panel {panel:?}"
+        );
+        assert!(clip.contains_rect(label), "{size:?}: {label:?} is clipped");
+        let a = f.game.attempt().unwrap();
+        let field = art::ArenaProjection::for_attempt(layout.field.rect, a);
+        let point = field.world(a.construction_bounds()[1] + 0.2, 0.2);
+        assert!(
+            (label.left() - point.x).abs() < 1.0 && (label.top() - point.y).abs() < 1.0,
+            "{size:?}: the label {label:?} left its field point {point:?}"
+        );
+        if size.x > 1000.0 {
+            assert!(label.height() < 16.0, "{size:?}: one line, {label:?}");
+        }
+    }
+}
