@@ -1876,6 +1876,15 @@ Measured on the W4-l commit (parent 22549a4: the repriced tree of W4-p, no enemy
 
 Reading. The rule earns little: the six early runs bring 266 coins in all against a tier-1 cost of 2,030, so the tier medians move by at most one run. It also removes little: sold / (owned + sold) is 2.1% after 60 runs and 1.5% after 150, below the model's 5.2% share at tier 4, because the relative quality roll (decision 7) leaves few Poor or Common drops at the higher tiers and `keep_upgrades` keeps some of those. The stash therefore grows almost as fast as the drops arrive: about 89 items per run over runs 1-60 and 159 per run over runs 61-150, near the 143.1 drops per run this section measured past rank 23. Both medians are above the save-clone fixtures (1,000 gated, 2,500 and 5,000 informational; `examples/save_clone.rs`). Nothing is tuned here: no row bounds the stash, so the levers of design Risks item 3 wait for the decision in §2.5, "The stash outgrows the save-clone fixtures".
 
+### 9.8 Primary contrast (closing phase)
+
+Design-ux-flow §10 asks for a primary contrast of "about 10:1". The amber primary (`ui/primary_action.rs`, `primary_button`) paints INK text (17, 23, 24) on the AMBER fill (239, 181, 82), and its hover fill is PRIMARY_HOVER (250, 200, 110). The ratios are WCAG 2.x contrast of the relative luminances (`art::lighting::contrast`, `relative_luminance`), pinned by `primary_text_contrast_is_about_ten_to_one` (resting within 9.5..=10.5, hover not below it).
+
+| Pair | Measured |
+|---|---|
+| INK on AMBER (resting primary) | 9.83:1 |
+| INK on PRIMARY_HOVER (hovered or pressed) | 11.69:1 |
+
 ---
 
 ## 10. Capture findings ledger

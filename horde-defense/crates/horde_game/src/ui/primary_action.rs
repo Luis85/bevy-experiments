@@ -124,3 +124,33 @@ fn primary_button(ui: &mut egui::Ui, text: &str, surface: Surface, min: Vec2) ->
     });
     response
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::art::lighting::{contrast, relative_luminance};
+
+    fn ratio(fill: Color32, text: Color32) -> f32 {
+        contrast(
+            relative_luminance([fill.r(), fill.g(), fill.b()]),
+            relative_luminance([text.r(), text.g(), text.b()]),
+        )
+    }
+
+    /// Design-ux-flow §10 "Primary contrast, about 10:1": the INK label on
+    /// the AMBER fill `primary_button` paints (9.83:1, plan §9.8) stays
+    /// within half a point of 10:1, and the hover fill never reads weaker.
+    #[test]
+    fn primary_text_contrast_is_about_ten_to_one() {
+        let resting = ratio(AMBER, INK);
+        assert!(
+            (9.5..=10.5).contains(&resting),
+            "INK on AMBER is {resting:.2}:1, not about 10:1"
+        );
+        let hovered = ratio(PRIMARY_HOVER, INK);
+        assert!(
+            hovered >= resting,
+            "INK on the hover fill is {hovered:.2}:1, under the resting {resting:.2}:1"
+        );
+    }
+}
