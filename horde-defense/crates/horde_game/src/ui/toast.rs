@@ -5,6 +5,7 @@
 //! Camp, Results and every other screen with no battle field stack up to
 //! three toasts top-right under the header; a battle shows the newest one in
 //! `BattleLayout.receipt_slot`, over the loot receipt (`battle_toast`).
+//! Expedition outcomes arrive through `expedition_notices::deliver`.
 use super::{Screen, UiCtx};
 use crate::art::{GREEN, PANEL, RED, TEXT};
 use bevy_egui::egui::{self, Color32, Rect, RichText, Stroke, pos2, vec2};
@@ -20,7 +21,7 @@ pub(super) const TOAST_LONG_SECS: f64 = TOAST_ERROR_SECS;
 /// The fade-out at the end of a toast's life; reduced effects has none.
 const TOAST_FADE_SECS: f64 = 0.25;
 /// The most toasts the top-right stack shows at once.
-const STACK_VISIBLE: usize = 3;
+pub(super) const STACK_VISIBLE: usize = 3;
 /// The stack's offset from the screen's top-right corner.
 const STACK_OFFSET: egui::Vec2 = vec2(-16.0, 52.0);
 /// The stack's width.
@@ -135,9 +136,13 @@ impl Toasts {
             toast.shown_at = Some(now);
         }
     }
-    #[cfg(test)]
+    /// How many toasts are queued.
     pub(super) fn len(&self) -> usize {
         self.queue.len()
+    }
+    /// Whether a queued toast reads exactly `text`.
+    pub(super) fn contains(&self, text: &str) -> bool {
+        self.queue.iter().any(|toast| toast.text == text)
     }
 }
 
@@ -181,7 +186,7 @@ pub(super) fn toast_layer(ctx: &egui::Context, f: &mut UiCtx) {
     ui.spacing_mut().item_spacing.y = 6.0;
     let mut hovered = None;
     for toast in &toasts {
-        if toast_card(&mut ui, toast, now, reduced, STACK_WIDTH).hovered() {
+        if toast_card(&mut ui, toast, now, reduced, STACK_WIDTH, true).hovered() {
             hovered = Some(toast.text.clone());
         }
     }
@@ -228,7 +233,7 @@ pub(super) fn battle_toast(ui: &mut egui::Ui, slot: Rect, f: &mut UiCtx) -> bool
     let hovered = ui
         .scope_builder(egui::UiBuilder::new().max_rect(slot), |ui| {
             ui.set_clip_rect(slot.intersect(ui.clip_rect()));
-            toast_card(ui, &toast, now, reduced, slot.width()).hovered()
+            toast_card(ui, &toast, now, reduced, slot.width(), false).hovered()
         })
         .inner;
     if hovered {
@@ -237,13 +242,16 @@ pub(super) fn battle_toast(ui: &mut egui::Ui, slot: Rect, f: &mut UiCtx) -> bool
     true
 }
 
-/// One toast: a PANEL card with a kind-coloured edge and one truncated line.
+/// One toast: a PANEL card with a kind-coloured edge. The stack wraps a long
+/// line (an expedition notice names a recruit and a country); the battle's
+/// fixed slot keeps one truncated line with the whole text on hover.
 fn toast_card(
     ui: &mut egui::Ui,
     toast: &Toast,
     now: f64,
     reduced: bool,
     width: f32,
+    wrap: bool,
 ) -> egui::Response {
     let color = toast.kind.color();
     ui.scope(|ui| {
@@ -254,12 +262,13 @@ fn toast_card(
             .inner_margin(egui::Margin::symmetric(10, 6))
             .show(ui, |ui| {
                 ui.set_width((width - 22.0).max(40.0));
-                ui.add(
-                    egui::Label::new(RichText::new(&toast.text).color(color).size(14.0))
-                        .truncate()
-                        .selectable(false),
-                )
-                .on_hover_text(&toast.text);
+                let label = egui::Label::new(RichText::new(&toast.text).color(color).size(14.0))
+                    .selectable(false);
+                if wrap {
+                    ui.add(label.wrap());
+                } else {
+                    ui.add(label.truncate()).on_hover_text(&toast.text);
+                }
             })
             .response
             .interact(egui::Sense::hover())

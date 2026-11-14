@@ -79,6 +79,9 @@ pub(crate) struct StatusUi {
     /// The status message the battle last turned into a toast, with its
     /// revision and error flag (`toast::status_toast`).
     pub(super) toasted: Option<(String, u64, bool)>,
+    /// An `AcknowledgeOutcomes` this UI queued that the runner may not have
+    /// applied yet (`expedition_notices::deliver`).
+    pub(super) outcome_ack_pending: bool,
     /// The one application modal slot (ui/modal.rs).
     pub(super) modal: Option<super::modal::AppModal>,
     /// The storage modal's note: "Path copied." or why the folder could not

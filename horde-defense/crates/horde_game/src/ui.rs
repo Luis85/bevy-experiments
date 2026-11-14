@@ -10,6 +10,7 @@ use horde_core::{content::Mode, sim::Input};
 mod app_tests;
 mod context;
 mod escape;
+mod expedition_notices;
 mod modal;
 mod notices;
 mod plugin;
@@ -102,6 +103,8 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
     // Before anything draws, so the registry holds this frame's primaries.
     primary_action::clear_frame_primaries(ctx);
     settings::configure(ctx, f.settings.scale);
+    // Settled expeditions become toasts, acknowledged in this same frame.
+    expedition_notices::deliver(f);
     // New toasts start their wall clock; expired ones go before any draws.
     toast::advance(ctx, f);
     // Before any reader of the keyboard: Escape is decided and consumed here.

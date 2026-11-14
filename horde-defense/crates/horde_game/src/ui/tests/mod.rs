@@ -599,6 +599,7 @@ mod character_tests;
 mod chrome_tests;
 mod defender_tests;
 mod escape_tests;
+mod expedition_notice_tests;
 mod feedback_tests;
 mod frame_tests;
 mod history_tests;

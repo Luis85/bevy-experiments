@@ -24,6 +24,8 @@ const HOME_ALERTS: usize = 3;
 const HOME_OFFERS: usize = 2;
 /// Recent run reports listed on Home.
 const HOME_REPORTS: usize = 3;
+/// Recent expedition outcomes listed on Home, above the run reports.
+const HOME_EXPEDITION_REPORTS: usize = 2;
 
 /// The camp's one primary action between defenses (loop map, Camp/Home).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -420,9 +422,13 @@ fn offers(ui: &mut egui::Ui, f: &mut UiCtx) {
 fn recent_reports(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::section(ui, "Recent reports");
     let history = &f.game.campaign().run_history;
-    if history.is_empty() {
+    let expeditions = super::expedition_notices::recent_lines(f.game, HOME_EXPEDITION_REPORTS);
+    if history.is_empty() && expeditions.is_empty() {
         muted(ui, "No defenses fought yet.");
         return;
+    }
+    for line in expeditions {
+        muted(ui, line);
     }
     for record in history.iter().rev().take(HOME_REPORTS) {
         let place = if record.country_name.is_empty() {
