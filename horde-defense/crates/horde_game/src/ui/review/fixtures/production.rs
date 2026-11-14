@@ -110,6 +110,14 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "upgrades" => prepare_upgrades(f),
         "camp-home" => prepare_camp_home(f),
         "camp-reports" => prepare_camp_reports(f),
+        "callout-camp" => prepare_camp_home(f),
+        "callout-upgrades" => {
+            prepare_camp_home(f);
+            f.act(|c| {
+                c.focus_next_upgrade();
+                c.open_upgrades();
+            });
+        }
         "briefing-recruit" => prepare_briefing_recruit(f),
         "equipment-autosell" => prepare_equipment_autosell(f),
         "results-liberation-recruit" => prepare_results_liberation_recruit(f),
@@ -739,6 +747,18 @@ const EXPEDITION_TICKS: u32 = 60 * 20;
 /// The camp-reports outcomes pruning folded into one count (an entitlement:
 /// folding needs more settled expeditions than the battle cap keeps).
 pub(in crate::ui::review) const CAMP_REPORTS_FOLDED: u32 = 3;
+/// The callout the callout stills leave unread: Expeditions, unlocked in
+/// the camp-home state, whose place is Operations, so neither Camp home nor
+/// Upgrades marks it seen on arrival.
+pub(in crate::ui::review) const UNREAD_CALLOUT: &str = "feature:parallel";
+
+/// The onboarding callout `scene` leaves unread, if it is a callout still
+/// (UX-16, closing): the camp-home state on Camp home or on Upgrades, the
+/// two places the callout row shows. Every other staged scene marks every
+/// unlocked callout seen (`matrix::prepare`).
+pub(in crate::ui::review) fn unread_callout(scene: &str) -> Option<&'static str> {
+    matches!(scene, "callout-camp" | "callout-upgrades").then_some(UNREAD_CALLOUT)
+}
 
 /// The Upgrades screen after a first round: the journey-upgrades round (a real
 /// stage-0 defense played with the smoke input, withdrawn if it outlasts

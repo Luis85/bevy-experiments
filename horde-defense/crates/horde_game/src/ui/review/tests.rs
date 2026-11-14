@@ -284,6 +284,9 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("boss-warning", Screen::Battle, None),
     // Closing phase: the W3-25 expedition toasts.
     ("camp-reports", Screen::Camp, Some(Tab::Home)),
+    // Closing phase: the UX-16 callout row on Camp home and on Upgrades.
+    ("callout-camp", Screen::Camp, Some(Tab::Home)),
+    ("callout-upgrades", Screen::Upgrades, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1642,6 +1645,51 @@ fn camp_reports_still_toasts_two_outcomes_and_the_folded_count() {
     );
     assert!(painted.contains(&folded), "{folded:?} in {painted:?}");
     assert_eq!(f.status.toasts.len(), 3, "the whole visible stack");
+}
+
+/// UX-16's callout row gets a capture on both places it shows: the
+/// callout-camp and callout-upgrades stills leave exactly one unlocked
+/// callout unread (every other scene marks them all seen), one whose place
+/// is elsewhere, so arriving does not mark it and every frame draws the row
+/// with "Show me" and "Got it".
+#[test]
+fn callout_stills_leave_one_callout_unread_on_camp_and_upgrades() {
+    use crate::ui::onboarding;
+    for (scene, screen) in [
+        ("callout-camp", Screen::Camp),
+        ("callout-upgrades", Screen::Upgrades),
+    ] {
+        assert_eq!(
+            review_scenes::lookup(scene),
+            Some(review_scenes::SceneKind::Still),
+            "{scene} is a registered still"
+        );
+        let mut f = staged(scene);
+        assert!(f.screen == screen, "{scene} staged {:?}", f.screen);
+        let callout = onboarding::due(&f.settings, &f.game)
+            .unwrap_or_else(|| panic!("{scene}: a callout is due"));
+        assert_eq!(callout.id, fixtures::production::UNREAD_CALLOUT, "{scene}");
+        let unread: Vec<_> = onboarding::CALLOUTS
+            .iter()
+            .filter(|c| !f.settings.seen_callouts.as_ref().unwrap().contains(c.id))
+            .filter(|c| onboarding::unlocked_ids(&f.game).contains(c.id))
+            .map(|c| c.id)
+            .collect();
+        assert_eq!(unread, [callout.id], "{scene}: one unread callout");
+        let line = onboarding::text(callout, &f.settings);
+        for _ in 0..2 {
+            let painted = painted_text(&one_frame(&mut f));
+            for text in [line.as_str(), "Show me", "Got it"] {
+                assert!(
+                    painted.iter().any(|p| p == text),
+                    "{scene}: {text:?} in {painted:?}"
+                );
+            }
+        }
+    }
+    // Every other staged scene still shows its screen without a callout.
+    let f = staged("camp-home");
+    assert!(crate::ui::onboarding::due(&f.settings, &f.game).is_none());
 }
 
 /// W2-28's close capture (CF-2-04) needs a spitter winding up at its reach:

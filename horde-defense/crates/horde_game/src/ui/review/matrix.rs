@@ -8,11 +8,17 @@ use horde_core::{
 };
 
 /// Stages the launch's scenario, if it names one. A staged scene shows its
-/// screen, not onboarding callouts for what the staging unlocked.
+/// screen, not onboarding callouts for what the staging unlocked; a callout
+/// still leaves its one callout unread (`production::unread_callout`).
 pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
     stage(f);
-    if f.launch.scenario.is_some() {
+    if let Some(scene) = f.launch.scenario.as_deref() {
         crate::ui::onboarding::mark_unlocked_seen(&mut f.settings, &f.game);
+        if let Some(id) = production::unread_callout(scene)
+            && let Some(seen) = f.settings.seen_callouts.as_mut()
+        {
+            seen.remove(id);
+        }
     }
 }
 
