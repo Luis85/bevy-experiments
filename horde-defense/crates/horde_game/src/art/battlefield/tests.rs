@@ -2794,6 +2794,7 @@ fn fx_budget_matches_presentation_caps() {
         ("decals", decals::BLOOD_DECALS_MAX),
         ("scorch", crate::battle_view::SCORCH_MAX),
         ("explosions_concurrent", explosion::EXPLOSIONS_MAX),
+        ("tracers", weapon_fx::TRACERS_MAX),
         ("hit_events", hits::HIT_EVENTS_MAX),
         ("flames_per_zone", ordnance::flames_per_zone(false)),
         ("flames_per_zone_reduced", ordnance::flames_per_zone(true)),

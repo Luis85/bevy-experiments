@@ -173,6 +173,46 @@ pub(super) fn shot_age_ticks(e: &FxView) -> u32 {
     (e.age * 60.0).round() as u32
 }
 
+/// The Shot events of `view` the frame paints, oldest first: those that
+/// still draw a flash or a tracer, of the newest whole volleys (one tick and
+/// one actor) that fit in [`weapon_fx::TRACERS_MAX`]. The first older volley
+/// that does not fit ends the selection, so a crowded frame keeps its most
+/// recent shots and never splits a shell's pellets from its flash.
+pub(super) fn shots_drawn(view: &BattleViewModel) -> Vec<&FxView> {
+    use std::collections::{BTreeMap, BTreeSet};
+    let live: Vec<&FxView> = view
+        .fx
+        .iter()
+        .filter(|e| {
+            e.kind == EventKind::Shot
+                && e.source.is_some_and(|source| {
+                    shot_age_ticks(e) < weapon_fx::shot_life_ticks(weapon_fx::weapon_fx(source))
+                })
+        })
+        .collect();
+    let volley = |e: &FxView| (e.tick, e.actor_id);
+    let mut sizes = BTreeMap::new();
+    for e in &live {
+        *sizes.entry(volley(e)).or_insert(0usize) += 1;
+    }
+    let mut kept = BTreeSet::new();
+    let mut total = 0;
+    for e in live.iter().rev() {
+        let key = volley(e);
+        if kept.contains(&key) {
+            continue;
+        }
+        total += sizes[&key];
+        if total > weapon_fx::TRACERS_MAX {
+            break;
+        }
+        kept.insert(key);
+    }
+    live.into_iter()
+        .filter(|e| kept.contains(&volley(e)))
+        .collect()
+}
+
 /// Where a Shot event's flash, tracer and light start: the drawn survivor's
 /// `muzzle` socket (when the rig resolved) for the survivor, the drawn
 /// barrel for a turret, else the event's own origin. `None` for a trap and
@@ -229,7 +269,7 @@ pub(super) fn events(
         reduced, textures, ..
     } = *options;
     let sy = arena.lane_height();
-    for e in view.fx.iter().filter(|e| e.kind == EventKind::Shot) {
+    for e in shots_drawn(view) {
         if let (Some(source), Some(from)) =
             (e.source, shot_origin(arena, view, e, muzzle, textures))
         {

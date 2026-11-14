@@ -59,6 +59,7 @@ pub const FX_BUDGET: &[(&str, usize)] = &[
     ("decals", 64),
     ("scorch", 8),
     ("explosions_concurrent", 8),
+    ("tracers", 96),
     ("hit_events", 64),
     ("flames_per_zone", 21),
     ("flames_per_zone_reduced", 9),
@@ -229,6 +230,7 @@ mod tests {
             ("explosions_concurrent", 8),
             ("flames_per_zone", 21),
             ("flames_per_zone_reduced", 9),
+            ("tracers", 96),
         ] {
             assert_eq!(whole(&json, &format!("/fx/{key}")), value, "/fx/{key}");
         }

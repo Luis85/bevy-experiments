@@ -428,3 +428,63 @@ fn shot_fx_never_mutates_attempt() {
         assert_eq!(game.state_digest(), digest, "{class:?}");
     }
 }
+
+/// Design-vfx-lighting §13 `tracers 96`: one frame draws the Shot events of
+/// its newest volleys up to the cap, whole volleys only, so a crowded frame
+/// keeps its most recent tracers and never splits a shell from its flash.
+#[test]
+fn shots_past_the_tracer_cap_keep_the_newest_whole_volleys() {
+    const CAP: usize = TRACERS_MAX;
+    assert_eq!(CAP, 96);
+    // 150 one-shot turret volleys on one tick (one per structure id).
+    let mut game = game_with(WeaponClass::Pistol);
+    let a = game.attempt_mut().unwrap();
+    for n in 0..150 {
+        shot(a, 1, n % 40, Some(9_000_000 + n as u64));
+    }
+    let view = view_of(&game, false);
+    let ends: Vec<_> = view
+        .fx
+        .iter()
+        .filter(|e| e.kind == EventKind::Shot)
+        .map(|e| e.to)
+        .collect();
+    assert_eq!(ends.len(), 150);
+    let shapes = paint_events(&game, false);
+    let drawn = lines(&shapes);
+    assert_eq!(drawn.len(), CAP, "one tracer per drawn shot");
+    assert_eq!(flashes(&shapes), CAP, "each drawn volley flashes");
+    let projection = ArenaProjection::for_attempt(arena(), game.attempt().unwrap());
+    for (([_, to], _, _), end) in drawn.iter().zip(&ends[150 - CAP..]) {
+        assert_eq!(*to, projection.world(end[0], end[1]), "the newest shots");
+    }
+    assert_eq!(lines(&paint_events(&game, true)).len(), CAP, "reduced");
+
+    // A nine-pellet shell that does not fit whole is left out whole: 90
+    // newer turret shots leave room for 6 pellets, not 9.
+    let mut game = game_with(WeaponClass::Shotgun);
+    let a = game.attempt_mut().unwrap();
+    volley(a, 2, 9);
+    for n in 0..90 {
+        shot(a, 1, n % 40, Some(9_000_000 + n as u64));
+    }
+    let shapes = paint_events(&game, false);
+    let drawn = lines(&shapes);
+    assert_eq!(drawn.len(), 90);
+    assert!(
+        drawn
+            .iter()
+            .all(|(_, _, color)| rgb(*color) != SHOTGUN_FX.tracer_rgb),
+        "no pellet of the shell is drawn"
+    );
+    // With room for it, the shell draws whole, its flash included.
+    let mut game = game_with(WeaponClass::Shotgun);
+    let a = game.attempt_mut().unwrap();
+    volley(a, 2, 9);
+    for n in 0..87 {
+        shot(a, 1, n % 40, Some(9_000_000 + n as u64));
+    }
+    let shapes = paint_events(&game, false);
+    assert_eq!(lines(&shapes).len(), CAP);
+    assert_eq!(flashes(&shapes), 88, "87 turret flashes and the shell's");
+}

@@ -203,18 +203,27 @@ pub(crate) fn width_scale(lane: f32) -> f32 {
     (lane / REFERENCE_LANE).clamp(1.0, 1.6)
 }
 
+/// The most Shot events one frame paints (design-vfx-lighting §13
+/// `tracers`): each draws one tracer (its streak, dim or full line, with a
+/// core line on the marksman) and, opening its volley, the flash. The
+/// newest whole volleys are kept (`fx::shots_drawn`).
+pub(crate) const TRACERS_MAX: usize = 96;
+
+/// How many ticks a Shot event of `fx` draws anything: its flash or its
+/// tracer.
+pub(crate) fn shot_life_ticks(fx: &WeaponFx) -> u32 {
+    u32::from(fx.flash_life_ticks.max(fx.tracer_life_ticks))
+}
+
 /// The longest any profile draws a shot, in seconds: the Shot row of
 /// `fx_lifetime` must cover it.
 #[cfg(test)]
 pub(crate) fn longest_shot_seconds() -> f32 {
     FxSource::ALL
         .into_iter()
-        .map(|source| {
-            let fx = weapon_fx(source);
-            fx.flash_life_ticks.max(fx.tracer_life_ticks)
-        })
+        .map(|source| shot_life_ticks(weapon_fx(source)))
         .max()
-        .map_or(0.0, |ticks| f32::from(ticks) / 60.0)
+        .map_or(0.0, |ticks| ticks as f32 / 60.0)
 }
 
 /// One Shot event to paint.

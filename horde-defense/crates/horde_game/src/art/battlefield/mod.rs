@@ -181,10 +181,8 @@ pub fn flash_facts(a: &Attempt, sky: SkyClock, reduced: bool) -> FlashFacts {
     let (grade, pulse) =
         lighting::scene_grade(look, reduced, lighting::sky_pulse(look, sky, a, reduced));
     let sky_flash = lighting::sky_alpha(pulse);
-    let muzzle_flashes: Vec<f32> = view
-        .fx
-        .iter()
-        .filter(|e| e.kind == horde_core::sim::EventKind::Shot)
+    let muzzle_flashes: Vec<f32> = fx::shots_drawn(&view)
+        .into_iter()
         .filter_map(|e| {
             let from = fx::shot_origin(arena, &view, e, muzzle, textures)?;
             let alpha = weapon_fx::muzzle_flash_alpha(
@@ -221,6 +219,7 @@ pub(crate) struct FxCounts {
     pub blood_decals: usize,
     pub scorch: usize,
     pub explosions: usize,
+    pub tracers: usize,
     pub hit_events: usize,
     pub fire_zones: usize,
     pub flames_per_zone: usize,
@@ -230,12 +229,13 @@ pub(crate) struct FxCounts {
 #[cfg(all(test, feature = "review"))]
 impl FxCounts {
     /// Each count with its `FX_BUDGET` row.
-    pub(crate) fn rows(&self) -> [(&'static str, usize); 9] {
+    pub(crate) fn rows(&self) -> [(&'static str, usize); 10] {
         [
             ("lights", self.lights),
             ("decals", self.blood_decals),
             ("scorch", self.scorch),
             ("explosions_concurrent", self.explosions),
+            ("tracers", self.tracers),
             ("hit_events", self.hit_events),
             ("fire_zones_drawn", self.fire_zones),
             ("flames_per_zone", self.flames_per_zone),
@@ -260,6 +260,7 @@ pub(crate) fn fx_counts(
         blood_decals: decals::decals(a, blood, reduced).len(),
         scorch: view.scorch.len(),
         explosions: explosion::blasts(arena, view).len(),
+        tracers: fx::shots_drawn(view).len(),
         hit_events: hits::drawn(view).count(),
         fire_zones: ordnance::burning(view).len(),
         flames_per_zone: ordnance::flames_per_zone(reduced),

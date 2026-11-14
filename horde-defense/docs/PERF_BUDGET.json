@@ -261,6 +261,7 @@
     "decals": 64,
     "scorch": 8,
     "explosions_concurrent": 8,
+    "tracers": 96,
     "hit_events": 64,
     "flames_per_zone": 21,
     "flames_per_zone_reduced": 9,
