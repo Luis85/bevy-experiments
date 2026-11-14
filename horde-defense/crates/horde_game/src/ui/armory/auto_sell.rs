@@ -228,11 +228,24 @@ fn threshold_chip(ui: &mut egui::Ui, chip: &Chip, selected: bool, settings: &Set
     response
 }
 
-/// The collapsed "Auto-sell" section under "Manage equipment".
+/// The collapsed "Auto-sell" section under "Manage equipment". A pending
+/// reveal (`ArmoryUi::reveal_auto_sell`) opens it and scrolls it into view
+/// once; after that the header is the player's again.
 pub(super) fn panel(ui: &mut egui::Ui, f: &mut UiCtx) {
-    egui::CollapsingHeader::new(HEADER)
+    let reveal = std::mem::take(&mut f.armory.reveal_auto_sell);
+    let section = egui::CollapsingHeader::new(HEADER)
         .id_salt("auto_sell_panel")
+        .open(reveal.then_some(true))
         .show(ui, |ui| body(ui, f));
+    if reveal {
+        let shown = section
+            .body_response
+            .map_or(section.header_response.rect, |body| {
+                section.header_response.rect.union(body.rect)
+            });
+        // At once, not animated: the next frame already shows the panel.
+        ui.scroll_to_rect_animation(shown, None, egui::style::ScrollAnimation::none());
+    }
 }
 
 fn body(ui: &mut egui::Ui, f: &mut UiCtx) {

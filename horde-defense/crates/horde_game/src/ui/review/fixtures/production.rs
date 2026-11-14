@@ -1,12 +1,13 @@
-//! The production pass's wave-1 review scenes (design-qa-captures 1.8) and
-//! the wave-2 close stills (W2-55, W2-57).
+//! The production pass's wave-1 review scenes (design-qa-captures 1.8), the
+//! wave-2 close stills (W2-55, W2-57) and the wave-3 UI scenes (W3-27).
 //!
 //! The recipes in this file stage feature state through
 //! `Game::apply(&Command)`; the `staging()` seam and the other non-command
 //! `Game` mutators (`deploy`, `set_paused`, `sell_item`, ...) appear here
 //! only inside top-level `entitle_*` helpers (the start country, coins,
-//! experience, earlier stage clears, inventory grants, and the boss-phase
-//! clock and wound);
+//! experience, earlier stage clears, inventory grants, the boss-phase
+//! clock and wound, liberated countries, an outbreak, a run's drops and the
+//! final boss at one hit point);
 //! `repo_checks::production_fixtures_stage_features_through_commands`
 //! enforces it for this file only. One exception, sanctioned by
 //! design-qa-captures (operations-observer row): `prepare_operations_observer`
@@ -88,7 +89,7 @@ const SHOT_TICK_CAP: u32 = 60;
 /// The first turret shot comes within the stage's first ten seconds.
 const TURRET_SHOT_TICK_CAP: u32 = 600;
 
-/// Stages a wave-1 scene; false when `screen` is not one of them.
+/// Stages a production-pass scene; false when `screen` is not one of them.
 pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> bool {
     match screen {
         "results-defeat" => prepare_results_defeat(f),
@@ -99,6 +100,12 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "operations-observer" => prepare_operations_observer(f),
         "boss-phase" => prepare_boss_phase(f),
         "spitter-windup" => prepare_spitter_windup(f),
+        "upgrades" => prepare_upgrades(f),
+        "camp-home" => prepare_camp_home(f),
+        "briefing-recruit" => prepare_briefing_recruit(f),
+        "equipment-autosell" => prepare_equipment_autosell(f),
+        "results-liberation-recruit" => prepare_results_liberation_recruit(f),
+        "takeover-battle" => prepare_takeover_battle(f),
         _ => {
             let Some(&(_, class, item)) = WEAPON_CLASS_SCENES
                 .iter()
@@ -198,6 +205,59 @@ fn entitle_found(
         .add_item_with_quality(definition, level, quality)
         .expect("explicit review inventory grant")
 }
+/// Countries marked liberated, as `fixtures::prepare_operations` marks them:
+/// every stage cleared.
+fn entitle_liberated(f: &mut FrontendParts, countries: &[&str]) {
+    for id in countries {
+        let stages = world().country(id).expect("a world country").level_count();
+        let campaign = f.game.staging().campaign();
+        if !campaign.world.cleared.iter().any(|c| c == id) {
+            campaign.world.cleared.push((*id).into());
+        }
+        campaign.world.country_levels.insert((*id).into(), stages);
+    }
+}
+/// An active outbreak in liberated `country`, by the strategy layer's own
+/// rule (its strength is the draw the world clock would make).
+fn entitle_outbreak(f: &mut FrontendParts, country: &str) {
+    let (strategy, campaign) = f.game.staging().strategy_and_campaign();
+    strategy
+        .trigger_outbreak(campaign, country)
+        .expect("explicit review outbreak");
+}
+/// One drop of catalogue item `definition` at `quality` in the live main
+/// run, banked as the drop site banks it: the stash item, the run's drop
+/// ids, its loot count and its quality counts.
+fn entitle_drop(f: &mut FrontendParts, definition: usize, quality: Quality) -> u64 {
+    let id = entitle_found(f, definition, 1, Some(quality));
+    let a = f.game.staging().attempt().expect("a live defense");
+    a.drop_ids.push(id);
+    a.loot += 1;
+    a.loot_quality_counts[quality] += 1;
+    id
+}
+/// The live stage's boss at one hit point in mid-field, as
+/// `fixtures::prepare_journey_victory` stages it; returns where to aim. The
+/// kill and its settlement are the core's.
+fn entitle_dying_boss(f: &mut FrontendParts) -> [f32; 2] {
+    let mut a = f
+        .game
+        .staging()
+        .attempt_slot()
+        .take()
+        .expect("a live defense");
+    a.boss_spawned = true;
+    let lane = a.lane_count / 2;
+    f.game
+        .spawn_enemy(&mut a, horde_core::content::EnemyKind::Brute, lane, true);
+    let target = a.enemies.last_mut().expect("the boss");
+    target.x = a.width_yards * 0.55;
+    target.hp = 1;
+    target.armor = 0;
+    let aim = [target.x, target.y()];
+    *f.game.staging().attempt_slot() = Some(a);
+    aim
+}
 
 // ----- commands -----
 
@@ -223,6 +283,29 @@ fn learn(f: &mut FrontendParts, id: &str) {
         entitle_coins(f, price);
     }
     command(f, Command::BuySkillNode(id.into()));
+}
+/// Buys the skill node that unlocks `feature`.
+fn learn_feature(f: &mut FrontendParts, feature: CampaignFeature) {
+    let node = skills()
+        .nodes
+        .iter()
+        .find(|node| {
+            node.effects
+                .iter()
+                .any(|effect| matches!(effect, SkillEffect::FeatureUnlock(f) if *f == feature))
+        })
+        .map(|node| node.id.clone())
+        .unwrap_or_else(|| panic!("a {feature:?} node"));
+    learn(f, &node);
+}
+/// Takes the first recruit offer of liberated `country` through
+/// `Command::Recruit`, paid with exactly its entitled price.
+fn recruit(f: &mut FrontendParts, country: &str) -> u64 {
+    entitle_coins(f, f.game.campaign().recruit_price());
+    let CommandOutcome::Id(id) = command(f, Command::Recruit(country.into())) else {
+        panic!("Recruit answers the recruit's id");
+    };
+    id
 }
 /// Deploys `stage` of the active country and leaves the battle paused, with
 /// the controls a fresh deployment resets to.
@@ -529,10 +612,6 @@ fn prepare_operations_observer(f: &mut FrontendParts) {
 /// quality (as quality-armory stages them), then the rule "sell below
 /// Uncommon" stored through `Command::SetAutoSell`. Returns each drop's id
 /// with its quality, in `Quality::ALL` order.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the equipment-autosell scene registers in wave 3")
-)]
 pub(in crate::ui::review) fn stage_equipment_autosell(
     f: &mut FrontendParts,
 ) -> Vec<(Quality, u64)> {
@@ -562,32 +641,190 @@ pub(in crate::ui::review) fn stage_equipment_autosell(
 /// clears, the Recruitment node bought, one recruit taken through
 /// `Command::Recruit` and chosen through `Command::SetNextDefender`. Returns
 /// the recruit's id.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the briefing-recruit scene registers in wave 3")
-)]
 pub(in crate::ui::review) fn stage_briefing_recruit(f: &mut FrontendParts) -> u64 {
     entitle_start(f, "DEU");
     let stages = world().country("DEU").expect("Germany").level_count();
     entitle_clears(f, stages);
-    let recruitment = skills()
-        .nodes
-        .iter()
-        .find(|node| {
-            node.effects.iter().any(|effect| {
-                matches!(
-                    effect,
-                    SkillEffect::FeatureUnlock(CampaignFeature::Recruitment)
-                )
-            })
-        })
-        .map(|node| node.id.clone())
-        .expect("a Recruitment node");
-    learn(f, &recruitment);
-    entitle_coins(f, f.game.campaign().recruit_price());
-    let CommandOutcome::Id(id) = command(f, Command::Recruit("DEU".into())) else {
-        panic!("Recruit answers the recruit's id");
-    };
+    learn_feature(f, CampaignFeature::Recruitment);
+    let id = recruit(f, "DEU");
     command(f, Command::SetNextDefender(DefenderId::Recruit(id)));
     id
+}
+
+// ----- wave-3 UI scenes (design-qa-captures 1.8 and "Wave 3", W3-27) -----
+
+/// The next front of the wave-3 scenes that need one: Germany's neighbour,
+/// chosen through `Command::SelectCountry` (which never deploys).
+pub(in crate::ui::review) const SECOND_FRONT: &str = "POL";
+/// Where the camp-home expedition fights.
+pub(in crate::ui::review) const EXPEDITION_FRONT: &str = "CZE";
+/// The liberated country with the camp-home outbreak.
+pub(in crate::ui::review) const OUTBREAK_COUNTRY: &str = "FRA";
+/// A journey round that has not settled after 5 minutes withdraws.
+const UPGRADES_TICK_CAP: u32 = 60 * 300;
+/// The camp-home expedition fights for twenty seconds before the still.
+const EXPEDITION_TICKS: u32 = 60 * 20;
+
+/// The upgrades home after a first round: the journey-upgrades round (a real
+/// stage-0 defense played with the smoke input, withdrawn if it outlasts
+/// `UPGRADES_TICK_CAP`), then the one route to the upgrades,
+/// `UiCtx::open_upgrades`. Until W3-03 splits `Screen::Upgrades` off, that
+/// route shows the shared Results screen; the scene follows the route.
+fn prepare_upgrades(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    deploy(f, 0, Mode::Personal);
+    command(f, Command::SetPaused(false));
+    for _ in 0..UPGRADES_TICK_CAP {
+        if f.game.attempt().is_none() {
+            break;
+        }
+        let input = horde_core::sim::smoke_input(&f.game);
+        f.game.tick(input);
+    }
+    if f.game.attempt().is_some() {
+        command(f, Command::Withdraw);
+    }
+    pause(f);
+    f.screen = Screen::Camp;
+    f.act(|c| {
+        c.focus_next_upgrade();
+        c.open_upgrades();
+    });
+}
+
+/// Camp home with everything it lists: Mara met, two recruits (one guarding
+/// Germany, one on a live expedition), an outbreak in a liberated country
+/// and the next front chosen. Orders go through commands; the liberations
+/// and the outbreak are entitlements.
+fn prepare_camp_home(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    entitle_liberated(f, &["DEU", OUTBREAK_COUNTRY, "CHE", "AUT"]);
+    for feature in [
+        CampaignFeature::Companion,
+        CampaignFeature::Recruitment,
+        CampaignFeature::Parallel,
+        CampaignFeature::Operations,
+    ] {
+        learn_feature(f, feature);
+    }
+    let guard = recruit(f, "DEU");
+    let scout = recruit(f, OUTBREAK_COUNTRY);
+    command(
+        f,
+        Command::AssignGuard {
+            id: guard,
+            country: "DEU".into(),
+        },
+    );
+    command(
+        f,
+        Command::DeploySurvivor {
+            id: scout,
+            country: EXPEDITION_FRONT.into(),
+            stage: 0,
+        },
+    );
+    command(f, Command::SetPaused(false));
+    for _ in 0..EXPEDITION_TICKS {
+        f.game.tick(Input::default());
+    }
+    entitle_outbreak(f, OUTBREAK_COUNTRY);
+    command(f, Command::SelectCountry(SECOND_FRONT.into()));
+    pause(f);
+    f.campaign.selected_country = SECOND_FRONT.into();
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Home;
+}
+
+/// The briefing of the next front with the recruit chosen to defend it.
+fn prepare_briefing_recruit(f: &mut FrontendParts) {
+    let recruit = stage_briefing_recruit(f);
+    command(f, Command::SelectCountry(SECOND_FRONT.into()));
+    assert_eq!(
+        f.game.next_defender(),
+        DefenderId::Recruit(recruit),
+        "choosing the front keeps the chosen defender"
+    );
+    pause(f);
+    f.screen = Screen::Camp;
+    f.act(|c| c.open_briefing());
+}
+
+/// The Equipment page with the Auto-sell panel open on the staged rule.
+fn prepare_equipment_autosell(f: &mut FrontendParts) {
+    let drops = stage_equipment_autosell(f);
+    pause(f);
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Armory;
+    f.armory.sort = crate::ui::armory::ArmorySort::Quality;
+    f.armory.selected_item = drops.last().map(|(_, id)| *id);
+    f.armory.reveal_auto_sell = true;
+}
+
+/// The Results of the victory that liberates Germany, with the auto-sell
+/// rule stored before the final win and the Recruitment node bought on the
+/// Results screen (the node needs a liberated country, so a first country
+/// cannot buy it earlier): the liberation block offers "Recruit from
+/// Germany" and the loot block lists what the settlement auto-sold. The
+/// final stage is really deployed; one drop of every quality and the boss at
+/// one hit point are entitlements, and the kill, the settlement and its
+/// sales are the core's.
+fn prepare_results_liberation_recruit(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    command(
+        f,
+        Command::SetAutoSell(AutoSellRule {
+            enabled: true,
+            sell_below: Quality::Uncommon,
+            keep_upgrades: false,
+            ..AutoSellRule::default()
+        }),
+    );
+    let last = world().country("DEU").expect("Germany").level_count() - 1;
+    entitle_clears(f, last);
+    deploy(f, last, Mode::Personal);
+    let definition = content()
+        .items
+        .iter()
+        .position(|item| item.slot == Slot::Ranged && item.tier == 1)
+        .expect("a tier-1 ranged item");
+    for quality in Quality::ALL {
+        entitle_drop(f, definition, quality);
+    }
+    let aim = entitle_dying_boss(f);
+    command(f, Command::SetPaused(false));
+    f.game.tick(Input {
+        fire: true,
+        aim,
+        ..Input::default()
+    });
+    assert!(
+        f.game.attempt().is_none(),
+        "the boss kill settles the stage"
+    );
+    let report = f.game.last_result().expect("settled report");
+    assert_eq!(report.outcome, Outcome::Victory);
+    assert!(report.country_freed, "the last stage liberates Germany");
+    pause(f);
+    learn_feature(f, CampaignFeature::Recruitment);
+    entitle_coins(f, f.game.campaign().recruit_price());
+    f.act(|c| c.focus_next_upgrade());
+    f.screen = Screen::Results;
+}
+
+/// A recruit holding the main defense: chosen through `SetNextDefender`,
+/// deployed on the next front through `BeginDefense`, paused before the
+/// first tick.
+fn prepare_takeover_battle(f: &mut FrontendParts) {
+    let recruit = stage_briefing_recruit(f);
+    command(f, Command::SelectCountry(SECOND_FRONT.into()));
+    command(f, Command::BeginDefense { stage: 0 });
+    pause(f);
+    let a = f.game.attempt().expect("the takeover deployed");
+    assert_eq!(a.defender(), DefenderId::Recruit(recruit));
+    f.battle.aim = [a.width_yards * 0.5, a.defender_position()[1]];
+    f.campaign.selected_country = SECOND_FRONT.into();
+    f.campaign.stage = 0;
+    f.campaign.mode = Mode::Npc;
+    f.screen = Screen::Battle;
 }

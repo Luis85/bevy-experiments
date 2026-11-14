@@ -120,6 +120,10 @@ pub(crate) struct ArmoryUi {
     pub(super) pending_sale: Option<u64>,
     pub(super) preset_name: String,
     pub(super) sell_confirm: bool,
+    /// Open the Auto-sell panel and scroll it into view on the next
+    /// Equipment frame, then clear: set by a route that leads to the panel
+    /// (the equipment-autosell review scene).
+    pub(super) reveal_auto_sell: bool,
 }
 impl Default for ArmoryUi {
     fn default() -> Self {
@@ -132,6 +136,7 @@ impl Default for ArmoryUi {
             pending_sale: None,
             preset_name: "Field loadout".into(),
             sell_confirm: false,
+            reveal_auto_sell: false,
         }
     }
 }

@@ -268,6 +268,14 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("skills-firearms", Screen::Results, Some(Tab::Skills)),
     // W2-57 (CF-2-04).
     ("spitter-windup", Screen::Battle, None),
+    // Wave-3 UI scenes (W3-27). `upgrades` follows `open_upgrades`: the
+    // shared Results screen until W3-03 lands `Screen::Upgrades`.
+    ("upgrades", Screen::Results, None),
+    ("camp-home", Screen::Camp, Some(Tab::Home)),
+    ("briefing-recruit", Screen::Camp, Some(Tab::Briefing)),
+    ("equipment-autosell", Screen::Camp, Some(Tab::Armory)),
+    ("results-liberation-recruit", Screen::Results, None),
+    ("takeover-battle", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -294,23 +302,33 @@ fn one_frame(f: &mut FrontendParts) -> egui::FullOutput {
 /// [`one_frame`], also returning the context it drew in (its primary
 /// registry holds the frame's primaries).
 fn one_frame_with_context(f: &mut FrontendParts) -> (egui::Context, egui::FullOutput) {
+    frames_with_context(f, 1)
+}
+
+/// `frames` headless 1440x900 frames on one context, returning the last: a
+/// modal paints from its second frame (the first only sizes it).
+fn frames_with_context(f: &mut FrontendParts, frames: usize) -> (egui::Context, egui::FullOutput) {
     let ctx = egui::Context::default();
     crate::settings::install_font(&ctx);
     let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
     warmup.textures_delta.clear();
-    f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
-    let mut output = ctx.run_ui(
-        egui::RawInput {
-            screen_rect: Some(egui::Rect::from_min_size(
-                egui::Pos2::ZERO,
-                egui::vec2(1440.0, 900.0),
-            )),
-            ..egui::RawInput::default()
-        },
-        |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
-    );
-    output.textures_delta.clear();
-    (ctx, output)
+    let mut last = None;
+    for _ in 0..frames.max(1) {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1440.0, 900.0),
+                )),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        output.textures_delta.clear();
+        last = Some(output);
+    }
+    (ctx, last.expect("at least one frame"))
 }
 
 /// Every still on `screens` prepares to its EXPECTED screen and tab, draws one
@@ -1603,4 +1621,405 @@ fn skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes() {
             layout.canvas
         );
     }
+}
+
+// ----- Wave-3 UI scenes (design-qa-captures 1.8 and "Wave 3", W3-27) -----
+
+/// Every painted text run of the frame.
+fn painted_text(output: &egui::FullOutput) -> Vec<String> {
+    fn walk(shape: &egui::epaint::Shape, out: &mut Vec<String>) {
+        match shape {
+            egui::epaint::Shape::Text(text) => out.push(text.galley.text().to_owned()),
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for clipped in &output.shapes {
+        walk(&clipped.shape, &mut out);
+    }
+    out
+}
+
+/// The labels of the last frame's primaries on `surface`, in draw order.
+fn primaries_on(ctx: &egui::Context, surface: crate::ui::Surface) -> Vec<String> {
+    crate::ui::frame_primaries(ctx)
+        .into_iter()
+        .filter(|record| record.surface == surface)
+        .map(|record| record.label)
+        .collect()
+}
+
+/// The wave-3 scenes are registered stills with their owners and "before"
+/// scenes (design-qa-captures 1.8).
+#[test]
+fn wave3_scenes_are_registered_stills() {
+    for (name, owner, proxy) in [
+        ("upgrades", "ux-flow", "journey-upgrades"),
+        ("camp-home", "ux-flow", "active-camp"),
+        ("briefing-recruit", "campaign-defenders", "briefing-npc"),
+        ("equipment-autosell", "loot-economy", "quality-armory"),
+        (
+            "results-liberation-recruit",
+            "campaign-defenders",
+            "journey-liberated",
+        ),
+        ("takeover-battle", "campaign-defenders", "npc"),
+    ] {
+        let scene = review_scenes::REVIEW_SCENES
+            .iter()
+            .find(|scene| scene.name == name)
+            .unwrap_or_else(|| panic!("{name} is not registered"));
+        assert_eq!(scene.kind, review_scenes::SceneKind::Still, "{name}");
+        assert_eq!(
+            (scene.owner, scene.before_proxy, scene.since_wave),
+            (owner, Some(proxy), 3),
+            "{name}"
+        );
+    }
+}
+
+/// The upgrades scene opens the upgrades by their one route
+/// (`UiCtx::open_upgrades`) after a real settled first round, focused on the
+/// recommended upgrade, and shows exactly one amber primary.
+///
+/// W3-03 has not landed: there is no `Screen::Upgrades`, so the route still
+/// shows the shared Results screen and the primary is its continue label.
+/// When W3-03 retargets `open_upgrades`, this test and the `upgrades`
+/// EXPECTED row move to `Screen::Upgrades`, and the primary becomes
+/// "Back to battle" (loop map, plan 3.2), registered as the scene's
+/// `primary`.
+#[test]
+fn upgrades_fixture_has_one_amber_primary() {
+    let mut f = staged("upgrades");
+    assert!(f.screen == Screen::Results, "staged {:?}", f.screen);
+    assert!(f.game.attempt().is_none(), "the round settled");
+    assert_eq!(f.game.campaign().run_history.len(), 1, "one real round");
+    let report = f.game.last_result().expect("a settled report");
+    assert_eq!(
+        (report.country_id.as_deref(), report.stage),
+        (Some("DEU"), 0)
+    );
+    assert!(
+        f.campaign.improvement_focus.is_some(),
+        "the tree opens on the recommended upgrade"
+    );
+    assert!(f.game.global_paused());
+    let (ctx, _) = one_frame_with_context(&mut f);
+    assert_eq!(
+        primaries_on(&ctx, crate::ui::Surface::Screen),
+        [UPGRADES_PRIMARY_BEFORE_W3_03],
+        "one amber primary: today's continue label (W3-03: \"Back to battle\")"
+    );
+}
+/// The upgrades scene's amber primary until W3-03 lands.
+const UPGRADES_PRIMARY_BEFORE_W3_03: &str = "Try again";
+
+/// Camp home lists what the scene stages: Mara and two recruits (a guard and
+/// one on a live expedition), an outbreak alert, the next front, and the
+/// one amber "Go to briefing".
+#[test]
+fn camp_home_fixture_lists_roster_and_go_to_briefing() {
+    use horde_core::{
+        defenders::DefenderId,
+        skill_catalog::CampaignFeature,
+        strategy::{OutbreakOutcome, RecruitStatus},
+    };
+    let mut f = staged("camp-home");
+    assert!(f.screen == Screen::Camp, "staged {:?}", f.screen);
+    assert_eq!(f.nav.tab, Tab::Home);
+    assert!(f.game.attempt().is_none(), "between defenses");
+    assert!(f.game.global_paused());
+    assert!(f.game.campaign().has_feature(CampaignFeature::Companion));
+    let statuses: Vec<RecruitStatus> = f.game.strategy().roster.iter().map(|r| r.status).collect();
+    assert_eq!(
+        statuses,
+        [RecruitStatus::Guarding, RecruitStatus::Deployed],
+        "a guard and an expedition recruit"
+    );
+    let live = f
+        .game
+        .battles()
+        .iter()
+        .filter(|b| !b.settled && b.game().attempt().is_some())
+        .count();
+    assert_eq!(live, 1, "one live expedition");
+    let outbreaks: Vec<&str> = f
+        .game
+        .strategy()
+        .outbreaks
+        .iter()
+        .filter(|o| o.outcome == OutbreakOutcome::Active)
+        .map(|o| o.country_id.as_str())
+        .collect();
+    assert_eq!(outbreaks, ["FRA"]);
+    assert_eq!(
+        f.game.campaign().world.active.as_deref(),
+        Some("POL"),
+        "the next front is chosen"
+    );
+    assert_eq!(f.game.next_defender(), DefenderId::Player);
+
+    let names: Vec<String> = f
+        .game
+        .available_defenders()
+        .into_iter()
+        .map(|option| option.card.name)
+        .collect();
+    assert_eq!(names.len(), 4, "you, Mara and the two recruits: {names:?}");
+    let (ctx, output) = one_frame_with_context(&mut f);
+    let text = painted_text(&output);
+    for name in &names {
+        assert!(
+            text.iter().any(|run| run == name),
+            "the roster lists {name}: {text:?}"
+        );
+    }
+    let next = format!("Poland · Defense 1 · {}", names[0]);
+    assert_eq!(crate::ui::tests::text_count(&output, &next), 1, "{text:?}");
+    assert!(
+        text.iter()
+            .any(|run| run.starts_with("France · ") && run.ends_with("s left")),
+        "the outbreak alert names France: {text:?}"
+    );
+    assert_eq!(
+        primaries_on(&ctx, crate::ui::Surface::Screen),
+        ["Go to briefing"]
+    );
+}
+
+/// The briefing of the next front with the staged recruit chosen through
+/// `SetNextDefender`: the one amber primary deploys the recruit by name.
+#[test]
+fn briefing_recruit_fixture_selects_next_defender() {
+    use horde_core::defenders::DefenderId;
+    let mut f = staged("briefing-recruit");
+    assert!(f.screen == Screen::Camp, "staged {:?}", f.screen);
+    assert_eq!(f.nav.tab, Tab::Briefing);
+    assert!(f.game.attempt().is_none(), "chosen between defenses");
+    let DefenderId::Recruit(id) = f.game.next_defender() else {
+        panic!("the next defender is {:?}", f.game.next_defender());
+    };
+    assert_eq!(
+        f.game.campaign().next_defender,
+        Some(DefenderId::Recruit(id))
+    );
+    assert_eq!(f.game.campaign().world.active.as_deref(), Some("POL"));
+    assert_eq!(f.campaign.stage, 0, "the front's first defense");
+    let card = f
+        .game
+        .defender_card(DefenderId::Recruit(id))
+        .expect("the recruit's card");
+    let deploy = format!("Deploy {}", card.name);
+    let scene = review_scenes::REVIEW_SCENES
+        .iter()
+        .find(|scene| scene.name == "briefing-recruit")
+        .expect("briefing-recruit is registered");
+    assert_eq!(scene.primary, Some(deploy.as_str()), "the registry primary");
+    let (ctx, output) = one_frame_with_context(&mut f);
+    assert_eq!(primaries_on(&ctx, crate::ui::Surface::Screen), [deploy]);
+    let line = format!("Poland · Defense 1 · {}", card.name);
+    assert_eq!(
+        crate::ui::tests::text_count(&output, &line),
+        1,
+        "{:?}",
+        painted_text(&output)
+    );
+}
+
+/// The Equipment page opens with the Auto-sell panel revealed on the staged
+/// rule (sell below Uncommon), and its preview counts only the Poor and the
+/// Common drop of the six, with core's coins.
+#[test]
+fn equipment_autosell_preview_counts_only_below_uncommon() {
+    use horde_core::{quality::Quality, sim::AutoSellScope};
+    let mut f = staged("equipment-autosell");
+    assert!(f.screen == Screen::Camp, "staged {:?}", f.screen);
+    assert_eq!(f.nav.tab, Tab::Armory);
+    let rule = f.game.campaign().auto_sell;
+    assert!(rule.enabled);
+    assert_eq!(rule.sell_below, Quality::Uncommon);
+    let preview = f.game.auto_sell_preview(&rule, AutoSellScope::Stash);
+    assert_eq!(preview.count, 2, "Poor and Common");
+    let line = format!("Would sell 2 now · +{}", preview.coins);
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1440.0, 900.0));
+    // The reveal is one-shot: the first frame opens the panel and asks the
+    // page to scroll to it; from the second frame on it is on screen.
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    for frame in 0..3 {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        output.textures_delta.clear();
+        assert!(!f.armory.reveal_auto_sell, "the reveal is consumed");
+        if frame == 0 {
+            continue;
+        }
+        assert_eq!(
+            crate::ui::tests::text_count(&output, &line),
+            1,
+            "frame {frame}: the open panel shows {line:?}: {:?}",
+            painted_text(&output)
+        );
+        let bounds = text_bounds(&output, &line);
+        assert!(
+            bounds.iter().all(|rect| screen.contains_rect(*rect)),
+            "frame {frame}: the preview is on screen: {bounds:?}"
+        );
+    }
+}
+
+/// Results after the victory that liberated Germany, with the Recruitment
+/// node owned and the auto-sell rule stored before the win: the liberation
+/// block offers the recruit at core's price, the loot block lists what the
+/// settlement auto-sold, and the amber primary is "Choose next country".
+#[test]
+fn results_liberation_recruit_offers_recruit_from_germany() {
+    use horde_core::{quality::Quality, skill_catalog::CampaignFeature};
+    let mut f = staged("results-liberation-recruit");
+    assert!(f.screen == Screen::Results, "staged {:?}", f.screen);
+    assert!(f.game.attempt().is_none(), "the final stage settled");
+    let report = f.game.last_result().expect("a settled report").clone();
+    assert_eq!(report.outcome, horde_core::sim::Outcome::Victory);
+    assert!(report.country_freed, "Germany is liberated");
+    assert_eq!(report.country_id.as_deref(), Some("DEU"));
+    assert!(f.game.campaign().has_feature(CampaignFeature::Recruitment));
+    assert!(f.game.strategy().roster.is_empty(), "nobody recruited yet");
+    let offer = f
+        .game
+        .recruit_offer("DEU")
+        .expect("Germany offers a recruit");
+    assert!(
+        f.game.campaign().coins >= offer.price,
+        "the offer is affordable"
+    );
+    // Decision 6: strictly below Uncommon, so the Poor and the Common drop.
+    assert_eq!(report.auto_sold.count, 2, "{:?}", report.auto_sold);
+    for quality in Quality::ALL {
+        assert_eq!(
+            report.auto_sold.by_quality[quality],
+            u32::from(quality < Quality::Uncommon),
+            "{quality:?}"
+        );
+    }
+
+    let (ctx, output) = one_frame_with_context(&mut f);
+    let recruit = format!("Recruit from Germany · {} coins", offer.price);
+    assert_eq!(
+        crate::ui::tests::text_count(&output, &recruit),
+        1,
+        "{:?}",
+        painted_text(&output)
+    );
+    let auto_sold = format!(
+        "Auto-sold {} · +{}",
+        report.auto_sold.count, report.auto_sold.coins
+    );
+    assert_eq!(
+        crate::ui::tests::text_count(&output, &auto_sold),
+        1,
+        "{:?}",
+        painted_text(&output)
+    );
+    assert_eq!(
+        primaries_on(&ctx, crate::ui::Surface::Screen),
+        ["Choose next country"]
+    );
+}
+
+/// The takeover battle is the recruit's: the main attempt's defender is the
+/// recruit chosen through `SetNextDefender`, the HUD names the recruit, and
+/// the field draws the attempt's stamped appearance (the recruit's own, not
+/// the Female rig `Mode::Npc` meant before W3-17).
+#[test]
+fn takeover_battle_draws_the_recruit_not_mara() {
+    use horde_core::{content::Mode, defenders::DefenderId, survivors::Appearance};
+    let mut f = staged("takeover-battle");
+    assert!(f.screen == Screen::Battle, "staged {:?}", f.screen);
+    let a = f.game.attempt().expect("a live takeover");
+    let DefenderId::Recruit(_) = a.defender() else {
+        panic!("the defender is {:?}", a.defender());
+    };
+    assert_eq!(a.mode, Mode::Npc);
+    assert!(a.paused && a.tick == 0, "paused before the first tick");
+    assert_eq!(a.country_id.as_deref(), Some("POL"));
+    let card = f.game.active_defender().expect("the defending recruit");
+    assert_eq!(card.id, a.defender());
+    assert_ne!(card.hud_name, "MARA");
+    assert_eq!(
+        card.appearance,
+        Appearance::Male,
+        "the staged recruit is not the Female default"
+    );
+    assert_eq!(a.defender_appearance(), card.appearance);
+    let hp = format!("{} · HP {} / {}", card.hud_name, a.hp.max(0), a.max_hp);
+
+    let all_meshes = |output: &egui::FullOutput| -> Vec<egui::Mesh> {
+        let mut clips: Vec<egui::Rect> = Vec::new();
+        for clipped in &output.shapes {
+            if !clips.contains(&clipped.clip_rect) {
+                clips.push(clipped.clip_rect);
+            }
+        }
+        clips
+            .into_iter()
+            .flat_map(|clip| managed_meshes(output, clip))
+            .collect()
+    };
+    let output = one_frame(&mut f);
+    assert_eq!(
+        crate::ui::tests::text_count(&output, &hp),
+        1,
+        "the HUD names the recruit: {:?}",
+        painted_text(&output)
+    );
+    assert!(
+        !painted_text(&output).iter().any(|run| run.contains("MARA")),
+        "Mara is not on this field"
+    );
+    let own = all_meshes(&output);
+    assert!(!own.is_empty(), "the rig draws from its source sheets");
+    // Stamping the other appearance changes the drawn rig: the field reads
+    // the attempt's stamp, not the mode.
+    f.game.attempt_mut().unwrap().profile.appearance = Appearance::Female;
+    let output = one_frame(&mut f);
+    // `assert!`, not `assert_ne!`: a failure must not dump the meshes.
+    assert!(
+        all_meshes(&output) != own,
+        "the field draws the attempt's stamped appearance"
+    );
+}
+
+/// The failed manual save opens the storage modal (W3-06): the modal holds
+/// the save's intent and the OS error, and its one primary is "Retry".
+#[test]
+fn save_error_fixture_opens_retry_modal() {
+    use crate::runner::SaveIntent;
+    use crate::ui::modal::{AppModal, StorageError};
+    let mut f = staged("save-error");
+    assert_eq!(
+        f.status.modal,
+        Some(AppModal::Storage(StorageError::Save {
+            intent: SaveIntent::Manual,
+            error: "Access is denied. (os error 5)".into(),
+        }))
+    );
+    let (ctx, output) = frames_with_context(&mut f, 2);
+    assert_eq!(primaries_on(&ctx, crate::ui::Surface::Modal), ["Retry"]);
+    assert_eq!(crate::ui::tests::text_count(&output, "Retry"), 1);
+    assert!(
+        painted_text(&output)
+            .iter()
+            .any(|run| run.contains("Access is denied. (os error 5)")),
+        "the modal shows the OS error"
+    );
+    assert!(!f.paths.campaign().exists(), "no save was attempted");
 }
