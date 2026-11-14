@@ -322,18 +322,27 @@ pub const fn mix(cue: Cue) -> CueMix {
 
 /// The one calibration knob of the voice buses (Effects, UI and Music), in
 /// dB. It replaces the hidden x0.7 the effects bus used to apply.
-pub const MIX_CALIBRATION_DB: f32 = -3.1;
+///
+/// Calibrated by the loudness gate (A6-17, `tests/offline_mix.rs`): -2.0 dB
+/// is the most the dense battle's true peak allows with margin (0.88 against
+/// 0.95), and it keeps one voice at the maximum sliders under 0.75.
+pub const MIX_CALIBRATION_DB: f32 = -2.0;
 /// The calibration knob of the ambience loops, in dB.
-pub const AMBIENCE_CALIBRATION_DB: f32 = 0.0;
+///
+/// Calibrated by the loudness gate (A6-17). The level-0 battle is sparse (one
+/// pistol), and no music track is shipped, so the bed carries the integrated
+/// loudness of the reference mix; the voices cannot, because the dense battle
+/// bounds them by true peak.
+pub const AMBIENCE_CALIBRATION_DB: f32 = 11.2;
 
 /// The default slider values. `Settings::default()` in `horde_game` reads
 /// these, and the offline render gates the mix at them. They are the
-/// settings-version-2 targets (ruling S5); the calibration step may retune
-/// them in 0.05 steps against the loudness gate. The version 0 and 1 values
+/// settings-version-2 targets (ruling S5), retuned in 0.05 steps against the
+/// loudness gate by the calibration (A6-17: Atmosphere 0.5 to 0.8). The version 0 and 1 values
 /// stay in `horde_game::settings::defaults::WAVE1_*` for the migration.
 pub const DEFAULT_MASTER: f32 = 0.8;
 pub const DEFAULT_EFFECTS: f32 = 0.8;
-pub const DEFAULT_AMBIENCE: f32 = 0.5;
+pub const DEFAULT_AMBIENCE: f32 = 0.8;
 /// "Interface sounds" and "Music & stingers" keep the level they had before
 /// the calibrated mix.
 pub const DEFAULT_UI: f32 = 0.7;

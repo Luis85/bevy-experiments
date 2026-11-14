@@ -85,7 +85,8 @@ fn bus_gains_multiply_master_slider_and_calibration() {
     assert_eq!(wild.bus_gain(Bus::Ui), 0.0);
     assert_eq!(wild.bus_gain(Bus::Music), calibration);
     assert_eq!(wild.bus_gain(Bus::Atmosphere), 0.0);
-    // The settings-version-2 targets (ruling S5). Interface sounds and
+    // The settings-version-2 targets (ruling S5), Atmosphere retuned by the
+    // loudness gate (A6-17). Interface sounds and
     // Music & stingers keep the 0.7 they had on the effects bus before it.
     assert_eq!(
         (
@@ -93,7 +94,7 @@ fn bus_gains_multiply_master_slider_and_calibration() {
             mix::DEFAULT_EFFECTS,
             mix::DEFAULT_AMBIENCE
         ),
-        (0.8, 0.8, 0.5)
+        (0.8, 0.8, 0.8)
     );
     assert_eq!((mix::DEFAULT_UI, mix::DEFAULT_MUSIC), (0.7, 0.7));
     assert_eq!(

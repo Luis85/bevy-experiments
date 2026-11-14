@@ -100,9 +100,9 @@ fn mix_rows_keep_the_v1_numbers() {
             "{cue:?}"
         );
     }
-    // The hidden x0.7 on the effects bus is now the calibration knob.
-    assert_eq!(MIX_CALIBRATION_DB, -3.1);
-    assert!((mix::calibration_gain() - 0.7).abs() < 0.0002);
+    // The calibration knobs, as the loudness gate set them (A6-17).
+    assert_eq!(MIX_CALIBRATION_DB, -2.0);
+    assert!((mix::calibration_gain() - 0.7943).abs() < 0.0002);
     assert_eq!(
         [
             CONTEXT_GAIN.menu,
@@ -112,8 +112,8 @@ fn mix_rows_keep_the_v1_numbers() {
         ],
         [0.55, 0.75, 1.0, 0.35]
     );
-    assert_eq!(mix::AMBIENCE_CALIBRATION_DB, 0.0);
-    assert_eq!(mix::ambience_calibration_gain(), 1.0);
+    assert_eq!(mix::AMBIENCE_CALIBRATION_DB, 11.2);
+    assert!((mix::ambience_calibration_gain() - 3.6308).abs() < 0.0002);
 }
 
 #[test]

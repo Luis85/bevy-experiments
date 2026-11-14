@@ -1228,9 +1228,9 @@ Still failing, all wave-4 work (W4-04..n, W4-p, W4-c): `goal5_tiers_affordable_3
 
 | Measure | Before (A6-04) | After (A6-17) | Gate |
 |---|---|---|---|
-| 60 s reference mix, integrated LUFS (both themes) | -47.0 (stage-1) / -42.4 (rain); the model predicted about -38..-42 | | -23 ±2 |
-| 60 s dense battle true peak (FS) | 0.080 | | ≤ 0.95 |
-| Runtime master limiter needed (R3) | n/a | yes / no | only if TP > 0.95 |
+| 60 s reference mix, integrated LUFS (both themes) | -47.0 (stage-1) / -42.4 (rain); the model predicted about -38..-42 | -24.2 (stage-1) / -22.9 (rain) | -23 ±2 |
+| 60 s dense battle true peak (FS) | 0.080 | 0.875 | ≤ 0.95 |
+| Runtime master limiter needed (R3) | n/a | no (measured TP 0.875 dense, 0.405 reference) | only if TP > 0.95 |
 
 A6-04 "before" (2026-11-13): `cargo test -p horde_audio --test offline_mix -- --ignored --nocapture`, the offline render (`horde_audio::render`) of today's assets under today's policy (the v1 mix rows, calibration -3.1 dB, 6 voices, 2 starts per frame, variant rotation, dual mono) at the default sliders 0.6 / 0.7 / 0.15, metered by `horde_audio::meter` at 44.1 kHz. The scene is 8 s Camp with two Confirm cues, 44 s of the seed-1 Personal level-0 battle under `smoke_input`, and 8 s Results on the paused bed with the victory stinger; the loot reveal and the coin batch are not in it, because those cues do not exist before A6-14. The stage-1 bed is DEU stage 0; rain is the same theme with rain weather.
 
@@ -1241,7 +1241,23 @@ A6-04 "before" (2026-11-13): `cargo test -p horde_audio --test offline_mix -- --
 | `dense_battle_60s` (`maximum_progression_render_fixture`) | -44.0 | -37.0 | -32.9 | 0.073 | 0.080 |
 | `max_sliders_60s` (stage-1, every slider 1.0) | -31.5 | -28.8 | -26.6 | 0.151 | 0.182 |
 
-`reference_mixed_60s_meets_loudness_gate` is red and ignored until A6-17: both themes are 19 to 24 LU under the gate. The stage-1 render reads 5 LU under the model's -42: the model's scripted battle was busier than the seed-1 level-0 battle, and the model is good to about 3 dB (design-audio section 14). `dense_battle_60s_true_peak_at_most_0_95` passes today (true peak 0.080, short-term max -37.0 against -14) and is ignored only for its length.
+`reference_mixed_60s_meets_loudness_gate` was red and ignored until A6-17: both themes are 19 to 24 LU under the gate. The stage-1 render reads 5 LU under the model's -42: the model's scripted battle was busier than the seed-1 level-0 battle, and the model is good to about 3 dB (design-audio section 14). `dense_battle_60s_true_peak_at_most_0_95` passes today (true peak 0.080, short-term max -37.0 against -14) and is ignored only for its length.
+
+A6-17 "after" (2026-11-14): the same command with `--include-ignored`, the shipped library (exporter v2, mastered) under the wave-6 policy at the default sliders 0.8 / 0.8 / 0.8 (Master / Combat effects / Atmosphere). The gate tests are green and no longer ignored; no runtime master limiter was added (R3).
+
+| Scene | Integrated (LUFS) | Short-term max | Momentary max | Sample peak (FS) | True peak (FS) |
+|---|---|---|---|---|---|
+| `reference_mixed_60s`, stage-1 | -24.2 | -21.5 | -19.1 | 0.390 | 0.405 |
+| `reference_mixed_60s`, rain | -22.9 | -20.5 | -19.6 | 0.380 | 0.399 |
+| `dense_battle_60s` | -23.1 | -21.6 | -19.1 | 0.823 | 0.875 |
+| `max_sliders_60s` (stage-1, every slider 1.0) | -20.3 | -17.6 | -15.2 | 0.609 | 0.632 |
+
+Before the calibration, with the wave-6 assets and policy (A6-16 tip): stage-1 -32.3, rain -29.0, dense -27.3 LUFS at true peak 0.805. What the calibration set, and why:
+- `MIX_CALIBRATION_DB` -3.1 to -2.0. The dense battle bounds the voice buses by true peak: its peaks are three or four transients that start on one frame (rifle, turret, impact, damage), 0.805 before the calibration. +1.1 dB leaves 0.875 against 0.95; one voice at the maximum sliders stays under 0.75.
+- `AMBIENCE_CALIBRATION_DB` 0 to +11.2 and the default Atmosphere slider 0.5 to 0.8 (+15.3 dB together). The level-0 battle is one pistol (voices alone read -31.2 LUFS, and at most +1.4 dB of voice gain fits under the dense peak), and no music track is shipped (FU-AUD-MUSIC), so the bed carries the integrated loudness of the reference mix. The loops at the maximum sliders stay under 0.57. The adapter (`atmosphere_audio::update_ambience`) now multiplies the calibration in; before, the knob existed only in the offline render.
+- Rain loop weight 0.38 to 0.10 (`SceneAmbience::from_theme`, `render::RAIN_WEIGHTS`). At 0.38 the rain bed read 9.3 LU over the dry bed, which no single bed level fits into a 4 LU window; at 0.10 it reads 1.3 LU over.
+
+**Risk for the listening pass (closing phase).** The bed now reads about 4 LU over the level-0 gunfire in integrated terms (gunfire still peaks higher: 0.39 against a bed peak near 0.2). If the listening pass finds the bed too forward, the alternatives are a music track (fills the gate from the Music bus) or more voice gain with the onset pile-up removed (a lower Effects start budget, or density gain applied at the start of a voice), not a quieter bed alone: that fails the gate. Themes other than stage-1 dry and rain (wind 0.40, cold 0.26, urban 0.18) are not gated.
 
 **FU-AUD-MUSIC (A6-15, follow-up).** 7 track slots deferred, no files, no AI music: every slot of `horde_audio::music::TRACKS` is `Track::Deferred` (decision 9; the user's chat decision is the approval record). The director, the Music bus, the "Music & stingers" slider and `Track::File` playback with its 2 s crossfade are in; a later track only fills a slot.
 

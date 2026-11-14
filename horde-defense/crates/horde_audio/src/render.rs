@@ -61,8 +61,10 @@ pub const CROSSFADE_SECONDS: f32 = 1.2;
 /// them. Pinned against the adapter by
 /// `reference_weights_match_scene_ambience` in `horde_game`.
 pub const REFERENCE_WEIGHTS: [f32; 6] = [0.28, 0.22, 0.0, 0.12, 0.0, 0.0];
-/// The same theme in rain.
-pub const RAIN_WEIGHTS: [f32; 6] = [0.28, 0.22, 0.0, 0.035, 0.38, 0.0];
+/// The same theme in rain. The rain loop is broadband and reads loud for its
+/// weight: at 0.10 the rain bed sits about 1.5 LU over the dry one (it was 9 LU
+/// over at 0.38), so both themes fit the loudness gate.
+pub const RAIN_WEIGHTS: [f32; 6] = [0.28, 0.22, 0.0, 0.035, 0.10, 0.0];
 
 /// The screen context the ambience follows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

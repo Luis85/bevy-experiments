@@ -3,10 +3,10 @@
 //! The render runs the shipped assets through the runtime's own decisions
 //! (`events::event_sound`, `select::select_sounds`, `select::CueGate`, the mix
 //! table) and the voice policy (`render::VoicePolicy`), and meters the
-//! result with `meter`. The gate tests are ignored and red until the mix is
-//! calibrated (A6-17); run them with
-//! `cargo test -p horde_audio --test offline_mix -- --ignored --nocapture`
-//! to print the numbers.
+//! result with `meter`. The gate tests run in the normal pass since the mix was
+//! calibrated (A6-17); run
+//! `cargo test -p horde_audio --test offline_mix -- --include-ignored --nocapture`
+//! to print the numbers, the logged max-slider render included.
 
 use horde_audio::{
     cue::Cue,
@@ -265,20 +265,20 @@ fn ambience_is_dual_mono_and_follows_the_slider_and_the_context() {
     assert_eq!(quiet.left[0], 0.0);
     let tail = 180 * FRAME_SAMPLES;
     assert!(rms(&quiet.left[tail..]) > 0.0);
-    // Twice the slider is twice the signal.
-    let loud = render::render(
+    // Half the slider is half the signal.
+    let soft = render::render(
         &library,
         &battle,
         &Scene {
             sliders: Sliders {
-                ambience: 2.0 * mix::DEFAULT_AMBIENCE,
+                ambience: 0.5 * mix::DEFAULT_AMBIENCE,
                 ..Sliders::DEFAULT
             },
             ..default_scene(REFERENCE_WEIGHTS)
         },
     );
-    let ratio = rms(&loud.left[tail..]) / rms(&quiet.left[tail..]);
-    assert!((ratio - 2.0).abs() < 1e-3, "{ratio}");
+    let ratio = rms(&soft.left[tail..]) / rms(&quiet.left[tail..]);
+    assert!((ratio - 0.5).abs() < 1e-3, "{ratio}");
     // A paused screen holds the loops at the paused share.
     let paused = render::render(
         &library,
@@ -345,7 +345,7 @@ fn render_10s_is_finite_and_audible() {
     assert!(loudness.true_peak <= 0.95, "{loudness:?}");
 }
 
-// ----- the gate (ignored: 60 s renders, red until A6-17) -----
+// ----- the gate (60 s renders; calibrated by A6-17) -----
 
 fn reference_render(weights: [f32; 6], sliders: Sliders) -> Stereo {
     let frames = render::reference_mixed_60s(&mut reference_battle());
@@ -365,7 +365,6 @@ fn reference_render(weights: [f32; 6], sliders: Sliders) -> Stereo {
 /// reads -23 +/-2 LUFS integrated with a true peak of at most 0.95 FS, in the
 /// stage-1 theme and in rain.
 #[test]
-#[ignore = "red until the mix is calibrated (A6-17); the BEFORE numbers are in the plan, section 9.3"]
 fn reference_mixed_60s_meets_loudness_gate() {
     let mut failures = Vec::new();
     for (theme, weights) in [("stage-1", REFERENCE_WEIGHTS), ("rain", RAIN_WEIGHTS)] {
@@ -386,7 +385,6 @@ fn reference_mixed_60s_meets_loudness_gate() {
 /// The dense battle holds its true peak under 0.95 FS and its short-term
 /// loudness under -14 LUFS. The integrated value is logged.
 #[test]
-#[ignore = "a 60 s render of the dense fixture; the closing phase and A6-17 run it"]
 fn dense_battle_60s_true_peak_at_most_0_95() {
     let frames = render::battle_frames(&mut dense_battle(), 3_600);
     let loudness =

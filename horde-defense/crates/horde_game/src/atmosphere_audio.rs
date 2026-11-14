@@ -118,7 +118,7 @@ impl SceneAmbience {
             } else {
                 0.0
             },
-            if rain { 0.38 } else { 0.0 },
+            if rain { 0.10 } else { 0.0 },
             if cold { 0.26 } else { 0.0 },
         ];
         normalize(&mut weights);
@@ -272,8 +272,11 @@ fn update_ambience(
     let duck = ducking.map_or(1.0, |ducking| {
         ducking.gains.duck[horde_audio::mix::Bus::Atmosphere as usize]
     });
+    // The mix's ambience calibration (`horde_audio::mix`, set by the loudness
+    // gate): the loops play at the level the offline render meters.
+    let calibration = horde_audio::mix::ambience_calibration_gain();
     for (layer, mut playback, sink) in &mut layers {
-        let volume = Volume::Linear(gains[layer.channel.index()] * duck);
+        let volume = Volume::Linear(gains[layer.channel.index()] * calibration * duck);
         // The component covers asynchronous asset/sink creation; the sink covers
         // already playing loops. No entity or decoder is recreated on a change.
         playback.volume = volume;
@@ -454,9 +457,14 @@ mod tests {
             }
             volumes
         };
-        assert_eq!(volumes(None), target.gains());
-        assert_eq!(volumes(Some(1.0)), target.gains());
-        assert_eq!(volumes(Some(0.5)), target.gains().map(|gain| gain * 0.5));
+        // The loops play at the mix's ambience calibration, as the offline
+        // loudness gate renders them (`Sliders::bus_gain(Bus::Atmosphere)`).
+        let calibration = horde_audio::mix::ambience_calibration_gain();
+        assert_ne!(calibration, 1.0);
+        let played = |duck: f32| target.gains().map(|gain| gain * calibration * duck);
+        assert_eq!(volumes(None), played(1.0));
+        assert_eq!(volumes(Some(1.0)), played(1.0));
+        assert_eq!(volumes(Some(0.5)), played(0.5));
     }
     #[test]
     fn paused_and_menu_profiles_duck_without_changing_settings() {
