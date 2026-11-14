@@ -208,9 +208,10 @@ fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     ui.checkbox(&mut settings.mono_audio, "Mono audio")
         .on_hover_text("Plays every sound centred, the same in both ears.");
 }
-/// The Controls row label of a binding. Pause is the battle's pause: the
-/// camp's world clock has its own key.
-fn binding_label(id: BindingId) -> &'static str {
+/// The Controls row label of a binding (this rebind table and the main
+/// menu's Controls list). Pause is the battle's pause: the camp's world
+/// clock has its own key.
+pub(super) fn binding_label(id: BindingId) -> &'static str {
     match id {
         BindingId::Core(Action::Pause) => "Pause (battle)",
         BindingId::Core(action) => action.name(),

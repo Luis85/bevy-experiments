@@ -3,7 +3,7 @@ use super::{Screen, UiCtx, muted, primary, status};
 use crate::{
     art::{self, AMBER, INK, MUTED, RED, TEXT},
     runner::{AppCommand, SaveIntent},
-    settings::Action,
+    settings::{self, BindingId, Settings},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Sense, pos2, vec2};
 use horde_core::{
@@ -12,6 +12,20 @@ use horde_core::{
 };
 
 const FOOTER_LINE: &str = "A BEVY EXPERIMENT  /  LOCAL CAMPAIGN  /  NO OFFLINE EARNINGS";
+
+/// The menu's Controls list: every binding, core rows first, with the
+/// Settings rebind table's label and its key (`settings::binding_text`, so
+/// an unbound action reads "Unbound").
+fn controls_rows(settings: &Settings) -> Vec<(&'static str, &str)> {
+    BindingId::all()
+        .map(|id| {
+            (
+                super::preferences::binding_label(id),
+                settings::binding_text(settings.binding(id)),
+            )
+        })
+        .collect()
+}
 
 fn title_galley(ui: &egui::Ui, width: f32) -> std::sync::Arc<egui::Galley> {
     let mut size = (width * 0.205).clamp(52.0, 88.0);
@@ -185,16 +199,16 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                         }
                         ui.add_space(10.0);
                         egui::CollapsingHeader::new("Controls").show(ui, |ui| {
-                            muted(
-                                ui,
-                                format!(
-                                    "{} fires. {} strikes a contact lane.\n{} reloads. {} pauses.",
-                                    f.settings.bindings[Action::Fire as usize],
-                                    f.settings.bindings[Action::Melee as usize],
-                                    f.settings.bindings[Action::Reload as usize],
-                                    f.settings.bindings[Action::Pause as usize]
-                                ),
-                            );
+                            egui::Grid::new("menu_controls")
+                                .num_columns(2)
+                                .spacing([16.0, 2.0])
+                                .show(ui, |ui| {
+                                    for (label, key) in controls_rows(f.settings) {
+                                        muted(ui, label);
+                                        muted(ui, key);
+                                        ui.end_row();
+                                    }
+                                });
                         });
                         let message = !f.status.message.is_empty()
                             && (!f.status.practice_profile || f.status.message_error);
@@ -497,6 +511,32 @@ mod tests {
                 "Menu content must not cover the survivor"
             );
         }
+    }
+    /// Closing: the menu's Controls list names all eight core bindings and
+    /// the two W3-10 extra ones (world clock, cycle attack) with the labels
+    /// and order of the Settings rebind table, and an unbound action reads
+    /// "Unbound".
+    #[test]
+    fn menu_controls_list_every_binding() {
+        let mut settings = settings::Settings::default();
+        assert_eq!(
+            controls_rows(&settings),
+            [
+                ("Fire", "Mouse1"),
+                ("Contact melee", "Mouse2"),
+                ("Reload", "R"),
+                ("Emergency aid", "1"),
+                ("Brace", "2"),
+                ("Construction", "B"),
+                ("Pause (battle)", "Escape"),
+                ("Toggle firing", "F"),
+                ("World clock (camp home)", "P"),
+                ("Cycle attack", "Q"),
+            ]
+        );
+        let cycle = settings::BindingId::Extra(settings::ExtraAction::CycleAttack);
+        settings.set_binding(cycle, String::new());
+        assert!(controls_rows(&settings).contains(&("Cycle attack", "Unbound")));
     }
     #[test]
     fn checkpoint_motion_changes_only_in_normal_mode_and_reduced_effects_are_static() {
