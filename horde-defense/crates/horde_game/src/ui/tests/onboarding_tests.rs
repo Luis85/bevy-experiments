@@ -92,8 +92,9 @@ fn unlock_callout_shows_once_and_survives_restart() {
         assert!(fully_visible(&output, "Got it"), "{target:?}");
         assert_eq!(h.screen_primaries(), before, "a callout is not a primary");
 
-        // The upgrade home shows it too.
-        f.screen = Screen::Results;
+        // Upgrades shows it too (W3-03: the camp row moved there with the
+        // tree; Results has no row and no callout).
+        f.screen = Screen::Upgrades;
         assert_eq!(callout_lines(&settle(&h, f)), [MARA], "{target:?}");
         f.screen = Screen::Camp;
 

@@ -2,7 +2,7 @@
 
 Each meaningful implemented screen or on-demand task has one Markdown file in [components](components/game.md), with type: View, stable kebab-case id, title, plain-ID parent, status and real source path/symbol. game is the sole root. Parent means containment; entry/return routes may be shared. Reusable drawing helpers, icons and decorative parts are not independent Views.
 
-The latest primary route is New game confirmation when needed → survivor → country → live main round → Journey upgrades → Continue/retry or Leave. The Results enum is the journey home; its old debrief task IDs are retained for actual current portions/actions. A renderer preview inside Character is not an extra navigation View. Five isolated developer review Views document the actual review shell and parity/parts/matrix/repairs tasks; they are not player-facing progression destinations.
+The latest primary route is New game confirmation when needed → survivor → country → live main round → Results → Upgrade (Journey upgrades) or Continue/retry or Leave. Results is the debrief and Upgrades holds the tree; the old debrief task IDs are retained under `journey-upgrades` for actual current portions/actions. A renderer preview inside Character is not an extra navigation View. Five isolated developer review Views document the actual review shell and parity/parts/matrix/repairs tasks; they are not player-facing progression destinations.
 
 - `game`
   - `battle`
@@ -63,6 +63,7 @@ The latest primary route is New game confirmation when needed → survivor → c
       - `survivor-ledger`
       - `survivor-policy`
       - `survivor-training`
+  - `results`
   - `run-history`
     - `run-history-detail`
     - `run-history-trends`
@@ -74,7 +75,7 @@ The latest primary route is New game confirmation when needed → survivor → c
     - `settings-gameplay`
     - `settings-profile`
 
-One connected 177-node DAG has one innate stable pistol_training root and seven camera-focus labels. Personal body development, weapon/ability progression, fortification blueprints/ranks and advanced feature access use the same preflight/payment/detail. Branch focus does not split/filter the tree. Every settled main round returns here; parallel worker orchestration remains separate.
+One connected 177-node DAG has one innate stable pistol_training root and seven camera-focus labels. Personal body development, weapon/ability progression, fortification blueprints/ranks and advanced feature access use the same preflight/payment/detail. Branch focus does not split/filter the tree. Every settled main round ends on Results, one action from this tree; parallel worker orchestration remains separate.
 
 Fresh profiles use coins for personal body nodes and do not mint personal CP from XP. Legacy body allocations remain ownership floors; eligible old CP uses the conserved graph-payment ledger. NPC training retains its separate pinned rules budget. Proficiency never creates an item. Feature nodes and existing liberation milestones progressively disclose companions, construction, recruitment, parallel fields and operations; old capabilities remain compatible.
 
@@ -90,6 +91,6 @@ Run the repository's source-aware validator:
 python scripts/check_views.py
 ```
 
-The final reconciliation checks actual IDs/root/parents/cycles, source files/symbols and local links. Current inventory: **69 View files**. Completed check results and source/gate/native evidence are recorded at the final documentation handoff and in [VALIDATION.md](VALIDATION.md).
+The final reconciliation checks actual IDs/root/parents/cycles, source files/symbols and local links. Current inventory: **70 View files**. Completed check results and source/gate/native evidence are recorded at the final documentation handoff and in [VALIDATION.md](VALIDATION.md).
 
 Implemented describes source presence, not GUI, OS interaction, listening, balance or performance proof. Dated earlier validation/archives retain their tested revisions.

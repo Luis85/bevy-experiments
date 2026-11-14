@@ -266,7 +266,7 @@ fn stage(f: &mut FrontendParts) {
                 .map(|i| i.id);
         }
         "skills" | "skills-survival" | "skills-ordnance" | "skills-firearms" => {
-            f.screen = Screen::Results;
+            f.screen = Screen::Upgrades;
             f.nav.tab = Tab::Skills;
             f.campaign.improvement_focus =
                 Some(horde_core::campaign::RecommendationAction::LearnNode(
@@ -283,14 +283,14 @@ fn stage(f: &mut FrontendParts) {
         "skills-search" => {
             // A search with a goal path: "reload" matches, and the focused
             // depth-3 node draws its unowned chain and "N steps · M coins".
-            f.screen = Screen::Results;
+            f.screen = Screen::Upgrades;
             f.campaign.tree_search_seed = Some("reload".into());
             f.campaign.improvement_focus = Some(
                 horde_core::campaign::RecommendationAction::LearnNode("combat_reload".into()),
             );
         }
         "engineering" => {
-            f.screen = Screen::Results;
+            f.screen = Screen::Upgrades;
             f.campaign.improvement_focus = horde_core::skill_catalog::skills()
                 .nodes
                 .iter()

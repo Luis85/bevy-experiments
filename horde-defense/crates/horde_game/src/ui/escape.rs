@@ -8,7 +8,8 @@
 //!
 //! The topmost overlay answers first, in [`Overlay`]'s order. With no overlay
 //! the screen answers: the menu asks to quit, a camp tab goes back to Camp
-//! home, Camp home and Results ask to return to the main menu, and the battle
+//! home, Upgrades goes back to Results (or to Camp home with no settled
+//! report), Camp home and Results ask to return to the main menu, and the battle
 //! cancels a retreat hold, else closes construction or, only when Pause is bound to Escape (decision 18),
 //! passes the press on to the Pause binding. Settings saves and returns,
 //! unless the difficulty draft is unapplied: then the press opens the draft
@@ -163,6 +164,10 @@ fn screen_action(cx: &EscapeContext) -> EscapeAction {
         Screen::Battle if cx.pause_is_escape => A::PassToPause,
         Screen::Battle => A::Ignore,
         Screen::Results => A::OpenModal(ModalKind::ReturnToMenu),
+        // Upgrades goes back to the debrief it was opened from, or to Camp
+        // home when no round has settled.
+        Screen::Upgrades if cx.settled_report => A::Go(Screen::Results),
+        Screen::Upgrades => A::GoTab(Tab::Home),
         Screen::History => A::CloseHistory,
         // An unapplied difficulty draft is never dropped silently (UX-09).
         Screen::Settings if cx.draft_dirty => A::OpenModal(ModalKind::DraftWarning),
@@ -324,7 +329,7 @@ fn apply(action: EscapeAction, f: &mut UiCtx) {
         // as its header's Menu does.
         A::Go(Screen::Menu) if f.screen == Screen::SurvivorSelection => f.go(Screen::Menu),
         A::Go(Screen::Menu) => f.save_settings_to_menu(),
-        A::Go(Screen::Results) => f.open_upgrades(),
+        A::Go(Screen::Results) => f.open_results(),
         A::Go(screen) => f.go(screen),
         A::OpenModal(kind) => {
             if let Some(modal) = AppModal::confirmation(kind) {

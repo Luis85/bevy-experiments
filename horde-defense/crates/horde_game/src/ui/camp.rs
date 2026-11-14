@@ -83,7 +83,7 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
                         Tab::Character => character(ui, f),
                         Tab::Survivor => survivor(ui, f),
                         Tab::Armory => armory(ui, f),
-                        // Redirected to the upgrade home above.
+                        // Redirected to Upgrades above.
                         Tab::Skills | Tab::Engineering => {}
                         Tab::Operations => operations(ui, f),
                     }

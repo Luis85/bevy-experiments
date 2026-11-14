@@ -1,39 +1,101 @@
-//! Primary home after every main round. All rewards have already been settled.
-use super::{Screen, Tab, UiCtx, chrome, muted, navigation, primary, progression, status};
-use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
-use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob};
+//! The debrief after every main round (UX-01, UX-02; design-ux-flow §4
+//! "Results"). All rewards have already been settled. The screen shows the
+//! outcome strip, then inline content (loot, the liberation block, the next
+//! defender) and one action bar of exactly three buttons: [Upgrade]
+//! [continue] [Leave journey]. The upgrade tree lives on `Screen::Upgrades`.
+use super::{Screen, UiCtx, chrome, muted, primary, primary_action::PRIMARY_MIN_SIZE, status};
+use crate::art::{AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT};
+use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob, vec2};
 use horde_core::{
+    campaign::{NodeStatus, RecommendationAction, UpgradeFocus},
     command::Command,
-    content::content,
+    content::{Mode, content},
     defenders::{DefenderId, RecruitBlocker},
     progression::BossRank,
     sim::{Outcome, Report},
+    skill_catalog::skills,
     stats::RunRecord,
     world::world,
 };
 mod loot_block;
+/// Whether `report` is the victory that completed its country: the
+/// continuation is then the choice of the next country.
+pub(super) fn liberation_settled(f: &UiCtx, report: &Report) -> bool {
+    report.outcome == Outcome::Victory
+        && report
+            .country_id
+            .as_deref()
+            .and_then(|id| world().country(id))
+            .is_some_and(|country| {
+                f.game.campaign().world.completed(&country.id) >= country.level_count()
+            })
+}
 fn continue_label(f: &UiCtx) -> &'static str {
-    if !f.game.campaign().journey_active || f.game.last_result().is_none() {
+    if !f.game.campaign().journey_active {
         return "Choose a country";
     }
     match f.game.last_result() {
-        Some(report) if report.outcome == Outcome::Victory => {
-            if report
-                .country_id
-                .as_deref()
-                .and_then(|id| world().country(id))
-                .is_some_and(|country| {
-                    f.game.campaign().world.completed(&country.id) >= country.level_count()
-                })
-            {
-                "Choose next country"
-            } else {
-                "Next defense"
-            }
-        }
+        Some(report) if liberation_settled(f, report) => "Choose next country",
+        Some(report) if report.outcome == Outcome::Victory => "Next defense",
         Some(_) => "Try again",
-        None => "Continue journey",
+        None => "Choose a country",
     }
+}
+/// Which of the action bar's first two buttons is the amber primary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ResultsAction {
+    Upgrade,
+    Continue,
+}
+/// The Results primary (design-ux-flow decision 3). After a defeat or a
+/// withdrawal the loop's next step is the upgrade, but only when the
+/// recommended node can be bought right now (`recommended` is its
+/// `NodeStatus`); a win, a live defense and an unaffordable recommendation
+/// all continue.
+pub(super) fn results_primary(
+    report: &Report,
+    recommended: Option<&NodeStatus>,
+    live: bool,
+) -> ResultsAction {
+    let lost = matches!(report.outcome, Outcome::Defeat | Outcome::Withdrawal);
+    if !live && lost && matches!(recommended, Some(NodeStatus::Available(_))) {
+        ResultsAction::Upgrade
+    } else {
+        ResultsAction::Continue
+    }
+}
+/// The status of the node the tree would open on for `mode`
+/// (`UpgradeFocus::Next`), or None when the recommendation is not a node.
+fn recommended_status(f: &UiCtx, mode: Mode) -> Option<NodeStatus> {
+    let campaign = f.game.campaign();
+    match campaign
+        .recommendation_fallback(UpgradeFocus::Next(mode))?
+        .action
+    {
+        RecommendationAction::LearnNode(id) => Some(campaign.node_status(&id)),
+        _ => None,
+    }
+}
+/// The primary Results draws this frame.
+pub(super) fn current_primary(f: &UiCtx) -> ResultsAction {
+    f.game
+        .last_result()
+        .map_or(ResultsAction::Continue, |report| {
+            results_primary(
+                report,
+                recommended_status(f, report.mode).as_ref(),
+                f.game.attempt().is_some(),
+            )
+        })
+}
+/// How many tree nodes can be bought right now.
+fn affordable_upgrades(f: &UiCtx) -> usize {
+    let campaign = f.game.campaign();
+    skills()
+        .nodes
+        .iter()
+        .filter(|node| matches!(campaign.node_status(&node.id), NodeStatus::Available(_)))
+        .count()
 }
 /// Why the round ended and what to try next, from the core report.
 fn reason_line(report: &Report) -> String {
@@ -232,42 +294,63 @@ fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     }
 }
 pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
-    // The same row as the camp; its selected first tab names this page.
-    let with_row = f.game.campaign().world.start.is_some();
-    navigation::camp_navigation(root, f);
+    // Results is the debrief of a settled round: with none there is nothing
+    // to show, so the screen hands over to Camp home.
+    if f.game.last_result().is_none() {
+        f.open_camp_home(None);
+        egui::CentralPanel::default()
+            .frame(egui::Frame::new().fill(INK))
+            .show(root, |_| {});
+        return;
+    }
+    // No camp row here: the bar's three actions are the only ways on.
+    egui::Panel::bottom("results_actions")
+        .frame(
+            egui::Frame::new()
+                .fill(PANEL)
+                .inner_margin(egui::Margin::symmetric(18, 8)),
+        )
+        .show(root, |ui| {
+            ui.horizontal(|ui| actions(ui, f));
+        });
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK).inner_margin(14))
         .show(root, |ui| {
-            // The global header carries the wallet, Menu, History and Settings.
-            if !with_row {
-                ui.label(RichText::new("Journey upgrades").size(26.0).strong());
-            }
-            if let Some(report) = f.game.last_result() {
-                outcome_strip(ui, f, report);
-            } else {
-                muted(
-                    ui,
-                    "Spend retained coins, choose an upgrade, then continue your journey.",
-                );
-            }
-            ui.add_space(4.0);
-            ui.horizontal_wrapped(|ui| actions(ui, f));
-            // Inline content under the actions: the run's loot, then the
-            // liberation block.
-            loot_block::loot_block(ui, f);
-            recruit_block(ui, f);
-            // Who defends next, between defenses of a running journey.
-            if f.game.campaign().journey_active && f.game.last_result().is_some() {
-                chrome::defender_picker(ui, f);
-            }
-            if f.status.message_error || f.status.save_pending {
-                status(ui, f);
-            }
-            let height = (ui.clip_rect().bottom() - ui.cursor().top())
-                .min(ui.available_height())
-                .max(150.0);
-            progression::skill_tree(ui, f, height);
+            egui::ScrollArea::vertical()
+                .auto_shrink(false)
+                .show(ui, |ui| debrief(ui, f));
         });
+}
+
+/// The inline content above the action bar: the outcome strip, the run's
+/// loot, the liberation block, the next defender and the upgrades hint.
+/// Its only controls are the whitelisted inline ones ("Equip", "Recruit
+/// from ...", the defender picker and the status line's own).
+fn debrief(ui: &mut egui::Ui, f: &mut UiCtx) {
+    // The title's mixed-size line box rounds a fraction above its row;
+    // this keeps it inside the scroll viewport's clip.
+    ui.add_space(2.0);
+    // The global header carries the wallet, Menu, History and Settings.
+    if let Some(report) = f.game.last_result() {
+        outcome_strip(ui, f, report);
+    }
+    ui.add_space(4.0);
+    loot_block::loot_block(ui, f);
+    recruit_block(ui, f);
+    // Who defends next, between defenses of a running journey.
+    if f.game.campaign().journey_active {
+        chrome::defender_picker(ui, f);
+    }
+    let affordable = affordable_upgrades(f);
+    if affordable > 0 {
+        muted(
+            ui,
+            chrome::count_noun(affordable, "upgrade affordable", "upgrades affordable"),
+        );
+    }
+    if f.status.message_error || f.status.save_pending {
+        status(ui, f);
+    }
 }
 
 /// What the liberation block shows, read from core's recruit offer.
@@ -307,7 +390,7 @@ fn recruit_block_model(f: &UiCtx) -> Option<RecruitBlock> {
     })
 }
 
-/// Inline content under the action bar, never a fourth action.
+/// Inline content above the action bar, never a fourth action.
 fn recruit_block(ui: &mut egui::Ui, f: &mut UiCtx) {
     match recruit_block_model(f) {
         None => {}
@@ -324,7 +407,7 @@ fn recruit_block(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
 }
 
-/// The continuation the action bar's primary names.
+/// The continuation the action bar's second button names.
 fn primary_label(f: &UiCtx) -> &'static str {
     if f.game.attempt().is_some() {
         "Return to active defense"
@@ -332,63 +415,65 @@ fn primary_label(f: &UiCtx) -> &'static str {
         continue_label(f)
     }
 }
-/// Whether the bar shows "More" (the replay route).
-fn more_shown(f: &UiCtx) -> bool {
-    f.game.attempt().is_none()
-        && (f.game.campaign().legacy_features || f.game.campaign().victories > 0)
+pub(super) const UPGRADE: &str = "Upgrade";
+pub(super) const LEAVE_JOURNEY: &str = "Leave journey";
+/// The action bar's buttons in draw order: always exactly these three, in
+/// fixed positions. Everything else on Results is inline content (the loot
+/// block, the recruit block, the defender picker).
+pub(super) fn action_bar_labels(f: &UiCtx) -> [&'static str; 3] {
+    [UPGRADE, primary_label(f), LEAVE_JOURNEY]
 }
-/// The action bar's buttons in draw order: at most three. Everything else
-/// on Results is inline content (the recruit block, the defender picker).
-#[cfg(test)]
-pub(super) fn action_bar_labels(f: &UiCtx) -> Vec<&'static str> {
-    let mut labels = vec![primary_label(f)];
-    if more_shown(f) {
-        labels.push("More");
-    }
-    if f.game.attempt().is_none() {
-        labels.push(LEAVE_JOURNEY);
-    }
-    labels
-}
-const LEAVE_JOURNEY: &str = "Leave journey";
 
-/// Primary continuation first, then the analysis, the non-navigation extras
-/// and the quiet exit. Destinations the camp row lists are not repeated here.
+/// One of the bar's first two buttons: the amber primary when `amber`,
+/// otherwise a plain button of the primary's height.
+fn bar_button(ui: &mut egui::Ui, label: &str, amber: bool) -> egui::Response {
+    if amber {
+        primary(ui, label)
+    } else {
+        ui.add(egui::Button::new(label).min_size(vec2(0.0, PRIMARY_MIN_SIZE.y)))
+    }
+}
+
+/// [Upgrade] [continue] [Leave journey]. The amber primary is the
+/// `results_primary` choice; the positions never change.
 fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     let live = f.game.attempt().is_some();
-    let label = primary_label(f);
-    if primary(ui, label).clicked() {
+    let choice = current_primary(f);
+    let [upgrade, continuation, leave] = action_bar_labels(f);
+    if bar_button(ui, upgrade, choice == ResultsAction::Upgrade)
+        .on_hover_text("Open the upgrade tree on the recommended upgrade.")
+        .clicked()
+    {
+        f.focus_next_upgrade();
+        f.open_upgrades();
+    }
+    if bar_button(ui, continuation, choice == ResultsAction::Continue).clicked() {
         if live {
             f.go(Screen::Battle);
             f.battle.fire_latched = false;
-        } else if f.game.campaign().journey_active && f.game.last_result().is_some() {
+        } else if f.game.campaign().journey_active {
             f.dispatch(Command::ContinueJourney, "Journey continued.");
         } else {
             f.open_campaign();
         }
     }
-    // The manual save is the header's "Save" (W3-05), so "More" holds only
-    // the replay route and is hidden when that is unavailable.
-    if more_shown(f) {
-        ui.menu_button("More", |ui| {
-            if ui.button("Plan or replay a defense").clicked() {
-                f.open_preparation(Tab::Briefing);
-                ui.close();
-            }
-        });
-    }
     // A durable transition (a save or reset) would reject the leave and
-    // strand "Saving…", so the exit waits for it.
-    if !live
-        && ui
-            .add_enabled(
-                !f.runtime.durable_transition_pending(),
-                egui::Button::new(RichText::new(LEAVE_JOURNEY).color(MUTED)).frame(false),
-            )
-            .on_hover_text(
-                "End this journey and return to the main menu. Banked coins, items and upgrades stay.",
-            )
-            .clicked()
+    // strand "Saving…", so the exit waits for it; a live defense is
+    // finished or retreated from first.
+    if ui
+        .add_enabled(
+            !live && !f.runtime.durable_transition_pending(),
+            egui::Button::new(RichText::new(leave).color(MUTED)).frame(false),
+        )
+        .on_hover_text(
+            "End this journey and return to the main menu. Banked coins, items and upgrades stay.",
+        )
+        .on_disabled_hover_text(if live {
+            "Finish or retreat from the active defense first."
+        } else {
+            "Saving…"
+        })
+        .clicked()
     {
         f.dispatch(Command::LeaveJourney, "");
         f.status.save_pending = true;

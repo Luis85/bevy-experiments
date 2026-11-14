@@ -339,9 +339,21 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
         self.request_save(SaveIntent::Menu);
     }
-    /// The Journey upgrades home: the one route to the complete tree. A live
-    /// main defense stays paused there and is reached from its primary action.
+    /// The Upgrades screen: the one route to the complete tree. A live main
+    /// defense stays paused there and is reached from its primary action.
     pub(super) fn open_upgrades(&mut self) {
+        self.dispatch(Command::SetPaused(true), "");
+        self.go(Screen::Upgrades);
+        self.battle.fire_latched = false;
+        self.runtime.clear_input();
+    }
+    /// The debrief of the settled round, paused. Without a settled report
+    /// there is nothing to show, so the request opens Camp home.
+    pub(super) fn open_results(&mut self) {
+        if self.game.last_result().is_none() {
+            self.open_camp_home(None);
+            return;
+        }
         self.dispatch(Command::SetPaused(true), "");
         self.go(Screen::Results);
         self.battle.fire_latched = false;
@@ -373,7 +385,7 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
     }
     fn preserve_debrief_pause(&mut self) {
-        if self.screen == Screen::Results && !self.game.global_paused() {
+        if matches!(self.screen, Screen::Results | Screen::Upgrades) && !self.game.global_paused() {
             self.dispatch(Command::SetPaused(true), "");
         }
     }
@@ -424,8 +436,11 @@ impl UiCtx<'_> {
         }
         if self.game.attempt().is_some() {
             self.go(Screen::Battle);
-        } else if self.game.campaign().world.start.is_some() && self.game.campaign().journey_active
+        } else if self.game.campaign().world.start.is_some()
+            && self.game.campaign().journey_active
+            && self.game.last_result().is_some()
         {
+            // A settled journey resumes on its debrief.
             self.focus_next_upgrade();
             self.go(Screen::Results);
         } else {

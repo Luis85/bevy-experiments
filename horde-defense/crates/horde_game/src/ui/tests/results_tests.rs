@@ -47,7 +47,12 @@ fn results_keep_rewards_banked_and_open_the_actual_recovered_equipment() {
         );
     }
     assert_eq!(f.game.campaign().coins, coins);
-    h.click(f, View::Results, "Equipment");
+    // W3-03 rewrite: the camp row left Results; Equipment is one step on,
+    // in the row of the Upgrades screen.
+    h.click(f, View::Results, "Upgrade");
+    assert!(f.screen == Screen::Upgrades);
+    assert_eq!(f.game.campaign().coins, coins);
+    h.click(f, View::Upgrades, "Equipment");
     assert!(f.screen == Screen::Camp);
     assert!(f.nav.tab == Tab::Armory);
     assert!(f.armory.selected_item.is_some());
@@ -187,27 +192,19 @@ fn liberated_country_continue_opens_map_and_does_not_autoselect_or_pay_again() {
     assert_eq!(f.game.campaign().run_history.len(), records);
 }
 
+/// W3-03 rewrite: this was one test of the shared upgrade home (header,
+/// camp row, the continue / "More" / "Leave journey" row). Results now has
+/// the header and the three-action bar and no camp row; the row is on
+/// Upgrades.
 #[test]
-fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
+fn results_and_upgrades_share_the_camp_header_and_only_upgrades_has_the_row() {
     let mut fixture = IsolatedFrontend::new();
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.withdraw();
     f.game.campaign_mut().coins = 42;
-    f.screen = Screen::Results;
-    let output = h.frame(f, View::ResultsWithChrome, vec![]);
-    for label in [
-        "LASTLIGHT",
-        "Menu",
-        "History",
-        "Settings",
-        "Journey upgrades",
-    ] {
-        assert_eq!(text_count(&output, label), 1, "{label} once");
-    }
-    assert_eq!(text_count(&output, "42 coins"), 1, "one wallet on screen");
-    let x = |label: &str| {
+    let x = |output: &FullOutput, label: &str| {
         output
             .shapes
             .iter()
@@ -215,44 +212,60 @@ fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
             .unwrap_or_else(|| panic!("{label} painted"))
             .left()
     };
+    const ROW: [&str; 6] = [
+        "Camp",
+        "Journey upgrades",
+        "Briefing",
+        "Equipment",
+        "Character",
+        "World map",
+    ];
+
+    f.screen = Screen::Results;
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    for label in ["LASTLIGHT", "Menu", "History", "Settings", "Save"] {
+        assert_eq!(text_count(&output, label), 1, "{label} once");
+    }
+    assert_eq!(text_count(&output, "42 coins"), 1, "one wallet on screen");
     assert_eq!(
         text_count(&output, "Run history"),
         0,
         "the header has History"
     );
-    let order = ["Try again", "More", "Leave journey"];
+    let order = ["Upgrade", "Try again", "Leave journey"];
     for pair in order.windows(2) {
-        assert!(x(pair[0]) < x(pair[1]), "{} before {}", pair[0], pair[1]);
-    }
-    // The camp row is drawn here too, so its destinations are not repeated
-    // as action buttons; "Journey upgrades" is the selected tab, not a title.
-    for label in ["Briefing", "Equipment", "Character", "World map"] {
-        assert_eq!(text_count(&output, label), 1, "{label} only in the row");
-    }
-    // "More" keeps only what the row does not list. The manual save moved
-    // to the header's "Save" (W3-05), so "Save journey" is gone from it.
-    h.click(f, View::ResultsWithChrome, "More");
-    let output = h.frame(f, View::ResultsWithChrome, vec![]);
-    assert_eq!(text_count(&output, "Plan or replay a defense"), 1);
-    assert_eq!(text_count(&output, "Save journey"), 0);
-    assert_eq!(text_count(&output, "Save"), 1, "the header saves");
-    for label in [
-        "World map",
-        "Character",
-        "Mara",
-        "Operations",
-        "Fortifications",
-    ] {
         assert!(
-            text_count(&output, label) <= 1,
-            "{label} not repeated in More"
+            x(&output, pair[0]) < x(&output, pair[1]),
+            "{} before {}",
+            pair[0],
+            pair[1]
         );
     }
-    h.frame(
-        f,
-        View::ResultsWithChrome,
-        vec![key_event(Key::Escape, true)],
-    );
+    // No camp row, no "More" menu, no replay route and no second save.
+    for gone in ROW
+        .into_iter()
+        .chain(["More", "Plan or replay a defense", "Save journey"])
+    {
+        assert_eq!(text_count(&output, gone), 0, "{gone} is not on Results");
+    }
+
+    f.screen = Screen::Upgrades;
+    let output = h.frame(f, View::UpgradesWithChrome, vec![]);
+    for label in ["LASTLIGHT", "Menu", "History", "Settings", "Save"] {
+        assert_eq!(text_count(&output, label), 1, "{label} once");
+    }
+    assert_eq!(text_count(&output, "42 coins"), 1, "one wallet on screen");
+    // The camp row is drawn here, so its destinations are not repeated as
+    // action buttons; "Journey upgrades" is the selected entry, not a title.
+    for label in ROW {
+        assert_eq!(text_count(&output, label), 1, "{label} only in the row");
+    }
+    assert!(x(&output, "Back to battle") < x(&output, "Back to camp"));
+    for gone in ["Upgrade", "Leave journey", "More"] {
+        assert_eq!(text_count(&output, gone), 0, "{gone} is not on Upgrades");
+    }
+
+    f.screen = Screen::Results;
     h.click(f, View::ResultsWithChrome, "Menu");
     f.flush_for_test();
     assert!(f.screen == Screen::Menu);
@@ -293,36 +306,34 @@ fn results_outcome_is_one_line_with_one_muted_hint_and_no_second_wallet() {
                 .any(|s| shape_has_text(&s.shape, "Already banked")),
             "{size:?}"
         );
-        // One muted hint under the outcome, above the actions.
+        // One hint under the outcome. W3-03 rewrite: the actions were the
+        // next row, so exactly one line sat between; they are the bottom
+        // bar now and the inline content (here the defender picker) sits
+        // between. The hint is still the first line under the outcome, it
+        // is painted once, and nothing below repeats the banked rewards.
         let (outcome, _) = clipped_bounds(&output, &line).unwrap();
         let (actions, _) = clipped_bounds(&output, "Try again").unwrap();
-        let between = output
-            .shapes
-            .iter()
-            .filter(|clipped| {
-                let mut found = false;
-                fn walk(shape: &egui::epaint::Shape, top: f32, bottom: f32, found: &mut bool) {
-                    match shape {
-                        egui::epaint::Shape::Text(text) => {
-                            let y = text.pos.y + text.galley.rect.center().y;
-                            *found |= y > top && y < bottom && !text.galley.text().is_empty();
-                        }
-                        egui::epaint::Shape::Vec(v) => {
-                            v.iter().for_each(|s| walk(s, top, bottom, found));
-                        }
-                        _ => {}
-                    }
-                }
-                walk(
-                    &clipped.shape,
-                    outcome.bottom(),
-                    actions.top() - 6.0,
-                    &mut found,
-                );
-                found
+        let mut between: Vec<(String, Rect)> = painted_texts(&output)
+            .into_iter()
+            .filter(|(text, rect)| {
+                let y = rect.center().y;
+                y > outcome.bottom() && y < actions.top() - 6.0 && !text.is_empty()
             })
-            .count();
-        assert_eq!(between, 1, "{size:?}: expected one hint line");
+            .collect();
+        between.sort_by(|a, b| a.1.top().total_cmp(&b.1.top()));
+        let hint = &between.first().expect("a hint under the outcome").0;
+        let cause = report.cause.trim().trim_end_matches('.');
+        assert!(
+            !cause.is_empty() && hint.starts_with(cause),
+            "{size:?}: the first line is the reason: {hint}"
+        );
+        assert_eq!(text_count(&output, hint), 1, "{size:?}: one hint");
+        assert!(
+            between[1..]
+                .iter()
+                .all(|(text, _)| !text.contains("banked")),
+            "{size:?}: {between:?}"
+        );
     }
 }
 
@@ -571,4 +582,232 @@ fn results_lists_elite_kills_and_boss_ttk() {
     let output = h.frame(f, View::ResultsWithChrome, vec![]);
     assert!(text_top_containing(&output, "Boss defeated in 25.5 s").is_some());
     assert!(text_top_containing(&output, "Elite kills").is_none());
+}
+
+/// Every painted text run with its bounds.
+fn painted_texts(output: &FullOutput) -> Vec<(String, Rect)> {
+    fn collect(shape: &egui::epaint::Shape, into: &mut Vec<(String, Rect)>) {
+        match shape {
+            egui::epaint::Shape::Text(t) => into.push((
+                t.galley.text().to_owned(),
+                t.galley.rect.translate(t.pos.to_vec2()),
+            )),
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| collect(s, into)),
+            _ => {}
+        }
+    }
+    let mut texts = Vec::new();
+    for clipped in &output.shapes {
+        collect(&clipped.shape, &mut texts);
+    }
+    texts
+}
+
+/// The text runs painted in the row of the Results action bar (the row of
+/// "Leave journey"), left to right.
+fn action_bar_row(output: &FullOutput) -> Vec<String> {
+    let texts = painted_texts(output);
+    let anchor = texts
+        .iter()
+        .find(|(text, _)| text == "Leave journey")
+        .map(|(_, rect)| *rect)
+        .expect("Leave journey painted");
+    let mut row: Vec<&(String, Rect)> = texts
+        .iter()
+        .filter(|(_, rect)| (rect.center().y - anchor.center().y).abs() < 14.0)
+        .collect();
+    row.sort_by(|a, b| a.1.left().total_cmp(&b.1.left()));
+    row.into_iter().map(|(text, _)| text.clone()).collect()
+}
+
+type ResultsStage = fn(&mut IsolatedFrontend);
+/// Settled rounds on Germany: a withdrawal, a victory with defenses left
+/// and the victory that liberates it.
+const SETTLED_ROUNDS: [(&str, ResultsStage, &str); 3] = [
+    (
+        "withdrawal",
+        |x| {
+            x.deploy();
+            x.frontend.game.withdraw();
+        },
+        "Try again",
+    ),
+    (
+        "victory",
+        |x| {
+            x.deploy();
+            let game = &mut x.frontend.game;
+            game.withdraw();
+            game.last_result_mut().as_mut().unwrap().outcome = Outcome::Victory;
+            game.campaign_mut()
+                .world
+                .country_levels
+                .insert("DEU".into(), 1);
+        },
+        "Next defense",
+    ),
+    (
+        "liberation",
+        |x| {
+            x.deploy();
+            let game = &mut x.frontend.game;
+            game.withdraw();
+            game.last_result_mut().as_mut().unwrap().outcome = Outcome::Victory;
+            let count = world().country("DEU").unwrap().level_count();
+            game.campaign_mut()
+                .world
+                .country_levels
+                .insert("DEU".into(), count);
+        },
+        "Choose next country",
+    ),
+];
+
+/// UX-02 (W3-03): the Results action bar is exactly [Upgrade] [continue]
+/// [Leave journey], in that order, at both target sizes and for every
+/// outcome. The camp row, "More", the replay route and a second save are
+/// not on Results.
+#[test]
+fn results_action_bar_has_exactly_three_buttons() {
+    for target in Target::BOTH {
+        for (name, stage, continuation) in SETTLED_ROUNDS {
+            let mut fixture = IsolatedFrontend::new();
+            stage(&mut fixture);
+            let h = Harness::at(target);
+            let f = &mut fixture.frontend;
+            f.game.set_paused(true);
+            f.screen = Screen::Results;
+            h.frame(f, View::Results, vec![]);
+            let output = h.frame(f, View::Results, vec![]);
+            assert_eq!(
+                action_bar_row(&output),
+                ["Upgrade", continuation, "Leave journey"],
+                "{target:?} {name}"
+            );
+            for gone in [
+                "More",
+                "Plan or replay a defense",
+                "Save journey",
+                "Journey upgrades",
+                "Briefing",
+                "Equipment",
+                "Character",
+                "World map",
+            ] {
+                assert_eq!(text_count(&output, gone), 0, "{target:?} {name}: {gone}");
+            }
+        }
+    }
+}
+
+/// Decision 3 (W3-03): the pure Results primary. Upgrade is the primary
+/// only after a defeat or a withdrawal whose recommended node can be bought
+/// right now; a win, a live defense and every other node status continue.
+#[test]
+fn results_primary_table() {
+    use super::results::{ResultsAction as R, results_primary};
+    use horde_core::campaign::NodeStatus;
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let game = &mut fixture.frontend.game;
+    game.withdraw();
+    game.campaign_mut().coins = 1_000_000;
+    let campaign = game.campaign();
+    let available = horde_core::skill_catalog::skills()
+        .nodes
+        .iter()
+        .map(|node| campaign.node_status(&node.id))
+        .find(|status| matches!(status, NodeStatus::Available(_)))
+        .expect("a rich campaign can buy some node");
+    let owned = NodeStatus::Owned;
+    let locked = NodeStatus::Locked {
+        reason: "Liberate a country first".into(),
+    };
+    let blocked = NodeStatus::Blocked {
+        payment: None,
+        reason: "Not enough coins".into(),
+    };
+    let report = |outcome| {
+        let mut report = game.last_result().unwrap().clone();
+        report.outcome = outcome;
+        report
+    };
+    use Outcome::{Defeat, Victory, Withdrawal};
+    let rows: [(Outcome, Option<&NodeStatus>, bool, R); 14] = [
+        (Defeat, Some(&available), false, R::Upgrade),
+        (Withdrawal, Some(&available), false, R::Upgrade),
+        // A live defense always continues.
+        (Defeat, Some(&available), true, R::Continue),
+        (Withdrawal, Some(&available), true, R::Continue),
+        // A win continues, whatever can be bought.
+        (Victory, Some(&available), false, R::Continue),
+        (Victory, Some(&available), true, R::Continue),
+        (Victory, None, false, R::Continue),
+        // A recommendation that cannot be bought now never takes the amber.
+        (Defeat, Some(&blocked), false, R::Continue),
+        (Defeat, Some(&locked), false, R::Continue),
+        (Defeat, Some(&owned), false, R::Continue),
+        (Defeat, None, false, R::Continue),
+        (Withdrawal, Some(&blocked), false, R::Continue),
+        (Withdrawal, Some(&locked), false, R::Continue),
+        (Withdrawal, None, false, R::Continue),
+    ];
+    for (outcome, status, live, expected) in rows {
+        assert_eq!(
+            results_primary(&report(outcome), status, live),
+            expected,
+            "{outcome:?} {status:?} live {live}"
+        );
+    }
+}
+
+/// The painted half of decision 3: the bar's amber primary is the
+/// `results_primary` choice, the other two buttons stay where they are,
+/// and exactly one primary is registered.
+#[test]
+fn results_primary_is_upgrade_after_a_loss_with_an_affordable_recommendation() {
+    for target in Target::BOTH {
+        for (name, stage, continuation) in SETTLED_ROUNDS {
+            for coins in [0, 1_000_000] {
+                let mut fixture = IsolatedFrontend::new();
+                stage(&mut fixture);
+                let h = Harness::at(target);
+                let f = &mut fixture.frontend;
+                f.game.campaign_mut().coins = coins;
+                f.game.set_paused(true);
+                f.screen = Screen::Results;
+                h.frame(f, View::Full, vec![]);
+                let output = h.frame(f, View::Full, vec![]);
+                let expected = if name == "withdrawal" && coins > 0 {
+                    "Upgrade"
+                } else {
+                    continuation
+                };
+                assert_eq!(
+                    h.screen_primaries(),
+                    [expected],
+                    "{target:?} {name} with {coins} coins"
+                );
+                assert_eq!(
+                    action_bar_row(&output),
+                    ["Upgrade", continuation, "Leave journey"],
+                    "{target:?} {name} with {coins} coins: fixed positions"
+                );
+            }
+        }
+    }
+}
+
+/// Results is the debrief of a settled round: drawn with no report it
+/// hands over to Camp home and registers no primary.
+#[test]
+fn results_without_a_report_redirects_to_camp_home() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    assert!(f.game.last_result().is_none());
+    f.screen = Screen::Results;
+    h.frame(f, View::Full, vec![]);
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Home);
 }

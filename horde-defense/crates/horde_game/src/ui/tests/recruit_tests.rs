@@ -259,13 +259,13 @@ fn liberation_recruit_price_reads_core_at_rank_10() {
     assert_eq!(f.status.modal, None);
 }
 
-/// The recruit action is inline content under the action bar, never a
-/// fourth action: the bar keeps its continue action, "More" and "Leave
-/// journey" (W3-03 turns the same three positions into Upgrade, continue
-/// and Leave journey).
+/// The recruit action is inline content above the action bar, never a
+/// fourth action: the bar keeps Upgrade, its continue action and "Leave
+/// journey" (W3-03 rewrite: the bar was continue, "More", "Leave journey"
+/// above the content; it is now the bottom panel).
 #[test]
 fn liberation_results_action_bar_still_three_buttons() {
-    const BAR: [&str; 3] = ["Choose next country", "More", "Leave journey"];
+    const BAR: [&str; 3] = ["Upgrade", "Choose next country", "Leave journey"];
     for target in Target::BOTH {
         let mut fixture = IsolatedFrontend::new();
         let h = Harness::at(target);
@@ -282,12 +282,16 @@ fn liberation_results_action_bar_still_three_buttons() {
             assert_eq!(text_count(&output, action), 1, "{target:?}: {action}");
             clipped_bounds(&output, action).unwrap().0
         });
-        let bar_bottom = bar.iter().map(|r| r.bottom()).fold(f32::MIN, f32::max);
-        let (recruit, _) = clipped_bounds(&output, &label)
+        let bar_top = bar.iter().map(|r| r.top()).fold(f32::MAX, f32::min);
+        let (recruit, clip) = clipped_bounds(&output, &label)
             .unwrap_or_else(|| panic!("{target:?}: {label} painted"));
         assert!(
-            recruit.top() >= bar_bottom,
-            "{target:?}: the recruit action sits under the bar ({recruit:?} vs {bar_bottom})"
+            clip.contains_rect(recruit),
+            "{target:?}: {label} is clipped"
+        );
+        assert!(
+            recruit.bottom() <= bar_top,
+            "{target:?}: the recruit action sits above the bar ({recruit:?} vs {bar_top})"
         );
         assert_eq!(h.screen_primaries(), ["Choose next country"], "{target:?}");
     }

@@ -351,14 +351,50 @@ fn matrix_table() {
             A::CloseModal,
         ),
         (
-            "the results More menu is egui's",
+            "the results defender picker popup is egui's",
             with(Overlay::Popup, on(Screen::Results)),
             A::LeaveToEgui,
         ),
+        // Upgrades (W3-03): back to the debrief, else to Camp home.
+        (
+            "upgrades after a report goes back to Results",
+            EscapeContext {
+                settled_report: true,
+                ..on(Screen::Upgrades)
+            },
+            A::Go(Screen::Results),
+        ),
+        (
+            "upgrades with no report goes back to Camp home",
+            on(Screen::Upgrades),
+            A::GoTab(Tab::Home),
+        ),
+        (
+            "upgrades over a live defense with an older report goes back to Results",
+            EscapeContext {
+                settled_report: true,
+                attempt_live: true,
+                ..on(Screen::Upgrades)
+            },
+            A::Go(Screen::Results),
+        ),
+        (
+            "upgrades waits for a pending save",
+            pending(EscapeContext {
+                settled_report: true,
+                ..on(Screen::Upgrades)
+            }),
+            A::Ignore,
+        ),
         (
             "tree search keeps its Escape",
-            with(Overlay::TextFocus, on(Screen::Results)),
+            with(Overlay::TextFocus, on(Screen::Upgrades)),
             A::LeaveToEgui,
+        ),
+        (
+            "details over the tree close first",
+            with(Overlay::Details, on(Screen::Upgrades)),
+            A::CloseDetails,
         ),
         // History and settings.
         ("history closes", on(Screen::History), A::CloseHistory),
@@ -476,7 +512,12 @@ fn every_context() -> Vec<EscapeContext> {
 /// follow it (`None` once a modal opens or the press leaves the model).
 fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
     match action {
-        A::GoTab(tab) => Some(EscapeContext { tab, ..cx }),
+        // A tab is a camp tab: from Upgrades the press lands on the camp.
+        A::GoTab(tab) => Some(EscapeContext {
+            screen: Screen::Camp,
+            tab,
+            ..cx
+        }),
         A::Go(screen) => Some(EscapeContext { screen, ..cx }),
         _ => None,
     }
@@ -485,7 +526,7 @@ fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
 #[test]
 fn properties() {
     let all = every_context();
-    assert_eq!(all.len(), 7 * 9 * 13 * 512);
+    assert_eq!(all.len(), 8 * 9 * 13 * 512);
     for cx in all {
         let action = escape_action(&cx);
         // A focused text field and an open popup keep Escape for egui, and
@@ -592,12 +633,12 @@ fn properties() {
                 "{cx:?}"
             );
         }
-        // From any camp tab, Results or survivor selection, at most three
+        // From any camp tab, Results, Upgrades or survivor selection, at most three
         // presses open the quit or return-to-menu confirmation or reach the
         // menu (design-ux-flow §10: <=5 presses to the Quit modal).
         if matches!(
             cx.screen,
-            Screen::Camp | Screen::Results | Screen::SurvivorSelection
+            Screen::Camp | Screen::Results | Screen::Upgrades | Screen::SurvivorSelection
         ) && cx.overlay == Overlay::None
             && !cx.durable_pending
         {

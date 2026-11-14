@@ -1,5 +1,5 @@
 //! One-time unlock callouts (UX-16): "New: X - find it in <place>" under the
-//! camp row on Camp and the upgrade home, never in a battle. The seen-set
+//! camp row on Camp and Upgrades, never in a battle or on Results. The seen-set
 //! is presentation memory in `Settings::seen_callouts` (ruling S4): it is
 //! written with every save, a pre-pass file (None) is seeded with every
 //! callout its journey already unlocked, and a New game starts it empty.
@@ -237,7 +237,7 @@ pub(super) fn visit(f: &mut UiCtx) {
 /// me" and "Got it". Hidden, and not marked, while hints are off. It is
 /// static: there is no motion for reduced effects to remove.
 pub(super) fn callout_row(root: &mut egui::Ui, f: &mut UiCtx) {
-    if !f.settings.show_guidance || !matches!(f.screen, Screen::Camp | Screen::Results) {
+    if !f.settings.show_guidance || !matches!(f.screen, Screen::Camp | Screen::Upgrades) {
         return;
     }
     let Some(callout) = due(f.settings, f.game) else {

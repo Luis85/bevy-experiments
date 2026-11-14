@@ -144,8 +144,11 @@ enum View {
     WorldWithChrome,
     Armory,
     Results,
-    /// The upgrade home with the global header and field strip, as drawn.
+    /// Results with the global header and field strip, as drawn.
     ResultsWithChrome,
+    Upgrades,
+    /// Upgrades with the global header and field strip, as drawn.
+    UpgradesWithChrome,
     History,
     Feedback,
     /// The whole App frame as `draw_screen` draws it: the current screen with
@@ -449,6 +452,12 @@ fn partial_view(ui: &mut egui::Ui, f: &mut UiCtx, view: View) {
             navigation::field_status(ui, f);
             results(ui, f);
         }
+        View::Upgrades => upgrades(ui, f),
+        View::UpgradesWithChrome => {
+            navigation::header(ui, f, 1.0);
+            navigation::field_status(ui, f);
+            upgrades(ui, f);
+        }
         View::History => history::show(ui, f),
         View::Feedback => {
             egui::CentralPanel::default().show(ui, |ui| status(ui, f));
@@ -618,3 +627,4 @@ mod retreat_tests;
 mod settings_tests;
 mod storage_tests;
 mod toast_tests;
+mod upgrades_tests;

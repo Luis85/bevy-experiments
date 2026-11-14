@@ -243,6 +243,7 @@ impl UiCtx<'_> {
                     .map_or(self.campaign.mode, |r| r.mode);
                 self.focus_next_upgrade();
                 self.go(Screen::Results);
+                self.go_tab(Tab::Home);
                 self.battle.fire_latched = false;
                 self.runtime.clear_input();
             }
@@ -463,8 +464,7 @@ impl UiCtx<'_> {
                     .map_or(self.campaign.mode, |r| r.mode);
                 self.go(Screen::Results);
                 self.focus_next_upgrade();
-                self.go_tab(Tab::Skills);
-                self.nav.last_prepare_tab = Tab::Skills;
+                self.go_tab(Tab::Home);
                 self.battle.fire_latched = false;
                 self.runtime.clear_input();
             }

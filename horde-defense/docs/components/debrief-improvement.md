@@ -11,6 +11,6 @@ source: "crates/horde_game/src/ui/results.rs::results"
 
 Choose a preparation or inspection destination without an automatic transaction.
 
-Equipment and Run analysis are direct. More exposes map/character and learned construction/companion/operations destinations plus save. Feature ownership and world milestones govern availability; legacy capabilities remain. The former recommendation-only route is now the main home around the complete tree. Purchases remain the explicit selected-node action.
+Results' Upgrade opens the Upgrades screen on the recommended node; it is the amber primary after a defeat or withdrawal when that node can be bought now. The camp row on Upgrades leads on to Equipment, Character, the Briefing and the map; Results itself has no row and no More menu. Feature ownership and world milestones govern availability; legacy capabilities remain. Purchases remain the explicit selected-node action.
 
 Parent IDs express containment, not exclusive entry routes. Implemented records source presence, not native interaction or performance validation.

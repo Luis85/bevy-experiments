@@ -13,7 +13,7 @@ fn legacy_body_points_are_spent_only_through_the_unified_upgrade_graph() {
         "body_vitality_1".into(),
     ));
     f.act(|c| c.open_preparation(Tab::Skills));
-    h.click(f, View::Results, "Learn skill · 1 legacy CP");
+    h.click(f, View::Upgrades, "Learn skill · 1 legacy CP");
     assert_eq!(f.game.campaign().player.points, 0);
     assert_eq!(f.game.campaign().player.legacy_graph_points, 1);
     assert!(f.game.campaign().has_node("body_vitality_1"));
@@ -21,7 +21,7 @@ fn legacy_body_points_are_spent_only_through_the_unified_upgrade_graph() {
         f.game.campaign().profile(Mode::Personal).personal.health,
         before + 5
     );
-    let output = h.frame(f, View::Results, vec![]);
+    let output = h.frame(f, View::Upgrades, vec![]);
     assert!(
         !output
             .shapes
@@ -46,9 +46,9 @@ fn immersive_skill_choices_and_purchase_remain_visible_in_the_compact_first_view
     f.settings.scale = 1.35;
     let size = vec2(1050., 700.);
     let before = serde_json::to_value(&f.game).unwrap();
-    h.frame_size(f, View::Results, vec![], size);
-    h.frame_size(f, View::Results, vec![], size);
-    let output = h.frame_size(f, View::Results, vec![], size);
+    h.frame_size(f, View::Upgrades, vec![], size);
+    h.frame_size(f, View::Upgrades, vec![], size);
+    let output = h.frame_size(f, View::Upgrades, vec![], size);
     let area = h.ctx.content_rect();
     let learn = format!("Learn skill · {} coins", nodes_price(&["piercing"]));
     for text in ["Controlled penetration", learn.as_str()] {

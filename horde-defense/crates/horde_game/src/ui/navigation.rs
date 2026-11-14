@@ -25,12 +25,12 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                         .font(FontId::new(24.0, egui::FontFamily::Name("display".into())))
                         .color(AMBER),
                 );
-                // Each screen is named once. The upgrade home is named by its
+                // Each screen is named once. Upgrades is named by its
                 // selected tab, and Settings and run history by their page
                 // titles, so the header adds no subtitle there.
                 let subtitle = match f.screen {
                     Screen::Battle => Some("Hold the line"),
-                    Screen::Results | Screen::Settings | Screen::History => None,
+                    Screen::Results | Screen::Upgrades | Screen::Settings | Screen::History => None,
                     _ => Some("Field command"),
                 };
                 if let Some(subtitle) = subtitle
@@ -42,8 +42,9 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                     if f.screen != Screen::Settings && ui.button("Settings").clicked() {
                         f.open_settings();
                     }
-                    // Camp and the upgrade home share one header grammar.
-                    let between_runs = matches!(f.screen, Screen::Camp | Screen::Results);
+                    // Camp, Results and Upgrades share one header grammar.
+                    let between_runs =
+                        matches!(f.screen, Screen::Camp | Screen::Results | Screen::Upgrades);
                     if between_runs && ui.button("History").clicked() {
                         f.open_history();
                     }
@@ -99,7 +100,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
 /// One destination in the camp navigation row.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum NavEntry {
-    /// The Journey upgrades home (`Screen::Results`).
+    /// The upgrade tree (`Screen::Upgrades`).
     Upgrades,
     Tab(Tab),
 }
@@ -114,22 +115,22 @@ impl NavEntry {
             NavEntry::Tab(Tab::Survivor) => CampaignFeature::Companion.label(),
             NavEntry::Tab(Tab::World) => "World map",
             NavEntry::Tab(Tab::Operations) => "Operations",
-            // Redirected to the upgrade home; never listed.
+            // Redirected to Upgrades; never listed.
             NavEntry::Tab(Tab::Skills | Tab::Engineering) => "Journey upgrades",
         }
     }
 }
 
-/// The single camp navigation row, in order: Camp home, the upgrade home,
+/// The single camp navigation row, in order: Camp home, Upgrades,
 /// then the Prepare pages and the world map (design-ux-flow decision 5). The
-/// upgrade home is listed while no main attempt is live (and on the home
+/// Upgrades entry is listed while no main attempt is live (and on Upgrades
 /// itself). Mara and Operations are drill-downs under Camp home, not entries.
 /// The complete upgrade tree has exactly one route: the home.
 pub(super) fn camp_entries(f: &UiCtx) -> Vec<NavEntry> {
     let mut entries = Vec::with_capacity(6);
     entries.push(NavEntry::Tab(Tab::Home));
-    // On the home itself the tab stays listed so the row shows where you are.
-    if f.game.attempt().is_none() || f.screen == Screen::Results {
+    // On Upgrades itself the entry stays listed so the row shows where you are.
+    if f.game.attempt().is_none() || f.screen == Screen::Upgrades {
         entries.push(NavEntry::Upgrades);
     }
     entries.extend([Tab::Briefing, Tab::Armory, Tab::Character, Tab::World].map(NavEntry::Tab));
@@ -140,7 +141,7 @@ pub(super) fn camp_entries(f: &UiCtx) -> Vec<NavEntry> {
 /// drill-downs (Mara, Operations).
 fn entry_selected(f: &UiCtx, entry: NavEntry) -> bool {
     match entry {
-        NavEntry::Upgrades => f.screen == Screen::Results,
+        NavEntry::Upgrades => f.screen == Screen::Upgrades,
         NavEntry::Tab(Tab::Home) => {
             f.screen == Screen::Camp && (f.tab == Tab::Home || f.tab.is_home_drill_down())
         }
@@ -172,7 +173,10 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
                             NavEntry::Upgrades => f.open_upgrades(),
                             NavEntry::Tab(Tab::Home) => f.open_camp_home(None),
                             // After a round, Equipment opens on the newest find.
-                            NavEntry::Tab(Tab::Armory) if f.screen == Screen::Results => {
+                            NavEntry::Tab(Tab::Armory)
+                                if f.screen == Screen::Upgrades
+                                    && f.game.last_result().is_some() =>
+                            {
                                 f.campaign.mode =
                                     f.game.last_result().map_or(Mode::Personal, |r| r.mode);
                                 f.armory.sort = super::armory::ArmorySort::Newest;
@@ -214,7 +218,7 @@ pub(super) fn active_defense_label(game: &Game) -> Option<String> {
 }
 
 pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
-    if !matches!(f.screen, Screen::Camp | Screen::Results) {
+    if !matches!(f.screen, Screen::Camp | Screen::Results | Screen::Upgrades) {
         return;
     }
     let fields = f.game.battles().iter().filter(|b| !b.settled).count();
@@ -263,7 +267,7 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                 }
                 muted(
                     ui,
-                    if f.screen == Screen::Results {
+                    if f.screen == Screen::Upgrades {
                         "Fields paused during upgrades"
                     } else if f.game.global_paused() {
                         "All fields paused"

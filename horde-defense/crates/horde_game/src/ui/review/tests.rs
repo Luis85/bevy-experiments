@@ -230,11 +230,11 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("character-max", Screen::Camp, Some(Tab::Character)),
     ("survivor", Screen::Camp, Some(Tab::Survivor)),
     ("armory", Screen::Camp, Some(Tab::Armory)),
-    ("skills", Screen::Results, Some(Tab::Skills)),
-    ("skills-survival", Screen::Results, Some(Tab::Skills)),
-    ("skills-ordnance", Screen::Results, Some(Tab::Skills)),
+    ("skills", Screen::Upgrades, Some(Tab::Skills)),
+    ("skills-survival", Screen::Upgrades, Some(Tab::Skills)),
+    ("skills-ordnance", Screen::Upgrades, Some(Tab::Skills)),
     ("ordnance", Screen::Battle, None),
-    ("engineering", Screen::Results, None),
+    ("engineering", Screen::Upgrades, None),
     ("results", Screen::Results, None),
     ("operations", Screen::Camp, Some(Tab::Operations)),
     ("settings", Screen::Settings, None),
@@ -248,7 +248,7 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("journey-victory", Screen::Results, None),
     ("journey-liberated", Screen::Results, None),
     ("journey-upgrades", Screen::Results, None),
-    ("skills-search", Screen::Results, None),
+    ("skills-search", Screen::Upgrades, None),
     // Wave 1 (design-qa-captures 1.8).
     ("results-defeat", Screen::Results, None),
     ("save-error", Screen::Camp, Some(Tab::World)),
@@ -265,12 +265,11 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("operations-observer", Screen::Camp, Some(Tab::Operations)),
     // Wave-2 close stills (W2-55).
     ("boss-phase", Screen::Battle, None),
-    ("skills-firearms", Screen::Results, Some(Tab::Skills)),
+    ("skills-firearms", Screen::Upgrades, Some(Tab::Skills)),
     // W2-57 (CF-2-04).
     ("spitter-windup", Screen::Battle, None),
-    // Wave-3 UI scenes (W3-27). `upgrades` follows `open_upgrades`: the
-    // shared Results screen until W3-03 lands `Screen::Upgrades`.
-    ("upgrades", Screen::Results, None),
+    // Wave-3 UI scenes (W3-27). `upgrades` follows `open_upgrades`.
+    ("upgrades", Screen::Upgrades, None),
     ("camp-home", Screen::Camp, Some(Tab::Home)),
     ("briefing-recruit", Screen::Camp, Some(Tab::Briefing)),
     ("equipment-autosell", Screen::Camp, Some(Tab::Armory)),
@@ -1584,7 +1583,7 @@ fn skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes() {
         (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
     ] {
         let mut f = staged("skills-firearms");
-        assert!(f.screen == Screen::Results, "staged {:?}", f.screen);
+        assert!(f.screen == Screen::Upgrades, "staged {:?}", f.screen);
         assert_eq!(f.nav.tab, Tab::Skills);
         f.settings.scale = scale;
         let ctx = egui::Context::default();
@@ -1681,18 +1680,12 @@ fn wave3_scenes_are_registered_stills() {
 
 /// The upgrades scene opens the upgrades by their one route
 /// (`UiCtx::open_upgrades`) after a real settled first round, focused on the
-/// recommended upgrade, and shows exactly one amber primary.
-///
-/// W3-03 has not landed: there is no `Screen::Upgrades`, so the route still
-/// shows the shared Results screen and the primary is its continue label.
-/// When W3-03 retargets `open_upgrades`, this test and the `upgrades`
-/// EXPECTED row move to `Screen::Upgrades`, and the primary becomes
-/// "Back to battle" (loop map, plan 3.2), registered as the scene's
-/// `primary`.
+/// recommended upgrade, and shows exactly one amber primary: "Back to
+/// battle" (loop map, plan 3.2), with "Back to camp" beside it.
 #[test]
-fn upgrades_fixture_has_one_amber_primary() {
+fn upgrades_fixture_has_one_amber_primary_back_to_battle() {
     let mut f = staged("upgrades");
-    assert!(f.screen == Screen::Results, "staged {:?}", f.screen);
+    assert!(f.screen == Screen::Upgrades, "staged {:?}", f.screen);
     assert!(f.game.attempt().is_none(), "the round settled");
     assert_eq!(f.game.campaign().run_history.len(), 1, "one real round");
     let report = f.game.last_result().expect("a settled report");
@@ -1705,15 +1698,26 @@ fn upgrades_fixture_has_one_amber_primary() {
         "the tree opens on the recommended upgrade"
     );
     assert!(f.game.global_paused());
-    let (ctx, _) = one_frame_with_context(&mut f);
+    let (ctx, output) = one_frame_with_context(&mut f);
     assert_eq!(
         primaries_on(&ctx, crate::ui::Surface::Screen),
-        [UPGRADES_PRIMARY_BEFORE_W3_03],
-        "one amber primary: today's continue label (W3-03: \"Back to battle\")"
+        ["Back to battle"],
+        "one amber primary"
+    );
+    assert_eq!(
+        crate::review_scenes::REVIEW_SCENES
+            .iter()
+            .find(|scene| scene.name == "upgrades")
+            .and_then(|scene| scene.primary),
+        Some("Back to battle"),
+        "the registered primary is the painted one"
+    );
+    assert_eq!(
+        crate::ui::tests::text_count(&output, "Back to camp"),
+        1,
+        "the way back to the camp"
     );
 }
-/// The upgrades scene's amber primary until W3-03 lands.
-const UPGRADES_PRIMARY_BEFORE_W3_03: &str = "Try again";
 
 /// Camp home lists what the scene stages: Mara and two recruits (a guard and
 /// one on a live expedition), an outbreak alert, the next front, and the

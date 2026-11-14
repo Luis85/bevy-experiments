@@ -83,7 +83,7 @@ fn the_hub_tab_returns_every_prepare_page_to_journey_upgrades_in_one_click() {
         f.act(|c| c.go_tab(tab));
         assert!(f.screen == Screen::Camp);
         h.click(f, View::Camp, "Journey upgrades");
-        assert!(f.screen == Screen::Results, "{tab:?}");
+        assert!(f.screen == Screen::Upgrades, "{tab:?}");
     }
 }
 
@@ -93,12 +93,12 @@ fn old_skills_and_fortification_tabs_redirect_to_the_one_upgrade_home() {
     let h = Harness::new();
     let f = between_runs(&mut fixture);
     f.act(|c| c.open_preparation(Tab::Skills));
-    assert!(f.screen == Screen::Results);
+    assert!(f.screen == Screen::Upgrades);
 
     f.act(|c| c.open_preparation(Tab::Armory));
     f.campaign.improvement_focus = None;
     f.act(|c| c.open_preparation(Tab::Engineering));
-    assert!(f.screen == Screen::Results);
+    assert!(f.screen == Screen::Upgrades);
     let fortification = f
         .game
         .campaign()
@@ -112,7 +112,7 @@ fn old_skills_and_fortification_tabs_redirect_to_the_one_upgrade_home() {
         f.screen = Screen::Camp;
         f.nav.tab = tab;
         h.frame(f, View::Camp, vec![]);
-        assert!(f.screen == Screen::Results, "{tab:?}");
+        assert!(f.screen == Screen::Upgrades, "{tab:?}");
     }
 
     // During a live defense the redirect lands on the same home, whose
@@ -123,12 +123,12 @@ fn old_skills_and_fortification_tabs_redirect_to_the_one_upgrade_home() {
     f.screen = Screen::Camp;
     f.game.set_paused(true);
     f.act(|c| c.open_preparation(Tab::Skills));
-    assert!(f.screen == Screen::Results);
+    assert!(f.screen == Screen::Upgrades);
     assert!(f.game.attempt().is_some());
-    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    let output = h.frame(f, View::UpgradesWithChrome, vec![]);
     assert_eq!(text_count(&output, "Return to active defense"), 1);
     assert_eq!(text_count(&output, "Leave journey"), 0);
-    h.click(f, View::ResultsWithChrome, "Return to active defense");
+    h.click(f, View::UpgradesWithChrome, "Return to active defense");
     assert!(f.screen == Screen::Battle);
 }
 
@@ -198,16 +198,16 @@ fn settings_and_history_return_to_the_page_they_were_opened_from() {
     assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Armory);
 
     f.act(|c| c.open_upgrades());
-    assert!(f.screen == Screen::Results);
-    h.click(f, View::ResultsWithChrome, "History");
+    assert!(f.screen == Screen::Upgrades);
+    h.click(f, View::UpgradesWithChrome, "History");
     assert!(f.screen == Screen::History);
     f.act(|c| c.close_history());
-    assert!(f.screen == Screen::Results);
-    h.click(f, View::ResultsWithChrome, "Settings");
+    assert!(f.screen == Screen::Upgrades);
+    h.click(f, View::UpgradesWithChrome, "Settings");
     assert!(f.screen == Screen::Settings);
     f.act(|c| c.request_save(SaveIntent::SettingsBack));
     f.flush_for_test();
-    assert!(f.screen == Screen::Results);
+    assert!(f.screen == Screen::Upgrades);
 }
 
 #[test]

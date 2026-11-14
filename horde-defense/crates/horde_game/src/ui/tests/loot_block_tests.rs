@@ -352,17 +352,8 @@ fn results_loot_block_fits_1050x700_at_1_35() {
             sold,
         ];
         lines.extend(loot.upgrades[..2].iter().map(gain_text));
-        // Every row's lead and control, and the actions the block sits
-        // beside, stay on screen too.
-        lines.extend(
-            [
-                "Better than equipped:",
-                "Equip",
-                "Try again",
-                "Leave journey",
-            ]
-            .map(String::from),
-        );
+        // Every row's lead and control stay on screen too.
+        lines.extend(["Better than equipped:", "Equip"].map(String::from));
         let mut bottom = 0.0_f32;
         for line in &lines {
             let rects = bounds_of(&output, line);
@@ -376,12 +367,23 @@ fn results_loot_block_fits_1050x700_at_1_35() {
                 bottom = bottom.max(rect.bottom());
             }
         }
-        // The block is content above the tree: the tree keeps at least its
-        // 150 pt minimum on screen.
+        // W3-03 rewrite: the block was content above the tree; it is now
+        // content above the bottom action bar, whose three actions stay on
+        // screen under it.
+        let mut bar_top = f32::MAX;
+        for action in ["Upgrade", "Try again", "Leave journey"] {
+            let (rect, clip) = clipped_bounds(&output, action)
+                .unwrap_or_else(|| panic!("{target:?}: {action} not painted"));
+            assert!(clip.contains_rect(rect), "{target:?}: {action} is clipped");
+            assert!(
+                screen.contains_rect(rect),
+                "{target:?}: {action} off screen"
+            );
+            bar_top = bar_top.min(rect.top());
+        }
         assert!(
-            bottom < screen.bottom() - 150.0,
-            "{target:?}: the block ends at {bottom} of {}",
-            screen.bottom()
+            bottom <= bar_top,
+            "{target:?}: the block ends at {bottom}, the bar starts at {bar_top}"
         );
     }
 }

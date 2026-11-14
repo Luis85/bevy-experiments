@@ -665,11 +665,10 @@ const UPGRADES_TICK_CAP: u32 = 60 * 300;
 /// The camp-home expedition fights for twenty seconds before the still.
 const EXPEDITION_TICKS: u32 = 60 * 20;
 
-/// The upgrades home after a first round: the journey-upgrades round (a real
+/// The Upgrades screen after a first round: the journey-upgrades round (a real
 /// stage-0 defense played with the smoke input, withdrawn if it outlasts
 /// `UPGRADES_TICK_CAP`), then the one route to the upgrades,
-/// `UiCtx::open_upgrades`. Until W3-03 splits `Screen::Upgrades` off, that
-/// route shows the shared Results screen; the scene follows the route.
+/// `UiCtx::open_upgrades`, which shows `Screen::Upgrades`.
 fn prepare_upgrades(f: &mut FrontendParts) {
     entitle_start(f, "DEU");
     deploy(f, 0, Mode::Personal);

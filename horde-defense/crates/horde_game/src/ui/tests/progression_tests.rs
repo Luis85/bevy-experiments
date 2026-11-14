@@ -8,7 +8,7 @@ fn upgrade_home() -> IsolatedFrontend {
     let mut fixture = IsolatedFrontend::new();
     let f = &mut fixture.frontend;
     f.game.campaign_mut().choose_start_country("DEU").unwrap();
-    f.screen = Screen::Results;
+    f.screen = Screen::Upgrades;
     f.campaign.improvement_focus = None;
     fixture
 }
@@ -32,7 +32,7 @@ fn the_tree_opens_on_the_recommended_node_not_the_owned_root() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.campaign_mut().coins = 60;
-    let output = h.frame(f, View::Results, vec![]);
+    let output = h.frame(f, View::Upgrades, vec![]);
     let root = skills().nodes.iter().find(|n| n.price == 0).unwrap();
     let chosen = selected(&h);
     assert_ne!(chosen, root.id);
@@ -54,7 +54,7 @@ fn learn_dispatches_the_purchase_keeps_the_selection_and_shows_the_main_delta() 
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.campaign_mut().coins = 500;
-    h.frame(f, View::Results, vec![]);
+    h.frame(f, View::Upgrades, vec![]);
     let id = selected(&h);
     assert!(f.game.campaign().can_purchase_node(&id).is_ok());
     let node = skills().node(&id).unwrap();
@@ -63,7 +63,7 @@ fn learn_dispatches_the_purchase_keeps_the_selection_and_shows_the_main_delta() 
     let coins = f.game.campaign().coins;
     let label = learn_label(f, &id);
     f.cues.clear();
-    h.click(f, View::Results, &label);
+    h.click(f, View::Upgrades, &label);
     assert!(f.game.campaign().has_node(&id), "BuySkillNode applied");
     assert!(
         f.cues.contains(&crate::audio::Cue::Confirm),
@@ -71,14 +71,14 @@ fn learn_dispatches_the_purchase_keeps_the_selection_and_shows_the_main_delta() 
         f.cues
     );
     assert_eq!(coins - f.game.campaign().coins, node.price);
-    let output = h.frame(f, View::Results, vec![]);
+    let output = h.frame(f, View::Upgrades, vec![]);
     assert_eq!(selected(&h), id, "selection stays after learning");
     assert_eq!(text_count(&output, &line), 1, "status line with the delta");
     assert_eq!(text_count(&output, "Owned"), 1, "state chip now owned");
     assert_eq!(text_count(&output, &label), 0, "no second purchase offered");
     // Home moves on to the next recommendation.
-    h.key(f, View::Results, Key::Home);
-    h.frame(f, View::Results, vec![]);
+    h.key(f, View::Upgrades, Key::Home);
+    h.frame(f, View::Upgrades, vec![]);
     assert_eq!(
         Some(selected(&h)),
         f.game.campaign().recommended_node(f.campaign.mode)
@@ -92,8 +92,8 @@ fn a_locked_selection_shows_the_core_reason_under_a_disabled_learn_button() {
     let f = &mut fixture.frontend;
     f.game.campaign_mut().coins = 0;
     f.game.campaign_mut().player.points = 0;
-    h.frame(f, View::Results, vec![]);
-    let output = h.frame(f, View::Results, vec![]);
+    h.frame(f, View::Upgrades, vec![]);
+    let output = h.frame(f, View::Upgrades, vec![]);
     let id = selected(&h);
     let reason = f
         .game
@@ -107,7 +107,7 @@ fn a_locked_selection_shows_the_core_reason_under_a_disabled_learn_button() {
     );
     let label = learn_label(f, &id);
     let before = serde_json::to_value(&f.game).unwrap();
-    h.click(f, View::Results, &label);
+    h.click(f, View::Upgrades, &label);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
 
@@ -116,10 +116,10 @@ fn search_selects_a_match_and_dims_everything_else() {
     let mut fixture = upgrade_home();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    h.frame(f, View::Results, vec![]);
-    h.click(f, View::Results, "Search upgrades");
-    h.frame(f, View::Results, vec![Event::Text("grenade".into())]);
-    let output = h.frame(f, View::Results, vec![]);
+    h.frame(f, View::Upgrades, vec![]);
+    h.click(f, View::Upgrades, "Search upgrades");
+    h.frame(f, View::Upgrades, vec![Event::Text("grenade".into())]);
+    let output = h.frame(f, View::Upgrades, vec![]);
     let matches: Vec<_> = search_nodes("grenade")
         .iter()
         .map(|n| n.id.clone())
@@ -159,7 +159,7 @@ fn arrow_keys_move_to_the_nearest_node_in_that_direction() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.campaign_mut().coins = 60;
-    h.frame(f, View::Results, vec![]);
+    h.frame(f, View::Upgrades, vec![]);
     let start = selected(&h);
     for (key, check) in [
         (Key::ArrowRight, (|d: Vec2| d.x > 1.0) as fn(Vec2) -> bool),
@@ -172,8 +172,8 @@ fn arrow_keys_move_to_the_nearest_node_in_that_direction() {
             .nodes
             .iter()
             .any(|n| check(vec2(n.position[0], n.position[1]) - position(&from)));
-        h.key(f, View::Results, key);
-        h.frame(f, View::Results, vec![]);
+        h.key(f, View::Upgrades, key);
+        h.frame(f, View::Upgrades, vec![]);
         let to = selected(&h);
         if reachable {
             assert_ne!(to, from, "{key:?} moves");
@@ -182,8 +182,8 @@ fn arrow_keys_move_to_the_nearest_node_in_that_direction() {
             assert_eq!(to, from);
         }
     }
-    h.key(f, View::Results, Key::Home);
-    h.frame(f, View::Results, vec![]);
+    h.key(f, View::Upgrades, Key::Home);
+    h.frame(f, View::Upgrades, vec![]);
     assert_eq!(selected(&h), start, "Home returns to the recommendation");
 }
 
@@ -200,7 +200,7 @@ fn an_explicit_fortification_focus_selects_that_branch() {
     f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
         first.id.clone(),
     ));
-    h.frame(f, View::Results, vec![]);
+    h.frame(f, View::Upgrades, vec![]);
     let chosen = selected(&h);
     assert_eq!(skills().node(&chosen).unwrap().branch, "Fortification");
     assert!(!f.game.campaign().has_node(&chosen));
@@ -213,7 +213,7 @@ fn the_compact_layout_keeps_at_least_half_the_tree_for_the_canvas() {
     let f = &mut fixture.frontend;
     f.game.campaign_mut().coins = 200;
     let wide = {
-        h.frame(f, View::Results, vec![]);
+        h.frame(f, View::Upgrades, vec![]);
         progression::layout_for_test(&h.ctx).unwrap()
     };
     assert!(!wide.compact);
@@ -221,8 +221,8 @@ fn the_compact_layout_keeps_at_least_half_the_tree_for_the_canvas() {
     f.settings.scale = 1.35;
     // The harness screen is in points: 1050×700 physical pixels at 1.35.
     let size = vec2(1050.0, 700.0) / 1.35;
-    h.frame_size(f, View::Results, vec![], size);
-    let output = h.frame_size(f, View::Results, vec![], size);
+    h.frame_size(f, View::Upgrades, vec![], size);
+    let output = h.frame_size(f, View::Upgrades, vec![], size);
     let layout = progression::layout_for_test(&h.ctx).unwrap();
     assert!(layout.compact);
     assert!(
@@ -290,8 +290,8 @@ fn counter_node_tooltip_names_its_archetypes() {
     f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
         node.id.clone(),
     ));
-    h.frame(f, View::Results, vec![]);
-    let output = h.frame(f, View::Results, vec![]);
+    h.frame(f, View::Upgrades, vec![]);
+    let output = h.frame(f, View::Upgrades, vec![]);
     assert_eq!(selected(&h), node.id);
     let line = format!("Counters: {}", names(node).join(", "));
     assert_eq!(text_count(&output, &line), 1, "{line}");

@@ -156,6 +156,7 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
         Screen::Camp => camp(root, f),
         Screen::Battle => battle(root, f, views),
         Screen::Results => results(root, f),
+        Screen::Upgrades => upgrades(root, f),
         Screen::History => history::show(root, f),
         Screen::Settings => settings_ui(root, f),
     }
@@ -232,6 +233,8 @@ mod reticle;
 use self::battle::{BattleFrame, battle, controls, gather_combat_input};
 mod results;
 use self::results::results;
+mod upgrades;
+use self::upgrades::upgrades;
 mod history;
 mod preferences;
 use self::preferences::settings_ui;

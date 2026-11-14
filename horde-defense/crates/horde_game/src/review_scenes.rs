@@ -206,10 +206,12 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     // W2-57 (CF-2-04): W2-28's ranged windup, a spitter mid-windup at reach.
     wave2_still("spitter-windup", "vfx-lighting", "battle", false),
     // Wave-3 UI stills for goals 2-4 (W3-27, design-qa-captures 1.8).
-    // W3-03 has not landed: `upgrades` follows `open_upgrades`, which still
-    // shows the shared Results screen, so its "Back to battle" primary is
-    // registered by W3-03 with `Screen::Upgrades`.
-    wave3_still("upgrades", "ux-flow", "journey-upgrades", None),
+    wave3_still(
+        "upgrades",
+        "ux-flow",
+        "journey-upgrades",
+        Some("Back to battle"),
+    ),
     wave3_still(
         "camp-home",
         "ux-flow",
@@ -274,8 +276,9 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
     // The wave-3 scenes.
     row(
         "upgrades",
-        "W3-27 (W3-03 pending)",
-        "the upgrades home after a first round, the recommended node focused, one amber primary",
+        "W3-03, W3-27",
+        "the Upgrades screen after a first round: the camp row, amber Back to battle and Back \
+         to camp above the tree, the recommended node focused",
     ),
     row(
         "camp-home",
@@ -310,7 +313,8 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
     row(
         "journey-upgrades",
         "W3-01, W3-16",
-        "Results with the tree after a first round (the upgrades pair)",
+        "Results after a first round: the outcome strip and the three-action bar, no tree (the \
+         upgrades pair)",
     ),
     row(
         "active-camp",

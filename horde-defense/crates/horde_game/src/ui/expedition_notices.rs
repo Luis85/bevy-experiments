@@ -59,7 +59,7 @@ fn kind(summary: &ExpeditionSummary) -> ToastKind {
 /// menu, survivor selection, settings).
 fn visible_slots(screen: Screen, game: &Game) -> Option<usize> {
     match screen {
-        Screen::Camp | Screen::Results | Screen::History => Some(STACK_VISIBLE),
+        Screen::Camp | Screen::Results | Screen::Upgrades | Screen::History => Some(STACK_VISIBLE),
         Screen::Battle if game.attempt().is_none_or(|a| a.paused) => Some(1),
         _ => None,
     }

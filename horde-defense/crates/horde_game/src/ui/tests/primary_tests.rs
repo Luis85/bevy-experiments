@@ -252,15 +252,36 @@ const MATRIX: &[(&str, fn(&mut IsolatedFrontend), Screen, Expect)] = &[
         Screen::Results,
         Expect::One,
     ),
+    // W3-03 rewrite: the screen opened over a live defense is Upgrades
+    // (Results with no settled report hands over to Camp home).
     (
-        "results-live",
+        "upgrades-live",
         |x| {
             x.deploy();
             x.frontend.game.set_paused(true);
-            x.frontend.screen = Screen::Results;
+            x.frontend.screen = Screen::Upgrades;
         },
-        Screen::Results,
+        Screen::Upgrades,
         Expect::Label("Return to active defense"),
+    ),
+    (
+        "upgrades",
+        |x| {
+            x.deploy();
+            x.frontend.game.apply(&Command::Withdraw).unwrap();
+            x.frontend.screen = Screen::Upgrades;
+        },
+        Screen::Upgrades,
+        Expect::Label("Back to battle"),
+    ),
+    (
+        "upgrades-no-report",
+        |x| {
+            between_runs(x);
+            x.frontend.screen = Screen::Upgrades;
+        },
+        Screen::Upgrades,
+        Expect::Label("Back to camp"),
     ),
     (
         "history",

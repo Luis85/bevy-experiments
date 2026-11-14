@@ -4,9 +4,9 @@ This build tests the complete survival, preparation, country and strategic loops
 
 ## Start
 
-In a packaged Windows folder, use Play Lastlight.cmd (or its optional process-local DirectX12 launcher); from the workspace use cargo run --locked -p horde-defense. Choose New game. Existing profiles get a confirmation and complete archive before replacement; Keep current journey cancels. Select Rook/June, confirm, then select the infected starting country for live Personal combat. Every main outcome returns to Journey upgrades; Continue retries/advances and Leave saves without erasing earnings. See [JOURNEYS.md](JOURNEYS.md).
+In a packaged Windows folder, use Play Lastlight.cmd (or its optional process-local DirectX12 launcher); from the workspace use cargo run --locked -p horde-defense. Choose New game. Existing profiles get a confirmation and complete archive before replacement; Keep current journey cancels. Select Rook/June, confirm, then select the infected starting country for live Personal combat. Every main outcome returns to Results, with three actions: Upgrade opens Journey upgrades, the continuation retries/advances and Leave saves without erasing earnings. See [JOURNEYS.md](JOURNEYS.md).
 
-Journey upgrades is the main between-round destination. The complete tree shares earned coins and actual requirements; Equipment and Run analysis are direct, with map/stats and progressively learned advanced routes under More. Main and worker outcomes are distinct; workers do not force the main screen away. The old management-first body/skills/fortification purchase tabs are superseded.
+Journey upgrades is the main between-round destination, one action from Results. The complete tree shares earned coins and actual requirements; its camp row leads to Equipment, Character, the Briefing and the map, and Back to battle continues the journey. Main and worker outcomes are distinct; workers do not force the main screen away. The old management-first body/skills/fortification purchase tabs are superseded.
 
 The pixel field retains compact corner status, direct combat actions, focused resource reticle and actual geometry. Journey upgrades shows all 177 nodes in one graph; Branch focus changes camera/selection only. Purchase requires the named learned parents, victories/liberations and Coins or explicitly eligible legacy CP. Fresh body ranks are bought here, not on Character. Settings keeps its durable named return.
 
@@ -107,7 +107,7 @@ Open History from the header on any screen. Filter mode, Victory/Defeat/Retreate
 
 On an isolated profile, test New game cancellation before a confirmed reset. A confirmed reset must archive the complete old generation before replacing it; failures keep the old journey active. Difficulty/display/audio/controls remain. Leave and resume a settled journey without resetting its equipment, nodes, money or history.
 
-After both a win and a retreat, inspect the same Journey upgrades screen and whole tree. Branch focus must not hide the other paths. Continue must use the legal next/retry stage without buying; country liberation returns to map choice.
+After both a win and a retreat, Results shows exactly Upgrade, the continuation and Leave journey; open Upgrade and inspect the same Journey upgrades screen and whole tree. Branch focus must not hide the other paths. The continuation and Back to battle must use the legal next/retry stage without buying; country liberation returns to map choice.
 
 Inspect actual equipment on Character: change an owned outfit/accessory/melee or trained firearm explicitly, then compare the shared preview and field layers. Hands should stay on grips, long-gun stock near the shoulder, muzzle/tracers aligned and boots planted through reload/recoil/mirroring. The preview must not spend, equip or alter combat/RNG. Old missing appearance snapshots must remain a valid fallback.
 

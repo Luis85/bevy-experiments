@@ -87,17 +87,26 @@ fn exactly_one_save_label() {
     for old in OLD_SAVE_LABELS {
         assert_eq!(text_count(&output, old), 0, "battle still names {old:?}");
     }
-    // Results: the header carries "Save"; "More" no longer repeats it.
+    // Results and Upgrades: the header carries "Save". (W3-03 rewrite:
+    // Results has no "More" menu any more.)
     f.game.withdraw();
-    f.screen = Screen::Results;
-    let h = Harness::new();
-    let output = h.frame(f, View::Full, vec![]);
-    assert_eq!(text_count(&output, "Save"), 1, "Results header saves once");
-    h.click(f, View::Full, "More");
-    let output = h.frame(f, View::Full, vec![]);
-    assert_eq!(text_count(&output, "Save"), 1, "More adds no second save");
-    for old in OLD_SAVE_LABELS {
-        assert_eq!(text_count(&output, old), 0, "Results still names {old:?}");
+    for screen in [Screen::Results, Screen::Upgrades] {
+        f.screen = screen;
+        let h = Harness::new();
+        let output = h.frame(f, View::Full, vec![]);
+        assert_eq!(
+            text_count(&output, "Save"),
+            1,
+            "{screen:?} header saves once"
+        );
+        assert_eq!(text_count(&output, "More"), 0, "{screen:?}");
+        for old in OLD_SAVE_LABELS {
+            assert_eq!(
+                text_count(&output, old),
+                0,
+                "{screen:?} still names {old:?}"
+            );
+        }
     }
     // Camp home: the header again, never a footer "Save campaign".
     f.screen = Screen::Camp;
