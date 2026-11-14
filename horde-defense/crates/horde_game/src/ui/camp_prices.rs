@@ -1,9 +1,11 @@
 //! Camp purchase buttons whose labels, enable checks and hover text read the
 //! core camp prices (rulings R10 and D15): `Campaign::recruit_price` and
-//! `Campaign::npc_training_price`, both threat-scaled.
+//! `Campaign::npc_training_price`, both threat-scaled. The recruit button
+//! opens and closes on `Game::recruit_offer`, core's one recruit gate.
 use super::coins::grouped;
 use horde_core::{
     campaign::{Campaign, Npc},
+    defenders::RecruitBlocker,
     sim::Game,
     world::world,
 };
@@ -31,44 +33,44 @@ pub(super) fn training_point(campaign: &Campaign, npc: &Npc) -> PriceButton {
     }
 }
 
-/// "Recruit survivor" in `country` at the core recruit price. The disabled
-/// hover names each blocker that holds the button, in the order the checks
-/// read; an open button keeps the whole requirement list.
+/// "Recruit survivor" in `country` at the core recruit price. The button is
+/// open exactly when `Game::recruit_offer` offers a recruit there; a closed
+/// button's hover names the core blocker that holds it, and an open button
+/// keeps the whole requirement list.
 pub(super) fn recruit(game: &Game, country: &str) -> PriceButton {
-    let campaign = game.campaign();
-    let price = campaign.recruit_price();
-    let max = world().strategy_config.max_roster;
-    let blockers: Vec<String> = [
-        (!campaign.world.cleared.iter().any(|id| id == country))
-            .then(|| "Choose a liberated country.".to_owned()),
-        (game.strategy().roster.len() >= max)
-            .then(|| format!("The roster is full ({max} survivors).")),
-        (campaign.coins < price).then(|| {
-            format!(
-                "Requires {} coins; you have {}.",
-                grouped(price),
-                grouped(campaign.coins)
-            )
-        }),
-        campaign
-            .reserved
-            .is_some()
-            .then(|| "Return the active defender to camp first.".to_owned()),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
+    let price = game.campaign().recruit_price();
+    let offer = game.recruit_offer(country);
     PriceButton {
         label: format!("Recruit survivor · {} coins", grouped(price)),
-        enabled: blockers.is_empty(),
-        disabled_hover: if blockers.is_empty() {
-            format!(
+        enabled: offer.is_ok(),
+        disabled_hover: match offer {
+            Ok(_) => format!(
                 "Requires a liberated country, room in the roster, {} coins and the active defender in camp.",
                 grouped(price)
-            )
-        } else {
-            blockers.join(" ")
+            ),
+            Err(blocker) => blocker_text(game, &blocker),
         },
+    }
+}
+
+/// The camp's words for a core `RecruitBlocker`, coins grouped by thousands.
+fn blocker_text(game: &Game, blocker: &RecruitBlocker) -> String {
+    match blocker {
+        RecruitBlocker::NeedsNode { name, price, .. } => format!(
+            "Learn {name} in Upgrades to recruit survivors ({} coins).",
+            grouped(*price)
+        ),
+        RecruitBlocker::NotLiberated => "Choose a liberated country.".to_owned(),
+        RecruitBlocker::RosterFull => format!(
+            "The roster is full ({} survivors).",
+            world().strategy_config.max_roster
+        ),
+        RecruitBlocker::DefenseInProgress => "Return the active defender to camp first.".to_owned(),
+        RecruitBlocker::NeedCoins(price) => format!(
+            "Requires {} coins; you have {}.",
+            grouped(*price),
+            grouped(game.campaign().coins)
+        ),
     }
 }
 
@@ -160,7 +162,8 @@ mod tests {
             recruit(&game, &elsewhere).disabled_hover,
             "Choose a liberated country."
         );
-        // A full roster and short coins: both named, in one sentence each.
+        // A full roster and short coins: core's first blocker, the roster,
+        // holds the button.
         let (mut game, country) = camp_at_rank_10(1_000_000);
         let max = world().strategy_config.max_roster;
         while game.strategy().roster.len() < max {
@@ -168,16 +171,37 @@ mod tests {
                 .unwrap();
         }
         game.staging().campaign().coins = 0;
-        let price = game.campaign().recruit_price();
         assert_eq!(
             recruit(&game, &country).disabled_hover,
-            format!("The roster is full ({max} survivors). Requires {price} coins; you have 0.")
+            format!("The roster is full ({max} survivors).")
         );
         // An open button keeps the whole requirement list as its hover.
         let (game, country) = camp_at_rank_10(1_000);
         assert_eq!(
             recruit(&game, &country).disabled_hover,
             "Requires a liberated country, room in the roster, 200 coins and the active defender in camp."
+        );
+    }
+
+    /// The button reads `Game::recruit_offer`, so core's own gates hold it:
+    /// a journey without the Recruitment node names the node and its price.
+    #[test]
+    fn recruit_button_follows_core_offer_gates() {
+        let (mut game, country) = camp_at_rank_10(1_000);
+        game.staging().campaign().legacy_features = false;
+        let Err(horde_core::defenders::RecruitBlocker::NeedsNode { name, price, .. }) =
+            game.recruit_offer(&country)
+        else {
+            panic!("the Recruitment node is missing");
+        };
+        let button = recruit(&game, &country);
+        assert!(!button.enabled, "core offers no recruit");
+        assert_eq!(
+            button.disabled_hover,
+            format!(
+                "Learn {name} in Upgrades to recruit survivors ({} coins).",
+                grouped(price)
+            )
         );
     }
 
