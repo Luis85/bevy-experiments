@@ -300,14 +300,14 @@ fn light_pools_paint_after_the_grade_and_under_the_vignette() {
     let warning = {
         let mut game = crowded();
         let a = game.attempt_mut().unwrap();
-        event(a, EventKind::BossWarning, 0, 0, None);
+        event(a, EventKind::Reinforcements, 0, 0, None);
         frame(&game, Lighting::Night, false)
     };
     let lights = light_meshes(&warning)[0];
     let banner = warning
         .iter()
-        .position(|s| matches!(&s.shape, Shape::Text(t) if t.galley.text() == "BOSS APPROACHING"))
-        .expect("the boss banner");
+        .position(|s| matches!(&s.shape, Shape::Text(t) if t.galley.text() == "REINFORCEMENTS"))
+        .expect("the reinforcements cue");
     assert!(banner > lights, "cues paint over the lights");
 }
 

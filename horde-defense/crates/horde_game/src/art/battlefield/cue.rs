@@ -57,7 +57,6 @@ pub(super) enum CueKind {
     Bar,
     Marker,
     Label,
-    Plate,
     Coin,
 }
 
@@ -110,7 +109,6 @@ pub(super) struct CueBatch {
     halo: MeshBuilder,
     fill: MeshBuilder,
     marker: MeshBuilder,
-    plates: Vec<(Rect, Label)>,
     /// Labels that move as one block, painted in order.
     labels: Vec<Vec<Label>>,
     coins: Vec<Coin>,
@@ -125,7 +123,6 @@ impl CueBatch {
             halo: MeshBuilder::untextured(enemies * 2 + 8),
             fill: MeshBuilder::untextured(enemies * 3 + 8),
             marker: MeshBuilder::untextured(8),
-            plates: Vec::new(),
             labels: Vec::new(),
             coins: Vec::new(),
             #[cfg(test)]
@@ -227,12 +224,6 @@ impl CueBatch {
         self.labels.push(block);
     }
 
-    /// A banner: `label` centred on an INK plate filling `rect`.
-    pub(super) fn plate(&mut self, rect: Rect, label: Label) {
-        self.record(CueKind::Plate, label.color, HALO);
-        self.plates.push((rect, label));
-    }
-
     /// A banked-coin pop-up: amber on an eight-way INK outline.
     pub(super) fn coin(&mut self, center: Pos2, coins: i32, alpha: f32, reduced: bool) {
         self.record(
@@ -248,22 +239,12 @@ impl CueBatch {
         });
     }
 
-    /// Paints the batch: halo, fill and marker meshes, then banners, labels
-    /// and coin pop-ups.
+    /// Paints the batch: halo, fill and marker meshes, then labels and coin
+    /// pop-ups.
     pub(super) fn paint(self, p: &Painter) {
         self.halo.paint(p);
         self.fill.paint(p);
         self.marker.paint(p);
-        for (rect, label) in self.plates {
-            p.rect_filled(rect, 2.0, HALO);
-            p.text(
-                rect.center(),
-                Align2::CENTER_CENTER,
-                label.text,
-                FontId::proportional(label.size),
-                label.color,
-            );
-        }
         for block in self.labels {
             callouts(p, block);
         }

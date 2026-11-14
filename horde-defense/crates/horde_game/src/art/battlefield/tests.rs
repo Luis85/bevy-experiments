@@ -2489,7 +2489,7 @@ fn every_cue_primitive_has_an_ink_backing_with_contrast_at_least_3() {
         collect_cues(&mut batch, projection, &view, &options, &fx_options);
         let kinds: std::collections::HashSet<CueKind> =
             batch.records.iter().map(|record| record.kind).collect();
-        assert_eq!(kinds.len(), 7, "every cue kind is staged: {kinds:?}");
+        assert_eq!(kinds.len(), 6, "every cue kind is staged: {kinds:?}");
         for record in &batch.records {
             let strength = f32::from(record.color.a()) / 255.0;
             assert!(strength > 0.0, "{record:?} is visible");
@@ -2623,7 +2623,6 @@ fn cue_pass_paints_after_the_grade_and_the_vignette() {
             })
             .collect();
         for cue in [
-            "BOSS APPROACHING",
             "REINFORCEMENTS",
             "INCOMING",
             "SIEGE BRUTE",
@@ -2737,7 +2736,7 @@ fn sky_flash_paints_under_cue_pass() {
             _ => None,
         })
         .collect();
-    for cue in ["BOSS APPROACHING", "REINFORCEMENTS", "INCOMING", "+150c"] {
+    for cue in ["REINFORCEMENTS", "INCOMING", "+150c"] {
         assert!(
             texts
                 .iter()
