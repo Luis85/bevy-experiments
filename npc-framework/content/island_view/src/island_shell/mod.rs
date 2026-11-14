@@ -54,6 +54,9 @@ enum Action {
     Total(TotalKind),
     /// The button of a host toast that failed: ask the host to try again.
     Retry,
+    /// "See the season" and the calendar's "Last season": the season-end
+    /// card (2.6).
+    SeasonCard,
 }
 
 /// How a toast from the host reads: a note, something that went well, or
@@ -74,6 +77,8 @@ struct HostToast {
     left: Option<f32>,
     /// The words on its one button ("Try again"), if it has one.
     button: Option<String>,
+    /// What the button does: the host's retry, or the season card.
+    action: Action,
 }
 
 /// Holds the host's toast in the lane.
@@ -90,6 +95,9 @@ struct ShellNotice;
 struct NoticeText;
 #[derive(Component)]
 struct PausedPill;
+/// The Paused pill's words: "Paused · 2 orders waiting".
+#[derive(Component)]
+struct PausedText;
 #[derive(Component)]
 struct DateText;
 #[derive(Component)]
@@ -125,6 +133,9 @@ struct CalendarToday;
 struct CalendarGatherings;
 #[derive(Component)]
 struct CalendarMourning;
+/// The calendar's way back to the season that ended last.
+#[derive(Component)]
+struct LastSeasonButton;
 /// The totals and the divider before them: Oversee only.
 #[derive(Component)]
 struct TotalsGroup;
@@ -146,6 +157,9 @@ struct ModeKey;
 /// The word on a mode segment; at the Compact width only the active one shows.
 #[derive(Component)]
 struct ModeLabel(ModeTab);
+/// The top bar's "Free" mark on Shape: shown while placement is free.
+#[derive(Component)]
+pub(crate) struct FreeBadge;
 
 /// The bar's own input. The ledger and the character workspace read their
 /// keys after it: Tab is taken here first, and a click is seen before a
@@ -498,6 +512,15 @@ fn spawn(world: &mut World) {
             Reach::Ring,
             ShellAction(Action::Mode(tab)),
         );
+        if tab == ModeTab::Shape {
+            // "Free" while placing is free (the recorded editor switch), in
+            // every mode, so a played island never has it on unseen.
+            let badge = w::badge(world, segment, Surface::Chrome, Status::Info, "Free");
+            world
+                .entity_mut(badge)
+                .insert((FreeBadge, Name::new("Free placement badge")));
+            w::show(world, badge, false);
+        }
         let caps: Vec<Entity> = world
             .get::<Children>(segment)
             .map(|children| children.to_vec())
@@ -789,6 +812,11 @@ fn spawn(world: &mut World) {
         ))
         .id();
     let paused = w::toast(world, lane, Status::Idle, "Paused", Some(Icon::Pause));
+    let words = world
+        .get::<Children>(paused)
+        .and_then(|children| children.last().copied())
+        .expect("pill text");
+    world.entity_mut(words).insert(PausedText);
     w::keycap(world, paused, Surface::Chrome, "Space");
     world
         .entity_mut(paused)
@@ -879,6 +907,19 @@ fn spawn(world: &mut World) {
         Tone::secondary(Surface::Paper),
     );
     world.entity_mut(mourning).insert(CalendarMourning);
+    // The season that ended, once one has (2.6).
+    let last = w::button(
+        world,
+        popover,
+        w::ButtonSpec::new("Last season", Kind::Quiet, Surface::Paper)
+            .size(w::Size::Small)
+            .reach(Reach::Ring),
+        ShellAction(Action::SeasonCard),
+    );
+    world.entity_mut(last).insert((
+        LastSeasonButton,
+        Tooltip::new("Last season", "The card of the season that ended last."),
+    ));
 }
 
 /// The calendar's gatherings and mourning notes from the simulation's own
@@ -1136,14 +1177,17 @@ fn keys(world: &mut World) {
             consumed.push(tab.key());
         }
     }
-    if keys.just_pressed(KeyCode::Space) && !control_focused {
+    use crate::keymap::{self as map, Mode::Live};
+    let pause = map::key(Live, map::PAUSE);
+    if keys.just_pressed(pause) && !control_focused {
         requests.push(Action::Clock(ClockAction::TogglePause));
-        consumed.push(KeyCode::Space);
+        consumed.push(pause);
     }
+    // The table's keys and their numpad twins.
     for (key, action) in [
-        (KeyCode::Minus, ClockAction::Slower),
+        (map::key(Live, map::SLOWER), ClockAction::Slower),
         (KeyCode::NumpadSubtract, ClockAction::Slower),
-        (KeyCode::Equal, ClockAction::Faster),
+        (map::key(Live, map::FASTER), ClockAction::Faster),
         (KeyCode::NumpadAdd, ClockAction::Faster),
     ] {
         if keys.just_pressed(key) {
@@ -1218,8 +1262,30 @@ fn set_host_toast(
             tone,
             left: (!lasting).then_some(stay),
             button,
+            action: Action::Retry,
         });
     }
+}
+
+/// A season has ended while the right column is in use: a toast in the
+/// host's place offers its card, for `TOAST_STAY_ALERT` (2.6).
+pub(crate) fn season_toast(world: &mut World, text: String) {
+    if let Some(mut state) = world.get_resource_mut::<ShellState>() {
+        state.host = Some(HostToast {
+            text,
+            tone: ToastTone::Note,
+            left: Some(t::motion::TOAST_STAY_ALERT),
+            button: Some("See the season".to_owned()),
+            action: Action::SeasonCard,
+        });
+    }
+}
+
+/// The host toast's words and button, for a test.
+#[cfg(test)]
+pub(crate) fn host_toast_text(world: &World) -> Option<(String, Option<String>)> {
+    let toast = world.get_resource::<ShellState>()?.host.clone()?;
+    Some((toast.text, toast.button))
 }
 
 pub(crate) fn clear_host_toast(world: &mut World) {
@@ -1264,6 +1330,11 @@ fn refresh_host_toast(world: &mut World, gated: bool, delta: f32) {
             .as_ref()
             .map(|toast| (toast.tone, toast.button.clone(), toast.text.clone()))
     };
+    let action = world
+        .resource::<ShellState>()
+        .host
+        .as_ref()
+        .map_or(Action::Retry, |toast| toast.action.clone());
     let slots: Vec<Entity> = world
         .query_filtered::<Entity, With<HostToastSlot>>()
         .iter(world)
@@ -1281,7 +1352,7 @@ fn refresh_host_toast(world: &mut World, gated: bool, delta: f32) {
                         w::ButtonSpec::new(label, Kind::Secondary, Surface::Chrome)
                             .size(w::Size::Small)
                             .reach(Reach::Ring),
-                        ShellAction(Action::Retry),
+                        ShellAction(action.clone()),
                     );
                 }
             }
@@ -1333,6 +1404,14 @@ fn process(world: &mut World) {
             }
             Action::Total(kind) => crate::colony_panel::open_page(world, kind.page()),
             Action::Retry => world.resource_mut::<ShellState>().retry = true,
+            Action::SeasonCard => {
+                let mut state = world.resource_mut::<ShellState>();
+                state.host = None;
+                if state.popover == Popover::Calendar {
+                    state.popover = Popover::None;
+                }
+                crate::colony_panel::open_last_season(world);
+            }
             Action::Mode(tab) => {
                 let current = *world.resource::<IslandMode>();
                 match model::intent(current, tab, life_state(world)) {
@@ -1432,10 +1511,14 @@ fn refresh_totals(world: &mut World, shown: bool, class: LayoutClass) {
     show::<TotalsGroup>(world, shown);
     show::<TotalsDivider>(world, shown && !second);
     show::<TotalsRow>(world, second);
-    let (left, right, drop) = model::toast_lane(
+    let counting = world
+        .get_resource::<npc_framework::kernel::commands::CommandQueue>()
+        .is_some_and(|queue| !queue.pending.is_empty());
+    let (left, right, drop) = model::toast_lane_for(
         scale::layout(world).width,
         crate::player_hud::workspace_width(world),
         crate::player_hud::GOAL_EDGE,
+        counting,
     );
     // Shape's resources panel stands right of the rail: the lane (the
     // Paused pill and the toasts) is centred in what is left beside it, so
@@ -1543,7 +1626,7 @@ fn refresh(world: &mut World) {
         .collect();
     for (entity, action) in buttons {
         let (on, enabled) = match action {
-            Action::Menu | Action::Total(_) | Action::Retry => continue,
+            Action::Menu | Action::Total(_) | Action::Retry | Action::SeasonCard => continue,
             Action::Mode(tab) => {
                 let button = bar.iter().find(|button| button.tab == tab).expect("mode");
                 tip(
@@ -1690,6 +1773,16 @@ fn refresh(world: &mut World) {
     // middle: the pill gives way to it (the bar's own Pause is lit meanwhile).
     let calendar_open = world.resource::<ShellState>().popover == Popover::Calendar;
     show::<PausedPill>(world, clock.stopped && !gated && !calendar_open);
+    // Orders given while paused wait for time to run (3.4): the pill counts
+    // them. `set_text` writes only a change.
+    let waiting = if clock.stopped {
+        world
+            .get_resource::<npc_framework::kernel::commands::CommandQueue>()
+            .map_or(0, |queue| queue.pending.len())
+    } else {
+        0
+    };
+    set_text::<PausedText>(world, &model::paused_words(waiting));
     let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
     refresh_host_toast(world, gated, delta);
     let transient = {
@@ -1735,6 +1828,8 @@ fn refresh_calendar(world: &mut World) {
             world,
             !(now.is_empty() && later.is_empty() && mourning.is_empty()),
         );
+        let ended = crate::colony_panel::last_season(world).is_some();
+        show::<LastSeasonButton>(world, ended);
     }
     let top = content_top(world) - MARGIN + 4.0;
     let width = scale::layout(world).width;

@@ -938,7 +938,6 @@
           "key": "axe",
           "display": "axes",
           "base_price": 18,
-          "stock_limit": 3,
           "tags": [
             "tool"
           ],
@@ -948,28 +947,27 @@
           "key": "bread",
           "display": "bread",
           "base_price": 6,
-          "stock_limit": 24,
           "food_value": 80000,
           "tags": [
             "food",
             "staple",
             "baked"
-          ]
+          ],
+          "shelf_life_days": 20
         },
         {
           "key": "hammer",
           "display": "hammers",
           "base_price": 18,
-          "stock_limit": 3,
           "tags": [
             "tool"
-          ]
+          ],
+          "durability": 60
         },
         {
           "key": "ingot",
           "display": "ingots",
           "base_price": 6,
-          "stock_limit": 12,
           "tags": [
             "metal"
           ]
@@ -978,7 +976,6 @@
           "key": "log",
           "display": "logs",
           "base_price": 3,
-          "stock_limit": 20,
           "tags": [
             "fuel",
             "timber"
@@ -989,7 +986,6 @@
           "key": "ore",
           "display": "ore",
           "base_price": 3,
-          "stock_limit": 20,
           "tags": [
             "ore"
           ],
@@ -999,7 +995,6 @@
           "key": "pickaxe",
           "display": "pickaxes",
           "base_price": 18,
-          "stock_limit": 3,
           "tags": [
             "tool"
           ],
@@ -1009,7 +1004,6 @@
           "key": "plank",
           "display": "planks",
           "base_price": 2,
-          "stock_limit": 20,
           "tags": [
             "lumber"
           ]
@@ -1018,7 +1012,6 @@
           "key": "village_berries",
           "display": "berries",
           "base_price": 2,
-          "stock_limit": 40,
           "food_value": 20000,
           "tags": [
             "food",
@@ -1028,13 +1021,13 @@
           "item": {
             "weight_g": 100,
             "max_stack": 40
-          }
+          },
+          "shelf_life_days": 14
         },
         {
           "key": "village_bowl",
           "display": "bowls",
           "base_price": 8,
-          "stock_limit": 6,
           "item": {
             "weight_g": 200,
             "max_stack": 20
@@ -1044,7 +1037,6 @@
           "key": "village_cooked_meal",
           "display": "cooked meals",
           "base_price": 9,
-          "stock_limit": 24,
           "food_value": 90000,
           "tags": [
             "food",
@@ -1054,13 +1046,13 @@
           "item": {
             "weight_g": 500,
             "max_stack": 10
-          }
+          },
+          "shelf_life_days": 10
         },
         {
           "key": "village_fiber",
           "display": "fiber",
           "base_price": 1,
-          "stock_limit": 40,
           "tags": [
             "fiber"
           ],
@@ -1073,17 +1065,17 @@
           "key": "village_fish",
           "display": "fish",
           "base_price": 4,
-          "stock_limit": 20,
           "item": {
             "weight_g": 500,
             "max_stack": 20
-          }
+          },
+          "gather_tool": "village_fishing_rod",
+          "gather_tool_required": true
         },
         {
           "key": "village_fishing_rod",
           "display": "fishing rods",
           "base_price": 12,
-          "stock_limit": 4,
           "tags": [
             "tool"
           ],
@@ -1093,13 +1085,13 @@
             "tags": [
               "tool:fishing"
             ]
-          }
+          },
+          "durability": 60
         },
         {
           "key": "village_flour",
           "display": "flour",
           "base_price": 6,
-          "stock_limit": 40,
           "item": {
             "weight_g": 250,
             "max_stack": 50
@@ -1109,7 +1101,6 @@
           "key": "village_grain",
           "display": "grain",
           "base_price": 3,
-          "stock_limit": 40,
           "tags": [
             "grain"
           ],
@@ -1123,7 +1114,6 @@
           "key": "village_hide",
           "display": "hides",
           "base_price": 4,
-          "stock_limit": 16,
           "tags": [
             "hide"
           ],
@@ -1136,7 +1126,6 @@
           "key": "village_hoe",
           "display": "hoes",
           "base_price": 14,
-          "stock_limit": 3,
           "tags": [
             "tool"
           ],
@@ -1153,7 +1142,6 @@
           "key": "village_leather",
           "display": "leather",
           "base_price": 10,
-          "stock_limit": 16,
           "tags": [
             "leather"
           ],
@@ -1166,7 +1154,6 @@
           "key": "village_raw_meat",
           "display": "raw meat",
           "base_price": 5,
-          "stock_limit": 16,
           "tags": [
             "meat"
           ],
@@ -1179,7 +1166,6 @@
           "key": "village_spear",
           "display": "hunting spears",
           "base_price": 10,
-          "stock_limit": 8,
           "tags": [
             "tool"
           ],
@@ -1189,13 +1175,13 @@
             "tags": [
               "tool:hunting"
             ]
-          }
+          },
+          "durability": 20
         },
         {
           "key": "village_thread",
           "display": "thread",
           "base_price": 4,
-          "stock_limit": 24,
           "tags": [
             "yarn"
           ],
@@ -1208,7 +1194,6 @@
           "key": "village_warm_clothes",
           "display": "warm clothes",
           "base_price": 34,
-          "stock_limit": 4,
           "tags": [
             "clothing",
             "staple"
@@ -1224,7 +1209,6 @@
           "key": "village_water",
           "display": "clean water",
           "base_price": 1,
-          "stock_limit": 40,
           "tags": [
             "staple",
             "drink"
@@ -1798,7 +1782,8 @@
               "count": 2
             }
           ],
-          "builds": true
+          "builds": true,
+          "tool": "hammer"
         },
         {
           "role": "miner",
@@ -1880,7 +1865,6 @@
           "station": "village_inn",
           "wants": [
             "log",
-            "hammer",
             "village_bowl"
           ],
           "keeps": [
@@ -1891,11 +1875,6 @@
             },
             {
               "good": "village_bowl",
-              "count": 1,
-              "reserve_inputs": true
-            },
-            {
-              "good": "hammer",
               "count": 1,
               "reserve_inputs": true
             }
@@ -1956,7 +1935,8 @@
                 "good": "village_hide",
                 "count": 1
               }
-            ]
+            ],
+            "prey": "deer"
           }
         },
         {
@@ -2133,11 +2113,12 @@
           "dx": 38000,
           "dz": -8000,
           "capacity": 80,
-          "gather_ticks": 220,
+          "gather_ticks": 293,
           "finite": false,
           "regrowth": 2,
           "harvest_loss": 40,
-          "soil_loss": 0
+          "soil_loss": 0,
+          "shore": true
         }
       ],
       "buildings": [
@@ -2979,7 +2960,12 @@
         "grants_spare_sites": true,
         "founder_coats_per_three": 2,
         "wildlife_motion": true,
-        "found_coat_workshops": true
+        "found_coat_workshops": true,
+        "build_tool_percent": 100,
+        "build_bare_percent": 150,
+        "inn_bed_price": 3,
+        "inn_bed_ticks": 300,
+        "storage_shelf_percent": 200
       },
       "demography": {
         "enabled": true,
@@ -3203,7 +3189,16 @@
         ],
         "order_goods": 3,
         "order_units": 10,
-        "order_price_percent": 130
+        "order_price_percent": 130,
+        "drift": {
+          "price_step_permille": 60,
+          "price_min_permille": 700,
+          "price_max_permille": 1400,
+          "revert_divisor": 8,
+          "hold_min_percent": 60,
+          "hold_max_percent": 140,
+          "missing_permille": 120
+        }
       },
       "live": {
         "enabled": true,
@@ -3449,7 +3444,14 @@
             "width": 1,
             "depth": 1
           },
-          "model": "living/props/barrel.gltf"
+          "model": "living/props/barrel.gltf",
+          "cost": [
+            {
+              "good": "plank",
+              "count": 1
+            }
+          ],
+          "work_ticks": 60
         },
         {
           "id": "crate_stack",
@@ -3458,7 +3460,14 @@
             "width": 1,
             "depth": 1
           },
-          "model": "living/props/crate_A_big.gltf"
+          "model": "living/props/crate_A_big.gltf",
+          "cost": [
+            {
+              "good": "plank",
+              "count": 2
+            }
+          ],
+          "work_ticks": 80
         },
         {
           "id": "fence",
@@ -3467,7 +3476,14 @@
             "width": 2,
             "depth": 1
           },
-          "model": "living/props/fence_wood_straight.gltf"
+          "model": "living/props/fence_wood_straight.gltf",
+          "cost": [
+            {
+              "good": "log",
+              "count": 1
+            }
+          ],
+          "work_ticks": 60
         },
         {
           "id": "flower_bed",
@@ -3477,7 +3493,8 @@
             "depth": 1
           },
           "solid": false,
-          "model": "living/nature/flower_redA.glb"
+          "model": "living/nature/flower_redA.glb",
+          "work_ticks": 60
         },
         {
           "id": "signpost",
@@ -3486,7 +3503,14 @@
             "width": 1,
             "depth": 1
           },
-          "model": "living/props/sign.glb"
+          "model": "living/props/sign.glb",
+          "cost": [
+            {
+              "good": "plank",
+              "count": 1
+            }
+          ],
+          "work_ticks": 60
         },
         {
           "id": "flag",
@@ -3495,7 +3519,14 @@
             "width": 1,
             "depth": 1
           },
-          "model": "living/props/flag_blue.gltf"
+          "model": "living/props/flag_blue.gltf",
+          "cost": [
+            {
+              "good": "plank",
+              "count": 1
+            }
+          ],
+          "work_ticks": 60
         },
         {
           "id": "wheelbarrow",
@@ -3504,7 +3535,14 @@
             "width": 1,
             "depth": 1
           },
-          "model": "living/props/wheelbarrow.gltf"
+          "model": "living/props/wheelbarrow.gltf",
+          "cost": [
+            {
+              "good": "plank",
+              "count": 2
+            }
+          ],
+          "work_ticks": 100
         }
       ]
     }

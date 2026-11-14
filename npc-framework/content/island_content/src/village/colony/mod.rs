@@ -18,6 +18,7 @@ pub use housing::{
     home_of, household_materials,
 };
 pub use model::{AwaitingArrival, ColonyState, Household, HousingProject, SocialLife};
+pub use social::Chatting;
 pub use social::{
     WORK_PACE_FASTEST, WORK_PACE_SLOWEST, social_available, social_target, work_pace_percent,
 };
@@ -50,6 +51,7 @@ pub fn register(app: &mut App) {
     app.register_sim_resource::<ColonyState>()
         .register_sim_component::<Household>()
         .register_sim_component::<SocialLife>()
+        .register_sim_component::<Chatting>()
         .register_sim_component::<AwaitingArrival>()
         .register_command::<ColonyAct>()
         .register_command::<JoinIsland>()

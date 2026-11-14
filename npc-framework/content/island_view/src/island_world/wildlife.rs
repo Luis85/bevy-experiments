@@ -351,14 +351,22 @@ pub(crate) fn on_ready(
     }
 }
 
-/// What the simulation says each animal is doing, read once a frame
-/// (`view::wildlife`, by SimId).
+/// What the simulation says each animal is doing (`view::wildlife`, by
+/// SimId), and the tick it was read at.
 #[derive(Resource, Default)]
-pub(crate) struct WildlifeStates(pub(crate) BTreeMap<SimId, WildlifeView>);
+pub(crate) struct WildlifeStates(
+    pub(crate) BTreeMap<SimId, WildlifeView>,
+    pub(crate) Option<u64>,
+);
 
-/// Read the animals' states for the frame. View only.
+/// Read the animals' states when the simulation's clock has moved (the
+/// states change only on a tick). View only.
 pub(crate) fn read_wildlife(world: &mut World) {
-    if !world.contains_resource::<WildlifeStates>() {
+    let tick = world.get_resource::<SimClock>().map(|clock| clock.tick);
+    let Some(states) = world.get_resource::<WildlifeStates>() else {
+        return;
+    };
+    if tick.is_some() && states.1 == tick {
         return;
     }
     let views = island_content::village::view::wildlife(world);
@@ -367,6 +375,7 @@ pub(crate) fn read_wildlife(world: &mut World) {
     states
         .0
         .extend(views.into_iter().map(|view| (view.id, view)));
+    states.1 = tick;
 }
 
 /// An animal's state as the view plays it.

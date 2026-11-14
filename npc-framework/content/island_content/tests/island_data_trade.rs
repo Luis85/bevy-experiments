@@ -26,11 +26,11 @@ pub fn pottery_world(seed: u64) -> bevy_app::App {
     let economy = &mut world["economy"];
     let goods = economy["goods"].as_array_mut().expect("goods");
     goods.push(json!({
-        "key": "clay", "display": "clay", "base_price": 2, "stock_limit": 20,
+        "key": "clay", "display": "clay", "base_price": 2,
         "item": {"weight_g": 1500, "max_stack": 20}
     }));
     goods.push(json!({
-        "key": "pots", "display": "clay pots", "base_price": 7, "stock_limit": 10,
+        "key": "pots", "display": "clay pots", "base_price": 7,
         "item": {"weight_g": 800, "max_stack": 10}
     }));
     economy["recipes"]

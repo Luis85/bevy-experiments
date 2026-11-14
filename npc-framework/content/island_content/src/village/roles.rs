@@ -21,6 +21,13 @@ pub struct Roles {
     pub drink: &'static str,
     /// What hearths burn.
     pub fuel: &'static str,
+    /// Every good tagged `fuel`, in key order: a hearth burns the first one
+    /// carried (review fix S2.9).
+    pub fuels: &'static [&'static str],
+    /// Every good tagged `drink` and every good tagged `clothing`, in key
+    /// order (S2.9): any of them quenches thirst or keeps a resident warm.
+    pub drinks: &'static [&'static str],
+    pub garments: &'static [&'static str],
     /// The warm garment residents wear.
     pub garment: &'static str,
     /// Raw building material (felled), and sawn building material.
@@ -58,6 +65,9 @@ pub struct Roles {
 pub const TESTBED: Roles = Roles {
     drink: catalog::WATER,
     fuel: "log",
+    fuels: &["log"],
+    drinks: &[catalog::WATER],
+    garments: &[catalog::WARM_CLOTHES],
     garment: catalog::WARM_CLOTHES,
     timber: "log",
     lumber: "plank",
@@ -163,9 +173,32 @@ pub fn from_spec(spec: &EconomySpec) -> Result<Roles, String> {
         .find(|profession| profession.outputs.iter().any(|good| good == garment))
         .ok_or("economy: no profession makes the garment")?
         .role;
+    let mut fuels: Vec<&'static str> = spec
+        .goods
+        .iter()
+        .filter(|good| good.tags.contains(&GoodTag::Fuel))
+        .map(|good| intern(&good.key))
+        .collect();
+    fuels.sort_unstable();
+    let fuels: &'static [&'static str] = Box::leak(fuels.into_boxed_slice());
+    let all_tagged = |tag: GoodTag| -> &'static [&'static str] {
+        let mut goods: Vec<&'static str> = spec
+            .goods
+            .iter()
+            .filter(|good| good.tags.contains(&tag))
+            .map(|good| intern(&good.key))
+            .collect();
+        goods.sort_unstable();
+        Box::leak(goods.into_boxed_slice())
+    };
+    let drinks = all_tagged(GoodTag::Drink);
+    let garments = all_tagged(GoodTag::Clothing);
     Ok(Roles {
         drink,
         fuel,
+        fuels,
+        drinks,
+        garments,
         garment,
         timber,
         lumber,

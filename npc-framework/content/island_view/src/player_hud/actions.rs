@@ -196,7 +196,7 @@ pub(super) fn process(world: &mut World) {
                 world.resource_mut::<PlayerMenuRequest>().0 = true;
                 Ok(())
             }
-            Action::Inspect | Action::WatchVillage => watch_village(world),
+            Action::WatchVillage => watch_village(world),
             Action::LifeChoices => {
                 life::show_choices(world);
                 Ok(())

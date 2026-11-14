@@ -49,7 +49,7 @@ pub(super) fn run(world: &mut World) {
             let name = path
                 .file_name()
                 .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
-            let text = format!("World exported as {name} in your worlds folder.");
+            let text = format!("Island saved as {name}. New game can start on it.");
             let offer = may_offer_new_game(world);
             {
                 let mut state = world.resource_mut::<ExportState>();
@@ -78,7 +78,7 @@ pub(super) fn run(world: &mut World) {
                 world,
                 ToastTone::Failed,
                 format!(
-                    "The world could not be exported: {error}. Check the folder, then try again."
+                    "The island could not be exported. Check that the folder can be written to, then try again. Details: {error}"
                 ),
                 true,
                 true,

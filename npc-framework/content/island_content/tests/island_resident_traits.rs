@@ -224,7 +224,9 @@ fn a_sociable_resident_takes_leisure_and_meets_more_people_than_an_unsociable_on
         "SOCIABILITY unsociable={alone:?} meetings={met_alone} sociable={social:?} \
          meetings={met_social}"
     );
-    assert_eq!(alone.leisure, 0, "an unsociable resident took leisure");
+    // Since the review fix pass (npc-ai#3) everybody has an evening; an
+    // unsociable resident spends it without company (checked below by the
+    // meetings), so its leisure samples are no longer zero.
     assert!(
         social.leisure >= 40,
         "the sociable resident spent only {} samples at leisure",

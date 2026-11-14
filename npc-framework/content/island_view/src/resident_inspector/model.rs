@@ -171,7 +171,7 @@ pub(crate) struct Segment {
     pub(crate) to: i32,
 }
 
-fn contains(from: i32, to: i32, at: i32) -> bool {
+pub(crate) fn contains(from: i32, to: i32, at: i32) -> bool {
     if from <= to {
         from <= at && at < to
     } else {
@@ -211,11 +211,12 @@ pub(crate) fn in_slot(
 
 #[cfg(test)]
 fn slot_of(spec: &ScheduleSpec, traits: ResidentTraits, permille: i32) -> Slot {
-    // Blocks overlap (a meal inside working hours): the narrower one shows.
+    // Blocks overlap: the one the resident's tree serves first shows
+    // (sleep, then a meal, then leisure, then work).
     for (kind, slot) in [
+        (BlockKind::Sleep, Slot::Sleep),
         (BlockKind::Meal, Slot::Meal),
         (BlockKind::Leisure, Slot::Leisure),
-        (BlockKind::Sleep, Slot::Sleep),
         (BlockKind::Work, Slot::Work),
     ] {
         if in_slot(spec, traits, kind, permille) {
@@ -232,11 +233,13 @@ fn slot_of(spec: &ScheduleSpec, traits: ResidentTraits, permille: i32) -> Slot {
 pub(crate) fn plan_of_blocks(blocks: &[(BlockKind, i32, i32)]) -> Vec<Segment> {
     let mut plan: Vec<Segment> = Vec::new();
     for permille in 0..1000 {
-        // Blocks overlap (a meal inside working hours): the narrower one shows.
+        // Blocks overlap: the one the resident's tree serves first shows
+        // (sleep, then a meal, then leisure, then work), as the simulation
+        // decides.
         let slot = [
+            (BlockKind::Sleep, Slot::Sleep),
             (BlockKind::Meal, Slot::Meal),
             (BlockKind::Leisure, Slot::Leisure),
-            (BlockKind::Sleep, Slot::Sleep),
             (BlockKind::Work, Slot::Work),
         ]
         .into_iter()
@@ -463,6 +466,19 @@ pub(crate) fn schedule_caption(plan: &[Segment], permille: i32) -> String {
     parts.join(" · ")
 }
 
+/// The card's job line: "Farmer · Harbour", and "· as you asked" when the
+/// player's order gave them the job.
+pub(crate) fn job_line(job: &str, village: Option<&str>, ordered: bool) -> String {
+    let mut line = match village {
+        Some(village) => format!("{job} \u{b7} {village}"),
+        None => job.to_owned(),
+    };
+    if ordered {
+        line.push_str(" \u{b7} as you asked");
+    }
+    line
+}
+
 pub(crate) fn capitalise(text: &str) -> String {
     let mut chars = text.chars();
     match chars.next() {
@@ -619,16 +635,16 @@ fn reason_phrase(reason: &str) -> &str {
             "nobody has asked them to build, and no site is ready"
         }
         "no supplied building site of this settlement needs a builder" => {
-            "no building site here is ready for a builder"
+            "no building site in this village is ready for a builder"
         }
         "no building site of this settlement needs materials this resident can bring" => {
-            "no building site here needs anything they could bring"
+            "no building site in this village needs anything they can bring"
         }
         "no stall of this settlement is short of a good its storage holds" => {
-            "no stall here is short of anything the stores hold"
+            "no stall in this village is short of a good that is in store"
         }
         "no surplus worth a trip, or no store of this settlement has room" => {
-            "nothing spare worth a trip, or the stores are full"
+            "nothing to spare that is worth the walk, or no store in this village has room"
         }
         "no neighbour has funded demand for it" => "no neighbour can pay for it",
         "no funded demand for a raw good, or no patch has any left" => {
@@ -646,7 +662,9 @@ fn reason_phrase(reason: &str) -> &str {
         "no reachable patch has any left, or the pack is full" => {
             "no patch in reach has any left, or their pack is full"
         }
-        "no requested or better-paid vacancy" => "no better job is open",
+        "no requested or better-paid vacancy" => {
+            "no open place that you asked for or that pays better"
+        }
         "not a hunter with a spear, funded demand and prey in reach" => {
             "it takes a spear, a paying buyer and prey in reach"
         }

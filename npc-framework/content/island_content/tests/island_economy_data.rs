@@ -40,7 +40,7 @@ fn entry<'a>(list: &'a mut Value, field: &str, name: &str) -> &'a mut Value {
 /// for carpenters, and smiths who keep two units in stock.
 fn add_charcoal(economy: &mut Value) {
     economy["goods"].as_array_mut().expect("goods").push(json!({
-        "key": CHARCOAL, "display": "charcoal", "base_price": 3, "stock_limit": 20,
+        "key": CHARCOAL, "display": "charcoal", "base_price": 3,
         "tags": ["fuel"], "item": {"weight_g": 300, "max_stack": 20}
     }));
     economy["recipes"]

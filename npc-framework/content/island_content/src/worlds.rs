@@ -204,12 +204,9 @@ pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
         if !(0..=1000).contains(&n.rise_milli_per_tick) {
             errors.push(format!("{name} rate must be 0..=1000"));
         }
-        if !(0..=100_000).contains(&n.low_milli)
-            || !(0..=100_000).contains(&n.out_milli)
-            || n.low_milli >= n.out_milli
-        {
+        if n.low_milli < 1 || n.out_milli > 100_000 || n.low_milli >= n.out_milli {
             errors.push(format!(
-                "{name} thresholds require 0 <= low < out <= 100000"
+                "needs: {name} `low_milli` must be at least 1 and below `out_milli` (at most 100000)"
             ));
         }
         if n.low_speed_pct > 100 {

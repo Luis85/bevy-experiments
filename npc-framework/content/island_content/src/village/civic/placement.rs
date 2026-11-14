@@ -74,6 +74,8 @@ pub struct Survey {
     patches: Vec<CellCoord>,
     settlements: Vec<(SimId, SimPos)>,
     open_sites: BTreeMap<SimId, usize>,
+    /// Open prop sites, which have their own allowance.
+    prop_sites: BTreeMap<SimId, usize>,
 }
 
 fn cell_of(pos: SimPos) -> CellCoord {
@@ -90,6 +92,7 @@ impl Survey {
             patches: Vec::new(),
             settlements: Vec::new(),
             open_sites: BTreeMap::new(),
+            prop_sites: BTreeMap::new(),
         };
         if let Some(spec) = crate::village::frontier::spec(world) {
             survey.entrances.insert(cell_of(spec.actor_start));
@@ -159,7 +162,12 @@ impl Survey {
             let plot = world
                 .get::<ConstructionSite>(*entity)
                 .map(|site| {
-                    *survey.open_sites.entry(site.settlement).or_default() += 1;
+                    let open = if site.is_prop() {
+                        &mut survey.prop_sites
+                    } else {
+                        &mut survey.open_sites
+                    };
+                    *open.entry(site.settlement).or_default() += 1;
                     site.plot
                 })
                 .or_else(|| world.get::<Building>(*entity).map(|building| building.plot));
@@ -196,7 +204,7 @@ impl Survey {
         let (plot, settlement) = self.check_ground(world, def, x, z, rotation)?;
         if self.open_sites.get(&settlement).copied().unwrap_or(0) >= MAX_OPEN_SITES {
             return Err(format!(
-                "this settlement already has {MAX_OPEN_SITES} open building sites"
+                "Four building sites are already open here. Wait for one to finish or cancel one."
             ));
         }
         Ok((plot, settlement))
@@ -212,6 +220,7 @@ impl Survey {
         z: i32,
         rotation: u8,
     ) -> Result<(Plot, SimId), String> {
+        cell_on_map(world, x, z)?;
         if rotation > 3 {
             return Err("rotation must be 0..=3 quarter turns".into());
         }
@@ -413,6 +422,18 @@ fn definition<'a>(world: &'a World, building: &str) -> Result<&'a BuildingDef, S
     })
 }
 
+/// The cell `(x, z)` when it lies on the island's map; checked before any
+/// arithmetic on a commanded cell (`plot_for` is safe after it: the map and
+/// every footprint are small).
+pub fn cell_on_map(world: &World, x: i32, z: i32) -> Result<CellCoord, String> {
+    let cell = CellCoord::new(x, z);
+    if terrain::bounds(world).contains(cell) {
+        Ok(cell)
+    } else {
+        Err("That spot is outside the island.".into())
+    }
+}
+
 /// Pure placement test for the view's ghost, the command and the planner:
 /// `Ok` when `building` may be placed with its entrance at cell `(x, z)`,
 /// otherwise the reason in words. Never changes the world.
@@ -448,6 +469,7 @@ pub fn ground_check(
 /// The body a building would cover, for drawing a ghost. `None` for an
 /// unknown building.
 pub fn placement_plot(world: &World, building: &str, x: i32, z: i32, rotation: u8) -> Option<Plot> {
+    cell_on_map(world, x, z).ok()?;
     definition(world, building)
         .ok()
         .map(|def| plot_for(def, x, z, rotation))
@@ -455,7 +477,7 @@ pub fn placement_plot(world: &World, building: &str, x: i32, z: i32, rotation: u
 
 /// Opens a construction site. Shared by the command and the planner; the
 /// caller's validation is repeated here, so a stale request changes nothing.
-pub(super) fn place(
+pub(crate) fn place(
     world: &mut World,
     building: &str,
     x: i32,
@@ -483,6 +505,66 @@ pub(super) fn place_site(
     let survey = Survey::new(world);
     let (plot, settlement) = survey.check_fast(world, &def, x, z, rotation)?;
     survey.check_reachable(world, &plot)?;
+    Ok(open_site(
+        world,
+        &def,
+        plot,
+        settlement,
+        civic,
+        reason,
+        announce,
+        super::model::SiteKind::Building,
+    ))
+}
+
+/// Prop sites one settlement may have open at a time.
+pub const MAX_OPEN_PROP_SITES: usize = 8;
+
+/// Opens the construction site of a prop (described as a building, see
+/// `props::as_building`), its entrance at `(x, z)`: the prop's own ground
+/// rules, the prop-site allowance, then the ordinary site path.
+pub(crate) fn place_prop_site(
+    world: &mut World,
+    def: &BuildingDef,
+    x: i32,
+    z: i32,
+    rotation: u8,
+    kind: super::model::SiteKind,
+) -> Result<SimId, String> {
+    let survey = Survey::new(world);
+    let (plot, settlement) = survey.check_ground(world, def, x, z, rotation)?;
+    survey.check_reachable(world, &plot)?;
+    if survey.prop_sites.get(&settlement).copied().unwrap_or(0) >= MAX_OPEN_PROP_SITES {
+        return Err(
+            "Eight small things already wait to be built here. Let the builders catch up first."
+                .into(),
+        );
+    }
+    Ok(open_site(
+        world,
+        def,
+        plot,
+        settlement,
+        false,
+        "laid out by the player",
+        true,
+        kind,
+    ))
+}
+
+/// Spawns a construction site on a checked plot.
+#[allow(clippy::too_many_arguments)]
+fn open_site(
+    world: &mut World,
+    def: &BuildingDef,
+    plot: Plot,
+    settlement: SimId,
+    civic: bool,
+    reason: &str,
+    announce: bool,
+    kind: super::model::SiteKind,
+) -> SimId {
+    let (building, x, z, rotation) = (def.id.as_str(), plot.x, plot.z, plot.rotation);
     let place = world
         .resource::<SimIndex>()
         .get(settlement)
@@ -561,6 +643,7 @@ pub(super) fn place_site(
                 builder: None,
                 builder_until: 0,
                 last_delivery_at: None,
+                kind,
             },
             SettlementMember { settlement },
             Perceivable::new(crate::world::kinds::STATION),
@@ -573,7 +656,7 @@ pub(super) fn place_site(
         .or_default()
         .push(site);
     if !announce {
-        return Ok(site);
+        return site;
     }
     // Whoever placed it, the village pays: raise what the fund lacks now, so
     // the site is supplied without waiting for the next levy day.
@@ -587,7 +670,7 @@ pub(super) fn place_site(
             "cell":[x,z],"rotation":rotation,"civic":civic,"reason":reason,"cost":cost,
             "work_ticks":def.work_ticks}),
     );
-    Ok(site)
+    site
 }
 
 /// Recorded placement of a building by the overseer or a player:

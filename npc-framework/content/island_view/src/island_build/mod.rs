@@ -667,8 +667,9 @@ pub(crate) fn keys(world: &mut World) {
     let tool = world.resource::<BuildTool>();
     let (holding, open, card) = (tool.selected.is_some(), tool.open, tool.card.is_some());
     let mut pressed = Vec::new();
-    if keys.just_pressed(KeyCode::KeyB) {
-        pressed.push((KeyCode::KeyB, Action::Toggle));
+    let tray = crate::keymap::key(crate::keymap::Mode::Oversee, crate::keymap::BUILD_TRAY);
+    if keys.just_pressed(tray) {
+        pressed.push((tray, Action::Toggle));
     }
     if holding && keys.just_pressed(KeyCode::KeyR) {
         pressed.push((KeyCode::KeyR, Action::Rotate));
@@ -1125,9 +1126,9 @@ fn place(world: &mut World) {
             tool.inflight.push((key, name.clone()));
             tool.rejection = None;
             tool.status = if stopped {
-                format!("{name} requested. The world is paused; press Space to open the site.")
+                format!("{name} is queued. The site opens when time runs (Space).")
             } else {
-                format!("{name} requested.")
+                format!("{name} ordered.")
             };
         }
         Err(error) => {

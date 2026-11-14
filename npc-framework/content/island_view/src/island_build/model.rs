@@ -529,7 +529,7 @@ pub(crate) fn decision_text(settlement: &str, building: Option<&str>, payload: &
                 (Some(cost), Some(fund)) => format!(" (about {cost} coins; fund {fund})"),
                 _ => String::new(),
             };
-            format!("{settlement} commissioned {what}{because}{cost}")
+            format!("{settlement} ordered {what}{because}{cost}")
         }
         "completed" => match number(payload, "paid") {
             Some(paid) => format!("{settlement} finished {what}; the fund paid {paid} coins"),
@@ -577,8 +577,8 @@ pub(crate) fn recent(log: &[Decision], limit: usize) -> Vec<&Decision> {
 pub(crate) fn last_decision(decision: &str, display: &dyn Fn(&str) -> Option<String>) -> String {
     match decision.strip_prefix("commissioned ") {
         Some(key) => match display(key) {
-            Some(name) => format!("commissioned {}", article(&name)),
-            None => format!("commissioned {}", article(&key.replace('_', " "))),
+            Some(name) => format!("ordered {}", article(&name)),
+            None => format!("ordered {}", article(&key.replace('_', " "))),
         },
         None => decision.to_owned(),
     }
@@ -593,9 +593,8 @@ pub(crate) fn planner_line(
     decision: &str,
 ) -> String {
     let seen = format!(
-        "{settlement}: {homeless} without a bed · {free_beds} free bed{} · {surplus} surplus unit{} unstored",
+        "{settlement}: {homeless} without a bed · {free_beds} free bed{} · {surplus} goods with no room in store",
         if free_beds == 1 { "" } else { "s" },
-        if surplus == 1 { "" } else { "s" },
     );
     if decision.is_empty() {
         format!("{seen}\nNo decision yet.")
@@ -859,7 +858,7 @@ impl Card {
     /// The line under the title: what kind of thing this is, and where.
     pub(crate) fn kind_line(&self) -> String {
         let kind = match &self.body {
-            CardBody::Site(site) if site.civic => "Building site · commissioned by the village",
+            CardBody::Site(site) if site.civic => "Building site · ordered by the village",
             CardBody::Site(_) => "Building site · placed by you",
             CardBody::Home { .. } => "Home",
             CardBody::Workplace {

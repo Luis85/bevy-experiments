@@ -10,7 +10,13 @@ use std::{collections::BTreeSet, path::Path};
 #[derive(Resource)]
 pub(crate) struct SessionState {
     pub(crate) available_save: bool,
-    pub(crate) issue: Option<String>,
+    pub(crate) issue: Option<super::Issue>,
+    /// A New game failed and the island in play could not be put back: no
+    /// file may be written, and the title asks for a restart. The details.
+    pub(crate) restart: Option<String>,
+    /// The autosave is newer than the save (the game did not close
+    /// properly): its age and the save's, in seconds.
+    pub(crate) autosave_newer: Option<(u64, u64)>,
     // Reserved aliases from immutable construction, before a saved world's
     // historical visitor/estate aliases are restored.
     reserved_names: BTreeSet<String>,
@@ -30,7 +36,11 @@ pub(crate) struct Summary {
     pub(crate) player: String,
     pub(crate) day: u64,
     pub(crate) season: String,
-    pub(crate) issue: Option<String>,
+    pub(crate) issue: Option<super::Issue>,
+    pub(crate) restart: Option<String>,
+    /// A save file exists (it can be continued or not): New game keeps it.
+    pub(crate) has_file: bool,
+    pub(crate) autosave_newer: Option<(u64, u64)>,
 }
 
 pub(crate) fn summary(world: &World) -> Summary {
@@ -49,13 +59,73 @@ pub(crate) fn summary(world: &World) -> Summary {
         .unwrap_or_else(|| "Traveller".into());
     let (day, season, _) = island_content::village::calendar(world);
     Summary {
-        can_continue: session.available_save || local.active,
-        can_start: local._lock.is_some(),
+        can_continue: (session.available_save || local.active) && session.restart.is_none(),
+        can_start: local._lock.is_some() && session.restart.is_none(),
         active: local.active,
         player,
         day: day + 1,
         season: format!("{season:?}"),
         issue: session.issue.clone(),
+        restart: session.restart.clone(),
+        has_file: local.path.exists(),
+        autosave_newer: session.autosave_newer.filter(|_| !local.active),
+    }
+}
+
+/// "Continue from the autosave": put the newer autosave in place of the
+/// save the title opened, after the same checks, then continue as usual.
+pub(crate) fn adopt_autosave(world: &mut World) -> Result<(), String> {
+    let auto = super::autosave_path(&world.resource::<LocalIsland>().path);
+    let saved = snapshot::read(&auto)?;
+    use island_content::village::island_save::{self, IslandSaveCheck};
+    if island_save::check_island_save(world, &saved) != IslandSaveCheck::Current {
+        return Err("The autosave cannot be opened. Continue from your save instead.".into());
+    }
+    let (doc, seed) = saved_construction(&saved, None).map_err(|error| error.to_string())?;
+    let before = snapshot::save(world)?;
+    let old_seed = world.resource::<WorldSeed>().0;
+    let scenario = world.resource::<ScenarioInfo>().clone();
+    if let Err(error) = replace_world(world, &saved, seed, scenario.clone()) {
+        warn!("the autosave could not be put in place: {error}");
+        replace_world(world, &before, old_seed, scenario)?;
+        return Err("The autosave cannot be opened. Continue from your save instead.".into());
+    }
+    {
+        let mut local = world.resource_mut::<LocalIsland>();
+        local.doc = doc;
+        local.seed = seed;
+    }
+    let mut session = world.resource_mut::<SessionState>();
+    session.autosave_newer = None;
+    session.available_save = true;
+    Ok(())
+}
+
+/// What the New screen says when a new island did not start and the one in
+/// play was put back as it was.
+pub(crate) const NEW_GAME_FAILED: &str =
+    "The new island could not start. Your island is as it was.";
+
+/// A New game failed after the island in play was taken down: put it back,
+/// or, when that fails too, stop every save and ask for a restart.
+fn roll_back(
+    world: &mut World,
+    error: String,
+    before: &snapshot::WorldSnapshot,
+    seed: u64,
+    scenario: ScenarioInfo,
+) -> String {
+    match replace_world(world, before, seed, scenario) {
+        Ok(()) => {
+            warn!("new game rolled back: {error}");
+            NEW_GAME_FAILED.to_owned()
+        }
+        Err(restore) => {
+            error!("new game failed ({error}) and the island could not be put back ({restore})");
+            world.resource_mut::<LocalIsland>().active = false;
+            world.resource_mut::<SessionState>().restart = Some(error.clone());
+            NEW_GAME_FAILED.to_owned()
+        }
     }
 }
 
@@ -68,16 +138,42 @@ pub(crate) fn open(
 ) -> Result<App, String> {
     let (lock, mut issue) = match lock_save(path) {
         Ok(lock) => (Some(lock), None),
-        Err(error) => (None, Some(error)),
+        Err(error) => (None, Some(super::Issue::Unopened(error))),
+    };
+    // The autosave beside the save: when there is no save it is the save;
+    // when it is newer the title offers it (the game did not close
+    // properly); when it is older it is stale and goes.
+    let auto = super::autosave_path(path);
+    let modified = |file: &Path| {
+        std::fs::metadata(file)
+            .and_then(|meta| meta.modified())
+            .ok()
+    };
+    let mut autosave_newer = None;
+    let source = if lock.is_some() && !path.exists() && auto.exists() {
+        auto.clone()
+    } else {
+        if lock.is_some()
+            && auto.exists()
+            && let (Some(own), Some(newer)) = (modified(path), modified(&auto))
+        {
+            if newer > own {
+                let age = |at: std::time::SystemTime| at.elapsed().map_or(0, |age| age.as_secs());
+                autosave_newer = Some((age(newer), age(own)));
+            } else if let Err(error) = std::fs::remove_file(&auto) {
+                warn!("could not remove a stale autosave: {error}");
+            }
+        }
+        path.to_path_buf()
     };
     let mut resumed = None;
-    if lock.is_some() && path.exists() {
+    if lock.is_some() && source.exists() {
         // Continue checks first, on a fresh world of this build: a save the
         // simulation refuses is named and kept untouched (New game backs it
         // up before writing; autosave writes nothing while no island is in
         // play).
         let prepared = (|| -> Result<_, super::RestoreError> {
-            let saved = snapshot::read(path)?;
+            let saved = snapshot::read(&source)?;
             let (doc, seed) = saved_construction(&saved, seed_override)?;
             let mut staged = island_content::scenario::load_with(&doc, seed, |_| {})?;
             attach_controllers(&doc, &mut staged)?;
@@ -86,11 +182,10 @@ pub(crate) fn open(
         })();
         match prepared {
             Ok(value) => resumed = Some(value),
-            Err(super::RestoreError::Refused(sentence)) => issue = Some(sentence),
+            Err(super::RestoreError::Refused(refused)) => issue = Some(refused),
             Err(super::RestoreError::Failed(error)) => {
-                issue = Some(format!(
-                    "Continue is unavailable: {error} A new game keeps a backup of this save."
-                ));
+                warn!("the saved island could not be opened: {error}");
+                issue = Some(super::Issue::Unopened(error));
             }
         }
     }
@@ -101,10 +196,11 @@ pub(crate) fn open(
             Ok(doc) => doc,
             Err(error) => {
                 let shipped = shipped_preset(rules);
-                issue = Some(format!(
-                    "The edited world rules could not load: {error} New game will use the shipped {} profile; your files are preserved.",
+                warn!(
+                    "the island rules could not load ({error}); using {}",
                     shipped.name
-                ));
+                );
+                issue = Some(super::Issue::Rules(format!("{error} ({})", shipped.name)));
                 construction_from_preset(shipped)?
             }
         };
@@ -135,6 +231,8 @@ pub(crate) fn open(
     app.insert_resource(SessionState {
         available_save: resumed.is_some(),
         issue,
+        restart: None,
+        autosave_newer,
         reserved_names,
         default_doc,
         default_world,
@@ -280,13 +378,15 @@ pub(crate) fn new_game_on(
     let was_active = world.resource::<LocalIsland>().active;
     let path = world.resource::<LocalIsland>().path.clone();
     if path.exists() {
-        backup(&path)?;
+        let older = world
+            .resource::<SessionState>()
+            .issue
+            .as_ref()
+            .is_some_and(super::Issue::keeps_forever);
+        backup(&path, older)?;
     }
     if let Err(error) = replace_world(world, &prepared, seed, scenario) {
-        let restored = replace_world(world, &before, old_seed, old_scenario);
-        return Err(format!(
-            "The new island could not start: {error}. Previous world restore: {restored:?}"
-        ));
+        return Err(roll_back(world, error, &before, old_seed, old_scenario));
     }
     {
         let mut local = world.resource_mut::<LocalIsland>();
@@ -305,11 +405,9 @@ pub(crate) fn new_game_on(
         if let Some(rules) = old_rules {
             world.insert_resource(Rules(rules));
         }
-        let restored = replace_world(world, &before, old_seed, old_scenario);
-        return Err(format!(
-            "The new island could not be saved: {error}. Previous world restore: {restored:?}"
-        ));
+        return Err(roll_back(world, error, &before, old_seed, old_scenario));
     }
+    super::prune_backups(&path);
     let mut session = world.resource_mut::<SessionState>();
     session.available_save = true;
     session.issue = None;
@@ -433,7 +531,7 @@ mod tests {
         assert!(
             new_game(app.world_mut(), "Ysolde")
                 .unwrap_err()
-                .contains("could not be saved")
+                .contains("could not start")
         );
         assert_eq!(state_hash(app.world_mut()), before);
         assert_eq!(summary(app.world()).player, "Zephyrine");
@@ -517,7 +615,11 @@ mod tests {
         std::fs::remove_file(&file).unwrap();
         drop(app);
         let resumed = open(&path, None, Some(&rules), |_| {}).unwrap();
-        assert!(summary(resumed.world()).can_continue);
+        assert!(
+            summary(resumed.world()).can_continue,
+            "{:?}",
+            summary(resumed.world()).issue
+        );
         assert_eq!(summary(resumed.world()).player, "Quillon");
         assert!(
             has_patch(resumed.world()),
@@ -564,7 +666,7 @@ mod tests {
         app.world_mut().resource_mut::<LocalIsland>().path =
             dir.join("missing-parent").join("island.json");
         let error = new_game_on(app.world_mut(), "Quillon", Some(&file)).unwrap_err();
-        assert!(error.contains("could not be saved"), "{error}");
+        assert!(error.contains("could not start"), "{error}");
         assert_eq!(state_hash(app.world_mut()), before);
         assert_eq!(summary(app.world()).player, "Tamsin");
         assert_eq!(
@@ -580,7 +682,7 @@ mod tests {
 
     #[test]
     fn an_older_save_is_named_kept_and_backed_up_by_new_game() {
-        use super::super::OLDER_SAVE;
+        use super::super::Issue;
         // A save this build cannot continue: made before the island's stamp
         // and by different content (another content hash).
         let path = path("older");
@@ -590,15 +692,18 @@ mod tests {
         new_game(app.world_mut(), "Zephyrine").unwrap();
         drop(app);
         let mut saved = snapshot::read(&path).unwrap();
-        saved
-            .header
-            .remove(island_content::village::island_save::HEADER_VERSION);
-        saved.content_hash ^= 1;
+        // Stamped with an earlier island version (a save without a stamp
+        // is unreadable now, not older: the sim's S1 rule).
+        let version = island_content::village::island_save::ISLAND_SAVE_VERSION - 1;
+        saved.header.insert(
+            island_content::village::island_save::HEADER_VERSION.into(),
+            version.into(),
+        );
         snapshot::write_atomic(&path, &saved).unwrap();
         let bytes = std::fs::read(&path).unwrap();
         let mut app = open(&path, None, None, |_| {}).unwrap();
         assert!(!summary(app.world()).can_continue);
-        assert_eq!(summary(app.world()).issue.as_deref(), Some(OLDER_SAVE));
+        assert_eq!(summary(app.world()).issue, Some(Issue::Older));
         // Nothing is in play: an autosave writes nothing over it.
         save(app.world_mut()).unwrap();
         assert_eq!(
@@ -608,9 +713,9 @@ mod tests {
         );
         new_game(app.world_mut(), "Ysolde").unwrap();
         assert_eq!(
-            std::fs::read(path.with_extension("previous-1.json")).unwrap(),
+            std::fs::read(path.with_extension("older-1.json")).unwrap(),
             bytes,
-            "New game keeps the older island as a backup"
+            "New game keeps the older island as a backup of its own kind"
         );
         drop(app);
         cleanup(&path);

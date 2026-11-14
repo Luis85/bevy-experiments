@@ -78,9 +78,9 @@ pub(crate) fn list(default: &WorldPreset, folder: Option<&Path>) -> Vec<WorldEnt
         path: None,
         name: default.name.clone(),
         when: if default.name.ends_with("(shaped)") {
-            "This window's world".into()
+            "The island you are playing".into()
         } else {
-            "Shipped world".into()
+            "Comes with the game".into()
         },
         summary: summary(default),
         file: None,
@@ -152,7 +152,7 @@ pub(crate) fn plain_reason(reason: &str) -> String {
     "its rules do not pass the world checks.".to_owned()
 }
 
-/// "3 settlements · patches: 4 logs, 2 grain".
+/// "3 villages · 12 patches".
 pub(crate) fn summary(preset: &WorldPreset) -> String {
     let Some(living) = &preset.living_world else {
         return "The island colony".into();
@@ -174,24 +174,16 @@ pub(crate) fn summary(preset: &WorldPreset) -> String {
             *goods.entry(patch.good.as_str()).or_default() += 1;
         }
     }
-    let mut goods: Vec<(&str, usize)> = goods.into_iter().filter(|(_, n)| *n > 0).collect();
-    goods.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-    let patches = goods
-        .iter()
-        .map(|(good, n)| {
-            island_view::game_ui::words::count(u64::try_from(*n).unwrap_or(u64::MAX), good)
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
+    let total: usize = goods.values().sum();
     let places = if settlements == 1 {
-        "1 settlement".to_owned()
+        "1 village".to_owned()
     } else {
-        format!("{settlements} settlements")
+        format!("{settlements} villages")
     };
-    if patches.is_empty() {
-        places
-    } else {
-        format!("{places} \u{b7} patches: {patches}")
+    match total {
+        0 => places,
+        1 => format!("{places} \u{b7} 1 patch"),
+        n => format!("{places} \u{b7} {n} patches"),
     }
 }
 
@@ -268,7 +260,7 @@ mod tests {
         let names: Vec<_> = entries.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names[0], living().name);
         assert_eq!(entries[0].path, None);
-        assert_eq!(entries[0].when, "Shipped world");
+        assert_eq!(entries[0].when, "Comes with the game");
         assert_eq!(entries.len(), 4, "{names:?}");
         let newer = names.iter().position(|n| *n == "Newer (shaped)").unwrap();
         let older = names.iter().position(|n| *n == "Older (shaped)").unwrap();
@@ -286,7 +278,7 @@ mod tests {
         );
         assert_eq!(broken.summary, "Cannot be used: it is not a world file.");
         assert!(
-            entries[newer].summary.contains("settlements"),
+            entries[newer].summary.contains("villages"),
             "{}",
             entries[newer].summary
         );
@@ -312,7 +304,10 @@ mod tests {
     fn a_summary_counts_settlements_and_patches_by_good() {
         let mut preset = living();
         let line = summary(&preset);
-        assert!(line.contains("settlements \u{b7} patches:"), "{line}");
+        assert!(
+            line.contains("villages \u{b7} ") && line.ends_with("patches"),
+            "{line}"
+        );
         let living = preset.living_world.as_mut().unwrap();
         living.resource_patches = vec![
             island_content::village::frontier::world_spec::PlacedPatch {
@@ -325,7 +320,7 @@ mod tests {
             2
         ];
         assert!(
-            summary(&preset).ends_with("patches: 2 logs"),
+            summary(&preset).ends_with("2 patches"),
             "{}",
             summary(&preset)
         );

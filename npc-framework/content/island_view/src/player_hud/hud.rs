@@ -130,8 +130,8 @@ pub(super) fn chain_words(chain: &super::depth::Chain) -> String {
 /// The chain's line under the goal: the current goal and what it unlocks.
 pub(super) fn chain_reward(chain: &super::depth::Chain) -> String {
     match (&chain.current, chain.reward.is_empty()) {
-        (Some(goal), true) => format!("Goal: {goal}"),
-        (Some(goal), false) => format!("Goal: {goal}. {}.", chain.reward),
+        (Some(goal), true) => format!("After that: {goal}"),
+        (Some(goal), false) => format!("After that: {goal}. {}.", chain.reward),
         (None, _) => String::new(),
     }
 }

@@ -101,7 +101,7 @@ pub(super) fn refresh(world: &mut World, observed: &Value) {
             w::label(
                 world,
                 mark,
-                location["name"].as_str().unwrap_or("Settlement"),
+                location["name"].as_str().unwrap_or("Village"),
                 t::CAPTION,
                 Tone::text(Surface::Chrome),
             );
@@ -122,7 +122,7 @@ pub(super) fn refresh(world: &mut World, observed: &Value) {
         let key = w::label(
             world,
             canvas,
-            "Ring: you \u{b7} squares: settlements",
+            "Ring: you \u{b7} squares: villages",
             t::CAPTION,
             Tone::caption(Surface::Chrome),
         );

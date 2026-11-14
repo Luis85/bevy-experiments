@@ -344,6 +344,56 @@ pub struct MerchantSpec {
     /// Price of an announced good, percent of the island's quote (at least
     /// one coin above it): the order is worth making for.
     pub order_price_percent: u32,
+    /// How the outside world's prices and the boat's hold change between
+    /// visits (review fix S2.3). Absent: a fixed boat.
+    #[serde(default)]
+    pub drift: MerchantDrift,
+}
+
+/// Seeded drift of the boat's outside prices and of what it brings.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MerchantDrift {
+    /// Largest random move of a good's outside price per visit, permille.
+    pub price_step_permille: u32,
+    /// Bounds of the outside price factor, permille.
+    pub price_min_permille: u32,
+    pub price_max_permille: u32,
+    /// Pull back towards 1000 per visit: `(1000 - factor) / revert_divisor`.
+    pub revert_divisor: u32,
+    /// Share of a sell entry's `units` aboard, percent.
+    pub hold_min_percent: u32,
+    pub hold_max_percent: u32,
+    /// Chance a sell good is not aboard at all, permille.
+    pub missing_permille: u32,
+}
+impl Default for MerchantDrift {
+    /// A fixed boat: no drift, the full hold every visit.
+    fn default() -> Self {
+        Self {
+            price_step_permille: 0,
+            price_min_permille: 1000,
+            price_max_permille: 1000,
+            revert_divisor: 8,
+            hold_min_percent: 100,
+            hold_max_percent: 100,
+            missing_permille: 0,
+        }
+    }
+}
+impl MerchantDrift {
+    /// The shipped boat's drift.
+    pub fn shipped() -> Self {
+        Self {
+            price_step_permille: 60,
+            price_min_permille: 700,
+            price_max_permille: 1400,
+            revert_divisor: 8,
+            hold_min_percent: 60,
+            hold_max_percent: 140,
+            missing_permille: 120,
+        }
+    }
 }
 
 impl Default for MerchantSpec {
@@ -397,6 +447,7 @@ impl Default for MerchantSpec {
             order_goods: 3,
             order_units: 10,
             order_price_percent: 130,
+            drift: MerchantDrift::shipped(),
         }
     }
 }
@@ -702,6 +753,17 @@ pub(super) fn validate_merchant(economy: &EconomySpec) -> Result<(), String> {
                 .into(),
         );
     }
+    let d = &m.drift;
+    if d.price_step_permille > 300
+        || !(100..=1000).contains(&d.price_min_permille)
+        || !(1000..=5000).contains(&d.price_max_permille)
+        || !(1..=100).contains(&d.revert_divisor)
+        || d.hold_min_percent > 100
+        || !(100..=400).contains(&d.hold_max_percent)
+        || d.missing_permille > 500
+    {
+        return Err("economy: merchant.drift needs price_step_permille at most 300, price_min_permille 100..=1000, price_max_permille 1000..=5000, revert_divisor 1..=100, hold_min_percent at most 100, hold_max_percent 100..=400 and missing_permille at most 500".into());
+    }
     if m.buys.len() > 64 || m.sells.len() > 64 {
         return Err("economy: merchant.buys and merchant.sells take at most 64 entries".into());
     }
@@ -778,6 +840,18 @@ impl MerchantSpec {
         h.u32(self.order_goods);
         h.u32(self.order_units);
         h.u32(self.order_price_percent);
+        let d = &self.drift;
+        for value in [
+            d.price_step_permille,
+            d.price_min_permille,
+            d.price_max_permille,
+            d.revert_divisor,
+            d.hold_min_percent,
+            d.hold_max_percent,
+            d.missing_permille,
+        ] {
+            h.u32(value);
+        }
     }
 }
 

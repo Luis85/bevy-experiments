@@ -660,7 +660,7 @@ fn the_goal_tracker_counts_steps_and_says_what_a_goal_unlocks() {
     assert_eq!(hud::chain_words(&chain), "Step 2 of 7");
     assert_eq!(
         hud::chain_reward(&chain),
-        "Goal: Build a storage chest. Unlocks a storage chest."
+        "After that: Build a storage chest. Unlocks a storage chest."
     );
     let all = depth::Chain {
         done: 7,
@@ -1019,5 +1019,17 @@ fn a_coin_sounds_when_the_days_trade_grows_and_only_then() {
     assert!(
         !traded(Some((3, 21)), Some((4, 0))),
         "a new day starts again"
+    );
+}
+
+#[test]
+fn the_morning_after_a_season_says_it_ended() {
+    assert_eq!(
+        rest::season_line("Autumn", 43, 2),
+        "Autumn has ended. The island has 43 residents; 2 buildings were finished."
+    );
+    assert_eq!(
+        rest::season_line("Winter", 40, 1),
+        "Winter has ended. The island has 40 residents; 1 building was finished."
     );
 }

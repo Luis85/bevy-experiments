@@ -47,7 +47,7 @@ fn ownership(plot: &Value) -> &'static str {
     if plot["own"] == true {
         "Your land"
     } else if plot["state_known"] != true {
-        "Visit to inspect ownership"
+        "Go there to see whose it is"
     } else if plot["owner"].is_null() || plot["owner_alive"] == false {
         "Available"
     } else {
@@ -125,7 +125,7 @@ pub(super) fn rows(
             rows.push(Row::action(
                 "visit_site",
                 "Walk to this site",
-                "Inspect its current ownership.",
+                "Go there to see whose it is.",
                 Action::Walk(pos),
                 ready,
             ));
@@ -136,7 +136,7 @@ pub(super) fn rows(
             "claim_site",
             "Claim this site",
             if plot["state_known"] != true {
-                "Visit the site to inspect its ownership first."
+                "Go there to see whose it is first."
             } else if available {
                 "You may own one house site and one garden. Claiming grants no supplies."
             } else {
@@ -246,7 +246,7 @@ fn bed_stage(bed: &Value) -> &'static str {
         Some("needs_water") => "Needs water",
         Some("growing") => "Growing",
         Some("ready") => "Ready to harvest",
-        _ => "Visit to inspect",
+        _ => "Go there to look",
     }
 }
 
@@ -333,23 +333,16 @@ fn garden(
                 ready,
             )),
             "growing" => {
-                let remaining = bed["ready_at"]
-                    .as_u64()
-                    .unwrap_or(0)
-                    .saturating_sub(observed["tick"].as_u64().unwrap_or(0));
                 rows.push(Row::note(
                     "growth",
                     "Growing in its own time",
-                    format!(
-                        "About {} game seconds remain. Explore, trade or rest while it grows.",
-                        remaining.div_ceil(20)
-                    ),
+                    "It needs a little longer. Explore, buy and sell, or rest while it grows.",
                 ));
             }
             _ => rows.push(Row::note(
                 "bed_unknown",
                 "Visit this bed",
-                "Inspect it before choosing work.",
+                "Look at it before you choose work.",
             )),
         }
     }

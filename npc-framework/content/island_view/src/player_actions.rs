@@ -48,9 +48,58 @@ pub(crate) struct PendingAction {
 struct SchedulerHold {
     actor: ActorStamp,
     submitted: u64,
-    before: SchedulerPolicy,
-    applied: SchedulerPolicy,
-    changed: u32,
+}
+/// The view's wish that the host's idle supervisor (ADR 0023) leave the
+/// played character alone while native input drives it. The view only sets
+/// this; the host owns `SchedulerPolicy` and applies the wish
+/// ([`apply_scheduler_hold`] is the reference way to do it). Host data: never
+/// simulation state, never saved.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SchedulerHoldRequest {
+    /// True while a native character is played.
+    pub hold: bool,
+}
+/// What the host applied for [`SchedulerHoldRequest`]: the policy it
+/// replaced, and the one it set (a later writer's change is never undone).
+#[derive(Resource, Clone, Debug, Default)]
+pub struct SchedulerHoldApplied(Option<(SchedulerPolicy, SchedulerPolicy)>);
+/// A host system: pause the idle supervisor while [`SchedulerHoldRequest`]
+/// asks for it and put the earlier policy back after, unless something else
+/// changed the policy in between. Run it in the host's schedule.
+pub fn apply_scheduler_hold(world: &mut World) {
+    let hold = world
+        .get_resource::<SchedulerHoldRequest>()
+        .is_some_and(|request| request.hold);
+    let Some(policy) = world.get_resource::<SchedulerPolicy>().cloned() else {
+        return;
+    };
+    let applied = world
+        .get_resource_or_init::<SchedulerHoldApplied>()
+        .0
+        .clone();
+    match (hold, applied) {
+        (true, None) => {
+            let mut held = policy.clone();
+            held.enabled = false;
+            if held != policy {
+                *world.resource_mut::<SchedulerPolicy>() = held.clone();
+            }
+            world.resource_mut::<SchedulerHoldApplied>().0 = Some((policy, held));
+        }
+        (false, Some((before, held))) => {
+            world.resource_mut::<SchedulerHoldApplied>().0 = None;
+            if policy == held && before != held {
+                *world.resource_mut::<SchedulerPolicy>() = before;
+            }
+        }
+        _ => {}
+    }
+}
+fn request_hold(world: &mut World, hold: bool) {
+    let mut request = world.get_resource_or_init::<SchedulerHoldRequest>();
+    if request.hold != hold {
+        request.hold = hold;
+    }
 }
 #[derive(Clone, Debug)]
 struct RefusalWatch {
@@ -78,11 +127,11 @@ pub(crate) struct NativeActions {
 fn actor(world: &World) -> Result<ActorStamp, String> {
     let state = world
         .get_resource::<VillageState>()
-        .ok_or("This world has no village hero")?;
+        .ok_or("This island has no character to play.")?;
     let entity = world
         .get_resource::<SimIndex>()
         .and_then(|index| index.get(state.played))
-        .ok_or("The hero is no longer present")?;
+        .ok_or("Your character is no longer on the island.")?;
     if world
         .get::<island_content::village::colony::AwaitingArrival>(entity)
         .is_some()
@@ -135,9 +184,7 @@ pub(crate) fn begin_successor(world: &mut World) -> Result<Value, String> {
         .get::<ExternalController>(entity)
         .is_some_and(|controller| controller.id != NATIVE_CONTROLLER)
     {
-        return Err(
-            "Another controller owns this life; release it before choosing a successor".into(),
-        );
+        return Err("This life is being played from somewhere else.".into());
     }
     let command = island_content::village::VillageAct::new(id, "new_life");
     let (tick, seq) =
@@ -165,9 +212,9 @@ fn native(world: &World) -> Result<ActorStamp, String> {
     match control(world) {
         ControlState::Native => Ok(actor),
         ControlState::Foreign { .. } => {
-            Err("The hero has another controller; release it before playing natively".into())
+            Err("Your character is being played from somewhere else.".into())
         }
-        _ => Err("Choose Play as hero and wait for the control command to apply".into()),
+        _ => Err("Choose Live to play your character.".into()),
     }
 }
 /// Registration protects remote transports. Native input is trusted in-process input;
@@ -175,7 +222,7 @@ fn native(world: &World) -> Result<ActorStamp, String> {
 pub(crate) fn observe(world: &World) -> Result<Value, String> {
     let id = world
         .get_resource::<VillageState>()
-        .ok_or("This world has no village hero")?
+        .ok_or("This island has no character to play.")?
         .played;
     observe::observe_with(
         world,
@@ -186,7 +233,7 @@ pub(crate) fn observe(world: &World) -> Result<Value, String> {
         },
     )
     .map(|(value, _)| value)
-    .ok_or_else(|| "The hero is no longer present".into())
+    .ok_or_else(|| "Your character is no longer on the island.".into())
 }
 pub(crate) fn known_position(world: &World, target: SimId) -> Option<SimPos> {
     let id = world.get_resource::<VillageState>()?.played;
@@ -205,23 +252,27 @@ pub(crate) fn known_position(world: &World, target: SimId) -> Option<SimPos> {
 }
 fn feedback(world: &mut World, text: impl Into<String>) {
     let text = text.into();
+    if text == SWITCHING {
+        // While time runs the switch is immediate: nothing to say.
+        let paused = crate::game_ui::words::paused(world);
+        world.get_resource_or_init::<NativeActions>().feedback =
+            paused.then(|| "Switching to Live when time runs (Space).".to_owned());
+        return;
+    }
     let text = player_feedback(&text).into();
     world.get_resource_or_init::<NativeActions>().feedback = Some(text);
 }
+/// The internal note of a requested switch to native control.
+const SWITCHING: &str = "Native control requested; it applies on the next simulation tick";
 fn player_feedback(text: &str) -> &str {
     match text {
-        "Native control requested; it applies on the next simulation tick" => {
-            "Getting ready to play. Resume the world if it is paused."
-        }
-        "Stop requested; queued approach and work cancelled on the next tick" => {
-            "Stopping your current activity."
-        }
+        "Stop requested; queued approach and work cancelled on the next tick" => "Stopping…",
         "Native control released on the next tick" => {
             "Returning to inspection. The village keeps running."
         }
         "Action submitted" => "Your activity is queued.",
         "Approach cancelled: hero, world or controller changed" => {
-            "The journey was cancelled because the active character changed."
+            "You stopped walking: something changed."
         }
         "Approach interrupted; follow-up action cancelled" => {
             "The journey was interrupted. Choose your next activity."
@@ -240,51 +291,24 @@ fn pause_scheduler(world: &mut World, actor: ActorStamp) {
     {
         return;
     }
-    let Some(before) = world.get_resource::<SchedulerPolicy>().cloned() else {
-        return;
-    };
-    let mut applied = before.clone();
-    applied.enabled = false;
-    if applied != before {
-        *world.resource_mut::<SchedulerPolicy>() = applied.clone();
-    }
-    let changed = world
-        .get_resource_ref::<SchedulerPolicy>()
-        .expect("existing policy")
-        .last_changed()
-        .get();
     let submitted = world.resource::<SimClock>().tick;
-    world.resource_mut::<NativeActions>().scheduler = Some(SchedulerHold {
-        actor,
-        submitted,
-        before,
-        applied,
-        changed,
-    });
+    world.resource_mut::<NativeActions>().scheduler = Some(SchedulerHold { actor, submitted });
+    request_hold(world, true);
 }
 fn restore_scheduler(world: &mut World) {
-    let Some(hold) = world
+    if world
         .get_resource_or_init::<NativeActions>()
         .scheduler
         .take()
-    else {
-        return;
-    };
-    // An inserted/replaced/edited policy belongs to its later writer, including a reset.
-    if world
-        .get_resource_ref::<SchedulerPolicy>()
-        .is_some_and(|policy| {
-            *policy == hold.applied && policy.last_changed().get() == hold.changed
-        })
-        && hold.before != hold.applied
+        .is_some()
     {
-        *world.resource_mut::<SchedulerPolicy>() = hold.before;
+        request_hold(world, false);
     }
 }
 pub(crate) fn take_control(world: &mut World) -> Result<Value, String> {
     let actor = actor(world)?;
     if matches!(control(world), ControlState::Foreign { .. }) {
-        return Err("Another controller owns the hero; native input will not take it over".into());
+        return Err("Your character is being played from somewhere else.".into());
     }
     if control(world) == ControlState::Native {
         pause_scheduler(world, actor);
@@ -314,10 +338,7 @@ pub(crate) fn take_control(world: &mut World) -> Result<Value, String> {
     )
     .map_err(|error| error.to_string())?;
     pause_scheduler(world, actor);
-    feedback(
-        world,
-        "Native control requested; it applies on the next simulation tick",
-    );
+    feedback(world, SWITCHING);
     Ok(json!({"accepted":true,"applies_at":at,"command_seq":seq}))
 }
 fn shared_act(world: &mut World, actor: ActorStamp, request: ActStep) -> Result<Value, String> {
@@ -330,7 +351,7 @@ fn shared_act(world: &mut World, actor: ActorStamp, request: ActStep) -> Result<
                 .any(|id| id.as_u64() != Some(u64::from(actor.id.0)))
         })
     {
-        return Err("Native hero controls may act only as the current hero".into());
+        return Err("Choose Live to play your character.".into());
     }
     let response = api::act(
         world,
@@ -732,7 +753,7 @@ fn retarget_person(world: &mut World, pending: &PendingAction) -> bool {
     let Some(position) = position else {
         feedback(
             world,
-            "Your neighbour is out of sight. Find them again before continuing the conversation or trade.",
+            "Your neighbour is out of sight. Find them again before you talk or buy and sell again.",
         );
         return true;
     };

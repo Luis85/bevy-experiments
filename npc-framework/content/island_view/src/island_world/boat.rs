@@ -420,59 +420,15 @@ pub(crate) fn sync(world: &mut World) {
     }
 }
 
-/// The played actor's fog record, when the fog is on: the boat is a thing
-/// that moves, drawn only where the actor sees now.
-type FogRecord<'a> = (
-    &'a npc_framework::prelude::SimId,
-    &'a npc_framework::perception::ExploredCells,
-    &'a npc_framework::perception::VisibleCells,
-    &'a npc_framework::perception::SeenStatics,
-);
-
-/// Whether the water from `lo` to `hi` (world metres) is in sight: always
-/// without fog, else only cells the played actor sees now.
-fn in_sight(
-    fog: Option<&crate::fog::FogOfWar>,
-    grid: Option<&npc_framework::prelude::SpatialGrid>,
-    records: &Query<FogRecord, With<npc_framework::perception::RevealsFog>>,
-    lo: Vec2,
-    hi: Vec2,
-) -> bool {
-    if !fog.is_some_and(|fog| fog.enabled) {
-        return true;
-    }
-    let Some(grid) = grid else { return true };
-    let Some((id, explored, visible, seen)) = records.iter().min_by_key(|record| *record.0) else {
-        return true;
-    };
-    let lens = crate::fog::FogLens {
-        grid,
-        explored,
-        visible,
-        seen,
-        memory: None,
-        actor: *id,
-        riding: None,
-    };
-    let mm = |v: f32| (v * 1000.0).round() as i32;
-    lens.area(
-        SimPos::new(mm(lo.x), mm(lo.y)),
-        SimPos::new(mm(hi.x), mm(hi.y)),
-    ) == crate::fog::CellFog::Visible
-}
-
 /// Put the hull where its phase has it, riding the water a little, and show
-/// the goods on the quay while it is in. Both only where the played actor
-/// sees, under the fog.
+/// the goods on the quay while it is in. (The island has no fog: both are
+/// always in sight.)
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn sail(
     scene: Res<BoatScene>,
     harbour: Option<Res<super::harbour::Harbour>>,
     clock: Option<Res<SimClock>>,
     (time, wind): (Res<Time>, Option<Res<super::ambient::Wind>>),
-    fog: Option<Res<crate::fog::FogOfWar>>,
-    grid: Option<Res<npc_framework::prelude::SpatialGrid>>,
-    records: Query<FogRecord, With<npc_framework::perception::RevealsFog>>,
     mut hulls: Query<(&mut Transform, &mut Visibility), (Without<BoatSail>, Without<BoatFlag>)>,
     (mut sails, mut flags, mut set): (
         Query<(&BoatSail, &mut Transform), Without<BoatFlag>>,
@@ -486,23 +442,14 @@ pub(crate) fn sail(
     let now = clock.map_or(0, |clock| clock.tick);
     let at_phase = phase(scene.docked, now, scene.next_visit_tick, scene.left_at);
     let placed = pose(at_phase, berth, out);
-    let seen = |centre: Vec2, half: f32| {
-        in_sight(
-            fog.as_deref(),
-            grid.as_deref(),
-            &records,
-            centre - Vec2::splat(half),
-            centre + Vec2::splat(half),
-        )
-    };
-    let hull_seen = placed.is_some_and(|(at, _)| seen(at, HULL.length * 0.5));
+    let hull_seen = placed.is_some();
     if let Some(cargo) = harbour.as_deref().and_then(|harbour| {
         harbour
             .cargo
             .zip(harbour.landing.map(|landing| landing.foot))
     }) && let Ok((_, mut visibility)) = hulls.get_mut(cargo.0)
     {
-        let want = if at_phase == Phase::Moored && seen(cargo.1, 1.5) {
+        let want = if at_phase == Phase::Moored {
             Visibility::Inherited
         } else {
             Visibility::Hidden

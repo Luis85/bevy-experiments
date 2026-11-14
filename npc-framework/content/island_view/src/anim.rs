@@ -92,10 +92,8 @@ impl Pose {
                 Pose::Fish => "CharacterArmature|Idle_Sword",
             };
         }
-        let skeleton = matches!(kind, ModelKind::SkeletonMinion | ModelKind::SkeletonWarrior);
         match self {
             Pose::Idle => "Idle",
-            Pose::Walk if skeleton => "Walking_D_Skeletons",
             Pose::Walk => "Walking_A",
             Pose::Work => "1H_Melee_Attack_Chop",
             Pose::Interact => "Interact",
@@ -470,11 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn skeletons_shamble() {
-        assert_eq!(
-            Pose::Walk.clip(ModelKind::SkeletonMinion),
-            "Walking_D_Skeletons"
-        );
+    fn every_pose_has_its_slot() {
         assert_eq!(Pose::Walk.clip(ModelKind::Knight), "Walking_A");
         assert_eq!(Pose::ALL.len(), Pose::COUNT);
         for (slot, pose) in Pose::ALL.into_iter().enumerate() {

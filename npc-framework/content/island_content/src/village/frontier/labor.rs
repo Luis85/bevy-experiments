@@ -462,6 +462,37 @@ pub fn essential_kept(world: &World, settlement: SimId, role: Role) -> bool {
     essential(world, role) && shortage(world, settlement, role) > 0
 }
 
+/// The resident of `settlement` (working another trade) closest to the
+/// skill `role` needs, when one has the aptitude but not the skill:
+/// `(resident, name, skill, has, needs)`.
+pub fn skill_gap(
+    world: &World,
+    settlement: SimId,
+    role: Role,
+) -> Option<(SimId, String, String, u32, u32)> {
+    let skill = economy_spec::registry(world)?
+        .definition(role)?
+        .skill
+        .clone()?;
+    village::demography::members(world, settlement)
+        .into_iter()
+        .filter(|(_, actor)| {
+            village::living(world, *actor)
+                && world
+                    .get::<Villager>(*actor)
+                    .is_some_and(|person| person.role != role)
+                && profile(world, *actor)
+                    .is_some_and(|profile| profile.allowed_roles.contains(&role))
+        })
+        .filter_map(|(id, actor)| {
+            let has = npc_framework::rules::effective_skill(world, id, &skill.name).unwrap_or(0);
+            let name = world.get::<Villager>(actor)?.name.clone();
+            (has < skill.level)
+                .then(|| (id, name, skill.name.clone(), has as u32, skill.level as u32))
+        })
+        .max_by_key(|(id, _, _, has, _)| (*has, std::cmp::Reverse(*id)))
+}
+
 /// Whether a living resident of `settlement` working another trade may take
 /// `role` (aptitude and skill).
 pub fn anyone_may_take(world: &World, settlement: SimId, role: Role) -> bool {
@@ -592,6 +623,9 @@ pub fn settle(world: &mut World, settlement: SimId, settler: &Settler) -> Result
         "RegionalNewcomerSettled",
         &json!({"settlement":settlement,"role":role.name(),"workplace":workplace}),
     );
+    if let Some(actor) = world.resource::<SimIndex>().get(id) {
+        village::resident::assign_tree(world, actor);
+    }
     Ok(id)
 }
 
@@ -1434,6 +1468,8 @@ fn change(world: &mut World, actor: Entity, role: Role, workplace: SimId, reason
         person.role = role;
         person.workplace = workplace;
     }
+    // A trade may run its own tree (S3.1).
+    village::resident::assign_tree(world, actor);
     world.entity_mut(actor).remove::<MoveIntent>();
     production::clear_intent(world, actor);
     let mut departures = world
@@ -1475,6 +1511,9 @@ fn change(world: &mut World, actor: Entity, role: Role, workplace: SimId, reason
             "workplace":workplace, "reason":reason,
             "from_key":previous.role.key(), "to_key":role.key(),
             "from_trade":from_trade, "to_trade":to_trade,
+            // The overseer asked for it: an assignment or a wanted headcount.
+            "by_order": reason == "Requested workplace assignment"
+                || reason == "Answering the overseer's wanted headcount",
         }),
     );
     true

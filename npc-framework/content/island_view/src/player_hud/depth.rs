@@ -288,7 +288,7 @@ pub(super) fn tier_gives(tier: &Tier) -> String {
         parts.push("invites you to gatherings".to_owned());
     }
     if parts.is_empty() {
-        "Nothing yet: talk, trade and give gifts to grow closer.".to_owned()
+        "Nothing yet. Talk, buy and sell, and give gifts to grow closer.".to_owned()
     } else {
         sentence(&parts.join(" · "))
     }

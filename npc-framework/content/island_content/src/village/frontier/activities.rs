@@ -1,7 +1,7 @@
 //! Shared recorded restoration work. Ecology owns the effect; this adapter owns
 //! work duration, reach and exact physical material claims.
 use super::ecology::{self, EcologyWorkKind};
-use crate::village::{Villager, catalog, economy, homestead::BuildMaterial, living};
+use crate::village::{Villager, economy, homestead::BuildMaterial, living};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
@@ -404,6 +404,16 @@ fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         "position":{"x":s.center.x,"z":s.center.z},"biome":s.biome})
         })
         .collect();
+    // The good that needs its own tool to gather (fish and a rod), from data.
+    let fishing = super::economy_spec::registry(world)
+        .and_then(|registry| {
+            registry.trade_kinds().iter().find_map(|kind| {
+                let good = registry.good(kind)?;
+                good.gather_tool_required
+                    .then(|| json!({"catch":kind,"tool":good.gather_tool,"verb":"gather"}))
+            })
+        })
+        .unwrap_or(serde_json::Value::Null);
     let sites: Vec<_> = local_sites(world, ctx).into_iter().filter_map(|(id, e)| {
         let p = world.get::<crate::village::ResourcePatch>(e)?;
         let ecology = world.get::<ecology::EcologicalPatch>(e)?;
@@ -425,7 +435,7 @@ fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
     Some(Section::new(
         json!({"chart":destinations,"width_mm":map_enabled.then(||spec.width_cells.saturating_mul(1000)),
         "height_mm":map_enabled.then(||spec.height_cells.saturating_mul(1000)),"nearby_sites":sites,
-        "fishing":{"catch":catalog::FISH,"tool":catalog::FISHING_ROD,"verb":"gather"},
+        "fishing":fishing,
         "work":world.get::<EcologyWork>(ctx.entity)}),
     ))
 }

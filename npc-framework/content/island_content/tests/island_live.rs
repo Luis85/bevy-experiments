@@ -273,8 +273,13 @@ fn talk_trade_and_gifts_build_a_bond_with_real_effects_and_neglect_wears_it() {
     );
     // Real effects. A friend takes a tenth off.
     beside(&mut app, actor, friend);
-    let asked = market::asking_price(app.world(), friend, "bread").expect("price") * 5;
-    let quote = market::quote(app.world(), actor, friend, "bread", 5).expect("quote");
+    // One fresh loaf: with a sit-down meal a day (review fix S3.3) the
+    // friend has eaten the bread it was given days ago, and five loaves need
+    // not fit the purse.
+    econ::grant(app.world_mut(), friend, Item::new("bread").stack(4));
+    let asked = market::asking_price(app.world(), friend, "bread").expect("price");
+    let quote = market::quote(app.world(), actor, friend, "bread", 1)
+        .unwrap_or_else(|error| panic!("quote: {error}"));
     assert_eq!(quote.total, (asked - asked / 10).max(1));
     assert!(
         asked < 10 || quote.total < asked,

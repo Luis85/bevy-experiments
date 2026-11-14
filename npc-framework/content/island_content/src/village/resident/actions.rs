@@ -189,6 +189,16 @@ pub const ACTIONS: &[ActionInfo] = &[
               Fails otherwise.",
     },
     ActionInfo {
+        name: "life.sit_down",
+        start: sit_down,
+        param: Param::None,
+        always_starts: false,
+        doc: "Sit down to the meal: eats the first food carried when hunger is below \
+              `schedule.meal_hunger_threshold` (nobody eats past hunger), and started in a meal \
+              block it marks the day's sit-down meal as had (one a day). Fails for a resident \
+              who is not alive.",
+    },
+    ActionInfo {
         name: "life.idle",
         start: idle,
         param: Param::None,
@@ -388,6 +398,7 @@ pub(super) fn label(action: &str, param: &ParamValue) -> Option<&'static str> {
         ("life.help", _) => "helping a friend",
         ("life.hunt", _) => "hunting",
         ("life.idle", _) => "idle",
+        ("life.sit_down", _) => "sitting at the table",
         ("life.pursue_goal", _) => "working to a plan",
         ("life.sell", _) => "delivering goods",
         ("life.sleep", _) => "resting at home",
@@ -964,7 +975,7 @@ fn inn_on_the_way(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
         return None;
     }
     let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
-    if coins < catalog::BED_PRICE.saturating_add(tuning.destitution_floor) {
+    if coins < catalog::bed_price(world).saturating_add(tuning.destitution_floor) {
         return None;
     }
     let mut keepers: Vec<(i64, SimId, SimPos)> = indoors::inns(world)
@@ -1223,6 +1234,40 @@ fn go_to(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
         }
         Ok(())
     })
+}
+
+fn sit_down(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
+    begin(
+        world,
+        actor,
+        "life.sit_down",
+        param,
+        LifeGoal::Leisure,
+        |world, actor| {
+            let meal = super::meal_block(world, actor);
+            world
+                .entity_mut(actor)
+                .remove::<npc_framework::prelude::MoveIntent>();
+            let threshold =
+                super::spec(world).map_or(60_000, |spec| spec.schedule.meal_hunger_threshold);
+            if econ::need(world, actor, "Hunger") < threshold
+                && let Some(kind) = foods(world, actor)
+                    .into_iter()
+                    .find(|kind| econ::count(world, actor, kind) > 0)
+            {
+                let mut command = VillageAct::new(id_of(world, actor), "eat");
+                command.kind = kind.into();
+                // A meal that cannot be eaten is still a meal sat down to.
+                let _ = command.perform(world);
+            }
+            if let Some(meal) = meal {
+                world.entity_mut(actor).insert(super::DayRhythm {
+                    last_meal: Some(meal),
+                });
+            }
+            Ok(())
+        },
+    )
 }
 
 fn idle(world: &mut World, actor: Entity, param: &ParamValue) -> Status {

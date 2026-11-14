@@ -152,9 +152,85 @@ fn depot_offers(
         .collect()
 }
 
+/// How long a buyer keeps the seller it chose (S3.4).
+pub const ERRAND_TICKS: u64 = 600;
+
+/// The seller a buyer chose and walks to: kept until the purchase, until
+/// it no longer offers the good at a price the buyer can pay, or for
+/// [`ERRAND_TICKS`] (review fix S3.4: errands remember their target).
+#[derive(
+    Component,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bevy_reflect::Reflect,
+)]
+#[reflect(Component)]
+pub struct Errand {
+    pub good: String,
+    pub target: SimId,
+    pub until: u64,
+}
+impl SimHash for Errand {
+    const NAME: &'static str = "island_errand_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.str(&self.good);
+        h.u32(self.target.0);
+        h.u64(self.until);
+    }
+}
+
+/// Whether `seller` still sells `kind` to `buyer` at a price it can pay.
+fn still_sells(world: &World, buyer: Entity, seller: Entity, kind: &str) -> bool {
+    let coins = world.get::<Wallet>(buyer).map_or(0, |wallet| wallet.coins);
+    let limit = super::production::purchase_bid_limit(world, buyer, kind);
+    if world.get::<super::civic::Depot>(seller).is_some() {
+        let buyer_id = world.get::<SimId>(buyer).copied();
+        return super::civic::depot_available(world, seller, kind, buyer_id) > 0
+            && super::market::unit_price(world, kind)
+                .is_some_and(|price| price <= coins && limit.is_none_or(|limit| price <= limit));
+    }
+    living(world, seller)
+        && super::market::person_sells(world, seller, kind)
+        && super::market::available_to_sell(world, seller, kind) > 0
+        && super::market::asking_price(world, seller, kind)
+            .is_some_and(|price| price <= coins && limit.is_none_or(|limit| price <= limit))
+}
+
+/// The remembered seller of `kind`, while the errand holds.
+fn recall_seller(world: &World, buyer: Entity, kind: &str) -> Option<Entity> {
+    let errand = world.get::<Errand>(buyer)?;
+    let now = world.resource::<SimClock>().tick;
+    if errand.good != kind || errand.until <= now {
+        return None;
+    }
+    let seller = world.resource::<SimIndex>().get(errand.target)?;
+    still_sells(world, buyer, seller, kind).then_some(seller)
+}
+
 pub(super) fn buy_market_input(world: &mut World, actor: Entity, kind: &str, wanted: u32) -> bool {
-    let Some(seller) = market_supplier(world, actor, kind) else {
-        return false;
+    let seller = match recall_seller(world, actor, kind) {
+        Some(seller) => seller,
+        None => {
+            world.entity_mut(actor).remove::<Errand>();
+            let Some(seller) = market_supplier(world, actor, kind) else {
+                return false;
+            };
+            let target = *world.get::<SimId>(seller).expect("seller identity");
+            let until = world
+                .resource::<SimClock>()
+                .tick
+                .saturating_add(ERRAND_TICKS);
+            world.entity_mut(actor).insert(Errand {
+                good: kind.to_owned(),
+                target,
+                until,
+            });
+            seller
+        }
     };
     let target = *world.get::<SimId>(seller).expect("seller identity");
     super::production::intent(world, actor, "buy", kind, "", Some(target));
@@ -179,9 +255,12 @@ pub(super) fn buy_market_input(world: &mut World, actor: Entity, kind: &str, wan
     for count in (1..=quantity).rev() {
         command.quantity = count;
         if command.perform(world).is_ok() {
+            // Done: the next purchase chooses afresh.
+            world.entity_mut(actor).remove::<Errand>();
             return true;
         }
     }
+    world.entity_mut(actor).remove::<Errand>();
     false
 }
 
@@ -905,6 +984,19 @@ pub(crate) fn stop_work(world: &mut World, e: Entity, reason: &str) {
 /// External queues remain the responsibility of `stop_work` / control ownership.
 pub(crate) fn cancel_owned_work(world: &mut World, e: Entity, reason: &str) {
     super::frontier::activities::cancel(world, e);
+    // A building stage interrupted by daily life (a critical need) is
+    // suspended, not lost: the builder finishes it later (S3.5).
+    if reason == "daily life interrupted"
+        && let Some(work) = world.get::<super::civic::SiteWork>(e).copied()
+    {
+        let now = world.resource::<SimClock>().tick;
+        world.entity_mut(e).insert(super::civic::SuspendedWork {
+            site: work.site,
+            ticks: work.ticks,
+            remaining: work.ends.saturating_sub(now).max(1),
+            expires_at: now.saturating_add(super::civic::SUSPEND_TICKS),
+        });
+    }
     super::civic::cancel_work(world, e);
     super::live::cancel_work(world, e);
     super::fields::cancel(world, e);
@@ -1192,7 +1284,8 @@ fn finish_gathers(world: &mut World, now: u64) {
         if p.remaining == 0
             || !econ::near(world, e, patch)
             || econ::fit(world, e, &[Item::new(&p.kind)]).is_err()
-            || (p.kind == catalog::FISH && econ::count(world, e, catalog::FISHING_ROD) == 0)
+            || catalog::gather_tool_required_in(world, &p.kind)
+                .is_some_and(|tool| super::living::usable_tool(world, e, tool).is_none())
         {
             continue;
         }

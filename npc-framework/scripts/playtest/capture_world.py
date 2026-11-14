@@ -2886,7 +2886,9 @@ def sound_lines(log_path):
 
 def sound11_run(binary, base, report):
     run = base / "sound11"
-    child, flow = enter(binary, run, rules_with_weather(base, "clear"), report, {}, 8)
+    # The island's sound lines log at debug level.
+    sound_log = {"RUST_LOG": "info,island_view::island_audio=debug"}
+    child, flow = enter(binary, run, rules_with_weather(base, "clear"), report, sound_log, 8)
     entry = report.setdefault("sound11", {})
     try:
         for attempt in range(4):

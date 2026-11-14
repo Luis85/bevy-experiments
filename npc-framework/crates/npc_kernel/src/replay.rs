@@ -35,7 +35,7 @@ use crate::clock::SimClock;
 use crate::commands::{CommandLog, CommandQueue, SimCommand};
 use crate::hash::{components_json, entity_hashes, state_hash};
 use crate::ids::{SimId, SimIndex};
-use crate::registry::content_hash;
+use crate::registry::{content_hash, initial_content_hash};
 use crate::rng::WorldSeed;
 use crate::schedule::run_ticks;
 
@@ -242,7 +242,9 @@ impl Recorder {
             })?;
         Ok(Replay {
             version: REPLAY_VERSION,
-            content_hash: Some(content_hash(world)),
+            // The build the run started from (equal to the current content
+            // hash unless content was replaced during the run, ADR 0045).
+            content_hash: Some(initial_content_hash(world)),
             seed: world.get_resource::<WorldSeed>().map_or(0, |s| s.0),
             scenario: info.name,
             villagers: info.villagers,

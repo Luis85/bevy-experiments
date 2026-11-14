@@ -352,13 +352,16 @@ pub fn load_with(
                 .world()
                 .resource::<IslandIds>()
                 .get(&context.actor)
-                .ok_or("the selected world's played actor is missing")?;
+                .ok_or("This world has no character to play.")?;
             crate::worlds::apply(app.world_mut(), played, &selection.preset);
         }
     }
-    if spec.layout == Layout::Island
-        && let Some(played) = actors.first()
-    {
+    if spec.layout == Layout::Island {
+        // An island needs somebody to play (review fix S1.5): refused here,
+        // not a panic later.
+        let Some(played) = actors.first() else {
+            return Err("This world has no character to play.".into());
+        };
         crate::village::apply(app.world_mut(), *played);
     }
     Ok(LoadedScenario { app, actors })

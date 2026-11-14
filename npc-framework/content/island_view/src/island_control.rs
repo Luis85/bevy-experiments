@@ -200,9 +200,7 @@ fn set_mode(world: &mut World, mode: IslandMode) {
 pub(crate) fn request_mode(world: &mut World, mode: IslandMode) -> Result<(), String> {
     if mode == IslandMode::Character {
         if matches!(player_actions::control(world), ControlState::Foreign { .. }) {
-            return Err(
-                "Another controller owns the hero; native input will not take it over".into(),
-            );
+            return Err("Your character is being played from somewhere else.".into());
         }
         if !player_actions::available(world) {
             return Err("This life is unavailable; choose a new life before playing".into());
@@ -231,17 +229,22 @@ pub(crate) fn request_mode(world: &mut World, mode: IslandMode) -> Result<(), St
         world.resource_mut::<IslandControl>().select_when_ready = true;
     }
     let native_ready = player_actions::control(world) == ControlState::Native;
+    let paused = crate::game_ui::words::paused(world);
     set_status(
         world,
         match mode {
             IslandMode::Inspector => {
-                "Inspect residents and set colony policies while the village lives on."
+                "Look at residents and give the villages orders while they live on.".to_owned()
             }
-            IslandMode::Character if native_ready => CHARACTER_READY,
-            IslandMode::Character => {
-                "Joining the island. WASD walks; F2 opens work, food and trade. Resume if paused."
+            IslandMode::Character if native_ready => CHARACTER_READY.to_owned(),
+            IslandMode::Character if paused => {
+                "Arriving on the island… Time is paused (Space).".to_owned()
             }
-            IslandMode::Editor => "Click land to paint. Resume the world to apply changes.",
+            IslandMode::Character => "Arriving on the island…".to_owned(),
+            IslandMode::Editor if paused => {
+                "Click land to shape it. Edits show when time runs (Space).".to_owned()
+            }
+            IslandMode::Editor => "Click land to shape it.".to_owned(),
         },
     );
     reconcile_control(world)
@@ -447,15 +450,20 @@ fn control_actor(world: &World) -> Option<(SimId, Entity, u64)> {
     Some((actor, entity, npc_framework::agent_io::api::epoch(world)))
 }
 
+/// While time runs a switch is immediate and nothing is said; while it is
+/// paused the switch waits, and the line says so.
 fn waiting_control_message(world: &mut World) {
+    if !crate::game_ui::words::paused(world) {
+        return;
+    }
     let mode = match world.resource::<IslandMode>() {
-        IslandMode::Inspector => "inspection",
-        IslandMode::Character => "character control",
-        IslandMode::Editor => "landscape editing",
+        IslandMode::Inspector => "Oversee",
+        IslandMode::Character => "Live",
+        IslandMode::Editor => "Shape",
     };
     set_status(
         world,
-        format!("Switching to {mode}. Resume the world to finish switching."),
+        format!("Switching to {mode} when time runs (Space)."),
     );
 }
 
@@ -543,9 +551,10 @@ fn reconcile_control(world: &mut World) -> Result<(), String> {
     };
     if let Some(request) = request {
         let response = request?;
-        let tick = response["applies_at"]
-            .as_u64()
-            .ok_or("Control request returned no simulation tick")?;
+        let tick = response["applies_at"].as_u64().ok_or_else(|| {
+            warn!("Control request returned no simulation tick: {response}");
+            "Live is not available right now. Nothing was changed.".to_owned()
+        })?;
         let seq = response["command_seq"]
             .as_u64()
             .and_then(|seq| u32::try_from(seq).ok())

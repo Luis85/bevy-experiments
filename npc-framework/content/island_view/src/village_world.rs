@@ -1084,10 +1084,9 @@ fn wildlife_visuals(
     if unseen.is_empty() {
         return;
     }
-    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-    let hide = materials.add(Color::srgb(0.56, 0.36, 0.19));
-    let dark = materials.add(Color::srgb(0.19, 0.16, 0.12));
-    let light = materials.add(Color::srgb(0.88, 0.79, 0.62));
+    // The box deer (without the deer models: headless hosts and tests):
+    // its mesh and colours made only when it is drawn.
+    let mut boxes = None;
     for (entity, id, pos) in unseen {
         let visual = commands
             .spawn((
@@ -1139,6 +1138,16 @@ fn wildlife_visuals(
             label(&mut commands, *id, visual, "Deer", 2.1, false);
             continue;
         }
+        let (cube, hide, dark, light) = boxes
+            .get_or_insert_with(|| {
+                (
+                    meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
+                    materials.add(Color::srgb(0.56, 0.36, 0.19)),
+                    materials.add(Color::srgb(0.19, 0.16, 0.12)),
+                    materials.add(Color::srgb(0.88, 0.79, 0.62)),
+                )
+            })
+            .clone();
         commands.entity(body_root).with_children(|body| {
             for (position, scale, material) in [
                 (

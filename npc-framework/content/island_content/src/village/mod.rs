@@ -21,6 +21,7 @@ pub mod hunting;
 pub mod indoors;
 pub mod integrity;
 pub mod island_save;
+pub mod ledger;
 pub mod live;
 pub mod living;
 pub mod market;
@@ -35,6 +36,7 @@ pub mod roles;
 pub mod routing;
 mod scheduler;
 pub mod speech;
+pub mod spoilage;
 pub mod stock;
 pub mod terrain;
 pub mod view;
@@ -88,7 +90,8 @@ pub fn intrinsic_action(verb: &str) -> bool {
 pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
     use npc_framework::perf::PerfAppExt;
     app.register_budget("village.economy", 250, 0);
-    app.insert_resource(crate::world_runtime::ActiveWorld(p.clone()));
+    app.insert_resource(crate::world_runtime::ActiveWorld(p.clone()))
+        .register_sim_resource::<crate::world_runtime::ActiveWorld>();
     frontier::register(app);
     // Host observation only: no sim registry/hash/snapshot entry and no tick system.
     app.insert_resource(
@@ -131,10 +134,12 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
             order: i as i32,
             decay_per_tick: spec.rise_milli_per_tick,
             thresholds: NeedThresholds {
-                low_enter: 100_001 - spec.low_milli,
-                low_exit: (102_000 - spec.low_milli).min(100_000),
-                urgent_enter: 100_001 - spec.out_milli,
-                urgent_exit: (102_000 - spec.out_milli).min(100_000),
+                // Clamped as well as validated: a threshold of 0 would
+                // overflow the need range.
+                low_enter: (100_001 - spec.low_milli).clamp(1, 100_000),
+                low_exit: (102_000 - spec.low_milli).clamp(1, 100_000),
+                urgent_enter: (100_001 - spec.out_milli).clamp(1, 100_000),
+                urgent_exit: (102_000 - spec.out_milli).clamp(1, 100_000),
             },
         });
     }

@@ -103,6 +103,9 @@ pub(crate) struct Inspector {
     /// "carry on": what began the activity a resident is finishing.
     latest: BTreeMap<SimId, Value>,
     origin: BTreeMap<SimId, Value>,
+    /// Each resident's latest job change: the job's key and whether the
+    /// player's order made it (2.7).
+    job_change: BTreeMap<SimId, (String, bool)>,
 }
 
 #[derive(Component)]
@@ -464,6 +467,14 @@ fn live_plan(world: &World, entity: Entity) -> Option<PlanView> {
     })
 }
 
+/// The routine (behaviour tree) the resident runs, in words: its data
+/// name with spaces ("island life").
+pub(crate) fn routine_name(world: &World, entity: Entity) -> Option<String> {
+    let id = island_content::village::resident::tree_for(world, entity)?;
+    let registry = world.get_resource::<npc_framework::ai::AiRegistry>()?;
+    Some(registry.tree(id).name.replace('_', " "))
+}
+
 /// The "Why" text for one resident: what they chose, what would have come
 /// first and why it did not, and the plan they are working to.
 #[cfg(test)]
@@ -656,7 +667,7 @@ fn friends_entries(world: &World, id: SimId) -> Vec<Entry> {
     }
     let mut rows = vec![Entry::caption("friends_title", "Friends").with_tip(Tooltip::new(
         "Friends",
-        "Their closest bonds, strongest first. Talk, trade and gifts bring people closer; time apart fades a bond.",
+        "Their closest bonds, strongest first. Talk, sales and gifts bring people closer; time apart fades a bond.",
     ))];
     rows.extend(
         lines
@@ -799,10 +810,12 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
                 )),
             );
             rows.push(Entry::text("carrying", "Carrying", false).with(Extra::Chips(chips)));
-            rows.push(Entry::caption("why_title", "Why now").with_tip(Tooltip::new(
-                "Why now",
-                "What they are doing and the reason the simulation gives. The Why tab has the whole decision.",
-            )));
+            rows.push(
+                Entry::caption("why_title", "Why now").with_tip(Tooltip::new(
+                    "Why now",
+                    "What they are doing, and why. The Why tab has the whole decision.",
+                )),
+            );
             match why_view(world, id, entity) {
                 Ok(why) => {
                     rows.push(Entry::strong("why_now", why.chosen));
@@ -877,6 +890,26 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
         },
         Tab::Why => match why_view(world, id, entity) {
             Ok(why) => {
+                // Residents may run different routines (by job or age).
+                if let Some(routine) = routine_name(world, entity) {
+                    rows.push(Entry::caption(
+                        "why_routine",
+                        format!("Follows the routine \u{201c}{routine}\u{201d}."),
+                    ));
+                }
+                rows.push(Entry::choices(
+                    "why_behaviour",
+                    vec![
+                        (
+                            "Save behaviour to file".to_owned(),
+                            LedgerAct::BehaviourFile(crate::BehaviourFile::Save),
+                        ),
+                        (
+                            "Reload behaviour from file".to_owned(),
+                            LedgerAct::BehaviourFile(crate::BehaviourFile::Reload),
+                        ),
+                    ],
+                ));
                 rows.push(Entry::text("why_chose_title", "Chose", true));
                 rows.push(Entry::strong("why_chose", why.chosen));
                 if !why.alternatives.is_empty() {
@@ -1058,7 +1091,7 @@ fn spawn(world: &mut World) {
     );
     world
         .entity_mut(close)
-        .insert(Tooltip::new("Close", "Close the inspector and clear the selection.").key("Esc"));
+        .insert(Tooltip::new("Close", "Close this card.").key("Esc"));
     // Status: shape, colour and word, then what they are doing.
     let status = world
         .spawn((
@@ -1158,6 +1191,7 @@ pub(crate) fn track(world: &mut World) {
         state.cursor = None;
         state.latest.clear();
         state.origin.clear();
+        state.job_change.clear();
         state.follow = false;
         state.avatar = None;
         state.status = None;
@@ -1172,11 +1206,14 @@ pub(crate) fn track(world: &mut World) {
     }
     // A journal that moved backwards belongs to another timeline.
     let rewound = matches!((newest, cursor), (Some(newest), Some(cursor)) if newest < cursor);
+    let unread = |entry: &&npc_framework::kernel::journal::JournalEntry| {
+        rewound || cursor.is_none_or(|cursor| (entry.tick, entry.seq) > cursor)
+    };
     let mut fresh: Vec<(SimId, Value)> = journal
         .entries
         .iter()
         .rev()
-        .take_while(|entry| rewound || cursor.is_none_or(|cursor| (entry.tick, entry.seq) > cursor))
+        .take_while(unread)
         .filter_map(|entry| match &entry.kind {
             JournalKind::Effect {
                 effect,
@@ -1188,12 +1225,39 @@ pub(crate) fn track(world: &mut World) {
         })
         .collect();
     fresh.reverse();
+    let mut changes: Vec<(SimId, (String, bool))> = journal
+        .entries
+        .iter()
+        .rev()
+        .take_while(unread)
+        .filter_map(|entry| match &entry.kind {
+            JournalKind::Effect {
+                effect,
+                applied: true,
+            } if effect.get("type").and_then(Value::as_str)
+                == Some("RegionalOccupationChanged") =>
+            {
+                Some((
+                    entry.unit?,
+                    (
+                        effect.get("to")?.as_str()?.to_owned(),
+                        effect.get("by_order").and_then(Value::as_bool) == Some(true),
+                    ),
+                ))
+            }
+            _ => None,
+        })
+        .collect();
+    changes.reverse();
     let mut state = world.resource_mut::<Inspector>();
     if rewound {
         state.latest.clear();
         state.origin.clear();
     }
     state.cursor = newest;
+    for (id, change) in changes {
+        state.job_change.insert(id, change);
+    }
     for (id, record) in fresh {
         if record["action"].as_str() != Some("life.continue") {
             state.origin.insert(id, record.clone());
@@ -1347,10 +1411,13 @@ fn refresh(world: &mut World) {
     } else {
         crate::colony_panel::trade_display(world, person.role)
     };
-    let subtitle = match settlement_name(world, entity) {
-        Some(village) => format!("{trade} \u{b7} {village}"),
-        None => trade,
-    };
+    // A job the player's order gave them says so (2.7).
+    let ordered = world
+        .resource::<Inspector>()
+        .job_change
+        .get(&id)
+        .is_some_and(|(job, by_order)| *by_order && job == person.role.name());
+    let subtitle = model::job_line(&trade, settlement_name(world, entity).as_deref(), ordered);
     set_text::<SubtitleText>(world, &subtitle);
     set_text::<ActivityText>(world, &model::capitalise(&activity_label(world, entity)));
     // The ring wears the trade's marker colour; the icon names the trade too.

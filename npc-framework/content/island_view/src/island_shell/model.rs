@@ -62,12 +62,17 @@ impl ModeTab {
             Self::Shape => "Raise, lower and paint the land.",
         }
     }
+    /// Its key, from the one table of keys (the same in every mode).
     pub(crate) fn key(self) -> KeyCode {
-        match self {
-            Self::Live => KeyCode::Digit1,
-            Self::Oversee => KeyCode::Digit2,
-            Self::Shape => KeyCode::Digit3,
-        }
+        use crate::keymap::{self as map, Mode::Live};
+        map::key(
+            Live,
+            match self {
+                Self::Live => map::LIVE,
+                Self::Oversee => map::OVERSEE,
+                Self::Shape => map::SHAPE,
+            },
+        )
     }
 }
 
@@ -619,15 +624,38 @@ pub(crate) fn bar_crowding(class: LayoutClass, totals_shown: usize) -> (bool, bo
 /// what is left between the goal tracker and the workspace; where that is too
 /// narrow for a sentence, under the folded goal tracker. The third value is
 /// how far the lane drops below the bar.
+#[cfg(test)]
 pub(crate) fn toast_lane(width: f32, workspace: f32, goal: f32) -> (f32, f32, f32) {
+    toast_lane_for(width, workspace, goal, false)
+}
+
+/// The Paused pill's words: "Paused", "Paused · 1 order waiting",
+/// "Paused · 3 orders waiting".
+pub(crate) fn paused_words(waiting: usize) -> String {
+    match waiting {
+        0 => "Paused".to_owned(),
+        1 => "Paused \u{b7} 1 order waiting".to_owned(),
+        waiting => format!("Paused \u{b7} {waiting} orders waiting"),
+    }
+}
+
+/// [`toast_lane`] while the Paused pill counts waiting orders: the pill is
+/// wider then.
+pub(crate) fn toast_lane_for(
+    width: f32,
+    workspace: f32,
+    goal: f32,
+    counting: bool,
+) -> (f32, f32, f32) {
     use crate::game_ui::tokens as t;
-    // Half of the Paused pill with its key cap, and a little air.
-    const HALF_PILL: f32 = 90.0;
+    // Half of the Paused pill with its key cap, and a little air; wider
+    // with "· 2 orders waiting".
+    let half_pill: f32 = if counting { 150.0 } else { 90.0 };
     // A sentence-long toast needs about this much.
     const TOAST: f32 = 320.0;
     // The goal tracker folds to this height while a workspace is open.
     const GOAL_FOLDED: f32 = 72.0;
-    if workspace <= 0.0 || width * 0.5 + HALF_PILL <= width - workspace - t::SCREEN_MARGIN {
+    if workspace <= 0.0 || width * 0.5 + half_pill <= width - workspace - t::SCREEN_MARGIN {
         (0.0, 0.0, 0.0)
     } else if width - workspace - t::SCREEN_MARGIN - goal >= TOAST {
         (goal, workspace + t::SCREEN_MARGIN, 0.0)
@@ -675,14 +703,19 @@ impl LedgerPage {
             Self::Journal => Icon::JournalPage,
         }
     }
+    /// Its key, from the one table of keys.
     pub(crate) fn key(self) -> KeyCode {
-        match self {
-            Self::Village => KeyCode::F1,
-            Self::Economy => KeyCode::F2,
-            Self::People => KeyCode::F3,
-            Self::Projects => KeyCode::F4,
-            Self::Journal => KeyCode::F5,
-        }
+        use crate::keymap::{self as map, Mode::Oversee};
+        map::key(
+            Oversee,
+            match self {
+                Self::Village => map::LEDGER_VILLAGE,
+                Self::Economy => map::LEDGER_ECONOMY,
+                Self::People => map::LEDGER_PEOPLE,
+                Self::Projects => map::LEDGER_PROJECTS,
+                Self::Journal => map::LEDGER_JOURNAL,
+            },
+        )
     }
     pub(crate) fn key_cap(self) -> &'static str {
         match self {

@@ -175,9 +175,14 @@ pub fn target(world: &World, settlement: SimId, kind: &str) -> u32 {
         } else {
             None
         };
-        topic.map_or(days, |topic| {
+        let days = topic.map_or(days, |topic| {
             oversee::scale(oversee::level(world, settlement, topic, None), days)
-        })
+        });
+        // Never more days of cover than the good keeps (S2.4).
+        super::frontier::economy_spec::registry(world)
+            .and_then(|registry| registry.spec.good(kind))
+            .and_then(|good| good.shelf_life_days)
+            .map_or(days, |life| days.min(life))
     };
     daily_use(world, settlement, kind)
         .saturating_mul(days)

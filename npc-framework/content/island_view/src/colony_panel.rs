@@ -5,8 +5,11 @@
 //! (village, economy, residents). Developer launches keep the ledger's own
 //! mode, clock and landscape rows.
 mod economy;
+mod goods;
 mod model;
+mod orders;
 mod roster;
+mod season;
 #[cfg(test)]
 mod tests;
 mod widgets;
@@ -14,6 +17,10 @@ mod widgets;
 pub(crate) use economy::{StockTrends, Trend, scopes, stock_totals, trade_display};
 use model::entries;
 pub(crate) use model::{Entry, Extra, manage_entries};
+/// The words of the world's marks for the player's orders (design-ui 2.7),
+/// for `island_atmosphere` and `village_world` to place.
+#[allow(unused_imports)]
+pub(crate) use orders::{order_pill, order_tag};
 pub(crate) use roster::capitalised;
 use std::collections::BTreeMap;
 use widgets::{button, reconcile, row, set_text};
@@ -24,6 +31,7 @@ use crate::game_ui::scale;
 use crate::game_ui::tokens::{self as t, Surface};
 use crate::game_ui::tooltip::Tooltip;
 use crate::game_ui::widgets::{self as kit, Reach, Tone};
+use crate::game_ui::words;
 use crate::island_shell::model::{Column, ColumnEvent, ColumnState, LedgerPage};
 
 use bevy::input::mouse::AccumulatedMouseScroll;
@@ -132,14 +140,56 @@ pub(crate) enum Action {
     AlertRow(u64),
     AlertFold(u64),
     AlertFilter(crate::island_alerts::model::Filter),
+    /// The resident card's Why page: save or reload the behaviour file
+    /// (the host does the file work).
+    BehaviourFile(crate::BehaviourFile),
+    /// Open Jobs, on this village when it names one, and flash this job's
+    /// row.
+    JobsOf(economy::Scope, Option<String>),
+    /// Open People listing only these residents under this head; an empty
+    /// list shows everyone again.
+    PeopleFilter(String, Vec<SimId>),
+    /// The narrow ledger's fold of the good card: open or close it.
+    GoodMore,
+    /// Take a refused order off "Your orders".
+    DismissOrder((u64, u32)),
+    /// Priorities: show or hide the jobs that may get their own level.
+    JobLevels,
+    /// The season-end card (2.6): open it on this season, close it, or
+    /// close it onto the Journal.
+    SeasonOpen(u32),
+    SeasonClose,
+    SeasonJournal,
 }
 #[derive(Resource)]
 struct Ledger {
+    /// People: the residents a link chose, and the page's head for them.
+    people_filter: Option<(String, Vec<SimId>)>,
+    /// The narrow ledger's good card: its fold is open.
+    good_more: bool,
+    /// Orders this ledger sent that wait or were refused (view state).
+    sent: Vec<orders::SentOrder>,
+    /// Priorities: the chips of jobs without their own level are open.
+    job_levels: bool,
+    /// The season whose end card the ledger shows (2.6).
+    season_card: Option<u32>,
+    /// The last finished season already offered; `None` before the first
+    /// look, so a loaded island does not offer an old season.
+    season_seen: Option<Option<u32>>,
+    /// The foot line last seen and how long it has stood, in real seconds:
+    /// it clears after six (2.7); "Your orders" is what stays.
+    foot: (String, f32),
+    /// A row to bring into view and flash: its key, the seconds it has
+    /// flashed, and whether it was found (2.3, "Show baker in Jobs").
+    flash: Option<(String, f32, bool)>,
     open: bool,
     tab: Tab,
-    /// Settlement shown by the Economy tab and the Residents roster; `None`
+    /// Settlement shown by the Goods table and the Residents roster; `None`
     /// is the whole island.
     scope: economy::Scope,
+    /// The village Jobs and Priorities show, remembered for both this
+    /// session; chosen again when it is unset or gone.
+    village_scope: Option<SimId>,
     sort: roster::SortKey,
     /// Economy page: which table, and the selected good.
     economy: economy::EconomyPage,
@@ -167,10 +217,19 @@ struct Ledger {
 impl Default for Ledger {
     fn default() -> Self {
         Self {
+            people_filter: None,
+            good_more: false,
+            sent: Vec::new(),
+            job_levels: false,
+            season_card: None,
+            season_seen: None,
+            foot: (String::new(), 0.0),
+            flash: None,
             // Closed by default: a management screen opens on request.
             open: false,
             tab: Tab::Overview,
             scope: None,
+            village_scope: None,
             sort: roster::SortKey::default(),
             economy: economy::EconomyPage::Goods,
             good: None,
@@ -273,12 +332,7 @@ fn spawn(world: &mut World) {
     kit::button(
         world,
         launcher,
-        kit::ButtonSpec::new(
-            "Colony and landscape",
-            kit::Kind::Secondary,
-            Surface::Chrome,
-        )
-        .key("F11"),
+        kit::ButtonSpec::new("Village and land", kit::Kind::Secondary, Surface::Chrome).key("F11"),
         (LedgerControl, LedgerAction(Action::Toggle)),
     );
     let root = world
@@ -324,9 +378,9 @@ fn spawn(world: &mut World) {
     if !shell {
         let modes = row(world, root);
         for (label, mode) in [
-            ("Inspect", IslandMode::Inspector),
-            ("Play character", IslandMode::Character),
-            ("Terraform", IslandMode::Editor),
+            ("Oversee", IslandMode::Inspector),
+            ("Live", IslandMode::Character),
+            ("Shape", IslandMode::Editor),
         ] {
             button(world, modes, label, Action::Mode(mode));
         }
@@ -441,16 +495,19 @@ fn keys(
     windows: Query<(), With<Window>>,
     roots: Query<Entity, With<LedgerRoot>>,
     nav: TabNavigation,
+    experience: Option<Res<crate::PlayerExperience>>,
     mut commands: Commands,
 ) {
     let Some(mut keys) = keys else { return };
+    // In the player session F1 to F5 and Esc open and close the ledger.
+    let player = experience.is_some_and(|experience| experience.enabled);
     if focus
         .get()
         .is_some_and(|entity| !controls.contains(entity) && !windows.contains(entity))
     {
         return;
     }
-    if keys.just_pressed(KeyCode::F11) {
+    if !player && keys.just_pressed(KeyCode::F11) {
         state.requests.push(Action::Toggle);
     }
     if !state.open {
@@ -520,17 +577,245 @@ pub(crate) fn pointer(world: &mut World) {
     }
 }
 
+/// Whether the ledger shows a page of one village: Economy's Jobs or
+/// Priorities.
+fn village_page(state: &Ledger) -> bool {
+    state.tab == Tab::Economy && state.economy != economy::EconomyPage::Goods
+}
+
+/// On Jobs or Priorities, keep the remembered village, or choose one when
+/// there is none or it is gone: the village under the camera's centre, else
+/// the one with most residents.
+fn choose_village(world: &mut World) {
+    let (wanted, remembered) = {
+        let state = world.resource::<Ledger>();
+        (village_page(state), state.village_scope)
+    };
+    if !wanted
+        || remembered.is_some_and(|id| {
+            village::frontier::settlements::all(world)
+                .iter()
+                .any(|(candidate, _)| *candidate == id)
+        })
+    {
+        return;
+    }
+    let camera = world
+        .query::<&crate::RtsCamera>()
+        .iter(world)
+        .next()
+        .map(|camera| camera.focus);
+    let chosen = economy::pick_village(world, camera);
+    let mut state = world.resource_mut::<Ledger>();
+    if state.village_scope != chosen {
+        state.village_scope = chosen;
+        state.dirty = true;
+    }
+}
+
 fn queue(world: &mut World, command: SimCommand, success: String) {
+    let given = words::order_given(words::paused(world)).to_owned();
+    queue_saying(world, command, given, success);
+}
+
+/// [`queue`] with its own line while the order waits: `given` stands at
+/// the ledger's foot until the village answers with `success` or a refusal.
+fn queue_saying(
+    world: &mut World,
+    command: SimCommand,
+    given: String,
+    success: String,
+) -> Option<(u64, u32)> {
     let result = submit(world, None, command);
     let mut state = world.resource_mut::<Ledger>();
+    state.dirty = true;
     match result {
         Ok(key) => {
             state.pending = Some((key, success));
-            state.message = "Change requested. Resume the world if paused.".into();
+            state.message = given;
+            Some(key)
         }
-        Err(error) => state.message = format!("Cannot apply: {error}"),
+        Err(error) => {
+            state.message = words::village_refused(&error.to_string());
+            None
+        }
     }
-    state.dirty = true;
+}
+
+/// Bring the asked-for row into view and flash it for one pulse: a honey
+/// outline, taken away again after `t::motion::PULSE`.
+fn flash_row(world: &mut World) {
+    let Some((key, secs, found)) = world.resource::<Ledger>().flash.clone() else {
+        return;
+    };
+    let Some(row) = world.resource::<Ledger>().rows.get(&key).copied() else {
+        // The page is built on the next refresh; give up after a while.
+        if secs > 1.0 {
+            world.resource_mut::<Ledger>().flash = None;
+        } else {
+            let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
+            world.resource_mut::<Ledger>().flash = Some((key, secs + delta, false));
+        }
+        return;
+    };
+    if !found {
+        world.trigger(bevy::ui_widgets::ScrollIntoView { entity: row });
+        world
+            .entity_mut(row)
+            .insert(Outline::new(px(2), px(0), t::HONEY_500));
+        world.resource_mut::<Ledger>().flash = Some((key, 0.0, true));
+        return;
+    }
+    let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
+    let secs = secs + delta;
+    if secs >= t::motion::PULSE {
+        if let Ok(mut entity) = world.get_entity_mut(row) {
+            entity.remove::<Outline>();
+        }
+        world.resource_mut::<Ledger>().flash = None;
+    } else {
+        world.resource_mut::<Ledger>().flash = Some((key, secs, true));
+    }
+}
+
+/// How long the ledger's foot line stands before it clears.
+const FOOT_SECS: f32 = 6.0;
+
+/// Clear the foot line once it has stood for [`FOOT_SECS`].
+fn age_foot(world: &mut World) {
+    let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
+    let mut state = world.resource_mut::<Ledger>();
+    if state.foot.0 != state.message {
+        state.foot = (state.message.clone(), 0.0);
+        return;
+    }
+    if state.message.is_empty() {
+        return;
+    }
+    state.foot.1 += delta;
+    if state.foot.1 >= FOOT_SECS {
+        state.message.clear();
+        state.foot = (String::new(), 0.0);
+        state.dirty = true;
+    }
+}
+
+/// Open the card of the season that ended last, if one has.
+pub(crate) fn open_last_season(world: &mut World) {
+    if let Some(season) = last_season(world)
+        && world.contains_resource::<Ledger>()
+    {
+        world
+            .resource_mut::<Ledger>()
+            .requests
+            .push(Action::SeasonOpen(season));
+    }
+}
+
+/// The last season that has ended, while the island keeps it.
+pub(crate) fn last_season(world: &World) -> Option<u32> {
+    let held = village::view::season_summaries(world);
+    // The newest one held is the season still running.
+    held.len().checked_sub(2).map(|index| held[index])
+}
+
+/// A season has just ended: its card opens by itself only into an empty
+/// right column in Oversee with no tool in hand; otherwise a notice says
+/// where it is. Never pauses time (2.6).
+fn offer_season(world: &mut World) {
+    let ended = last_season(world);
+    let seen = world.resource::<Ledger>().season_seen;
+    {
+        let mut state = world.resource_mut::<Ledger>();
+        state.season_seen = Some(ended);
+        if !state.open {
+            state.season_card = None;
+        }
+    }
+    // The first look at this island offers nothing; then only a season
+    // that ended since the last look.
+    let (Some(seen), Some(season)) = (seen, ended) else {
+        return;
+    };
+    if seen == Some(season) || !shell(world) {
+        return;
+    }
+    let empty = column(world) == Column::Empty
+        && *world.resource::<IslandMode>() == IslandMode::Inspector
+        && !crate::island_build::palette_open(world);
+    if empty {
+        world
+            .resource_mut::<Ledger>()
+            .requests
+            .push(Action::SeasonOpen(season));
+    } else if let Some(name) =
+        village::view::season_summary(world, season).map(|summary| summary.name)
+    {
+        crate::island_shell::season_toast(world, format!("{name} has ended."));
+    }
+}
+
+/// [`queue`] for an order of "Your orders": it is remembered until the
+/// village applies it, or refuses it and the player dismisses that.
+fn queue_order(
+    world: &mut World,
+    command: SimCommand,
+    success: String,
+    village: SimId,
+    what: orders::Sent,
+) {
+    let given = words::order_given(words::paused(world)).to_owned();
+    if let Some(key) = queue_saying(world, command, given, success) {
+        world.resource_mut::<Ledger>().sent.push(orders::SentOrder {
+            command: key,
+            village,
+            what,
+            refused: None,
+        });
+    }
+}
+
+/// Orders this ledger sent: drop the applied ones, keep a refusal with the
+/// village's reason until the player dismisses it.
+fn settle_orders(world: &mut World) {
+    if world
+        .resource::<Ledger>()
+        .sent
+        .iter()
+        .all(|order| order.refused.is_some())
+    {
+        return;
+    }
+    let skipped = world.get_resource::<SkippedCommands>();
+    let applied = world.get_resource::<CommandLog>();
+    let mut sent = world.resource::<Ledger>().sent.clone();
+    let before = sent.clone();
+    sent.retain_mut(|order| {
+        if order.refused.is_some() {
+            return true;
+        }
+        if let Some(error) = skipped.and_then(|log| {
+            log.entries
+                .iter()
+                .rev()
+                .find(|entry| (entry.tick, entry.seq) == order.command)
+                .map(|entry| entry.error.to_string())
+        }) {
+            order.refused = Some(error);
+            return true;
+        }
+        !applied.is_some_and(|log| {
+            log.entries
+                .iter()
+                .rev()
+                .any(|(tick, seq, _)| (*tick, *seq) == order.command)
+        })
+    });
+    if sent != before {
+        let mut state = world.resource_mut::<Ledger>();
+        state.sent = sent;
+        state.dirty = true;
+    }
 }
 fn process(world: &mut World) {
     let requests = std::mem::take(&mut world.resource_mut::<Ledger>().requests);
@@ -567,6 +852,7 @@ fn process(world: &mut World) {
             Action::AlertRow(serial) => crate::island_alerts::request_row(world, serial, false),
             Action::AlertFold(day) => crate::island_alerts::request_row(world, day, true),
             Action::AlertFilter(filter) => crate::island_alerts::request_filter(world, filter),
+            Action::BehaviourFile(what) => crate::behaviour_file::request(world, what),
             Action::Mode(mode) => switch_mode(world, mode),
             Action::Tab(tab) => {
                 let mut state = world.resource_mut::<Ledger>();
@@ -598,13 +884,24 @@ fn process(world: &mut World) {
                         .into(),
                 );
             }
-            Action::Scope(scope) => world.resource_mut::<Ledger>().scope = scope,
+            Action::Scope(scope) => {
+                let mut state = world.resource_mut::<Ledger>();
+                if village_page(&state) {
+                    // Jobs and Priorities never show the whole island.
+                    if scope.is_some() {
+                        state.village_scope = scope;
+                    }
+                } else {
+                    state.scope = scope;
+                }
+            }
             Action::Sort(sort) => {
                 world.resource_mut::<Ledger>().sort = sort;
                 reset_scroll(world);
             }
             Action::EconomyPage(page) => {
                 world.resource_mut::<Ledger>().economy = page;
+                choose_village(world);
                 reset_scroll(world);
             }
             Action::Target {
@@ -614,7 +911,18 @@ fn process(world: &mut World) {
             } => match economy::target_command(world, settlement, &profession, step) {
                 Ok(command) => {
                     let success = economy::target_success(world, &command);
-                    queue(world, SimCommand::content(&command), success);
+                    let what = orders::Sent::Job {
+                        key: profession,
+                        display: economy::trade_display(world, command.profession),
+                        wanted: command.wanted,
+                    };
+                    queue_order(
+                        world,
+                        SimCommand::content(&command),
+                        success,
+                        settlement,
+                        what,
+                    );
                 }
                 Err(reason) => {
                     let mut state = world.resource_mut::<Ledger>();
@@ -627,17 +935,45 @@ fn process(world: &mut World) {
                 topic,
                 profession,
                 level,
-            } => match economy::priority_command(world, settlement, topic, profession, level) {
-                Ok(command) => {
-                    let success = economy::priority_success(world, &command);
-                    queue(world, SimCommand::content(&command), success);
+            } => {
+                match economy::priority_command(world, settlement, topic, profession.clone(), level)
+                {
+                    Ok(command) => {
+                        let success = economy::priority_success(world, &command);
+                        let display = match &profession {
+                            Some(_) => format!(
+                                "Workplaces: {}",
+                                words::noun(
+                                    &economy::trade_display(
+                                        world,
+                                        command.profession.expect("a job's own level")
+                                    ),
+                                    2
+                                )
+                            ),
+                            None => command.topic.display().to_owned(),
+                        };
+                        let what = orders::Sent::Priority {
+                            topic,
+                            profession,
+                            display,
+                            level,
+                        };
+                        queue_order(
+                            world,
+                            SimCommand::content(&command),
+                            success,
+                            settlement,
+                            what,
+                        );
+                    }
+                    Err(reason) => {
+                        let mut state = world.resource_mut::<Ledger>();
+                        state.message = reason;
+                        state.dirty = true;
+                    }
                 }
-                Err(reason) => {
-                    let mut state = world.resource_mut::<Ledger>();
-                    state.message = reason;
-                    state.dirty = true;
-                }
-            },
+            }
             Action::SortGoods(column) => {
                 let mut state = world.resource_mut::<Ledger>();
                 state.goods_sort = economy::next_sort(state.goods_sort, column);
@@ -645,6 +981,60 @@ fn process(world: &mut World) {
             Action::Good(kind) => {
                 let mut state = world.resource_mut::<Ledger>();
                 state.good = (state.good.as_deref() != Some(kind.as_str())).then_some(kind);
+            }
+            Action::SeasonOpen(season) => {
+                open_page(world, LedgerPage::Journal);
+                let mut state = world.resource_mut::<Ledger>();
+                state.tab = Tab::Journal;
+                state.open = true;
+                state.season_card = Some(season);
+                reset_scroll(world);
+            }
+            Action::SeasonClose => {
+                world.resource_mut::<Ledger>().season_card = None;
+                close(world);
+            }
+            Action::SeasonJournal => {
+                world.resource_mut::<Ledger>().season_card = None;
+                reset_scroll(world);
+            }
+            Action::GoodMore => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.good_more = !state.good_more;
+            }
+            Action::JobLevels => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.job_levels = !state.job_levels;
+            }
+            Action::DismissOrder(key) => world
+                .resource_mut::<Ledger>()
+                .sent
+                .retain(|order| order.command != key),
+            Action::JobsOf(village, job) => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.tab = Tab::Economy;
+                state.economy = economy::EconomyPage::Jobs;
+                if village.is_some() {
+                    state.village_scope = village;
+                }
+                choose_village(world);
+                reset_scroll(world);
+                let village = world.resource::<Ledger>().village_scope;
+                world.resource_mut::<Ledger>().flash = village
+                    .zip(job)
+                    .map(|(village, job)| (format!("target_{}_{job}", village.0), 0.0, false));
+            }
+            Action::PeopleFilter(head, residents) => {
+                let mut state = world.resource_mut::<Ledger>();
+                if residents.is_empty() {
+                    state.people_filter = None;
+                } else {
+                    state.people_filter = Some((head, residents));
+                    state.tab = Tab::Residents;
+                    state.open = true;
+                    state.confirm_site = None;
+                }
+                reset_scroll(world);
             }
             Action::Fold(section) => {
                 let mut state = world.resource_mut::<Ledger>();
@@ -698,15 +1088,28 @@ fn process(world: &mut World) {
                     column_event(world, ColumnEvent::Selected);
                 }
             }
-            Action::Profession(resident, workplace) => queue(
-                world,
-                SimCommand::content(&village::frontier::labor::AssignProfession {
-                    resident,
-                    workplace,
-                }),
-                "Assignment requested. The resident finishes committed work before changing jobs."
-                    .into(),
-            ),
+            Action::Profession(resident, workplace) => {
+                let name = world
+                    .resource::<SimIndex>()
+                    .get(resident)
+                    .and_then(|entity| world.get::<village::Villager>(entity))
+                    .map_or_else(|| "They".to_owned(), |person| person.name.clone());
+                let success = format!("{name} will change job when their work is done.");
+                let given = if words::paused(world) {
+                    format!("{success} Queued: it starts when time runs (Space).")
+                } else {
+                    success.clone()
+                };
+                queue_saying(
+                    world,
+                    SimCommand::content(&village::frontier::labor::AssignProfession {
+                        resident,
+                        workplace,
+                    }),
+                    given,
+                    success,
+                );
+            }
             Action::Settlement(id) => {
                 if let Some(position) = world
                     .resource::<SimIndex>()
@@ -765,13 +1168,20 @@ fn process(world: &mut World) {
         });
         if failed.is_some() || applied {
             let mut state = world.resource_mut::<Ledger>();
-            state.message = failed.map_or(success, |error| format!("Not applied: {error}"));
+            state.message = failed.map_or(success, |error| words::village_refused(&error));
             state.pending = None;
             state.dirty = true;
         }
     }
+    settle_orders(world);
+    age_foot(world);
+    flash_row(world);
+    offer_season(world);
     sync_mode(world);
     follow_selection(world);
+    // Any way onto Jobs or Priorities (the switch, a tab, the shell's
+    // column) lands on a village.
+    choose_village(world);
     if let Some((revision, message)) = crate::island_control::status(world)
         && revision != world.resource::<Ledger>().control_revision
     {
@@ -898,6 +1308,61 @@ pub(crate) fn open_page(world: &mut World, page: LedgerPage) {
     }
 }
 
+/// Open People listing only `residents`, under `head`: a folded alert row
+/// ("Show them", 2.4).
+pub(crate) fn show_people(world: &mut World, head: String, residents: Vec<SimId>) {
+    if !world.contains_resource::<Ledger>() {
+        return;
+    }
+    open_page(world, LedgerPage::People);
+    world
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::PeopleFilter(head, residents));
+}
+
+/// Which part of the Economy page another surface asks for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum EconomyView {
+    /// Goods, with this good's card open when it names one.
+    Goods(Option<String>),
+    Jobs,
+    Priorities,
+}
+
+/// Open Economy on one village (the outlook strip's lines, 2.5): Goods
+/// scoped to it, or its Jobs or Priorities.
+pub(crate) fn show_economy(world: &mut World, village: SimId, view: EconomyView) {
+    if !world.contains_resource::<Ledger>() {
+        return;
+    }
+    open_page(world, LedgerPage::Economy);
+    {
+        let mut state = world.resource_mut::<Ledger>();
+        state.tab = Tab::Economy;
+        state.open = true;
+        match view {
+            EconomyView::Goods(good) => {
+                state.economy = economy::EconomyPage::Goods;
+                state.scope = Some(village);
+                if good.is_some() {
+                    state.good = good;
+                }
+            }
+            EconomyView::Jobs => {
+                state.economy = economy::EconomyPage::Jobs;
+                state.village_scope = Some(village);
+            }
+            EconomyView::Priorities => {
+                state.economy = economy::EconomyPage::Priorities;
+                state.village_scope = Some(village);
+            }
+        }
+        state.dirty = true;
+    }
+    reset_scroll(world);
+}
+
 /// The page the ledger shows, while it is open.
 pub(crate) fn page(world: &World) -> Option<LedgerPage> {
     let ledger = world.get_resource::<Ledger>()?;
@@ -992,10 +1457,7 @@ pub(crate) fn refresh(world: &mut World) {
         state.dirty = false;
         state.elapsed = 0.0;
     }
-    let (open, mode) = (
-        world.resource::<Ledger>().open,
-        *world.resource::<IslandMode>(),
-    );
+    let open = world.resource::<Ledger>().open;
     let shell = shell(world);
     let top = crate::island_shell::content_top(world);
     let bottom = crate::island_shell::content_bottom(world);
@@ -1020,14 +1482,20 @@ pub(crate) fn refresh(world: &mut World) {
         .query_filtered::<&mut Node, With<LedgerRoot>>()
         .iter_mut(world)
     {
-        node.display = if open && overseeing {
+        // Each field written only when it differs, so layout stays idle.
+        let display = if open && overseeing {
             Display::Flex
         } else {
             Display::None
         };
-        node.width = px(width);
-        if shell {
-            // The right column: under the bar, above the docks.
+        if node.display != display {
+            node.display = display;
+        }
+        if node.width != px(width) {
+            node.width = px(width);
+        }
+        // The right column: under the bar, above the docks.
+        if shell && (node.top != px(top) || node.bottom != px(bottom)) {
             node.top = px(top);
             node.bottom = px(bottom);
         }
@@ -1037,21 +1505,14 @@ pub(crate) fn refresh(world: &mut World) {
         .iter_mut(world)
     {
         // The player session opens the ledger from its dock.
-        node.display = if open || shell {
+        let display = if open || shell {
             Display::None
         } else {
             Display::Flex
         };
-    }
-    for mut node in world
-        .query_filtered::<&mut Node, With<crate::village::Hud>>()
-        .iter_mut(world)
-    {
-        node.display = if mode == IslandMode::Character && !open {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        if node.display != display {
+            node.display = display;
+        }
     }
     let clock = world.resource::<SimClock>();
     let config = world.resource::<SimConfig>();
@@ -1090,6 +1551,20 @@ pub(crate) fn refresh(world: &mut World) {
         }
     }
     if open {
+        // The market figures: read again only when the day or the market
+        // moved, or another good or scope is chosen.
+        let (tab, scope, good, village) = {
+            let state = world.resource::<Ledger>();
+            (
+                state.tab,
+                state.scope,
+                state.good.clone(),
+                village_page(state).then_some(state.village_scope).flatten(),
+            )
+        };
+        if tab == Tab::Economy {
+            goods::refresh_cache(world, scope, good.as_deref(), village);
+        }
         let rows = entries(world);
         reconcile(world, rows);
     }
@@ -1108,7 +1583,11 @@ fn sync(world: &mut World) {
         let state = world.resource::<Ledger>();
         (
             state.tab,
-            state.scope,
+            if village_page(state) {
+                state.village_scope
+            } else {
+                state.scope
+            },
             state.sort,
             state.open,
             state.economy,

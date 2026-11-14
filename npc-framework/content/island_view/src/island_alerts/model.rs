@@ -78,7 +78,7 @@ impl AlertKind {
         match self {
             Self::Occupation => ("job change", "job changes"),
             Self::Arrival => ("arrival", "arrivals"),
-            Self::Trade => ("trade", "trades"),
+            Self::Trade => ("sale", "sales"),
             Self::Built => ("new cottage", "new cottages"),
             Self::Levy => ("levy day", "levy days"),
             Self::FirstTool => ("first tool", "first tools"),
@@ -127,7 +127,7 @@ pub(crate) enum Row<'a> {
         count: u32,
         /// "6 job changes", or "9 notes" when the day mixes kinds.
         label: String,
-        /// The breakdown of a mixed day: "6 job changes, 2 trades, 1 levy day".
+        /// The breakdown of a mixed day: "6 job changes, 2 sales, 1 levy day".
         detail: Option<String>,
         open: bool,
     },
@@ -138,7 +138,7 @@ fn plural(count: u32, (one, many): (&'static str, &'static str)) -> String {
 }
 
 /// "6 job changes" for a day of one kind; "9 notes" and the breakdown
-/// "6 job changes, 2 trades, 1 levy day" for a mixed one.
+/// "6 job changes, 2 sales, 1 levy day" for a mixed one.
 fn fold_label(counts: &BTreeMap<AlertKind, u32>) -> (String, Option<String>) {
     let mut parts: Vec<(AlertKind, u32)> =
         counts.iter().map(|(kind, count)| (*kind, *count)).collect();
@@ -177,13 +177,129 @@ pub(crate) struct Alert {
 }
 
 impl Alert {
-    pub(crate) fn line(&self, day: u64) -> String {
+    /// "Today · Bram is starving ×2": `when` is the capitalised date
+    /// (`game_ui::words::when`), never the running day count.
+    pub(crate) fn line(&self, when: &str) -> String {
         let repeat = if self.count > 1 {
             format!(" ×{}", self.count)
         } else {
             String::new()
         };
-        format!("Day {day} · {}{repeat}", self.text)
+        format!("{when} · {}{repeat}", self.text)
+    }
+}
+
+/// The need a resident's alert is about: `Hunger`, `Thirst`, `Energy` or
+/// `Warmth`; `None` for an alert that is not about a need.
+pub(crate) fn need_of(kind: AlertKind) -> Option<&'static str> {
+    match kind {
+        AlertKind::Starving => Some("Hunger"),
+        AlertKind::Dehydrated => Some("Thirst"),
+        AlertKind::Exhausted => Some("Energy"),
+        AlertKind::Freezing => Some("Warmth"),
+        _ => None,
+    }
+}
+
+/// A need alert's reason in the view's own words (design-ui 2.4): the short
+/// form for the row's second line and the full sentence for its tooltip.
+/// `target` names whom an `OnTheWay` resident goes to; `fallback` is the
+/// simulation's own sentence, used as the short form for a cause the view
+/// does not word yet.
+pub(crate) fn reason_words(
+    need: &str,
+    cause: Option<&island_content::village::view::NeedCause>,
+    name: &str,
+    target: Option<&str>,
+    fallback: Option<&str>,
+) -> (String, String) {
+    use island_content::village::view::NeedCause;
+    let it = match need {
+        "Thirst" => "water",
+        _ => "food",
+    };
+    match (cause, need) {
+        (Some(NeedCause::HasItNotUsed), "Thirst") => (
+            "has water, has not drunk yet".to_owned(),
+            format!("{name} carries water and has not drunk yet."),
+        ),
+        (Some(NeedCause::HasItNotUsed), "Hunger") => (
+            "has food, has not eaten yet".to_owned(),
+            format!("{name} carries food and has not eaten yet."),
+        ),
+        (Some(NeedCause::OnTheWay { good, .. }), _) => {
+            let good = crate::game_ui::words::noun(good, 2);
+            (
+                format!("on the way to get {good}"),
+                match target {
+                    Some(target) => format!("{name} is on the way to get {good} from {target}."),
+                    None => format!("{name} is on the way to get {good}."),
+                },
+            )
+        }
+        (Some(NeedCause::NoCoins), "Hunger" | "Thirst") => (
+            format!("no {it} and no coins"),
+            format!("{name} has no {it} and no coins to buy any."),
+        ),
+        (Some(NeedCause::NoSeller), "Hunger" | "Thirst") => (
+            format!("nobody sells {it} they can pay for"),
+            format!("{name} has no {it}, and nobody sells any at a price they can pay."),
+        ),
+        (Some(NeedCause::SourceEmpty), "Thirst") => (
+            "no water, and the wells are dry".to_owned(),
+            format!("{name} has no water, and the wells are dry."),
+        ),
+        (Some(NeedCause::Asleep), "Energy") => (
+            "asleep now".to_owned(),
+            format!("{name} is asleep. The night restores them."),
+        ),
+        (_, "Energy") => (
+            "needs a night in a bed".to_owned(),
+            format!("{name} is tired. A night in a bed restores them."),
+        ),
+        (Some(NeedCause::NoCoat), "Warmth") => (
+            "no warm coat".to_owned(),
+            format!("{name} has no warm coat, and it is cold outside."),
+        ),
+        (Some(NeedCause::Outdoors), "Warmth") => (
+            "out in the cold".to_owned(),
+            format!("{name} is out in the cold. A heated home warms them."),
+        ),
+        _ => (
+            fallback.map(str::to_owned).unwrap_or_default(),
+            format!("{name} needs help."),
+        ),
+    }
+}
+
+/// The head of a row that folds several residents of one village with one
+/// need: "3 residents in Harbour are starving".
+pub(crate) fn group_title(count: usize, village: &str, kind: AlertKind) -> String {
+    let state = match kind {
+        AlertKind::Starving => "are starving",
+        AlertKind::Dehydrated => "are thirsty",
+        AlertKind::Exhausted => "are exhausted",
+        AlertKind::Freezing => "are freezing",
+        _ => "need help",
+    };
+    format!("{count} residents in {village} {state}")
+}
+
+/// An alert row's tooltip: what a click does, then the full sentence and
+/// since when (design-ui 2.4).
+pub(crate) fn alert_tip(name: &str, full: &str, since: &str) -> (String, String) {
+    (format!("Go to {name}"), format!("{full} Since {since}."))
+}
+
+/// A note about something the player ordered: "Tom became a baker, as you
+/// asked." The note keeps its own full stop, if it has one.
+pub(crate) fn as_you_asked(text: &str, by_order: bool) -> String {
+    if !by_order {
+        return text.to_owned();
+    }
+    match text.strip_suffix('.') {
+        Some(stem) => format!("{stem}, as you asked."),
+        None => format!("{text}, as you asked"),
     }
 }
 
@@ -329,13 +445,13 @@ impl Feed {
         rows
     }
     /// Rows that need attention: everything above a routine note.
+    #[cfg(test)]
     pub(crate) fn attention(&self) -> usize {
         self.entries
             .iter()
             .filter(|alert| alert.kind.severity() != Severity::Info)
             .count()
     }
-    #[cfg(test)]
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Alert> {
         self.entries.iter()
     }
@@ -543,10 +659,53 @@ pub(crate) fn classify(
         "RegionalOccupationChanged" => {
             let from = text_field(read, "from").unwrap_or_else(|| "work".into());
             let to = text_field(read, "to").unwrap_or_else(|| "new work".into());
+            // An order of the player's reads "as you asked" (2.7).
+            let by_order = read("by_order").and_then(|value| value.as_bool()) == Some(true);
             (
                 AlertKind::Occupation,
-                format!("{who} changed from {from} to {to}"),
+                as_you_asked(&format!("{who} changed from {from} to {to}"), by_order),
             )
+        }
+        // The player's orders, as the village took them (2.7).
+        "LivingProfessionTargetSet" => {
+            let village =
+                text_field(read, "settlement_name").unwrap_or_else(|| "The village".to_owned());
+            let trade = text_field(read, "trade").unwrap_or_else(|| "worker".to_owned());
+            let by_order = read("by_order").and_then(|value| value.as_bool()) == Some(true);
+            let text = match number("wanted") {
+                Some(wanted) => format!(
+                    "{village} wants {}",
+                    crate::game_ui::words::count(u64::try_from(wanted).unwrap_or(0), &trade)
+                ),
+                None => format!(
+                    "{village} decides its {} again",
+                    crate::game_ui::words::noun(&trade, 2)
+                ),
+            };
+            (AlertKind::Social, as_you_asked(&text, by_order))
+        }
+        "LivingVillagePrioritySet" => {
+            let village =
+                text_field(read, "settlement_name").unwrap_or_else(|| "The village".to_owned());
+            let topic = text_field(read, "topic").unwrap_or_default();
+            let what = match (topic.as_str(), text_field(read, "profession")) {
+                ("workplace", Some(job)) => format!(
+                    "{} workplaces",
+                    crate::game_ui::words::noun(&job.replace('_', " "), 2)
+                ),
+                ("workplace", None) => "workplaces".to_owned(),
+                ("food_reserve", _) => "food".to_owned(),
+                ("fuel_reserve", _) => "firewood".to_owned(),
+                ("boat_orders", _) => "the boat's orders".to_owned(),
+                (other, _) => other.replace('_', " "),
+            };
+            let by_order = read("by_order").and_then(|value| value.as_bool()) == Some(true);
+            let text = match text_field(read, "level").as_deref() {
+                Some("high") => format!("{village} sees to {what} first"),
+                Some("low") => format!("{village} leaves {what} for last"),
+                _ => format!("{village} sees to {what} as usual"),
+            };
+            (AlertKind::Social, as_you_asked(&text, by_order))
         }
         "VillageArrival" => (AlertKind::Arrival, format!("{who} arrived on the island")),
         // A resident put on a coat for the cold.
@@ -728,7 +887,7 @@ mod tests {
             (AlertKind::Freezing, 2, 900)
         );
         assert_eq!(first.serial, 1, "the row keeps its identity for the widget");
-        assert!(first.line(20).ends_with("×2"));
+        assert!(first.line("Today").ends_with("×2"));
         // Another resident, or the same one long after, is a new row.
         feed.push(incoming(AlertKind::Freezing, 8, 950), 4.0);
         feed.push(incoming(AlertKind::Freezing, 7, 900 + 1201), 5.0);
@@ -856,7 +1015,7 @@ mod tests {
         assert_eq!(
             lines(&feed, Filter::Attention, &[]),
             [
-                "fold day 21: 7 notes: 5 trades, 1 job change, 1 levy day (7)",
+                "fold day 21: 7 notes: 5 sales, 1 job change, 1 levy day (7)",
                 "Depleted 60",
                 "fold day 20: 6 job changes (6)",
                 "Death 50",

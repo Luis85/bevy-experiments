@@ -1,27 +1,16 @@
-//! Presentation of the Actor Testbed (`island_content`, actor-capabilities
-//! spec §4.9): Dungeon wall runs and swinging doors, trees and stumps, the
-//! ore rock, workstations, items on the ground or in hand, the cart and the
-//! siege-ram wagon (wheels spin as they roll), animated actors (Knight and
-//! Rogue for faction 1, skeletons for faction 2) with faction rings and a
-//! riding pose, an RTS camera and the RTS command UI, plus the F1 overlay,
-//! the F5 character sheet, the F6 perception panel and (explorer mode) the F7
-//! notes editor (diary, memory, proposals). The F3 journal and
-//! F4 perf panels come from `npc_view_helpers`. The explorer's prompt modal
-//! ([`ExplorerModalPlugin`]) is added by the app in explorer mode only.
+//! Presentation of Island Village (`island_content`): the terrain, the
+//! settlements and their buildings, residents and their work poses, the
+//! world's weather, ambience, wildlife, boats and sound, the camera, and the
+//! player's HUD, shell and colony panels. The F3 journal and F4 perf panels
+//! come from `npc_view_helpers`.
 //!
 //! Reads sim components, never writes them, and never inserts components on
-//! sim entities; orders go out as recorded `IssueOrder` commands. Scales and
-//! the door adaptation are documented in [`visuals`](crate#scale).
+//! sim entities; orders go out as recorded commands.
 //!
 //! # Scale
 //!
-//! Every model is brought to KayKit 1:1 and scaled by [`V`] = 0.75 (a
-//! Knight is 1.74 m, a Dungeon wall piece 3 m × 3 m). The sim's doors are
-//! 1 m cells but the Dungeon doorway is 4 units (3 m) wide: the view
-//! squeezes the doorway piece to [`DOOR_SX`] = 0.5 along the wall, so its
-//! opening and leaf match the 1 m door cell (its solid ends overlap the
-//! neighbouring wall cells), keeps its height (a 2.06 m opening), and hangs
-//! the leaf on its own hinge pivot so it swings without shearing.
+//! Every KayKit character is brought to 1:1 and scaled by [`V`] = 0.75 (a
+//! Knight is 1.74 m).
 //!
 //! View keys live here (F1/F3/F4/F5/F6, camera, formations, Hold/Stop/
 //! Unload); the sim speed keys belong to the app (`apps/island_game`).
@@ -34,6 +23,7 @@
 
 mod anim;
 mod assets;
+mod behaviour_file;
 mod camera;
 mod colony_panel;
 mod colony_scene;
@@ -51,6 +41,7 @@ mod island_homes;
 mod island_poses;
 mod island_shell;
 mod island_world;
+mod keymap;
 mod overlay;
 mod panel_scroll;
 mod panels;
@@ -71,14 +62,12 @@ pub use anim::{Pose, pose_of};
 pub use assets::{ASSET_DIR, asset_plugin};
 pub use camera::{CameraFocusOnSelected, CameraStart, IslandCameraSettings, RtsCamera};
 pub use command::{FORMATION_SPACING_MM, context_tool_order};
-pub use fog::{
-    CellFog, FogLens, FogOfWar, Look, MASK_EXPLORED, MASK_GREY, MASK_UNEXPLORED, MASK_VISIBLE,
-    MaskRegion, area_look, marker_pos, mask_alpha, mask_hash, mask_texel, mask_texels, static_look,
-    unit_look,
-};
+pub use fog::{FogOfWar, Look, marker_pos};
 pub use island_audio::IslandAudioSettings;
 pub use island_control::IslandMode;
 pub use island_world::ambient::AmbientMotion;
+pub use keymap::{GuideSection, guide_controls};
+pub use player_actions::{SchedulerHoldRequest, apply_scheduler_hold};
 pub use player_hud::{
     DeveloperKeys, FrontendGate, FrontendUiRoot, PlayerExperience, PlayerMenuRequest,
 };
@@ -150,13 +139,16 @@ pub fn clear_player_view_intent(world: &mut World) {
     player_actions::clear_view(world);
     island_control::clear_view(world);
 }
+pub use behaviour_file::{
+    BehaviourFile, BehaviourFileRequest, behaviour_text, reload_from_text, take_behaviour_request,
+};
 pub use npc_framework::view_helpers::command_ui::{CommandFormation, CommandSelection, CommandUi};
 pub use npc_framework::view_helpers::{
     ScreenshotRequest, Selected, VisualIndex, VisualOf, save_screenshot, sim_to_world,
 };
 pub use overlay::OverlayState;
 pub use panels::IslandPanels;
-pub use visuals::{DOOR_SX, V};
+pub use visuals::V;
 
 /// Install the same OS copy/cut/paste bridge used by the game's F7 fields
 /// in a standalone editor. Calling this more than once is harmless.
@@ -167,6 +159,18 @@ pub fn install_text_clipboard(app: &mut App) {
     {
         field_clipboard::plugin(app);
     }
+}
+
+/// Put `text` on the OS clipboard, through the same bridge as the text
+/// fields ("Copy the folder path" on the title).
+pub fn copy_to_clipboard(world: &World, text: &str) -> Result<(), String> {
+    let copy = world
+        .get_resource::<field_clipboard::ClipboardTools>()
+        .map_or_else(
+            || field_clipboard::ClipboardTools::default().copy,
+            |tools| tools.copy,
+        );
+    copy(text)
 }
 
 /// F3 toggles the journal panel, F4 the perf panel.

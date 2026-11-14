@@ -195,8 +195,14 @@ impl VillageAct {
                         "resource patch is depleted; renewable sites recover over time".into()
                     });
                 }
-                if p.kind == catalog::FISH && econ::count(world, actor, catalog::FISHING_ROD) == 0 {
-                    return Err("fishing requires a fishing rod in your pack".into());
+                if let Some(tool) = catalog::gather_tool_required_in(world, &p.kind)
+                    .filter(|tool| super::living::usable_tool(world, actor, tool).is_none())
+                {
+                    let tool_name = catalog::display_in(world, tool).unwrap_or(tool);
+                    let kind_name = catalog::display_in(world, &p.kind).unwrap_or(&p.kind);
+                    return Err(format!(
+                        "You need your own {tool_name} in the pack to gather {kind_name} here."
+                    ));
                 }
                 if world.get::<Gathering>(actor).is_some()
                     || world.get::<super::hunting::Hunting>(actor).is_some()
@@ -211,12 +217,20 @@ impl VillageAct {
             "eat" | "drink" => {
                 let kind = if self.verb == "eat" {
                     if self.kind.is_empty() {
-                        super::roles::roles(world).baked
+                        super::production::diet(world, actor)
+                            .into_iter()
+                            .find(|kind| econ::count(world, actor, kind) > 0)
+                            .unwrap_or(super::roles::roles(world).baked)
                     } else {
                         self.kind.as_str()
                     }
                 } else {
-                    super::roles::roles(world).drink
+                    super::roles::roles(world)
+                        .drinks
+                        .iter()
+                        .copied()
+                        .find(|kind| econ::count(world, actor, kind) > 0)
+                        .unwrap_or(super::roles::roles(world).drink)
                 };
                 if self.verb == "eat" && catalog::food_restore_in(world, kind).is_none() {
                     return Err(
@@ -261,12 +275,12 @@ impl VillageAct {
                 {
                     return Err("the inn has no free bed".into());
                 }
-                if world.get::<Wallet>(actor).map_or(0, |w| w.coins) < catalog::BED_PRICE {
-                    return Err(format!("a bed costs {} coins", catalog::BED_PRICE));
+                if world.get::<Wallet>(actor).map_or(0, |w| w.coins) < catalog::bed_price(world) {
+                    return Err(format!("a bed costs {} coins", catalog::bed_price(world)));
                 }
                 if world
                     .get::<Wallet>(inn)
-                    .and_then(|wallet| wallet.coins.checked_add(catalog::BED_PRICE))
+                    .and_then(|wallet| wallet.coins.checked_add(catalog::bed_price(world)))
                     .is_none()
                 {
                     return Err("the innkeeper's wallet is full".into());
@@ -428,7 +442,10 @@ impl VillageAct {
             "eat" | "drink" => {
                 let (kind, need, amount) = if self.verb == "eat" {
                     let kind = if self.kind.is_empty() {
-                        super::roles::roles(world).baked
+                        super::production::diet(world, actor)
+                            .into_iter()
+                            .find(|kind| econ::count(world, actor, kind) > 0)
+                            .unwrap_or(super::roles::roles(world).baked)
                     } else {
                         self.kind.as_str()
                     };
@@ -438,9 +455,17 @@ impl VillageAct {
                         catalog::food_restore_in(world, kind).expect("checked food"),
                     )
                 } else {
-                    (super::roles::roles(world).drink, "Thirst", 90_000)
+                    // Any good tagged `drink`, the first one carried (S2.9).
+                    let drinks = super::roles::roles(world).drinks;
+                    let drink = drinks
+                        .iter()
+                        .copied()
+                        .find(|kind| econ::count(world, actor, kind) > 0)
+                        .unwrap_or(super::roles::roles(world).drink);
+                    (drink, "Thirst", 90_000)
                 };
                 econ::consume(world, actor, kind, 1)?;
+                super::ledger::used(world, kind, 1);
                 econ::restore(world, actor, need, amount);
                 record_effect(
                     world,
@@ -468,17 +493,18 @@ impl VillageAct {
             }
             "rest" => {
                 let keeper = self.target(world)?;
+                let (price, ticks) = (catalog::bed_price(world), catalog::bed_ticks(world));
                 ai::stop_work(world, actor, "renting a bed");
-                world.get_mut::<Wallet>(actor).expect("wallet").coins -= catalog::BED_PRICE;
-                world.get_mut::<Wallet>(keeper).expect("wallet").coins += catalog::BED_PRICE;
-                super::frontier::labor::took(world, keeper, catalog::BED_PRICE);
-                ai::start_rest(world, actor, catalog::BED_TICKS, 400);
+                world.get_mut::<Wallet>(actor).expect("wallet").coins -= price;
+                world.get_mut::<Wallet>(keeper).expect("wallet").coins += price;
+                super::frontier::labor::took(world, keeper, price);
+                ai::start_rest(world, actor, ticks, 400);
                 super::indoors::rented_bed(world, actor, keeper);
                 record_effect(
                     world,
                     Some(SimId(self.unit)),
                     "VillageBedRented",
-                    &json!({"coins":catalog::BED_PRICE,"ticks":catalog::BED_TICKS}),
+                    &json!({"coins":price,"ticks":ticks}),
                 );
                 Ok(())
             }
@@ -505,11 +531,12 @@ impl VillageAct {
                     })
                     .collect();
                 let keeper = super::frontier::economy_spec::is_service(world, v.role);
+                let bed_price = catalog::bed_price(world);
                 record_effect(
                     world,
                     Some(SimId(self.unit)),
                     "VillageConversation",
-                    &json!({"name":v.name,"role":v.role,"offers":offers,"bed_price":if keeper{Some(catalog::BED_PRICE)}else{None}}),
+                    &json!({"name":v.name,"role":v.role,"offers":offers,"bed_price":if keeper{Some(bed_price)}else{None}}),
                 );
                 super::speech::speak(world, SimId(self.unit), self.target, "What do you offer?");
                 Ok(())

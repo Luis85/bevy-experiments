@@ -268,6 +268,21 @@ struct Drawn {
 pub(crate) struct PropScene {
     drawn: BTreeMap<SimId, Drawn>,
     since: f32,
+    /// The open construction sites when last read.
+    sites: Vec<SimId>,
+}
+
+/// The open construction sites, ascending. A finished site leaves this list
+/// in the same tick its prop (or field) appears, so a reader that redraws
+/// when the list changes puts the finished look up in the frame the site
+/// look goes: no gap, no double.
+pub(crate) fn open_sites(world: &World) -> Vec<SimId> {
+    let Some(state) = world.get_resource::<island_content::village::civic::CivicState>() else {
+        return Vec::new();
+    };
+    let mut ids: Vec<SimId> = state.sites.values().flatten().copied().collect();
+    ids.sort_unstable();
+    ids
 }
 
 /// The ground under a prop's middle (water: the sea's level).
@@ -306,19 +321,21 @@ pub(crate) fn changes(
     (draw, gone)
 }
 
-/// Follow the placed props: twice a second, draw the new and changed, take
-/// away the removed.
+/// Follow the placed props: twice a second, and at once when a site opens
+/// or finishes, draw the new and changed, take away the removed.
 pub(crate) fn sync(world: &mut World) {
     let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
+    let sites = open_sites(world);
     {
         let Some(mut scene) = world.get_resource_mut::<PropScene>() else {
             return;
         };
         scene.since += delta;
-        if scene.since < 0.5 {
+        if scene.since < 0.5 && scene.sites == sites {
             return;
         }
         scene.since = 0.0;
+        scene.sites = sites;
     }
     let views = island_content::village::frontier::props::props(world);
     let drawn: BTreeMap<SimId, PropView> = world

@@ -620,4 +620,30 @@ impl SimHashResource for LivingWorldSpec {
             }
         }
     }
+    // The construction travels in the save (fix: a world chosen for New Game
+    // is loaded into a running window from a snapshot, and must replace the
+    // window's own construction, or its save would not match the world it
+    // was made in).
+    fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
+        Some(npc_framework::snapshot::ResourceSnapshotFns {
+            save: save_construction,
+            load: load_construction,
+        })
+    }
+}
+
+fn save_construction(world: &World) -> Option<serde_json::Value> {
+    let spec = world.get_resource::<LivingWorldSpec>()?;
+    Some(serde_json::to_value(spec).expect("a world construction serializes"))
+}
+
+/// Loads the construction and rebuilds what is derived from it: the economy
+/// registry and the roles of goods.
+fn load_construction(world: &mut World, value: serde_json::Value) -> Result<(), String> {
+    let spec: LivingWorldSpec = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    let roles = crate::village::roles::from_spec(&spec.economy)?;
+    world.insert_resource(super::economy_spec::EconomyRegistry::new(&spec.economy));
+    world.insert_resource(crate::village::roles::WorldRoles(roles));
+    world.insert_resource(spec);
+    Ok(())
 }

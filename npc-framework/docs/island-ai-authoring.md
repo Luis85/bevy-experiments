@@ -145,10 +145,11 @@ is in progress.
 | `life.collect_found` | none | Pick up a dropped coin purse or diary within reach. | None is near. |
 | `life.sleep` | none | Walk home and rest there. Inside the resident's sleep block this is the sleep of the night: it lasts to the end of the block at `tuning.sleep_energy_per_tick`, and only a critical need of the resident, a starving child of the home or a player order ends it earlier (`VillageWoken`). Outside the block it is a short rest of 300 ticks at `tuning.nap_energy_per_tick`. | Never. |
 | `life.warm_up` | none | Walk home and stay by the hearth until warm, at most 1500 ticks. | Never. |
-| `life.go_to` | `home`, `work`, `centre`, a key from `behavior.places`, or `{"Pos": [x, z]}` | Walk there and stay. | The way is blocked (`home` never fails). |
+| `life.go_to` | `home`, `work`, `centre`, `meal` (home, else the nearest inn, else the square), a key from `behavior.places`, or `{"Pos": [x, z]}` | Walk there and stay. | The way is blocked (`home` never fails). |
 | `life.socialise` | none | Walk to a free neighbour within 15 m for a meeting. | Nobody is free, or the resident met someone in the last 600 ticks. |
 | `life.continue` | none | Keep doing the physical work in progress. | Nothing is in progress. |
 | `life.idle` | none | Stand still for one decision. | Never. Put it last. |
+| `life.sit_down` | none | Sit down to the meal: eats when hunger is below `schedule.meal_hunger_threshold`; in a meal block it marks the day's sit-down meal had (one a day). | The resident is not alive. |
 | `ExecuteOrder` | none | The engine's player-order leaf. | No order is queued. |
 
 Field work is timed like gathering: the matching tool (a hoe for grain) and
@@ -198,7 +199,9 @@ schedule or the resident's traits.
 | `life.in_meal_window` | Inside a meal block. | nothing |
 | `life.in_leisure_window` | Inside a leisure block (delayed by diligence). | nothing |
 | `life.in_sleep_window` | Inside a sleep block. | nothing |
-| `life.wants_leisure` | Not busy, sociable, inside a leisure block, and not out in the cold (night or winter) without a coat. | nothing |
+| `life.wants_leisure` | Not busy, inside a leisure block, and not out in the cold (night or winter) without a coat. Everybody has an evening; sociability decides whether it is spent in company. | nothing |
+| `life.family_at_home` | Has a partner or a child, and a home, and the village is not gathering. | nothing |
+| `life.meal_due` | Not busy, inside a meal block on a day without a sit-down meal yet, carrying food, and the village is not gathering. | nothing |
 | `life.sociable` | Sociability is at least `traits.sociable_min`. | nothing |
 | `life.diligent` | Diligence is 60 or more. | nothing |
 | `life.thrifty` | Thrift is 60 or more. | nothing |
@@ -254,7 +257,7 @@ lower-priority work.
 | Meal time | `life.wants_meal` | eat |
 | Chores | none | pick up lost property; put on a coat; fetch hearth fuel when `life.needs_fuel`; stock provisions when `life.has_spare_coins`; replace clothing |
 | Storm | `life.storm` | craft during work hours, else shelter at home |
-| Leisure | `life.wants_leisure` | help a friend, meet a neighbour, else stroll to the square |
+| Leisure | `life.wants_leisure` | help a friend, a family evening at home, meet a neighbour (sociable residents), else stroll to the square |
 | Work hours | `life.in_work_window` | change job, build, carry building materials, sell surplus to the boat, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
 | Night | `life.in_sleep_window` | stay home |
 | (last) | none | seek company, idle |
@@ -549,3 +552,31 @@ the construction copy and the evening walk. `island_resident_traits` runs the
 same world twice with one trait of one resident changed and checks that the
 resident behaves differently. `island_decision_records` checks the record
 contents, the rate limit and that the journal does not change the state hash.
+
+## Conditions with parameters, `not`, and a tree per resident
+
+A guard may test with parameters, or negate any condition (review fix pass, S3.1):
+
+```json
+{"Guard": {"if": "need_below", "need": "Hunger", "value": 40000, "not": false, "abort": "None"}}
+{"Guard": {"if": "life.night", "not": true, "abort": "None"}}
+```
+
+| `if` | Parameters | True when |
+|---|---|---|
+| `need_below` | `need` (`Hunger`, `Thirst`, `Energy`, `Warmth`), `value` 0..=100000 | the need is below the value |
+| `has_good` | `good` (a good key or a tag), `value` (count, default 1) | the pack holds at least that many |
+| `is_trade` | `trade` (a profession key) | the resident works that trade |
+| `season` | `season` | it is that season |
+| `trait_at_least` | `trait` (`diligence`, `sociability`, `thrift`), `value` 0..=100 | the trait is at least the value |
+| `in_block` | `block` (`work`, `meal`, `leisure`, `sleep`) | the resident's shifted schedule is in that block |
+| any registered condition | `not: true` | the condition is false |
+
+The loader turns each into a plain registered name (`need_below:Hunger:40000`,
+`not:life.night`); a world may use at most 64 distinct ones. A `not` guard, and any
+guard with parameters, must not abort lower-priority work.
+
+Which tree a resident runs is data: `behavior.stage_trees` (`child`, `elder`) and a
+profession's `tree`; the order is child, trade, elder, then `island_life`. Any tree
+name is allowed; every named tree must exist. `ReplaceBehavior` replaces the whole
+behaviour block at a tick boundary (see `village::resident::replace`).

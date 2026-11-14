@@ -39,8 +39,8 @@ impl SortKey {
     pub(crate) fn note(self) -> &'static str {
         match self {
             Self::Name => "by name",
-            Self::Settlement => "by settlement, then name",
-            Self::Profession => "by profession, then name",
+            Self::Settlement => "by village, then name",
+            Self::Profession => "by job, then name",
             Self::Mood => "lowest mood first",
             Self::Wealth => "richest first",
         }

@@ -90,8 +90,14 @@ pub const LIVING_RECIPE_VERBS: &[&str] = &[
     "craft:village_tailor",
     "craft:village_forge_spear",
 ];
-pub const BED_PRICE: u32 = 3;
-pub const BED_TICKS: u64 = 300;
+/// Coins a night in an inn bed costs (`tuning.inn_bed_price`).
+pub fn bed_price(world: &World) -> u32 {
+    super::frontier::economy_spec::tuning(world).map_or(3, |tuning| tuning.inn_bed_price)
+}
+/// Ticks one rented night lasts (`tuning.inn_bed_ticks`).
+pub fn bed_ticks(world: &World) -> u64 {
+    super::frontier::economy_spec::tuning(world).map_or(300, |tuning| tuning.inn_bed_ticks)
+}
 /// Public goods, sorted by stable key. Merchant demand is derived with [`wants`].
 pub const TRADE_KINDS: &[&str] = &[
     "axe", "bread", "hammer", "ingot", "log", "ore", "pickaxe", "plank", BOWL, FLOUR, GRAIN, WATER,
@@ -222,12 +228,6 @@ pub fn price_in(world: &World, kind: &str) -> Option<u32> {
         None => price(kind),
     }
 }
-pub fn stock_limit_in(world: &World, kind: &str) -> u32 {
-    match super::frontier::economy_spec::registry(world) {
-        Some(registry) => registry.good(kind).map_or(0, |good| good.stock_limit),
-        None => stock_limit(kind),
-    }
-}
 /// Hunger restored by a finished edible good in this world.
 pub fn food_restore_in(world: &World, kind: &str) -> Option<i32> {
     match super::frontier::economy_spec::registry(world) {
@@ -240,6 +240,13 @@ pub fn gather_tool_in(world: &World, kind: &str) -> Option<&'static str> {
         Some(registry) => registry.good(kind).and_then(|good| good.gather_tool),
         None => gather_tool(kind),
     }
+}
+/// The tool without which `kind` cannot be gathered at all (a rod for fish).
+pub fn gather_tool_required_in(world: &World, kind: &str) -> Option<&'static str> {
+    super::frontier::economy_spec::registry(world)?
+        .good(kind)
+        .filter(|good| good.gather_tool_required)
+        .and_then(|good| good.gather_tool)
 }
 pub fn role_tool_in(world: &World, role: Role) -> Option<&'static str> {
     match super::frontier::economy_spec::registry(world) {
@@ -384,25 +391,6 @@ pub fn price(kind: &str) -> Option<u32> {
         HOE => 14,
         _ => return None,
     })
-}
-pub fn stock_limit(kind: &str) -> u32 {
-    match kind {
-        WATER | GRAIN | FLOUR => 40,
-        "bread" => 24,
-        "log" | "ore" | "plank" => 20,
-        "ingot" => 12,
-        BOWL => 6,
-        "hammer" | "axe" | "pickaxe" => 3,
-        RAW_MEAT | HIDE | LEATHER => 16,
-        FIBER | BERRIES => 40,
-        THREAD | COOKED_MEAL => 24,
-        WARM_CLOTHES => 4,
-        SPEAR => 8,
-        FISH => 20,
-        FISHING_ROD => 4,
-        HOE => 3,
-        _ => 0,
-    }
 }
 pub fn outputs(role: Role) -> &'static [&'static str] {
     match role {

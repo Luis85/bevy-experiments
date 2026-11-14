@@ -31,19 +31,22 @@ pub(crate) use haul::{
 };
 pub use model::{
     Building, CIVIC_OWNER, CivicState, ConstructionSite, Depot, Goods, Hold, PlannerState, Plot,
-    SiteWork, held,
+    SUSPEND_TICKS, SiteKind, SiteWork, SuspendedWork, held,
 };
+pub use placement::MAX_OPEN_PROP_SITES;
 pub use placement::{
     COAST_REACH_CELLS, CancelBuilding, MAX_OPEN_SITES, MAX_SETTLEMENT_DISTANCE_MM, PlaceBuilding,
-    ground_check, placement_check, placement_plot, plot_for, sea,
+    cell_on_map, ground_check, placement_check, placement_plot, plot_for, sea,
 };
+pub(crate) use placement::{place, place_prop_site};
 pub use planner::{can_build_home, find_site, find_site_around, house_homeless, largest_home_beds};
 pub use sites::{
-    begin_work, budget, cancel as cancel_site, cancel_work, check_delivery, deliver, fund_hold,
-    funding, levy_capacity, material_orders, open_sites, outstanding_cost, reserve, site_budget,
+    begin_work, budget, build_tool_percent, cancel as cancel_site, cancel_work, check_delivery,
+    deliver, fund_hold, funding, levy_capacity, material_orders, open_sites, outstanding_cost,
+    reserve, site_budget,
 };
+pub(crate) use sites::{builder_tool, removable, remove_finished};
 pub(crate) use sites::{note_grants, raise_building_levy, raise_relief_levy, settle_earmark};
-pub(crate) use sites::{removable, remove_finished};
 
 use crate::village::frontier::building_spec::BuildingDef;
 use crate::village::frontier::economy_spec;
@@ -60,6 +63,7 @@ pub fn register(app: &mut App) {
         .register_sim_component::<Building>()
         .register_sim_component::<Depot>()
         .register_sim_component::<SiteWork>()
+        .register_sim_component::<SuspendedWork>()
         .register_command::<PlaceBuilding>()
         .register_command::<CancelBuilding>();
 }
@@ -171,7 +175,12 @@ pub fn sites(world: &World) -> Vec<SiteView> {
                 id,
                 building: site.building.clone(),
                 label: site.label.clone(),
-                kind: definition(world, &site.building).map_or("", |def| def.kind.name()),
+                // A prop site reads `prop`; its `building` is the prop's key.
+                kind: if site.is_prop() {
+                    "prop"
+                } else {
+                    definition(world, &site.building).map_or("", |def| def.kind.name())
+                },
                 settlement: site.settlement,
                 plot: site.plot,
                 door: site.plot.door(),

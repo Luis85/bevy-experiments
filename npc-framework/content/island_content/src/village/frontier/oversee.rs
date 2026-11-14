@@ -209,7 +209,7 @@ impl SetProfessionTarget {
             &json!({"settlement":self.settlement,"profession":self.profession.key(),
                 "trade":economy_spec::trade_label(world, self.profession),
                 "wanted":self.wanted,"previous":previous,
-                "current":headcount(world, self.settlement, self.profession)}),
+                "current":headcount(world, self.settlement, self.profession),"by_order":true}),
         );
         Ok(())
     }
@@ -222,6 +222,21 @@ impl ContentCommand for SetProfessionTarget {
     fn apply(self, world: &mut World) {
         let _ = self.perform(world);
     }
+}
+
+/// The first `(settlement, trade)` target, in that order, that nobody on
+/// the island can learn: the next boat's first settler brings it.
+pub fn untaught_target(world: &World) -> Option<(SimId, Role)> {
+    let oversight = world.get_resource::<Oversight>()?;
+    oversight.targets.iter().find_map(|entry| {
+        let (seats, taken) = super::labor::seats_in(world, entry.settlement, entry.profession);
+        let current = headcount(world, entry.settlement, entry.profession);
+        (entry.wanted > current
+            && seats > taken
+            && !super::labor::anyone_may_take(world, entry.settlement, entry.profession)
+            && super::labor::skill_gap(world, entry.settlement, entry.profession).is_none())
+        .then_some((entry.settlement, entry.profession))
+    })
 }
 
 /// One row of the Oversee profession table.
@@ -243,6 +258,37 @@ pub struct ProfessionRowView {
     /// Why `current` differs from `wanted`, in one sentence; `None` when they
     /// match or there is no target.
     pub reason: Option<String>,
+    /// The same, typed, for the interface to act on.
+    pub cause: Option<GapCause>,
+}
+
+/// Why a profession's headcount differs from the overseer's target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub enum GapCause {
+    TooMany {
+        n: u32,
+    },
+    /// The last worker of an essential trade stays.
+    LastKept,
+    /// No workplace of the trade stands here: build this one.
+    NoWorkplace {
+        building: String,
+    },
+    SeatsFull {
+        building: String,
+    },
+    /// Somebody has the aptitude but not the skill yet.
+    SkillTooLow {
+        who: SimId,
+        skill: String,
+        has: u32,
+        needs: u32,
+    },
+    NoAptitude,
+    /// Residents move at their next reviews.
+    Waiting {
+        n: u32,
+    },
 }
 
 /// The Oversee profession table of a settlement: every trade of the catalog,
@@ -254,6 +300,9 @@ pub fn profession_table(world: &World, settlement: SimId) -> Vec<ProfessionRowVi
             let current = headcount(world, settlement, role);
             let wanted = target(world, settlement, role);
             let (seats, taken) = super::labor::seats_in(world, settlement, role);
+            let gap = wanted
+                .filter(|wanted| *wanted != current)
+                .map(|wanted| gap_reason(world, settlement, role, current, wanted, seats, taken));
             ProfessionRowView {
                 key: role.key().to_owned(),
                 display: economy_spec::trade_label(world, role).to_owned(),
@@ -261,9 +310,8 @@ pub fn profession_table(world: &World, settlement: SimId) -> Vec<ProfessionRowVi
                 wanted,
                 free_seats: seats.saturating_sub(taken),
                 adjustable: !economy_spec::is_service(world, role),
-                reason: wanted.filter(|wanted| *wanted != current).map(|wanted| {
-                    gap_reason(world, settlement, role, current, wanted, seats, taken)
-                }),
+                cause: gap.as_ref().map(|(cause, _)| cause.clone()),
+                reason: gap.map(|(_, sentence)| sentence),
             }
         })
         .collect()
@@ -277,36 +325,67 @@ fn gap_reason(
     wanted: u32,
     seats: u32,
     taken: u32,
-) -> String {
+) -> (GapCause, String) {
     let trade = economy_spec::trade_label(world, role);
     if current > wanted {
         if super::labor::essential_kept(world, settlement, role) && wanted == 0 {
-            return format!("The last {trade} stays while the village still wants its goods.");
+            return (
+                GapCause::LastKept,
+                format!("The last {trade} stays while the village still wants its goods."),
+            );
         }
-        return format!(
-            "{} {trade}(s) too many: they move to other work at their next review, when a \
-             trade they may take has a free seat.",
-            current - wanted
+        let n = current - wanted;
+        return (
+            GapCause::TooMany { n },
+            format!(
+                "{n} {trade}(s) too many: they move to other work at their next review, when a                  trade they may take has a free seat."
+            ),
         );
     }
     if seats == 0 {
         let building = workplace_building(world, role);
-        return format!(
+        let sentence = format!(
             "No {trade} workplace stands here: build {}.",
             with_article(&building)
         );
+        return (GapCause::NoWorkplace { building }, sentence);
     }
     if taken >= seats {
         let building = workplace_building(world, role);
-        return format!("Every {trade} seat is taken: build another {building}.");
+        let sentence = format!("Every {trade} seat is taken: build another {building}.");
+        return (GapCause::SeatsFull { building }, sentence);
     }
     if !super::labor::anyone_may_take(world, settlement, role) {
-        return format!("Nobody here has the aptitude for the {trade}'s trade.");
+        if let Some((who, name, skill, has, needs)) =
+            super::labor::skill_gap(world, settlement, role)
+        {
+            let sentence = format!(
+                "{name} could become {} but has {skill} {has} of {needs}.",
+                with_article(trade)
+            );
+            return (
+                GapCause::SkillTooLow {
+                    who,
+                    skill,
+                    has,
+                    needs,
+                },
+                sentence,
+            );
+        }
+        return (
+            GapCause::NoAptitude,
+            format!(
+                "Nobody here can learn the {trade}'s trade. Keep the target set: the next boat brings a settler who can."
+            ),
+        );
     }
-    format!(
-        "{} more {trade}(s) wanted: residents move at their next review, once their \
-         switching rest is over and they are between tasks.",
-        wanted - current
+    let n = wanted - current;
+    (
+        GapCause::Waiting { n },
+        format!(
+            "{n} more {trade}(s) wanted: residents move at their next review, once their              switching rest is over and they are between tasks."
+        ),
     )
 }
 
@@ -517,7 +596,7 @@ impl SetVillagePriority {
             "LivingVillagePrioritySet",
             &json!({"settlement":self.settlement,"topic":self.topic,
                 "profession":self.profession.map(Role::key),"level":self.level,
-                "previous":previous}),
+                "previous":previous,"by_order":true}),
         );
         Ok(())
     }

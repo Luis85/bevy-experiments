@@ -454,13 +454,48 @@ fn the_day_strip_follows_the_schedule_and_the_residents_own_hours() {
         diligence: 100,
         ..ResidentTraits::NEUTRAL
     };
-    assert!(!in_slot(&spec, keen, BlockKind::Leisure, 660));
-    assert!(in_slot(&spec, keen, BlockKind::Leisure, 690));
+    // Read from the data, not from fixed hours: the day's blocks are
+    // authored and change (the sim's S3 added more free time).
+    let shift = spec.diligence_shift;
+    let block = spec
+        .blocks
+        .iter()
+        .filter(|block| block.kind == BlockKind::Leisure)
+        .find(|block| {
+            let length = (block.to - block.from).rem_euclid(1000);
+            length > shift + 2
+                && !spec.blocks.iter().any(|other| {
+                    other.kind == BlockKind::Leisure
+                        && !std::ptr::eq(other, *block)
+                        && contains(other.from, other.to, (block.from + 1).rem_euclid(1000))
+                })
+        })
+        .expect("a leisure block longer than the diligence shift");
+    let neutral_at = |permille: i32| {
+        (permille + ResidentTraits::NEUTRAL.chronotype * spec.chronotype_shift / 100)
+            .rem_euclid(1000)
+    };
+    let keen_at =
+        |permille: i32| (permille + keen.chronotype * spec.chronotype_shift / 100).rem_euclid(1000);
     assert!(in_slot(
         &spec,
         ResidentTraits::NEUTRAL,
         BlockKind::Leisure,
-        660
+        neutral_at(block.from + 1)
+    ));
+    if shift > 1 {
+        assert!(!in_slot(
+            &spec,
+            keen,
+            BlockKind::Leisure,
+            keen_at(block.from + 1)
+        ));
+    }
+    assert!(in_slot(
+        &spec,
+        keen,
+        BlockKind::Leisure,
+        keen_at(block.from + shift + 1)
     ));
 }
 
@@ -883,6 +918,31 @@ fn a_day_from_the_simulations_blocks_shows_the_narrower_block_and_wraps() {
     );
     assert_eq!(slot_at(700), Slot::Free);
     assert_eq!(slot_at(900), Slot::Sleep);
+    // The default day: leisure from 620 overlaps the evening meal; the meal
+    // shows until 650, as the residents' tree eats before it rests.
+    let day = [
+        (BlockKind::Work, 0, 700),
+        (BlockKind::Meal, 250, 300),
+        (BlockKind::Meal, 600, 650),
+        (BlockKind::Leisure, 620, 700),
+        (BlockKind::Sleep, 700, 1000),
+    ];
+    let plan = plan_of_blocks(&day);
+    let runs: Vec<(Slot, i32, i32)> = plan
+        .iter()
+        .map(|run| (run.slot, run.from, run.to))
+        .collect();
+    assert_eq!(
+        runs,
+        [
+            (Slot::Work, 0, 250),
+            (Slot::Meal, 250, 300),
+            (Slot::Work, 300, 600),
+            (Slot::Meal, 600, 650),
+            (Slot::Leisure, 650, 700),
+            (Slot::Sleep, 700, 1000),
+        ]
+    );
     assert_eq!(plan.first().unwrap().from, 0);
     assert_eq!(plan.last().unwrap().to, 1000);
     assert!(

@@ -489,7 +489,7 @@ fn add_salt(world: &mut Value) {
         .as_array_mut()
         .expect("goods")
         .push(json!({
-            "key": SALT, "display": "salt", "base_price": 4, "stock_limit": 40,
+            "key": SALT, "display": "salt", "base_price": 4,
             "item": {"weight_g": 200, "max_stack": 40}}));
 }
 
@@ -522,6 +522,19 @@ fn coins_and_goods_are_conserved_across_births_deaths_inheritance_and_boat_trade
         let people = residents(app.world(), place);
         for pair in people.chunks(2).take(5) {
             marry(app.world_mut(), pair[0].1, pair[1].1);
+            // The couples are made young adults: founders' ages are seeded
+            // from their identities (2 to 5 seasons here, elder at 4), and
+            // only a couple both aged 2 is still adult on the first day a
+            // birth can happen. With the shipped construction's identities
+            // (island split, step 5) no chosen couple happened to be; the
+            // test needs couples, not that seed luck.
+            let today = village::calendar(app.world()).0 as i64;
+            for (_, actor) in pair {
+                let mut life = app.world_mut().get_mut::<Life>(*actor).expect("life");
+                life.born_day = today - 2;
+                life.stage = LifeStage::Adult;
+                life.death_day = life.death_day.max(today as u64 + 6);
+            }
         }
         for (_, actor) in people {
             econ::grant(app.world_mut(), actor, Item::new(SALT).stack(2));

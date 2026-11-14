@@ -275,7 +275,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
                 .collect::<Vec<_>>()
                 .join("; ")
         ));
-        market.push(json!({"id":id,"name":v.name,"role":v.role,"activity":activity(world,e).0,"decision":super::behavior::decision(world,e),"stock":stock,"offers":offers,"bed_price":if super::frontier::economy_spec::is_service(world,v.role){Some(catalog::BED_PRICE)}else{None}}));
+        market.push(json!({"id":id,"name":v.name,"role":v.role,"activity":activity(world,e).0,"decision":super::behavior::decision(world,e),"stock":stock,"offers":offers,"bed_price":if super::frontier::economy_spec::is_service(world,v.role){Some(catalog::bed_price(world))}else{None}}));
     }
     let (activity_kind, busy, recovery) = activity(world, ctx.entity);
     let heard_speech = super::speech::heard(world, ctx.unit);
@@ -610,8 +610,8 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
                         "rest",
                         format!(
                             "Rent a bed: {} coins, {} ticks",
-                            catalog::BED_PRICE,
-                            catalog::BED_TICKS
+                            catalog::bed_price(world),
+                            catalog::bed_ticks(world)
                         ),
                     )
                     .target(id),

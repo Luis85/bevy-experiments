@@ -294,7 +294,13 @@ pub fn merchant_check(
         }
         let limit = super::production::purchase_target(world, trader, kind);
         if count(world, trader, kind).saturating_add(n) > limit {
-            return Err("the buyer has no open procurement demand for that quantity".into());
+            let name = world
+                .get::<Villager>(trader)
+                .map_or_else(|| "The buyer".to_owned(), |person| person.name.clone());
+            let display = catalog::display_in(world, kind).unwrap_or(kind);
+            return Err(format!(
+                "{name} needs no more {display} today. Lay it on a market stall and it sells when somebody wants it."
+            ));
         }
         if let Some(limit) = super::production::purchase_bid_limit(world, trader, kind)
             && market::quote(world, trader, actor, kind, n)?.unit_price > limit

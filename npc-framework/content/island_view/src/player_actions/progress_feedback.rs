@@ -137,7 +137,7 @@ pub(super) fn refusal(_world: &World, reason: &str) -> String {
     } else if lower.contains("too far") || lower.contains("within") || lower.contains("reach") {
         "Move closer before trying again."
     } else if lower.contains("afford") || lower.contains("coins") || lower.contains("buyer has") {
-        "There are not enough coins for this trade."
+        "There are not enough coins for this sale."
     } else if lower.contains("capacity") || lower.contains("carry") || lower.contains("weight") {
         "Your pouch cannot carry that. Make some room first."
     } else if lower.contains("busy") || lower.contains("reserved") {
@@ -177,91 +177,79 @@ fn words(world: &World, verb: &str) -> [String; 3] {
             })
             .unwrap_or_else(|| "goods".into());
         return [
-            format!("Making {item} requested."),
+            format!("Making {item}…"),
             format!("Making {item}…"),
             format!("Finished making {item}."),
         ];
     }
     let messages = match verb {
-        "gather" => [
-            "Gathering requested.",
-            "Gathering supplies…",
-            "Supplies gathered.",
-        ],
+        "gather" => ["Gathering…", "Gathering supplies…", "Supplies gathered."],
         "build_cottage" => [
-            "Cottage construction requested.",
+            "Building the cottage…",
             "Building your cottage…",
             "Your cottage is complete.",
         ],
         "claim_plot" => [
-            "Claim requested.",
+            "Claiming the plot…",
             "Claiming your site…",
             "This site is now yours.",
         ],
-        "plant" => [
-            "Planting requested.",
-            "Planting your crop…",
-            "Your crop is planted.",
-        ],
+        "plant" => ["Planting…", "Planting your crop…", "Your crop is planted."],
         "plant_tree" => [
-            "Tree planting requested.",
+            "Planting a tree…",
             "Planting a tree cutting…",
             "Tree cutting planted. Growth takes time.",
         ],
         "restore_habitat" => [
-            "Habitat restoration requested.",
+            "Restoring the habitat…",
             "Restoring the habitat…",
             "Habitat work is complete. Recovery takes time.",
         ],
-        "water_crop" => [
-            "Watering requested.",
-            "Watering your crop…",
-            "Your crop is watered.",
-        ],
+        "water_crop" => ["Watering…", "Watering your crop…", "Your crop is watered."],
         "harvest" => [
-            "Harvest requested.",
+            "Harvesting…",
             "Harvesting your crop…",
             "Your harvest is in your pouch.",
         ],
         "rest" | "rest_home" | "rest_ground" => {
-            ["Rest requested.", "Resting…", "You finished resting."]
+            ["Going to rest…", "Resting…", "You finished resting."]
         }
-        "hunt" => ["Hunt requested.", "Hunting…", "The hunt is complete."],
-        "buy" | "sell" => ["Trade requested.", "Trading goods…", "Trade completed."],
-        "eat" => ["Eating requested.", "Eating…", "You ate from your pouch."],
-        "drink" => ["Drinking requested.", "Drinking…", "You drank some water."],
+        "hunt" => ["Hunting…", "Hunting…", "The hunt is complete."],
+        "buy" | "sell" => ["Buying and selling…", "Buying and selling…", "Sale done."],
+        "eat" => ["Eating…", "Eating…", "You ate from your pouch."],
+        "drink" => ["Drinking…", "Drinking…", "You drank some water."],
         "talk" => [
-            "Conversation requested.",
+            "Starting to talk…",
             "Talking with your neighbour…",
             "You spoke with your neighbour.",
         ],
         "offer_goods" => [
-            "Listing requested.",
+            "Putting it up for sale…",
             "Offering your goods…",
             "Your goods are listed for sale.",
         ],
         "withdraw_offer" => [
-            "Withdrawal requested.",
+            "Taking it back…",
             "Removing your listing…",
             "Your listing was withdrawn.",
         ],
         "equip" | "unequip" => [
-            "Equipment change requested.",
+            "Changing what you hold…",
             "Changing your equipment…",
             "Your equipment has changed.",
         ],
         "stop_work" => [
-            "Stopping requested.",
+            "Stopping…",
             "Stopping your activity…",
             "Your activity has stopped.",
         ],
         "walk" | "execute_orders" | "order+execute_orders" => [
-            "Walk requested.",
+            "Walking…",
             "Walking to your destination…",
             "You reached your destination.",
         ],
         _ => [
-            "Activity requested.",
+            "Starting…",
             "Your activity is in progress…",
             "Your activity is complete.",
         ],
@@ -285,7 +273,12 @@ pub(super) fn track(
         .filter(|watch| watch.actor == actor)
         .map(|watch| watch.commands.clone())
         .unwrap_or_default();
-    feedback(world, words[0].clone());
+    let started = if crate::game_ui::words::paused(world) {
+        format!("{} Time is paused (Space).", words[0])
+    } else {
+        words[0].clone()
+    };
+    feedback(world, started);
     world.resource_mut::<NativeActions>().progress = Some(Watch {
         actor,
         verb,
@@ -646,20 +639,20 @@ mod tests {
         for (verb, requested, working, completed) in [
             (
                 "plant_tree",
-                "Tree planting requested.",
+                "Planting a tree…",
                 "Planting a tree cutting…",
                 "Tree cutting planted. Growth takes time.",
             ),
             (
                 "restore_habitat",
-                "Habitat restoration requested.",
+                "Restoring the habitat…",
                 "Restoring the habitat…",
                 "Habitat work is complete. Recovery takes time.",
             ),
         ] {
             let (mut app, who, target, site) = restoration_fixture();
             restore(&mut app, target, verb);
-            assert_eq!(message(&app), requested);
+            assert!(message(&app).starts_with(requested), "{}", message(&app));
             run_ticks(app.world_mut(), 1);
             tick(app.world_mut());
             assert_eq!(message(&app), working);
@@ -773,7 +766,7 @@ mod tests {
         events::harvest(app.world_mut());
         let before = state_hash(app.world_mut());
         update(app.world_mut(), Some(who), true);
-        assert_eq!(message(&app), "Tree planting requested.");
+        assert!(message(&app).starts_with("Planting a tree…"));
         assert!(
             !app.world()
                 .resource::<NativeActions>()
@@ -823,7 +816,7 @@ mod tests {
         });
         events::harvest(app.world_mut());
         update(app.world_mut(), Some(who), true);
-        assert_eq!(message(&app), "Habitat restoration requested.");
+        assert!(message(&app).starts_with("Restoring the habitat…"));
         assert!(app.world().resource::<NativeActions>().progress.is_some());
         journal::record_effect(
             app.world_mut(),
@@ -957,7 +950,7 @@ mod tests {
         let (mut app, who, source) = fixture();
         let before = economy::count(app.world(), who.entity, "log");
         gather(&mut app, source);
-        assert_eq!(message(&app), "Gathering requested.");
+        assert!(message(&app).starts_with("Gathering…"));
         run_ticks(app.world_mut(), 1);
         tick(app.world_mut());
         assert_eq!(message(&app), "Gathering supplies…");
@@ -999,7 +992,7 @@ mod tests {
         events::harvest(app.world_mut());
         let before = state_hash(app.world_mut());
         update(app.world_mut(), Some(who), true);
-        assert_eq!(message(&app), "Gathering requested.");
+        assert!(message(&app).starts_with("Gathering…"));
         assert_eq!(state_hash(app.world_mut()), before);
         app.insert_resource(AgentIoState::default());
         let new_actor = actor(app.world()).unwrap();
@@ -1054,7 +1047,7 @@ mod tests {
         }
         events::harvest(app.world_mut());
         update(app.world_mut(), Some(who), true);
-        assert!(message(&app).contains("requested"));
+        assert!(message(&app).starts_with("Making"));
         journal::record(app.world_mut(), Some(who.id), || {
             JournalKind::ExternalAction {
                 handle: 123,

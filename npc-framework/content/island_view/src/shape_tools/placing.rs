@@ -35,7 +35,10 @@ use island_content::village::{
     civic,
     frontier::{
         props::{self as prop_data, PlaceProp, RemoveProp},
-        shape::{PlacePlot, RemovePlot},
+        shape::{
+            PlaceMode, PlacePlot, PlaceResourcePatch, RemovePlot, RemoveResourcePatch,
+            SetEditorMode,
+        },
     },
 };
 use npc_framework::kernel::commands::{CommandQueue, SkippedCommands, submit_deferred};
@@ -52,6 +55,9 @@ const HISTORY: usize = 64;
 pub(crate) enum Kind {
     Plot,
     Prop,
+    /// A resource patch (Shape's Resource tool): placed and removed there,
+    /// taken back and laid again here, on the same timeline.
+    Patch,
 }
 
 /// What is in hand.
@@ -70,6 +76,8 @@ pub(crate) enum PlaceAction {
     Remove,
     Rotate,
     Leave,
+    /// "Place for free": the recorded editor switch, on or off.
+    Free,
 }
 
 /// One placement as the commands describe it: kind, catalog key, cell (a
@@ -81,6 +89,12 @@ pub(crate) struct Thing {
     pub(crate) x: i32,
     pub(crate) z: i32,
     pub(crate) rotation: u8,
+    /// A patch's richness in percent (its `x`, `z` are millimetres); 0 for
+    /// plots and props.
+    pub(crate) richness: u32,
+    /// Built by the villagers (a building site), or free while the island
+    /// is being edited. Patches ignore it.
+    pub(crate) mode: PlaceMode,
 }
 
 impl Thing {
@@ -88,6 +102,15 @@ impl Thing {
         match self.kind {
             Kind::Plot => SimCommand::content(&self.plot()),
             Kind::Prop => SimCommand::content(&self.prop()),
+            Kind::Patch => SimCommand::content(&self.patch()),
+        }
+    }
+    fn patch(&self) -> PlaceResourcePatch {
+        PlaceResourcePatch {
+            good: self.key.clone(),
+            x: self.x,
+            z: self.z,
+            richness: self.richness,
         }
     }
     fn plot(&self) -> PlacePlot {
@@ -96,6 +119,7 @@ impl Thing {
             x: self.x,
             z: self.z,
             rotation: self.rotation,
+            mode: self.mode,
         }
     }
     fn prop(&self) -> PlaceProp {
@@ -104,6 +128,7 @@ impl Thing {
             x: self.x,
             z: self.z,
             rotation: self.rotation,
+            mode: self.mode,
         }
     }
     /// The simulation's verdict on placing it now.
@@ -111,6 +136,7 @@ impl Thing {
         match self.kind {
             Kind::Plot => self.plot().check(world),
             Kind::Prop => self.prop().check(world),
+            Kind::Patch => self.patch().check(world),
         }
     }
     /// The placed plot or prop of this kind, key, cell and turn.
@@ -131,7 +157,97 @@ impl Thing {
                             == (self.x, self.z, self.rotation % 4)
                 })
                 .map(|building| building.id),
+            Kind::Patch => super::resources::patch_at(world, &self.key, self.x, self.z),
         }
+        .or_else(|| self.site(world))
+    }
+    /// The building site a build-mode placement opened (until it is built):
+    /// a site of this catalog key over the same body.
+    fn site(&self, world: &World) -> Option<SimId> {
+        if self.kind == Kind::Patch {
+            return None;
+        }
+        let (lo, hi, _) = footprint(world, self)?;
+        civic::sites(world)
+            .into_iter()
+            .find(|site| {
+                site.building == self.key
+                    && (
+                        (site.plot.lo_x, site.plot.lo_z),
+                        (site.plot.hi_x, site.plot.hi_z),
+                    ) == (lo, hi)
+            })
+            .map(|site| site.id)
+    }
+}
+
+/// How a placement made now is made: free while the island is being
+/// edited (the recorded switch), else built by the villagers.
+pub(crate) fn current_mode(world: &World) -> PlaceMode {
+    if island_content::village::view::editor_mode(world) {
+        PlaceMode::Editor
+    } else {
+        PlaceMode::Build
+    }
+}
+
+/// "1 plank", "2 logs", or nothing: what a building site of this item asks.
+fn cost_words(world: &World, kind: Kind, key: &str) -> (String, u32) {
+    let (cost, work): (Vec<(String, u32)>, u32) = match kind {
+        Kind::Plot => civic::definition(world, key).map_or((Vec::new(), 0), |def| {
+            (
+                def.cost
+                    .iter()
+                    .map(|stack| (stack.good.clone(), stack.count))
+                    .collect(),
+                def.work_ticks,
+            )
+        }),
+        Kind::Prop => prop_data::catalog(world)
+            .into_iter()
+            .find(|def| def.id == key)
+            .map_or((Vec::new(), 0), |def| {
+                (
+                    def.cost
+                        .iter()
+                        .map(|stack| (stack.good.clone(), stack.count))
+                        .collect(),
+                    def.work_ticks,
+                )
+            }),
+        Kind::Patch => (Vec::new(), 0),
+    };
+    let goods = cost
+        .iter()
+        .map(|(good, qty)| crate::game_ui::words::count(u64::from(*qty), good))
+        .collect::<Vec<_>>()
+        .join(", ");
+    (goods, work)
+}
+
+/// The caption under the chosen item: what it costs and how long it takes,
+/// or that it stands at once while the island is being edited.
+pub(crate) fn item_caption(world: &World, kind: Kind, key: &str, free: bool) -> String {
+    let name = name_of(world, kind, key);
+    if free {
+        return format!("{name} \u{b7} free");
+    }
+    let (goods, work) = cost_words(world, kind, key);
+    let day = world
+        .get_resource::<npc_framework::prelude::SimConfig>()
+        .map_or(2400, |config| config.day_length)
+        .max(1);
+    let hours = (u64::from(work) * 24).div_ceil(day);
+    let time = match hours {
+        0 => None,
+        1 => Some("about 1 hour of work".to_owned()),
+        n => Some(format!("about {n} hours of work")),
+    };
+    match (goods.is_empty(), time) {
+        (true, None) => format!("{name} \u{b7} stands at once"),
+        (true, Some(time)) => format!("{name} \u{b7} {time}"),
+        (false, None) => format!("{name} \u{b7} {goods}"),
+        (false, Some(time)) => format!("{name} \u{b7} {goods} \u{b7} {time}"),
     }
 }
 
@@ -139,13 +255,20 @@ pub(crate) fn remove_command(kind: Kind, id: SimId) -> SimCommand {
     match kind {
         Kind::Plot => SimCommand::content(&RemovePlot { plot: id }),
         Kind::Prop => SimCommand::content(&RemoveProp { prop: id }),
+        Kind::Patch => SimCommand::content(&RemoveResourcePatch { patch: id }),
     }
+}
+
+/// The recorded switch for free placement ("Place for free").
+pub(crate) fn editor_command(on: bool) -> SimCommand {
+    SimCommand::content(&SetEditorMode { on })
 }
 
 fn check_remove(world: &World, kind: Kind, id: SimId) -> Result<(), String> {
     match kind {
         Kind::Plot => RemovePlot { plot: id }.check(world),
         Kind::Prop => RemoveProp { prop: id }.check(world),
+        Kind::Patch => RemoveResourcePatch { patch: id }.check(world),
     }
 }
 
@@ -210,6 +333,8 @@ pub(crate) fn footprint(
     thing: &Thing,
 ) -> Option<((i32, i32), (i32, i32), (i32, i32))> {
     match thing.kind {
+        // A patch is a point: the Resource tool draws its own ring.
+        Kind::Patch => None,
         Kind::Plot => civic::placement_plot(world, &thing.key, thing.x, thing.z, thing.rotation)
             .map(|plot| {
                 (
@@ -360,6 +485,14 @@ pub(crate) fn active(world: &World) -> bool {
         .is_some_and(|state| state.tool.is_some())
 }
 
+/// Whether a plot or prop is in hand (then R turns it and the brush keys
+/// wait).
+pub(crate) fn holding_item(world: &World) -> bool {
+    world
+        .get_resource::<Placing>()
+        .is_some_and(|state| matches!(state.tool, Some(Tool::Place(..))))
+}
+
 /// Recorded placements still waiting for their tick.
 pub(crate) fn busy(world: &World) -> bool {
     world
@@ -396,6 +529,35 @@ pub(crate) fn claims(world: &World, undo: bool) -> bool {
         )
     };
     placement_first(undo, stamp, stroke)
+}
+
+/// A placement or removal recorded elsewhere in Shape (the Resource tool's
+/// patches): once it applies it joins Undo and Redo here.
+pub(crate) fn track(
+    world: &mut World,
+    key: (u64, u32),
+    thing: Thing,
+    present: bool,
+    words: String,
+) {
+    let stamp = world.resource::<ShapeTools>().history.issued();
+    let Some(mut state) = world.get_resource_mut::<Placing>() else {
+        return;
+    };
+    state.serial += 1;
+    let serial = state.serial;
+    state.inflight.push(Inflight {
+        key,
+        entry: Entry {
+            serial,
+            thing,
+            id: None,
+            present,
+            stamp,
+        },
+        origin: Origin::Fresh,
+        words,
+    });
 }
 
 fn words_of(world: &World, thing: &Thing) -> String {
@@ -528,6 +690,8 @@ pub(crate) fn aim(world: &mut World, cell: Option<(i32, i32)>, clicked: bool) {
                 x,
                 z,
                 rotation,
+                richness: 0,
+                mode: current_mode(world),
             };
             let verdict = thing
                 .check_place(world)
@@ -538,7 +702,7 @@ pub(crate) fn aim(world: &mut World, cell: Option<(i32, i32)>, clicked: bool) {
                 front,
                 refused: verdict.is_err(),
             });
-            let words = format!("Placed a {}.", words_of(world, &thing));
+            let words = placed_words(world, &thing);
             planned = Some((
                 thing.place_command(),
                 Entry {
@@ -621,6 +785,8 @@ fn placed_at(world: &World, (x, z): (i32, i32)) -> Option<(Thing, SimId, String)
                 x: prop.x,
                 z: prop.z,
                 rotation: prop.rotation,
+                richness: 0,
+                mode: current_mode(world),
             },
             prop.id,
             prop.display,
@@ -641,6 +807,8 @@ fn placed_at(world: &World, (x, z): (i32, i32)) -> Option<(Thing, SimId, String)
                     x: building.plot.x,
                     z: building.plot.z,
                     rotation: building.plot.rotation,
+                    richness: 0,
+                    mode: current_mode(world),
                 },
                 building.id,
                 name,
@@ -782,6 +950,25 @@ struct ItemsGrid(Kind);
 #[derive(Component)]
 struct FacingText;
 #[derive(Component)]
+struct CostText;
+
+/// What the status says once a placement applied: free, it stands; built,
+/// the site is ordered (queued while time is paused).
+pub(crate) fn placed_words(world: &World, thing: &Thing) -> String {
+    let name = name_of(world, thing.kind, &thing.key);
+    if thing.mode == PlaceMode::Editor {
+        return format!("Placed a {}.", name.to_lowercase());
+    }
+    let paused = world
+        .get_resource::<npc_framework::prelude::SimControl>()
+        .is_none_or(npc_framework::prelude::SimControl::is_stopped);
+    if paused {
+        format!("{name} is queued. The site opens when time runs (Space).")
+    } else {
+        format!("{name} ordered. Residents bring the materials, then build.")
+    }
+}
+#[derive(Component)]
 struct HintText;
 #[derive(Component)]
 struct TagRoot;
@@ -812,7 +999,7 @@ pub(super) fn plugin(app: &mut App) {
         )
         .add_systems(
             Update,
-            (process, refresh, mark, gizmo)
+            (process, refresh, mark, gizmo, free_badge)
                 .chain()
                 .in_set(ViewSystems::Present)
                 .after(super::resources::process),
@@ -923,6 +1110,29 @@ fn spawn(world: &mut World) {
     ));
     let facing = w::label(world, row, "", t::BODY, Tone::text(Surface::Chrome));
     world.entity_mut(facing).insert(FacingText);
+    // What the chosen item costs the village, or that it stands at once.
+    let caption = w::paragraph(
+        world,
+        panel,
+        "",
+        t::CAPTION,
+        Tone::secondary(Surface::Chrome),
+    );
+    world.entity_mut(caption).insert(CostText);
+    let free = w::button(
+        world,
+        panel,
+        ButtonSpec::new("Place for free", Look::Secondary, Surface::Chrome).reach(Reach::Ring),
+        PlaceControl(PlaceAction::Free),
+    );
+    world.entity_mut(free).insert((
+        Name::new("Game: Place for free"),
+        Tooltip::new(
+            "Place for free",
+            "Off: residents bring the materials and build it. On: it stands at once. For making an island, not for playing one.",
+        )
+        .detail(["The switch is kept with the island, and the top bar says Free while it is on."]),
+    ));
     let remove = w::button(
         world,
         panel,
@@ -1015,13 +1225,22 @@ fn keys(world: &mut World) {
         return;
     }
     let holding = active(world);
+    let item = holding_item(world);
     let pressed: Vec<(KeyCode, PlaceAction)> = [
         (KeyCode::KeyL, PlaceAction::Open),
         (KeyCode::KeyR, PlaceAction::Rotate),
         (KeyCode::Escape, PlaceAction::Leave),
     ]
     .into_iter()
-    .filter(|(key, action)| keys.just_pressed(*key) && (*action == PlaceAction::Open || holding))
+    .filter(|(key, action)| {
+        keys.just_pressed(*key)
+            && match action {
+                PlaceAction::Open => true,
+                // R turns only a plot or prop in hand; otherwise it raises.
+                PlaceAction::Rotate => item,
+                _ => holding,
+            }
+    })
     .collect();
     if pressed.is_empty() {
         return;
@@ -1116,6 +1335,15 @@ pub(crate) fn process(world: &mut World) {
                 world.resource_mut::<Placing>().put_down();
                 false
             }
+            PlaceAction::Free => {
+                // A recorded command: the switch shows the simulation's
+                // state once it applies, also after a load.
+                let on = !island_content::village::view::editor_mode(world);
+                if let Err(error) = submit_deferred(world, None, editor_command(on)) {
+                    status(world, format!("Not changed: {error}"), true);
+                }
+                false
+            }
         };
         if taken {
             // One tool in hand: the resource tools rest.
@@ -1166,6 +1394,7 @@ fn refresh(world: &mut World) {
             PlaceAction::Remove => (tool == Some(Tool::Remove), true),
             PlaceAction::Rotate => (false, matches!(tool, Some(Tool::Place(..)))),
             PlaceAction::Leave => (false, true),
+            PlaceAction::Free => (island_content::village::view::editor_mode(world), true),
         };
         w::set_state(world, entity, on, false);
         w::set_enabled(world, entity, enabled);
@@ -1243,6 +1472,19 @@ fn refresh(world: &mut World) {
     for entity in facing {
         w::set_text(world, entity, facing_words(rotation));
     }
+    let free = island_content::village::view::editor_mode(world);
+    let cost = match &tool {
+        Some(Tool::Place(kind, key)) => item_caption(world, *kind, key, free),
+        _ => String::new(),
+    };
+    let costs: Vec<Entity> = world
+        .query_filtered::<Entity, With<CostText>>()
+        .iter(world)
+        .collect();
+    for entity in costs {
+        w::set_text(world, entity, &cost);
+        w::show(world, entity, !cost.is_empty());
+    }
     let hint = match tool {
         Some(Tool::Remove) => "Click a marked plot or prop to take it away. Undo puts it back.",
         _ => {
@@ -1259,9 +1501,14 @@ fn refresh(world: &mut World) {
     // The cursor tag.
     let line = match (&tool, hover) {
         (Some(Tool::Place(kind, key)), Some(_)) => Some(format!(
-            "Place {} \u{b7} {}",
+            "Place {} \u{b7} {}{}",
             name_of(world, *kind, key).to_lowercase(),
-            facing_words(rotation).to_lowercase()
+            facing_words(rotation).to_lowercase(),
+            if free {
+                ""
+            } else {
+                ". Residents will build it."
+            }
         )),
         (Some(Tool::Remove), Some(_)) => Some(hovered.as_ref().map_or_else(
             || "Remove".to_owned(),
@@ -1314,6 +1561,22 @@ fn refresh(world: &mut World) {
                 }
                 _ => node.display = Display::None,
             }
+        }
+    }
+}
+
+/// The top bar's "Free" mark follows the simulation's editor switch;
+/// written only when it changes.
+fn free_badge(world: &mut World) {
+    let free = island_content::village::view::editor_mode(world);
+    let badges: Vec<(Entity, bool)> = world
+        .query_filtered::<(Entity, &Node), With<crate::island_shell::FreeBadge>>()
+        .iter(world)
+        .map(|(entity, node)| (entity, node.display != Display::None))
+        .collect();
+    for (badge, shown) in badges {
+        if shown != free {
+            w::show(world, badge, free);
         }
     }
 }
@@ -1417,12 +1680,64 @@ mod tests {
     use npc_framework::kernel::hash::state_hash;
     use npc_framework::prelude::{SimPos, run_ticks};
 
-    fn living() -> App {
+    /// The living world with Shape's tools, built by the villagers.
+    fn building() -> App {
         let mut app = island_content::new_sim_app(7, "living_world");
         app.init_resource::<ShapeTools>()
             .init_resource::<Placing>()
             .insert_resource(IslandMode::Editor);
         app
+    }
+
+    /// The same, with "Place for free" switched on (a recorded command).
+    fn living() -> App {
+        let mut app = building();
+        npc_framework::prelude::submit(app.world_mut(), None, editor_command(true)).unwrap();
+        run_ticks(app.world_mut(), 2);
+        assert!(island_content::village::view::editor_mode(app.world()));
+        app
+    }
+
+    #[test]
+    fn a_built_placement_opens_a_site_says_its_cost_and_undo_cancels_it() {
+        let mut app = building();
+        let barrel = placeable(app.world(), Kind::Prop, "barrel");
+        let caption = item_caption(app.world(), Kind::Prop, "barrel", false);
+        assert!(caption.starts_with("Barrel \u{b7} 1 plank"), "{caption}");
+        assert!(caption.contains("of work"), "{caption}");
+        assert_eq!(
+            item_caption(app.world(), Kind::Prop, "barrel", true),
+            "Barrel \u{b7} free"
+        );
+        app.world_mut().resource_mut::<Placing>().tool =
+            Some(Tool::Place(Kind::Prop, "barrel".into()));
+        aim(app.world_mut(), Some((barrel.x, barrel.z)), true);
+        let sent: Vec<serde_json::Value> = app
+            .world()
+            .resource::<CommandQueue>()
+            .pending
+            .values()
+            .map(|command| serde_json::to_value(command).unwrap())
+            .collect();
+        assert_eq!(sent[0]["mode"], "build", "{sent:?}");
+        apply(&mut app);
+        let site = barrel.find(app.world()).expect("a building site");
+        assert!(
+            civic::sites(app.world())
+                .iter()
+                .any(|open| open.id == site && open.building == "barrel"),
+            "the barrel waits to be built"
+        );
+        assert!(
+            prop_data::props(app.world()).is_empty(),
+            "nothing stands yet"
+        );
+        step(app.world_mut(), true);
+        apply(&mut app);
+        assert!(
+            !civic::sites(app.world()).iter().any(|open| open.id == site),
+            "Undo cancels the site"
+        );
     }
 
     /// Apply what was recorded, then settle.
@@ -1456,6 +1771,8 @@ mod tests {
                             x: cx + dx,
                             z: cz + dz,
                             rotation: 0,
+                            richness: 0,
+                            mode: PlaceMode::Build,
                         };
                         if thing.check_place(world).is_ok() {
                             return thing;
@@ -1542,7 +1859,8 @@ mod tests {
         assert_eq!(
             queued,
             [serde_json::json!({
-                "type": "PlaceProp", "prop": "barrel", "x": barrel.x, "z": barrel.z, "rotation": 0
+                "type": "PlaceProp", "prop": "barrel", "x": barrel.x, "z": barrel.z, "rotation": 0,
+                "mode": "editor"
             })]
         );
         apply(&mut app);

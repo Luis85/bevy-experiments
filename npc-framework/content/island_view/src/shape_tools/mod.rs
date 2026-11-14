@@ -403,6 +403,11 @@ fn keys(world: &mut World) {
     if other {
         return;
     }
+    // With a plot or prop in hand the brush is not in use: its keys wait
+    // (R turns the item, in `placing`); Undo and Redo still work.
+    if !control && placing::holding_item(world) {
+        return;
+    }
     let bindings: &[(KeyCode, Action)] = if control {
         &[
             (
@@ -557,6 +562,15 @@ pub(crate) fn pointer(world: &mut World) {
 
 /// One rate-limited dab: plan from current (or already planned) heights,
 /// then queue its one absolute command (a disc or a batch of cells).
+/// Why an edit waits on earlier ones, by whether time runs.
+fn catching_up(paused: bool) -> &'static str {
+    if paused {
+        "Earlier edits are waiting. They show when time runs (Space)."
+    } else {
+        "The island is still catching up. Wait a moment."
+    }
+}
+
 fn dab(world: &mut World, cell: (i32, i32)) {
     let (brush, anchor_mm, moved, waited) = {
         let state = world.resource::<ShapeTools>();
@@ -574,6 +588,7 @@ fn dab(world: &mut World, cell: (i32, i32)) {
         return;
     }
     let limits = limits(world);
+    let paused = crate::game_ui::words::paused(world);
     let expected = std::mem::take(&mut world.resource_mut::<ShapeTools>().expected);
     let edits = model::plan_dab(&brush, cell, anchor_mm, &limits, |x, z| {
         sample(world, &expected, x, z)
@@ -602,8 +617,7 @@ fn dab(world: &mut World, cell: (i32, i32)) {
         return;
     }
     if queued + commands.len() > OUTBOX_LIMIT {
-        state.status =
-            "Edits are queued faster than the world applies them. Resume or slow down.".into();
+        state.status = catching_up(paused).into();
         state.latency.dropped += 1;
         return;
     }
@@ -738,9 +752,8 @@ fn apply_request(world: &mut World, action: Action) {
         Action::Undo | Action::Redo => {
             finish_stroke(world);
             if world.resource::<ShapeTools>().queued() > 0 || placing::busy(world) {
-                world.resource_mut::<ShapeTools>().status =
-                    "Earlier edits are still being applied. Resume the world, then try again."
-                        .into();
+                let paused = crate::game_ui::words::paused(world);
+                world.resource_mut::<ShapeTools>().status = catching_up(paused).into();
                 return;
             }
             // Strokes and placements share one timeline: the newer of the

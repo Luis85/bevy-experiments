@@ -2,7 +2,7 @@
 //! shaped world.
 //!
 //! Two tools beside the terrain brushes: Resource (N) places a patch of the
-//! chosen good at the chosen richness where the ground is clicked, Remove (E)
+//! chosen good at the chosen richness where the ground is clicked, Remove (X)
 //! takes away the patch under the pointer. Both are recorded commands
 //! (`PlaceResourcePatch`, `RemoveResourcePatch`); the simulation's own check
 //! is the verdict beside the cursor before the click, and its refusal is the
@@ -10,15 +10,16 @@
 //! list here. While either tool is in hand the existing patches carry a
 //! marker and a label.
 //!
-//! Neither tool takes part in Undo: Shape's history holds terrain cells, and
-//! the inverse of a placement is a removal of an identity the simulation
-//! hands out only when it applies the command. The tooltips and the hint say
-//! so; the Remove tool takes a placed patch back.
+//! Both take part in Undo and Redo (`placing::track`): the inverse of a
+//! placement is the removal of the patch the simulation made, found again
+//! by good and position; the inverse of a removal places the same good at
+//! the same spot and richness again.
 //!
 //! "Export world" asks the host to write the world file
 //! ([`WorldExportRequest`]); the view does no file work.
 use super::ShapeTools;
 use super::picking;
+use super::placing::{Kind as PlaceKind, Thing};
 use crate::IslandMode;
 use crate::game_ui::icon::{self, Icon};
 use crate::game_ui::tokens::{self as t, Status, Surface};
@@ -30,6 +31,7 @@ use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::InteractionDisabled;
 use bevy::ui_widgets::Activate;
+use island_content::village::frontier::shape::PlaceMode;
 use island_content::village::{
     ResourcePatch,
     frontier::{
@@ -182,6 +184,39 @@ fn patches(world: &World) -> Vec<(SimId, Entity, String, SimPos)> {
         .collect();
     out.sort_unstable_by_key(|(id, ..)| *id);
     out
+}
+
+/// The patch of `good` standing at `(x, z)` millimetres, if any.
+pub(crate) fn patch_at(world: &World, good: &str, x: i32, z: i32) -> Option<SimId> {
+    patches(world)
+        .into_iter()
+        .find(|(_, _, kind, pos)| kind == good && (pos.x, pos.z) == (x, z))
+        .map(|(id, ..)| id)
+}
+
+/// A placed patch's richness in percent: its capacity against the world's
+/// own patch of that good, in the stepper's steps.
+fn richness_of(world: &World, entity: Entity) -> u32 {
+    let Some(patch) = world.get::<ResourcePatch>(entity) else {
+        return RICHNESS_DEFAULT;
+    };
+    let authored = frontier::economy_spec::registry(world).and_then(|registry| {
+        registry
+            .spec
+            .patches
+            .iter()
+            .find(|def| def.good == patch.kind)
+            .map(|def| def.capacity)
+    });
+    match authored {
+        Some(capacity) if capacity > 0 => {
+            let percent = u64::from(patch.capacity) * 100 / u64::from(capacity);
+            let stepped = (percent + u64::from(RICHNESS_STEP) / 2) / u64::from(RICHNESS_STEP)
+                * u64::from(RICHNESS_STEP);
+            (stepped as u32).clamp(RICHNESS_MIN, RICHNESS_MAX)
+        }
+        _ => RICHNESS_DEFAULT,
+    }
 }
 
 /// The patch nearest `at` within reach of the Remove tool.
@@ -362,14 +397,14 @@ pub(super) fn rail_tiles(world: &mut World, rail: Entity) {
             Icon::ResourcePatches,
             "N",
             ResAction::Mode(Mode::Place),
-            "Place a patch of a good where you click: berries, trees, stone. The settlement within 60 m works it.",
+            "Place a patch of a good where you click: berries, trees, stone. A village within 60 m works it.",
         ),
         (
             "Remove",
             Icon::Cannot,
-            "E",
+            "X",
             ResAction::Mode(Mode::Remove),
-            "Take away the patch under the pointer. A settlement keeps its last patch of each good.",
+            "Take away the patch under the pointer. A village keeps its last patch of each good.",
         ),
     ] {
         let tile = w::dock_tile(
@@ -415,7 +450,7 @@ pub(super) fn export_tile(world: &mut World, rail: Entity) {
 
 /// Placing and removing are not strokes: Undo does not take them back.
 pub(crate) const UNDO_SENTENCE: &str =
-    "Not part of Undo: take a placed patch back with Remove (E), or place one again.";
+    "Ctrl+Z takes back a placed patch or brings back a removed one.";
 
 fn spawn(world: &mut World) {
     let panel = world
@@ -622,7 +657,7 @@ fn activate(
     }
 }
 
-/// N takes up Resource, E takes up Remove; Esc puts either down (one step,
+/// N takes up Resource, X takes up Remove; Esc puts either down (one step,
 /// before the shell's own Esc ladder).
 fn keys(world: &mut World) {
     if !editing(world) {
@@ -649,7 +684,7 @@ fn keys(world: &mut World) {
     let holding = active(world);
     let pressed: Vec<(KeyCode, ResAction)> = [
         (KeyCode::KeyN, ResAction::Mode(Mode::Place)),
-        (KeyCode::KeyE, ResAction::Mode(Mode::Remove)),
+        (KeyCode::KeyX, ResAction::Mode(Mode::Remove)),
         (KeyCode::Escape, ResAction::Leave),
     ]
     .into_iter()
@@ -712,7 +747,25 @@ pub(super) fn pointer(world: &mut World) {
                         good_words(world, &good),
                         richness_words(state.richness).to_lowercase()
                     );
-                    (verdict, None, Some((SimCommand::content(&place), words)))
+                    let thing = Thing {
+                        kind: PlaceKind::Patch,
+                        key: good.clone(),
+                        x: at.x,
+                        z: at.z,
+                        rotation: 0,
+                        richness: state.richness,
+                        mode: PlaceMode::Build,
+                    };
+                    (
+                        verdict,
+                        None,
+                        Some((
+                            SimCommand::content(&place),
+                            format!("Placed a {}.", words.to_lowercase()),
+                            thing,
+                            true,
+                        )),
+                    )
                 }
             }
         }
@@ -727,7 +780,16 @@ pub(super) fn pointer(world: &mut World) {
             );
             match near.and_then(|id| all.iter().find(|row| row.0 == id)) {
                 None => (Err("No resource patch here.".to_owned()), None, None),
-                Some((id, entity, kind, _)) => {
+                Some((id, entity, kind, pos)) => {
+                    let thing = Thing {
+                        kind: PlaceKind::Patch,
+                        key: kind.clone(),
+                        x: pos.x,
+                        z: pos.z,
+                        rotation: 0,
+                        richness: richness_of(world, *entity),
+                        mode: PlaceMode::Build,
+                    };
                     let words = match settlement_label(world, *entity) {
                         Some(place) => format!("{} patch of {place}", good_words(world, kind)),
                         None => format!("{} patch", good_words(world, kind)),
@@ -737,7 +799,12 @@ pub(super) fn pointer(world: &mut World) {
                     (
                         verdict,
                         Some((*id, words.clone())),
-                        Some((SimCommand::content(&remove), words)),
+                        Some((
+                            SimCommand::content(&remove),
+                            format!("Removed the {}.", words.to_lowercase()),
+                            thing,
+                            false,
+                        )),
                     )
                 }
             }
@@ -752,13 +819,13 @@ pub(super) fn pointer(world: &mut World) {
     }
     if clicked && at.is_some() {
         match (verdict, command) {
-            (Ok(()), Some((command, words))) => match submit_deferred(world, None, command) {
-                Ok(key) => world
-                    .resource_mut::<Resources>()
-                    .inflight
-                    .push((key, words)),
-                Err(error) => refused(world, mode, &error.to_string()),
-            },
+            // Applied, it joins Undo and Redo with strokes, plots and props.
+            (Ok(()), Some((command, words, thing, present))) => {
+                match submit_deferred(world, None, command) {
+                    Ok(key) => super::placing::track(world, key, thing, present, words),
+                    Err(error) => refused(world, mode, &error.to_string()),
+                }
+            }
             // A refused click says why in the notice too; nothing is recorded.
             (Err(reason), _) => refused(world, mode, &reason),
             _ => {}
@@ -993,10 +1060,10 @@ fn refresh(world: &mut World) {
     }
     let hint = match mode {
         Some(Mode::Remove) => {
-            "Click a marked patch to remove it. A settlement keeps its last patch of each good. Not part of Undo."
+            "Click a marked patch to remove it. A village keeps its last patch of each good. Ctrl+Z brings it back."
         }
         _ => {
-            "Click the ground to place: green where it can go, red with the reason where not. Not part of Undo; Remove (E) takes a patch back."
+            "Click the ground to place: green where it can go, red with the reason where not. Ctrl+Z takes it back."
         }
     };
     let hints: Vec<Entity> = world

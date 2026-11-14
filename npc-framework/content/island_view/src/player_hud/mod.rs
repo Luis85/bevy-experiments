@@ -173,7 +173,6 @@ pub(super) enum Action {
     /// Fold the goal tracker to its title, or open it again.
     GoalFold,
     Menu,
-    Inspect,
     Successor,
     WatchVillage,
     LifeChoices,
@@ -564,7 +563,9 @@ fn keys(world: &mut World) {
     {
         return;
     }
+    use crate::keymap::{self as map, Mode::Live};
     if life::watching(world) {
+        let successor = map::key(Live, map::SUCCESSOR);
         let requested = world
             .get_resource::<ButtonInput<KeyCode>>()
             .is_some_and(|keys| {
@@ -576,7 +577,7 @@ fn keys(world: &mut World) {
                     KeyCode::SuperLeft,
                     KeyCode::SuperRight,
                 ];
-                keys.just_pressed(KeyCode::KeyL)
+                keys.just_pressed(successor)
                     && !keys.any_pressed(modifiers)
                     && !keys.any_just_pressed(modifiers)
             });
@@ -587,7 +588,7 @@ fn keys(world: &mut World) {
                 .push(Action::LifeChoices);
             world
                 .resource_mut::<ButtonInput<KeyCode>>()
-                .reset(KeyCode::KeyL);
+                .reset(successor);
         }
         return;
     }
@@ -639,15 +640,17 @@ fn keys(world: &mut World) {
     }
     let mut actions = Vec::new();
     let mut consumed = Vec::new();
-    for (key, tab) in [
-        (KeyCode::KeyI, Tab::Pouch),
-        (KeyCode::KeyC, Tab::Craft),
-        (KeyCode::KeyB, Tab::Build),
-        (KeyCode::KeyG, Tab::Garden),
-        (KeyCode::KeyT, Tab::Trade),
-        (KeyCode::KeyN, Tab::People),
-        (KeyCode::KeyM, Tab::Explore),
+    // The hotbar's keys, from the one table of keys.
+    for (does, tab) in [
+        (map::POUCH, Tab::Pouch),
+        (map::CRAFT, Tab::Craft),
+        (map::BUILD, Tab::Build),
+        (map::GARDEN, Tab::Garden),
+        (map::TRADE, Tab::Trade),
+        (map::PEOPLE, Tab::People),
+        (map::EXPLORE, Tab::Explore),
     ] {
+        let key = map::key(Live, does);
         if keys.just_pressed(key) {
             actions.push(if world.resource::<PlayerState>().tab == Some(tab) {
                 Action::Close
@@ -657,14 +660,6 @@ fn keys(world: &mut World) {
             consumed.push(key);
         }
     }
-    if keys.just_pressed(KeyCode::F2) {
-        actions.push(if world.resource::<PlayerState>().tab.is_some() {
-            Action::Close
-        } else {
-            Action::Open(Tab::Pouch)
-        });
-        consumed.push(KeyCode::F2);
-    }
     if keys.just_pressed(KeyCode::Escape) {
         actions.push(if world.resource::<PlayerState>().tab.is_some() {
             Action::Close
@@ -673,15 +668,13 @@ fn keys(world: &mut World) {
         });
         consumed.push(KeyCode::Escape);
     }
-    if keys.just_pressed(KeyCode::KeyX) {
+    let stop = map::key(Live, map::STOP);
+    if keys.just_pressed(stop) {
         actions.push(Action::Stop);
-        consumed.push(KeyCode::KeyX);
+        consumed.push(stop);
     }
-    if keys.just_pressed(KeyCode::F11) {
-        actions.push(Action::Inspect);
-        consumed.push(KeyCode::F11);
-    }
-    if keys.just_pressed(KeyCode::KeyE) {
+    let reach = map::key(Live, map::USE);
+    if keys.just_pressed(reach) {
         if let Some(context) = world
             .resource::<PlayerState>()
             .context
@@ -691,7 +684,7 @@ fn keys(world: &mut World) {
         {
             actions.push(context);
         }
-        consumed.push(KeyCode::KeyE);
+        consumed.push(reach);
     }
     if keys.just_pressed(KeyCode::Tab) && world.resource::<PlayerState>().tab.is_none() {
         actions.push(Action::Open(Tab::Pouch));
@@ -849,32 +842,20 @@ pub(crate) fn refresh(world: &mut World) {
         }
     }
     if !active || dead {
+        // Written only when it differs: an unchanged `Node` keeps layout idle.
         for mut node in world
             .query_filtered::<&mut Node, With<hud::PromptRoot>>()
             .iter_mut(world)
         {
-            node.display = Display::None;
+            if node.display != Display::None {
+                node.display = Display::None;
+            }
         }
     }
     life::refresh(world);
     rest::refresh(world, active && !dead);
     if !active {
         return;
-    }
-    for mut node in world
-        .query_filtered::<&mut Node, With<crate::village::Hud>>()
-        .iter_mut(world)
-    {
-        node.display = Display::None;
-    }
-    for mut node in world
-        .query_filtered::<&mut Node, Or<(
-            With<crate::colony_panel::LedgerRoot>,
-            With<crate::colony_panel::LedgerLauncher>,
-        )>>()
-        .iter_mut(world)
-    {
-        node.display = Display::None;
     }
     let delta = world.get_resource::<Time>().map_or(0., Time::delta_secs);
     {
@@ -885,6 +866,19 @@ pub(crate) fn refresh(world: &mut World) {
         }
         state.dirty = false;
         state.elapsed = 0.;
+    }
+    // Live has no ledger; the ledger hides itself in Live too, so this is a
+    // backstop and runs on the HUD's own 0.2 s beat, writing only a change.
+    for mut node in world
+        .query_filtered::<&mut Node, Or<(
+            With<crate::colony_panel::LedgerRoot>,
+            With<crate::colony_panel::LedgerLauncher>,
+        )>>()
+        .iter_mut(world)
+    {
+        if node.display != Display::None {
+            node.display = Display::None;
+        }
     }
     let Ok(observed) = player_actions::observe(world) else {
         return;

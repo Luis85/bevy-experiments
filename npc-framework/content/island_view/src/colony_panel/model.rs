@@ -32,6 +32,8 @@ pub(crate) struct Entry {
     pub(crate) extra: Option<Extra>,
     /// What the row says about itself on hover.
     pub(crate) tip: Option<Tooltip>,
+    /// A card's lines that say more on hover: line index and its tooltip.
+    pub(crate) line_tips: Vec<(usize, Tooltip)>,
 }
 
 /// Rows beyond text, actions and tables. The row's own `text` is its label
@@ -71,6 +73,11 @@ pub(crate) enum Extra {
     /// On a table header: every column sorts. The sorted column and
     /// whether it runs upwards.
     SortHeader(Option<(u8, bool)>),
+    /// Bars of a good's last market prices, heights in pixels (2.3); the
+    /// row's text says the same in words.
+    Spark(Vec<u32>),
+    /// A line of "Your orders" (2.7): its state and its button.
+    Order(super::orders::OrderStatus, Option<(String, Action)>),
 }
 impl Entry {
     pub(crate) fn text(key: &str, value: impl Into<String>, heading: bool) -> Self {
@@ -88,6 +95,7 @@ impl Entry {
             stats: None,
             extra: None,
             tip: None,
+            line_tips: Vec::new(),
         }
     }
     pub(crate) fn choices(key: &str, choices: Vec<(String, Action)>) -> Self {
@@ -111,6 +119,7 @@ impl Entry {
             stats: None,
             extra: None,
             tip: None,
+            line_tips: Vec::new(),
         }
     }
     pub(crate) fn stats(key: &str, stats: Vec<(Icon, &str, String)>) -> Self {
@@ -202,11 +211,19 @@ impl Entry {
             stats: None,
             extra: None,
             tip: None,
+            line_tips: Vec::new(),
         }
     }
 }
 pub(crate) fn entries(world: &World) -> Vec<Entry> {
     let ledger = world.resource::<Ledger>();
+    // The season-end card stands in the column in place of the page.
+    if let Some(card) = ledger
+        .season_card
+        .and_then(|season| season_card(world, season))
+    {
+        return super::season::season_entries(&card);
+    }
     let summary = colony::summary(world);
     match ledger.tab {
         Tab::Overview => village_entries(world),
@@ -215,12 +232,30 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
             rows.extend(commission_entries(world, &summary));
             rows
         }
-        Tab::Journal => journal_entries(world),
+        Tab::Journal => {
+            let mut rows = Vec::new();
+            if let Some(season) = super::last_season(world)
+                && let Some(summary) = village::view::season_summary(world, season)
+            {
+                rows.push(Entry::link(
+                    "journal_season",
+                    format!("{} ended. See the season.", summary.name),
+                    Icon::Hint,
+                    Action::SeasonOpen(season),
+                ));
+            }
+            rows.extend(journal_entries(world));
+            rows
+        }
         Tab::Residents => resident_entries(world),
         Tab::Economy => super::economy::entries(
             world,
             super::economy::View {
                 scope: ledger.scope,
+                village: ledger.village_scope,
+                more: ledger.good_more,
+                job_levels: ledger.job_levels,
+                sent: &ledger.sent,
                 page: ledger.economy,
                 good: ledger.good.as_deref(),
                 sort: ledger.goods_sort,
@@ -302,7 +337,7 @@ fn village_entries(world: &World) -> Vec<Entry> {
         Entry::text(
             "homes",
             format!(
-                "{} households · {} social encounters · {} completed trades",
+                "{} households · {} meetings · {} sales",
                 summary.households, summary.social_events, village.transactions
             ),
             false,
@@ -315,7 +350,7 @@ fn village_entries(world: &World) -> Vec<Entry> {
     rows.extend(year_entry(village::view::yearly_census(world).last()));
     rows.extend(inn_entries(&village::view::inns(world)));
     rows.extend([
-        Entry::text("policy_title", "Colony policies", true),
+        Entry::text("policy_title", "Village rules", true),
         Entry::text(
             "policy",
             format!("Household food reserve: {} days", state.food_reserve_days),
@@ -411,11 +446,11 @@ pub(crate) fn employment_text(
 ) -> String {
     let mut lines = vec![format!("Qualified for: {qualified}"), reason.to_owned()];
     if let Some(span) = reconsiders_in {
-        lines.push(format!("They will look at their trade again in {span}."));
+        lines.push(format!("They will think about their job again in {span}."));
     }
     if let Some(place) = requested {
         lines.push(format!(
-            "A move to {place} is requested; it waits until their current work is done."
+            "They will move to {place} when their work is done."
         ));
     }
     lines.join("\n")
@@ -616,6 +651,27 @@ fn commission_entries(world: &World, summary: &colony::ColonySummary) -> Vec<Ent
 
 /// The Journal page: the alert feed with its three filters, grouped by day.
 /// Rows select and frame exactly as alert rows do.
+/// The season-end card of `season`, beside the season before it when the
+/// island keeps one.
+fn season_card(world: &World, season: u32) -> Option<super::season::SeasonCard> {
+    let ended = village::view::season_summary(world, season)?;
+    let before = season
+        .checked_sub(1)
+        .and_then(|earlier| village::view::season_summary(world, earlier));
+    // The island's age in days at the season's end.
+    let days = u64::from(ended.season + 1) * village::DAYS_PER_SEASON;
+    let good = |key: &str, count: u64| {
+        let name = village::catalog::display_in(world, key).unwrap_or(key);
+        crate::game_ui::words::noun(name, count)
+    };
+    Some(super::season::season_card(
+        &ended,
+        before.as_ref(),
+        days,
+        &good,
+    ))
+}
+
 fn journal_entries(world: &World) -> Vec<Entry> {
     let (filter, total, lines) = crate::island_alerts::journal(world);
     let mut rows = vec![Entry::choices(
@@ -634,7 +690,12 @@ fn journal_entries(world: &World) -> Vec<Entry> {
         if days.insert(line.day) {
             rows.push(Entry::text(
                 &format!("journal_day{}", line.day),
-                format!("Day {}", line.day),
+                // The fold's day as the top bar dates it: "Today",
+                // "Autumn, day 4".
+                crate::game_ui::words::capital(&crate::game_ui::words::when_day(
+                    world,
+                    line.day.saturating_sub(1),
+                )),
                 true,
             ));
         }
@@ -832,11 +893,30 @@ fn resident_entries(world: &World) -> Vec<Entry> {
                 .collect(),
         ));
     }
-    let roster = super::roster::arrange(super::roster::rows(world), ledger.sort, scope);
+    let mut roster = super::roster::arrange(super::roster::rows(world), ledger.sort, scope);
+    // A link chose these residents ("Show them"): the page lists them only.
+    if let Some((head, residents)) = &ledger.people_filter {
+        roster.retain(|row| residents.contains(&row.id));
+        rows.push(Entry::strong(
+            "roster_filter",
+            format!(
+                "{head}: {} resident{}",
+                roster.len(),
+                if roster.len() == 1 { "" } else { "s" }
+            ),
+        ));
+        rows.push(Entry::choices(
+            "roster_everyone",
+            vec![(
+                "Show everyone".to_owned(),
+                Action::PeopleFilter(String::new(), Vec::new()),
+            )],
+        ));
+    }
     let place = scopes
         .iter()
         .find(|(candidate, _)| *candidate == scope)
-        .map_or("All island", |(_, label)| label.as_str());
+        .map_or("Whole island", |(_, label)| label.as_str());
     rows.push(Entry::text(
         "roster_note",
         format!(
@@ -952,11 +1032,11 @@ pub(crate) fn manage_entries(world: &World, id: SimId, entity: Entity) -> Vec<En
                     .resource::<SimIndex>()
                     .get(vacancy.settlement)
                     .and_then(|e| world.get::<village::frontier::Settlement>(e))
-                    .map_or("Settlement", |s| s.label.as_str());
+                    .map_or("Village", |s| s.label.as_str());
                 rows.push(Entry::action(
                     format!("job{}", vacancy.workplace.0),
                     format!(
-                        "Request {} in {settlement} · {}/{} places filled",
+                        "Ask for {} in {settlement} · {}/{} places taken",
                         vacancy.role, vacancy.occupied, vacancy.capacity
                     ),
                     Action::Profession(id, vacancy.workplace),

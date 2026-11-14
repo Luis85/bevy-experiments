@@ -593,9 +593,9 @@ pub(crate) fn size_text(radius: u32) -> String {
     format!("{} m", radius * 2 + 1)
 }
 
-/// The history depth under Undo: "12 of 32".
+/// The history depth under Undo: "12 of 32 steps".
 pub(crate) fn history_text(depth: usize, kept: usize) -> String {
-    format!("{depth} of {kept}")
+    format!("{depth} of {kept} steps")
 }
 
 /// How loud a line of the tool's own word is.
@@ -612,13 +612,13 @@ pub(crate) enum Weight {
 pub(crate) fn status_text(status: &str, queued: usize, stopped: bool) -> Option<(Weight, String)> {
     if queued > 0 && stopped {
         let edits = if queued == 1 {
-            "1 edit waits".to_owned()
+            "Edit queued".to_owned()
         } else {
-            format!("{queued} edits wait")
+            format!("{queued} edits queued")
         };
         return Some((
             Weight::Warning,
-            format!("{edits} for the world to run. Resume to apply."),
+            format!("{edits}. It shows when time runs (Space)."),
         ));
     }
     if status.is_empty() || status.starts_with("Landscape updated") {
@@ -725,7 +725,7 @@ mod tests {
         }]);
         history.push(stroke);
         let (depth, kept) = history.depth();
-        assert_eq!(history_text(depth, kept), "1 of 32");
+        assert_eq!(history_text(depth, kept), "1 of 32 steps");
         assert!(HISTORY_SENTENCE.contains("32 strokes"));
         // The tag: tool, the ground and its height; never a cell coordinate.
         let ground = Cell {
@@ -784,14 +784,14 @@ mod tests {
             status_text("Landscape updated · 2 edits applied", 3, true),
             Some((
                 Weight::Warning,
-                "3 edits wait for the world to run. Resume to apply.".into()
+                "3 edits queued. It shows when time runs (Space).".into()
             ))
         );
         assert!(
             status_text("", 1, true)
                 .unwrap()
                 .1
-                .starts_with("1 edit waits")
+                .starts_with("Edit queued")
         );
         for surface in [Grass, Stone, Water, TerrainSurface::Soil] {
             assert!(

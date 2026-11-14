@@ -161,7 +161,7 @@ pub(crate) fn sample(world: &mut World) {
 }
 
 pub(crate) fn scopes(world: &World) -> Vec<(Scope, String)> {
-    let mut scopes = vec![(None, "All island".to_owned())];
+    let mut scopes = vec![(None, "Whole island".to_owned())];
     for (id, entity) in village::frontier::settlements::all(world) {
         if let Some(place) = world.get::<village::frontier::Settlement>(entity) {
             scopes.push((Some(id), place.label.clone()));
@@ -267,6 +267,8 @@ pub(crate) struct StockRow {
     pub(crate) trend: Trend,
     /// Days the stock lasts at the simulation's estimate of a day's use.
     pub(crate) days: Option<u32>,
+    /// The price a day of market rounds ago (2.2), from the view cache.
+    pub(crate) day_ago: Option<u32>,
 }
 
 fn good_label(world: &World, kind: &str) -> String {
@@ -289,6 +291,7 @@ pub(crate) fn stock_rows(world: &World, scope: Scope) -> Vec<StockRow> {
     let totals = stock_totals(world);
     let trends = world.get_resource::<StockTrends>();
     let usage = day_use(world, scope);
+    let prices = world.get_resource::<super::goods::EconomyCache>();
     let mut kinds: Vec<&str> = catalog::trade_kinds(world).to_vec();
     for (held_scope, kind) in totals.keys() {
         if *held_scope == scope && !kinds.contains(&kind.as_str()) {
@@ -309,78 +312,11 @@ pub(crate) fn stock_rows(world: &World, scope: Scope) -> Vec<StockRow> {
                 .then(|| usage.get(kind))
                 .flatten()
                 .and_then(|(per_day, stock)| stock.checked_div(*per_day)),
+            day_ago: prices
+                .and_then(|cache| cache.prices.get(kind))
+                .and_then(|line| line.day_ago),
         })
         .collect()
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct RoleRow {
-    pub(crate) role: String,
-    pub(crate) workers: u32,
-    pub(crate) open: u32,
-}
-
-/// Fold worker roles and open workplaces into one sorted table.
-pub(crate) fn role_table(
-    workers: impl IntoIterator<Item = String>,
-    vacancies: impl IntoIterator<Item = (String, u32)>,
-) -> Vec<RoleRow> {
-    let mut rows: BTreeMap<String, (u32, u32)> = BTreeMap::new();
-    for role in workers {
-        rows.entry(role).or_default().0 += 1;
-    }
-    for (role, open) in vacancies {
-        rows.entry(role).or_default().1 += open;
-    }
-    rows.into_iter()
-        .map(|(role, (workers, open))| RoleRow {
-            role,
-            workers,
-            open,
-        })
-        .collect()
-}
-
-pub(crate) fn role_rows(world: &World, scope: Scope) -> Vec<RoleRow> {
-    let Some(index) = world.get_resource::<SimIndex>() else {
-        return Vec::new();
-    };
-    let workers = index.map.values().filter_map(|entity| {
-        let person = world.get::<Villager>(*entity)?;
-        (person.role != Role::Visitor
-            && village::living(world, *entity)
-            && (scope.is_none() || village::frontier::settlements::member(world, *entity) == scope))
-            .then(|| person.role.name().to_owned())
-    });
-    let vacancies = village::frontier::labor::vacancies(world);
-    role_table(
-        workers,
-        vacancies
-            .into_iter()
-            .filter(|vacancy| scope.is_none() || Some(vacancy.settlement) == scope)
-            .map(|vacancy| {
-                (
-                    vacancy.role,
-                    vacancy.capacity.saturating_sub(vacancy.occupied),
-                )
-            }),
-    )
-}
-
-/// A trade's name as players read it: the profession's own `display` from
-/// the world's data, else its key in plain words. Never matched on: a trade
-/// added in data shows its own name.
-pub(crate) fn trade_name(world: &World, role: &str) -> String {
-    let display = village::frontier::economy_spec::registry(world).and_then(|registry| {
-        registry
-            .spec
-            .professions
-            .iter()
-            .find(|profession| profession.role.name() == role)
-            .map(|profession| profession.display.clone())
-            .filter(|display| !display.trim().is_empty())
-    });
-    capitalised(&display.unwrap_or_else(|| role.replace('_', " ")))
 }
 
 /// A resident's trade as players read it ("Well keeper", "Potter"): the
@@ -465,7 +401,7 @@ pub(crate) fn target_from_row(
                 format!("The village already decides its {}.", plural(&row.display))
             }
             TargetStep::More => format!(
-                "{} is the most a village may want of one trade.",
+                "A village can ask for at most {} of one job.",
                 oversee::MAX_TARGET
             ),
             TargetStep::Fewer => format!("No {} are wanted already.", plural(&row.display)),
@@ -492,7 +428,7 @@ pub(crate) fn target_command(
     let row = oversee::profession_table(world, settlement)
         .into_iter()
         .find(|row| row.key == profession)
-        .ok_or_else(|| "That trade is not in this village's table any more.".to_owned())?;
+        .ok_or_else(|| "That job is not in this village's table any more.".to_owned())?;
     target_from_row(world, settlement, &row, step)
 }
 
@@ -501,11 +437,9 @@ pub(crate) fn target_success(world: &World, command: &oversee::SetProfessionTarg
     let name = trade_display(world, command.profession);
     match command.wanted {
         None => format!("{name}: the village decides again."),
-        Some(1) => format!(
-            "{name}: 1 worker wanted. Residents change trade one review at a time, after their work."
-        ),
         Some(count) => format!(
-            "{name}: {count} workers wanted. Residents change trade one review at a time, after their work."
+            "{}: {count} wanted. Residents change job one at a time, after the day's work.",
+            capitalised(&plural(&name))
         ),
     }
 }
@@ -579,21 +513,30 @@ pub(crate) fn level_label(level: oversee::PriorityLevel) -> &'static str {
 pub(crate) fn choice_tip(action: &Action) -> Option<crate::game_ui::tooltip::Tooltip> {
     use crate::game_ui::tooltip::Tooltip;
     Some(match action {
+        Action::BehaviourFile(crate::BehaviourFile::Save) => Tooltip::new(
+            "Save behaviour to file",
+            "Write the island's behaviour document to behaviour.json beside your save, to edit it.",
+        ),
+        Action::BehaviourFile(crate::BehaviourFile::Reload) => Tooltip::new(
+            "Reload behaviour from file",
+            "Read behaviour.json and change how every resident behaves, if the document passes the checks.",
+        )
+        .detail(["A refused document changes nothing and says why."]),
         Action::Target { step, .. } => match step {
             TargetStep::Fewer => Tooltip::new(
                 "Fewer wanted",
-                "Want one worker fewer in this trade. Surplus workers move to trades that need them, one review at a time.",
+                "Ask for one fewer in this job. Those no longer needed move to jobs that are short, one at a time.",
             ),
             TargetStep::More => Tooltip::new(
                 "More wanted",
-                "Want one worker more in this trade. Residents whose own trade can spare them join at the next review.",
+                "Ask for one more in this job. A resident whose own job can spare them joins after the day's work.",
             ),
             TargetStep::VillageDecides => Tooltip::new(
                 "Village decides",
-                "Clear your number: the village staffs the trade from its own shortages again.",
+                "Clear your number: the village staffs the job from its own shortages again.",
             ),
         }
-        .detail(["Nobody leaves mid-task; the last worker of an essential trade stays."]),
+        .detail(["Nobody leaves in the middle of their work. The last one in a job the village cannot do without stays."]),
         Action::Priority { level, .. } => Tooltip::new(
             level_label(*level),
             match level {
@@ -618,14 +561,61 @@ fn capitalised(text: &str) -> String {
     })
 }
 
-/// The selector's label for a scope. The whole island is "All": with three
-/// settlements the four choices then share one row at both supported widths.
+/// The selector's label for a scope: "Whole island" or the village's name.
 pub(crate) fn scope_choice(scope: Scope, label: &str) -> String {
     if scope.is_none() {
-        "All".to_owned()
+        "Whole island".to_owned()
     } else {
         label.to_owned()
     }
+}
+
+/// How near the camera's centre a village's centre must be to be the one
+/// Jobs and Priorities open on, in metres.
+pub(crate) const NEAR_VILLAGE_M: f32 = 60.0;
+
+/// The village Jobs and Priorities open on: the one whose centre is within
+/// [`NEAR_VILLAGE_M`] of the camera's centre (the nearest), else the one with
+/// the most residents (ties: the lower id). `None` on an island with none.
+pub(crate) fn pick_village(world: &World, camera: Option<Vec3>) -> Option<SimId> {
+    let villages: Vec<(SimId, Option<Vec3>)> = village::frontier::settlements::all(world)
+        .into_iter()
+        .map(|(id, entity)| {
+            let centre = world
+                .get::<npc_framework::prelude::SimPos>(entity)
+                .map(|pos| npc_framework::view_helpers::sim_to_world(*pos));
+            (id, centre)
+        })
+        .collect();
+    let near = camera.and_then(|focus| {
+        villages
+            .iter()
+            .filter_map(|(id, centre)| {
+                let centre = (*centre)?;
+                let gap = Vec2::new(centre.x - focus.x, centre.z - focus.z).length();
+                (gap <= NEAR_VILLAGE_M).then_some((gap, *id))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)))
+            .map(|(_, id)| id)
+    });
+    near.or_else(|| {
+        let mut residents: BTreeMap<SimId, u32> = villages.iter().map(|(id, _)| (*id, 0)).collect();
+        if let Some(index) = world.get_resource::<SimIndex>() {
+            for entity in index.map.values() {
+                if world.get::<Villager>(*entity).is_some()
+                    && village::living(world, *entity)
+                    && let Some(home) = village::frontier::settlements::member(world, *entity)
+                    && let Some(count) = residents.get_mut(&home)
+                {
+                    *count += 1;
+                }
+            }
+        }
+        residents
+            .into_iter()
+            .max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)))
+            .map(|(id, _)| id)
+    })
 }
 
 /// What open sites still wait for, by good.
@@ -649,7 +639,16 @@ fn site_needs(world: &World) -> BTreeMap<String, u32> {
 /// good, the sorted column, and whether the column is the narrow one.
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct View<'a> {
+    /// The Goods table's scope; `None` is the whole island.
     pub(super) scope: Scope,
+    /// The village Jobs and Priorities show; chosen again when it is gone.
+    pub(super) village: Option<SimId>,
+    /// The narrow ledger's good card has its fold open.
+    pub(super) more: bool,
+    /// Priorities: the jobs that may get their own level are shown.
+    pub(super) job_levels: bool,
+    /// Orders sent from the ledger that wait or were refused.
+    pub(super) sent: &'a [super::orders::SentOrder],
     pub(super) page: EconomyPage,
     pub(super) good: Option<&'a str>,
     pub(super) sort: Option<(u8, bool)>,
@@ -683,7 +682,15 @@ pub(crate) fn sort_goods(
     };
     let order = match column {
         1 => a.stock.cmp(&b.stock),
-        2 => a.price.cmp(&b.price),
+        // By price, then by its change since yesterday.
+        2 => a.price.cmp(&b.price).then_with(|| {
+            let change = |row: &StockRow| {
+                row.price
+                    .zip(row.day_ago)
+                    .map_or(0, |(now, then)| i64::from(now) - i64::from(then))
+            };
+            change(a).cmp(&change(b))
+        }),
         3 => a.days.cmp(&b.days),
         4 => change(a).cmp(&change(b)),
         _ => by_name,
@@ -788,6 +795,10 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
     use super::model::Extra;
     let View {
         scope,
+        village: chosen,
+        more,
+        job_levels,
+        sent,
         page,
         good,
         sort,
@@ -796,22 +807,26 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
     use crate::game_ui::icon::Icon;
     use crate::game_ui::tokens::Status;
     let scopes = scopes(world);
+    let goods = page == EconomyPage::Goods;
     // A settlement from another world is not a valid selection here.
     let scope = scopes
         .iter()
         .find(|(candidate, _)| *candidate == scope)
         .and_then(|(candidate, _)| *candidate);
+    // Jobs and Priorities belong to one village, never the whole island.
+    let chosen = chosen
+        .filter(|id| scopes.iter().any(|(candidate, _)| *candidate == Some(*id)))
+        .or_else(|| pick_village(world, None));
     let mut rows = day_entries(world);
-    if scopes.len() > 1 {
-        rows.push(Entry::choices(
-            "stock_scopes",
-            scopes
-                .iter()
-                .map(|(candidate, label)| {
-                    (scope_choice(*candidate, label), Action::Scope(*candidate))
-                })
-                .collect(),
-        ));
+    // Goods: the whole island and each village. Jobs and Priorities: the
+    // villages only, and no row at all with one village.
+    let chips: Vec<(String, Action)> = scopes
+        .iter()
+        .filter(|(candidate, _)| goods || candidate.is_some())
+        .map(|(candidate, label)| (scope_choice(*candidate, label), Action::Scope(*candidate)))
+        .collect();
+    if chips.len() > 1 {
+        rows.push(Entry::choices("stock_scopes", chips));
     }
     let mut pages = vec![
         ("Goods".to_owned(), Action::EconomyPage(EconomyPage::Goods)),
@@ -822,58 +837,32 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
         Action::EconomyPage(EconomyPage::Priorities),
     ));
     rows.push(Entry::choices("economy_view", pages));
-    if page == EconomyPage::Priorities {
-        rows.extend(priority_entries(world, scope));
-        return rows;
-    }
-    if page == EconomyPage::Jobs
-        && let Some(settlement) = scope
-    {
-        rows.extend(target_entries(world, settlement));
-        return rows;
-    }
-    if page == EconomyPage::Jobs {
-        rows.push(Entry::table(
-            "roles_header",
-            ["Profession", "Workers", "Open", ""],
-            None,
-            true,
-        ));
-        let roles = role_rows(world, scope);
-        for row in &roles {
-            rows.push(
-                Entry::table(
-                    format!("role_{}", row.role),
-                    [
-                        trade_name(world, &row.role),
-                        row.workers.to_string(),
-                        if row.open == 0 {
-                            "\u{2013}".into()
-                        } else {
-                            row.open.to_string()
-                        },
-                        String::new(),
-                    ],
-                    None,
-                    false,
-                )
-                .with_icon(Some(Icon::of_trade(&row.role).unwrap_or(Icon::Work))),
-            );
+    if !goods {
+        if let Some(settlement) = chosen {
+            // "Your orders" heads both pages of a village (2.7).
+            let name = scopes
+                .iter()
+                .find(|(candidate, _)| *candidate == Some(settlement))
+                .map_or("the village", |(_, label)| label.as_str());
+            let table = oversee::profession_table(world, settlement);
+            let priorities = oversee::priorities(world, settlement);
+            rows.extend(super::orders::order_entries(
+                settlement,
+                name,
+                super::orders::order_lines(
+                    settlement,
+                    &table,
+                    &priorities,
+                    sent,
+                    crate::game_ui::words::paused(world),
+                ),
+            ));
+            rows.extend(if page == EconomyPage::Jobs {
+                target_entries(world, settlement)
+            } else {
+                priority_entries_with(world, settlement, &table, priorities, job_levels)
+            });
         }
-        let workers: u32 = roles.iter().map(|row| row.workers).sum();
-        let open: u32 = roles.iter().map(|row| row.open).sum();
-        rows.push(Entry::text(
-            "roles_total",
-            format!(
-                "{workers} working residents \u{b7} {open} open workplace{}.",
-                if open == 1 { "" } else { "s" }
-            ),
-            false,
-        ));
-        rows.push(Entry::caption(
-            "roles_choose",
-            "Choose a village above to say how many of each trade it wants.",
-        ));
         return rows;
     }
     rows.push(
@@ -933,8 +922,7 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
             [
                 row.label.clone(),
                 row.stock.to_string(),
-                row.price
-                    .map_or_else(|| "\u{2013}".into(), |price| price.to_string()),
+                super::goods::price_cell(row.price, row.day_ago),
                 days_words(row.days),
                 row.trend.text(),
             ],
@@ -947,62 +935,145 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
             entry = entry.with(Extra::Badge(Status::Warn, "Low".to_owned()));
         }
         rows.push(entry);
+        // The selected good's card sits right under its row (2.3).
+        if good == Some(row.kind.as_str()) {
+            rows.extend(good_card(world, row, scope, &scopes, &needs, compact, more));
+        }
     }
-    // The selected good: where it is, what it costs and what waits for it.
-    if let Some((_, row)) = good.and_then(|kind| stock.iter().find(|(_, row)| row.kind == kind)) {
-        let totals = stock_totals(world);
-        let mut lines = Vec::new();
-        let places: Vec<String> = scopes
+    rows
+}
+
+/// The card of the selected good, under its row: the numbered lines of
+/// design-ui 2.3, the price bars, and the links. The narrow ledger keeps
+/// lines 2, 3, 7 and 8 in view and folds the rest.
+fn good_card(
+    world: &World,
+    row: &StockRow,
+    scope: Scope,
+    scopes: &[(Scope, String)],
+    needs: &BTreeMap<String, u32>,
+    compact: bool,
+    more: bool,
+) -> Vec<Entry> {
+    use super::goods;
+    use super::model::Extra;
+    use crate::game_ui::icon::Icon;
+    let cache = world.get_resource::<goods::EconomyCache>();
+    let price = cache.and_then(|cache| cache.prices.get(&row.kind));
+    let flow = cache
+        .filter(|cache| cache.has_flow(scope, &row.kind))
+        .and_then(|cache| cache.flow.as_ref());
+    // Lines by their number in the design; figures not read yet are left
+    // out for one reconcile rather than shown as "loading".
+    let mut lines: Vec<(u8, String)> = Vec::new();
+    let mut links: Vec<(String, String, Action)> = Vec::new();
+    let totals = stock_totals(world);
+    let places: Vec<String> = scopes
+        .iter()
+        .filter(|(candidate, _)| candidate.is_some())
+        .map(|(candidate, label)| {
+            format!(
+                "{label} {}",
+                totals
+                    .get(&(*candidate, row.kind.clone()))
+                    .copied()
+                    .unwrap_or(0)
+            )
+        })
+        .collect();
+    if places.len() > 1 {
+        lines.push((1, places.join(" \u{b7} ")));
+    }
+    if cache.is_some() {
+        match (price, row.price) {
+            (Some(line), _) => {
+                lines.push((2, goods::price_sentence(Some(line))));
+                lines.push((3, goods::market_sentence(line.last_market.as_ref())));
+                if let Some(below) = goods::below_sentence(line.last_market.as_ref()) {
+                    lines.push((4, below));
+                }
+            }
+            // Priced, but no market round of it yet: the price alone.
+            (None, Some(coins)) => {
+                lines.push((
+                    2,
+                    format!("Price {coins} coin{}.", if coins == 1 { "" } else { "s" }),
+                ));
+                lines.push((3, goods::market_sentence(None)));
+            }
+            (None, None) => lines.push((2, goods::price_sentence(None))),
+        }
+    }
+    let spark = price.and_then(|price| goods::spark(&price.history));
+    if let Some(flow) = flow {
+        let job = |who: Option<SimId>| {
+            let entity = world.resource::<SimIndex>().get(who?)?;
+            let person = world.get::<Villager>(entity)?;
+            Some(crate::game_ui::words::noun(
+                &trade_display(world, person.role),
+                2,
+            ))
+        };
+        let made = |recipe: &str| {
+            world
+                .get_resource::<npc_framework::crafting::RecipeRegistry>()?
+                .recipes
+                .get(recipe)?
+                .outputs
+                .first()
+                .map(|output| crate::game_ui::words::noun(&output.kind, 2))
+        };
+        let groups: Vec<(String, u32)> = flow
+            .used_by
             .iter()
-            .filter(|(candidate, _)| candidate.is_some())
-            .map(|(candidate, label)| {
-                format!(
-                    "{label} {}",
-                    totals
-                        .get(&(*candidate, row.kind.clone()))
-                        .copied()
-                        .unwrap_or(0)
-                )
-            })
+            .map(|line| (goods::user_group(line, &job, &made), line.wanted))
             .collect();
-        if !places.is_empty() {
-            lines.push(places.join(" \u{b7} "));
-        }
-        lines.push(match row.price {
-            Some(price) => format!(
-                "Reference price {price} coin{}.",
-                if price == 1 { "" } else { "s" }
-            ),
-            None => "No reference price: it is not traded at the market.".to_owned(),
-        });
-        match needs.get(&row.kind).copied().unwrap_or(0) {
-            0 => {}
-            needed => lines.push(format!("Open sites still need {needed}.")),
-        }
-        if row.days.is_some()
-            && let Some((per_day, _)) = day_use(world, scope).get(&row.kind).copied()
-            && per_day > 0
-        {
-            lines.push(format!(
-                "About {per_day} used a day: {} day{} left.",
-                days_words(row.days),
-                if row.days == Some(1) { "" } else { "s" }
+        lines.push((6, goods::used_by_sentence(&groups)));
+        if let Some((line, who)) = goods::without_sentence(&flow.going_without) {
+            lines.push((7, line));
+            links.push((
+                format!("stock_without_{}", row.kind),
+                "Show them".to_owned(),
+                Action::PeopleFilter(format!("Going without {}", row.label.to_lowercase()), who),
             ));
         }
-        // Who makes it: the simulation's producers, nearest workplaces first.
-        let makers = village::view::producers(world, &row.kind);
-        if makers.is_empty() {
-            lines.push(
-                "Nobody makes it now: the Jobs view shows the trades with open places.".to_owned(),
-            );
-        } else {
-            let names: Vec<String> = makers
-                .iter()
-                .take(4)
-                .map(|maker| format!("{} ({})", maker.name, maker.role))
-                .collect();
-            let more = makers.len().saturating_sub(4);
-            lines.push(format!(
+        for line in goods::held_up_lines(&flow.held_up, &row.kind) {
+            lines.push((8, line));
+        }
+    }
+    // Who makes it: the simulation's producers, nearest workplaces first.
+    let makers = village::view::producers(world, &row.kind);
+    if makers.is_empty() {
+        let job = scope
+            .or_else(|| pick_village(world, None))
+            .and_then(|village| {
+                oversee::profession_table(world, village)
+                    .into_iter()
+                    .filter(|job| {
+                        catalog::outputs_for(world, Role::from_key(&job.key))
+                            .contains(&row.kind.as_str())
+                    })
+                    .max_by_key(|job| job.free_seats)
+            });
+        let (line, link) = goods::nobody_makes(
+            job.as_ref()
+                .map(|job| (job.display.as_str(), job.key.as_str(), job.free_seats)),
+            scope,
+        );
+        lines.push((9, line));
+        if let Some((label, action)) = link {
+            links.push((format!("stock_maker_{}", row.kind), label, action));
+        }
+    } else {
+        let names: Vec<String> = makers
+            .iter()
+            .take(4)
+            .map(|maker| format!("{} ({})", maker.name, maker.role))
+            .collect();
+        let more = makers.len().saturating_sub(4);
+        lines.push((
+            9,
+            format!(
                 "Made by {}{}.",
                 names.join(", "),
                 if more > 0 {
@@ -1010,24 +1081,116 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
                 } else {
                     String::new()
                 }
-            ));
-        }
-        if let Some(by) = trend_words(row.trend) {
-            lines.push(by);
-        }
-        if compact {
-            // The narrow column keeps the table in view: two lines, not four.
-            let rest = lines.split_off(1.min(lines.len())).join(" ");
-            lines.push(rest);
-            lines.retain(|line| !line.is_empty());
-        }
-        rows.push(
-            Entry::text("stock_detail", row.label.clone(), false)
-                .with_icon(Icon::of_good(&row.kind))
-                .with(Extra::Card(lines)),
+            ),
+        ));
+    }
+    if row.days.is_some()
+        && let Some((per_day, _)) = day_use(world, scope).get(&row.kind).copied()
+        && per_day > 0
+    {
+        lines.push((
+            10,
+            format!(
+                "About {per_day} used a day: {} day{} left.",
+                days_words(row.days),
+                if row.days == Some(1) { "" } else { "s" }
+            ),
+        ));
+    }
+    match needs.get(&row.kind).copied().unwrap_or(0) {
+        0 => {}
+        needed => lines.push((11, format!("Open sites still need {needed}."))),
+    }
+    if let Some(by) = trend_words(row.trend) {
+        lines.push((12, by));
+    }
+    let icon = Icon::of_good(&row.kind);
+    // Lines 3 and 8 say more on hover (2.3).
+    let mut tips: BTreeMap<u8, crate::game_ui::tooltip::Tooltip> = BTreeMap::new();
+    if let Some(round) = price.and_then(|line| line.last_market.as_ref()) {
+        tips.insert(
+            3,
+            crate::game_ui::tooltip::Tooltip::new(
+                "Last market",
+                goods::market_tip(&crate::game_ui::words::date(world, round.tick), &{
+                    let permille = world
+                        .get_resource::<npc_framework::prelude::SimConfig>()
+                        .map_or(0, |config| config.time_of_day_permille(round.tick));
+                    crate::game_ui::words::clock_face(permille)
+                }),
+            ),
         );
     }
-    rows
+    if let Some(since) =
+        flow.and_then(|flow| flow.held_up.iter().filter_map(|line| line.since_tick).min())
+    {
+        tips.insert(
+            8,
+            crate::game_ui::tooltip::Tooltip::new(
+                "Held up",
+                format!("Since {}.", crate::game_ui::words::moment(world, since)),
+            ),
+        );
+    }
+    // The first card carries the good's name and picture; a card that
+    // continues it carries neither.
+    let card = |key: &str, lines: Vec<(u8, String)>| {
+        let first = key == "stock_detail";
+        let mut entry = Entry::text(
+            key,
+            if first {
+                row.label.clone()
+            } else {
+                String::new()
+            },
+            false,
+        )
+        .with_icon(if first { icon } else { None });
+        entry.line_tips = lines
+            .iter()
+            .enumerate()
+            .filter_map(|(index, (number, _))| Some((index, tips.get(number)?.clone())))
+            .collect();
+        entry.with(Extra::Card(
+            lines.into_iter().map(|(_, line)| line).collect(),
+        ))
+    };
+    let spark_entry = spark.map(|(heights, words)| {
+        Entry::text(&format!("stock_spark_{}", row.kind), words, false).with(Extra::Spark(heights))
+    });
+    let link_entries = links
+        .into_iter()
+        .map(|(key, label, action)| Entry::link(key, label, Icon::Locate, action));
+    let mut out = Vec::new();
+    if compact {
+        let (kept, rest): (Vec<_>, Vec<_>) = lines
+            .into_iter()
+            .partition(|(number, _)| goods::COMPACT_LINES.contains(number));
+        out.push(card("stock_detail", kept));
+        out.extend(link_entries);
+        out.push(
+            Entry::action(
+                format!("stock_more_{}", row.kind),
+                format!("More about {}", row.label.to_lowercase()),
+                Action::GoodMore,
+            )
+            .with(Extra::Fold(more)),
+        );
+        if more {
+            out.push(card("stock_detail_more", rest));
+            out.extend(spark_entry);
+        }
+    } else {
+        // Lines 1 to 4, the bars (line 5), then the rest.
+        let (head, tail): (Vec<_>, Vec<_>) = lines.into_iter().partition(|(number, _)| *number < 5);
+        out.push(card("stock_detail", head));
+        out.extend(spark_entry);
+        if !tail.is_empty() {
+            out.push(card("stock_detail_rest", tail));
+        }
+        out.extend(link_entries);
+    }
+    out
 }
 
 /// A dash for "the village decides", else the number.
@@ -1043,7 +1206,7 @@ pub(crate) fn target_entries(world: &World, settlement: SimId) -> Vec<Entry> {
     use crate::game_ui::icon::Icon;
     let mut rows = vec![Entry::table(
         "targets_header",
-        ["Profession", "Now", "Wanted", "Open"],
+        ["Job", "Now", "Wanted", "Open"],
         None,
         true,
     )];
@@ -1105,7 +1268,7 @@ pub(crate) fn target_entries(world: &World, settlement: SimId) -> Vec<Entry> {
             // Why there are no controls: the simulation's own refusal.
             let why = target_from_row(world, settlement, row, TargetStep::More)
                 .err()
-                .unwrap_or_else(|| "The village staffs this trade itself.".to_owned());
+                .unwrap_or_else(|| "The village staffs this job itself.".to_owned());
             rows.push(Entry::caption(&format!("{key}_fixed"), why));
         }
     }
@@ -1114,11 +1277,11 @@ pub(crate) fn target_entries(world: &World, settlement: SimId) -> Vec<Entry> {
     rows.push(Entry::text(
         "targets_total",
         if wanted.is_empty() {
-            "The village decides every trade. Use + and \u{2212} to want more or fewer of one."
+            "The village decides every job. Use + and \u{2212} to ask for more or fewer of one."
                 .to_owned()
         } else {
             format!(
-                "You set {} of {} trades; the village decides the rest.",
+                "You set {} of {} jobs; the village decides the rest.",
                 wanted.len(),
                 table.len()
             )
@@ -1128,53 +1291,166 @@ pub(crate) fn target_entries(world: &World, settlement: SimId) -> Vec<Entry> {
     rows
 }
 
-/// A village's priorities: each topic with Low, Normal and High, and the
-/// simulation's sentence of what the level changes. The whole island has
-/// none of its own: each village keeps its own.
-pub(crate) fn priority_entries(world: &World, scope: Scope) -> Vec<Entry> {
-    let Some(settlement) = scope else {
-        return vec![Entry::caption(
-            "priorities_choose",
-            "Choose a village above: each village keeps its own priorities.",
-        )];
+/// The figure a priority's title carries (3.9): "4 days in store", "11
+/// residents without". `None` when the figure is not known; Storage has none.
+pub(crate) fn topic_figure(
+    topic: &str,
+    outlook: Option<&village::view::Outlook>,
+    open_places: u32,
+    boat_days: Option<u64>,
+) -> Option<String> {
+    let plural = |count: u32, one: &str, many: &str| {
+        format!("{count} {}", if count == 1 { one } else { many })
     };
+    match topic {
+        "food_reserve" => outlook?
+            .food_days
+            .map(|days| format!("{} in store", plural(days, "day", "days"))),
+        "fuel_reserve" => outlook?
+            .fuel_days
+            .map(|days| format!("{} in store", plural(days, "day", "days"))),
+        "coats" => Some(format!(
+            "{} without",
+            plural(outlook?.without_coat, "resident", "residents")
+        )),
+        "housing" => Some(format!(
+            "{} without a home",
+            plural(outlook?.homeless, "resident", "residents")
+        )),
+        "workplace" => Some(plural(open_places, "open place", "open places")),
+        "boat_orders" => boat_days.map(|days| match days {
+            0 => "the boat is in".to_owned(),
+            1 => "next call tomorrow".to_owned(),
+            days => format!("next call in {days} days"),
+        }),
+        _ => None,
+    }
+}
+
+fn level_choices(
+    settlement: SimId,
+    topic: &'static str,
+    profession: Option<String>,
+) -> Vec<(String, Action)> {
+    [
+        oversee::PriorityLevel::Low,
+        oversee::PriorityLevel::Normal,
+        oversee::PriorityLevel::High,
+    ]
+    .into_iter()
+    .map(|level| {
+        (
+            level_label(level).to_owned(),
+            Action::Priority {
+                settlement,
+                topic,
+                profession: profession.clone(),
+                level,
+            },
+        )
+    })
+    .collect()
+}
+
+/// A village's priorities, its tables already read: each topic with Low,
+/// Normal and High, its figure in the title, and the simulation's sentence
+/// of what the level changes; under Workplaces the way to give one job its
+/// own level (3.9). The whole island has none of its own.
+pub(crate) fn priority_entries_with(
+    world: &World,
+    settlement: SimId,
+    table: &[oversee::ProfessionRowView],
+    priorities: Vec<oversee::PriorityRowView>,
+    job_levels: bool,
+) -> Vec<Entry> {
+    use super::model::Extra;
     let mut rows = vec![Entry::caption(
         "priorities_intro",
-        "Normal is how the village weighs things on its own. High sees to a topic first; low puts it last.",
+        "Normal is how the village decides by itself. High sees to a thing first. Low leaves it for last.",
     )];
-    for row in oversee::priorities(world, settlement) {
+    let outlook = world
+        .get_resource::<super::goods::EconomyCache>()
+        .and_then(|cache| cache.outlook_of(settlement));
+    let open_places: u32 = table.iter().map(|row| row.free_seats).sum();
+    let boat = village::view::boat(world);
+    let boat_days = boat.enabled.then(|| {
+        if boat.docked {
+            return 0;
+        }
+        let now = world
+            .get_resource::<SimClock>()
+            .map_or(0, |clock| clock.tick);
+        let day = world
+            .get_resource::<npc_framework::prelude::SimConfig>()
+            .map_or(1, |config| config.day_length.max(1));
+        boat.next_visit_tick.saturating_sub(now).div_ceil(day)
+    });
+    let own: Vec<String> = priorities
+        .iter()
+        .filter_map(|row| row.profession.clone())
+        .collect();
+    for row in priorities {
         let key = format!(
             "priority_{}_{}_{}",
             settlement.0,
             row.topic,
             row.profession.as_deref().unwrap_or("all")
         );
-        rows.push(Entry::strong(&format!("{key}_title"), row.display.clone()));
-        rows.push(Entry::choices(
-            &key,
-            [
-                oversee::PriorityLevel::Low,
-                oversee::PriorityLevel::Normal,
-                oversee::PriorityLevel::High,
-            ]
-            .into_iter()
-            .map(|level| {
-                (
-                    level_label(level).to_owned(),
-                    Action::Priority {
-                        settlement,
-                        topic: row.topic,
-                        profession: row.profession.clone(),
-                        level,
-                    },
-                )
-            })
-            .collect(),
-        ));
+        let figure = topic_figure(row.topic, outlook, open_places, boat_days);
+        let title = match (&row.profession, figure) {
+            (None, Some(figure)) => format!("{} \u{b7} {figure}", row.display),
+            _ => row.display.clone(),
+        };
+        rows.push(Entry::strong(&format!("{key}_title"), title));
+        let mut choices = level_choices(settlement, row.topic, row.profession.clone());
+        if let Some(job) = &row.profession {
+            // A job's own level goes back to the level of all workplaces.
+            choices.push((
+                "Same as the others".to_owned(),
+                Action::Priority {
+                    settlement,
+                    topic: row.topic,
+                    profession: Some(job.clone()),
+                    level: oversee::PriorityLevel::Normal,
+                },
+            ));
+        }
+        rows.push(Entry::choices(&key, choices));
         rows.push(Entry::caption(
             &format!("{key}_effect"),
             crate::game_ui::words::sentence(&row.effect),
         ));
+        if row.topic == "workplace" && row.profession.is_none() {
+            rows.push(
+                Entry::action(
+                    format!("{key}_one_job"),
+                    "Give one job its own level",
+                    Action::JobLevels,
+                )
+                .with(Extra::Fold(job_levels)),
+            );
+            if job_levels {
+                // A chip puts that job's workplaces first: its own level, High.
+                let chips: Vec<(String, Action)> = table
+                    .iter()
+                    .filter(|job| !own.contains(&job.key))
+                    .map(|job| {
+                        (
+                            super::orders::jobs(&job.display),
+                            Action::Priority {
+                                settlement,
+                                topic: "workplace",
+                                profession: Some(job.key.clone()),
+                                level: oversee::PriorityLevel::High,
+                            },
+                        )
+                    })
+                    .collect();
+                if !chips.is_empty() {
+                    rows.push(Entry::choices(&format!("{key}_jobs"), chips));
+                }
+            }
+        }
     }
     rows
 }
@@ -1182,9 +1458,9 @@ pub(crate) fn priority_entries(world: &World, scope: Scope) -> Vec<Entry> {
 /// "Up 7 since yesterday." for the detail card.
 fn trend_words(trend: Trend) -> Option<String> {
     Some(match trend {
-        Trend::Rising(by) => format!("Up {by} since yesterday."),
-        Trend::Falling(by) => format!("Down {by} since yesterday."),
-        Trend::Steady => "Steady since yesterday.".to_owned(),
+        Trend::Rising(by) => format!("Stock up {by} since yesterday."),
+        Trend::Falling(by) => format!("Stock down {by} since yesterday."),
+        Trend::Steady => "Stock the same as yesterday.".to_owned(),
         Trend::Unknown => return None,
     })
 }
@@ -1281,6 +1557,7 @@ mod tests {
             price,
             trend,
             days: None,
+            day_ago: None,
         };
         let mut rows = vec![
             row("Planks", 11, Some(2), Trend::Rising(7)),
@@ -1341,7 +1618,7 @@ mod tests {
         assert_eq!(Trend::Steady.text(), "steady");
         assert_eq!(
             trend_words(Trend::Falling(2)).as_deref(),
-            Some("Down 2 since yesterday.")
+            Some("Stock down 2 since yesterday.")
         );
         assert_eq!(trend_words(Trend::Unknown), None);
     }
@@ -1412,33 +1689,5 @@ mod tests {
         trends.record(5000, &totals(1));
         assert!(trends.due(2, 100), "the clock moved backwards");
         assert_eq!(trends.trend(None, "village_flour"), Trend::Unknown);
-    }
-
-    #[test]
-    fn professions_fold_workers_and_open_places() {
-        let rows = role_table(
-            ["farmer", "baker", "farmer"].map(str::to_owned),
-            [("fisher".to_owned(), 2), ("farmer".to_owned(), 1)],
-        );
-        assert_eq!(
-            rows,
-            vec![
-                RoleRow {
-                    role: "baker".into(),
-                    workers: 1,
-                    open: 0
-                },
-                RoleRow {
-                    role: "farmer".into(),
-                    workers: 2,
-                    open: 1
-                },
-                RoleRow {
-                    role: "fisher".into(),
-                    workers: 0,
-                    open: 2
-                },
-            ]
-        );
     }
 }

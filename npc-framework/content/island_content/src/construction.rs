@@ -186,7 +186,7 @@ pub fn apply_senses(
         .get_resource::<IslandIds>()
         .and_then(|ids| ids.get(actor))
         .and_then(|id| world.resource::<SimIndex>().get(id))
-        .ok_or_else(|| format!("the explorer world has no actor named `{actor}`"))?;
+        .ok_or_else(|| "This world has no character to play.".to_owned())?;
     if world
         .get::<crate::village::Vitality>(entity)
         .is_some_and(|v| v.died_at.is_some())

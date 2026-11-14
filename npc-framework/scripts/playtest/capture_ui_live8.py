@@ -464,9 +464,9 @@ def make_older_save():
     made by other content (another content hash)."""
     data = json.loads((FIXTURES / "cottage-evening.json").read_text(encoding="utf-8"))
     header = data.setdefault("header", {})
-    header.pop("island_save_version", None)
-    header.pop("island_content_hash", None)
-    data["content_hash"] = int(data["content_hash"]) ^ 1
+    # Stamped with an earlier island version (a save with no stamp is
+    # unreadable, not older), as the unit test builds one.
+    header["island_save_version"] = int(header.get("island_save_version", 3)) - 1
     OLDER.write_text(json.dumps(data), encoding="utf-8")
 
 

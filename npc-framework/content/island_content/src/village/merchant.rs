@@ -17,6 +17,7 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use npc_framework::kernel::hash::SimHashResource;
+use npc_framework::kernel::rng::sim_range;
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -113,6 +114,11 @@ pub struct Merchant {
     /// Coins of boat duty the boat paid the civic fund.
     #[serde(default)]
     pub duty_paid: u64,
+    /// The outside world's price factor of each good the boat trades,
+    /// permille (1000: the catalog price). Drifts between visits (S2.3).
+    pub outside: BTreeMap<String, u32>,
+    /// What the next visit carries (set when the boat leaves).
+    pub next_hold: Goods,
     /// Where the boat ties up: the centre of the sea cell nearest to the
     /// port settlement's centre. The trading post stands beside it.
     #[serde(default)]
@@ -187,6 +193,12 @@ impl SimHashResource for Merchant {
             h.u32(order.delivered);
         }
         h.u32(self.orders_announced);
+        h.u32(self.outside.len() as u32);
+        for (good, factor) in &self.outside {
+            h.str(good);
+            h.u32(*factor);
+        }
+        hash_goods(h, &self.next_hold);
     }
     fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
         Some(npc_framework::snapshot::serde_resource_fns::<Self>())
@@ -281,7 +293,160 @@ pub fn purse(world: &World) -> u32 {
 
 fn price(world: &World, kind: &str, percent: u32) -> Option<u32> {
     let base = catalog::price_in(world, kind)?;
-    Some(((u64::from(base) * u64::from(percent)).div_ceil(100)).clamp(1, 1_000_000) as u32)
+    let factor = outside_factor(world, kind);
+    Some(
+        ((u64::from(base) * u64::from(percent) * u64::from(factor)).div_ceil(100_000))
+            .clamp(1, 1_000_000) as u32,
+    )
+}
+
+/// The outside price factor of `kind`, permille (1000 until it drifts).
+pub fn outside_factor(world: &World, kind: &str) -> u32 {
+    world
+        .get_resource::<Merchant>()
+        .and_then(|merchant| merchant.outside.get(kind).copied())
+        .unwrap_or(1000)
+}
+
+/// `sim_rand` purposes of the boat's drift (id `MERCHANT_OWNER`, tick field
+/// `visits * 1024 + good index`).
+const BOAT_PRICE_DRIFT: u32 = 0x424f_4131;
+const BOAT_HOLD_SHARE: u32 = 0x424f_4132;
+const BOAT_HOLD_MISSING: u32 = 0x424f_4133;
+
+/// Whether the island is short of `kind`: less on offer than its target.
+fn island_short(world: &World, kind: &str) -> bool {
+    let (offer, target) = island_stock(world, kind);
+    offer < target
+}
+
+/// As the boat leaves: the outside prices drift and the next hold is set.
+/// An island shortage fills the hold to the maximum (the island sent word).
+fn drift(world: &mut World, spec: &MerchantSpec) {
+    let d = &spec.drift;
+    let seed = world.resource::<WorldSeed>().0;
+    let visits = u64::from(world.resource::<Merchant>().visits);
+    let mut goods: Vec<&str> = spec
+        .buys
+        .iter()
+        .map(|buy| buy.good.as_str())
+        .chain(spec.sells.iter().map(|sell| sell.good.as_str()))
+        .collect();
+    goods.sort_unstable();
+    goods.dedup();
+    let step = i32::try_from(d.price_step_permille).unwrap_or(0);
+    let mut outside = world.resource::<Merchant>().outside.clone();
+    for (index, good) in goods.iter().enumerate() {
+        let tick = visits * 1024 + index as u64;
+        let factor = i64::from(outside.get(*good).copied().unwrap_or(1000));
+        let moved = if step > 0 {
+            i64::from(sim_range(
+                seed,
+                MERCHANT_OWNER,
+                tick,
+                BOAT_PRICE_DRIFT,
+                -step,
+                step + 1,
+            ))
+        } else {
+            0
+        };
+        let revert = (1000 - factor) / i64::from(d.revert_divisor.max(1));
+        let next = (factor + moved + revert).clamp(
+            i64::from(d.price_min_permille),
+            i64::from(d.price_max_permille),
+        );
+        outside.insert((*good).to_owned(), next as u32);
+    }
+    let mut sells: Vec<&super::frontier::life_spec::MerchantSell> = spec.sells.iter().collect();
+    sells.sort_by(|a, b| a.good.cmp(&b.good));
+    let mut hold = Goods::new();
+    let mut missing = 0_usize;
+    for sell in sells {
+        let index = goods
+            .iter()
+            .position(|good| *good == sell.good)
+            .unwrap_or(0) as u64;
+        let tick = visits * 1024 + index;
+        let share = if d.hold_max_percent > d.hold_min_percent {
+            sim_range(
+                seed,
+                MERCHANT_OWNER,
+                tick,
+                BOAT_HOLD_SHARE,
+                d.hold_min_percent as i32,
+                d.hold_max_percent as i32 + 1,
+            ) as u32
+        } else {
+            d.hold_min_percent
+        };
+        let gone = d.missing_permille > 0
+            && (sim_range(seed, MERCHANT_OWNER, tick, BOAT_HOLD_MISSING, 0, 1000) as u32)
+                < d.missing_permille
+            && missing < spec.sells.len() / 2;
+        let units = if island_short(world, &sell.good) {
+            sell.units * d.hold_max_percent / 100
+        } else if gone {
+            missing += 1;
+            0
+        } else {
+            sell.units * share / 100
+        };
+        if units > 0 {
+            hold.insert(sell.good.clone(), units);
+        }
+    }
+    let next_day = {
+        let mut merchant = world.resource_mut::<Merchant>();
+        merchant.outside = outside.clone();
+        merchant.next_hold = hold.clone();
+        merchant.next_visit_day
+    };
+    record_effect(
+        world,
+        None,
+        "VillageBoatForecast",
+        &json!({"next_visit_day":next_day + 1,
+            "prices":outside.iter().map(|(good, factor)| json!({"good":good,"factor":factor}))
+                .collect::<Vec<_>>(),
+            "aboard":hold}),
+    );
+}
+
+/// What the boat's next visit looks like, for the interface.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BoatOutlook {
+    pub good: String,
+    /// The outside price factor, permille.
+    pub factor_permille: u32,
+    /// Units aboard at the next visit (goods it sells).
+    pub units_next: u32,
+    /// The boat buys it.
+    pub buys: bool,
+}
+
+/// The boat's outlook by good (key order); empty without a boat.
+pub fn outlook(world: &World) -> Vec<BoatOutlook> {
+    let (Some(spec), Some(merchant)) = (spec(world), world.get_resource::<Merchant>()) else {
+        return Vec::new();
+    };
+    let mut goods: Vec<&str> = spec
+        .buys
+        .iter()
+        .map(|buy| buy.good.as_str())
+        .chain(spec.sells.iter().map(|sell| sell.good.as_str()))
+        .collect();
+    goods.sort_unstable();
+    goods.dedup();
+    goods
+        .into_iter()
+        .map(|good| BoatOutlook {
+            good: good.to_owned(),
+            factor_permille: merchant.outside.get(good).copied().unwrap_or(1000),
+            units_next: merchant.next_hold.get(good).copied().unwrap_or(0),
+            buys: spec.buys.iter().any(|buy| buy.good == good),
+        })
+        .collect()
 }
 
 /// Units of `kind` the port settlement holds: its residents' packs and its
@@ -401,17 +566,28 @@ fn announce(world: &mut World, spec: &MerchantSpec) {
     if made.is_empty() {
         return;
     }
+    // The boat never asks for what the island lacks, and asks first for
+    // what is dear abroad (S2.3); equal factors keep the rotation.
     let start = world.resource::<Merchant>().orders_announced as usize;
-    let count = (spec.order_goods as usize).min(made.len());
+    let mut ranked: Vec<(std::cmp::Reverse<u32>, usize, &str)> = (0..made.len())
+        .map(|index| made[(start + index) % made.len()])
+        .filter(|good| !island_short(world, good))
+        .enumerate()
+        .map(|(index, good)| (std::cmp::Reverse(outside_factor(world, good)), index, good))
+        .collect();
+    ranked.sort_unstable();
+    let count = (spec.order_goods as usize).min(ranked.len());
     let mut order = Vec::with_capacity(count);
-    for index in 0..count {
-        let good = made[(start + index) % made.len()];
+    for (_, _, good) in ranked.into_iter().take(count) {
         let Some(quote) =
             market::unit_price(world, good).or_else(|| catalog::price_in(world, good))
         else {
             continue;
         };
-        let unit_price = ((u64::from(quote) * u64::from(spec.order_price_percent)) / 100)
+        let unit_price = ((u64::from(quote)
+            * u64::from(spec.order_price_percent)
+            * u64::from(outside_factor(world, good)))
+            / 100_000)
             .max(u64::from(quote) + 1)
             .min(1_000_000) as u32;
         order.push(BoatOrder {
@@ -760,11 +936,16 @@ fn land(world: &mut World, spec: &MerchantSpec, now: u64) {
     {
         let mut merchant = world.resource_mut::<Merchant>();
         merchant.docked_until = Some(now + spec.stay_ticks);
-        merchant.hold = spec
-            .sells
-            .iter()
-            .map(|sell| (sell.good.clone(), sell.units))
-            .collect();
+        // What the last departure announced; the first visit carries the
+        // listed units.
+        merchant.hold = if merchant.visits == 0 {
+            spec.sells
+                .iter()
+                .map(|sell| (sell.good.clone(), sell.units))
+                .collect()
+        } else {
+            std::mem::take(&mut merchant.next_hold)
+        };
         merchant.visit = VisitTotals {
             arrived_at: now,
             ..Default::default()
@@ -807,6 +988,7 @@ fn leave(world: &mut World, spec: &MerchantSpec, now: u64, reason: &str) {
     // The duty is settled once a visit, on everything traded: per-trade
     // rounding would lose most of it on small lots.
     duty(world, totals.bought_coins.saturating_add(totals.sold_coins));
+    drift(world, spec);
     announce(world, spec);
     let (purse, visit) = {
         let merchant = world.resource::<Merchant>();

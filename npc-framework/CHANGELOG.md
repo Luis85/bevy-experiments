@@ -8,6 +8,82 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Island review fix pass (sim)
+
+- Shape placements are built: `PlacePlot`/`PlaceProp` take `mode` (`build` opens a
+  site with the catalog cost and work, `editor` needs `SetEditorMode`); prop sites
+  (`SiteKind::Prop`, at most 8 open). Spears, rods and hammers wear (`durability` in
+  data; 150% build time without a hammer). The boat's prices and hold drift
+  (`merchant.drift`) and its order follows island shortages. Food spoils
+  (`shelf_life_days`, `village::spoilage`). A market stall takes any traded good.
+  Any good with a `food_value` is eaten; every `fuel` burns.
+- Views for the interface: `price_line(s)`, `good_flow`, `need_alert`, `outlook`,
+  `season_summary` (season ledger), `consigned`, `merchant::outlook`, `editor_mode`.
+- Saves: stricter identity (`OtherBuild`, stamps checked, state hash checked), the
+  world rules travel with the save (`saved_rules`), `ISLAND_SAVE_VERSION` 4.
+- Behaviour: a tree per trade or life stage, guards with parameters and `not`,
+  everybody has an evening, family evenings; `ReplaceBehavior` replaces the
+  behaviour document, trees included, at a tick boundary (ADR 0045, additive
+  `npc_ai::AiRegistry::replace_trees`).
+- Day rhythm: one sit-down meal a day at home or the inn (`life.meal_due`,
+  `life.sit_down`, `DayRhythm`); meetings last `chat_ticks` and pay at their end
+  (`Chatting`); buyers keep their seller (`Errand`); a building stage a critical
+  need interrupts is resumed (`SuspendedWork`). Hired builders use the hammer
+  factor; drinks and garments are found by tag.
+- Replays stamp the content hash of their first tick (`InitialContentHash`), so a
+  replay with a `ReplaceBehavior` verifies; existing replay files are unchanged.
+- Fix: a world chosen for New Game now replaces the window's construction (the
+  construction is saved and loaded with its economy and roles), so its save
+  continues.
+
+### Island game: review fixes (saving, startup, keys, words)
+
+- Saving: Save game and Ctrl+S write your save; the minute timer writes
+  `<stem>.autosave.json` beside it, removed on a clean exit. After a crash
+  the title offers "Continue from the autosave" when it is newer. The pause
+  menu says how old both are and offers "Quit without saving", which asks
+  first, with Back as the default. When saving on the way out fails, the
+  game offers to quit without saving, and a second close asks for it. A
+  failed autosave stays as a toast until one succeeds.
+- Backups: the next backup is numbered after the highest, and the five
+  newest are kept. An island from an older version, another build or a
+  newer version is kept as `<stem>.older-<n>.json` and never deleted.
+- Startup: a save that cannot open, older or other-build or newer saves,
+  and unreadable island rules each get a card on the title with the file
+  name, the backup it will become and "Copy the folder path". If the
+  game's own files cannot build the island, a window says so instead of
+  `exit(2)`. Continue uses the sim's `load_island_save` as its single gate,
+  built from the rules the save carries.
+- New game: once the new island exists the player stays on it; if Live
+  cannot start, Oversee opens with a notice. A failed rollback stops every
+  save and asks for a restart.
+- Sleep: pausing while asleep keeps the player's own speed, and Resume
+  never restores 30x.
+- Keys: the RTS order keys, `.`, F9, F2 and F11 are developer keys or
+  removed. In Shape, Remove patch is X (E turns the camera), R turns a held
+  plot or prop without changing the tool, and the brush keys wait while
+  one is held. Ctrl chords never move the camera, and Ctrl+S works on the
+  pause menu. Patches join Undo and Redo.
+- Shape placement goes through building sites, with cost and work shown
+  before placing. "Place for free" is the recorded `SetEditorMode`, and
+  Undo cancels a site.
+- Behaviour: the host saves `behaviour.json` beside the save and reloads it
+  through `ReplaceBehavior` after the sim's own check (`island_view::reload_from_text`).
+- Words: a New screen with Live first and Shape as a link, "Continue in
+  Oversee", plain host errors with a "Details:" line, and the glossary
+  sweep across the panels.
+
+### Island view: review fixes (fog stub, audio, wildlife, assets)
+
+- **Fog:** the island's `fog.rs` is a stub. The fog is always off, so the mask plane, its per-tick walks and the dimmed materials are gone. What you see does not change.
+- **Audio:** `island_audio` logs at debug level, so a sound capture needs `RUST_LOG=info,island_view::island_audio=debug`.
+  - The work-sound pass no longer allocates every frame.
+  - The Morning and Built jingles play only during play, never on a load.
+- **Wildlife:** it is read once per sim tick, and the fallback box-deer assets are made only when they are used.
+- **Assets:**
+  - The skeleton model kinds and the testbed prop models (walls, doors, trees, siege ram, cart) are removed from the island view, together with their visuals. The island spawns no such props.
+  - `assets/hex`, `assets/furniture`, the axe prop and the grass texture are now listed in `living-world-manifest.json`.
+
 ### Island Village in its own crates; older island tiers removed
 
 No backwards compatibility: read the "not kept" bullets before updating.

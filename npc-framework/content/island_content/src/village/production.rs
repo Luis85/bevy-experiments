@@ -309,20 +309,32 @@ pub fn food_preference(world: &World, actor: Entity) -> &'static str {
     }
 }
 
-pub fn food_choice(world: &World, actor: Entity) -> Option<&'static str> {
+/// Every food of the catalog in eating order: the resident's preferred
+/// food, then by food value (highest first), then by key (review fix S2.9:
+/// any good with a `food_value` is eaten, not only three named roles).
+pub fn diet(world: &World, actor: Entity) -> Vec<&'static str> {
     let preferred = food_preference(world, actor);
-    let roles = roles(world);
-    let alternate = if preferred == roles.baked {
-        roles.cooked
-    } else {
-        roles.baked
-    };
-    [preferred, alternate, roles.foraged]
-        .into_iter()
+    let mut foods: Vec<(bool, i32, &'static str)> = catalog::trade_kinds(world)
+        .iter()
+        .filter_map(|kind| {
+            let value = catalog::food_restore_in(world, kind)?;
+            Some((*kind != preferred, -value, *kind))
+        })
+        .collect();
+    foods.sort_unstable();
+    foods.into_iter().map(|(_, _, kind)| kind).collect()
+}
+
+pub fn food_choice(world: &World, actor: Entity) -> Option<&'static str> {
+    let foods = diet(world, actor);
+    foods
+        .iter()
+        .copied()
         .find(|kind| econ::count(world, actor, kind) > 0)
         .or_else(|| {
-            [preferred, alternate, roles.foraged]
-                .into_iter()
+            foods
+                .iter()
+                .copied()
                 .find(|kind| super::ai::market_supplier(world, actor, kind).is_some())
         })
 }

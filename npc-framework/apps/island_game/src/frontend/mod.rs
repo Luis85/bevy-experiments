@@ -26,6 +26,8 @@ pub(crate) enum Screen {
     Controls,
     Settings,
     Transition,
+    /// "Quit without saving?": Back is the default.
+    ConfirmQuit,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Destination {
@@ -90,6 +92,9 @@ pub(crate) struct FrontendState {
     guide_page: u8,
     /// The player's speed while the played character sleeps faster.
     sleep_restore: Option<u32>,
+    /// Saving on the way out failed: the pause menu offers "Quit without
+    /// saving" as its primary way out, and a second close asks for it.
+    quit_failed: bool,
 }
 impl Default for FrontendState {
     fn default() -> Self {
@@ -107,6 +112,7 @@ impl Default for FrontendState {
             settings_tab: SettingsTab::default(),
             guide_page: 0,
             sleep_restore: None,
+            quit_failed: false,
         }
     }
 }
@@ -134,6 +140,14 @@ pub(crate) enum Action {
     GuidePage(u8),
     /// A world in the New-game list, by its place in the list.
     ChooseWorld(u8),
+    /// The title's notice: put the save's folder on the clipboard.
+    CopyFolder,
+    /// The title, after a crash: load the newer autosave instead.
+    ContinueAutosave,
+    /// "Quit without saving" on the pause menu: asks first.
+    QuitUnsaved,
+    /// The confirmation: leave, writing nothing.
+    ConfirmQuitUnsaved,
 }
 
 /// The four tabs of the Settings screen.
@@ -258,7 +272,9 @@ fn keys(world: &mut World) {
     if escape {
         let screen = world.resource::<FrontendState>().screen;
         let action = match screen {
-            Screen::New | Screen::Controls | Screen::Settings => Some(Action::Back),
+            Screen::New | Screen::Controls | Screen::Settings | Screen::ConfirmQuit => {
+                Some(Action::Back)
+            }
             Screen::Pause => Some(Action::Resume),
             Screen::Playing
                 if world.get_resource::<IslandMode>() != Some(&IslandMode::Character) =>
@@ -273,6 +289,20 @@ fn keys(world: &mut World) {
                 keys.reset(KeyCode::Escape);
             }
         }
+    }
+    // Ctrl+S on the pause menu is its Save game button (the key cap says
+    // so; the island's own save key is held back while menus are open).
+    let save_chord = world
+        .get_resource::<ButtonInput<KeyCode>>()
+        .is_some_and(|keys| {
+            keys.just_pressed(KeyCode::KeyS)
+                && keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight])
+        });
+    if save_chord && world.resource::<FrontendState>().screen == Screen::Pause {
+        world
+            .resource_mut::<FrontendState>()
+            .requests
+            .push(Action::Save);
     }
     // "Try again" on a failed save's or export's toast: the outcome is the
     // next toast.
@@ -299,10 +329,14 @@ fn keys(world: &mut World) {
         world
             .resource_mut::<Messages<bevy::window::WindowCloseRequested>>()
             .clear();
-        world
-            .resource_mut::<FrontendState>()
-            .requests
-            .push(Action::Quit);
+        // After a failed save on the way out, a second close asks to quit
+        // without saving instead of trying a third time.
+        let action = if world.resource::<FrontendState>().quit_failed {
+            Action::QuitUnsaved
+        } else {
+            Action::Quit
+        };
+        world.resource_mut::<FrontendState>().requests.push(action);
     }
 }
 
@@ -352,41 +386,61 @@ fn start_in_mode(
     } else {
         session::continue_game(world)?;
     }
-    // A saved key/approach is transient; committed work and its reservations are
-    // physical state and continue exactly where the snapshot left them.
-    island_view::prepare_player_suspend(world)?;
-    island_view::clear_player_view_intent(world);
-    let mut mode = if requested == IslandMode::Character && session::living_player(world) {
-        IslandMode::Character
-    } else {
-        IslandMode::Inspector
+    // From here on the island exists and the player is on it: a later step
+    // that fails opens Oversee with a notice, never the screen they left.
+    let entered = enter_island(world, requested);
+    let (mode, notice, notice_tone) = match entered {
+        Ok(mode) => (mode, String::new(), NoticeTone::Info),
+        Err(error) => {
+            warn!("island entry fell back to Oversee: {error}");
+            let _ = island_view::request_island_mode(world, IslandMode::Inspector);
+            (
+                IslandMode::Inspector,
+                LIVE_UNAVAILABLE.to_owned(),
+                NoticeTone::Error,
+            )
+        }
     };
-    let mut notice = String::new();
-    let mut notice_tone = NoticeTone::Info;
-    let entry = if requested == IslandMode::Inspector {
-        island_view::watch_island_village(world)
-    } else {
-        island_view::request_island_mode(world, mode)
-    };
-    if let Err(error) = entry {
-        mode = IslandMode::Inspector;
-        island_view::request_island_mode(world, mode)?;
-        notice_tone = NoticeTone::Error;
-        notice =
-            format!("You can inspect this island while character control is unavailable: {error}");
-    }
     {
         let mut flow = world.resource_mut::<FrontendState>();
         flow.resume_mode = mode;
         flow.resume_multiplier = 1;
-        flow.message = notice;
+        flow.message.clear();
         flow.notice_tone = notice_tone;
     }
     let mut control = world.resource_mut::<SimControl>();
     control.paused = false;
     control.multiplier = 1;
     set_screen(world, Screen::Playing);
+    if !notice.is_empty() {
+        // Said on the island, where the player now is, and kept until read.
+        island_view::island_toast(world, island_view::ToastTone::Note, notice, true, false);
+    }
     Ok(())
+}
+
+/// The notice when Live cannot be entered on an island that is open.
+pub(crate) const LIVE_UNAVAILABLE: &str =
+    "Your island is ready. Live is not available right now, so you are in Oversee.";
+
+/// Enter the island that is now loaded, in the requested mode; Oversee when
+/// the played character cannot be taken.
+fn enter_island(world: &mut World, requested: IslandMode) -> Result<IslandMode, String> {
+    // A saved key/approach is transient; committed work and its reservations are
+    // physical state and continue exactly where the snapshot left them.
+    island_view::prepare_player_suspend(world)?;
+    island_view::clear_player_view_intent(world);
+    let mode = if requested == IslandMode::Character && session::living_player(world) {
+        IslandMode::Character
+    } else {
+        IslandMode::Inspector
+    };
+    if requested == IslandMode::Inspector {
+        island_view::watch_island_village(world)?;
+    } else {
+        island_view::request_island_mode(world, mode)?;
+    }
+    Ok(mode)
 }
 
 fn pause(world: &mut World) {
@@ -398,7 +452,9 @@ fn pause(world: &mut World) {
     {
         let mut flow = world.resource_mut::<FrontendState>();
         flow.resume_mode = mode;
-        flow.resume_multiplier = speed.max(1);
+        // Asleep at the night's speed: the player's own speed is the one
+        // kept; the night raises it again if the character still sleeps.
+        flow.resume_multiplier = flow.sleep_restore.take().unwrap_or(speed).max(1);
         flow.message.clear();
         flow.notice_tone = NoticeTone::Info;
     }
@@ -407,7 +463,12 @@ fn pause(world: &mut World) {
 }
 fn resume(world: &mut World, mode: IslandMode) -> Result<(), String> {
     island_view::request_island_mode(world, mode)?;
-    let speed = world.resource::<FrontendState>().resume_multiplier.max(1);
+    // Never the night's speed: only `night` sets that and takes it away.
+    let top = crate::SPEED_PRESETS[crate::SPEED_PRESETS.len() - 1];
+    let speed = world
+        .resource::<FrontendState>()
+        .resume_multiplier
+        .clamp(1, top);
     let mut control = world.resource_mut::<SimControl>();
     control.paused = false;
     control.multiplier = speed;
@@ -498,21 +559,22 @@ fn finish_exit(world: &mut World) {
         message(
             world,
             NoticeTone::Error,
-            "Movement could not finish stopping. Your world is still open; resume or retry saving.",
+            "Your character could not stop in time, so nothing was saved. Resume, or try again.",
         );
         return;
     }
-    match session::save_for_title(world) {
+    let saved = session::save_for_title(world);
+    if saved.is_ok() {
+        // A clean exit: the crash copy is no longer needed.
+        crate::island::remove_autosave(world);
+    }
+    match saved {
         Ok(()) if destination == Destination::Quit => {
             world.write_message(AppExit::Success);
         }
         Ok(()) if destination == Destination::NewGame => {
             open_new_game(world);
-            message(
-                world,
-                NoticeTone::Success,
-                "Your island is saved and will be kept as a backup. Name your character and choose how to begin.",
-            );
+            message(world, NoticeTone::Success, "Your island is saved.");
         }
         Ok(()) => {
             set_screen(world, Screen::Title);
@@ -524,7 +586,14 @@ fn finish_exit(world: &mut World) {
         }
         Err(error) => {
             set_screen(world, Screen::Pause);
-            message(world, NoticeTone::Error, error);
+            let text = match destination {
+                Destination::Title => format!("{error} You are still on your island."),
+                _ => error,
+            };
+            if destination == Destination::Quit {
+                world.resource_mut::<FrontendState>().quit_failed = true;
+            }
+            message(world, NoticeTone::Error, text);
         }
     }
 }
@@ -552,7 +621,12 @@ pub(crate) fn exit_failed(world: &mut World, error: String) {
     if !world.contains_resource::<FrontendState>() {
         return;
     }
-    world.resource_mut::<FrontendState>().pending = None;
+    {
+        let mut flow = world.resource_mut::<FrontendState>();
+        flow.pending = None;
+        // Only the way out fails here: offer leaving without a save.
+        flow.quit_failed = true;
+    }
     world.resource_mut::<SimControl>().paused = true;
     let screen = if session::summary(world).active {
         Screen::Pause
@@ -573,6 +647,7 @@ fn process(world: &mut World) {
         if matches!(
             action,
             Action::Continue
+                | Action::ContinueAutosave
                 | Action::ContinueInspector
                 | Action::New
                 | Action::Begin
@@ -594,6 +669,9 @@ fn process(world: &mut World) {
                     false,
                 );
             }),
+            Action::ContinueAutosave if screen == Screen::Title => {
+                session::adopt_autosave(world).and_then(|()| start_play(world, None))
+            }
             Action::ContinueInspector if screen == Screen::Title => {
                 start_in_mode(world, None, IslandMode::Inspector)
             }
@@ -653,6 +731,8 @@ fn process(world: &mut World) {
             Action::Back => {
                 let target = if matches!(screen, Screen::Controls | Screen::Settings) {
                     world.resource::<FrontendState>().controls_back
+                } else if screen == Screen::ConfirmQuit {
+                    Screen::Pause
                 } else {
                     Screen::Title
                 };
@@ -697,8 +777,33 @@ fn process(world: &mut World) {
                 resume(world, mode)
             }
             Action::Save if screen == Screen::Pause => crate::island::save(world)
-                .map(|()| message(world, NoticeTone::Success, "Your island is saved.")),
+                .map(|()| message(world, NoticeTone::Success, "Island saved.")),
+            Action::QuitUnsaved if screen == Screen::Pause => {
+                set_screen(world, Screen::ConfirmQuit);
+                Ok(())
+            }
+            Action::ConfirmQuitUnsaved if screen == Screen::ConfirmQuit => {
+                crate::island::quit_unsaved(world);
+                Ok(())
+            }
             Action::Title if screen == Screen::Pause => begin_exit(world, Destination::Title),
+            Action::CopyFolder if screen == Screen::Title => {
+                let folder = crate::island::save_path(world)
+                    .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                    .unwrap_or_default();
+                match island_view::copy_to_clipboard(world, &folder.to_string_lossy()) {
+                    Ok(()) => message(world, NoticeTone::Success, "Folder path copied."),
+                    Err(error) => {
+                        warn!("could not copy the folder path: {error}");
+                        message(
+                            world,
+                            NoticeTone::Error,
+                            "The folder path could not be copied.",
+                        );
+                    }
+                }
+                Ok(())
+            }
             Action::Quit => begin_exit(world, Destination::Quit),
             _ => Ok(()),
         };
@@ -864,7 +969,23 @@ mod tests {
             app.world()
                 .resource::<FrontendState>()
                 .message
-                .contains("Could not save")
+                .starts_with(crate::island::SAVE_FAILED)
+        );
+        // The way out is now leaving without a save, after its question.
+        assert!(app.world().resource::<FrontendState>().quit_failed);
+        app.world_mut()
+            .init_resource::<Messages<bevy::window::WindowCloseRequested>>();
+        app.world_mut()
+            .resource_mut::<Messages<bevy::window::WindowCloseRequested>>()
+            .write(bevy::window::WindowCloseRequested {
+                window: Entity::PLACEHOLDER,
+            });
+        keys(app.world_mut());
+        process(app.world_mut());
+        assert_eq!(
+            app.world().resource::<FrontendState>().screen,
+            Screen::ConfirmQuit,
+            "a second close asks instead of trying a third save"
         );
         assert!(app.world().resource::<FrontendState>().pending.is_none());
         assert_eq!(
@@ -875,6 +996,102 @@ mod tests {
         std::fs::remove_dir(&path).unwrap();
         let _ = std::fs::remove_file(path.with_extension("world.lock"));
         let _ = std::fs::remove_dir(dir);
+    }
+
+    fn frontend_app(label: &str) -> (App, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("npc-{label}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = dir.join("island.json");
+        let app = session::open(&path, None, None, |app| {
+            app.add_plugins(island_view::IslandViewPlugin);
+            install(app);
+            app.init_resource::<Messages<AppExit>>();
+        })
+        .unwrap();
+        (app, path)
+    }
+
+    #[test]
+    fn a_pause_during_sleep_gives_back_the_players_own_speed() {
+        let (mut app, path) = frontend_app("sleep-speed");
+        start_play(app.world_mut(), Some("Zephyrine".into())).unwrap();
+        // Asleep: the night runs at its own speed and keeps the player's 3.
+        app.world_mut().resource_mut::<SimControl>().multiplier = SLEEP_SPEED;
+        app.world_mut()
+            .resource_mut::<FrontendState>()
+            .sleep_restore = Some(3);
+        pause(app.world_mut());
+        let flow = app.world().resource::<FrontendState>();
+        assert_eq!(flow.resume_multiplier, 3, "the player's own speed is kept");
+        assert_eq!(flow.sleep_restore, None);
+        let mode = flow.resume_mode;
+        resume(app.world_mut(), mode).unwrap();
+        assert_eq!(app.world().resource::<SimControl>().multiplier, 3);
+        drop(app);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn thirty_times_is_never_restored_as_the_players_speed() {
+        let (mut app, path) = frontend_app("speed-cap");
+        start_play(app.world_mut(), Some("Zephyrine".into())).unwrap();
+        pause(app.world_mut());
+        app.world_mut()
+            .resource_mut::<FrontendState>()
+            .resume_multiplier = SLEEP_SPEED;
+        let mode = app.world().resource::<FrontendState>().resume_mode;
+        resume(app.world_mut(), mode).unwrap();
+        let top = crate::SPEED_PRESETS[crate::SPEED_PRESETS.len() - 1];
+        assert_eq!(app.world().resource::<SimControl>().multiplier, top);
+        drop(app);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn quit_without_saving_asks_first_and_leaves_the_save_as_it_was() {
+        let (mut app, path) = frontend_app("quit-unsaved");
+        start_play(app.world_mut(), Some("Zephyrine".into())).unwrap();
+        crate::island::save(app.world_mut()).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        run_ticks(app.world_mut(), 5);
+        pause(app.world_mut());
+        let request = |app: &mut App, action: Action| {
+            app.world_mut()
+                .resource_mut::<FrontendState>()
+                .requests
+                .push(action);
+            process(app.world_mut());
+        };
+        request(&mut app, Action::QuitUnsaved);
+        assert_eq!(
+            app.world().resource::<FrontendState>().screen,
+            Screen::ConfirmQuit
+        );
+        // Back (and Esc) return to the pause menu.
+        request(&mut app, Action::Back);
+        assert_eq!(
+            app.world().resource::<FrontendState>().screen,
+            Screen::Pause
+        );
+        request(&mut app, Action::QuitUnsaved);
+        request(&mut app, Action::ConfirmQuitUnsaved);
+        assert!(!app.world().resource::<Messages<AppExit>>().is_empty());
+        crate::island::save_on_exit(app.world_mut());
+        assert_eq!(std::fs::read(&path).unwrap(), bytes, "nothing was written");
+        assert!(!crate::island::autosave_path(&path).exists());
+        assert_eq!(
+            ui::confirm_quit_lines(Some(720), false),
+            ["Everything since your last save is lost. Your last save was 12 minutes ago."]
+        );
+        assert_eq!(
+            ui::confirm_quit_lines(None, true),
+            [
+                "The island could not be saved.",
+                "This island has never been saved. It will be gone."
+            ]
+        );
+        drop(app);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

@@ -228,7 +228,25 @@ pub fn open_sites(world: &World, settlement: SimId) -> Vec<(SimId, Entity)> {
         .into_iter()
         .flatten()
         .filter_map(|id| Some((*id, world.resource::<SimIndex>().get(*id)?)))
-        .collect()
+        // Builders and haulers take building sites before prop sites; each
+        // group keeps its placing order (a stable partition).
+        .partition::<Vec<_>, _>(|(_, entity)| {
+            !world
+                .get::<ConstructionSite>(*entity)
+                .is_some_and(ConstructionSite::is_prop)
+        })
+        .into_concat()
+}
+
+trait IntoConcat {
+    fn into_concat(self) -> Vec<(SimId, Entity)>;
+}
+impl IntoConcat for (Vec<(SimId, Entity)>, Vec<(SimId, Entity)>) {
+    fn into_concat(self) -> Vec<(SimId, Entity)> {
+        let (mut buildings, props) = self;
+        buildings.extend(props);
+        buildings
+    }
 }
 
 /// Materials the open sites of a settlement still wait for and the fund can
@@ -443,10 +461,26 @@ pub fn begin_work(world: &mut World, actor: Entity, site: Entity) -> Result<(), 
     let stage = economy_spec::tuning(world).map_or(200, |tuning| tuning.build_stage_ticks);
     let ticks = remaining.min(stage);
     let pace = u64::from(crate::village::colony::work_pace_percent(world, actor));
-    let ends = world
-        .resource::<SimClock>()
-        .tick
-        .saturating_add((u64::from(ticks) * pace / 100).max(1));
+    let tool = u64::from(build_tool_percent(world, actor));
+    let now = world.resource::<SimClock>().tick;
+    let mut ticks = ticks;
+    let mut ends = now.saturating_add((u64::from(ticks) * pace / 100 * tool / 100).max(1));
+    // Resume a stage a critical need interrupted at this site (S3.5).
+    if let Some(suspended) = world.get::<super::model::SuspendedWork>(actor).copied() {
+        world
+            .entity_mut(actor)
+            .remove::<super::model::SuspendedWork>();
+        if suspended.site == site_id && suspended.expires_at > now {
+            ticks = suspended.ticks.min(remaining);
+            ends = now.saturating_add(suspended.remaining);
+            record_effect(
+                world,
+                Some(me),
+                "VillageWorkResumed",
+                &json!({"site":site_id,"ticks_left":suspended.remaining}),
+            );
+        }
+    }
     world
         .entity_mut(actor)
         .remove::<MoveIntent>()
@@ -457,6 +491,26 @@ pub fn begin_work(world: &mut World, actor: Entity, site: Entity) -> Result<(), 
         });
     claim(world, site, me, ends);
     Ok(())
+}
+
+/// The builder's tool: the tool of the trade that builds (a hammer).
+pub(crate) fn builder_tool(world: &World) -> Option<&'static str> {
+    crate::village::catalog::role_tool_in(world, crate::village::roles::roles(world).builder)
+}
+
+/// Stage time in percent for `actor`: `tuning.build_tool_percent` with a
+/// usable builder's tool, `build_bare_percent` without (S2.2).
+pub fn build_tool_percent(world: &World, actor: Entity) -> u32 {
+    let Some(tuning) = economy_spec::tuning(world) else {
+        return 100;
+    };
+    match builder_tool(world) {
+        Some(tool) if crate::village::living::usable_tool(world, actor, tool).is_some() => {
+            tuning.build_tool_percent
+        }
+        Some(_) => tuning.build_bare_percent,
+        None => 100,
+    }
 }
 
 /// Marks `builder` as the resident on the way to, or at work on, the site.
@@ -540,6 +594,10 @@ pub(super) fn tick(world: &mut World, now: u64) {
             .saturating_add(work.ticks)
             .min(state.work_ticks);
         let (done, total) = (state.work_done, state.work_ticks);
+        // A finished stage wears the builder's tool (S2.2).
+        if let Some(tool) = builder_tool(world) {
+            crate::village::living::wear_tool(world, actor, id, tool);
+        }
         record_effect(
             world,
             Some(id),
@@ -605,6 +663,42 @@ fn finish(world: &mut World, site_id: SimId, builder: Option<SimId>, founding: b
     let Some(site) = world.entity_mut(entity).take::<ConstructionSite>() else {
         return;
     };
+    // A prop site becomes the prop: the site and its body go, the prop
+    // stands where it was placed.
+    if let super::model::SiteKind::Prop { x, z, rotation } = site.kind {
+        release_workers(world, site_id);
+        {
+            let mut civic = world.resource_mut::<CivicState>();
+            if let Some(sites) = civic.sites.get_mut(&site.settlement) {
+                sites.retain(|id| *id != site_id);
+            }
+        }
+        if let Some(blocker) = site
+            .blocker
+            .and_then(|id| world.resource::<SimIndex>().get(id))
+        {
+            world.despawn(blocker);
+        }
+        world.despawn(entity);
+        crate::village::colony_demand_changed(world);
+        let prop = crate::village::frontier::props::spawn_built(
+            world,
+            &site.building,
+            site.plot,
+            site.settlement,
+            x,
+            z,
+            rotation,
+        );
+        record_effect(
+            world,
+            builder,
+            "LivingPropBuilt",
+            &json!({"site":site_id,"prop":prop,"kind":site.building,"x":x,"z":z,
+                "rotation":rotation,"settlement":site.settlement}),
+        );
+        return;
+    }
     let Some(def) = economy_spec::registry(world)
         .and_then(|registry| registry.spec.building(&site.building))
         .cloned()

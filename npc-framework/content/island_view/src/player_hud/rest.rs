@@ -49,6 +49,20 @@ pub(super) struct Rest {
     open: Option<DaySummary>,
     shown_day: Option<u64>,
     focus: bool,
+    /// The last season that had ended when the character fell asleep: a
+    /// season that ends in the night is told in the morning (2.6).
+    season_at_sleep: Option<u32>,
+}
+
+/// The morning account's line after the season's last night: "Autumn has
+/// ended. The island has 43 residents; 2 buildings were finished."
+pub(super) fn season_line(name: &str, residents: u32, built: u32) -> String {
+    let built = match built {
+        0 => "no building was finished".to_owned(),
+        1 => "1 building was finished".to_owned(),
+        built => format!("{built} buildings were finished"),
+    };
+    format!("{name} has ended. The island has {residents} residents; {built}.")
 }
 
 /// Whether the played character is asleep, by the simulation's account.
@@ -255,12 +269,24 @@ fn heading(world: &World, day: u64) -> String {
 fn fill(world: &mut World, summary: &DaySummary) {
     let next = depth::chain(world).and_then(|chain| chain.current);
     let events = depth::day_events(world, summary.day);
-    let lines = depth::summary_lines(
+    let mut lines = depth::summary_lines(
         summary,
         &|id| depth::name_of(world, id),
         next.as_deref(),
         &events,
     );
+    // A season that ended in the night.
+    let ended = crate::colony_panel::last_season(world);
+    if ended.is_some()
+        && ended != world.resource::<Rest>().season_at_sleep
+        && let Some(season) = ended.and_then(|season| view::season_summary(world, season))
+    {
+        let built: u32 = season.built.iter().map(|(_, count)| *count).sum();
+        lines.push((
+            "Season",
+            season_line(&season.name, season.population_end, built),
+        ));
+    }
     let title = heading(world, summary.day);
     let headings: Vec<Entity> = world
         .query_filtered::<Entity, With<SummaryHeading>>()
@@ -357,9 +383,15 @@ pub(super) fn refresh(world: &mut World, active: bool) {
     let woke = {
         let mut rest = world.resource_mut::<Rest>();
         let woke = rest.asleep && !asleep;
+        let fell = !rest.asleep && asleep;
         rest.asleep = asleep;
-        woke
+        (woke, fell)
     };
+    let (woke, fell) = woke;
+    if fell {
+        let season = crate::colony_panel::last_season(world);
+        world.resource_mut::<Rest>().season_at_sleep = season;
+    }
     if woke
         && let Some((unit, _)) = depth::played(world)
         && let Some(summary) = view::day_summary(world, unit)

@@ -77,6 +77,118 @@ pub fn count(count: u64, kind: &str) -> String {
     format!("{count} {}", noun(kind, count))
 }
 
+/// The calendar day index of `tick`, the one the top bar's date counts.
+fn day_index(world: &bevy::prelude::World, tick: u64) -> u64 {
+    let config = world
+        .get_resource::<npc_framework::prelude::SimConfig>()
+        .copied()
+        .unwrap_or_default();
+    island_content::village::calendar_at(tick, &config, true).0
+}
+
+/// When `tick` was, in the one calendar the player sees: "today",
+/// "yesterday", else "Autumn, day 4", with ", year 2" from the second
+/// year on. Lower case where it is relative; capitalise at the start of a
+/// line.
+pub fn when(world: &bevy::prelude::World, tick: u64) -> String {
+    when_day(world, day_index(world, tick))
+}
+
+/// [`when`] for a calendar day index (`calendar_at(..).0`).
+pub fn when_day(world: &bevy::prelude::World, day: u64) -> String {
+    let now = world
+        .get_resource::<npc_framework::prelude::SimClock>()
+        .map_or(0, |clock| clock.tick);
+    let today = day_index(world, now);
+    date_words(day, today, island_content::village::DAYS_PER_SEASON)
+}
+
+/// The words of [`when_day`] without a world: `day` and `today` are
+/// calendar day indices, `season_days` the length of a season.
+pub fn date_words(day: u64, today: u64, season_days: u64) -> String {
+    if day == today {
+        return "today".to_owned();
+    }
+    if day + 1 == today {
+        return "yesterday".to_owned();
+    }
+    calendar_words(day, season_days)
+}
+
+/// The date of `tick` as the top bar says it, never relative: "Autumn,
+/// day 6" (", year 2" from the second year on).
+pub fn date(world: &bevy::prelude::World, tick: u64) -> String {
+    calendar_words(
+        day_index(world, tick),
+        island_content::village::DAYS_PER_SEASON,
+    )
+}
+
+/// "Autumn, day 6" for calendar day index `day`.
+pub fn calendar_words(day: u64, season_days: u64) -> String {
+    const SEASONS: [&str; 4] = ["Spring", "Summer", "Autumn", "Winter"];
+    let length = season_days.max(1);
+    let season = SEASONS[(day / length % 4) as usize];
+    let date = format!("{season}, day {}", day % length + 1);
+    match day / (4 * length) + 1 {
+        1 => date,
+        year => format!("{date}, year {year}"),
+    }
+}
+
+/// A moment as the 24-hour face of the top bar shows it, the day starting
+/// at 06:00: `permille` is the share of the day gone.
+pub fn clock_face(permille: u32) -> String {
+    let minutes = (6 * 60 + permille.min(999) * 24 * 60 / 1000) % (24 * 60);
+    format!("{:02}:{:02}", minutes / 60, minutes % 60)
+}
+
+/// [`when`] with the time for a moment near now: "today, 09:10",
+/// "yesterday, 18:40", else the calendar form.
+pub fn moment(world: &bevy::prelude::World, tick: u64) -> String {
+    let config = world
+        .get_resource::<npc_framework::prelude::SimConfig>()
+        .copied()
+        .unwrap_or_default();
+    let when = when(world, tick);
+    if when == "today" || when == "yesterday" {
+        format!("{when}, {}", clock_face(config.time_of_day_permille(tick)))
+    } else {
+        when
+    }
+}
+
+/// "today" as "Today": the first letter in capitals.
+pub fn capital(text: &str) -> String {
+    let mut letters = text.chars();
+    letters.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(letters).collect()
+    })
+}
+
+/// Whether time is paused now (no `SimControl` counts as paused). Words
+/// about time appear only then; while time runs no sentence mentions it.
+pub fn paused(world: &bevy::prelude::World) -> bool {
+    world
+        .get_resource::<npc_framework::prelude::SimControl>()
+        .is_none_or(npc_framework::prelude::SimControl::is_stopped)
+}
+
+/// The ledger's foot after an order, by whether time runs.
+pub fn order_given(paused: bool) -> &'static str {
+    if paused {
+        "Order queued. It starts when time runs (Space)."
+    } else {
+        "Order given."
+    }
+}
+
+/// A refusal of the village in one sentence: "The village could not do
+/// that. {Reason}."
+pub fn village_refused(reason: &str) -> String {
+    format!("The village could not do that. {}", sentence(reason))
+}
+
 /// The simulation's words as a sentence: capital first, full stop last.
 pub fn sentence(reason: &str) -> String {
     let mut letters = reason.trim().chars();
@@ -113,5 +225,17 @@ mod tests {
         assert_eq!(count(5, "Fiber"), "5 fiber");
         assert_eq!(count(2, "warm clothes"), "2 warm clothes");
         assert_eq!(count(0, "log"), "0 logs");
+    }
+
+    #[test]
+    fn a_date_is_relative_near_now_and_in_the_season_otherwise() {
+        // Seven-day seasons; day index 19 is the sixth day of autumn.
+        assert_eq!(date_words(19, 19, 7), "today");
+        assert_eq!(date_words(18, 19, 7), "yesterday");
+        assert_eq!(date_words(17, 19, 7), "Autumn, day 4");
+        assert_eq!(calendar_words(19, 7), "Autumn, day 6");
+        assert_eq!(calendar_words(21, 7), "Winter, day 1");
+        assert_eq!(calendar_words(28, 7), "Spring, day 1, year 2");
+        assert_eq!(capital("today"), "Today");
     }
 }

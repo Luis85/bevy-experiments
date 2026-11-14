@@ -12,7 +12,9 @@
 //! [`conditions::CONDITIONS`]; `docs/island-ai-authoring.md` is the guide.
 pub mod actions;
 pub mod conditions;
+pub mod param;
 pub mod record;
+pub mod replace;
 
 use super::frontier::economy_spec::EconomySpec;
 use bevy_app::App;
@@ -67,6 +69,11 @@ impl<'de> Deserialize<'de> for TreeFile {
 /// `TreeDef` itself: nodes in pre-order, children as indices. Both become the
 /// same `TreeDef`; the saved construction data always holds the flat shape.
 pub fn parse_tree(file: &str, value: &serde_json::Value) -> Result<TreeDef, String> {
+    // Guards with parameters or `not` become plain condition names first.
+    let mut rewritten = value.clone();
+    param::rewrite_guards(&mut rewritten)
+        .map_err(|error| format!("behaviour tree file `{file}`: {error}"))?;
+    let value = &rewritten;
     let shape = "a tree has `name` and either `root` (nested nodes) or `nodes` (flat list)";
     let object = value
         .as_object()
@@ -257,6 +264,10 @@ pub struct ScheduleSpec {
     pub diligence_shift: i32,
     /// During a meal block a resident carrying food eats below this Hunger.
     pub meal_hunger_threshold: i32,
+    /// Ticks a meeting lasts; it pays its morale and affinity at the end.
+    pub chat_ticks: u64,
+    /// A meeting ends early, paying nothing, beyond this distance (mm).
+    pub chat_break_mm: i32,
 }
 
 impl Default for ScheduleSpec {
@@ -267,12 +278,14 @@ impl Default for ScheduleSpec {
                 block(BlockKind::Work, 0, 700),
                 block(BlockKind::Meal, 250, 300),
                 block(BlockKind::Meal, 600, 650),
-                block(BlockKind::Leisure, 640, 700),
+                block(BlockKind::Leisure, 620, 700),
                 block(BlockKind::Sleep, 700, 1000),
             ],
             chronotype_shift: 25,
             diligence_shift: 40,
             meal_hunger_threshold: 60_000,
+            chat_ticks: 200,
+            chat_break_mm: 3000,
         }
     }
 }
@@ -297,6 +310,19 @@ pub struct BehaviorSpec {
     pub traits: TraitSpec,
     pub schedule: ScheduleSpec,
     pub places: Vec<PlaceDef>,
+    /// Trees by life stage (review fix S3.1); a profession may name its own
+    /// (`professions[].tree`). Order: child, profession, elder, default.
+    pub stage_trees: StageTrees,
+}
+
+/// The trees a child and an elder run, when they differ from the default.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct StageTrees {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elder: Option<String>,
 }
 
 impl Default for BehaviorSpec {
@@ -307,12 +333,13 @@ impl Default for BehaviorSpec {
             traits: TraitSpec::default(),
             schedule: ScheduleSpec::default(),
             places: Vec::new(),
+            stage_trees: StageTrees::default(),
         }
     }
 }
 
 /// Built-in destinations of `life.go_to`.
-pub const BUILTIN_PLACES: [&str; 3] = ["home", "work", "centre"];
+pub const BUILTIN_PLACES: [&str; 4] = ["home", "work", "centre", "meal"];
 
 impl BehaviorSpec {
     pub fn validate(&self, economy: &EconomySpec, bounds: GridBounds) -> Result<(), String> {
@@ -410,13 +437,6 @@ impl BehaviorSpec {
                     file.file
                 ));
             }
-            if name != RESIDENT_TREE && !name.starts_with("island_resident_") {
-                return Err(format!(
-                    "behaviour tree file `{}`: tree name `{name}` must be `{RESIDENT_TREE}` (the \
-                     tree residents run) or start with `island_resident_`",
-                    file.file
-                ));
-            }
             validate_tree(
                 file,
                 &Context {
@@ -429,6 +449,37 @@ impl BehaviorSpec {
         if !names.contains(RESIDENT_TREE) {
             return Err(format!(
                 "behavior.trees needs a tree named `{RESIDENT_TREE}`: the tree every resident runs"
+            ));
+        }
+        // Every tree a stage or a trade names exists (S3.1).
+        for (what, tree) in [
+            ("stage_trees.child", &self.stage_trees.child),
+            ("stage_trees.elder", &self.stage_trees.elder),
+        ] {
+            if let Some(tree) = tree
+                && !names.contains(tree.as_str())
+            {
+                return Err(format!(
+                    "behavior.{what} names tree `{tree}`, which `behavior.trees` does not contain"
+                ));
+            }
+        }
+        for entry in &economy.professions {
+            if let Some(tree) = &entry.tree
+                && !names.contains(tree.as_str())
+            {
+                return Err(format!(
+                    "profession `{}` names tree `{tree}`, which `behavior.trees` does not contain",
+                    entry.role.key()
+                ));
+            }
+        }
+        let params = param::names_in(&self.trees);
+        if params.len() > param::SLOTS {
+            return Err(format!(
+                "behavior.trees use {} conditions with parameters or `not`; at most {}",
+                params.len(),
+                param::SLOTS
             ));
         }
         Ok(())
@@ -452,6 +503,8 @@ impl BehaviorSpec {
         }
         h.i32(self.traits.sociable_min);
         h.u32(self.traits.thrift_reserve_coins);
+        h.opt(self.stage_trees.child.as_ref(), |h, tree| h.str(tree));
+        h.opt(self.stage_trees.elder.as_ref(), |h, tree| h.str(tree));
         h.u32(self.schedule.blocks.len() as u32);
         for block in &self.schedule.blocks {
             h.u8(block.kind as u8);
@@ -461,6 +514,8 @@ impl BehaviorSpec {
         h.i32(self.schedule.chronotype_shift);
         h.i32(self.schedule.diligence_shift);
         h.i32(self.schedule.meal_hunger_threshold);
+        h.u64(self.schedule.chat_ticks);
+        h.i32(self.schedule.chat_break_mm);
         h.u32(self.places.len() as u32);
         for place in &self.places {
             h.str(&place.key);
@@ -574,6 +629,25 @@ fn validate_tree(file: &TreeFile, context: &Context) -> Result<(), String> {
             NodeKind::Leaf { action, param } => {
                 actions::check(&action.name, param, context)
                     .map_err(|error| format!("{}: {error}", at(index)))?;
+            }
+            NodeKind::Guard { cond, abort } if param::is_param(&cond.name) => {
+                param::parse(&cond.name, context.economy)
+                    .map_err(|error| format!("{}: {error}", at(index)))?;
+                if *abort == Abort::LowerPriority {
+                    return Err(if cond.name.starts_with("not:") {
+                        format!(
+                            "{}: a `not` guard cannot abort lower-priority work",
+                            at(index)
+                        )
+                    } else {
+                        format!(
+                            "{}: condition `{}` does not promise that its branch can start, so \
+                             it must not abort lower-priority work; use \"abort\": \"None\"",
+                            at(index),
+                            cond.name
+                        )
+                    });
+                }
             }
             NodeKind::Guard { cond, abort } => {
                 let Some(info) = conditions::find(&cond.name) else {
@@ -794,6 +868,22 @@ pub fn place(world: &World, actor: Entity, param: &ParamValue) -> Option<SimPos>
                 super::frontier::settlements::definition(world, settlement)
                     .map(|definition| definition.center)
             }
+            // Where a meal is eaten (S3.3): at home, else at the nearest
+            // inn, else at the square.
+            "meal" => {
+                let id = *world.get::<SimId>(actor)?;
+                if super::colony::home_of(world, id).is_some() {
+                    return world
+                        .get::<super::Villager>(actor)
+                        .map(|person| person.home);
+                }
+                let here = *world.get::<SimPos>(actor)?;
+                super::indoors::inns(world)
+                    .into_iter()
+                    .map(|inn| inn.entrance)
+                    .min_by_key(|door| (here.dist2(*door), door.x, door.z))
+                    .or_else(|| place(world, actor, &ParamValue::Name("centre".into())))
+            }
             key => {
                 let here = *world.get::<SimPos>(actor)?;
                 spec(world)?
@@ -817,7 +907,10 @@ pub(super) fn register(app: &mut App) {
         .behavior
         .clone();
     app.init_resource::<DecisionTrace>()
-        .register_sim_component::<ResidentTraits>();
+        .register_sim_component::<ResidentTraits>()
+        .register_sim_component::<DayRhythm>()
+        .register_sim_component::<super::ai::Errand>()
+        .register_command::<replace::ReplaceBehavior>();
     for action in actions::ACTIONS {
         app.register_action(action.name, action.start, super::behavior::stop);
     }
@@ -829,11 +922,122 @@ pub(super) fn register(app: &mut App) {
     for (name, score, _) in conditions::SCORERS {
         app.register_scorer(name, *score);
     }
+    // Conditions with parameters or `not`: one slot each (S3.1).
+    let economy = app
+        .world()
+        .resource::<super::frontier::LivingWorldSpec>()
+        .economy
+        .clone();
+    let mut table = param::ParamConds::default();
+    for (index, name) in param::names_in(&spec.trees).into_iter().enumerate() {
+        let Ok(cond) = param::parse(&name, &economy) else {
+            continue;
+        };
+        let leaked: &'static str = Box::leak(name.clone().into_boxed_str());
+        app.register_cond(leaked, param::SLOT_FNS[index]);
+        table.slots.push((name, cond));
+    }
+    app.insert_resource(table);
     for file in spec.trees {
         app.world_mut()
             .get_resource_or_init::<AiRegistry>()
             .add_tree(file.tree);
     }
+}
+
+/// The tree `actor` runs: its life stage's (a child's), else its trade's,
+/// else an elder's, else [`RESIDENT_TREE`] (S3.1). A working elder keeps the
+/// trade's routine.
+pub fn tree_for(world: &World, actor: Entity) -> Option<npc_framework::ai::TreeId> {
+    let registry = world.get_resource::<AiRegistry>()?;
+    let spec = spec(world);
+    let stage = super::demography::stage(world, actor);
+    let by_name = |name: &Option<String>| name.as_deref().and_then(|name| registry.tree_id(name));
+    let trade = world.get::<super::Villager>(actor).and_then(|person| {
+        super::frontier::economy_spec::registry(world)?
+            .definition(person.role)?
+            .tree
+            .clone()
+    });
+    let child = spec
+        .filter(|_| stage == super::demography::LifeStage::Child)
+        .and_then(|spec| by_name(&spec.stage_trees.child));
+    let elder = spec
+        .filter(|_| stage == super::demography::LifeStage::Elder)
+        .and_then(|spec| by_name(&spec.stage_trees.elder));
+    child
+        .or_else(|| by_name(&trade))
+        .or(elder)
+        .or_else(|| registry.tree_id(RESIDENT_TREE))
+}
+
+/// Gives `actor` the tree [`tree_for`] names, stopping its running leaf
+/// through the one teardown path when the tree changes.
+pub fn assign_tree(world: &mut World, actor: Entity) {
+    let Some(tree) = tree_for(world, actor) else {
+        return;
+    };
+    if world
+        .get::<Brain>(actor)
+        .is_some_and(|brain| brain.tree == tree)
+    {
+        return;
+    }
+    if world.get::<ActiveLeaf>(actor).is_some() {
+        super::behavior::stop(world, actor, npc_framework::ai::StopReason::Aborted);
+    }
+    world
+        .entity_mut(actor)
+        .remove::<(BrainState, ActiveLeaf)>()
+        .insert(Brain { tree });
+}
+
+/// Stops `actor`'s running leaf and gives it a fresh brain on the tree
+/// [`tree_for`] names (after the trees were replaced, every id is new).
+pub fn reset_brain(world: &mut World, actor: Entity) {
+    if world.get::<ActiveLeaf>(actor).is_some() {
+        super::behavior::stop(world, actor, npc_framework::ai::StopReason::Aborted);
+    }
+    let Some(tree) = tree_for(world, actor) else {
+        return;
+    };
+    world
+        .entity_mut(actor)
+        .remove::<(BrainState, ActiveLeaf)>()
+        .insert(Brain { tree });
+}
+
+/// The meals a resident has had (S3.3): the day it last sat down to a meal,
+/// so the day has one sit-down meal (the first meal block it reaches;
+/// hunger is still answered at any hour).
+#[derive(
+    Component, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Component)]
+pub struct DayRhythm {
+    /// The day of the last sit-down meal; `None` before the first.
+    pub last_meal: Option<u64>,
+}
+impl SimHash for DayRhythm {
+    const NAME: &'static str = "island_day_rhythm_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.opt(self.last_meal.as_ref(), |h, meal| h.u64(*meal));
+    }
+}
+
+/// The day, while `actor` is in a meal block (none outside one).
+pub fn meal_block(world: &World, actor: Entity) -> Option<u64> {
+    let spec = spec(world)?;
+    let traits = traits(world, actor);
+    let schedule = &spec.schedule;
+    let at = (day_permille(world) - traits.chronotype * schedule.chronotype_shift / 100)
+        .rem_euclid(1000);
+    let day = world.resource::<SimClock>().tick / world.resource::<SimConfig>().day_length.max(1);
+    schedule
+        .blocks
+        .iter()
+        .any(|block| block.kind == BlockKind::Meal && contains(block.from, block.to, at))
+        .then_some(day)
 }
 
 /// Marks that the travel of the leaf being started was abandoned for good.

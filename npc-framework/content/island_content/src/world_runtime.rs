@@ -5,9 +5,30 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use npc_framework::prelude::*;
 
-/// The world preset this island was built from (construction data).
-#[derive(Resource, Clone)]
+/// The world preset this island was built from: its rules (needs, day and
+/// night, the living world's catalog and behaviour). Hashed and saved
+/// (`island_world_rules_v1`), so a save carries the rules it was made under
+/// and Continue never depends on an edited world file (review fix S1.3).
+#[derive(Resource, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ActiveWorld(pub WorldPreset);
+
+impl ActiveWorld {
+    /// Canonical JSON of the rules: structs and `BTreeMap`s only, so the
+    /// text is the same on every run and platform.
+    pub fn canonical(&self) -> String {
+        serde_json::to_string(&self.0).unwrap_or_default()
+    }
+}
+
+impl npc_framework::kernel::hash::SimHashResource for ActiveWorld {
+    const NAME: &'static str = "island_world_rules_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.str(&self.canonical());
+    }
+    fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
+        Some(npc_framework::snapshot::serde_resource_fns::<Self>())
+    }
+}
 
 /// Installs the world rules before content freezes: the AI scheduler policy,
 /// [`ActiveWorld`] and the day/night clock.

@@ -160,7 +160,7 @@ pub(super) fn speak(world: &mut World, actor: SimId, target: Option<SimId>, text
     let offer = if let Some(reply) = public_topic_reply(world, text) {
         reply
     } else if super::frontier::economy_spec::is_service(world, person.role) {
-        format!("A bed costs {} coins.", catalog::BED_PRICE)
+        format!("A bed costs {} coins.", catalog::bed_price(world))
     } else if goods.is_empty() {
         "Welcome to the village.".into()
     } else {

@@ -4,7 +4,7 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use npc_framework::crafting::Crafting;
-use npc_framework::interaction::items::{self, entity_of};
+use npc_framework::interaction::items::entity_of;
 use npc_framework::interaction::{CarriedBy, Item};
 use npc_framework::kernel::journal::ReleaseReason;
 use npc_framework::prelude::*;
@@ -297,16 +297,16 @@ fn finish_check(world: &World, actor: Entity, work: Hunting) -> Result<(), Strin
 /// The host calls once in sorted island Effects, before autonomous decisions.
 pub fn tick(world: &mut World) {
     let now = world.resource::<SimClock>().tick;
-    let hunters: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter_map(|(id, entity)| {
-            world
-                .get::<Hunting>(*entity)
-                .map(|work| (*id, *entity, *work))
+    let mut hunters: Vec<_> = world
+        .try_query::<(Entity, &SimId, &Hunting)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .map(|(entity, id, work)| (*id, entity, *work))
+                .collect()
         })
-        .collect();
+        .unwrap_or_default();
+    hunters.sort_unstable_by_key(|(id, _, _)| *id);
     for (id, actor, work) in hunters {
         // Invalidated targets release claims promptly. Ownership, capacity and
         // reach are rechecked at completion before any physical goods change.
@@ -335,9 +335,16 @@ pub fn tick(world: &mut World) {
         for target in claims {
             release(world, actor, target, ReleaseReason::Finished);
         }
-        let tool = entity_of(world, work.tool).expect("checked spear");
-        items::take_from_holder(world, tool);
-        world.despawn(tool);
+        // The spear wears one use per hunt (review fix S2.2: `durability`
+        // in data) instead of being spent.
+        let spear = world
+            .get::<npc_framework::interaction::Item>(
+                entity_of(world, work.tool).expect("checked spear"),
+            )
+            .map(|item| item.kind.clone());
+        if let Some(kind) = spear {
+            super::living::wear_tool(world, actor, id, &kind);
+        }
         let prey = entity_of(world, work.target).expect("checked animal");
         world.despawn(prey);
         for item in yield_items(world) {
@@ -356,24 +363,25 @@ pub fn tick(world: &mut World) {
             world,
             Some(id),
             "VillageHunted",
-            &json!({"target":work.target,"meat":2,"hide":1,"spear_spent":true}),
+            &json!({"target":work.target,"meat":2,"hide":1,"spear_spent":false}),
         );
     }
     super::frontier::ecology::wildlife_tick(world);
 }
 
 fn replenish(world: &mut World, habitat: SimId, home: SimPos, capacity: u32) {
-    let individuals: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .filter(|entity| {
-            world
-                .get::<Wildlife>(*entity)
-                .is_some_and(|wildlife| wildlife.habitat == habitat)
+    let mut individuals: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &Wildlife)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .filter(|(_, _, wildlife)| wildlife.habitat == habitat)
+                .map(|(entity, id, _)| (*id, entity))
+                .collect()
         })
-        .collect();
+        .unwrap_or_default();
+    individuals.sort_unstable_by_key(|(id, _)| *id);
+    let individuals: Vec<Entity> = individuals.into_iter().map(|(_, entity)| entity).collect();
     let mut positions = Vec::new();
     let mut living_count = 0_usize;
     for entity in individuals {

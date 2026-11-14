@@ -43,7 +43,7 @@ impl Overlay {
     ];
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Trades => "Trades",
+            Self::Trades => "Jobs",
             Self::HomesAndBeds => "Homes and beds",
             Self::OpenJobs => "Open jobs",
             Self::ResourcePatches => "Resource patches",
@@ -312,7 +312,7 @@ pub(crate) fn spawn(world: &mut World) {
         ledger,
         "Ledger",
         Icon::Ledger,
-        Some("F11"),
+        None,
         DockAction::LedgerLast,
         "Open the ledger on the page it showed last. Its tabs lead to the others.",
     );
@@ -356,7 +356,7 @@ pub(crate) fn spawn(world: &mut World) {
             );
             world.entity_mut(row).insert(Tooltip::new(
                 overlay.label(),
-                "Colour each resident's marker by trade and show the key.",
+                "Colour each resident's marker by job and show the key.",
             ));
         } else {
             icon::icon(
@@ -429,15 +429,21 @@ pub(crate) fn keys(world: &mut World) {
             }
         }
     }
-    if keys.just_pressed(KeyCode::KeyO) {
-        pressed.push((KeyCode::KeyO, Some(DockAction::Overlays)));
+    use crate::keymap::{self as map, Mode};
+    let (overlays, places, follow_key) = (
+        map::key(Mode::Oversee, map::OVERLAYS),
+        map::key(Mode::Oversee, map::PLACES),
+        map::key(Mode::Card, map::FOLLOW),
+    );
+    if keys.just_pressed(overlays) {
+        pressed.push((overlays, Some(DockAction::Overlays)));
     }
-    if keys.just_pressed(KeyCode::KeyM) {
-        pressed.push((KeyCode::KeyM, Some(DockAction::Places)));
+    if keys.just_pressed(places) {
+        pressed.push((places, Some(DockAction::Places)));
     }
-    let follow = keys.just_pressed(KeyCode::KeyF) && crate::resident_inspector::open(world);
+    let follow = keys.just_pressed(follow_key) && crate::resident_inspector::open(world);
     if follow {
-        pressed.push((KeyCode::KeyF, None));
+        pressed.push((follow_key, None));
     }
     if pressed.is_empty() {
         return;

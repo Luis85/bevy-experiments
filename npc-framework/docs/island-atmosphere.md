@@ -1239,21 +1239,24 @@ tested without a device.
   - a galloping deer (`step_dirt_*` as hooves);
   - a door drawn open (`door_open`).
 
-  Only within 45 m of the focus, only what the fog shows live, at most 8 voices at
+  Only within 45 m of the focus, at most 8 voices at
   once, and each emitter at its own cadence with a pitch of 0.92 to 1.08 from a
   view-side hash. A stopped clock or a menu: none. At 3x and 10x the clock thins
   them (3 and 2 a second, longer waits) rather than pitching them up. Reduce motion
   does not touch sound.
 - **Music.** `day` or `night` by the lamp curve, then a gap of 150 s plus 90 to 210 s.
   `jingle_morning` plays on a new day and `jingle_built` when a civic building is
-  added. Music holds while a menu is open.
+  added. Both play only in play: a load, New game or Continue never plays one,
+  because the music system must have run within a quarter of a day before the
+  change. Music holds while a menu is open.
 - **Interface.** The UI kit (`game_ui::sound`) writes `PlayUiSound(UiSound)` for
   clicks, hovers, panels opening and closing, refusals, placing, alerts, coins and
   pages. `island_audio` plays each once a frame from `ui/`. There is no second click
   path.
 - **Log.** Each layer that becomes audible, each one-shot, each music start and each
-  UI sound logs one `island_audio:` line, which `capture_world.py --only sound11`
-  counts.
+  UI sound logs one `island_audio:` line at debug level, which
+  `capture_world.py --only sound11` counts. Run it with
+  `RUST_LOG=info,island_view::island_audio=debug`.
 
 ## Capture and review aids
 

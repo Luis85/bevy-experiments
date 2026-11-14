@@ -1,108 +1,35 @@
-//! Visual entities for the testbed's sim entities. Each sim entity with a
-//! `Prop`, an `Item` or a `IslandUnit` gets its own visual root carrying
-//! `VisualOf(sim)`; nothing is ever inserted on the sim entity itself.
+//! Visual entities for the island's residents and loose items. Each sim
+//! entity with an `Item` or an `IslandUnit` gets its own visual root carrying
+//! `VisualOf(sim)`; nothing is ever inserted on the sim entity itself. (The
+//! island spawns no `Prop`s, walls, doors, trees, ore rocks or vehicles of the
+//! older testbed layout; their visuals are gone.)
 //!
-//! Scale (`docs/_notes/testbed-assets-measured.md`): every model is brought
-//! to KayKit 1:1 (×KK), then scaled by the view factor [`V`] = 0.75 (a
-//! Knight is 1.74 m, a 4-unit Dungeon wall piece 3 m).
-//!
-//! **Doors vs. the Dungeon doorway.** The sim's doors are one 1 m cell in a
-//! 1 m-thick wall, but the Dungeon `wall_doorway` piece is 4 units wide
-//! (3 m at `V`) with a 2-unit (1.5 m) leaf. The view squeezes the doorway
-//! piece along the wall to [`DOOR_SX`] = 0.5 (a 2 m piece whose opening and
-//! leaf are exactly the 1 m door cell; its solid ends overlap half of each
-//! neighbouring wall cell) and keeps the height at `V` (a 2.06 m opening).
-//! The leaf node `wall_doorway_door` is re-parented onto a hinge pivot that
-//! carries the non-uniform scale itself, so rotating it never shears.
-//! Wall runs are tiled with `wall` pieces stretched to the run's length.
-//!
-//! Fog of war ([`crate::fog`]): every visual root carries the look decided
-//! for it (`Fogged`); trees, doors and items lying on the ground follow a
-//! last-seen look, and each wall piece is fogged by its own cells.
+//! Scale: every KayKit character is brought to 1:1 and scaled by the view
+//! factor [`V`] = 0.75 (a Knight is 1.74 m).
 
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, world_serialization::WorldInstanceReady};
+use bevy::prelude::*;
 use island_content::content::{AXE, BREAD, HAMMER, INGOT, LOG, ORE, PICKAXE, PLANK};
-use island_content::{IslandUnit, Prop, PropKind};
+use island_content::{IslandUnit, Prop};
 use npc_framework::interaction::items::{MAIN_HAND, OFF_HAND};
-use npc_framework::perception::{SeenState, Sensors};
+use npc_framework::perception::Sensors;
 use npc_framework::prelude::{
-    CarriedBy, Door, GridBlocker, Item, MountedIn, Owner, PrevSimPos, SimClock, SimControl, SimId,
-    SimIndex, SimPos, SimRate, SimTime, ToolTarget, Vehicle,
+    CarriedBy, Item, Owner, PrevSimPos, SimClock, SimControl, SimId, SimIndex, SimPos, SimRate,
+    SimTime,
 };
 use npc_framework::view_helpers::interp::interp_alpha;
 use npc_framework::view_helpers::{Selectable, ViewSystems, VisualIndex, VisualOf, sim_to_world};
 
 use crate::assets::{ModelKind, Models, ViewAssets};
-use crate::fog::{FogArea, FogDim, FogSet, Fogged, Look};
+use crate::fog::{FogDim, FogSet, Fogged, Look};
 use crate::island_world::cast::{self, Cast};
 
 /// The view factor: KayKit 1:1 model units → metres.
 pub const V: f32 = 0.75;
-/// Hex-kit models are ¼ KayKit scale.
-const HEX: f32 = 4.0 * V;
-/// Kenney Survival models (workbench, anvil, campfire, tools).
-const SURVIVAL: f32 = 4.5 * V;
 pub(crate) const KENNEY_TOOL: f32 = 4.7;
-const CART_SCALE: f32 = 3.0 * V;
-const RAM_SCALE: f32 = 2.5 * V;
-/// Length of a Dungeon wall piece in model units.
-const WALL_PIECE: f32 = 4.0;
-/// Wall pieces: 3 m high, 1 m thick (the `GridBlocker` cell).
-const WALL_SCALE_Y: f32 = V;
-const WALL_SCALE_Z: f32 = 1.0;
-/// Doorway along the wall (see the module docs).
-pub const DOOR_SX: f32 = 0.5;
-/// Doorway height / depth: a hair over the walls' so faces never coincide.
-const DOOR_SY: f32 = V * 1.01;
-const DOOR_SZ: f32 = 1.08;
-/// The leaf's own scale (it is re-parented off the squeezed frame).
-const LEAF_SCALE: Vec3 = Vec3::new(DOOR_SX, DOOR_SY, V);
-/// `wall_doorway_door`'s node x (model units): the hinge line.
-const DOOR_HINGE_X: f32 = -0.820_098_9;
-/// Negative: doors swing away from the yard side (local -z) into the rooms
-/// and, for the gate, into the compound.
-/// The hinge sits near the room-side face of the 1 m wall (local +z), so the
-/// open leaf lies in the room instead of inside the wall's thickness.
-const DOOR_HINGE_Z: f32 = 0.33;
-const DOOR_OPEN: f32 = -95.0 * PI / 180.0;
-/// Door swing speed, radians per second.
-const DOOR_RATE: f32 = 2.4;
 /// Yaw smoothing rate (1/s).
 const TURN_RATE: f32 = 10.0;
-
-/// A static prop (walls, workstations, the chest).
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct StaticVisual;
-
-/// A tree: its two looks, swapped when its `ToolTarget` is used up.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct TreeVisual {
-    tree: Entity,
-    stump: Entity,
-    depleted: Option<bool>,
-}
-
-/// The ore rock: shrinks as its uses run out.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct OreVisual {
-    model: Entity,
-    shown: Option<Option<u32>>,
-}
-
-/// A door: its current leaf angle and the hinge pivot (once the model is in).
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct DoorVisual {
-    pub angle: f32,
-    pivot: Option<Entity>,
-}
-
-/// On the doorway frame model, for its ready observer.
-#[derive(Component, Clone, Copy, Debug)]
-struct DoorFrame {
-    root: Entity,
-}
 
 /// An item: where its model is and what holds it.
 #[derive(Component, Clone, Debug)]
@@ -186,22 +113,6 @@ pub(crate) struct ActorModel {
     pub root: Entity,
 }
 
-/// A vehicle's visual root.
-#[derive(Component, Clone, Debug)]
-pub(crate) struct VehicleVisual {
-    kind: PropKind,
-    pub motion: Motion,
-    wheels: Vec<Entity>,
-    spin: f32,
-    last: Option<Vec3>,
-}
-
-#[derive(Component, Clone, Copy, Debug)]
-struct VehicleModel {
-    root: Entity,
-    kind: PropKind,
-}
-
 /// Faction ring mesh and materials.
 #[derive(Resource, Clone)]
 pub(crate) struct Rings {
@@ -223,13 +134,7 @@ pub(crate) fn plugin(app: &mut App) {
         )
         .add_systems(
             Update,
-            (
-                (tree_states, ore_states, swing_doors),
-                vehicle_transforms,
-                spin_wheels,
-                actor_transforms,
-                item_transforms,
-            )
+            (actor_transforms, item_transforms)
                 .chain()
                 .after(FogSet)
                 .in_set(ViewSystems::Animate),
@@ -283,15 +188,6 @@ fn model(scene: &Handle<bevy::world_serialization::WorldAsset>, t: Transform) ->
     (WorldAssetRoot(scene.clone()), t)
 }
 
-fn yaw_of(prop: &Prop) -> Quat {
-    Quat::from_rotation_y((prop.yaw_deg as f32).to_radians())
-}
-
-/// A deterministic per-entity variation in `0..n` (from its `SimId`).
-fn vary(id: Option<&SimId>, n: u32) -> u32 {
-    id.map_or(0, |i| i.0.wrapping_mul(2_654_435_761) >> 16) % n.max(1)
-}
-
 #[allow(clippy::too_many_arguments)]
 fn spawn_visuals(
     mut commands: Commands,
@@ -303,7 +199,6 @@ fn spawn_visuals(
     ),
     mut index: ResMut<VisualIndex>,
     alive: Query<(), With<VisualOf>>,
-    props: Query<(Entity, Option<&SimId>, &Prop, &SimPos, Option<&GridBlocker>)>,
     items: Query<(Entity, &Item, Option<&SimPos>), (Without<Prop>, Without<IslandUnit>)>,
     actors: Query<
         (
@@ -330,157 +225,6 @@ fn spawn_visuals(
             true
         }
     };
-
-    for (sim, id, prop, pos, blocker) in &props {
-        if !fresh(&mut index, sim) {
-            continue;
-        }
-        let at = sim_to_world(*pos);
-        let root_id = commands
-            .spawn((
-                Name::new(format!("visual {}", prop.kind.name())),
-                VisualOf(sim),
-                Transform::from_translation(at).with_rotation(yaw_of(prop)),
-                Visibility::default(),
-                Fogged::default(),
-                FogDim::default(),
-            ))
-            .id();
-        match prop.kind {
-            PropKind::Wall => {
-                commands.entity(root_id).insert(StaticVisual);
-                spawn_wall(&mut commands, (root_id, at), m, blocker, prop);
-            }
-            PropKind::Doorway => {
-                commands.entity(root_id).insert((
-                    DoorVisual {
-                        angle: 0.0,
-                        pivot: None,
-                    },
-                    Selectable,
-                ));
-                commands
-                    .spawn((
-                        ChildOf(root_id),
-                        DoorFrame { root: root_id },
-                        model(
-                            &m.doorway,
-                            Transform::from_scale(Vec3::new(DOOR_SX, DOOR_SY, DOOR_SZ)),
-                        ),
-                    ))
-                    .observe(on_doorway_ready);
-            }
-            PropKind::Tree => {
-                let yaw = Quat::from_rotation_y(vary(id, 360) as f32 * PI / 180.0);
-                let b = vary(id, 2) == 1;
-                let scale = Vec3::splat(HEX * if b { 1.05 } else { 1.0 });
-                let tree = commands
-                    .spawn((
-                        ChildOf(root_id),
-                        model(
-                            if b { &m.tree_b } else { &m.tree_a },
-                            Transform::from_rotation(yaw).with_scale(scale),
-                        ),
-                    ))
-                    .id();
-                let stump = commands
-                    .spawn((
-                        ChildOf(root_id),
-                        model(
-                            if b { &m.stump_b } else { &m.stump_a },
-                            Transform::from_rotation(yaw).with_scale(scale),
-                        ),
-                        Visibility::Hidden,
-                    ))
-                    .id();
-                commands.entity(root_id).insert((
-                    TreeVisual {
-                        tree,
-                        stump,
-                        depleted: None,
-                    },
-                    Selectable,
-                ));
-            }
-            PropKind::OreRock => {
-                let model_id = commands
-                    .spawn((
-                        ChildOf(root_id),
-                        model(&m.stone, Transform::from_scale(Vec3::splat(HEX))),
-                    ))
-                    .id();
-                commands.entity(root_id).insert((
-                    OreVisual {
-                        model: model_id,
-                        shown: None,
-                    },
-                    Selectable,
-                ));
-            }
-            PropKind::Workbench | PropKind::Anvil | PropKind::Forge => {
-                commands.entity(root_id).insert((StaticVisual, Selectable));
-                let scene = match prop.kind {
-                    PropKind::Workbench => &m.workbench,
-                    PropKind::Anvil => &m.anvil,
-                    _ => &m.forge,
-                };
-                commands.spawn((
-                    ChildOf(root_id),
-                    model(scene, Transform::from_scale(Vec3::splat(SURVIVAL))),
-                ));
-            }
-            PropKind::Chest => {
-                commands.entity(root_id).insert((StaticVisual, Selectable));
-                commands.spawn((
-                    ChildOf(root_id),
-                    model(
-                        &m.chest,
-                        Transform::from_rotation(Quat::from_rotation_y(PI))
-                            .with_scale(Vec3::splat(0.6)),
-                    ),
-                ));
-            }
-            PropKind::Cart | PropKind::Wagon => {
-                commands.entity(root_id).insert((
-                    VehicleVisual {
-                        kind: prop.kind,
-                        motion: Motion::at(at),
-                        wheels: Vec::new(),
-                        spin: 0.0,
-                        last: None,
-                    },
-                    Selectable,
-                ));
-                let (scene, t) = if prop.kind == PropKind::Cart {
-                    // A hand-cart leads with its handles (model -z).
-                    (
-                        &m.cart,
-                        Transform::from_rotation(Quat::from_rotation_y(PI))
-                            .with_scale(Vec3::splat(CART_SCALE)),
-                    )
-                } else {
-                    // The ram is long along model x: turn it so it drives
-                    // along +Z like the cart.
-                    (
-                        &m.ram,
-                        Transform::from_rotation(Quat::from_rotation_y(-PI / 2.0))
-                            .with_scale(Vec3::splat(RAM_SCALE)),
-                    )
-                };
-                commands
-                    .spawn((
-                        ChildOf(root_id),
-                        VehicleModel {
-                            root: root_id,
-                            kind: prop.kind,
-                        },
-                        model(scene, t),
-                    ))
-                    .observe(on_vehicle_ready);
-            }
-        }
-        index.map.insert(sim, root_id);
-    }
 
     for (sim, item, pos) in &items {
         if !fresh(&mut index, sim) {
@@ -605,141 +349,8 @@ fn spawn_visuals(
     }
 }
 
-/// Tiles a wall run (`GridBlocker` footprint, local x along the run) with
-/// `wall` pieces stretched to its length. Each piece is fogged by the cells
-/// it covers (`FogArea`).
-fn spawn_wall(
-    commands: &mut Commands,
-    (root, at): (Entity, Vec3),
-    m: &Models,
-    blocker: Option<&GridBlocker>,
-    prop: &Prop,
-) {
-    let Some(b) = blocker else { return };
-    let half = if prop.yaw_deg == 0 {
-        b.0.half_x_mm
-    } else {
-        b.0.half_z_mm
-    };
-    // A run of n cells has a footprint half extent of (n-1)/2 m.
-    let len = 2.0 * half as f32 / 1000.0 + 1.0;
-    let pieces = (len / (WALL_PIECE * V)).ceil().max(1.0);
-    let piece = len / pieces;
-    let yaw = yaw_of(prop);
-    for i in 0..pieces as i32 {
-        let x = -len / 2.0 + piece * (i as f32 + 0.5);
-        commands.spawn((
-            ChildOf(root),
-            model(
-                &m.wall,
-                Transform::from_xyz(x, 0.0, 0.0).with_scale(Vec3::new(
-                    piece / WALL_PIECE,
-                    WALL_SCALE_Y,
-                    WALL_SCALE_Z,
-                )),
-            ),
-            Visibility::default(),
-            FogArea::around(
-                at + yaw * Vec3::new(x, 0.0, 0.0),
-                yaw * Vec3::new(piece / 2.0, 0.0, 0.5),
-            ),
-            FogDim::default(),
-        ));
-    }
-}
-
-/// Re-parents the door leaf onto a hinge pivot under the visual root (see
-/// the module docs).
-fn on_doorway_ready(
-    ready: On<WorldInstanceReady>,
-    mut commands: Commands,
-    frames: Query<&DoorFrame>,
-    children: Query<&Children>,
-    names: Query<&Name>,
-    mut doors: Query<&mut DoorVisual>,
-) {
-    let Ok(frame) = frames.get(ready.entity) else {
-        return;
-    };
-    let Some(leaf) = children.iter_descendants(ready.entity).find(|e| {
-        names
-            .get(*e)
-            .is_ok_and(|n| n.as_str() == "wall_doorway_door")
-    }) else {
-        warn!("island_view: doorway model has no `wall_doorway_door` node");
-        return;
-    };
-    let pivot = commands
-        .spawn((
-            Name::new("door hinge"),
-            ChildOf(frame.root),
-            Transform::from_xyz(DOOR_HINGE_X * DOOR_SX, 0.0, DOOR_HINGE_Z).with_scale(LEAF_SCALE),
-            Visibility::default(),
-        ))
-        .id();
-    commands
-        .entity(leaf)
-        .insert((ChildOf(pivot), Transform::IDENTITY));
-    if let Ok(mut door) = doors.get_mut(frame.root) {
-        door.pivot = Some(pivot);
-    }
-}
-
-/// Wheel re-pivoting: `(node name, centre offset from the node origin, model
-/// units)` per vehicle model (measured).
-fn wheel_spec(kind: PropKind) -> (&'static str, Vec3) {
-    match kind {
-        PropKind::Cart => ("Group", Vec3::new(-0.061, 0.234, 0.234)),
-        _ => ("wheel", Vec3::new(-0.2015, 0.2015, 0.0665)),
-    }
-}
-
-/// Inserts a pivot at each wheel's centre (the nodes' origins sit on a rim
-/// corner) so wheels spin about their hub.
-#[allow(clippy::too_many_arguments)]
-fn on_vehicle_ready(
-    ready: On<WorldInstanceReady>,
-    mut commands: Commands,
-    models: Query<&VehicleModel>,
-    children: Query<&Children>,
-    names: Query<&Name>,
-    parents: Query<&ChildOf>,
-    transforms: Query<&Transform>,
-    mut vehicles: Query<&mut VehicleVisual>,
-) {
-    let Ok(vm) = models.get(ready.entity) else {
-        return;
-    };
-    let (name, centre) = wheel_spec(vm.kind);
-    let mut wheels = Vec::new();
-    for e in children.iter_descendants(ready.entity) {
-        if !names.get(e).is_ok_and(|n| n.as_str() == name) {
-            continue;
-        }
-        let (Ok(parent), Ok(t)) = (parents.get(e), transforms.get(e)) else {
-            continue;
-        };
-        let pivot = commands
-            .spawn((
-                Name::new("wheel hub"),
-                ChildOf(parent.parent()),
-                Transform::from_translation(t.translation + centre),
-                Visibility::default(),
-            ))
-            .id();
-        commands
-            .entity(e)
-            .insert((ChildOf(pivot), Transform::from_translation(-centre)));
-        wheels.push(pivot);
-    }
-    if let Ok(mut v) = vehicles.get_mut(vm.root) {
-        v.wheels = wheels;
-    }
-}
-
 /// Despawns visuals whose sim entity is gone.
 type VisualSimKinds = Or<(
-    With<Prop>,
     With<Item>,
     With<IslandUnit>,
     With<island_content::village::VillagePlace>,
@@ -768,90 +379,6 @@ pub(crate) fn despawn_visuals(
     });
 }
 
-/// The last-seen fact (`fact` of its `SeenState`) a fogged visual shows
-/// instead of the live one, if any.
-fn last_seen(fogged: Option<&Fogged>, fact: impl Fn(&SeenState) -> Option<bool>) -> Option<bool> {
-    match fogged {
-        Some(Fogged(Look::LastSeen(s))) => fact(s),
-        _ => None,
-    }
-}
-
-fn tree_states(
-    sims: Query<&ToolTarget>,
-    mut trees: Query<(&VisualOf, &mut TreeVisual, Option<&Fogged>)>,
-    mut vis: Query<&mut Visibility>,
-) {
-    for (of, mut t, fogged) in &mut trees {
-        let depleted = last_seen(fogged, |s| s.felled)
-            .unwrap_or_else(|| sims.get(of.0).is_ok_and(|tt| tt.remaining == Some(0)));
-        if t.depleted == Some(depleted) {
-            continue;
-        }
-        t.depleted = Some(depleted);
-        let (show, hide) = if depleted {
-            (t.stump, t.tree)
-        } else {
-            (t.tree, t.stump)
-        };
-        if let Ok(mut v) = vis.get_mut(show) {
-            *v = Visibility::Inherited;
-        }
-        if let Ok(mut v) = vis.get_mut(hide) {
-            *v = Visibility::Hidden;
-        }
-    }
-}
-
-fn ore_states(
-    sims: Query<&ToolTarget>,
-    mut ores: Query<(&VisualOf, &mut OreVisual)>,
-    mut transforms: Query<&mut Transform>,
-) {
-    for (of, mut ore) in &mut ores {
-        let remaining = sims.get(of.0).ok().and_then(|t| t.remaining);
-        if ore.shown == Some(remaining) {
-            continue;
-        }
-        ore.shown = Some(remaining);
-        // Six uses: full size down to a pebble pile.
-        let f = remaining.map_or(1.0, |r| 0.35 + 0.65 * (r.min(6) as f32 / 6.0));
-        if let Ok(mut t) = transforms.get_mut(ore.model) {
-            t.scale = Vec3::splat(HEX * f);
-        }
-    }
-}
-
-fn swing_doors(
-    time: Res<Time>,
-    sims: Query<&Door>,
-    mut doors: Query<(&VisualOf, &mut DoorVisual, Option<&Fogged>)>,
-    mut transforms: Query<&mut Transform>,
-) {
-    let step = DOOR_RATE * time.delta_secs();
-    for (of, mut door, fogged) in &mut doors {
-        let open =
-            last_seen(fogged, |s| s.open).unwrap_or_else(|| sims.get(of.0).is_ok_and(|d| d.open));
-        let want = if open { DOOR_OPEN } else { 0.0 };
-        let d = want - door.angle;
-        door.angle += d.clamp(-step, step);
-        let Some(pivot) = door.pivot else { continue };
-        if let Ok(mut t) = transforms.get_mut(pivot) {
-            // Ease the swing: slow at both ends.
-            let eased = DOOR_OPEN * smooth(door.angle / DOOR_OPEN);
-            let r = Quat::from_rotation_y(eased);
-            if t.rotation != r {
-                t.rotation = r;
-            }
-        }
-    }
-}
-
-fn smooth(t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
 pub(crate) fn lerp_angle(from: f32, to: f32, t: f32) -> f32 {
     let mut d = (to - from) % (2.0 * PI);
     if d > PI {
@@ -877,85 +404,6 @@ fn frame_params(inputs: &MotionInputs) -> (f32, Option<u64>, f32) {
     (alpha, clock.as_ref().map(|c| c.tick), turn)
 }
 
-fn vehicle_transforms(
-    inputs: MotionInputs,
-    sims: Query<(&SimPos, Option<&PrevSimPos>)>,
-    mut visuals: Query<(&VisualOf, &mut Transform, &mut VehicleVisual)>,
-) {
-    let (alpha, tick, turn) = frame_params(&inputs);
-    for (of, mut transform, mut vis) in &mut visuals {
-        let Ok((pos, prev)) = sims.get(of.0) else {
-            continue;
-        };
-        let now = sim_to_world(*pos);
-        let prev = prev.map_or(now, |p| sim_to_world(p.0));
-        let at = vis.motion.step(tick, prev, now, alpha);
-        if let Some(h) = vis.motion.heading() {
-            vis.motion.turn_towards(h, turn * 0.5);
-        }
-        transform.translation = at;
-        transform.rotation = Quat::from_rotation_y(vis.motion.yaw);
-    }
-}
-
-fn spin_wheels(
-    mut vehicles: Query<(&Transform, &mut VehicleVisual)>,
-    mut transforms: Query<&mut Transform, Without<VehicleVisual>>,
-) {
-    for (t, mut v) in &mut vehicles {
-        let here = t.translation;
-        let moved = v
-            .last
-            .map_or(0.0, |last| (here - last).dot(t.rotation * Vec3::Z));
-        v.last = Some(here);
-        if moved.abs() < 1e-6 {
-            continue;
-        }
-        let (axis, radius, sign) = match v.kind {
-            PropKind::Cart => (Vec3::X, 0.234 * CART_SCALE, 1.0),
-            _ => (Vec3::Z, 0.2015 * RAM_SCALE, -1.0),
-        };
-        v.spin = (v.spin + sign * moved / radius) % (2.0 * PI);
-        let r = Quat::from_axis_angle(axis, v.spin);
-        for &w in &v.wheels {
-            if let Ok(mut wt) = transforms.get_mut(w) {
-                wt.rotation = r;
-            }
-        }
-    }
-}
-
-/// Where a rider sits on a vehicle, in the vehicle's frame (+Z forward).
-/// The sim's seat offsets are world-axis mm (vehicles have no heading in
-/// the sim); the view reads them as vehicle-local (forward = +z), lifts the
-/// rider onto the bed and spreads riders that share an offset sideways.
-fn seat_local(kind: PropKind, vehicle: &Vehicle, seat: u8) -> Vec3 {
-    let seat = seat as usize;
-    let offset = vehicle
-        .seats
-        .get(seat)
-        .map_or(SimPos::new(0, 0), |s| s.offset);
-    let same: Vec<usize> = vehicle
-        .seats
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| s.offset == offset)
-        .map(|(i, _)| i)
-        .collect();
-    let k = same.iter().position(|&i| i == seat).unwrap_or(0) as f32;
-    let lateral = (k - (same.len() as f32 - 1.0) / 2.0) * 0.8;
-    let (lift, forward) = match kind {
-        // In the bed, behind the handles.
-        PropKind::Cart => (0.42, -0.35),
-        _ => (0.8, 0.5),
-    };
-    Vec3::new(
-        offset.x as f32 / 1000.0 + lateral,
-        lift,
-        offset.z as f32 / 1000.0 + forward,
-    )
-}
-
 #[allow(clippy::type_complexity)]
 fn actor_transforms(
     inputs: MotionInputs,
@@ -963,43 +411,17 @@ fn actor_transforms(
         &SimPos,
         Option<&PrevSimPos>,
         Option<&npc_framework::prelude::Facing>,
-        Option<&MountedIn>,
     )>,
-    index: Option<Res<SimIndex>>,
-    vehicle_sims: Query<(&Vehicle, &Prop)>,
-    vis_index: Res<VisualIndex>,
-    vehicle_visuals: Query<&Transform, (With<VehicleVisual>, Without<ActorVisual>)>,
     mut visuals: Query<(&VisualOf, &mut Transform, &mut ActorVisual)>,
 ) {
     let (alpha, tick, turn) = frame_params(&inputs);
     for (of, mut transform, mut vis) in &mut visuals {
-        let Ok((pos, prev, facing, mounted)) = sims.get(of.0) else {
+        let Ok((pos, prev, facing)) = sims.get(of.0) else {
             continue;
         };
         let now = sim_to_world(*pos);
         let prev = prev.map_or(now, |p| sim_to_world(p.0));
         let at = vis.motion.step(tick, prev, now, alpha);
-
-        // Riders sit on their vehicle's visual, facing its way.
-        if let Some(m) = mounted {
-            let ride = index
-                .as_deref()
-                .and_then(|i| i.get(m.vehicle))
-                .and_then(|ve| {
-                    let (v, p) = vehicle_sims.get(ve).ok()?;
-                    let vt = vis_index
-                        .map
-                        .get(&ve)
-                        .and_then(|e| vehicle_visuals.get(*e).ok())?;
-                    Some((vt, seat_local(p.kind, v, m.seat)))
-                });
-            if let Some((vt, local)) = ride {
-                transform.translation = vt.translation + vt.rotation * local;
-                transform.rotation = vt.rotation;
-                vis.motion.yaw = vt.rotation.to_euler(EulerRot::YXZ).0;
-                continue;
-            }
-        }
 
         let target = vis.motion.heading().or_else(|| {
             facing
@@ -1241,8 +663,7 @@ mod tests {
     }
 
     use npc_framework::interaction::items::{place_in_world, put_in_inventory, put_in_slot};
-    use npc_framework::perception::{ExploredCells, RevealsFog, SeenStatics, VisibleCells};
-    use npc_framework::prelude::{Equipment, GridBounds, Inventory, SpatialGrid, spawn_sim};
+    use npc_framework::prelude::{Equipment, Inventory, spawn_sim};
 
     // Render-system fixtures have handles, not loaded models or a GPU. The
     // holder's hand/grip is a view entity; item ownership uses the real API.
@@ -1260,30 +681,21 @@ mod tests {
             actor: vec![default(); ModelKind::ANIMATED.len()],
             grass: default(),
             models: models!(
-                wall,
-                doorway,
                 chest,
                 food,
                 ingot,
                 barrel,
                 crate_large,
-                tree_a,
-                tree_b,
-                stump_a,
-                stump_b,
                 stone,
                 lumber,
                 book,
                 axe,
                 workbench,
                 anvil,
-                forge,
                 pickaxe,
                 hammer,
                 log,
                 planks,
-                ram,
-                cart
             ),
         });
         app.insert_resource(Rings {
@@ -1424,179 +836,14 @@ mod tests {
         }
     }
     #[test]
-    fn unseen_real_pickup_keeps_last_seen_ghost_until_the_cell_is_seen_empty() {
-        let (mut app, holder, item, _) = carried_fixture(ModelKind::Rogue);
-        let bounds = GridBounds::centered(8, 8);
-        app.insert_resource(SpatialGrid::new(1000, bounds));
-        app.insert_resource(crate::fog::FogOfWar { enabled: true });
-        app.add_plugins(crate::fog::plugin);
-        let (_, observer) = spawn_sim(app.world_mut(), (SimPos::new(0, 0), RevealsFog));
-        let id = *app.world().get::<SimId>(item).unwrap();
-        let last = SeenState {
-            kind: 1,
-            pos: SimPos::new(1000, 0),
-            open: None,
-            felled: None,
-            footprint: None,
-        };
-        let explored = ExploredCells::sized(bounds);
-        let mut visible = VisibleCells {
-            bits: vec![0; explored.bits.len()],
-            ..default()
-        };
-        let index = bounds
-            .index(npc_framework::kernel::spatial::CellCoord::new(1, 0))
-            .unwrap() as usize;
-        visible.bits[index / 64] |= 1 << (index % 64);
-        app.world_mut().entity_mut(observer).insert((
-            explored,
-            visible,
-            SeenStatics(std::collections::BTreeMap::from([(id, last)])),
-        ));
-        app.update();
-        let root = item_root(&app, item);
-        app.world_mut()
-            .get_mut::<VisibleCells>(observer)
-            .unwrap()
-            .bits
-            .fill(0);
-        put_in_inventory(app.world_mut(), holder, item);
-        assert_carried_has_no_ground_position(&app, item);
-        app.world_mut().resource_mut::<SimClock>().tick += 1;
-        app.update();
-        assert_eq!(
-            app.world().get::<Fogged>(root).unwrap().0,
-            Look::LastSeen(last)
-        );
-        assert_eq!(
-            app.world().get::<Visibility>(root),
-            Some(&Visibility::Inherited)
-        );
-        assert_eq!(
-            app.world().get::<Transform>(root).unwrap().translation,
-            sim_to_world(last.pos)
-        );
-        assert!(app.world().get::<FogDim>(root).unwrap().0);
-        put_in_slot(app.world_mut(), holder, item, MAIN_HAND);
-        app.world_mut().resource_mut::<SimClock>().tick += 1;
-        app.update();
-        assert_eq!(
-            app.world().get::<Fogged>(root).unwrap().0,
-            Look::LastSeen(last)
-        );
-        assert!(
-            app.world().get::<ChildOf>(root).is_none(),
-            "an unseen equip must not steal the remembered ground ghost"
-        );
-        // The sim's fog pass removes this record only when it observes the
-        // old cell empty (covered separately by npc_perception's regression).
-        app.world_mut()
-            .get_mut::<SeenStatics>(observer)
-            .unwrap()
-            .0
-            .remove(&id);
-        app.world_mut()
-            .get_mut::<VisibleCells>(observer)
-            .unwrap()
-            .bits[index / 64] |= 1 << (index % 64);
-        app.world_mut().resource_mut::<SimClock>().tick += 1;
-        app.update();
-        assert_eq!(
-            app.world().get::<Visibility>(root),
-            Some(&Visibility::Hidden)
-        );
-        assert_eq!(app.world().get::<Fogged>(root).unwrap().0, Look::Hidden);
-    }
-
-    #[test]
-    fn fog_cannot_reveal_own_inventory_or_hide_its_equipped_grip() {
-        let (mut app, holder, item, grip) = carried_fixture(ModelKind::Rogue);
-        let bounds = GridBounds::centered(8, 8);
-        app.insert_resource(SpatialGrid::new(1000, bounds));
-        app.insert_resource(crate::fog::FogOfWar { enabled: true });
-        app.add_plugins(crate::fog::plugin);
-        app.world_mut().entity_mut(holder).insert((
-            IslandUnit {
-                template: "scout".into(),
-                behaviour: island_content::world::Behaviour::Idle,
-                speed_mm_per_tick: 70,
-                home: SimPos::new(0, 0),
-                wander_radius_mm: 0,
-            },
-            RevealsFog,
-            ExploredCells::sized(bounds),
-            VisibleCells {
-                bits: vec![0; ExploredCells::sized(bounds).bits.len()],
-                ..default()
-            },
-        ));
-        app.update();
-        let root = item_root(&app, item);
-        put_in_inventory(app.world_mut(), holder, item);
-        for _ in 0..2 {
-            app.world_mut().resource_mut::<SimClock>().tick += 1;
-            app.update();
-            assert_eq!(app.world().get::<Fogged>(root).unwrap().0, Look::Live);
-            assert_eq!(
-                app.world().get::<Visibility>(root),
-                Some(&Visibility::Hidden)
-            );
-        }
-        put_in_slot(app.world_mut(), holder, item, MAIN_HAND);
-        app.world_mut().resource_mut::<SimClock>().tick += 1;
-        app.update();
-        assert_eq!(
-            app.world().get::<ChildOf>(root).map(ChildOf::parent),
-            Some(grip)
-        );
-        assert_eq!(
-            app.world().get::<Visibility>(root),
-            Some(&Visibility::Inherited)
-        );
-        let holder_root = app.world().resource::<VisualIndex>().map[&holder];
-        assert_eq!(
-            app.world().get::<Visibility>(holder_root),
-            Some(&Visibility::Inherited)
-        );
-        put_in_inventory(app.world_mut(), holder, item);
-        app.world_mut().resource_mut::<SimClock>().tick += 1;
-        app.update();
-        app.world_mut()
-            .resource_mut::<crate::fog::FogOfWar>()
-            .enabled = false;
-        app.update();
-        assert_eq!(
-            app.world().get::<Visibility>(root),
-            Some(&Visibility::Hidden)
-        );
-        assert!(app.world().get::<ChildOf>(root).is_none());
-    }
-
-    #[test]
-    fn models_follow_faction_and_template() {
+    fn models_follow_the_template() {
         assert_eq!(ModelKind::for_actor("smith", Some(1)), ModelKind::Knight);
         assert_eq!(ModelKind::for_actor("scout", Some(1)), ModelKind::Rogue);
+        // The testbed's skeleton templates have no model of their own here.
         assert_eq!(
-            ModelKind::for_actor("skeleton_warrior", Some(2)),
-            ModelKind::SkeletonWarrior
+            ModelKind::for_actor("skeleton_minion", Some(2)),
+            ModelKind::Rogue
         );
-        assert_eq!(
-            ModelKind::for_actor("skeleton_minion", None),
-            ModelKind::SkeletonMinion
-        );
-        assert_eq!(
-            ModelKind::for_actor("novice", Some(2)),
-            ModelKind::SkeletonMinion
-        );
-    }
-
-    #[test]
-    fn door_scale_matches_the_one_metre_cell() {
-        // The leaf is 2 model units wide; squeezed it fills the 1 m door cell.
-        assert!((2.0 * DOOR_SX - 1.0).abs() < 1e-6);
-        // A Dungeon wall piece is 3 m at V.
-        assert!((WALL_PIECE * V - 3.0).abs() < 1e-6);
-        assert!(smooth(0.0) == 0.0 && smooth(1.0) == 1.0 && smooth(0.5) == 0.5);
     }
 
     #[test]

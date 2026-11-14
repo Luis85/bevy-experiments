@@ -80,8 +80,28 @@ fn every_settlement_is_founded_with_a_field_that_is_also_a_granary() {
     let state = app.world().resource::<civic::CivicState>();
     assert_eq!((state.completed, state.spent), (0, 0));
     assert_eq!(effects(app.world(), "VillageSitePlaced").len(), 0);
-    // Three fields, the trading post and the harbour's market stall.
-    assert_eq!(effects(app.world(), "VillageBuildingFounded").len(), 5);
+    // Three fields, the trading post, the harbour's market stall and, since
+    // pass 5 (`tuning.found_coat_workshops`, ADR 0041), each settlement's
+    // tailors' workshop: eight buildings founded.
+    let founded = effects(app.world(), "VillageBuildingFounded");
+    let mut kinds: Vec<&str> = founded
+        .iter()
+        .filter_map(|effect| effect["definition"].as_str())
+        .collect();
+    kinds.sort_unstable();
+    assert_eq!(
+        kinds,
+        [
+            "field",
+            "field",
+            "field",
+            "market_stall",
+            "tailor_shop",
+            "tailor_shop",
+            "tailor_shop",
+            "trading_post"
+        ]
+    );
     assert!(
         units(app.world_mut(), catalog::GRAIN) >= 24,
         "seed counts as grain"

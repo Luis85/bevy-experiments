@@ -153,7 +153,8 @@ fn effective_schedule_blocks_follow_chronotype_and_diligence() {
         .iter()
         .find(|block| block.kind == BlockKind::Leisure)
         .expect("leisure");
-    assert_eq!((leisure.from_permille, leisure.to_permille), (640, 700));
+    // The evening starts at 620 since the review fix pass (npc-ai#3).
+    assert_eq!((leisure.from_permille, leisure.to_permille), (620, 700));
     // An owl's whole day is later; a lark's wraps before dawn.
     set(&mut app, 100, 50);
     let owl = view::schedule_blocks(app.world(), actor);
@@ -178,7 +179,7 @@ fn effective_schedule_blocks_follow_chronotype_and_diligence() {
         .iter()
         .find(|block| block.kind == BlockKind::Leisure)
         .expect("leisure");
-    assert_eq!(leisure.from_permille, 680);
+    assert_eq!(leisure.from_permille, 660);
     // Every view agrees with the condition the tree reads, all day long.
     set(&mut app, 37, 81);
     for _ in 0..24 {

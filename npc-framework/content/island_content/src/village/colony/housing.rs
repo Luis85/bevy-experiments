@@ -548,7 +548,7 @@ pub(super) fn tick(world: &mut World, now: u64) -> bool {
         );
     }
     if super::super::living::cold(world) {
-        let fuel = super::super::roles::roles(world).fuel;
+        let fuels = super::super::roles::roles(world).fuels;
         for (house_id, entity) in households(world) {
             let house = world.get::<Household>(entity).expect("house").clone();
             if house.heated_until > now {
@@ -562,11 +562,19 @@ pub(super) fn tick(world: &mut World, now: u64) -> bool {
                     || world
                         .get::<SimPos>(actor)
                         .is_none_or(|pos| pos.dist2(house.door) > i64::from(HEARTH_REACH_MM).pow(2))
-                    || economy::count(world, actor, fuel) < HEARTH_FUEL_REQUIRED
                 {
                     continue;
                 }
+                // Any good tagged `fuel`, the first one carried (S2.9).
+                let Some(fuel) = fuels
+                    .iter()
+                    .copied()
+                    .find(|fuel| economy::count(world, actor, fuel) >= HEARTH_FUEL_REQUIRED)
+                else {
+                    continue;
+                };
                 if economy::consume(world, actor, fuel, HEARTH_FUEL_REQUIRED).is_ok() {
+                    crate::village::ledger::used(world, fuel, HEARTH_FUEL_REQUIRED);
                     let heated_until = now.saturating_add(heating_period(world));
                     let mut house = world.get_mut::<Household>(entity).expect("house");
                     house.heated_until = heated_until;

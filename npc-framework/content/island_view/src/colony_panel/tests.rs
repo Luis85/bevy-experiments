@@ -300,7 +300,7 @@ fn blocked_terrain_edit_is_explained_without_queuing_it() {
         app.world()
             .resource::<Ledger>()
             .message
-            .starts_with("Cannot apply:")
+            .starts_with("The village could not do that.")
     );
     assert!(app.world().resource::<Ledger>().pending.is_none());
     assert_eq!(before, state_hash(app.world_mut()));
@@ -972,9 +972,90 @@ fn open_village(app: &mut App, page: economy::EconomyPage) -> npc_framework::pre
     let mut ledger = app.world_mut().resource_mut::<Ledger>();
     ledger.open = true;
     ledger.tab = Tab::Economy;
-    ledger.scope = Some(village);
+    ledger.village_scope = Some(village);
     ledger.economy = page;
     village
+}
+
+/// The chips of the Economy page's scope row, empty when it has none.
+fn scope_chips(rows: &[Entry]) -> Vec<(String, Action)> {
+    rows.iter()
+        .find(|entry| entry.key == "stock_scopes")
+        .and_then(|entry| entry.choices.clone())
+        .unwrap_or_default()
+}
+
+#[test]
+fn jobs_and_priorities_open_on_a_village() {
+    let mut app = oversee_fixture();
+    {
+        let mut ledger = app.world_mut().resource_mut::<Ledger>();
+        ledger.open = true;
+        ledger.tab = Tab::Economy;
+        ledger.economy = economy::EconomyPage::Goods;
+        ledger.scope = None;
+    }
+    // Goods offers the whole island and every village.
+    let goods = scope_chips(&entries(app.world()));
+    assert_eq!(goods.len(), 4, "the island and its three villages");
+    assert_eq!(goods[0].0, "Whole island");
+    // Jobs: a village is chosen, the one with most residents when the
+    // camera is over none, and the row holds the villages only.
+    let most = economy::pick_village(app.world(), None).expect("a village");
+    app.world_mut()
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::EconomyPage(economy::EconomyPage::Jobs));
+    process(app.world_mut());
+    assert_eq!(app.world().resource::<Ledger>().village_scope, Some(most));
+    let rows = entries(app.world());
+    assert!(rows.iter().any(|entry| entry.key == "targets_header"));
+    assert!(rows.iter().all(|entry| !entry.key.ends_with("_choose")));
+    let chips = scope_chips(&rows);
+    assert_eq!(chips.len(), 3, "the villages only");
+    assert!(
+        chips
+            .iter()
+            .all(|(_, action)| !matches!(action, Action::Scope(None)))
+    );
+    // Another village's chip is remembered for Jobs and Priorities alike.
+    let Some((_, Action::Scope(Some(other)))) = chips
+        .iter()
+        .find(|(_, action)| !matches!(action, Action::Scope(Some(id)) if *id == most))
+        .cloned()
+    else {
+        panic!("another village");
+    };
+    app.world_mut().resource_mut::<Ledger>().requests.extend([
+        Action::Scope(Some(other)),
+        Action::EconomyPage(economy::EconomyPage::Priorities),
+    ]);
+    process(app.world_mut());
+    assert_eq!(app.world().resource::<Ledger>().village_scope, Some(other));
+    let rows = entries(app.world());
+    assert!(
+        rows.iter()
+            .any(|entry| entry.key == format!("priority_{}_housing_all", other.0))
+    );
+    // Goods returns to the scope it had: the whole island.
+    app.world_mut()
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::EconomyPage(economy::EconomyPage::Goods));
+    process(app.world_mut());
+    assert_eq!(app.world().resource::<Ledger>().scope, None);
+    assert_eq!(scope_chips(&entries(app.world())).len(), 4);
+    // A camera over a village picks that one.
+    let centre = |id: SimId| {
+        let entity = app.world().resource::<SimIndex>().get(id).unwrap();
+        npc_framework::view_helpers::sim_to_world(
+            *app.world()
+                .get::<npc_framework::prelude::SimPos>(entity)
+                .unwrap(),
+        )
+    };
+    let near = centre(other) + Vec3::new(20.0, 0.0, 0.0);
+    assert_eq!(economy::pick_village(app.world(), Some(near)), Some(other));
 }
 
 /// The one recorded command waiting in the queue, as sent.
@@ -1165,15 +1246,358 @@ fn a_villages_priority_sends_its_level_and_says_what_it_changes() {
     assert_ne!(high, normal, "the line says what the new level changes");
     assert_eq!(app.world().resource::<Ledger>().message, high);
 
-    // The whole island has no priorities of its own.
-    app.world_mut().resource_mut::<Ledger>().scope = None;
+    // The whole island has no priorities of its own: no chip offers it.
     let rows = entries(app.world());
-    assert!(rows.iter().any(|entry| entry.key == "priorities_choose"));
-    assert!(!rows.iter().any(|entry| {
-        entry.choices.as_ref().is_some_and(|choices| {
-            choices
-                .iter()
-                .any(|(_, action)| matches!(action, Action::Priority { .. }))
+    assert!(
+        scope_chips(&rows)
+            .iter()
+            .all(|(_, action)| !matches!(action, Action::Scope(None)))
+    );
+}
+
+/// The Goods page of the whole island with `good` chosen, its figures read.
+fn goods_view(app: &mut App, good: &str, compact: bool, more: bool) -> Vec<Entry> {
+    goods::refresh_cache(app.world_mut(), None, Some(good), None);
+    economy::entries(
+        app.world(),
+        economy::View {
+            page: economy::EconomyPage::Goods,
+            good: Some(good),
+            compact,
+            more,
+            ..Default::default()
+        },
+    )
+}
+
+/// A traded good of the living world.
+fn a_traded_good(app: &App) -> String {
+    economy::stock_rows(app.world(), None)
+        .into_iter()
+        .find(|row| row.price.is_some())
+        .expect("a traded good")
+        .kind
+}
+
+#[test]
+fn the_card_sits_under_its_row() {
+    let mut app = oversee_fixture();
+    let good = a_traded_good(&app);
+    let rows = goods_view(&mut app, &good, false, false);
+    let keys: Vec<&str> = rows.iter().map(|entry| entry.key.as_str()).collect();
+    let at = keys
+        .iter()
+        .position(|key| *key == format!("stock_{good}"))
+        .expect("the good's row");
+    assert_eq!(keys[at + 1], "stock_detail", "{keys:?}");
+    let Some(Extra::Card(lines)) = &rows[at + 1].extra else {
+        panic!("a card");
+    };
+    assert!(
+        lines.iter().any(|line| line.starts_with("Price ")),
+        "{lines:?}"
+    );
+    // One card, and the table goes on under it.
+    assert_eq!(keys.iter().filter(|key| **key == "stock_detail").count(), 1);
+}
+
+#[test]
+fn the_narrow_ledger_folds_the_rest_of_the_card() {
+    let mut app = oversee_fixture();
+    let good = a_traded_good(&app);
+    let card = |rows: &[Entry], key: &str| {
+        rows.iter()
+            .find(|entry| entry.key == key)
+            .and_then(|entry| match &entry.extra {
+                Some(Extra::Card(lines)) => Some(lines.clone()),
+                _ => None,
+            })
+    };
+    let folded = goods_view(&mut app, &good, true, false);
+    let kept = card(&folded, "stock_detail").expect("the card");
+    assert!(
+        kept.iter().any(|line| line.starts_with("Price ")),
+        "{kept:?}"
+    );
+    assert!(
+        kept.iter()
+            .all(|line| !line.starts_with("Made by") && !line.starts_with("Nobody makes")),
+        "line 9 folds: {kept:?}"
+    );
+    let fold = format!("stock_more_{good}");
+    assert!(folded.iter().any(|entry| entry.key == fold));
+    assert!(card(&folded, "stock_detail_more").is_none());
+    let open = goods_view(&mut app, &good, true, true);
+    let rest = card(&open, "stock_detail_more").expect("the folded lines");
+    assert!(
+        rest.iter()
+            .any(|line| line.starts_with("Made by") || line.starts_with("Nobody makes")),
+        "{rest:?}"
+    );
+}
+
+#[test]
+fn a_priority_title_carries_its_figure() {
+    use island_content::village::view::Outlook;
+    let outlook = Outlook {
+        day: 20,
+        season: village::Season::Autumn,
+        population: 10,
+        food_days: Some(4),
+        water_days: Some(9),
+        fuel_days: Some(6),
+        beds_free: 0,
+        homeless: 2,
+        idle_hands: 0,
+        open_places: 3,
+        cold_in_days: None,
+        cold_now: false,
+        without_coat: 11,
+        next_shortage: None,
+    };
+    let figure = |topic| economy::topic_figure(topic, Some(&outlook), 3, Some(2));
+    assert_eq!(figure("food_reserve").as_deref(), Some("4 days in store"));
+    assert_eq!(figure("fuel_reserve").as_deref(), Some("6 days in store"));
+    assert_eq!(figure("coats").as_deref(), Some("11 residents without"));
+    assert_eq!(
+        figure("housing").as_deref(),
+        Some("2 residents without a home")
+    );
+    assert_eq!(figure("workplace").as_deref(), Some("3 open places"));
+    assert_eq!(
+        figure("boat_orders").as_deref(),
+        Some("next call in 2 days")
+    );
+    assert_eq!(figure("storage"), None);
+    assert_eq!(economy::topic_figure("coats", None, 0, None), None);
+    // In the ledger: the Workplaces title carries its open places.
+    let mut app = oversee_fixture();
+    let village = open_village(&mut app, economy::EconomyPage::Priorities);
+    let rows = entries(app.world());
+    let title = rows
+        .iter()
+        .find(|entry| entry.key == format!("priority_{}_workplace_all_title", village.0))
+        .expect("the Workplaces title");
+    assert!(
+        title.text.starts_with("Workplaces \u{b7} "),
+        "{}",
+        title.text
+    );
+    assert!(title.text.contains("open place"), "{}", title.text);
+}
+
+#[test]
+fn one_job_can_have_its_own_workplace_level() {
+    use village::frontier::oversee::PriorityLevel;
+    let mut app = oversee_fixture();
+    let village = open_village(&mut app, economy::EconomyPage::Priorities);
+    let link = format!("priority_{}_workplace_all_one_job", village.0);
+    assert!(entries(app.world()).iter().any(|entry| entry.key == link));
+    app.world_mut()
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::JobLevels);
+    process(app.world_mut());
+    let chips = entries(app.world())
+        .into_iter()
+        .find(|entry| entry.key == format!("priority_{}_workplace_all_jobs", village.0))
+        .and_then(|entry| entry.choices)
+        .expect("the jobs without their own level");
+    let (_, chip) = chips[0].clone();
+    let Action::Priority {
+        profession: Some(job),
+        level: PriorityLevel::High,
+        ..
+    } = chip.clone()
+    else {
+        panic!("a chip gives its job its own level: {chip:?}");
+    };
+    app.world_mut().resource_mut::<Ledger>().requests.push(chip);
+    process(app.world_mut());
+    run_ticks(app.world_mut(), 1);
+    process(app.world_mut());
+    let rows = entries(app.world());
+    let own = rows
+        .iter()
+        .find(|entry| entry.key == format!("priority_{}_workplace_{job}", village.0))
+        .and_then(|entry| entry.choices.clone())
+        .expect("the job's own row");
+    let same = own
+        .iter()
+        .find(|(label, _)| label == "Same as the others")
+        .expect("Same as the others")
+        .1
+        .clone();
+    assert_eq!(
+        same,
+        Action::Priority {
+            settlement: village,
+            topic: "workplace",
+            profession: Some(job.clone()),
+            level: PriorityLevel::Normal,
+        }
+    );
+    // "Your orders" names the level in force.
+    assert!(
+        rows.iter()
+            .any(|entry| entry.text.starts_with("Workplaces: ") && entry.text.contains(": high.")),
+        "{:?}",
+        rows.iter()
+            .map(|entry| entry.text.clone())
+            .collect::<Vec<_>>()
+    );
+    // "Same as the others" takes the job's own level away again.
+    app.world_mut().resource_mut::<Ledger>().requests.push(same);
+    process(app.world_mut());
+    run_ticks(app.world_mut(), 1);
+    assert!(
+        !village::frontier::oversee::priorities(app.world(), village)
+            .iter()
+            .any(|row| row.profession.as_deref() == Some(job.as_str()))
+    );
+}
+
+/// A ledger in the player session over the living world, its right column
+/// empty, with the seasons `held` (the newest is the one running).
+fn season_fixture(held: &[(u32, &str)]) -> App {
+    let mut app = oversee_fixture();
+    app.insert_resource(crate::PlayerExperience { enabled: true })
+        .init_resource::<crate::island_shell::ShellState>();
+    set_seasons(&mut app, held);
+    close(app.world_mut());
+    process(app.world_mut());
+    app
+}
+
+fn set_seasons(app: &mut App, held: &[(u32, &str)]) {
+    use island_content::village::ledger::{SeasonLedger, SeasonTally};
+    let seasons = held
+        .iter()
+        .map(|(season, name)| SeasonTally {
+            season: *season,
+            name: (*name).to_owned(),
+            ..Default::default()
         })
-    }));
+        .collect();
+    app.world_mut().insert_resource(SeasonLedger { seasons });
+}
+
+#[test]
+fn the_season_card_opens_only_into_an_empty_column() {
+    let mut app = season_fixture(&[(0, "Autumn")]);
+    assert_eq!(app.world().resource::<Ledger>().season_card, None);
+    // Autumn ends with the column empty: its card opens there by itself.
+    set_seasons(&mut app, &[(0, "Autumn"), (1, "Winter")]);
+    process(app.world_mut());
+    process(app.world_mut());
+    let ledger = app.world().resource::<Ledger>();
+    assert_eq!(ledger.season_card, Some(0));
+    assert!(ledger.open);
+    let rows = entries(app.world());
+    assert_eq!(rows[0].text, "Autumn has ended");
+    // Winter ends while a ledger page is read: a notice, not the card.
+    app.world_mut()
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::SeasonClose);
+    process(app.world_mut());
+    open_page(app.world_mut(), LedgerPage::Economy);
+    set_seasons(&mut app, &[(0, "Autumn"), (1, "Winter"), (2, "Spring")]);
+    process(app.world_mut());
+    process(app.world_mut());
+    assert_eq!(app.world().resource::<Ledger>().season_card, None);
+    assert_eq!(
+        crate::island_shell::host_toast_text(app.world()),
+        Some((
+            "Winter has ended.".to_owned(),
+            Some("See the season".to_owned())
+        ))
+    );
+    // Its button opens the card.
+    open_last_season(app.world_mut());
+    process(app.world_mut());
+    assert_eq!(app.world().resource::<Ledger>().season_card, Some(1));
+    app.world_mut()
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::SeasonJournal);
+    process(app.world_mut());
+    // The Journal offers it again.
+    app.world_mut().resource_mut::<Ledger>().tab = Tab::Journal;
+    let link = entries(app.world())
+        .into_iter()
+        .find(|entry| entry.key == "journal_season")
+        .expect("the Journal's note");
+    assert_eq!(link.text, "Winter ended. See the season.");
+    assert_eq!(link.action, Some(Action::SeasonOpen(1)));
+}
+
+#[test]
+fn the_season_card_never_pauses_time() {
+    let mut app = season_fixture(&[(0, "Autumn")]);
+    let before = *app.world().resource::<SimControl>();
+    set_seasons(&mut app, &[(0, "Autumn"), (1, "Winter")]);
+    process(app.world_mut());
+    process(app.world_mut());
+    assert_eq!(app.world().resource::<Ledger>().season_card, Some(0));
+    assert_eq!(*app.world().resource::<SimControl>(), before);
+}
+
+#[test]
+fn no_sentence_mentions_time_while_time_runs() {
+    let mut app = oversee_fixture();
+    assert!(!app.world().resource::<SimControl>().is_stopped());
+    // The ledger's foot after an order.
+    let village = open_village(&mut app, economy::EconomyPage::Priorities);
+    app.world_mut()
+        .resource_mut::<Ledger>()
+        .requests
+        .push(Action::Priority {
+            settlement: village,
+            topic: "housing",
+            profession: None,
+            level: village::frontier::oversee::PriorityLevel::High,
+        });
+    process(app.world_mut());
+    let foot = app.world().resource::<Ledger>().message.clone();
+    assert_eq!(foot, "Order given.");
+    // "Your orders" while it waits for the next tick.
+    let rows = entries(app.world());
+    for entry in &rows {
+        assert!(!entry.text.contains("time runs"), "{}", entry.text);
+    }
+    // The build tray and Shape say nothing about time either.
+    assert!(!crate::game_ui::words::order_given(false).contains("time"));
+    // Paused, the same order says it waits.
+    assert_eq!(
+        crate::game_ui::words::order_given(true),
+        "Order queued. It starts when time runs (Space)."
+    );
+}
+
+#[test]
+fn the_foot_line_clears_after_six_seconds() {
+    let mut app = oversee_fixture();
+    app.init_resource::<Time>();
+    app.world_mut().resource_mut::<Ledger>().message = "Order given.".into();
+    process(app.world_mut());
+    let advance = |app: &mut App, secs: f32| {
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_secs_f32(secs));
+        process(app.world_mut());
+    };
+    advance(&mut app, 5.0);
+    assert_eq!(app.world().resource::<Ledger>().message, "Order given.");
+    advance(&mut app, 1.5);
+    assert_eq!(app.world().resource::<Ledger>().message, "");
+}
+
+#[test]
+fn the_price_change_stands_apart_from_the_price() {
+    assert_eq!(widgets::split_change("4 +1"), ("4", Some("+1")));
+    assert_eq!(widgets::split_change("3 -2"), ("3", Some("-2")));
+    assert_eq!(widgets::split_change("4"), ("4", None));
+    assert_eq!(widgets::split_change("\u{2013}"), ("\u{2013}", None));
+    assert_eq!(widgets::split_change("up 3"), ("up 3", None));
 }

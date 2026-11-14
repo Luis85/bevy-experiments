@@ -823,87 +823,6 @@ pub(crate) fn raised_point(terrain: Option<&TerrainState>, pos: SimPos, lift: f3
     Vec3::new(pos.x as f32 / 1000.0, y + lift, pos.z as f32 / 1000.0)
 }
 
-/// The existing exploration texture follows the actual terrain surface. One
-/// mesh covers the bounded region; no per-cell view entities are introduced.
-pub(crate) fn terrain_mask_mesh(terrain: &TerrainState, region: crate::fog::MaskRegion) -> Mesh {
-    let mut geometry = Geometry::default();
-    let mut uvs = Vec::new();
-    let height = |x, z| {
-        terrain
-            .cell(x, z)
-            .map_or(0.0, |c| c.height_mm.max(0) as f32 / 1000.0)
-            + 0.07
-    };
-    let uv = |x: f32, z: f32| {
-        [
-            (x - region.min.x as f32) / region.width as f32,
-            (z - region.min.z as f32) / region.height as f32,
-        ]
-    };
-    for z in region.min.z..region.min.z + region.height as i32 {
-        for x in region.min.x..region.min.x + region.width as i32 {
-            let (a, b, h) = (x as f32, z as f32, height(x, z));
-            geometry.quad(
-                [
-                    [a, h, b],
-                    [a, h, b + 1.0],
-                    [a + 1.0, h, b + 1.0],
-                    [a + 1.0, h, b],
-                ],
-                [0.0, 1.0, 0.0],
-                [1.0; 4],
-            );
-            uvs.extend([
-                uv(a, b),
-                uv(a, b + 1.0),
-                uv(a + 1.0, b + 1.0),
-                uv(a + 1.0, b),
-            ]);
-            for (dx, dz, normal, edge) in [
-                (
-                    -1,
-                    0,
-                    [-1.0, 0.0, 0.0],
-                    [[a - 0.004, b], [a - 0.004, b + 1.0]],
-                ),
-                (
-                    1,
-                    0,
-                    [1.0, 0.0, 0.0],
-                    [[a + 1.004, b + 1.0], [a + 1.004, b]],
-                ),
-                (
-                    0,
-                    -1,
-                    [0.0, 0.0, -1.0],
-                    [[a + 1.0, b - 0.004], [a, b - 0.004]],
-                ),
-                (
-                    0,
-                    1,
-                    [0.0, 0.0, 1.0],
-                    [[a, b + 1.004], [a + 1.0, b + 1.004]],
-                ),
-            ] {
-                let low = height(x + dx, z + dz);
-                if low >= h {
-                    continue;
-                }
-                let [[x0, z0], [x1, z1]] = edge;
-                geometry.quad(
-                    [[x0, h, z0], [x0, low, z0], [x1, low, z1], [x1, h, z1]],
-                    normal,
-                    [1.0; 4],
-                );
-                uvs.extend([uv(a + 0.5, b + 0.5); 4]);
-            }
-        }
-    }
-    geometry
-        .mesh()
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-}
-
 /// First visible heightfield cell under a pointer. Walks at most width+height
 /// cells; unlike a full-grid search its cost does not scale with map area.
 pub(crate) fn terrain_hit(world: &World, ray: Ray3d) -> Option<(i32, i32)> {
@@ -3053,29 +2972,10 @@ mod tests {
         assert_eq!(index.map.get(&cottage), Some(&cottage_visual));
     }
     #[test]
-    fn captions_and_fog_cover_the_raised_surface() {
+    fn captions_cover_the_raised_surface() {
         let terrain = plateau(4700);
         let point = raised_point(Some(&terrain), SimPos::new(500, 500), 2.1);
         assert!((point.y - 6.8).abs() < 0.0001);
-        let region = crate::fog::MaskRegion {
-            min: npc_framework::prelude::CellCoord::new(0, 0),
-            width: 2,
-            height: 2,
-        };
-        let mesh = terrain_mask_mesh(&terrain, region);
-        let Some(bevy::mesh::VertexAttributeValues::Float32x3(vertices)) =
-            mesh.attribute(Mesh::ATTRIBUTE_POSITION)
-        else {
-            panic!("positions")
-        };
-        assert!(vertices.iter().all(|point| point[1] > 4.7));
-        let Some(bevy::mesh::VertexAttributeValues::Float32x2(uv)) =
-            mesh.attribute(Mesh::ATTRIBUTE_UV_0)
-        else {
-            panic!("mask UV")
-        };
-        assert_eq!(uv[0], [0.0, 0.0]);
-        assert!(uv.contains(&[1.0, 1.0]));
     }
     #[test]
     fn seasons_recolour_without_changing_topology_and_large_oceans_stay_bounded() {

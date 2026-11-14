@@ -91,7 +91,6 @@ pub struct GoodDef {
     /// Lower-case noun shown in job summaries, for example `logs`.
     pub display: String,
     pub base_price: u32,
-    pub stock_limit: u32,
     /// Hunger restored by eating one unit; requires the `food` tag.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub food_value: Option<i32>,
@@ -103,6 +102,14 @@ pub struct GoodDef {
     /// The tool good that speeds gathering this good from a patch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gather_tool: Option<String>,
+    /// Without a usable `gather_tool` the good cannot be gathered at all
+    /// (a fishing rod for fish), instead of slowly by hand.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub gather_tool_required: bool,
+    /// Mean life in days of a unit in a pack (stores keep it
+    /// `tuning.storage_shelf_percent` as long); absent: it keeps for ever.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shelf_life_days: Option<u32>,
     /// Item kind registered for this good; omit for an engine item kind.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<ItemSpec>,
@@ -206,6 +213,9 @@ pub struct ProfessionDef {
     /// empty: the role's own name.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub display: String,
+    /// The behaviour tree its workers run (S3.1); none: the default tree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree: Option<String>,
 }
 
 /// What a hunting trade hunts with and what one hunt yields.
@@ -214,6 +224,8 @@ pub struct ProfessionDef {
 pub struct HuntDef {
     pub tool: String,
     pub yields: Vec<Stack>,
+    /// The wildlife kind it hunts (`deer`).
+    pub prey: String,
 }
 
 /// What a service trade's keeper is assured of.
@@ -256,6 +268,10 @@ pub struct PatchDef {
     /// Soil (milli) lost per harvested unit.
     #[serde(default)]
     pub soil_loss: u32,
+    /// The patch lies at the water: on the dry cell beside water nearest to
+    /// its authored spot (a fishing ground).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shore: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -325,6 +341,12 @@ pub struct EconomyTuning {
     /// Gathering duration with and without the matching tool, percent of base.
     pub tool_gather_percent: u32,
     pub bare_gather_percent: u32,
+    /// Building stage time with a usable builder's tool, percent.
+    pub build_tool_percent: u32,
+    /// Building stage time without one, percent.
+    pub build_bare_percent: u32,
+    /// How much longer goods keep in a store than in a pack, percent.
+    pub storage_shelf_percent: u32,
     /// Work duration at zero and at full morale, percent of base.
     pub work_pace_slowest_percent: u32,
     pub work_pace_fastest_percent: u32,
@@ -473,6 +495,10 @@ pub struct EconomyTuning {
     /// Each settlement is founded with its coat makers' workplace built and
     /// each coat maker holding one batch of coat materials.
     pub found_coat_workshops: bool,
+    /// Coins a night in an inn bed costs.
+    pub inn_bed_price: u32,
+    /// Ticks one rented night lasts.
+    pub inn_bed_ticks: u64,
 }
 impl Default for EconomyTuning {
     fn default() -> Self {
@@ -487,6 +513,9 @@ impl Default for EconomyTuning {
             switch_cooldown_ticks: 12000,
             tool_gather_percent: 75,
             bare_gather_percent: 150,
+            build_tool_percent: 100,
+            build_bare_percent: 150,
+            storage_shelf_percent: 200,
             work_pace_slowest_percent: 115,
             work_pace_fastest_percent: 90,
             cold_health_threshold: 10_000,
@@ -543,6 +572,8 @@ impl Default for EconomyTuning {
             founder_coats_per_three: 2,
             wildlife_motion: true,
             found_coat_workshops: true,
+            inn_bed_price: 3,
+            inn_bed_ticks: 300,
         }
     }
 }
@@ -607,7 +638,6 @@ struct Good<'a> {
     key: &'a str,
     display: &'a str,
     price: u32,
-    limit: u32,
     food: Option<i32>,
     tags: &'a [GoodTag],
     durability: Option<u32>,
@@ -621,11 +651,12 @@ impl Good<'_> {
             key: self.key.into(),
             display: self.display.into(),
             base_price: self.price,
-            stock_limit: self.limit,
             food_value: self.food,
             tags: self.tags.to_vec(),
             durability: self.durability,
             gather_tool: self.gather_tool.map(Into::into),
+            gather_tool_required: false,
+            shelf_life_days: None,
             item: self.item.map(|(weight_g, max_stack, tag, slot)| ItemSpec {
                 weight_g,
                 max_stack,
@@ -635,12 +666,13 @@ impl Good<'_> {
         }
     }
 }
-const fn good<'a>(key: &'a str, display: &'a str, price: u32, limit: u32) -> Good<'a> {
+/// `_limit` was the deleted `stock_limit` (review fix S2.5); the tables
+/// below keep their old column for readability.
+const fn good<'a>(key: &'a str, display: &'a str, price: u32, _limit: u32) -> Good<'a> {
     Good {
         key,
         display,
         price,
-        limit,
         food: None,
         tags: &[],
         durability: None,
@@ -668,6 +700,7 @@ fn default_goods() -> Vec<GoodDef> {
         },
         Good {
             tags: &[Tool],
+            durability: Some(60),
             ..good("hammer", "hammers", 18, 3)
         },
         Good {
@@ -716,11 +749,13 @@ fn default_goods() -> Vec<GoodDef> {
         },
         Good {
             item: item(500, 20),
+            gather_tool: Some(FISHING_ROD),
             ..good(FISH, "fish", 4, 20)
         },
         Good {
             tags: &[Tool],
             item: Some((800, 1, Some("tool:fishing"), None)),
+            durability: Some(60),
             ..good(FISHING_ROD, "fishing rods", 12, 4)
         },
         Good {
@@ -757,6 +792,7 @@ fn default_goods() -> Vec<GoodDef> {
         Good {
             tags: &[Tool],
             item: Some((1500, 1, Some("tool:hunting"), None)),
+            durability: Some(20),
             ..good(SPEAR, "hunting spears", 10, 8)
         },
         Good {
@@ -778,6 +814,18 @@ fn default_goods() -> Vec<GoodDef> {
     ]
     .into_iter()
     .map(Good::build)
+    .map(|mut good| {
+        // No rod, no fishing (review fix S2.2).
+        good.gather_tool_required = good.key == FISH;
+        // Food spoils (S2.4): days of mean life in a pack.
+        good.shelf_life_days = match good.key.as_str() {
+            "bread" => Some(20),
+            COOKED_MEAL => Some(10),
+            BERRIES => Some(14),
+            _ => None,
+        };
+        good
+    })
     .collect()
 }
 
@@ -935,6 +983,7 @@ fn profession(role: Role, station: &str, aptitudes: &[Role]) -> ProfessionDef {
         builds: false,
         sows: false,
         display: String::new(),
+        tree: None,
     }
 }
 
@@ -1013,6 +1062,8 @@ fn default_professions() -> Vec<ProfessionDef> {
             skill: skill("Carpentry"),
             template: "carpenter".into(),
             endowment: stacks(&[("plank", 2), (BOWL, 2), (FISHING_ROD, 2)]),
+            // The builder's tool: founded with one, keeps one (S2.2).
+            tool: Some("hammer".into()),
             builds: true,
             ..profession(Carpenter, SAW, &[Carpenter, Woodcutter, Miller])
         },
@@ -1041,8 +1092,8 @@ fn default_professions() -> Vec<ProfessionDef> {
             ..profession(Smith, SMELT, &metal)
         },
         ProfessionDef {
-            wants: names(&["log", "hammer", BOWL]),
-            keeps: [("log", 2), (BOWL, 1), ("hammer", 1)]
+            wants: names(&["log", BOWL]),
+            keeps: [("log", 2), (BOWL, 1)]
                 .into_iter()
                 .map(|(good, count)| KeepDef {
                     good: good.into(),
@@ -1062,6 +1113,7 @@ fn default_professions() -> Vec<ProfessionDef> {
             hunt: Some(HuntDef {
                 tool: SPEAR.into(),
                 yields: stacks(&[(RAW_MEAT, 2), (HIDE, 1)]),
+                prey: "deer".into(),
             }),
             ..profession(Hunter, INN, &hides)
         },
@@ -1108,6 +1160,7 @@ fn patch(good: &str, dx: i32, dz: i32, capacity: u32, gather_ticks: u32) -> Patc
         winter_regrowth: None,
         harvest_loss: 40,
         soil_loss: 0,
+        shore: false,
     }
 }
 
@@ -1141,7 +1194,10 @@ fn default_patches() -> Vec<PatchDef> {
         patch(BERRIES, 38000, 0, 160, 80),
         PatchDef {
             regrowth: 2,
-            ..patch(FISH, 38000, -8000, 80, 220)
+            shore: true,
+            // 293 x 75% with a rod = 219: the catch rate of the rod-free
+            // days before S2.2.
+            ..patch(FISH, 38000, -8000, 80, 293)
         },
     ]
 }
@@ -1212,7 +1268,7 @@ impl EconomySpec {
         self.validate_recipes()?;
         self.validate_professions()?;
         super::building_spec::validate(self)?;
-        super::props::validate(&self.props)?;
+        super::props::validate(self)?;
         self.validate_seed()?;
         self.validate_tuning()?;
         // Every role the living world's logic needs is filled by the data.
@@ -1248,11 +1304,6 @@ impl EconomySpec {
             if !(1..=10_000).contains(&good.base_price) {
                 return Err(format!(
                     "economy: good `{name}` base_price must be 1..=10000"
-                ));
-            }
-            if !(1..=10_000).contains(&good.stock_limit) {
-                return Err(format!(
-                    "economy: good `{name}` stock_limit must be 1..=10000"
                 ));
             }
             let food = good.tags.contains(&GoodTag::Food);
@@ -1659,6 +1710,62 @@ impl EconomySpec {
 
     fn validate_tuning(&self) -> Result<(), String> {
         let t = &self.tuning;
+        if !(25..=400).contains(&t.build_tool_percent)
+            || !(25..=400).contains(&t.build_bare_percent)
+        {
+            return Err(
+                "economy: tuning.build_tool_percent and build_bare_percent must be 25..=400".into(),
+            );
+        }
+        // Every work tool wears: it needs a durability (S2.2).
+        let mut tools: Vec<&str> = Vec::new();
+        for entry in &self.professions {
+            tools.extend(entry.tool.as_deref());
+            tools.extend(entry.required_tool.as_deref());
+            tools.extend(entry.hunt.as_ref().map(|hunt| hunt.tool.as_str()));
+        }
+        tools.extend(
+            self.goods
+                .iter()
+                .filter_map(|good| good.gather_tool.as_deref()),
+        );
+        for tool in tools {
+            if self
+                .good(tool)
+                .is_some_and(|good| !good.durability.is_some_and(|d| (1..=100_000).contains(&d)))
+            {
+                return Err(format!(
+                    "economy: `{tool}` is a work tool but has no `durability`"
+                ));
+            }
+        }
+        if !(100..=1000).contains(&t.storage_shelf_percent) {
+            return Err("economy: tuning.storage_shelf_percent must be 100..=1000".into());
+        }
+        if let Some(good) = self.goods.iter().find(|good| {
+            good.shelf_life_days
+                .is_some_and(|days| !(1..=1000).contains(&days))
+        }) {
+            return Err(format!(
+                "economy: good `{}` shelf_life_days must be 1..=1000",
+                good.key
+            ));
+        }
+        if let Some(good) = self
+            .goods
+            .iter()
+            .find(|good| good.gather_tool_required && good.gather_tool.is_none())
+        {
+            return Err(format!(
+                "economy: good `{}` needs a `gather_tool` to require one",
+                good.key
+            ));
+        }
+        if !(1..=1000).contains(&t.inn_bed_price) || !(1..=24_000).contains(&t.inn_bed_ticks) {
+            return Err(
+                "economy: tuning.inn_bed_price must be 1..=1000 and inn_bed_ticks 1..=24000".into(),
+            );
+        }
         let checks: [(bool, &str); 18] = [
             (t.levy_percent <= 100, "levy_percent must be 0..=100"),
             (
@@ -1794,7 +1901,6 @@ impl EconomySpec {
             h.str(&good.key);
             h.str(&good.display);
             h.u32(good.base_price);
-            h.u32(good.stock_limit);
             h.opt(good.food_value.as_ref(), |h, v| h.i32(*v));
             h.u32(good.tags.len() as u32);
             for tag in &good.tags {
@@ -1802,6 +1908,8 @@ impl EconomySpec {
             }
             h.opt(good.durability.as_ref(), |h, v| h.u32(*v));
             text(h, &good.gather_tool);
+            h.u8(u8::from(good.gather_tool_required));
+            h.opt(good.shelf_life_days.as_ref(), |h, v| h.u32(*v));
             h.opt(good.item.as_ref(), |h, item| {
                 h.u32(item.weight_g);
                 h.u32(item.max_stack);
@@ -1850,10 +1958,12 @@ impl EconomySpec {
             h.opt(entry.hunt.as_ref(), |h, hunt| {
                 h.str(&hunt.tool);
                 pile(h, &hunt.yields);
+                h.str(&hunt.prey);
             });
             h.u8(u8::from(entry.builds));
             h.u8(u8::from(entry.sows));
             h.str(&entry.display);
+            h.opt(entry.tree.as_ref(), |h, tree| h.str(tree));
         }
         h.u32(self.patches.len() as u32);
         for patch in &self.patches {
@@ -1872,6 +1982,7 @@ impl EconomySpec {
             h.opt(patch.winter_regrowth.as_ref(), |h, v| h.u32(*v));
             h.u32(patch.harvest_loss);
             h.u32(patch.soil_loss);
+            h.u8(u8::from(patch.shore));
         }
         let seed = &self.seed;
         h.u32(seed.coins);
@@ -1892,6 +2003,9 @@ impl EconomySpec {
             t.fund_reserve_per_resident,
             t.tool_gather_percent,
             t.bare_gather_percent,
+            t.build_tool_percent,
+            t.build_bare_percent,
+            t.storage_shelf_percent,
             t.work_pace_slowest_percent,
             t.work_pace_fastest_percent,
             t.winter_hearth_lightings,
@@ -1961,6 +2075,8 @@ impl EconomySpec {
         h.u32(t.founder_coats_per_three);
         h.u8(u8::from(t.wildlife_motion));
         h.u8(u8::from(t.found_coat_workshops));
+        h.u32(t.inn_bed_price);
+        h.u64(t.inn_bed_ticks);
         self.demography.sim_hash(h);
         super::life_spec::hash_crops(&self.crops, h);
         self.weather.sim_hash(h);
@@ -2061,11 +2177,11 @@ pub struct GoodEntry {
     pub key: &'static str,
     pub display: &'static str,
     pub base_price: u32,
-    pub stock_limit: u32,
     pub food_value: Option<i32>,
     pub staple: bool,
     pub durability: Option<u32>,
     pub gather_tool: Option<&'static str>,
+    pub gather_tool_required: bool,
 }
 #[derive(Clone, Debug)]
 pub struct ProfessionEntry {
@@ -2106,11 +2222,11 @@ impl EconomyRegistry {
                         key,
                         display: intern(&good.display),
                         base_price: good.base_price,
-                        stock_limit: good.stock_limit,
                         food_value: good.food_value,
                         staple: good.tags.contains(&GoodTag::Staple),
                         durability: good.durability,
                         gather_tool: good.gather_tool.as_deref().map(intern),
+                        gather_tool_required: good.gather_tool_required,
                     },
                 )
             })
@@ -2417,7 +2533,6 @@ mod tests {
         for kind in registry.trade_kinds() {
             let good = registry.good(kind).unwrap();
             assert_eq!(Some(good.base_price), crate::village::catalog::price(kind));
-            assert_eq!(good.stock_limit, crate::village::catalog::stock_limit(kind));
             assert_eq!(good.food_value, crate::village::catalog::food_restore(kind));
             assert_eq!(good.gather_tool, crate::village::catalog::gather_tool(kind));
         }

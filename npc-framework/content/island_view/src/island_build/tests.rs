@@ -282,7 +282,7 @@ fn planner_decisions_read_as_sentences_with_their_reasons() {
         "estimated_cost": 64, "fund": 410});
     assert_eq!(
         model::decision_text("Harbour", Some("Cottage"), &commissioned),
-        "Harbour commissioned a cottage: 2 resident(s) have had no bed for 3 reviews (about 64 coins; fund 410)"
+        "Harbour ordered a cottage: 2 resident(s) have had no bed for 3 reviews (about 64 coins; fund 410)"
     );
     let deferred = json!({"settlement": 3,
         "decision": "deferred: the civic fund cannot pay for the materials yet",
@@ -313,18 +313,18 @@ fn planner_decisions_read_as_sentences_with_their_reasons() {
     assert_eq!(recent, [6, 5, 4], "newest first, bounded");
     assert_eq!(
         model::planner_line("Harbour", 2, 1, 46, "commissioned cottage"),
-        "Harbour: 2 without a bed · 1 free bed · 46 surplus units unstored\nLast decision: commissioned cottage"
+        "Harbour: 2 without a bed · 1 free bed · 46 goods with no room in store\nLast decision: commissioned cottage"
     );
     assert!(model::planner_line("Harbour", 0, 3, 1, "").ends_with("No decision yet."));
     // The planner's own memory names a building by its key.
     let display = |key: &str| (key == "tailor_shop").then(|| "Tailor's shop".to_owned());
     assert_eq!(
         model::last_decision("commissioned tailor_shop", &display),
-        "commissioned a tailor's shop"
+        "ordered a tailor's shop"
     );
     assert_eq!(
         model::last_decision("commissioned grain_store", &display),
-        "commissioned a grain store"
+        "ordered a grain store"
     );
     assert_eq!(
         model::last_decision("deferred: no buildable site near the centre", &display),
@@ -341,7 +341,7 @@ fn a_building_card_shows_what_its_kind_needs() {
     };
     assert_eq!(
         site.kind_line(),
-        "Building site · commissioned by the village · Harbour"
+        "Building site · ordered by the village · Harbour"
     );
     assert_eq!(site.bar_permille(), Some(750));
     assert_eq!(
@@ -1191,7 +1191,7 @@ fn planner_decisions_are_logged_from_the_journal_with_names() {
     assert_eq!(decisions[0].site, Some(4000));
     assert_eq!(
         decisions[0].text,
-        "Harbour commissioned a cottage: 1 resident(s) have had no bed for 3 reviews (about 40 coins; fund 300)"
+        "Harbour ordered a cottage: 1 resident(s) have had no bed for 3 reviews (about 40 coins; fund 300)"
     );
     // Nothing new in the journal: nothing is added twice.
     track(app.world_mut());

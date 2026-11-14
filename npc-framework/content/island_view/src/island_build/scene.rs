@@ -21,6 +21,7 @@ use island_content::village::{
     Role, VillagePlace, civic,
     colony::Household,
     frontier::{
+        economy_spec::EconomyRegistry,
         settlements::{HOME_OFFSET_MM, WORKPLACE_OFFSET_MM},
         terrain::TerrainState,
         world_spec::LivingWorldSpec,
@@ -118,6 +119,29 @@ pub(crate) fn stage_for(share: f32, started: bool) -> Option<usize> {
     } else {
         2
     })
+}
+
+/// How an open site is drawn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SiteLook {
+    /// A building's site: earth bed, doorway, scaffold and the kit's
+    /// stages rising inside.
+    Raised,
+    /// A prop's or a field's site: stakes and a rail round the footprint
+    /// and the delivered materials in front; no scaffold. The finished
+    /// prop (`island_world::props`) or field (`island_world::fields`) takes
+    /// its place when the site finishes.
+    Staked,
+}
+
+/// The look of a site: staked for a prop or a field (or garden) plot,
+/// raised for every other building.
+pub(crate) fn site_look(prop: bool, field: bool) -> SiteLook {
+    if prop || field {
+        SiteLook::Staked
+    } else {
+        SiteLook::Raised
+    }
 }
 
 /// The stock shown at a store or a stall.
@@ -567,6 +591,39 @@ fn spawn_site(
     });
 }
 
+/// A prop's or a field's site: a thin bed of turned earth, stakes and a low
+/// rail round the footprint, and the delivered materials in front. It
+/// shares `SiteVisual` with building sites so deliveries fill the same pile
+/// slots; it has no scaffold, walls or stages (those entities are
+/// placeholders the progress system skips).
+fn spawn_staked_site(
+    commands: &mut Commands,
+    assets: &CivicAssets,
+    root: Entity,
+    id: SimId,
+    frame: &Frame,
+) {
+    block(
+        commands,
+        root,
+        assets,
+        &assets.soil,
+        Vec3::new(0.0, -0.2, 0.0),
+        Vec3::new(frame.width - 0.1, 0.44, frame.depth - 0.1),
+    );
+    outline(commands, root, assets, frame, 0.3);
+    let piles = slots(commands, root, front_pile(frame), 0.6);
+    commands.entity(root).insert(SiteVisual {
+        source: id,
+        frame: Entity::PLACEHOLDER,
+        walls: Entity::PLACEHOLDER,
+        piles,
+        height: YARD_HEIGHT,
+        stages: [Entity::PLACEHOLDER; 3],
+        observed: None,
+    });
+}
+
 /// An open store: a fenced yard with the stock inside.
 fn spawn_yard(
     commands: &mut Commands,
@@ -811,6 +868,7 @@ fn sync(
         Option<&civic::Depot>,
     )>,
     fields: Query<(), With<island_content::village::fields::Field>>,
+    registry: Option<Res<EconomyRegistry>>,
     roots: Query<&CivicVisual>,
     mut visuals: ResMut<VisualIndex>,
     mut shown: ResMut<CivicVisuals>,
@@ -920,14 +978,24 @@ fn sync(
             ))
             .id();
         if !built {
-            spawn_site(
-                &mut commands,
-                &assets,
-                root,
-                id,
-                &frame,
-                signature.plot.solid,
-            );
+            let look = sites.get(entity).map_or(SiteLook::Raised, |site| {
+                let field = registry
+                    .as_deref()
+                    .and_then(|registry| registry.spec.building(&site.building))
+                    .is_some_and(|def| def.field.is_some());
+                site_look(site.is_prop(), field)
+            });
+            match look {
+                SiteLook::Raised => spawn_site(
+                    &mut commands,
+                    &assets,
+                    root,
+                    id,
+                    &frame,
+                    signature.plot.solid,
+                ),
+                SiteLook::Staked => spawn_staked_site(&mut commands, &assets, root, id, &frame),
+            }
         } else if home.is_some() || place.is_some_and(|place| place.role == Role::Innkeeper) {
             // A home and an inn are places somebody can be inside:
             // `island_homes` fits their house to the plot's body.
@@ -1245,5 +1313,81 @@ mod tests {
         assert_eq!(stage_for(0.5, true), Some(1));
         assert_eq!(stage_for(0.9, true), Some(2));
         assert_eq!(stage_for(1.0, true), Some(2));
+    }
+
+    /// A barrel placed in build mode is a site drawn with stakes and no
+    /// prop; once it stands it is the prop and no site. Gardens and fields
+    /// are staked, other buildings raised.
+    #[test]
+    fn a_prop_site_is_staked_and_never_drawn_as_the_prop_until_it_stands() {
+        use crate::island_world::props as drawn;
+        use island_content::village::frontier::{
+            props::{self, PlaceProp, RemoveProp},
+            settlements,
+            shape::{PlaceMode, SetEditorMode},
+        };
+        use npc_framework::kernel::commands::ContentCommand;
+        let mut app = island_content::new_sim_app(7, "living_world");
+        npc_framework::prelude::run_ticks(app.world_mut(), 2);
+        let barrel = |(x, z): (i32, i32), mode| PlaceProp {
+            prop: "barrel".into(),
+            x,
+            z,
+            rotation: 0,
+            mode,
+        };
+        let world = app.world();
+        let harbour = world
+            .resource::<island_content::IslandIds>()
+            .id("settlement_harbour");
+        let centre = settlements::definition(world, harbour)
+            .expect("harbour")
+            .center;
+        let spot = (-30..=30)
+            .step_by(3)
+            .flat_map(|dz| (-30..=30).step_by(3).map(move |dx| (dx, dz)))
+            .map(|(dx, dz)| (centre.x / 1000 + dx, centre.z / 1000 + dz))
+            .find(|spot| barrel(*spot, PlaceMode::Build).check(world).is_ok())
+            .expect("a spot for a barrel");
+        let site = barrel(spot, PlaceMode::Build)
+            .perform(app.world_mut())
+            .expect("a site");
+        // While it is a site: the staked look, and nothing for the prop
+        // layer to draw.
+        let world = app.world();
+        let entity = world.resource::<SimIndex>().get(site).expect("site entity");
+        let state = world
+            .get::<civic::ConstructionSite>(entity)
+            .expect("a construction site");
+        assert!(state.is_prop());
+        assert_eq!(site_look(state.is_prop(), false), SiteLook::Staked);
+        let open = drawn::open_sites(world);
+        assert!(open.contains(&site));
+        let (draw, _) = drawn::changes(&BTreeMap::new(), &props::props(world));
+        assert!(draw.is_empty(), "a site is not drawn as its prop");
+        // Standing (the sim's finish and an editor placement both leave a
+        // prop and no site): the prop alone, and the open-site list changed,
+        // so the prop layer redraws in the frame the site look goes.
+        RemoveProp { prop: site }
+            .perform(app.world_mut())
+            .expect("site cancelled");
+        SetEditorMode { on: true }.apply(app.world_mut());
+        let standing = barrel(spot, PlaceMode::Editor)
+            .perform(app.world_mut())
+            .expect("stands at once");
+        let world = app.world();
+        let now = drawn::open_sites(world);
+        assert!(!now.contains(&site) && now != open);
+        let (draw, gone) = drawn::changes(&BTreeMap::new(), &props::props(world));
+        assert_eq!(
+            draw.iter().map(|view| view.id).collect::<Vec<_>>(),
+            vec![standing]
+        );
+        assert!(gone.is_empty());
+        // Plots with a field are staked; every other building is raised.
+        let garden = civic::definition(world, "garden").expect("the garden");
+        assert!(garden.field.is_some());
+        assert_eq!(site_look(false, true), SiteLook::Staked);
+        assert_eq!(site_look(false, false), SiteLook::Raised);
     }
 }

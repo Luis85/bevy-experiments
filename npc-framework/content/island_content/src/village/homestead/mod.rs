@@ -375,17 +375,19 @@ fn finish_build(world: &mut World, actor: Entity, build: CottageBuild) {
 
 pub fn tick(world: &mut World) {
     let now = world.resource::<SimClock>().tick;
-    let builders: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .filter_map(|actor| {
-            world
-                .get::<CottageBuild>(actor)
-                .cloned()
-                .map(|build| (actor, build))
+    let mut builders: Vec<(SimId, Entity, CottageBuild)> = world
+        .try_query::<(Entity, &SimId, &CottageBuild)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .map(|(entity, id, build)| (*id, entity, build.clone()))
+                .collect()
         })
+        .unwrap_or_default();
+    builders.sort_unstable_by_key(|(id, _, _)| *id);
+    let builders: Vec<(Entity, CottageBuild)> = builders
+        .into_iter()
+        .map(|(_, entity, build)| (entity, build))
         .collect();
     for (actor, build) in builders {
         if !living(world, actor) {

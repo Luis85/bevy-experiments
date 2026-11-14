@@ -30,6 +30,10 @@ fn social_relationships_require_real_proximity_and_obey_gathering_policy() {
     app.world_mut().entity_mut(b).insert(SimPos::new(200, 100));
     app.world_mut().resource_mut::<SimClock>().tick = 300;
     colony::tick(app.world_mut());
+    // A meeting lasts `schedule.chat_ticks` (200) and pays at its end
+    // (review fix S3.3): advance to its end and settle it.
+    app.world_mut().resource_mut::<SimClock>().tick = 500;
+    colony::tick(app.world_mut());
     assert_eq!(
         app.world()
             .get::<SocialLife>(a)

@@ -58,6 +58,8 @@ pub fn register(app: &mut App) {
     super::indoors::register(app);
     super::live::register(app);
     super::stock::register(app);
+    super::ledger::register(app);
+    shape::register(app);
     app.register_command::<shape::PlaceResourcePatch>()
         .register_command::<shape::RemoveResourcePatch>()
         .register_command::<shape::PlacePlot>()
@@ -70,6 +72,10 @@ pub fn spawn_places(world: &mut World, ids: &mut crate::IslandIds) {
 }
 pub fn spawn(world: &mut World) {
     labor::spawn(world);
+    // Each founder runs the tree its trade or stage names (S3.1).
+    for (_, actor) in super::demography::residents(world) {
+        super::resident::assign_tree(world, actor);
+    }
     super::homestead::spawn(world);
     super::colony::spawn(world);
     // Planner memory only: no entity is spawned, so no identity moves.
@@ -106,9 +112,11 @@ pub fn spawn(world: &mut World) {
     super::production::validate(world).expect("regional production graph must be acyclic");
 }
 pub fn tick(world: &mut World) {
+    super::ledger::tick(world);
     activities::tick(world);
     labor::tick(world);
     super::weather::tick(world);
+    super::spoilage::tick(world);
     super::fields::tick(world);
     super::civic::tick(world);
     super::merchant::tick(world);

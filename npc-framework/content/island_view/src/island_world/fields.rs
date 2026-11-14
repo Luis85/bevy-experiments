@@ -197,6 +197,9 @@ struct FieldVisual {
 #[derive(Resource, Default)]
 pub(crate) struct FieldScene {
     since: f32,
+    /// The open construction sites when last read: a field site that
+    /// finishes is redrawn as its field in the same frame.
+    sites: Vec<SimId>,
     fields: BTreeMap<SimId, FieldVisual>,
     assets: Option<FieldAssets>,
 }
@@ -418,13 +421,15 @@ pub(crate) fn sync(world: &mut World) {
     let delta = world
         .get_resource::<Time>()
         .map_or(0.0, |time| time.delta_secs());
+    let sites = super::props::open_sites(world);
     {
         let mut scene = world.resource_mut::<FieldScene>();
         scene.since += delta;
-        if scene.since < READ_SECS {
+        if scene.since < READ_SECS && scene.sites == sites {
             return;
         }
         scene.since = 0.0;
+        scene.sites = sites;
     }
     let fields = view::fields(world);
     let mut scene = world.remove_resource::<FieldScene>().expect("field scene");

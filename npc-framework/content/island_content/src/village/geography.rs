@@ -526,3 +526,12 @@ impl SimHashResource for Geography {
 pub fn for_world(_world: &World) -> &'static Geography {
     &REGIONAL
 }
+
+/// The centre of a one-metre cell, saturating at the edges of `i32` so a
+/// cell read from a save or a command can never overflow.
+pub fn cell_centre(x: i32, z: i32) -> npc_framework::prelude::SimPos {
+    npc_framework::prelude::SimPos::new(
+        x.saturating_mul(1000).saturating_add(500),
+        z.saturating_mul(1000).saturating_add(500),
+    )
+}

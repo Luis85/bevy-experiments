@@ -168,10 +168,35 @@ impl ContentCommand for PlaceResourcePatch {
     }
 }
 
-/// Lays out a farm or garden plot: a catalog building with a `field`,
-/// finished at once and empty, with its entrance at cell `(x, z)`.
+/// How a Shape placement is made: `build` opens a construction site with
+/// the cost and work of the catalog entry (the village supplies and builds
+/// it); `editor` places it at once and free, only while the recorded editor
+/// switch is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaceMode {
+    Build,
+    Editor,
+}
+
+/// Refuses free placement while the world is not being edited.
+pub fn editor_gate(world: &World, mode: PlaceMode) -> Result<(), String> {
+    if mode == PlaceMode::Editor
+        && !world
+            .get_resource::<EditorMode>()
+            .is_some_and(|editor| editor.on)
+    {
+        return Err("Free placement is only available while editing the world.".into());
+    }
+    Ok(())
+}
+
+/// Lays out a farm or garden plot: a catalog building with a `field`, with
+/// its entrance at cell `(x, z)`. `mode: "build"` opens its construction
+/// site (cost and work from the catalog); `mode: "editor"` lays it out
+/// finished and empty at once.
 ///
-/// `{"type": "PlacePlot", "plot": "garden", "x": 12, "z": -30, "rotation": 0}`
+/// `{"type": "PlacePlot", "plot": "garden", "x": 12, "z": -30, "rotation": 0, "mode": "build"}`
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlacePlot {
@@ -180,9 +205,12 @@ pub struct PlacePlot {
     pub z: i32,
     #[serde(default)]
     pub rotation: u8,
+    pub mode: PlaceMode,
 }
 impl PlacePlot {
     pub fn check(&self, world: &World) -> Result<(), String> {
+        editor_gate(world, self.mode)?;
+        crate::village::civic::cell_on_map(world, self.x, self.z)?;
         let def = crate::village::civic::definition(world, &self.plot)
             .filter(|def| def.field.is_some())
             .ok_or_else(|| {
@@ -194,7 +222,10 @@ impl PlacePlot {
         let body = crate::village::civic::plot_for(def, self.x, self.z, self.rotation);
         crate::village::civic::placement_check(world, &self.plot, self.x, self.z, self.rotation)?;
         if body.cells().any(|cell| {
-            super::terrain::on_road(world, SimPos::new(cell.x * 1000 + 500, cell.z * 1000 + 500))
+            super::terrain::on_road(
+                world,
+                crate::village::geography::cell_centre(cell.x, cell.z),
+            )
         }) {
             return Err("a plot cannot be laid over a road".into());
         }
@@ -202,19 +233,41 @@ impl PlacePlot {
     }
     pub fn perform(&self, world: &mut World) -> Result<SimId, String> {
         self.check(world)?;
-        let id =
-            crate::village::civic::lay_out(world, &self.plot, self.x, self.z, self.rotation, true)?;
-        let settlement = world
-            .resource::<SimIndex>()
-            .get(id)
-            .and_then(|entity| world.get::<Building>(entity))
-            .map(|building| building.settlement);
+        let id = match self.mode {
+            PlaceMode::Editor => crate::village::civic::lay_out(
+                world,
+                &self.plot,
+                self.x,
+                self.z,
+                self.rotation,
+                true,
+            )?,
+            PlaceMode::Build => crate::village::civic::place(
+                world,
+                &self.plot,
+                self.x,
+                self.z,
+                self.rotation,
+                false,
+                "laid out by the player",
+            )?,
+        };
+        let settlement = world.resource::<SimIndex>().get(id).and_then(|entity| {
+            world
+                .get::<Building>(entity)
+                .map(|building| building.settlement)
+                .or_else(|| {
+                    world
+                        .get::<ConstructionSite>(entity)
+                        .map(|site| site.settlement)
+                })
+        });
         record_effect(
             world,
             None,
             "LivingPlotPlaced",
             &json!({"plot":id,"building":self.plot,"x":self.x,"z":self.z,
-                "rotation":self.rotation,"settlement":settlement}),
+                "rotation":self.rotation,"settlement":settlement,"mode":self.mode}),
         );
         Ok(id)
     }
@@ -241,6 +294,21 @@ pub struct RemovePlot {
 }
 impl RemovePlot {
     pub fn check(&self, world: &World) -> Result<(), String> {
+        // A plot still being built: its site can always be cancelled.
+        if let Some(site) = world
+            .resource::<SimIndex>()
+            .get(self.plot)
+            .and_then(|entity| world.get::<ConstructionSite>(entity))
+        {
+            return if !site.is_prop()
+                && crate::village::civic::definition(world, &site.building)
+                    .is_some_and(|def| def.field.is_some())
+            {
+                Ok(())
+            } else {
+                Err("that is not a farm or garden plot".into())
+            };
+        }
         let building = world
             .resource::<SimIndex>()
             .get(self.plot)
@@ -261,6 +329,15 @@ impl RemovePlot {
     }
     pub fn perform(&self, world: &mut World) -> Result<(), String> {
         self.check(world)?;
+        if world
+            .resource::<SimIndex>()
+            .get(self.plot)
+            .is_some_and(|entity| world.get::<ConstructionSite>(entity).is_some())
+        {
+            // Delivered goods go back as for `CancelBuilding`.
+            crate::village::civic::cancel_site(world, self.plot, "removed by the player");
+            return Ok(());
+        }
         let building = world
             .resource::<SimIndex>()
             .get(self.plot)
@@ -287,6 +364,46 @@ impl ContentCommand for RemovePlot {
     fn apply(self, world: &mut World) {
         let _ = self.perform(world);
     }
+}
+
+/// Whether the Shape tools place for free (editor mode). Off in play; only
+/// the recorded [`SetEditorMode`] changes it.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EditorMode {
+    pub on: bool,
+}
+impl npc_framework::kernel::hash::SimHashResource for EditorMode {
+    const NAME: &'static str = "island_editor_mode_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.u8(u8::from(self.on));
+    }
+    fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
+        Some(npc_framework::snapshot::serde_resource_fns::<Self>())
+    }
+}
+
+/// Switches free placement on or off: `{"type":"SetEditorMode","on":true}`.
+/// Never refused.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetEditorMode {
+    pub on: bool,
+}
+impl ContentCommand for SetEditorMode {
+    const NAME: &'static str = "SetEditorMode";
+    fn validate(&self, _world: &World) -> Result<(), CommandError> {
+        Ok(())
+    }
+    fn apply(self, world: &mut World) {
+        world.resource_mut::<EditorMode>().on = self.on;
+        record_effect(world, None, "LivingEditorModeSet", &json!({"on": self.on}));
+    }
+}
+
+pub fn register(app: &mut bevy_app::App) {
+    app.init_resource::<EditorMode>()
+        .register_sim_resource::<EditorMode>()
+        .register_command::<SetEditorMode>();
 }
 
 /// Spawns a full resource patch with a fresh ecological history.
@@ -474,7 +591,10 @@ pub fn export_spec(world: &World) -> Option<LivingWorldSpec> {
                     )
                 })
             } else {
-                let site = world.get::<ConstructionSite>(*entity)?;
+                // Prop sites are exported with the props.
+                let site = world
+                    .get::<ConstructionSite>(*entity)
+                    .filter(|site| !site.is_prop())?;
                 Some((
                     *id,
                     PlacedBuilding {

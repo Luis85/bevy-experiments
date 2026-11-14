@@ -403,6 +403,10 @@ fn host(app: &mut App, args: &Args) {
             (speed_input, step_input).chain().in_set(ViewSystems::Input),
         )
         .add_systems(Update, scripted_commands.before(NpcDriverSet))
+        // The view asks for the idle supervisor to hold while a character is
+        // played; the host owns the policy and applies the request.
+        .init_resource::<island_view::SchedulerHoldRequest>()
+        .add_systems(PostUpdate, island_view::apply_scheduler_hold)
         .add_systems(Startup, (log_names, preselect));
     if args.front_end {
         frontend::install(app);
@@ -428,16 +432,82 @@ fn host(app: &mut App, args: &Args) {
     debug_tools::install(app, args);
 }
 
+/// What the window says when the game's own files cannot build the island.
+pub(crate) const FATAL_TITLE: &str = "The game could not start.";
+pub(crate) const FATAL_BODY: &str =
+    "Something in the game's own files is damaged. Installing the game again should fix it.";
+
+/// A window with no island: the reason, its details and the way out
+/// (closing the window, or Esc). Never `exit(2)`.
+fn fatal_app(error: &str) -> App {
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: window_title(true).into(),
+            resolution: (1280, 720).into(),
+            ..default()
+        }),
+        ..default()
+    }));
+    let details = format!("Details: {error}");
+    app.add_systems(Startup, move |mut commands: Commands| {
+        commands.spawn(Camera2d);
+        commands
+            .spawn(Node {
+                width: percent(100),
+                height: percent(100),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: px(12),
+                ..default()
+            })
+            .with_children(|root| {
+                for (text, size) in [
+                    (FATAL_TITLE.to_owned(), 28.0),
+                    (FATAL_BODY.to_owned(), 18.0),
+                    (details.clone(), 13.0),
+                    ("Close the window or press Esc to quit.".to_owned(), 15.0),
+                ] {
+                    root.spawn((
+                        Text::new(text),
+                        TextFont {
+                            font_size: bevy::text::FontSize::Px(size),
+                            ..default()
+                        },
+                        Node {
+                            max_width: px(760),
+                            ..default()
+                        },
+                    ));
+                }
+            });
+    })
+    .add_systems(
+        Update,
+        |keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>| {
+            if keys.just_pressed(KeyCode::Escape) {
+                exit.write(AppExit::Success);
+            }
+        },
+    );
+    app
+}
+
 /// The game's app: the player flow, a local save, or a scenario.
 fn scenario_app(args: &Args) -> App {
     if args.front_end {
-        return island::session::open(
-            args.island_save.as_deref().expect("frontend save path"),
-            args.seed,
-            args.island_rules.as_deref(),
-            |app| host(app, args),
-        )
-        .unwrap_or_else(|error| usage(&error));
+        // A save or rules that cannot open are named on the title; only the
+        // game's own files failing leaves the title out, with a window that
+        // says so. `usage` is for command-line arguments alone.
+        let save = args.island_save.as_deref().expect("frontend save path");
+        return island::session::open(save, args.seed, args.island_rules.as_deref(), |app| {
+            host(app, args)
+        })
+        .unwrap_or_else(|error| {
+            error!("the island could not be opened: {error}");
+            fatal_app(&error)
+        });
     }
     if let Some(path) = &args.island_save {
         return island::open(
@@ -587,9 +657,28 @@ fn speed_input(keys: Option<Res<ButtonInput<KeyCode>>>, mut control: ResMut<SimC
     }
 }
 
-/// `.` (period) runs exactly one tick while the sim is stopped.
-fn step_input(keys: Option<Res<ButtonInput<KeyCode>>>, mut control: ResMut<SimControl>) {
-    if keys.is_some_and(|k| k.just_pressed(KeyCode::Period)) && control.is_stopped() {
+/// Whether the developer keys act: always on a developer host, and in the
+/// player session only with `--dev-keys`.
+pub(crate) fn developer_keys_on(world: &World) -> bool {
+    !world
+        .get_resource::<island_view::PlayerExperience>()
+        .is_some_and(|experience| experience.enabled)
+        || world
+            .get_resource::<island_view::DeveloperKeys>()
+            .is_some_and(|keys| keys.0)
+}
+
+/// `.` (period) runs exactly one tick while the sim is stopped. A developer
+/// key: in the player session a pause means nothing moves.
+fn step_input(
+    keys: Option<Res<ButtonInput<KeyCode>>>,
+    experience: Option<Res<island_view::PlayerExperience>>,
+    developer: Option<Res<island_view::DeveloperKeys>>,
+    mut control: ResMut<SimControl>,
+) {
+    let player = experience.is_some_and(|experience| experience.enabled)
+        && !developer.is_some_and(|developer| developer.0);
+    if !player && keys.is_some_and(|k| k.just_pressed(KeyCode::Period)) && control.is_stopped() {
         control.step();
     }
 }

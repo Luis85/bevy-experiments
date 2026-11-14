@@ -161,8 +161,6 @@ fn log_asset_dir() {
 pub(crate) enum ModelKind {
     Knight,
     Rogue,
-    SkeletonMinion,
-    SkeletonWarrior,
     Barbarian,
     Mage,
     UnhoodedRogue,
@@ -173,11 +171,9 @@ pub(crate) enum ModelKind {
 }
 
 impl ModelKind {
-    pub const ANIMATED: [ModelKind; 11] = [
+    pub const ANIMATED: [ModelKind; 9] = [
         ModelKind::Knight,
         ModelKind::Rogue,
-        ModelKind::SkeletonMinion,
-        ModelKind::SkeletonWarrior,
         ModelKind::Barbarian,
         ModelKind::Mage,
         ModelKind::UnhoodedRogue,
@@ -195,8 +191,6 @@ impl ModelKind {
         Some(match self {
             ModelKind::Knight => "testbed/characters/Knight.glb",
             ModelKind::Rogue => "characters/Rogue_Hooded.glb",
-            ModelKind::SkeletonMinion => "testbed/characters/Skeleton_Minion.glb",
-            ModelKind::SkeletonWarrior => "testbed/characters/Skeleton_Warrior.glb",
             ModelKind::Barbarian => "living/characters/Barbarian.glb",
             ModelKind::Mage => "living/characters/Mage.glb",
             ModelKind::UnhoodedRogue => "living/characters/Rogue.glb",
@@ -211,8 +205,6 @@ impl ModelKind {
         Some(match name {
             "knight" => Self::Knight,
             "rogue" => Self::Rogue,
-            "skeleton_minion" => Self::SkeletonMinion,
-            "skeleton_warrior" => Self::SkeletonWarrior,
             "barbarian" => Self::Barbarian,
             "mage" => Self::Mage,
             "unhooded_rogue" => Self::UnhoodedRogue,
@@ -262,21 +254,13 @@ impl ModelKind {
         ROSTER[appearance as usize % ROSTER.len()]
     }
 
-    /// Faction 1 = adventurers (Knight for the smith and the woodcutter,
-    /// Rogue for everyone else), faction 2 = skeletons (Warrior for
-    /// `*warrior*` templates).
-    pub fn for_actor(template: &str, owner: Option<u32>) -> Self {
-        if owner == Some(2) || template.starts_with("skeleton") {
-            if template.contains("warrior") {
-                ModelKind::SkeletonWarrior
-            } else {
-                ModelKind::SkeletonMinion
-            }
-        } else {
-            match template {
-                "smith" | "woodcutter" => ModelKind::Knight,
-                _ => ModelKind::Rogue,
-            }
+    /// A unit with no resident look: the Knight for the smith and the
+    /// woodcutter, the Rogue for everyone else. (The island has no second
+    /// faction; the testbed's skeletons are not drawn.)
+    pub fn for_actor(template: &str, _owner: Option<u32>) -> Self {
+        match template {
+            "smith" | "woodcutter" => ModelKind::Knight,
+            _ => ModelKind::Rogue,
         }
     }
 }
@@ -298,30 +282,21 @@ macro_rules! models {
 }
 
 models! {
-    wall = "testbed/dungeon/wall.gltf.glb",
-    doorway = "testbed/dungeon/wall_doorway.glb",
     chest = "testbed/dungeon/chest.glb",
     food = "testbed/dungeon/plate_food_A.gltf.glb",
     ingot = "testbed/dungeon/coin_stack_small.gltf.glb",
     barrel = "testbed/dungeon/barrel_small.gltf.glb",
     crate_large = "testbed/dungeon/box_large.gltf.glb",
-    tree_a = "hex/tree_single_A.gltf",
-    tree_b = "hex/tree_single_B.gltf",
-    stump_a = "hex/tree_single_A_cut.gltf",
-    stump_b = "hex/tree_single_B_cut.gltf",
     stone = "hex/resource_stone.gltf",
     lumber = "hex/resource_lumber.gltf",
     book = "furniture/book_single.gltf",
     axe = "props/axe_1handed.gltf",
     workbench = "testbed/survival/workbench.glb",
     anvil = "testbed/survival/workbench-anvil.glb",
-    forge = "testbed/survival/campfire-pit.glb",
     pickaxe = "testbed/survival/tool-pickaxe.glb",
     hammer = "testbed/survival/tool-hammer.glb",
     log = "testbed/survival/tree-log.glb",
     planks = "testbed/survival/resource-planks.glb",
-    ram = "testbed/castle/siege-ram.glb",
-    cart = "testbed/town/cart.glb",
 }
 
 pub(crate) const GRASS: &str = "textures/grass_color.jpg";

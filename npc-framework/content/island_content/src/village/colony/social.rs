@@ -14,14 +14,120 @@ pub(super) fn welcome(world: &mut World, actor: Entity) {
 /// Shared availability for seeking and settling a leisure meeting. Walking may
 /// be the actor's own social approach; committed work and its approach intent
 /// remain owned by their existing action systems and are never interrupted here.
+/// A meeting under way (S3.3): both parties stand together until `until`,
+/// when the meeting pays; walking apart or a critical need ends it early,
+/// paying nothing.
+#[derive(
+    Component,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    bevy_reflect::Reflect,
+)]
+#[reflect(Component)]
+pub struct Chatting {
+    pub with: SimId,
+    pub until: u64,
+}
+impl npc_framework::prelude::SimHash for Chatting {
+    const NAME: &'static str = "island_chatting_v1";
+    fn sim_hash(&self, h: &mut npc_framework::prelude::Fnv64) {
+        h.u32(self.with.0);
+        h.u64(self.until);
+    }
+}
+
+/// Ends or pays the meetings under way, lower identity first.
+fn settle_meetings(world: &mut World, now: u64) {
+    let mut chats: Vec<(SimId, Entity, Chatting)> = world
+        .try_query::<(Entity, &SimId, &Chatting)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .map(|(e, id, chat)| (*id, e, *chat))
+                .collect()
+        })
+        .unwrap_or_default();
+    chats.sort_unstable_by_key(|(id, _, _)| *id);
+    let (break_mm,) =
+        (super::super::resident::spec(world).map_or(3000, |spec| spec.schedule.chat_break_mm),);
+    let critical = super::super::policy::active(world).map_or_else(
+        || super::super::policy::IslandAiPolicy::default().critical_need,
+        |policy| policy.critical_need,
+    );
+    for (id, actor, chat) in chats {
+        if world.get::<Chatting>(actor).is_none() || chat.with < id {
+            continue;
+        }
+        let other = world.resource::<SimIndex>().get(chat.with);
+        let apart = other.is_none_or(|other| {
+            !living(world, other)
+                || world
+                    .get::<SimPos>(actor)
+                    .zip(world.get::<SimPos>(other))
+                    .is_none_or(|(a, b)| a.dist2(*b) > i64::from(break_mm).pow(2))
+        });
+        let needy = [Some(actor), other].into_iter().flatten().any(|person| {
+            ["Hunger", "Thirst", "Energy", "Warmth"]
+                .iter()
+                .any(|need| economy::need(world, person, need) < critical)
+        });
+        if !apart && !needy && chat.until > now {
+            continue;
+        }
+        let paid = !apart && !needy;
+        for (person, partner) in [(Some(actor), chat.with), (other, id)] {
+            let Some(person) = person else {
+                continue;
+            };
+            world.entity_mut(person).remove::<Chatting>();
+            if paid && let Some(mut social) = world.get_mut::<SocialLife>(person) {
+                social.morale = (social.morale + 1000).min(100_000);
+                let affinity = social.affinity.entry(partner).or_default();
+                *affinity = (*affinity + 250).min(100_000);
+            }
+        }
+        if paid {
+            world.resource_mut::<ColonyState>().social_events += 1;
+        }
+        record_effect(
+            world,
+            Some(id),
+            "VillageSocialMeeting",
+            &json!({"with":chat.with,"paid":paid}),
+        );
+    }
+}
+
+/// A resident walking to the village's gathering does not stop to chat on
+/// the way (a meeting lasts, S3.3): the gathering is the meeting.
+fn on_the_way_to_a_gathering(world: &World, actor: Entity) -> bool {
+    if !super::super::live::attending(world, actor) {
+        return false;
+    }
+    let centre = super::super::frontier::settlements::member(world, actor)
+        .and_then(|settlement| super::super::frontier::settlements::definition(world, settlement))
+        .map(|definition| definition.center);
+    match (centre, world.get::<SimPos>(actor)) {
+        (Some(centre), Some(here)) => here.dist2(centre) > 10_000_i64.pow(2),
+        _ => false,
+    }
+}
+
 pub fn social_available(world: &World, actor: Entity) -> bool {
     if !world.contains_resource::<ColonyState>()
         || !living(world, actor)
+        || world.get::<Chatting>(actor).is_some()
         || world.get::<SocialLife>(actor).is_none()
         || world
             .get::<super::super::production::JobIntent>(actor)
             .is_some()
         || !matches!(super::super::activity(world, actor).0, "idle" | "walking")
+        || on_the_way_to_a_gathering(world, actor)
     {
         return false;
     }
@@ -108,6 +214,7 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
 }
 
 pub(super) fn tick(world: &mut World, now: u64) {
+    settle_meetings(world, now);
     let mut people: Vec<(SimId, Entity)> = world
         .try_query::<(Entity, &SimId, &SocialLife)>()
         .map(|mut query| {
@@ -195,19 +302,27 @@ pub(super) fn tick(world: &mut World, now: u64) {
             {
                 continue;
             }
+            // A meeting lasts `schedule.chat_ticks` and pays at its end.
+            let until = now.saturating_add(
+                super::super::resident::spec(world).map_or(200, |spec| spec.schedule.chat_ticks),
+            );
             for (person, other) in [(*a, *b_id), (*b, *a_id)] {
-                let mut social = world.get_mut::<SocialLife>(person).expect("social");
-                social.last_social_tick = now;
-                social.morale = (social.morale + 1000).min(100_000);
-                let affinity = social.affinity.entry(other).or_default();
-                *affinity = (*affinity + 250).min(100_000);
+                world
+                    .get_mut::<SocialLife>(person)
+                    .expect("social")
+                    .last_social_tick = now;
+                world
+                    .entity_mut(person)
+                    .remove::<npc_framework::prelude::MoveIntent>();
+                world
+                    .entity_mut(person)
+                    .insert(Chatting { with: other, until });
             }
-            world.resource_mut::<ColonyState>().social_events += 1;
             record_effect(
                 world,
                 Some(*a_id),
-                "VillageSocialMeeting",
-                &json!({"with":b_id}),
+                "VillageSocialMeetingStarted",
+                &json!({"with":b_id,"until":until}),
             );
             break;
         }

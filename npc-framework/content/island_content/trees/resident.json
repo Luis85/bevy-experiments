@@ -53,8 +53,11 @@
     {"name": "Bedtime", "kind": {"Guard": {"cond": "life.bedtime", "abort": "LowerPriority"}}, "children": [
       {"name": "Go to bed", "kind": {"Leaf": {"action": "life.sleep", "param": "None"}}}
     ]},
-    {"name": "Meal time", "kind": {"Guard": {"cond": "life.wants_meal", "abort": "None"}}, "children": [
-      {"name": "Eat a meal", "kind": {"Leaf": {"action": "life.eat", "param": "None"}}}
+    {"name": "Meal time", "kind": {"Guard": {"cond": "life.meal_due", "abort": "None"}}, "children": [
+      {"name": "Sit down to a meal", "kind": "Sequence", "children": [
+        {"name": "Go to the table", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "meal"}}}},
+        {"name": "Sit at the table", "kind": {"Leaf": {"action": "life.sit_down", "param": "None"}}}
+      ]}
     ]},
     {"name": "Chores", "kind": "Selector", "children": [
       {"name": "Pick up lost property", "kind": {"Leaf": {"action": "life.collect_found", "param": "None"}}},
@@ -84,7 +87,12 @@
     {"name": "Leisure", "kind": {"Guard": {"cond": "life.wants_leisure", "abort": "None"}}, "children": [
       {"name": "Free time", "kind": "Selector", "children": [
         {"name": "Help a friend", "kind": {"Leaf": {"action": "life.help", "param": "None"}}},
-        {"name": "Meet a neighbour","kind": {"Leaf": {"action": "life.socialise", "param": "None"}}},
+        {"name": "Family evening", "kind": {"Guard": {"cond": "life.family_at_home", "abort": "None"}}, "children": [
+          {"name": "Evening at home", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "home"}}}}
+        ]},
+        {"name": "Sociable", "kind": {"Guard": {"cond": "life.sociable", "abort": "None"}}, "children": [
+          {"name": "Meet a neighbour","kind": {"Leaf": {"action": "life.socialise", "param": "None"}}}
+        ]},
         {"name": "Stroll to the square", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "centre"}}}}
       ]}
     ]},
@@ -97,13 +105,13 @@
         {"name": "Harvest the field", "kind": {"Leaf": {"action": "life.harvest", "param": "None"}}},
         {"name": "Sow the field", "kind": {"Leaf": {"action": "life.sow", "param": "None"}}},
         {"name": "Tend the field", "kind": {"Leaf": {"action": "life.tend", "param": "None"}}},
+        {"name": "Restock the stall", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "restock"}}}},
+        {"name": "Store surplus", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "surplus"}}}},
         {"name": "Pursue production goal", "kind": {"Leaf": {"action": "life.pursue_goal", "param": "None"}}},
         {"name": "Craft", "kind": {"Leaf": {"action": "life.craft", "param": "None"}}},
         {"name": "Hunt", "kind": {"Leaf": {"action": "life.hunt", "param": "None"}}},
         {"name": "Buy materials", "kind": {"Leaf": {"action": "life.buy", "param": {"Name": "inputs"}}}},
-        {"name": "Gather", "kind": {"Leaf": {"action": "life.gather", "param": {"Name": "outputs"}}}},
-        {"name": "Store surplus", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "surplus"}}}},
-        {"name": "Restock the stall", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "restock"}}}}
+        {"name": "Gather", "kind": {"Leaf": {"action": "life.gather", "param": {"Name": "outputs"}}}}
       ]}
     ]},
     {"name": "Night", "kind": {"Guard": {"cond": "life.in_sleep_window", "abort": "None"}}, "children": [

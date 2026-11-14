@@ -26,6 +26,22 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Value {
     let mut resources = Vec::new();
     let mut workstations = Vec::new();
     let mut wildlife = Vec::new();
+    // The prey and the hunting tool come from the catalog (S2.9).
+    let hunt = super::frontier::economy_spec::registry(world).and_then(|registry| {
+        registry
+            .spec
+            .professions
+            .iter()
+            .find_map(|entry| entry.hunt.clone())
+    });
+    let prey = hunt
+        .as_ref()
+        .map_or("", |hunt| hunt.prey.as_str())
+        .to_owned();
+    let hunt_tool = hunt
+        .as_ref()
+        .map_or("", |hunt| hunt.tool.as_str())
+        .to_owned();
     for id in known {
         let Some(entity) = world.resource::<SimIndex>().get(id) else {
             continue;
@@ -36,7 +52,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Value {
                     .get::<PerceptionMemory>(ctx.entity)
                     .and_then(|memory| memory.get(id))
                     .is_some_and(|p| p.sensed);
-            wildlife.push(json!({"id":id,"kind":"deer","current":current,"alive":current.then(||super::living(world,entity)),"hunt_ticks":super::hunting::HUNT_TICKS,"tool":catalog::SPEAR}));
+            wildlife.push(json!({"id":id,"kind":prey,"current":current,"alive":current.then(||super::living(world,entity)),"hunt_ticks":super::hunting::HUNT_TICKS,"tool":hunt_tool}));
         }
         if let Some(patch) = world.get::<ResourcePatch>(entity) {
             let current = economy::near(world, ctx.entity, entity)

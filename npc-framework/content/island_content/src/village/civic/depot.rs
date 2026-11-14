@@ -203,7 +203,13 @@ pub fn check_deposit(
     if !(1..=100).contains(&count) {
         return Err("quantity must be 1..=100".into());
     }
-    if !storable(world, kind) || market::unit_price(world, kind).is_none() {
+    if market::unit_price(world, kind).is_none() {
+        let display = crate::village::catalog::display_in(world, kind).unwrap_or(kind);
+        return Err(format!("Nobody on this island trades {display}."));
+    }
+    // A market stall takes anything traded (review fix S2.6): it is the
+    // guaranteed outlet for what a player made. Stores keep goods only.
+    if !state.public && !storable(world, kind) {
         return Err("tools, clothing and untraded goods cannot be stored".into());
     }
     if !state.accepts(kind) {
@@ -219,6 +225,13 @@ pub fn check_deposit(
     }
     let now = world.resource::<SimClock>().tick;
     if state.room(world.get::<SimId>(owner).copied(), now) < count {
+        if state.public {
+            return Err(format!(
+                "The stall is full ({} of {}).",
+                state.used(),
+                state.capacity
+            ));
+        }
         return Err("the store has no room for that many".into());
     }
     Ok(())

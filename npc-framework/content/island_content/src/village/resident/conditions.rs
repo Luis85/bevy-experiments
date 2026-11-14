@@ -340,7 +340,20 @@ pub const CONDITIONS: &[ConditionInfo] = &[
         "life.wants_leisure",
         wants_leisure,
         &[],
-        "Not busy, sociable, inside a leisure block, and not out in the cold (night or winter)          without a coat."
+        "Not busy, inside a leisure block, and not out in the cold (night or winter) without a          coat. Everybody has an evening; sociability decides whether it is spent in company."
+    ),
+    condition!(
+        "life.meal_due",
+        meal_due,
+        &[],
+        "Not busy, inside a meal block on a day without a sit-down meal yet, carrying food, and the \
+         village is not gathering."
+    ),
+    condition!(
+        "life.family_at_home",
+        family_at_home,
+        &[],
+        "Has a partner or a child, and a home, and the village is not gathering."
     ),
     condition!(
         "life.wants_meal",
@@ -459,6 +472,42 @@ fn has_food(world: &World, actor: Entity) -> bool {
     })
 }
 
+/// A resident with a family to spend the evening with: a partner or a child,
+/// and a home. A gathering of the calendar wins: the family goes too.
+fn family_at_home(world: &World, actor: Entity) -> bool {
+    if super::super::live::attending(world, actor) {
+        return false;
+    }
+    let Some(id) = world.get::<SimId>(actor).copied() else {
+        return false;
+    };
+    let Some(home) = super::super::colony::home_of(world, id) else {
+        return false;
+    };
+    world
+        .get::<super::super::demography::Life>(actor)
+        .is_some_and(|life| life.partner.is_some())
+        || !super::super::demography::children_of(world, home).is_empty()
+}
+
+/// A meal block on a day without a sit-down meal yet: everybody stops for
+/// one meal a day, hungry or not (S3.3). A gathering of the calendar wins
+/// (hunger is still answered by the hunger branch).
+fn meal_due(world: &World, actor: Entity) -> bool {
+    let Some(day) = super::meal_block(world, actor) else {
+        return false;
+    };
+    if super::super::live::attending(world, actor) {
+        return false;
+    }
+    super::super::living(world, actor)
+        && !behavior::busy(world, actor)
+        && has_food(world, actor)
+        && world
+            .get::<super::DayRhythm>(actor)
+            .is_none_or(|rhythm| rhythm.last_meal != Some(day))
+}
+
 fn wants_meal(world: &World, actor: Entity) -> bool {
     let Some(spec) = super::spec(world) else {
         return false;
@@ -549,8 +598,9 @@ fn wants_leisure(world: &World, actor: Entity) -> bool {
         return !(super::super::living::cold(world)
             && !super::super::living::has_coat(world, actor));
     }
+    // Everybody stops working in the leisure block (review fix npc-ai#3);
+    // `life.sociable` decides whether the evening is spent in company.
     !behavior::busy(world, actor)
-        && sociable(world, actor)
         && super::in_block(world, actor, BlockKind::Leisure)
         // Nobody strolls in the cold without a coat: that time goes to the
         // work that clothes the village.

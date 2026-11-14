@@ -332,7 +332,18 @@ fn rts_camera(
             rts.yaw -= drag.x * DRAG_YAW;
             rts.pitch = (rts.pitch + drag.y * DRAG_PITCH).clamp(MIN_PITCH, MAX_PITCH);
         }
-        if let Some(keys) = keys.as_deref() {
+        // A chord (Ctrl+S, Ctrl+Z) is a command, never a camera move.
+        let chord = keys.as_deref().is_some_and(|keys| {
+            keys.any_pressed([
+                KeyCode::ControlLeft,
+                KeyCode::ControlRight,
+                KeyCode::AltLeft,
+                KeyCode::AltRight,
+                KeyCode::SuperLeft,
+                KeyCode::SuperRight,
+            ])
+        });
+        if let Some(keys) = keys.as_deref().filter(|_| !chord) {
             let pressed =
                 |a: KeyCode, b: KeyCode| (!character && keys.pressed(a)) || keys.pressed(b);
             let mut input = Vec2::ZERO;

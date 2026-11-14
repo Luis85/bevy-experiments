@@ -175,16 +175,19 @@ fn indoors_the_hearth_decides_warmth_and_passers_by_cannot_meet_the_resident() {
             run_ticks(app.world_mut(), 1);
         }
         sheltered = people.iter().copied().find(|(id, actor)| {
-            *id != out_id
-                && coatless(&app, *actor)
-                && view::inside(app.world(), *id).is_some()
-                && econ::need(app.world(), *actor, "Warmth") < 99_000
+            *id != out_id && coatless(&app, *actor) && view::inside(app.world(), *id).is_some()
         });
         if sheltered.is_some() {
             break;
         }
     }
     let (in_id, inside) = sheltered.expect("nobody was indoors at night");
+    // Since the family evening (review fix S3.3) residents are home well
+    // before the night and already warm: chill the one inside so the hearth
+    // has something to show.
+    if econ::need(app.world(), inside, "Warmth") >= 99_000 {
+        set_need(app.world_mut(), inside, "Warmth", 90_000);
+    }
     let house = view::inside(app.world(), in_id).expect("inside");
     let before = (
         econ::need(app.world(), inside, "Warmth"),
@@ -335,6 +338,7 @@ fn over_several_days_nobody_with_a_bed_rests_outside_their_home() {
         only_weather(world, "clear");
     });
     let mut asleep_indoors = 0_u32;
+    let mut asleep_guests = 0_u32;
     let mut indoors_samples = 0_u32;
     for _ in 0..360 {
         run_ticks(app.world_mut(), 50);
@@ -350,11 +354,19 @@ fn over_several_days_nobody_with_a_bed_rests_outside_their_home() {
             }
             if view::repose(app.world(), actor) == Repose::Asleep {
                 assert!(inside.is_some(), "asleep outdoors");
-                asleep_indoors += 1;
+                // Count the sleepers of the same population as the indoor
+                // samples: a guest asleep in a rented inn bed is neither (it
+                // used to be counted asleep only, so the comparison below
+                // mixed two populations once residents rented beds).
+                if !inn_guest(app.world(), id) {
+                    asleep_indoors += 1;
+                } else {
+                    asleep_guests += 1;
+                }
             }
         }
     }
-    println!("INDOORS samples={indoors_samples} asleep={asleep_indoors}");
+    println!("INDOORS samples={indoors_samples} asleep={asleep_indoors} guests={asleep_guests}");
     assert!(
         asleep_indoors > 100,
         "residents slept indoors: {asleep_indoors}"

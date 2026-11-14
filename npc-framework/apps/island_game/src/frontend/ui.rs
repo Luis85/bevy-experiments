@@ -228,6 +228,216 @@ fn season_day(world: &World, day: u64) -> u64 {
     day.saturating_sub(1) % island_content::village::days_per_season(world) + 1
 }
 
+/// "12 minutes ago", "just now".
+pub(crate) fn ago(seconds: u64) -> String {
+    match seconds {
+        0..60 => "just now".to_owned(),
+        60..120 => "a minute ago".to_owned(),
+        120..3600 => format!("{} minutes ago", seconds / 60),
+        3600..7200 => "an hour ago".to_owned(),
+        _ => format!("{} hours ago", seconds / 3600),
+    }
+}
+
+/// The title's sentence when the autosave is newer than the save.
+pub(crate) fn autosave_sentence(auto_age_secs: u64, own_age_secs: u64) -> String {
+    format!(
+        "There is an autosave from {}, newer than your save ({}).",
+        ago(auto_age_secs),
+        ago(own_age_secs)
+    )
+}
+
+/// The pause menu's line about the two files.
+pub(crate) fn saves_line(
+    own: Option<std::time::Duration>,
+    auto: Option<std::time::Duration>,
+    auto_failed: bool,
+) -> String {
+    let own = own.map_or_else(|| "none yet".to_owned(), |age| ago(age.as_secs()));
+    let auto = if auto_failed {
+        "the last one failed".to_owned()
+    } else {
+        auto.map_or_else(|| "none yet".to_owned(), |age| ago(age.as_secs()))
+    };
+    format!("Your save: {own} \u{b7} Autosave: {auto}")
+}
+
+/// What the confirmation says before leaving without a save.
+pub(crate) fn confirm_quit_lines(own_age_secs: Option<u64>, failed: bool) -> Vec<String> {
+    let mut lines = Vec::new();
+    if failed {
+        lines.push("The island could not be saved.".to_owned());
+    }
+    match own_age_secs {
+        Some(age) => lines.push(format!(
+            "Everything since your last save is lost. Your last save was {}.",
+            ago(age)
+        )),
+        None => lines.push("This island has never been saved. It will be gone.".to_owned()),
+    }
+    lines
+}
+
+/// The card the title shows above its buttons when it cannot simply
+/// continue: what happened, what the player can do, and the details.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TitleCard {
+    pub(crate) title: &'static str,
+    pub(crate) lines: Vec<String>,
+    pub(crate) details: Option<String>,
+    /// "Copy the folder path" is offered (the file is kept there).
+    pub(crate) copy_folder: bool,
+    pub(crate) status: Status,
+}
+
+/// A refusal's technical sentence in the player's words, for the details
+/// line; anything not known passes as it is.
+pub(crate) fn plain_details(reason: &str) -> String {
+    let known = [
+        ("different seed", "The save belongs to a different island."),
+        (
+            "not a local Island Village save",
+            "The file is not an island of this game.",
+        ),
+        (
+            "missing its immutable scenario",
+            "Part of the save is missing.",
+        ),
+        (
+            "need a new host",
+            "The save needs a newer version of the game.",
+        ),
+    ];
+    known
+        .iter()
+        .find(|(words, _)| reason.contains(words))
+        .map_or_else(
+            || reason.trim().to_owned(),
+            |(_, plain)| (*plain).to_owned(),
+        )
+}
+
+/// The title's card for `summary`, with the save's file name and the name
+/// its backup will get; `None` when the title can continue as usual.
+pub(crate) fn title_card(
+    summary: &session::Summary,
+    file: &str,
+    backup: &str,
+) -> Option<TitleCard> {
+    use crate::island::Issue;
+    if let Some(detail) = &summary.restart {
+        return Some(TitleCard {
+            title: "The game has to be restarted",
+            lines: vec![
+                "The new island could not start, and the island you were playing could not be put back.".into(),
+                "Your saved island on disk is untouched. Quit, then start the game again and choose Continue.".into(),
+            ],
+            details: Some(plain_details(detail)),
+            copy_folder: false,
+            status: Status::Warn,
+        });
+    }
+    Some(match summary.issue.as_ref()? {
+        Issue::Older => TitleCard {
+            title: "Your island is from an older version",
+            lines: vec![
+                format!("This version of the game cannot open it. The file is untouched: {file}."),
+                format!(
+                    "Start a new game to play now. Your old island is then kept beside it as {backup}."
+                ),
+            ],
+            details: None,
+            copy_folder: true,
+            status: Status::Warn,
+        },
+        Issue::OtherBuild => TitleCard {
+            title: "Your island is from another build of the game",
+            lines: vec![
+                format!("This build cannot open it. The file is untouched: {file}."),
+                format!(
+                    "Start a new game to play now. Your old island is then kept beside it as {backup}."
+                ),
+            ],
+            details: None,
+            copy_folder: true,
+            status: Status::Warn,
+        },
+        Issue::Newer => TitleCard {
+            title: "Your island is from a newer version",
+            lines: vec![
+                format!("Update the game to continue it. The file is untouched: {file}."),
+                format!("Or start a new game now. Your island is then kept beside it as {backup}."),
+            ],
+            details: None,
+            copy_folder: true,
+            status: Status::Warn,
+        },
+        Issue::Unopened(reason) => TitleCard {
+            title: "Your island could not be opened",
+            lines: vec![format!(
+                "The file is untouched: {file}. Starting a new game keeps it beside the new one as {backup}."
+            )],
+            details: Some(plain_details(reason)),
+            copy_folder: true,
+            status: Status::Warn,
+        },
+        Issue::Rules(reason) => TitleCard {
+            title: "Your changed island rules could not be read",
+            lines: vec![
+                "New game uses the island that comes with the game. Your files are untouched."
+                    .into(),
+            ],
+            details: Some(plain_details(reason)),
+            copy_folder: true,
+            status: Status::Info,
+        },
+    })
+}
+
+fn draw_title_card(world: &mut World, parent: Entity, tab: &mut i32, card: &TitleCard) {
+    let surface = Surface::Paper;
+    let root = w::card(world, parent, 12.0);
+    world.entity_mut(root).insert(Name::new("Title notice"));
+    if let Some(mut node) = world.get_mut::<Node>(root) {
+        node.width = px(420);
+        node.margin = UiRect::top(px(10));
+    }
+    let head = row(world, root, 6.0);
+    island_view::game_ui::icon::icon(
+        world,
+        head,
+        island_view::game_ui::icon::Icon::status(card.status),
+        16.0,
+        Tone::status(surface, card.status),
+    );
+    w::label(world, head, card.title, t::SUBHEADING, Tone::text(surface));
+    for line in &card.lines {
+        w::paragraph(world, root, line.clone(), t::BODY, Tone::text(surface));
+    }
+    if let Some(details) = &card.details {
+        w::paragraph(
+            world,
+            root,
+            format!("Details: {details}"),
+            t::CAPTION,
+            Tone::secondary(surface),
+        );
+    }
+    if card.copy_folder {
+        button(
+            world,
+            root,
+            tab,
+            "Copy the folder path",
+            Kind::Quiet,
+            surface,
+            None,
+            Action::CopyFolder,
+        );
+    }
+}
+
 pub(super) fn menu_tip(action: Action) -> Option<(&'static str, &'static str)> {
     Some(match action {
         Action::Continue => (
@@ -235,7 +445,7 @@ pub(super) fn menu_tip(action: Action) -> Option<(&'static str, &'static str)> {
             "Load your island where you left it and play on.",
         ),
         Action::ContinueInspector => (
-            "Oversee the village",
+            "Continue in Oversee",
             "Load your island and watch it from above; join as your character whenever you choose.",
         ),
         Action::New => (
@@ -254,16 +464,28 @@ pub(super) fn menu_tip(action: Action) -> Option<(&'static str, &'static str)> {
         Action::Resume => ("Resume", "Back to the island; time runs again."),
         Action::Save => (
             "Save game",
-            "Save the island now. It also saves itself every minute.",
+            "Save the island now. The game also keeps an autosave every minute.",
         ),
         Action::Title => (
             "Save and go to title",
             "Save, then leave for the title screen.",
         ),
-        Action::Quit => ("Quit", "Close the game; an island in play is saved first."),
+        Action::Quit => ("Quit", "Close the game. Your island is saved first."),
+        Action::ContinueAutosave => (
+            "Continue from the autosave",
+            "Load the island as the autosave left it; your own save stays as it is until you save.",
+        ),
+        Action::QuitUnsaved => (
+            "Quit without saving",
+            "Close the game and keep your last save as it is.",
+        ),
         Action::Settings => ("Settings", "Sound, display, controls and accessibility."),
         Action::Controls => ("How to play", "The Guide: keys and how each mode works."),
         Action::Back => ("Back", "Return to the previous screen."),
+        Action::CopyFolder => (
+            "Copy the folder path",
+            "Put the folder that holds your island on the clipboard.",
+        ),
         _ => return None,
     })
 }
@@ -301,17 +523,6 @@ fn column(world: &mut World, parent: Entity, gap: f32) -> Entity {
         .id()
 }
 
-/// "saved just now", "saved 2 minutes ago": how old the island's save is.
-fn saved_words(seconds: f32) -> String {
-    let minutes = (seconds / 60.0).floor() as u32;
-    match minutes {
-        0 => "saved just now".to_owned(),
-        1 => "saved a minute ago".to_owned(),
-        2..=59 => format!("saved {minutes} minutes ago"),
-        _ => "saved over an hour ago".to_owned(),
-    }
-}
-
 /// The keys of the island, for the Settings list and the Guide.
 const KEYS: [(&str, &str); 11] = [
     (
@@ -331,27 +542,45 @@ const KEYS: [(&str, &str); 11] = [
         "W A S D",
         "Walk in Live; pan the camera in Oversee and Shape",
     ),
-    ("Q  E", "Orbit the camera (Q and R in Live)"),
+    (
+        "Q  E",
+        "Turn the camera (Q and R in Live, where E uses things)",
+    ),
     ("Wheel", "Zoom; scroll when over a panel"),
     ("Middle mouse", "Drag to orbit and tilt the camera"),
 ];
 
 pub(super) const GUIDE_PAGES: [&str; 5] = ["Controls", "Oversee", "Live", "Shape", "The economy"];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum GuideLine {
     Text(&'static str),
     Key(&'static str, &'static str),
+    /// A mode's heading on the Controls page.
+    Heading(&'static str),
+    /// A key from the island's one key table (`island_view::guide_controls`).
+    Keys(String, &'static str),
 }
 
 /// One page of the Guide: a few sentences and the keys that belong to them.
 fn guide(page: u8) -> Vec<GuideLine> {
     use GuideLine::{Key, Text};
     match page {
-        0 => KEYS.iter().map(|(keys, what)| Key(keys, what)).collect(),
+        // The island's one key table: every player key, by mode.
+        0 => island_view::guide_controls()
+            .into_iter()
+            .flat_map(|section| {
+                std::iter::once(GuideLine::Heading(section.mode)).chain(
+                    section
+                        .keys
+                        .into_iter()
+                        .map(|(keys, what)| GuideLine::Keys(keys, what)),
+                )
+            })
+            .collect(),
         1 => vec![
             Text(
-                "Oversee shows the whole island from above. Nothing is done by your hand: residents do the work, and you decide what the village builds and who works where.",
+                "Oversee shows the whole island from above. Nothing is done by your hand: residents do the work, and you decide what a village builds, how many do each job, and what it sees to first. The Village outlook on the left says what needs you next.",
             ),
             Key(
                 "F1 to F5",
@@ -361,7 +590,7 @@ fn guide(page: u8) -> Vec<GuideLine> {
             Key("O  M", "Overlays, and the places to go to"),
             Key("F", "Follow the selected resident"),
             Text(
-                "Click a resident for their inspector: needs, family and bed, their day, why they chose what they do, home and job. Click a building for its card.",
+                "Click a resident for their card: needs, family and bed, their day, why they chose what they do, home and job. Click a building for its card.",
             ),
             Text(
                 "Alerts list what needs you, most urgent first; choose one to go there. While you place a building, the tag at the cursor says whether it can stand there, and why not.",
@@ -385,7 +614,7 @@ fn guide(page: u8) -> Vec<GuideLine> {
                 "Actions use real stock and take real time. A recipe you cannot make says what is missing. Gathering, recipes and garden work can be repeated five or ten times; Stop ends it.",
             ),
             Text(
-                "From evening on, your own door offers sleep until morning; the night passes quickly and the morning brings an account of the day. Talk, trade and give gifts to grow friendships; a friend sells for less and lends a hand. Build improves your homestead one tier at a time.",
+                "From evening on, your own door offers sleep until morning; the night passes quickly and the morning brings an account of the day. Talk, buy and sell, and give gifts to grow friendships; a friend sells for less and lends a hand. Build improves your homestead one tier at a time.",
             ),
             Text(
                 "Materials you order and a builder you hire take island hours: residents fetch, carry and build while you gather, tend the garden or sleep. The Build card says who is on the way, and when nobody has taken an order yet.",
@@ -398,49 +627,53 @@ fn guide(page: u8) -> Vec<GuideLine> {
             Key("H", "Hard or soft edge"),
             Key("V", "The next surface: grass, soil, stone, water"),
             Key("Ctrl+Z", "Take the last stroke back; Ctrl+Y lays it again"),
-            Key("N  E", "Place a resource patch, or remove one"),
+            Key("N  X", "Place a patch of a good, or remove one"),
+            Key("L", "Place plots and props; R turns the one in hand"),
             Text(
-                "Resource places a patch of a good where you click, at the richness you set; the nearest settlement works it, and Remove takes a patch away (a settlement keeps its last one of each good). Patches are not part of Undo, and Export writes the shaped island as a new world file in your worlds folder, and New game can start on it.",
+                "Resource places a patch of a good where you click, as rich as you set. The nearest village works it. Remove takes a patch away; a village keeps its last one of each good. Ctrl+Z brings back what you removed. Export saves the island you shaped as a new island, and New game can start on it.",
             ),
             Text(
-                "The simulation protects residents, homes, worksites and plots, and refuses cliffs: the outline turns red and dashed and the tag says why. Edits made while paused apply when time runs.",
+                "Residents, homes, workplaces and plots are protected, and cliffs are refused: the outline turns red and dashed and the tag says why. Edits made while paused show when time runs.",
             ),
         ],
         _ => vec![
             Text(
-                "Twelve trades turn what the island gives into food, tools and clothes: grain to flour to bread, logs to planks, ore to ingots to tools, hides to leather, fiber to thread to warm clothes.",
+                "Twelve jobs turn what the island gives into food, tools and clothes: grain to flour to bread, logs to planks, ore to ingots to tools, hides to leather, fiber to thread to warm clothes.",
             ),
             Text(
                 "Goods and coins move by hand. A resident walks to a store, a stall or a seller, and pays for what they take.",
             ),
             Text(
-                "The civic fund collects a levy and pays residents for the materials of village buildings. A site waits while the fund cannot pay.",
+                "The fund collects a levy and pays residents for the materials of village buildings. A building site waits while the fund cannot pay.",
             ),
             Text(
-                "The Economy page of the ledger lists every good with its stock, its price, the days it lasts at a day's use and its change since yesterday, and marks what is low. Choose a good to see who makes it. Its Jobs view shows who works where.",
+                "The Economy page of the ledger lists every good with its stock, its price, the days it lasts at a day's use and its change since yesterday, and marks what is low. Choose a good to see its price, the last market, who uses it, who goes without and who makes it. Jobs shows who works where and lets you ask for more or fewer. Priorities says what a village sees to first.",
             ),
         ],
     }
 }
 
 /// The three ways to begin, as the new-game screen offers them.
-const START_CHOICES: [(&str, &str, &str); 3] = [
+/// The two ways to begin drawn as cards (control name, title, sentence);
+/// Shape is the quiet link under them ([`SHAPE_START`]).
+const START_CHOICES: [(&str, &str, &str); 2] = [
     (
         "Start on the island",
         "Live",
-        "Arrive as a traveller: meet your neighbours, gather, and build a home.",
+        "Arrive as a traveller and live one life: meet your neighbours, gather, build a home. Best for a first game.",
     ),
     (
         "Oversee the village",
         "Oversee",
-        "Watch and guide the villages first; join as a character whenever you choose.",
-    ),
-    (
-        "Shape the landscape",
-        "Shape",
-        "Sculpt the land first; the villages carry on while you work.",
+        "Watch the villages from above and guide them: what they build, who does which job. You have no character until you choose Live.",
     ),
 ];
+/// Shape first: (words on the link, its tooltip). Its control name stays
+/// "Shape the landscape".
+const SHAPE_START: (&str, &str) = (
+    "Or shape the land first",
+    "Raise and lower the land, place patches of goods, plots and props. The villages carry on while you work.",
+);
 
 fn rebuild(world: &mut World) {
     let old: Vec<_> = world
@@ -558,6 +791,7 @@ fn rebuild(world: &mut World) {
         Screen::Controls => "Guide",
         Screen::Settings => "Settings",
         Screen::Transition => "Saving your island",
+        Screen::ConfirmQuit => "Quit without saving?",
         Screen::Playing => unreachable!(),
     };
     w::label(
@@ -591,6 +825,60 @@ fn rebuild(world: &mut World) {
                 t::SUBHEADING,
                 Tone::secondary(surface),
             );
+            let path = crate::island::save_path(world).unwrap_or_default();
+            let file = path
+                .file_name()
+                .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+            let older = summary
+                .issue
+                .as_ref()
+                .is_some_and(crate::island::Issue::keeps_forever);
+            let backup = crate::island::next_backup(&path, older)
+                .file_name()
+                .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+            if let Some(card) = title_card(&summary, &file, &backup) {
+                draw_title_card(world, panel, &mut tab, &card);
+            }
+            if let Some((auto, own)) = summary.autosave_newer {
+                let card = w::card(world, panel, 12.0);
+                world.entity_mut(card).insert(Name::new("Autosave notice"));
+                if let Some(mut node) = world.get_mut::<Node>(card) {
+                    node.width = px(420);
+                    node.margin = UiRect::top(px(10));
+                }
+                w::label(
+                    world,
+                    card,
+                    "The game did not close properly.",
+                    t::SUBHEADING,
+                    Tone::text(Surface::Paper),
+                );
+                w::paragraph(
+                    world,
+                    card,
+                    autosave_sentence(auto, own),
+                    t::BODY,
+                    Tone::text(Surface::Paper),
+                );
+                let pair = row(world, card, 8.0);
+                for (text, action) in [
+                    ("Continue from the autosave", Action::ContinueAutosave),
+                    ("Continue from my save", Action::Continue),
+                ] {
+                    let entity = button(
+                        world,
+                        pair,
+                        &mut tab,
+                        text,
+                        Kind::Secondary,
+                        Surface::Paper,
+                        None,
+                        action,
+                    );
+                    rename(world, entity, text);
+                    w::set_enabled(world, entity, ready);
+                }
+            }
             let buttons = column(world, panel, 8.0);
             if let Some(mut node) = world.get_mut::<Node>(buttons) {
                 node.width = px(320);
@@ -642,35 +930,40 @@ fn rebuild(world: &mut World) {
                 }
                 first = ready.then_some(resume);
             }
-            let new = button(
-                world,
-                buttons,
-                &mut tab,
-                "New game",
-                if summary.can_continue {
-                    Kind::Secondary
-                } else {
-                    Kind::Primary
-                },
-                surface,
-                None,
-                Action::New,
-            );
-            w::set_enabled(world, new, ready && summary.can_start);
-            if first.is_none() && ready && summary.can_start {
-                first = Some(new);
+            // After a failed restore only Settings, How to play and Quit.
+            if summary.restart.is_none() {
+                let new = button(
+                    world,
+                    buttons,
+                    &mut tab,
+                    "New game",
+                    if summary.can_continue {
+                        Kind::Secondary
+                    } else {
+                        Kind::Primary
+                    },
+                    surface,
+                    None,
+                    Action::New,
+                );
+                w::set_enabled(world, new, ready && summary.can_start);
+                if first.is_none() && ready && summary.can_start {
+                    first = Some(new);
+                }
             }
             if summary.can_continue {
                 let oversee = button(
                     world,
                     buttons,
                     &mut tab,
-                    "Oversee the village",
+                    "Continue in Oversee",
                     Kind::Secondary,
                     surface,
                     None,
                     Action::ContinueInspector,
                 );
+                // Its name stays the script's: "Oversee the village".
+                rename(world, oversee, "Oversee the village");
                 w::set_enabled(world, oversee, ready);
             }
             let pair = row(world, buttons, 8.0);
@@ -707,15 +1000,6 @@ fn rebuild(world: &mut World) {
                 Action::Quit,
             );
             rename(world, quit, "Quit game");
-            if let Some(issue) = &summary.issue {
-                w::paragraph(
-                    world,
-                    panel,
-                    issue.clone(),
-                    t::BODY,
-                    Tone::status(surface, Status::Crit),
-                );
-            }
             // The credits line, bottom left.
             let credits = w::label(
                 world,
@@ -835,7 +1119,6 @@ fn rebuild(world: &mut World) {
             for ((name, title, sentence), (picture, action)) in START_CHOICES.into_iter().zip([
                 (Icon::Live, Action::Begin),
                 (Icon::Oversee, Action::BeginInspector),
-                (Icon::Shape, Action::BeginShape),
             ]) {
                 let card = w::card_button(world, left, name, 10.0, Reach::Tab(tab), action);
                 tab += 1;
@@ -867,11 +1150,34 @@ fn rebuild(world: &mut World) {
                 w::set_enabled(world, card, ready && valid && summary.can_start);
                 world.entity_mut(card).insert(BeginButton);
             }
-            if summary.can_continue {
+            w::paragraph(
+                world,
+                left,
+                "You can switch between Live, Oversee and Shape at any time with 1, 2 and 3.",
+                t::CAPTION,
+                Tone::caption(surface),
+            );
+            let shape = button(
+                world,
+                left,
+                &mut tab,
+                SHAPE_START.0,
+                Kind::Quiet,
+                surface,
+                None,
+                Action::BeginShape,
+            );
+            rename(world, shape, "Shape the landscape");
+            world.entity_mut(shape).insert((
+                island_view::game_ui::tooltip::Tooltip::new(SHAPE_START.0, SHAPE_START.1),
+                BeginButton,
+            ));
+            w::set_enabled(world, shape, ready && valid && summary.can_start);
+            if summary.has_file {
                 w::paragraph(
                     world,
                     left,
-                    "Your current island will be kept as a backup.",
+                    "Your current island will be kept as a backup. The game keeps the five newest.",
                     t::CAPTION,
                     Tone::caption(surface),
                 );
@@ -889,23 +1195,28 @@ fn rebuild(world: &mut World) {
                 Some("Esc"),
                 Action::Back,
             );
-            world_list(world, right, surface, &entries, chosen, world_tab, ready);
+            // Only the island that comes with the game: nothing to choose.
+            if entries.len() > 1 {
+                world_list(world, right, surface, &entries, chosen, world_tab, ready);
+            }
         }
         Screen::Pause => {
-            let saved = crate::island::save_notice(world)
-                .filter(|saved| !saved.failed)
-                .map(|saved| saved_words(saved.age.as_secs_f32()));
-            let mut subtitle = format!(
+            let subtitle = format!(
                 "{} \u{b7} {}, day {}",
                 summary.player,
                 summary.season,
                 season_day(world, summary.day)
             );
-            if let Some(saved) = saved {
-                subtitle.push_str(" \u{b7} ");
-                subtitle.push_str(&saved);
-            }
             w::paragraph(world, panel, subtitle, t::BODY, Tone::secondary(surface));
+            let (own, auto) = crate::island::save_ages(world);
+            w::paragraph(
+                world,
+                panel,
+                saves_line(own, auto, crate::island::autosave_failed(world)),
+                t::CAPTION,
+                Tone::secondary(surface),
+            );
+            let failed = world.resource::<FrontendState>().quit_failed;
             let buttons = column(world, panel, 8.0);
             first = Some(button(
                 world,
@@ -949,6 +1260,20 @@ fn rebuild(world: &mut World) {
             }
             let notice = w::paragraph(world, panel, "", t::BODY, Tone::secondary(surface));
             world.entity_mut(notice).insert(Notice(surface));
+            if failed {
+                // Saving on the way out failed: leaving without a save is
+                // the way out, after its own question.
+                button(
+                    world,
+                    panel,
+                    &mut tab,
+                    "Quit without saving",
+                    Kind::Primary,
+                    surface,
+                    None,
+                    Action::QuitUnsaved,
+                );
+            }
             w::divider(world, panel, surface, false);
             // The modes are in the top bar; leaving is all that is left here.
             let leave = column(world, panel, 8.0);
@@ -968,12 +1293,55 @@ fn rebuild(world: &mut World) {
                 leave,
                 &mut tab,
                 "Save and quit",
-                Kind::Quiet,
+                Kind::Secondary,
                 surface,
                 None,
                 Action::Quit,
             );
             rename(world, quit, "Quit game");
+            if !failed {
+                let unsaved = button(
+                    world,
+                    leave,
+                    &mut tab,
+                    "Quit without saving",
+                    Kind::Quiet,
+                    surface,
+                    None,
+                    Action::QuitUnsaved,
+                );
+                rename(world, unsaved, "Quit without saving");
+            }
+        }
+        Screen::ConfirmQuit => {
+            let (own, _) = crate::island::save_ages(world);
+            let failed = world.resource::<FrontendState>().quit_failed;
+            for line in confirm_quit_lines(own.map(|age| age.as_secs()), failed) {
+                w::paragraph(world, panel, line, t::BODY, Tone::text(surface));
+            }
+            let foot = row(world, panel, 8.0);
+            // Back is the safe choice, and the first.
+            first = Some(button(
+                world,
+                foot,
+                &mut tab,
+                "Back",
+                Kind::Primary,
+                surface,
+                Some("Esc"),
+                Action::Back,
+            ));
+            let leave = button(
+                world,
+                foot,
+                &mut tab,
+                "Quit without saving",
+                Kind::Secondary,
+                surface,
+                None,
+                Action::ConfirmQuitUnsaved,
+            );
+            rename(world, leave, "Confirm quit without saving");
         }
         Screen::Settings => {
             let current = world.resource::<FrontendState>().settings_tab;
@@ -1051,6 +1419,10 @@ fn rebuild(world: &mut World) {
                         w::paragraph(world, body, text, t::BODY, Tone::text(surface));
                     }
                     GuideLine::Key(keys, what) => key_row(world, body, surface, keys, what),
+                    GuideLine::Keys(keys, what) => key_row(world, body, surface, &keys, what),
+                    GuideLine::Heading(mode) => {
+                        w::label(world, body, mode, t::SUBHEADING, Tone::text(surface));
+                    }
                 }
             }
             let foot = row(world, panel, 8.0);
@@ -1069,7 +1441,7 @@ fn rebuild(world: &mut World) {
             w::paragraph(
                 world,
                 panel,
-                "Stopping transient movement and saving the whole village. Work and crops keep their progress.",
+                "Saving the whole island. Work and crops keep their progress.",
                 t::BODY,
                 Tone::text(surface),
             );
@@ -1749,6 +2121,61 @@ fn hud_notice(host: Option<(&str, NoticeTone)>, saved: Option<Saved>) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn summary_with(
+        issue: Option<crate::island::Issue>,
+        restart: Option<&str>,
+    ) -> session::Summary {
+        session::Summary {
+            can_continue: false,
+            can_start: restart.is_none(),
+            active: false,
+            player: "Ada".into(),
+            day: 6,
+            season: "Autumn".into(),
+            issue,
+            restart: restart.map(str::to_owned),
+            has_file: true,
+            autosave_newer: None,
+        }
+    }
+
+    #[test]
+    fn the_older_island_card_names_the_file_and_the_backup() {
+        use crate::island::Issue;
+        let file = "island.world.json";
+        let backup = "island.world.older-1.json";
+        let card = title_card(&summary_with(Some(Issue::Older), None), file, backup).unwrap();
+        assert_eq!(card.title, "Your island is from an older version");
+        assert!(card.lines[0].ends_with("The file is untouched: island.world.json."));
+        assert!(card.lines[1].ends_with("kept beside it as island.world.older-1.json."));
+        assert!(card.copy_folder && card.details.is_none());
+        let refused = Issue::Unopened(
+            "This file is not a local Island Village save; choose a different --island-save path."
+                .into(),
+        );
+        let card = title_card(&summary_with(Some(refused), None), file, backup).unwrap();
+        assert_eq!(card.title, "Your island could not be opened");
+        assert_eq!(
+            card.details.as_deref(),
+            Some("The file is not an island of this game."),
+            "developer words stay out of the details too"
+        );
+        for issue in [Issue::OtherBuild, Issue::Newer] {
+            let card = title_card(&summary_with(Some(issue), None), file, backup).unwrap();
+            assert!(card.copy_folder, "{}", card.title);
+        }
+        let card = title_card(&summary_with(None, Some("disk full")), file, backup).unwrap();
+        assert_eq!(card.title, "The game has to be restarted");
+        assert_eq!(card.details.as_deref(), Some("disk full"));
+        assert_eq!(title_card(&summary_with(None, None), file, backup), None);
+        assert_eq!(
+            saves_line(None, None, false),
+            "Your save: none yet \u{b7} Autosave: none yet"
+        );
+        assert_eq!(ago(30), "just now");
+        assert_eq!(ago(12 * 60), "12 minutes ago");
+    }
     use bevy::input::{
         ButtonState, InputPlugin,
         keyboard::{Key, KeyboardInput},

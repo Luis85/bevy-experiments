@@ -153,7 +153,7 @@ pub fn spawn(world: &mut World, ids: &mut crate::IslandIds) {
                 });
             // A fishing ground lies at the water: the dry cell beside water
             // nearest to the authored spot (the fisher's site).
-            let position = if kind == crate::village::catalog::FISH {
+            let position = if patch.shore {
                 shore_near(world, position).unwrap_or(position)
             } else {
                 position

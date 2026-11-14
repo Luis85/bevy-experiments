@@ -16,6 +16,7 @@
 //! host presentation scoped to the session epoch; it is never saved or hashed
 //! and starts at the present, so a loaded journal's history is not replayed.
 pub(crate) mod model;
+pub(crate) mod outlook;
 #[cfg(test)]
 mod tests;
 
@@ -48,6 +49,10 @@ const TOAST_SECS: f64 = 9.0;
 const TOAST_LIMIT: usize = 3;
 /// Rows of the Oversee stack; the rest is "+N more" and the Journal.
 pub(crate) const STACK_ROWS: usize = 3;
+/// Residents of one village with one reason that fold into one row.
+pub(crate) const STACK_FOLD: usize = 3;
+/// Real seconds between two reads of the Village outlook, at most.
+const OUTLOOK_SECS: f32 = 0.5;
 /// Real seconds between two read-only scans for conditions without an effect.
 const SCAN_SECS: f32 = 0.5;
 /// Ticks at the critical level before a scan reports hunger or thirst, where
@@ -90,6 +95,21 @@ pub(crate) struct Alerts {
     /// The first scan of this world has run: what it found was already
     /// there when the world was opened, and makes no sound.
     scanned: bool,
+    /// A need alert's reason by alert serial, read on the scan's beat
+    /// (2.4): the short form, the full sentence and since when.
+    reasons: BTreeMap<u64, (String, String, u64, Option<String>)>,
+    /// The folded rows the stack shows: their first alert's serial, the
+    /// head of People and the residents (2.4).
+    groups: BTreeMap<u64, (String, Vec<SimId>)>,
+    /// The Village outlook's lines (2.5); `None` before the first read.
+    outlook: Option<Vec<outlook::OutlookLine>>,
+    /// The session epoch and game hour of that read, and the real seconds
+    /// since: the card is read again when the hour changes, at most twice a
+    /// second.
+    outlook_read: Option<(u64, u64)>,
+    outlook_elapsed: f32,
+    /// The lines the card shows now; it is rebuilt only when they change.
+    outlook_drawn: Option<Vec<outlook::OutlookLine>>,
 }
 
 /// Identity of one feed line across rebuilds.
@@ -97,6 +117,8 @@ pub(crate) struct Alerts {
 enum RowKey {
     Alert(u64),
     Fold(u64),
+    /// Three or more residents of one village with one reason (2.4).
+    Group(u64),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,6 +128,8 @@ enum Request {
     Collapse,
     /// "+N more" and the journal line: open the Journal page.
     Journal,
+    /// A line of the Village outlook: open what answers it.
+    Outlook(usize),
 }
 
 impl Default for Alerts {
@@ -132,6 +156,12 @@ impl Default for Alerts {
             view_revision: 0,
             fresh_heard: None,
             scanned: false,
+            reasons: BTreeMap::new(),
+            groups: BTreeMap::new(),
+            outlook: None,
+            outlook_read: None,
+            outlook_elapsed: OUTLOOK_SECS,
+            outlook_drawn: None,
         }
     }
 }
@@ -158,6 +188,16 @@ struct CountBadge(bool);
 struct CountText(bool);
 #[derive(Component)]
 struct JournalText;
+/// The Village outlook card and the body its lines fill.
+#[derive(Component)]
+struct OutlookCard;
+#[derive(Component)]
+struct OutlookBody;
+/// The folded header's count of the outlook's urgent lines.
+#[derive(Component)]
+struct OutlookFoldBadge;
+#[derive(Component)]
+struct OutlookFoldText;
 #[derive(Component)]
 struct ToastRoot;
 #[derive(Component)]
@@ -238,6 +278,15 @@ fn spawn(world: &mut World) {
             .expect("badge text");
         world.entity_mut(text).insert(CountText(critical));
     }
+    // Folded, the header also counts the outlook's urgent lines (2.5).
+    let outlook_badge = w::badge(world, header, Surface::Chrome, Status::Warn, "0");
+    world.entity_mut(outlook_badge).insert(OutlookFoldBadge);
+    let text = world
+        .get::<Children>(outlook_badge)
+        .and_then(|children| children.last().copied())
+        .expect("badge text");
+    world.entity_mut(text).insert(OutlookFoldText);
+    w::show(world, outlook_badge, false);
     world.spawn((
         ChildOf(header),
         Node {
@@ -275,6 +324,40 @@ fn spawn(world: &mut World) {
         Node {
             flex_direction: FlexDirection::Column,
             row_gap: px(4),
+            ..default()
+        },
+    ));
+    // The Village outlook: now, next, past (2.5). Not drawn before its first
+    // read.
+    let card = world
+        .spawn((
+            ChildOf(content),
+            OutlookCard,
+            w::chrome(
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    padding: UiRect::all(px(8)),
+                    row_gap: px(2),
+                    flex_shrink: 0.0,
+                    display: Display::None,
+                    ..default()
+                },
+                t::RADIUS_MD,
+            ),
+        ))
+        .id();
+    w::label(
+        world,
+        card,
+        "Village outlook",
+        t::CAPTION,
+        Tone::secondary(Surface::Chrome),
+    );
+    world.spawn((
+        ChildOf(card),
+        OutlookBody,
+        Node {
+            flex_direction: FlexDirection::Column,
             ..default()
         },
     ));
@@ -607,6 +690,59 @@ pub(crate) fn track(world: &mut World) {
     if world.resource::<Alerts>().scan_elapsed >= SCAN_SECS {
         world.resource_mut::<Alerts>().scan_elapsed = 0.0;
         scan(world);
+        read_reasons(world);
+    }
+}
+
+/// Each need alert's reason, in the resident's own terms (2.4), read from
+/// the simulation's `need_alert` on the scan's beat (twice a second at
+/// most), never per frame. Rows rebuild only when a reason changed.
+fn read_reasons(world: &mut World) {
+    let wanted: Vec<(u64, u32, &'static str, u64)> = world
+        .resource::<Alerts>()
+        .feed
+        .iter()
+        .filter_map(|alert| {
+            let need = model::need_of(alert.kind)?;
+            Some((alert.serial, alert.subject?, need, alert.tick))
+        })
+        .collect();
+    let mut reasons = BTreeMap::new();
+    for (serial, subject, need, tick) in wanted {
+        let Some(entity) = world
+            .get_resource::<SimIndex>()
+            .and_then(|index| index.get(SimId(subject)))
+        else {
+            continue;
+        };
+        let Some((name, _)) = name_of(world, SimId(subject)) else {
+            continue;
+        };
+        let alert = village::view::need_alert(world, entity, need);
+        let target = alert.as_ref().and_then(|alert| match &alert.cause {
+            village::view::NeedCause::OnTheWay { target, .. } => {
+                name_of(world, *target).map(|(name, _)| name)
+            }
+            _ => None,
+        });
+        let (short, full) = model::reason_words(
+            need,
+            alert.as_ref().map(|alert| &alert.cause),
+            &name,
+            target.as_deref(),
+            alert.as_ref().map(|alert| alert.sentence.as_str()),
+        );
+        if alert.is_none() {
+            debug!("no reason for {name}'s {need} alert");
+        }
+        let since = alert.and_then(|alert| alert.since_tick).unwrap_or(tick);
+        let village = settlement_of(world, entity);
+        reasons.insert(serial, (short, full, since, village));
+    }
+    let mut state = world.resource_mut::<Alerts>();
+    if state.reasons != reasons {
+        state.reasons = reasons;
+        state.view_revision = state.view_revision.wrapping_add(1);
     }
 }
 
@@ -685,7 +821,24 @@ fn harvest(world: &mut World) {
                 let Some(kind) = effect.get("type").and_then(|value| value.as_str()) else {
                     continue;
                 };
-                let read = |key: &str| effect.get(key).cloned();
+                // A village's name for the notes of the player's orders.
+                let village = effect
+                    .get("settlement")
+                    .and_then(serde_json::Value::as_u64)
+                    .and_then(|id| u32::try_from(id).ok())
+                    .and_then(|id| {
+                        let entity = world.get_resource::<SimIndex>()?.get(SimId(id))?;
+                        world
+                            .get::<village::frontier::Settlement>(entity)
+                            .map(|place| place.label.clone())
+                    });
+                let read = |key: &str| {
+                    if key == "settlement_name" {
+                        village.clone().map(serde_json::Value::String)
+                    } else {
+                        effect.get(key).cloned()
+                    }
+                };
                 let Some((alert, text)) = model::classify(kind, &who, &read) else {
                     continue;
                 };
@@ -916,13 +1069,54 @@ fn scan(world: &mut World) {
 /// Click-to-focus: move the overview camera to the resident or the site.
 /// Header controls and fold lines only change what the feed shows.
 fn process(world: &mut World) {
+    let mut outlook_opens: Vec<outlook::Opens> = Vec::new();
     let requests = std::mem::take(&mut world.resource_mut::<Alerts>().requests);
+    // A line of the outlook opens the page that answers it.
+    let requests: Vec<Request> = requests
+        .into_iter()
+        .filter(|request| {
+            let Request::Outlook(index) = request else {
+                return true;
+            };
+            let opens = world
+                .resource::<Alerts>()
+                .outlook_drawn
+                .as_ref()
+                .and_then(|lines| lines.get(*index))
+                .and_then(|line| line.opens.clone());
+            outlook_opens.extend(opens);
+            false
+        })
+        .collect();
     // The resident card, the build menu, a building card or a ledger page.
     let inspecting = crate::resident_inspector::open(world)
         || crate::island_build::column_taken(world)
         || crate::colony_panel::open(world);
+    for opens in outlook_opens {
+        match opens {
+            outlook::Opens::Goods(village, good) => crate::colony_panel::show_economy(
+                world,
+                village,
+                crate::colony_panel::EconomyView::Goods(good),
+            ),
+            outlook::Opens::Jobs(village) => crate::colony_panel::show_economy(
+                world,
+                village,
+                crate::colony_panel::EconomyView::Jobs,
+            ),
+            outlook::Opens::Priorities(village) => crate::colony_panel::show_economy(
+                world,
+                village,
+                crate::colony_panel::EconomyView::Priorities,
+            ),
+            outlook::Opens::Homes => {
+                crate::island_build::request_group(world, crate::island_build::model::Group::Homes);
+            }
+        }
+    }
     let mut close_inspector = false;
     let mut open_journal = false;
+    let mut open_group = None;
     for request in requests {
         let serial = match request {
             Request::Row(RowKey::Alert(serial)) => serial,
@@ -943,6 +1137,8 @@ fn process(world: &mut World) {
                     }
                     Request::Collapse => state.collapsed = !state.collapsed,
                     Request::Journal => open_journal = true,
+                    Request::Outlook(_) => {}
+                    Request::Row(RowKey::Group(serial)) => open_group = Some(serial),
                     Request::Row(RowKey::Alert(_)) => {}
                 }
                 state.view_revision = state.view_revision.wrapping_add(1);
@@ -990,6 +1186,12 @@ fn process(world: &mut World) {
     if open_journal {
         crate::colony_panel::open_page(world, LedgerPage::Journal);
     }
+    // A folded row: People with only those residents.
+    if let Some((head, who)) =
+        open_group.and_then(|serial| world.resource::<Alerts>().groups.get(&serial).cloned())
+    {
+        crate::colony_panel::show_people(world, head, who);
+    }
 }
 
 /// Severity as the kit's status: critical is a diamond, warning a
@@ -1023,6 +1225,7 @@ pub(crate) fn title_and_detail(text: &str) -> (&str, Option<&str>) {
     }
 }
 
+#[cfg(test)]
 fn day_of(world: &World, tick: u64) -> u64 {
     let config = world
         .get_resource::<SimConfig>()
@@ -1100,11 +1303,16 @@ pub(crate) fn journal(world: &World) -> (Filter, usize, Vec<JournalLine>) {
 /// What the stack shows: up to three rows that need attention, newest
 /// first, how many more there are, and the counts by severity.
 pub(crate) struct Stack {
-    rows: Vec<(u64, Status, String, String)>,
+    /// Serial, status, title, second line and, for a need alert, the
+    /// tooltip's title and body.
+    rows: Vec<(u64, Status, String, String, Option<(String, String)>)>,
+    /// The rows that fold several residents: by serial, the head of People
+    /// and the residents.
+    groups: BTreeMap<u64, (String, Vec<SimId>)>,
     more: usize,
     critical: usize,
     warning: usize,
-    /// "Day 20 · 36 notes in the journal".
+    /// "Autumn, day 6 · 36 notes in the journal".
     journal: String,
 }
 
@@ -1115,11 +1323,48 @@ fn stack(world: &World) -> Stack {
         .copied()
         .unwrap_or_default();
     let day = |tick: u64| village::calendar_at(tick, &config, true).0 + 1;
-    let today = day(world
+    let now = world
         .get_resource::<SimClock>()
-        .map_or(0, |clock| clock.tick));
+        .map_or(0, |clock| clock.tick);
+    let today = day(now);
+    // The one calendar of the top bar, never the running count.
+    let date = crate::game_ui::words::date(world, now);
     let none = BTreeSet::new();
     let (mut rows, mut critical, mut warning, mut notes) = (Vec::new(), 0, 0, 0);
+    // Need alerts of one village, one kind and one reason: three or more
+    // fold into one row (2.4), keyed by the first of them.
+    let mut members: BTreeMap<(String, AlertKind, String), Vec<(u64, SimId)>> = BTreeMap::new();
+    for row in state.feed.rows(Filter::Attention, &none, &day) {
+        if let Row::Alert(alert) = row
+            && let Some((short, _, _, Some(village))) = state.reasons.get(&alert.serial)
+            && let Some(subject) = alert.subject
+        {
+            members
+                .entry((village.clone(), alert.kind, short.clone()))
+                .or_default()
+                .push((alert.serial, SimId(subject)));
+        }
+    }
+    let mut folded: BTreeMap<u64, (u64, usize)> = BTreeMap::new();
+    let mut groups = BTreeMap::new();
+    for ((village, kind, short), list) in &members {
+        if list.len() < STACK_FOLD {
+            continue;
+        }
+        let first = list[0].0;
+        for (serial, _) in list {
+            folded.insert(*serial, (first, list.len()));
+        }
+        let head = model::group_title(list.len(), village, *kind);
+        groups.insert(
+            first,
+            (
+                head.clone(),
+                list.iter().map(|(_, who)| *who).collect::<Vec<_>>(),
+                short.clone(),
+            ),
+        );
+    }
     for row in state.feed.rows(Filter::Attention, &none, &day) {
         match row {
             Row::Alert(alert) => {
@@ -1129,8 +1374,52 @@ fn stack(world: &World) -> Stack {
                 } else {
                     warning += 1;
                 }
+                // A member of a folded group: the group's row stands for it.
+                if let Some((first, _)) = folded.get(&alert.serial) {
+                    if *first == alert.serial
+                        && let Some((head, _, short)) = groups.get(first)
+                    {
+                        let mut second = vec![severity_word(severity).to_owned()];
+                        if !short.is_empty() {
+                            second.push(short.clone());
+                        }
+                        rows.push((
+                            alert.serial,
+                            severity_status(severity),
+                            head.clone(),
+                            second.join(" \u{b7} "),
+                            Some((
+                                "Show them".to_owned(),
+                                "Opens People with only them.".to_owned(),
+                            )),
+                        ));
+                    }
+                    continue;
+                }
                 let (title, detail) = title_and_detail(&alert.text);
                 let mut second = vec![severity_word(severity).to_owned()];
+                // A need alert: the resident's own reason; its day goes to
+                // the tooltip with the full sentence.
+                if let Some((short, full, since, _)) = state.reasons.get(&alert.serial) {
+                    if !short.is_empty() {
+                        second.push(short.clone());
+                    }
+                    if alert.count > 1 {
+                        second.push(format!("\u{d7}{}", alert.count));
+                    }
+                    let who = name_of(world, SimId(alert.subject.unwrap_or(0)))
+                        .map_or_else(|| title.to_owned(), |(name, _)| name);
+                    let tip =
+                        model::alert_tip(&who, full, &crate::game_ui::words::moment(world, *since));
+                    rows.push((
+                        alert.serial,
+                        severity_status(severity),
+                        title.to_owned(),
+                        second.join(" \u{b7} "),
+                        Some(tip),
+                    ));
+                    continue;
+                }
                 // A waiting site: a short title, the wait and what is missing.
                 let title = match model::waiting_parts(title) {
                     Some((label, wait)) => {
@@ -1140,7 +1429,7 @@ fn stack(world: &World) -> Stack {
                     }
                     None => {
                         second.extend(detail.map(str::to_owned));
-                        second.push(format!("day {}", day(alert.tick)));
+                        second.push(crate::game_ui::words::when(world, alert.tick));
                         title.to_owned()
                     }
                 };
@@ -1152,31 +1441,42 @@ fn stack(world: &World) -> Stack {
                     severity_status(severity),
                     title,
                     second.join(" \u{b7} "),
+                    None,
                 ));
             }
             Row::Fold { day, count, .. } if day == today => notes = count,
             Row::Fold { .. } => {}
         }
     }
-    debug_assert_eq!(rows.len(), state.feed.attention());
-    let more = state.feed.attention().saturating_sub(STACK_ROWS);
+    let more = rows.len().saturating_sub(STACK_ROWS);
     rows.truncate(STACK_ROWS);
     Stack {
         rows,
+        groups: groups
+            .into_iter()
+            .map(|(serial, (head, who, _))| (serial, (head, who)))
+            .collect(),
         more,
         critical,
         warning,
         journal: match notes {
-            0 => format!("Day {today} \u{b7} the journal"),
-            1 => format!("Day {today} \u{b7} 1 note in the journal"),
-            notes => format!("Day {today} \u{b7} {notes} notes in the journal"),
+            0 => format!("{date} \u{b7} the journal"),
+            1 => format!("{date} \u{b7} 1 note in the journal"),
+            notes => format!("{date} \u{b7} {notes} notes in the journal"),
         },
     }
 }
 
 /// One row of the stack: a chrome card, 44 high, with a severity edge, the
 /// shape, a title, one line of detail and a locate marker.
-fn row(world: &mut World, body: Entity, key: RowKey, status: Status, title: &str, detail: &str) {
+fn row(
+    world: &mut World,
+    body: Entity,
+    key: RowKey,
+    status: Status,
+    title: &str,
+    detail: &str,
+) -> Option<Entity> {
     let card = world
         .spawn((
             ChildOf(body),
@@ -1207,7 +1507,7 @@ fn row(world: &mut World, body: Entity, key: RowKey, status: Status, title: &str
         },
         FeedRow(key),
     );
-    if matches!(key, RowKey::Alert(_)) {
+    if matches!(key, RowKey::Alert(_) | RowKey::Group(_)) {
         // The four-pixel severity edge.
         world.spawn((
             ChildOf(entity),
@@ -1255,7 +1555,7 @@ fn row(world: &mut World, body: Entity, key: RowKey, status: Status, title: &str
             Tone::secondary(Surface::Chrome),
         );
     }
-    if matches!(key, RowKey::Alert(_)) {
+    if matches!(key, RowKey::Alert(_) | RowKey::Group(_)) {
         icon::icon(
             world,
             entity,
@@ -1271,7 +1571,9 @@ fn row(world: &mut World, body: Entity, key: RowKey, status: Status, title: &str
             )
             .beside(),
         );
+        return Some(entity);
     }
+    None
 }
 
 /// One alert sound when new critical or warning alerts arrived since the
@@ -1312,8 +1614,19 @@ fn rebuild(world: &mut World, stack: &Stack) {
             .clear();
     }
     world.entity_mut(body).despawn_children();
-    for (serial, status, title, detail) in &stack.rows {
-        row(world, body, RowKey::Alert(*serial), *status, title, detail);
+    world.resource_mut::<Alerts>().groups = stack.groups.clone();
+    for (serial, status, title, detail, tip) in &stack.rows {
+        let key = if stack.groups.contains_key(serial) {
+            RowKey::Group(*serial)
+        } else {
+            RowKey::Alert(*serial)
+        };
+        let entity = row(world, body, key, *status, title, detail);
+        if let (Some(entity), Some((head, text))) = (entity, tip) {
+            world
+                .entity_mut(entity)
+                .insert(Tooltip::new(head, text).beside());
+        }
     }
     if stack.more > 0 {
         let more = world
@@ -1361,6 +1674,168 @@ fn set_text<M: Component>(world: &mut World, value: &str) {
             text.0 = value.into();
         }
     }
+}
+
+/// The folded header's title: "Alerts · Outlook 2" (the shapes and counts
+/// stand beside it), "Alerts" when the outlook has nothing urgent.
+pub(crate) fn fold_title(outlook: usize) -> String {
+    if outlook == 0 {
+        "Alerts".to_owned()
+    } else {
+        format!("Alerts \u{b7} Outlook {outlook}")
+    }
+}
+
+/// Read the Village outlook when the game hour changed, at most twice a
+/// second of real time (2.5).
+fn read_outlook(world: &mut World) {
+    let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
+    let epoch = npc_framework::agent_io::api::epoch(world);
+    let tick = world
+        .get_resource::<SimClock>()
+        .map_or(0, |clock| clock.tick);
+    let day = world
+        .get_resource::<SimConfig>()
+        .map_or(2400, |config| config.day_length.max(1));
+    let hour = tick * 24 / day;
+    {
+        let mut state = world.resource_mut::<Alerts>();
+        state.outlook_elapsed += delta;
+        if state.outlook_read == Some((epoch, hour)) || state.outlook_elapsed < OUTLOOK_SECS {
+            return;
+        }
+        state.outlook_elapsed = 0.0;
+        state.outlook_read = Some((epoch, hour));
+    }
+    let villages: Vec<(SimId, String, village::view::Outlook)> =
+        village::frontier::settlements::all(world)
+            .into_iter()
+            .filter_map(|(id, entity)| {
+                let name = world
+                    .get::<village::frontier::Settlement>(entity)?
+                    .label
+                    .clone();
+                Some((id, name, village::view::outlook(world, id)))
+            })
+            .collect();
+    let views: Vec<outlook::VillageOutlook> = villages
+        .iter()
+        .map(|(id, name, outlook)| outlook::VillageOutlook {
+            id: *id,
+            name,
+            outlook,
+        })
+        .collect();
+    let fuel = village::roles::roles(world).fuel;
+    let lines = outlook::lines(
+        &views,
+        fuel,
+        &|good| kind_name(world, good).to_lowercase(),
+        &|good| {
+            if good == catalog::WATER {
+                Some(outlook::Topic::Water)
+            } else if good == fuel {
+                Some(outlook::Topic::Fuel)
+            } else if catalog::food_restore_in(world, good).is_some() {
+                Some(outlook::Topic::Food)
+            } else {
+                None
+            }
+        },
+    );
+    // A low window keeps two lines.
+    let mut lines = lines;
+    lines.truncate(outlook::shown(scale::layout(world).height));
+    world.resource_mut::<Alerts>().outlook = Some(lines);
+}
+
+/// Fill the outlook card: rows are built again only when the lines changed,
+/// so a quiet hour leaves every entity and text as it was.
+fn draw_outlook(world: &mut World) {
+    let lines = world.resource::<Alerts>().outlook.clone();
+    show::<OutlookCard>(world, lines.is_some());
+    let Some(lines) = lines else {
+        return;
+    };
+    if world.resource::<Alerts>().outlook_drawn.as_ref() == Some(&lines) {
+        return;
+    }
+    let Some(body) = world
+        .query_filtered::<Entity, With<OutlookBody>>()
+        .iter(world)
+        .next()
+    else {
+        return;
+    };
+    let focused = world
+        .get_resource::<bevy::input_focus::InputFocus>()
+        .and_then(|focus| focus.get());
+    if focused.is_some_and(|entity| {
+        world
+            .get::<FeedControl>(entity)
+            .is_some_and(|control| matches!(control.0, Request::Outlook(_)))
+    }) {
+        world
+            .resource_mut::<bevy::input_focus::InputFocus>()
+            .clear();
+    }
+    world.entity_mut(body).despawn_children();
+    for (index, line) in lines.iter().enumerate() {
+        let node = Node {
+            width: percent(100),
+            height: px(t::ROW_ONE_LINE),
+            column_gap: px(8),
+            align_items: AlignItems::Center,
+            overflow: Overflow::clip(),
+            ..default()
+        };
+        let entity = if line.opens.is_some() {
+            w::control(
+                world,
+                body,
+                &line.text,
+                Kind::Quiet,
+                Surface::Chrome,
+                Reach::Ring,
+                node,
+                FeedControl(Request::Outlook(index)),
+            )
+        } else {
+            world.spawn((ChildOf(body), node)).id()
+        };
+        icon::icon(
+            world,
+            entity,
+            Icon::status(line.status),
+            14.0,
+            Tone::status(Surface::Chrome, line.status),
+        );
+        let text = w::label(
+            world,
+            entity,
+            &line.text,
+            t::DENSE,
+            Tone::text(Surface::Chrome),
+        );
+        world.entity_mut(text).insert(Node {
+            flex_grow: 1.0,
+            min_width: px(0),
+            ..default()
+        });
+        if line.opens.is_some() {
+            w::label(
+                world,
+                entity,
+                "\u{203a}",
+                t::DENSE,
+                Tone::secondary(Surface::Chrome),
+            );
+        }
+        world
+            .entity_mut(entity)
+            .insert(Tooltip::new(&line.text, &line.tip).beside());
+    }
+    world.resource_mut::<Alerts>().outlook_drawn = Some(lines);
 }
 
 fn show<M: Component>(world: &mut World, shown: bool) {
@@ -1439,14 +1914,22 @@ fn refresh(world: &mut World) {
             world.resource_mut::<Alerts>().rendered = Some(revision);
         }
         let attention = stack.critical + stack.warning;
-        set_text::<FeedTitle>(
-            world,
-            if attention == 0 {
-                "No alerts"
-            } else {
-                "Alerts"
-            },
-        );
+        let urgent = world
+            .resource::<Alerts>()
+            .outlook
+            .as_deref()
+            .map_or(0, outlook::attention);
+        let folded = collapsed && urgent > 0;
+        let title = if folded {
+            fold_title(urgent)
+        } else if attention == 0 {
+            "No alerts".to_owned()
+        } else {
+            "Alerts".to_owned()
+        };
+        set_text::<FeedTitle>(world, &title);
+        show::<OutlookFoldBadge>(world, folded);
+        set_text::<OutlookFoldText>(world, &urgent.to_string());
         for critical in [true, false] {
             let count = if critical {
                 stack.critical
@@ -1474,6 +1957,8 @@ fn refresh(world: &mut World) {
         set_text::<CollapseLabel>(world, if collapsed { "Show" } else { "Hide" });
         set_text::<JournalText>(world, &stack.journal);
         show::<FeedContent>(world, !collapsed);
+        read_outlook(world);
+        draw_outlook(world);
     }
     // Live: a few fading lines, never interactive, never over the toolbar.
     let living = enabled && hud && mode == Some(IslandMode::Character);
@@ -1483,7 +1968,11 @@ fn refresh(world: &mut World) {
             .feed
             .toasts(state.clock_secs, TOAST_SECS, TOAST_LIMIT)
             .iter()
-            .map(|alert| alert.line(day_of(world, alert.tick)))
+            .map(|alert| {
+                alert.line(&crate::game_ui::words::capital(
+                    &crate::game_ui::words::when(world, alert.tick),
+                ))
+            })
             .collect::<Vec<_>>()
             .join("\n")
     } else {

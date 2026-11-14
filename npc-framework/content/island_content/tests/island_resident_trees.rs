@@ -160,7 +160,7 @@ fn an_unknown_action_or_condition_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["action"] = json!("life.nap");
     let error = refused(&tree);
     assert!(
-        error.contains("behaviour tree file `resident.json`, node 80 `Idle`")
+        error.contains("behaviour tree file `resident.json`, node 85 `Idle`")
             && error.contains("unknown action `life.nap`")
             && error.contains("life.sleep"),
         "{error}"
@@ -184,7 +184,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(chores, "Replace clothing")["kind"]["Leaf"]["param"] = json!({"Name": "gold"});
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 50 `Replace clothing`")
+        error.contains("`resident.json`, node 52 `Replace clothing`")
             && error.contains("action `life.buy` does not accept parameter {\"Name\":\"gold\"}")
             && error.contains("provisions"),
         "{error}"
@@ -197,7 +197,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["param"] = json!({"Int": 3});
     let error = refused(&tree);
     assert!(
-        error.contains("node 80 `Idle`") && error.contains("expected no parameter"),
+        error.contains("node 85 `Idle`") && error.contains("expected no parameter"),
         "{error}"
     );
     // A parameter of a shape the format does not have.
@@ -205,7 +205,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["param"] = json!({"Number": 3});
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 80 `Idle`") && error.contains("unknown variant"),
+        error.contains("`resident.json`, node 85 `Idle`") && error.contains("unknown variant"),
         "{error}"
     );
     // A place nobody defined.
@@ -214,7 +214,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
         json!({"Name": "lighthouse"});
     let error = refused(&tree);
     assert!(
-        error.contains("node 78 `Stay home`") && error.contains("centre, home, work"),
+        error.contains("node 83 `Stay home`") && error.contains("centre, home, meal, work"),
         "{error}"
     );
 }
@@ -226,7 +226,7 @@ fn a_guard_that_could_abort_work_without_being_able_to_start_is_refused() {
     child(&mut tree["root"], "Work hours")["kind"]["Guard"]["abort"] = json!("LowerPriority");
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 61 `Work hours`")
+        error.contains("`resident.json`, node 66 `Work hours`")
             && error.contains("`life.in_work_window` does not promise that its branch can start")
             && error.contains("\"abort\": \"None\""),
         "{error}"
@@ -285,7 +285,7 @@ fn structural_mistakes_and_a_missing_resident_tree_are_refused() {
     child(&mut tree["root"], "Idle")["kinds"] = json!("Selector");
     let error = refused(&tree);
     assert!(
-        error.contains("node 80 `Idle`") && error.contains("unknown field `kinds`"),
+        error.contains("node 85 `Idle`") && error.contains("unknown field `kinds`"),
         "{error}"
     );
     // Residents need their tree.
@@ -341,8 +341,14 @@ fn add_evening_walk(world: &mut Value) {
         json!({"name": "Evening walk",
         "kind": {"Guard": {"cond": "life.wants_leisure", "abort": "None"}},
         "children": [
-            {"name": "Walk to the pier",
-             "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "pier"}}}}
+            // Everybody has an evening since the review fix pass
+            // (npc-ai#3); the walk is for the sociable ones.
+            {"name": "Sociable walker",
+             "kind": {"Guard": {"cond": "life.sociable", "abort": "None"}},
+             "children": [
+                {"name": "Walk to the pier",
+                 "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "pier"}}}}
+             ]}
         ]}),
     );
     world["behavior"] = json!({
@@ -406,7 +412,7 @@ fn an_evening_walk_added_in_json_is_walked_by_sociable_residents() {
                 matches!(&entry.kind, JournalKind::Effect { effect, applied: true }
                     if effect.get("type").and_then(Value::as_str) == Some("VillageDecision")
                         && effect.get("branch").and_then(Value::as_str)
-                            == Some("Resident life > Evening walk > Walk to the pier"))
+                            == Some("Resident life > Evening walk > Sociable walker > Walk to the pier"))
             });
         for (id, actor, sociable) in &harbour {
             if village::behavior::decision(app.world(), *actor) == Some("taking a walk") {

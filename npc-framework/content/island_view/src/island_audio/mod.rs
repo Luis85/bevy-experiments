@@ -13,8 +13,9 @@
 //! Without Bevy's audio plugin (headless hosts, tests) or with
 //! `ISLAND_AUDIO_OFF=1` nothing is loaded or played.
 //!
-//! Every started layer and one-shot logs one `island_audio:` line, so a
-//! capture can count them.
+//! Every started layer and one-shot logs one `island_audio:` line at debug
+//! level (`RUST_LOG=info,island_view::island_audio=debug`), so a capture can
+//! count them without noise in an ordinary run.
 pub(crate) mod catalog;
 pub(crate) mod mix;
 pub(crate) mod synth;
@@ -279,6 +280,35 @@ struct Music {
     tracks: u32,
     day: Option<u64>,
     buildings: Option<usize>,
+    /// The clock's tick last frame: a jump (a world loaded, New game, a
+    /// save continued) re-reads the day and buildings without a jingle.
+    tick: Option<u64>,
+}
+
+/// Whether the clock moved as in play from `last` to `now`: forward, by
+/// less than a quarter of a day in one frame. Anything else is a world
+/// swapped in under the view (New game, Continue, a load).
+pub(crate) fn played_on(last: Option<u64>, now: u64, day_length: u64) -> bool {
+    last.is_some_and(|last| now >= last && now - last <= (day_length / 4).max(1))
+}
+
+/// The jingle for what changed since the last frame, if the clock moved as
+/// in play: a new day's morning, else one more building finished.
+pub(crate) fn jingle_for(
+    in_play: bool,
+    (seen_day, day): (Option<u64>, u64),
+    (seen_built, built): (Option<usize>, usize),
+) -> Option<Tune> {
+    if !in_play {
+        return None;
+    }
+    if seen_day.is_some_and(|seen| day == seen + 1) {
+        Some(Tune::Morning)
+    } else if seen_built.is_some_and(|seen| built == seen + 1) {
+        Some(Tune::Built)
+    } else {
+        None
+    }
 }
 
 /// When the next thunder of a storm comes, and how many there have been.
@@ -345,7 +375,7 @@ fn stem_of(path: &str) -> &str {
 fn setup(mut commands: Commands, server: Res<AssetServer>, mut made: ResMut<Assets<synth::Synth>>) {
     let root = &crate::assets::asset_dir().path;
     let paths = catalog::available(root);
-    info!(
+    debug!(
         "island_audio: {} sound files found under {}",
         paths.len(),
         root.display()
@@ -601,7 +631,7 @@ fn ambience(
                 .is_none_or(|at| *at < twin_delay(voice.layer));
         let audible = volume > 0.002 && !waiting;
         if audible && !voice.audible && voice.copy == 0 {
-            info!(
+            debug!(
                 "island_audio: layer {} started ({})",
                 voice.layer.name(),
                 voice.source
@@ -655,7 +685,7 @@ fn thunder(
     if volume <= 0.0 {
         return;
     }
-    info!("island_audio: one-shot thunder");
+    debug!("island_audio: one-shot thunder");
     commands.spawn((
         Name::new("thunder"),
         ShotVoice,
@@ -682,7 +712,7 @@ fn work_sounds(
         Option<Res<crate::island_homes::OpenDoors>>,
     ),
     mut limiter: ResMut<ShotLimiter>,
-    mut seen_doors: Local<BTreeSet<Entity>>,
+    (mut seen_doors, mut emitters): (Local<BTreeSet<Entity>>, Local<Vec<(f32, Shot, u32, Vec3)>>),
     cameras: Query<&RtsCamera>,
     players: Query<&ActorAnimTarget>,
     roots: Query<(
@@ -700,12 +730,22 @@ fn work_sounds(
     let gain = levels.effects_gain();
     let stopped = control.as_deref().is_none_or(SimControl::is_stopped);
     // Doors opened this frame are remembered even while quiet, so a pause
-    // does not leave a burst of them for later.
-    let open: BTreeSet<Entity> = doors
-        .as_deref()
-        .map_or_else(BTreeSet::new, |doors| doors.leaves().collect());
-    let opened: Vec<Entity> = open.difference(&seen_doors).copied().collect();
-    *seen_doors = open;
+    // does not leave a burst of them for later. The set is rebuilt only when
+    // the open doors differ from those seen (no allocation otherwise).
+    let opened = doors.as_deref().map_or_else(Vec::new, |doors| {
+        if seen_doors.len() == doors.leaves().count()
+            && doors.leaves().all(|leaf| seen_doors.contains(&leaf))
+        {
+            return Vec::new();
+        }
+        let open: BTreeSet<Entity> = doors.leaves().collect();
+        let opened = open.difference(&seen_doors).copied().collect();
+        *seen_doors = open;
+        opened
+    });
+    if doors.is_none() && !seen_doors.is_empty() {
+        seen_doors.clear();
+    }
     if gain <= 0.0 || stopped || gate.is_some_and(|gate| gate.0) {
         return;
     }
@@ -725,7 +765,9 @@ fn work_sounds(
         audible(at).then_some(())?;
         Some((ids.get(of.0).ok()?.0, at))
     };
-    let mut emitters: Vec<(f32, Shot, u32, Vec3)> = Vec::new();
+    // One buffer kept between frames.
+    let emitters = &mut *emitters;
+    emitters.clear();
     for player in &players {
         let Some(shot) = player.playing().and_then(mix::pose_shot) else {
             continue;
@@ -776,7 +818,7 @@ fn work_sounds(
     emitters.dedup_by_key(|emitter| (emitter.1, emitter.2));
     let mut voices_now = voices.iter().count();
     let volume = gain * mix::nearness(camera.distance);
-    for (_, shot, id, at) in emitters {
+    for &(_, shot, id, at) in emitters.iter() {
         if voices_now >= mix::MAX_VOICES {
             break;
         }
@@ -788,7 +830,7 @@ fn work_sounds(
         }
         let count = limiter.played(id);
         let (source, own) = files[count as usize % files.len()].clone();
-        info!(
+        debug!(
             "island_audio: one-shot {} at {:.1},{:.1}",
             shot.name(),
             at.x,
@@ -850,13 +892,9 @@ fn music(
     };
     let day = clock.tick / config.day_length.max(1);
     let built = buildings.iter().count();
-    let jingle = if state.day.is_some_and(|seen| day > seen) {
-        Some(Tune::Morning)
-    } else if state.buildings.is_some_and(|seen| built > seen) && now > 5.0 {
-        Some(Tune::Built)
-    } else {
-        None
-    };
+    let in_play = played_on(state.tick, clock.tick, config.day_length);
+    let jingle = jingle_for(in_play, (state.day, day), (state.buildings, built));
+    state.tick = Some(clock.tick);
     state.day = Some(day);
     state.buildings = Some(built);
     if menu || levels.music_gain() <= 0.0 {
@@ -878,7 +916,7 @@ fn music(
     {
         entity.despawn();
     }
-    info!("island_audio: music {} started", tune.stem());
+    debug!("island_audio: music {} started", tune.stem());
     let entity = commands
         .spawn((
             Name::new("island music"),
@@ -914,7 +952,7 @@ fn ui_sounds(
             continue;
         }
         if let Some((file, own)) = sounds.ui.get(sound) {
-            info!("island_audio: ui {sound:?}");
+            debug!("island_audio: ui {sound:?}");
             commands.spawn((
                 Name::new("ui sound"),
                 AudioPlayer::new(file.clone()),
@@ -1003,6 +1041,29 @@ mod tests {
             ..levels
         };
         assert_eq!(loud.effects_gain(), 1.0);
+    }
+
+    #[test]
+    fn jingles_come_only_in_play_never_on_a_load() {
+        // In play: a new day or one more building.
+        assert!(played_on(Some(1000), 1003, 2400));
+        assert_eq!(
+            jingle_for(true, (Some(4), 5), (Some(3), 3)),
+            Some(Tune::Morning)
+        );
+        assert_eq!(
+            jingle_for(true, (Some(5), 5), (Some(3), 4)),
+            Some(Tune::Built)
+        );
+        // A save continued at a later day, New game (the clock going back),
+        // a first frame: no jingle.
+        assert!(!played_on(Some(1000), 90_000, 2400));
+        assert!(!played_on(Some(90_000), 10, 2400));
+        assert!(!played_on(None, 10, 2400));
+        assert_eq!(jingle_for(false, (Some(4), 5), (Some(3), 4)), None);
+        // A load that adds many buildings or days at once is not a jingle.
+        assert_eq!(jingle_for(true, (Some(4), 9), (Some(3), 12)), None);
+        assert_eq!(jingle_for(true, (None, 5), (None, 4)), None);
     }
 
     #[test]

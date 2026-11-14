@@ -315,10 +315,13 @@ pub fn found_wearing_coat(world: &mut World, actor: Entity, ordinal: usize) {
 }
 
 pub fn has_coat(world: &World, actor: Entity) -> bool {
-    items::equipped_matching(world, actor, super::roles::roles(world).garment)
-        .and_then(|id| world.resource::<SimIndex>().get(id))
-        .and_then(|item| world.get::<Durability>(item))
-        .is_some_and(|durability| durability.current > 0)
+    // Any good tagged `clothing` keeps a resident warm (S2.9).
+    super::roles::roles(world).garments.iter().any(|garment| {
+        items::equipped_matching(world, actor, garment)
+            .and_then(|id| world.resource::<SimIndex>().get(id))
+            .and_then(|item| world.get::<Durability>(item))
+            .is_some_and(|durability| durability.current > 0)
+    })
 }
 
 /// Cold ticks in the next two simulation days. Future activity is unknown, so
@@ -438,9 +441,14 @@ pub fn gather_ticks(world: &World, actor: Entity, kind: &str, base: u32) -> u32 
 
 /// One completed gather wears the matching tool; a spent tool breaks for good.
 pub(super) fn wear_gather_tool(world: &mut World, actor: Entity, id: SimId, kind: &str) {
-    let Some(tool) = catalog::gather_tool_in(world, kind) else {
-        return;
-    };
+    if let Some(tool) = catalog::gather_tool_in(world, kind) {
+        wear_tool(world, actor, id, tool);
+    }
+}
+
+/// One completed work unit (a gather, a hunt, a build stage) wears the
+/// actor's usable `tool`; a spent tool breaks for good (review fix S2.2).
+pub(crate) fn wear_tool(world: &mut World, actor: Entity, id: SimId, tool: &str) {
     let Some(item) = usable_tool(world, actor, tool) else {
         return;
     };
@@ -452,6 +460,7 @@ pub(super) fn wear_gather_tool(world: &mut World, actor: Entity, id: SimId, kind
         items::take_from_holder(world, item);
         world.despawn(item);
         record_effect(world, Some(id), "VillageToolWornOut", &json!({"kind":tool}));
+        super::ledger::tool_worn(world);
     }
 }
 
@@ -470,18 +479,17 @@ pub fn climate_tick(world: &mut World) {
     // 100 outside the regional profile and in ordinary weather.
     let loss_percent = super::weather::warmth_loss_percent(world).max(1) as i32;
     let tick = world.resource::<SimClock>().tick;
-    let actors: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter(|(_, e)| {
-            world.get::<Villager>(**e).is_some()
-                && world
-                    .get::<Vitality>(**e)
-                    .is_some_and(|v| v.died_at.is_none())
+    let mut actors: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &Villager, &Vitality)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .filter(|(_, _, _, vitality)| vitality.died_at.is_none())
+                .map(|(entity, id, _, _)| (*id, entity))
+                .collect()
         })
-        .map(|(id, e)| (*id, *e))
-        .collect();
+        .unwrap_or_default();
+    actors.sort_unstable_by_key(|(id, _)| *id);
     for (id, actor) in actors {
         if tick > 0
             && world

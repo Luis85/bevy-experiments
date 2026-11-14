@@ -49,7 +49,7 @@ impl Plot {
     }
     /// Centre of the entrance cell.
     pub fn door(&self) -> SimPos {
-        SimPos::new(self.x * 1000 + 500, self.z * 1000 + 500)
+        crate::village::geography::cell_centre(self.x, self.z)
     }
     fn sim_hash(&self, h: &mut Fnv64) {
         for value in [self.x, self.z, self.lo_x, self.lo_z, self.hi_x, self.hi_z] {
@@ -88,6 +88,17 @@ pub fn held(holds: &BTreeMap<SimId, Hold>, kind: &str, except: Option<SimId>, no
         .fold(0, u32::saturating_add)
 }
 
+/// What a construction site becomes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+pub enum SiteKind {
+    /// A building of the catalog (`ConstructionSite.building` is its key).
+    #[default]
+    Building,
+    /// A prop of the catalog (`ConstructionSite.building` is the prop's key),
+    /// placed with the cell and quarter turns of its `PlaceProp`.
+    Prop { x: i32, z: i32, rotation: u8 },
+}
+
 /// A building under construction. The entity keeps its `SimId` when finished.
 #[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[reflect(Component)]
@@ -117,8 +128,13 @@ pub struct ConstructionSite {
     /// Tick of the last delivery of materials.
     #[serde(default)]
     pub last_delivery_at: Option<u64>,
+    /// A building or a prop.
+    pub kind: SiteKind,
 }
 impl ConstructionSite {
+    pub fn is_prop(&self) -> bool {
+        matches!(self.kind, SiteKind::Prop { .. })
+    }
     /// Whether `actor` may take the builder's place now.
     pub fn free_for(&self, actor: SimId, now: u64) -> bool {
         self.builder.is_none_or(|builder| builder == actor) || self.builder_until <= now
@@ -160,6 +176,15 @@ impl SimHash for ConstructionSite {
         h.opt(self.builder.as_ref(), |h, id| h.u32(id.0));
         h.u64(self.builder_until);
         h.opt(self.last_delivery_at.as_ref(), |h, tick| h.u64(*tick));
+        match &self.kind {
+            SiteKind::Building => h.u8(0),
+            SiteKind::Prop { x, z, rotation } => {
+                h.u8(1);
+                h.i32(*x);
+                h.i32(*z);
+                h.u8(*rotation);
+            }
+        }
     }
 }
 
@@ -326,6 +351,33 @@ pub struct SiteWork {
     /// Work ticks this stage adds to the site.
     pub ticks: u32,
 }
+/// A building stage a critical need interrupted (review fix S3.5): the
+/// builder comes back to the same site and finishes the stage's remaining
+/// ticks instead of starting it again. Forgotten after `expires_at` or when
+/// the site is gone.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[reflect(Component)]
+pub struct SuspendedWork {
+    pub site: SimId,
+    /// Work ticks the stage adds when finished.
+    pub ticks: u32,
+    /// Clock ticks of the stage still to go.
+    pub remaining: u64,
+    pub expires_at: u64,
+}
+impl SimHash for SuspendedWork {
+    const NAME: &'static str = "island_suspended_work_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.u32(self.site.0);
+        h.u32(self.ticks);
+        h.u64(self.remaining);
+        h.u64(self.expires_at);
+    }
+}
+
+/// Ticks an interrupted building stage is kept for its builder.
+pub const SUSPEND_TICKS: u64 = 1200;
+
 impl SimHash for SiteWork {
     const NAME: &'static str = "regional_site_work_v1";
     fn sim_hash(&self, h: &mut Fnv64) {

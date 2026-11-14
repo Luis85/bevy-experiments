@@ -4,6 +4,7 @@
 mod life_support;
 
 use bevy_ecs::prelude::*;
+use island_content::village::frontier::shape::PlaceMode;
 use island_content::village::{
     self, Role, civic,
     frontier::{
@@ -257,6 +258,14 @@ fn a_high_food_reserve_keeps_more_food_on_the_shelves() {
 
 // --- Plots and props --------------------------------------------------------
 
+/// Free placement: these tests are about where things may stand.
+fn editor_on(app: &mut bevy_app::App) {
+    ContentCommand::apply(
+        island_content::village::frontier::shape::SetEditorMode { on: true },
+        app.world_mut(),
+    );
+}
+
 fn plot_spot(world: &World, plot: &str, settlement: SimId) -> PlacePlot {
     let centre = settlements::definition(world, settlement)
         .expect("settlement")
@@ -269,6 +278,7 @@ fn plot_spot(world: &World, plot: &str, settlement: SimId) -> PlacePlot {
                     x: centre.x / 1000 + dx,
                     z: centre.z / 1000 + dz,
                     rotation,
+                    mode: PlaceMode::Editor,
                 };
                 if command.check(world).is_ok() {
                     return command;
@@ -290,6 +300,7 @@ fn prop_spot(world: &World, prop: &str, settlement: SimId) -> PlaceProp {
                 x: centre.x / 1000 + dx,
                 z: centre.z / 1000 + dz,
                 rotation: 0,
+                mode: PlaceMode::Editor,
             };
             if command.check(world).is_ok() {
                 return command;
@@ -303,6 +314,7 @@ fn prop_spot(world: &World, prop: &str, settlement: SimId) -> PlaceProp {
 fn a_garden_plot_is_placed_refused_where_it_cannot_lie_and_undone() {
     let mut app = world_with(|world| only_weather(world, "clear"));
     run_ticks(app.world_mut(), 2);
+    editor_on(&mut app);
     let harbour = settlement(app.world(), "harbour");
     let reason = refused(
         app.world(),
@@ -311,6 +323,7 @@ fn a_garden_plot_is_placed_refused_where_it_cannot_lie_and_undone() {
             x: 0,
             z: 0,
             rotation: 0,
+            mode: PlaceMode::Editor,
         },
     );
     assert!(reason.contains("not a farm or garden plot"), "{reason}");
@@ -344,6 +357,7 @@ fn a_garden_plot_is_placed_refused_where_it_cannot_lie_and_undone() {
             x: wet.x,
             z: wet.z,
             rotation: 0,
+            mode: PlaceMode::Editor,
         },
     );
     assert!(!reason.is_empty());
@@ -368,6 +382,7 @@ fn a_garden_plot_is_placed_refused_where_it_cannot_lie_and_undone() {
 fn props_come_from_the_catalog_block_cells_and_are_undone() {
     let mut app = world_with(|world| only_weather(world, "clear"));
     run_ticks(app.world_mut(), 2);
+    editor_on(&mut app);
     let harbour = settlement(app.world(), "harbour");
     let catalog = props::catalog(app.world());
     for key in ["barrel", "fence", "flower_bed", "signpost"] {
@@ -384,6 +399,7 @@ fn props_come_from_the_catalog_block_cells_and_are_undone() {
             x: 0,
             z: 0,
             rotation: 0,
+            mode: PlaceMode::Editor,
         },
     );
     assert!(reason.contains("not a prop"), "{reason}");
@@ -427,6 +443,7 @@ fn props_come_from_the_catalog_block_cells_and_are_undone() {
             x: on_road.x.div_euclid(1000),
             z: on_road.z.div_euclid(1000),
             rotation: 0,
+            mode: PlaceMode::Editor,
         },
     );
     assert!(!reason.is_empty());
@@ -444,6 +461,7 @@ fn props_come_from_the_catalog_block_cells_and_are_undone() {
 fn plots_and_props_are_exported_and_built_again() {
     let mut app = world_with(|world| only_weather(world, "clear"));
     run_ticks(app.world_mut(), 2);
+    editor_on(&mut app);
     let harbour = settlement(app.world(), "harbour");
     plot_spot(app.world(), "garden", harbour)
         .perform(app.world_mut())
@@ -507,6 +525,7 @@ fn neighbourhood<C: ContentCommand + Clone>(
 fn a_removed_plot_or_prop_leaves_nothing_behind() {
     let mut app = world_with(|world| only_weather(world, "clear"));
     run_ticks(app.world_mut(), 2);
+    editor_on(&mut app);
     let harbour = settlement(app.world(), "harbour");
     let shift_plot = |c: &PlacePlot, dx: i32, dz: i32| PlacePlot {
         x: c.x + dx,

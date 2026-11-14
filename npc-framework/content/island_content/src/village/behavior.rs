@@ -227,13 +227,17 @@ pub(super) fn stop(world: &mut World, actor: Entity, reason: StopReason) {
 pub(super) fn advance(world: &mut World) {
     super::resident::record::flush(world);
     let now = world.resource::<SimClock>().tick;
-    let actors: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .values()
-        .copied()
-        .filter(|e| world.get::<LifeDecision>(*e).is_some())
-        .collect();
+    let mut actors: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &LifeDecision)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .map(|(entity, id, _)| (*id, entity))
+                .collect()
+        })
+        .unwrap_or_default();
+    actors.sort_unstable_by_key(|(id, _)| *id);
+    let actors: Vec<Entity> = actors.into_iter().map(|(_, entity)| entity).collect();
     for actor in actors {
         if !living(world, actor) {
             world.entity_mut(actor).remove::<LifeDecision>();

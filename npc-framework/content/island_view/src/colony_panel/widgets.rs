@@ -68,6 +68,8 @@ enum RowKind {
 #[derive(Component, Clone, Debug, Default)]
 struct RowParts {
     texts: Vec<Entity>,
+    /// A cell's smaller second word, by column: the price's change.
+    subs: Vec<Option<Entity>>,
     /// The cells of a table row, in column order.
     cells: Vec<Entity>,
     /// The node that holds a status shape or a trend arrow.
@@ -448,7 +450,31 @@ fn table_row(world: &mut World, parent: Entity, entry: &Entry) -> Entity {
             parts.texts.push(text);
             continue;
         }
-        let text = w::label(world, cell, value, t::DENSE, tone);
+        // The goods table's price: the price in the row's type, its change
+        // since yesterday smaller and grey beside it, taking no side (2.2).
+        let priced = !entry.heading && entry.trend.is_some() && index == 2;
+        let (main, change) = if priced {
+            split_change(value)
+        } else {
+            (value.as_str(), None)
+        };
+        let text = w::label(world, cell, main, t::DENSE, tone);
+        parts.subs.resize(index, None);
+        if priced {
+            let sub = w::label(
+                world,
+                cell,
+                change.unwrap_or(""),
+                t::CAPTION,
+                Tone::secondary(Surface::Paper),
+            );
+            if let Some(mut node) = world.get_mut::<Node>(sub) {
+                node.margin = UiRect::left(px(3));
+            }
+            parts.subs.push(Some(sub));
+        } else {
+            parts.subs.push(None);
+        }
         // A plain header says what its column counts.
         if entry.heading
             && let Some(meaning) = header_tip(value)
@@ -472,22 +498,36 @@ fn table_row(world: &mut World, parent: Entity, entry: &Entry) -> Entity {
     row
 }
 
+/// "4 +1" as the price and its change; "4" and "–" alone.
+pub(super) fn split_change(value: &str) -> (&str, Option<&str>) {
+    match value.split_once(' ') {
+        Some((price, change))
+            if change.len() > 1
+                && change.starts_with(['+', '-'])
+                && change[1..].chars().all(|c| c.is_ascii_digit()) =>
+        {
+            (price, Some(change))
+        }
+        _ => (value, None),
+    }
+}
+
 /// What a table header's column counts, for its tooltip.
 pub(super) fn header_tip(header: &str) -> Option<&'static str> {
     Some(match header {
-        "Good" => "Every good the island trades, in three groups.",
+        "Good" => "Every good on the island, in three groups.",
         "Stock" => "Units held in packs, stores and stalls.",
-        "Price" => "The market's reference price, in coins.",
-        "Days" => "Days the stock lasts at the simulation's estimate of a day's use.",
+        "Price" => "What one costs at the market, in coins, and the change since yesterday.",
+        "Days" => "Days the stock lasts at about one day's use.",
         "Since yesterday" | "Change" => {
             "How much the stock rose or fell since this time yesterday."
         }
-        "Profession" => "Each trade of the village.",
+        "Job" => "Each job in the village.",
         "Workers" => "Residents working in it now.",
         "Open" => "Workplaces with a free place.",
-        "Now" => "Residents of this village working the trade now.",
+        "Now" => "Residents of this village who do this job now.",
         "Wanted" => {
-            "How many you want working it. A dash: the village decides. Workers move one review at a time and finish their work first."
+            "How many you want working it. A dash: the village decides. Residents change job one at a time, after the day's work."
         }
         _ => return None,
     })
@@ -687,14 +727,21 @@ fn built(world: &mut World, body: Entity, entry: &Entry, extra: &Extra) -> Entit
                 t::BODY,
                 Tone::text(Surface::Paper),
             );
-            for line in lines {
-                w::paragraph(
+            for (index, line) in lines.iter().enumerate() {
+                let text = w::paragraph(
                     world,
                     entity,
                     line,
                     t::DENSE,
                     Tone::secondary(Surface::Paper),
                 );
+                // A line that says more on hover (the last market, what
+                // waits since when).
+                if let Some((_, tip)) = entry.line_tips.iter().find(|(at, _)| *at == index) {
+                    world
+                        .entity_mut(text)
+                        .insert((Hovered::default(), tip.clone()));
+                }
             }
             entity
         }
@@ -860,6 +907,106 @@ fn built(world: &mut World, body: Entity, entry: &Entry, extra: &Extra) -> Entit
             }
             entity
         }
+        Extra::Spark(heights) => {
+            let entity = world
+                .spawn((
+                    ChildOf(body),
+                    Node {
+                        column_gap: px(8),
+                        align_items: AlignItems::Center,
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                ))
+                .id();
+            // Decoration beside the words that carry the same fact: never a
+            // control, never picked.
+            let bars = world
+                .spawn((
+                    ChildOf(entity),
+                    bevy::picking::Pickable::IGNORE,
+                    Node {
+                        height: px(16),
+                        column_gap: px(2),
+                        align_items: AlignItems::FlexEnd,
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                ))
+                .id();
+            for (index, height) in heights.iter().enumerate() {
+                let last = index + 1 == heights.len();
+                world.spawn((
+                    ChildOf(bars),
+                    bevy::picking::Pickable::IGNORE,
+                    Swatch::Fill,
+                    if last {
+                        Tone::text(Surface::Paper)
+                    } else {
+                        Tone::secondary(Surface::Paper)
+                    },
+                    Node {
+                        width: px(4),
+                        height: px(*height as f32),
+                        ..default()
+                    },
+                    BackgroundColor(Color::NONE),
+                ));
+            }
+            w::label(
+                world,
+                entity,
+                &entry.text,
+                t::DENSE,
+                Tone::secondary(Surface::Paper),
+            );
+            entity
+        }
+        Extra::Order(status, button_spec) => {
+            use super::orders::OrderStatus;
+            let entity = world
+                .spawn((
+                    ChildOf(body),
+                    Node {
+                        column_gap: px(6),
+                        align_items: AlignItems::Center,
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                ))
+                .id();
+            let (picture, shade) = match status {
+                OrderStatus::Queued => (Icon::Pause, Status::Idle),
+                OrderStatus::Working | OrderStatus::Priority => {
+                    (Icon::status(Status::Info), Status::Info)
+                }
+                OrderStatus::Met => (Icon::status(Status::Good), Status::Good),
+                OrderStatus::Refused => (Icon::status(Status::Crit), Status::Crit),
+            };
+            icon::icon(
+                world,
+                entity,
+                picture,
+                14.0,
+                Tone::status(Surface::Paper, shade),
+            );
+            let text = w::paragraph(
+                world,
+                entity,
+                &entry.text,
+                t::DENSE,
+                Tone::text(Surface::Paper),
+            );
+            if let Some(mut node) = world.get_mut::<Node>(text) {
+                node.flex_grow = 1.0;
+                node.flex_shrink = 1.0;
+                node.min_width = px(0);
+            }
+            if let Some((label, action)) = button_spec {
+                button(world, entity, label, action.clone());
+            }
+            entity
+        }
         Extra::Strong => w::paragraph(
             world,
             body,
@@ -978,12 +1125,20 @@ fn update(world: &mut World, entity: Entity, entry: &Entry) {
         Some(RowKind::Text { .. }) => w::set_text(world, entity, &entry.text),
         Some(RowKind::Built(_)) | None => {}
         Some(RowKind::Table { .. }) => {
-            for (text, value) in parts
+            for (index, (text, value)) in parts
                 .texts
                 .iter()
                 .zip(entry.columns.as_deref().unwrap_or_default())
+                .enumerate()
             {
-                w::set_text(world, *text, value);
+                match parts.subs.get(index).copied().flatten() {
+                    Some(sub) => {
+                        let (main, change) = split_change(value);
+                        w::set_text(world, *text, main);
+                        w::set_text(world, sub, change.unwrap_or(""));
+                    }
+                    None => w::set_text(world, *text, value),
+                }
             }
             // The columns follow the window: a row built at one size keeps
             // its place in the table at another.
@@ -1108,11 +1263,9 @@ pub(super) fn reconcile(world: &mut World, entries: Vec<Entry>) {
     else {
         return;
     };
-    // A card of facts stays under the scrolling rows, where it is always in
-    // view however far the table above it is scrolled.
-    let (pinned, entries): (Vec<Entry>, Vec<Entry>) = entries
-        .into_iter()
-        .partition(|entry| matches!(entry.extra, Some(Extra::Card(_))));
+    // A good's card sits under its own row (2.3); nothing is pinned to the
+    // foot any more, and what was is taken away.
+    let pinned: Vec<Entry> = Vec::new();
     let old = std::mem::take(&mut world.resource_mut::<Ledger>().rows);
     let live = reconcile_rows(world, body, old, entries);
     world.resource_mut::<Ledger>().rows = live;

@@ -27,8 +27,16 @@ pub(crate) fn plugin(app: &mut App) {
     app.world_mut()
         .get_resource_or_init::<ContextOrders>()
         .add("testbed.use_tool", context_tool_order);
-    app.add_systems(Update, order_keys.in_set(ViewSystems::Input))
-        .add_systems(Update, inspect_target.in_set(ViewSystems::Animate));
+    // The order keys are developer keys: in the player session H, B, U, Z,
+    // X, C and V mean other things (or nothing) and never order the played
+    // character. Click and right-click orders stay.
+    app.add_systems(
+        Update,
+        order_keys
+            .in_set(ViewSystems::Input)
+            .run_if(crate::player_hud::developer_keys),
+    )
+    .add_systems(Update, inspect_target.in_set(ViewSystems::Animate));
 }
 
 /// Right-click resolver: a tree or the ore rock with uses left →
@@ -125,5 +133,76 @@ fn inspect_target(
         if selected.0 != want {
             selected.0 = want;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{DeveloperKeys, PlayerExperience};
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn queued(app: &App) -> usize {
+        app.world()
+            .get_resource::<npc_framework::kernel::commands::CommandQueue>()
+            .map_or(0, |queue| queue.pending.len())
+    }
+
+    /// Press H, B, U, Z, X, C and V one at a time; the orders recorded.
+    fn press_all(app: &mut App) -> usize {
+        let before = queued(app);
+        for key in [
+            KeyCode::KeyH,
+            KeyCode::KeyB,
+            KeyCode::KeyU,
+            KeyCode::KeyZ,
+            KeyCode::KeyX,
+            KeyCode::KeyC,
+            KeyCode::KeyV,
+        ] {
+            {
+                let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+                input.reset_all();
+                input.press(key);
+            }
+            // The plugin's run condition, then the system.
+            let allowed = app
+                .world_mut()
+                .run_system_once(crate::player_hud::developer_keys)
+                .unwrap();
+            if allowed {
+                app.world_mut().run_system_once(order_keys).unwrap();
+            }
+        }
+        queued(app) - before
+    }
+
+    #[test]
+    fn order_hotkeys_do_nothing_in_the_player_session() {
+        let mut app = island_content::new_sim_app(7, "living_world");
+        app.init_resource::<ButtonInput<KeyCode>>();
+        let played = app
+            .world()
+            .resource::<island_content::village::VillageState>()
+            .played;
+        app.world_mut()
+            .get_resource_or_init::<CommandSelection>()
+            .units = vec![played];
+        app.insert_resource(PlayerExperience { enabled: true })
+            .insert_resource(DeveloperKeys(false));
+        assert_eq!(press_all(&mut app), 0, "no order from the player session");
+        assert!(
+            app.world()
+                .get_resource::<CommandFormation>()
+                .is_none_or(|f| f.0.is_none()),
+            "no formation was chosen either"
+        );
+        // With the developer keys the formation keys act again.
+        app.insert_resource(DeveloperKeys(true));
+        press_all(&mut app);
+        assert!(
+            app.world().get_resource::<CommandFormation>().is_some(),
+            "the developer keys still reach the orders"
+        );
     }
 }

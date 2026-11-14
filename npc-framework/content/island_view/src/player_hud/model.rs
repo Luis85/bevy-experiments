@@ -1693,7 +1693,7 @@ fn explore_places(world: &World, observed: &Value, ready: bool, rows: &mut Vec<R
                 "regional_chart",
                 "Coastal chart",
                 format!(
-                    "{} settlements share this island. Carry food and water for the journey.",
+                    "{} villages share this island. Carry food and water for the walk.",
                     array(&regional["chart"]).len()
                 ),
             ));
@@ -1702,7 +1702,7 @@ fn explore_places(world: &World, observed: &Value, ready: bool, rows: &mut Vec<R
                 let Some(pos) = position(&destination["position"]) else {
                     continue;
                 };
-                let name = destination["name"].as_str().unwrap_or("Settlement");
+                let name = destination["name"].as_str().unwrap_or("Village");
                 let description = match destination["biome"].as_str() {
                     Some("coast") => "Fishing, village workshops and a place to begin.",
                     Some("woodland") => "Woodland resources, forest homes and habitat restoration.",
@@ -1730,7 +1730,7 @@ fn explore_places(world: &World, observed: &Value, ready: bool, rows: &mut Vec<R
             }
         }
         rows.push(Row::heading("landcare", "Care for the landscape"));
-        rows.push(Row::note("landcare_intro", "What you take changes the world", "Fish stocks, trees and forage recover over time. Approach a resource site to inspect it, plant tree cuttings or restore its habitat."));
+        rows.push(Row::note("landcare_intro", "What you take changes the world", "Fish stocks, trees and forage recover over time. Walk up to a patch to look at it, plant tree cuttings or restore its habitat."));
         for site in array(&regional["nearby_sites"]) {
             let (Some(target), Some(pos)) = (id(&site["id"]), position(&site["position"])) else {
                 continue;
@@ -1908,7 +1908,7 @@ fn context_for(world: &World, observed: &Value, target: SimId, ready: bool) -> O
     {
         return Some(Row::action(
             "context",
-            "Inspect this plot",
+            "Look at this plot",
             "Choose a home or tend its beds.",
             Action::InspectPlot(target.0),
             true,

@@ -415,8 +415,14 @@ fn begin(world: &mut World, actor: Entity, owner: SimId, ticks: u64, hired: bool
         return Err("no work is left");
     }
     let pace = u64::from(crate::village::colony::work_pace_percent(world, actor));
+    // A hired builder without a hammer is slower, like any builder (S2.2).
+    let tool = if hired {
+        u64::from(crate::village::civic::build_tool_percent(world, actor))
+    } else {
+        100
+    };
     let started = now(world);
-    let ends = started.saturating_add((ticks * pace / 100).max(1));
+    let ends = started.saturating_add((ticks * pace / 100 * tool / 100).max(1));
     world
         .entity_mut(actor)
         .remove::<MoveIntent>()
@@ -807,6 +813,12 @@ pub(super) fn tick(world: &mut World, spec: &LiveSpec) {
             continue;
         }
         world.entity_mut(actor).remove::<UpgradeWork>();
+        // A finished hired stage wears the builder's hammer (S2.2).
+        if work.hired
+            && let Some(tool) = crate::village::civic::builder_tool(world)
+        {
+            crate::village::living::wear_tool(world, actor, id, tool);
+        }
         let paid = {
             let mut state = world.resource_mut::<LiveState>();
             let Some(upgrade) = state.upgrades.get_mut(&work.owner) else {

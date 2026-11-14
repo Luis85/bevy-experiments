@@ -103,10 +103,10 @@ impl Tip {
                 "Alerts list what is going wrong, the most urgent first. Choose one to go to the place."
             }
             Self::Live => {
-                "Your goal is top left and your needs are bottom left. The hotbar opens what you carry, make, build and trade; E uses what is in reach."
+                "Your goal is top left and your needs are bottom left. The hotbar opens what you carry, make, build, and buy and sell. E uses what is in reach."
             }
             Self::Shape => {
-                "Pick a tool on the left and drag across the island. Ctrl+Z takes a stroke back. Where the simulation refuses, the outline turns red and the tag says why."
+                "Pick a tool on the left and drag across the island. Ctrl+Z takes a stroke back. Where the land cannot be changed, the outline turns red and the tag says why."
             }
         }
     }

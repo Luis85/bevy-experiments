@@ -747,6 +747,7 @@ fn age_residents(world: &mut World, spec: &DemographySpec, day: u64) {
         }
         if life.stage == LifeStage::Adult && age_days_at(day, life.born_day) >= elder_days {
             world.get_mut::<Life>(actor).expect("life").stage = LifeStage::Elder;
+            super::resident::assign_tree(world, actor);
             slow_down(world, actor, spec.elder_speed_percent);
             let name = world
                 .get::<Villager>(actor)
@@ -1461,10 +1462,16 @@ pub(super) fn arrive(world: &mut World) -> u32 {
     };
     let dock = super::merchant::status(world).dock;
     let mut landed = 0;
+    // The overseer wants a trade nobody on the island can learn: the first
+    // settler of this visit comes with that aptitude, to that settlement
+    // (review fix S2.7; targets in (settlement, trade) order, one a visit).
+    let mut wanted = super::frontier::oversee::untaught_target(world);
     for _ in 0..spec.arrivals_per_visit {
+        let asked = wanted.take();
         let target = settlements::all(world)
             .into_iter()
             .filter(|(id, _)| can_settle(world, *id).is_ok())
+            .filter(|(id, _)| asked.is_none_or(|(settlement, _)| settlement == *id))
             .map(|(id, _)| {
                 let beds: u32 = homes(world, id)
                     .into_iter()
@@ -1489,7 +1496,7 @@ pub(super) fn arrive(world: &mut World) -> u32 {
                 name: &name,
                 at,
                 seat: None,
-                extra_roles: &[],
+                extra_roles: &asked.map(|(_, role)| vec![role]).unwrap_or_default(),
                 reason: "Arrived by boat and took a free place",
             },
         ) else {

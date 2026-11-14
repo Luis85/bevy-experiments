@@ -233,7 +233,7 @@ fn job_changes_fold_into_one_line_that_a_click_unfolds() {
     let folded = shown(&app);
     assert_eq!(folded.len(), 2, "{folded:?}");
     assert!(
-        folded[0].ends_with("7 notes · show\n4 job changes, 3 trades"),
+        folded[0].ends_with("7 notes · show\n4 job changes, 3 sales"),
         "{}",
         folded[0]
     );
@@ -251,7 +251,7 @@ fn job_changes_fold_into_one_line_that_a_click_unfolds() {
     assert_eq!((stack.critical, stack.warning, stack.more), (1, 0, 0));
     assert_eq!(stack.rows.len(), 1);
     assert!(stack.rows[0].2.ends_with("has died"));
-    assert!(stack.rows[0].3.starts_with("Critical \u{b7} day "));
+    assert_eq!(stack.rows[0].3, "Critical \u{b7} today");
     assert!(
         stack.journal.ends_with("7 notes in the journal"),
         "{}",
@@ -815,4 +815,287 @@ fn what_the_first_scan_after_a_load_finds_makes_no_alert_sound() {
     assert!(
         super::alert_due(Some(2), 3) && !super::alert_due(Some(3), 3) && !super::alert_due(None, 3)
     );
+}
+
+#[test]
+fn no_alert_or_journal_line_shows_the_running_day_count() {
+    let mut app = fixture();
+    track(app.world_mut());
+    let resident = app
+        .world()
+        .resource::<SimIndex>()
+        .map
+        .iter()
+        .find(|(_, entity)| app.world().get::<Villager>(**entity).is_some())
+        .map(|(id, _)| *id)
+        .expect("a resident");
+    record_effect(
+        app.world_mut(),
+        Some(resident),
+        "VillageDeath",
+        &json!({"permanent": true}),
+    );
+    track(app.world_mut());
+    let tick = app.world().resource::<SimClock>().tick;
+    // The running count the old lines printed ("day 20").
+    let running = |app: &App| {
+        format!(
+            "day {}",
+            day_of(app.world(), app.world().resource::<SimClock>().tick)
+        )
+    };
+    let lines = |app: &App| {
+        let stack = stack(app.world());
+        let mut lines = vec![stack.journal.clone()];
+        lines.extend(stack.rows.iter().map(|row| row.3.clone()));
+        lines.extend(journal(app.world()).2.into_iter().map(|line| line.text));
+        lines.extend(app.world().resource::<Alerts>().feed.iter().map(|alert| {
+            alert.line(&crate::game_ui::words::capital(
+                &crate::game_ui::words::when(app.world(), alert.tick),
+            ))
+        }));
+        lines
+    };
+    let today = lines(&app);
+    let count = running(&app);
+    assert!(
+        today
+            .iter()
+            .all(|line| !line.to_lowercase().contains(&count)),
+        "{today:?}"
+    );
+    let first = stack(app.world());
+    assert!(first.rows[0].3.ends_with("today"), "{}", first.rows[0].3);
+    assert_eq!(
+        first.journal,
+        format!(
+            "{} \u{b7} the journal",
+            crate::game_ui::words::date(app.world(), tick)
+        )
+    );
+    assert!(first.journal.contains(", day "), "{}", first.journal);
+    // Days later the alert is dated in the season, still without the count.
+    let day_length = app.world().resource::<SimConfig>().day_length;
+    app.world_mut().resource_mut::<SimClock>().tick = tick + 3 * day_length;
+    let later = lines(&app);
+    let count = running(&app);
+    assert!(
+        later
+            .iter()
+            .all(|line| !line.to_lowercase().contains(&count)),
+        "{later:?}"
+    );
+    let row = &stack(app.world()).rows[0].3;
+    assert!(
+        row.ends_with(&crate::game_ui::words::date(app.world(), tick)),
+        "{row}"
+    );
+}
+
+#[test]
+fn a_need_alert_says_the_residents_own_reason() {
+    use island_content::village::view::NeedCause;
+    let words = |need: &str, cause: Option<NeedCause>| {
+        model::reason_words(
+            need,
+            cause.as_ref(),
+            "Mira",
+            Some("Tom"),
+            Some("she is fine"),
+        )
+    };
+    let cases = [
+        (
+            "Hunger",
+            Some(NeedCause::HasItNotUsed),
+            "has food, has not eaten yet",
+            "Mira carries food and has not eaten yet.",
+        ),
+        (
+            "Thirst",
+            Some(NeedCause::HasItNotUsed),
+            "has water, has not drunk yet",
+            "Mira carries water and has not drunk yet.",
+        ),
+        (
+            "Hunger",
+            Some(NeedCause::OnTheWay {
+                target: SimId(4),
+                good: "bread".into(),
+            }),
+            "on the way to get bread",
+            "Mira is on the way to get bread from Tom.",
+        ),
+        (
+            "Hunger",
+            Some(NeedCause::NoCoins),
+            "no food and no coins",
+            "Mira has no food and no coins to buy any.",
+        ),
+        (
+            "Thirst",
+            Some(NeedCause::NoSeller),
+            "nobody sells water they can pay for",
+            "Mira has no water, and nobody sells any at a price they can pay.",
+        ),
+        (
+            "Thirst",
+            Some(NeedCause::SourceEmpty),
+            "no water, and the wells are dry",
+            "Mira has no water, and the wells are dry.",
+        ),
+        (
+            "Energy",
+            Some(NeedCause::Asleep),
+            "asleep now",
+            "Mira is asleep. The night restores them.",
+        ),
+        (
+            "Energy",
+            Some(NeedCause::NoCoins),
+            "needs a night in a bed",
+            "Mira is tired. A night in a bed restores them.",
+        ),
+        (
+            "Warmth",
+            Some(NeedCause::NoCoat),
+            "no warm coat",
+            "Mira has no warm coat, and it is cold outside.",
+        ),
+        (
+            "Warmth",
+            Some(NeedCause::Outdoors),
+            "out in the cold",
+            "Mira is out in the cold. A heated home warms them.",
+        ),
+        // No reason from the simulation: its own sentence, if any.
+        ("Hunger", None, "she is fine", "Mira needs help."),
+    ];
+    for (need, cause, short, full) in cases {
+        assert_eq!(
+            words(need, cause),
+            (short.to_owned(), full.to_owned()),
+            "{need}"
+        );
+    }
+    assert_eq!(
+        model::reason_words("Warmth", None, "Mira", None, None),
+        (String::new(), "Mira needs help.".to_owned())
+    );
+    assert_eq!(model::need_of(model::AlertKind::Starving), Some("Hunger"));
+    assert_eq!(model::need_of(model::AlertKind::Built), None);
+}
+
+#[test]
+fn an_alert_tooltip_is_the_action_and_the_full_sentence() {
+    assert_eq!(
+        model::alert_tip(
+            "Mira",
+            "Mira has no food and no coins to buy any.",
+            "today, 09:10"
+        ),
+        (
+            "Go to Mira".to_owned(),
+            "Mira has no food and no coins to buy any. Since today, 09:10.".to_owned()
+        )
+    );
+    assert_eq!(crate::game_ui::words::clock_face(0), "06:00");
+    assert_eq!(crate::game_ui::words::clock_face(500), "18:00");
+}
+
+#[test]
+fn the_outlook_is_filled_in_place_between_hours() {
+    let mut app = fixture();
+    spawn_for_tests(app.world_mut());
+    read_outlook(app.world_mut());
+    draw_outlook(app.world_mut());
+    let lines = app
+        .world()
+        .resource::<Alerts>()
+        .outlook
+        .clone()
+        .expect("read once");
+    assert!(!lines.is_empty() && lines.len() <= 3, "{lines:?}");
+    let count = |app: &mut App| {
+        let world = app.world_mut();
+        world.query::<Entity>().iter(world).count()
+    };
+    let before = count(&mut app);
+    let texts = |app: &mut App| {
+        let world = app.world_mut();
+        world
+            .query::<(Entity, &Text)>()
+            .iter(world)
+            .map(|(entity, text)| (entity, text.0.clone()))
+            .collect::<Vec<_>>()
+    };
+    let shown = texts(&mut app);
+    for _ in 0..5 {
+        read_outlook(app.world_mut());
+        draw_outlook(app.world_mut());
+    }
+    assert_eq!(
+        count(&mut app),
+        before,
+        "nothing built again within the hour"
+    );
+    assert_eq!(texts(&mut app), shown, "no text rewritten");
+}
+
+#[test]
+fn three_residents_with_one_reason_fold_into_one_alert() {
+    let mut app = fixture();
+    track(app.world_mut());
+    let residents: Vec<SimId> = app
+        .world()
+        .resource::<SimIndex>()
+        .map
+        .iter()
+        .filter(|(_, entity)| app.world().get::<Villager>(**entity).is_some())
+        .map(|(id, _)| *id)
+        .take(4)
+        .collect();
+    {
+        let mut state = app.world_mut().resource_mut::<Alerts>();
+        for (index, id) in residents.iter().enumerate() {
+            state.feed.push(
+                model::Incoming {
+                    kind: model::AlertKind::Starving,
+                    subject: Some(id.0),
+                    focus: None,
+                    text: format!("Resident {} is starving", id.0),
+                    tick: 0,
+                },
+                index as f64,
+            );
+        }
+        // Three of Harbour have no food and no coins; one is elsewhere.
+        let serials: Vec<u64> = state.feed.iter().map(|alert| alert.serial).collect();
+        for (index, serial) in serials.into_iter().enumerate() {
+            let village = if index < 3 { "Harbour" } else { "Hilltop" };
+            state.reasons.insert(
+                serial,
+                (
+                    "no food and no coins".to_owned(),
+                    "They have no food and no coins to buy any.".to_owned(),
+                    0,
+                    Some(village.to_owned()),
+                ),
+            );
+        }
+    }
+    let stack = stack(app.world());
+    assert_eq!(stack.critical, 4, "every alert still counts");
+    assert_eq!(stack.rows.len(), 2, "three fold into one row");
+    let folded = stack
+        .rows
+        .iter()
+        .find(|row| row.2.starts_with("3 residents"))
+        .expect("the folded row");
+    assert_eq!(folded.2, "3 residents in Harbour are starving");
+    assert_eq!(folded.3, "Critical \u{b7} no food and no coins");
+    assert_eq!(folded.4.as_ref().unwrap().0, "Show them");
+    let (head, who) = stack.groups.get(&folded.0).expect("its residents");
+    assert_eq!(head, "3 residents in Harbour are starving");
+    assert_eq!(who.len(), 3);
 }
