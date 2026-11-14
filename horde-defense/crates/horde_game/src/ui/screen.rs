@@ -74,6 +74,7 @@ impl Screen {
             Screen::Camp => MusicScreen::Camp,
             Screen::Battle => MusicScreen::Battle,
             Screen::Results => MusicScreen::Results,
+            Screen::Upgrades => MusicScreen::Upgrades,
             Screen::History | Screen::Settings => MusicScreen::Overlay,
         }
     }

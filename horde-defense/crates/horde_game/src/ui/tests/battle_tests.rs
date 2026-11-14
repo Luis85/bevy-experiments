@@ -1865,6 +1865,7 @@ fn music_input_follows_the_screen_and_the_battle() {
             (Screen::Camp, Tab::Armory, MusicScreen::Camp),
             (Screen::Camp, Tab::Briefing, MusicScreen::Briefing),
             (Screen::Results, Tab::Briefing, MusicScreen::Results),
+            (Screen::Upgrades, Tab::Home, MusicScreen::Upgrades),
             (Screen::Settings, Tab::Home, MusicScreen::Overlay),
             (Screen::History, Tab::Home, MusicScreen::Overlay),
         ] {
