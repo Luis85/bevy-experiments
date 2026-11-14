@@ -1324,6 +1324,14 @@ W1-49 is done when `battlefield_paint` does not grow over the stress run, and th
 
 For context, the last stress runs before W1-48 and W1-49 (`target/perf/w1-37/dev-novsync`, dev, VSync off, about 1,514 corpses) painted the battlefield in 1.22-1.33 ms. Both commits landed between those runs and these, so the drop is not W1-49's alone.
 
+## Save format 7 docs and the pins at the wave-7 build — 14 November 2026 (W7-10)
+
+SIMULATION.md now describes save format 7 as built: "Save format 7" (the v1→v2 to v6→v7 chain, the seven fixtures, the freeze rule and the separate settings version), "Determinism pins" (every pin constant of `tests/determinism.rs` and `tests/save_migration.rs`, its test, what it hashes and who may move it, the provisional-pin protocol and the re-bless history) and "Keyed rolls and RNG streams" (the two saved streams, the six `hash::tags` purposes and the presentation RNG guard). ARCHITECTURE.md's `settings.rs` row and "Persistence" state `SETTINGS_VERSION` 2 and the freeze rule. This closes plan finding SD20 for the docs W7-10 owns.
+
+The gate is `repo_checks::save_docs_name_the_v7_format_every_migration_step_pin_and_tag`. It reads the facts from the code, not from a list: every `fn v<a>_to_v<b>` step in `sim/migrations.rs` (and that the chain ends at `SAVE_VERSION`), every `save_v*.json` under `tests/fixtures/`, every top-level pin constant of the two test files (a name ending in `GOLDEN`, `TRACE`, `CONTINUATION`, `_FNV`, `FIXTURE_CHECKSUM` or `FIXTURE_BYTES`) and every tag in `hash.rs`'s `mod tags`. SIMULATION.md must say "the envelope is currently v7" and name each fact in its section; ARCHITECTURE.md must state the envelope, `RULESET_VERSION` and `SETTINGS_VERSION` values the code defines. A later migration step, fixture, pin, tag or version bump therefore fails it until the docs follow. `save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap` exercises the readers and each kind of gap on planted text.
+
+**Pins at this commit (source state, not a run).** No commit after W4-09 (`fa616e99`) changes `tests/determinism.rs`, `tests/save_migration.rs` or `tests/fixtures/`: the waves 5-7 builds set no provisional pin, `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None and both cause lists are empty. Whether the pins still hold at the release candidate is the final zero-move record (W5-12, A6-19 and W7-10's record: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6, the V1-V6 continuations, `V7_CONTINUATION_FNV` and the `save_v7.json` identity unchanged). Under ruling R36 that run belongs to the closing phase and is recorded there.
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:

@@ -37,6 +37,11 @@
 //! acceptance matrix, with each function its Proof names defined in a file
 //! its Defined in column lists, and `acceptance_lists_every_pending_human_check`
 //! keeps its pending human checks equal to the plan's (W7-08).
+//!
+//! `save_docs_name_the_v7_format_every_migration_step_pin_and_tag` keeps
+//! docs/SIMULATION.md and docs/ARCHITECTURE.md describing the save format the
+//! code defines: every migration step, save fixture, determinism pin and
+//! keyed-roll tag, and the save, ruleset and settings versions (W7-10).
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -1202,7 +1207,8 @@ fn package_link_check_reports_relative_links_only() {
 /// line, nothing more. W4-10 lists enemy-balance's four docs, W4-11
 /// progression-tree's goal-5 section, W7-04 loot-economy's auto-sell
 /// sections, W7-05 progression-tree's, W7-06 campaign-defenders' and W7-07
-/// ux-flow's; W7-08 adds the rest of the inventory.
+/// ux-flow's; W7-08 adds the rest of the inventory and W7-10
+/// save-determinism's save docs.
 const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     (
         "docs/ENEMY_COMPOSITION.md",
@@ -1332,6 +1338,21 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     ),
     ("docs/VALIDATION.md", &["## Full verify"]),
     ("docs/ARCHITECTURE.md", &["## Ownership"]),
+    // W7-10, save-determinism: save format 7, the pins and the keyed rolls
+    // (what they must name is `save_docs_name_the_v7_format_every_migration_step_pin_and_tag`).
+    (
+        "docs/SIMULATION.md",
+        &[
+            "## Save format 7",
+            "## Determinism pins",
+            "## Keyed rolls and RNG streams",
+        ],
+    ),
+    (
+        "docs/VALIDATION.md",
+        &["## Save format 7 docs and the pins at the wave-7 build — 14 November 2026 (W7-10)"],
+    ),
+    ("docs/ARCHITECTURE.md", &["## Persistence"]),
 ];
 
 /// Interface claims the production pass made false, with what replaced each
@@ -2049,5 +2070,267 @@ fn human_check_names_ignore_a_trailing_parenthetical() {
             format!("\"B\" is pending in the plan but not in {ACCEPTANCE_LEDGER}"),
             format!("\"C\" is in {ACCEPTANCE_LEDGER} but not in the plan's list"),
         ]
+    );
+}
+
+/// The save and determinism docs at save format 7 (W7-10, save-determinism;
+/// plan SD20). docs/SIMULATION.md states the envelope version, names every
+/// migration step `sim/migrations.rs` defines and every checked-in save
+/// fixture under "## Save format 7", every pin constant of the determinism
+/// and migration tests under "## Determinism pins", and every keyed-roll
+/// purpose tag of `hash.rs` under "## Keyed rolls and RNG streams";
+/// docs/ARCHITECTURE.md states the envelope, ruleset and settings versions.
+/// Each is read from the code, so a later step, pin, tag or bump fails here
+/// until the docs name it.
+const SAVE_DOC: &str = "docs/SIMULATION.md";
+const SAVE_FORMAT_SECTION: &str = "## Save format 7";
+const SAVE_PINS_SECTION: &str = "## Determinism pins";
+const SAVE_RNG_SECTION: &str = "## Keyed rolls and RNG streams";
+const SAVE_MIGRATIONS: &str = "crates/horde_core/src/sim/migrations.rs";
+const SAVE_HASH: &str = "crates/horde_core/src/hash.rs";
+const SAVE_FIXTURES: &str = "crates/horde_core/tests/fixtures";
+/// The test files whose top-level pin constants the docs list.
+const SAVE_PIN_SOURCES: &[&str] = &[
+    "crates/horde_core/tests/determinism.rs",
+    "crates/horde_core/tests/save_migration.rs",
+];
+/// A top-level constant is a pin when its name ends with one of these.
+const SAVE_PIN_SUFFIXES: &[&str] = &[
+    "GOLDEN",
+    "TRACE",
+    "CONTINUATION",
+    "_FNV",
+    "FIXTURE_CHECKSUM",
+    "FIXTURE_BYTES",
+];
+
+/// Every `fn v<a>_to_v<b>(` step in `source`, in source order.
+fn migration_steps(source: &str) -> Vec<(u32, u32)> {
+    source
+        .lines()
+        .filter_map(|line| {
+            let rest = line.trim_start().strip_prefix("fn v")?;
+            let (from, rest) = rest.split_once("_to_v")?;
+            let (to, _) = rest.split_once('(')?;
+            Some((from.parse().ok()?, to.parse().ok()?))
+        })
+        .collect()
+}
+
+/// Every top-level `const NAME` of `source` whose name ends with a
+/// [`SAVE_PIN_SUFFIXES`] entry.
+fn pin_constants(source: &str) -> Vec<String> {
+    source
+        .lines()
+        .filter_map(|line| line.strip_prefix("const "))
+        .filter_map(|rest| rest.split(':').next())
+        .map(str::trim)
+        .filter(|name| {
+            SAVE_PIN_SUFFIXES
+                .iter()
+                .any(|suffix| name.ends_with(suffix))
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Every keyed-roll purpose tag of `source`: the constants inside its
+/// `mod tags` block.
+fn keyed_tags(source: &str) -> Vec<String> {
+    let mut inside = false;
+    let mut tags = Vec::new();
+    for line in source.lines() {
+        let line = line.trim();
+        if line.ends_with("mod tags {") {
+            inside = true;
+            continue;
+        }
+        if !inside {
+            continue;
+        }
+        if line == "}" {
+            break;
+        }
+        let constant = line
+            .strip_prefix("pub(crate) const ")
+            .or_else(|| line.strip_prefix("pub const "));
+        if let Some(name) = constant.and_then(|rest| rest.split(':').next()) {
+            tags.push(name.trim().to_owned());
+        }
+    }
+    tags
+}
+
+/// What [`SAVE_DOC`]'s text leaves out of the code facts it must state.
+fn save_doc_violations(
+    text: &str,
+    save_version: u32,
+    steps: &[(u32, u32)],
+    fixtures: &[String],
+    pins: &[String],
+    tags: &[String],
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let current = format!("the envelope is currently v{save_version}");
+    if !normalized(text).contains(&current) {
+        violations.push(format!("{SAVE_DOC}: does not say \"{current}\""));
+    }
+    if steps.last().map(|(_, to)| *to) != Some(save_version) {
+        violations.push(format!(
+            "{SAVE_MIGRATIONS}: the chain {steps:?} does not end at SAVE_VERSION {save_version}"
+        ));
+    }
+    let mut format_needles: Vec<String> = steps
+        .iter()
+        .map(|(from, to)| format!("v{from}→v{to}"))
+        .collect();
+    format_needles.extend(fixtures.iter().map(|name| format!("`{name}`")));
+    let sections = [
+        (SAVE_FORMAT_SECTION, format_needles),
+        (
+            SAVE_PINS_SECTION,
+            pins.iter().map(|name| format!("`{name}`")).collect(),
+        ),
+        (
+            SAVE_RNG_SECTION,
+            tags.iter().map(|name| format!("`{name}`")).collect(),
+        ),
+    ];
+    for (heading, needles) in sections {
+        match section_body(text, heading) {
+            None => violations.push(format!("{SAVE_DOC}: missing \"{heading}\"")),
+            Some(body) => violations.extend(
+                needles
+                    .into_iter()
+                    .filter(|needle| !body.contains(needle.as_str()))
+                    .map(|needle| format!("{SAVE_DOC}: \"{heading}\" does not name {needle}")),
+            ),
+        }
+    }
+    violations
+}
+
+/// What docs/ARCHITECTURE.md's text leaves out of the three versions.
+fn architecture_version_violations(
+    text: &str,
+    save_version: u32,
+    ruleset_version: u32,
+    settings_version: u32,
+) -> Vec<String> {
+    [
+        format!("envelope **v{save_version}** (`SAVE_VERSION`)"),
+        format!("`RULESET_VERSION` {ruleset_version}"),
+        format!("`SETTINGS_VERSION` {settings_version}"),
+    ]
+    .into_iter()
+    .filter(|needle| !text.contains(needle.as_str()))
+    .map(|needle| format!("docs/ARCHITECTURE.md: does not say \"{needle}\""))
+    .collect()
+}
+
+#[test]
+fn save_docs_name_the_v7_format_every_migration_step_pin_and_tag() {
+    let workspace = workspace_directory();
+    let steps = migration_steps(&read_workspace_file(SAVE_MIGRATIONS));
+    let fixtures: Vec<String> =
+        workspace_files(&workspace, &workspace.join(SAVE_FIXTURES), &["json"])
+            .into_iter()
+            .filter_map(|path| path.rsplit('/').next().map(str::to_owned))
+            .filter(|name| name.starts_with("save_v"))
+            .collect();
+    let pins: Vec<String> = SAVE_PIN_SOURCES
+        .iter()
+        .flat_map(|name| pin_constants(&read_workspace_file(name)))
+        .collect();
+    let tags = keyed_tags(&read_workspace_file(SAVE_HASH));
+    assert!(
+        steps.len() >= 6 && fixtures.len() >= 7 && pins.len() >= 10 && tags.len() >= 6,
+        "the code facts were not found: {steps:?} {fixtures:?} {pins:?} {tags:?}"
+    );
+    let save_version = horde_core::sim::SAVE_VERSION;
+    let mut violations = save_doc_violations(
+        &read_workspace_file(SAVE_DOC),
+        save_version,
+        &steps,
+        &fixtures,
+        &pins,
+        &tags,
+    );
+    violations.extend(architecture_version_violations(
+        &read_workspace_file("docs/ARCHITECTURE.md"),
+        save_version,
+        horde_core::sim::RULESET_VERSION,
+        crate::settings::SETTINGS_VERSION,
+    ));
+    assert!(
+        violations.is_empty(),
+        "the save docs are out of date ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap() {
+    assert_eq!(
+        migration_steps("fn v1_to_v2(x) {}\n    fn v2_to_v3(mut v: Value)\nfn v3_level(k)\n"),
+        vec![(1, 2), (2, 3)]
+    );
+    assert_eq!(
+        pin_constants(
+            "const GOLDEN: [u64; 6] = [];\nconst TICKS: u32 = 1;\n\
+             const V1_CONTINUATION_FNV: u64 = 1;\nconst V2_CONTINUATION: [&str; 6] = [];\n\
+             \x20   const NESTED_FNV: u64 = 2;\nconst V7_FIXTURE_BYTES: usize = 3;\n\
+             const PROVISIONAL: Option<u64> = None;\n"
+        ),
+        vec![
+            "GOLDEN",
+            "V1_CONTINUATION_FNV",
+            "V2_CONTINUATION",
+            "V7_FIXTURE_BYTES"
+        ]
+    );
+    assert_eq!(
+        keyed_tags(
+            "pub(crate) const NOT_A_TAG: u64 = 0;\npub(crate) mod tags {\n\
+             \x20   pub(crate) const QUALITY: u64 = 1;\n    pub(crate) const ELITE: u64 = 2;\n}\n\
+             pub(crate) const AFTER: u64 = 3;\n"
+        ),
+        vec!["QUALITY", "ELITE"]
+    );
+    let doc = "The envelope is\ncurrently v3.\n## Save format 7\nv1→v2, `save_v1.json`\n\
+               ## Determinism pins\n`GOLDEN`\n## Other\n`ELITE`\n";
+    let violations = save_doc_violations(
+        doc,
+        3,
+        &[(1, 2), (2, 3)],
+        &["save_v1.json".to_owned(), "save_v2.json".to_owned()],
+        &["GOLDEN".to_owned(), "V7_CONTINUATION_FNV".to_owned()],
+        &["ELITE".to_owned()],
+    );
+    assert_eq!(
+        violations,
+        vec![
+            format!("{SAVE_DOC}: \"## Save format 7\" does not name v2→v3"),
+            format!("{SAVE_DOC}: \"## Save format 7\" does not name `save_v2.json`"),
+            format!("{SAVE_DOC}: \"## Determinism pins\" does not name `V7_CONTINUATION_FNV`"),
+            format!("{SAVE_DOC}: missing \"## Keyed rolls and RNG streams\""),
+        ]
+    );
+    assert_eq!(
+        save_doc_violations("", 4, &[(1, 2)], &[], &[], &[])[..2],
+        [
+            format!("{SAVE_DOC}: does not say \"the envelope is currently v4\""),
+            format!("{SAVE_MIGRATIONS}: the chain [(1, 2)] does not end at SAVE_VERSION 4"),
+        ]
+    );
+    assert_eq!(
+        architecture_version_violations(
+            "envelope **v7** (`SAVE_VERSION`), `RULESET_VERSION` 4, `SETTINGS_VERSION` 1",
+            7,
+            4,
+            2
+        ),
+        vec!["docs/ARCHITECTURE.md: does not say \"`SETTINGS_VERSION` 2\"".to_owned()]
     );
 }
