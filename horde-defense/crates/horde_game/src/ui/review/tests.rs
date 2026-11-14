@@ -282,6 +282,8 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("storm", Screen::Battle, None),
     // Closing phase: the W3-14 boss banner.
     ("boss-warning", Screen::Battle, None),
+    // Closing phase: the W3-25 expedition toasts.
+    ("camp-reports", Screen::Camp, Some(Tab::Home)),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1597,6 +1599,49 @@ fn boss_warning_motion_export_starts_on_the_warning_tick() {
         .map(|k| (due + 4 * k, Some(due)))
         .collect();
     assert_eq!(frames, expected);
+}
+
+/// W3-25's expedition notices get a deterministic capture: the camp-reports
+/// still is Camp home with two settled expeditions the player has not
+/// acknowledged and a folded count, so its first frame toasts both outcome
+/// lines and the folded summary (three toasts, the whole visible stack).
+#[test]
+fn camp_reports_still_toasts_two_outcomes_and_the_folded_count() {
+    assert_eq!(
+        review_scenes::lookup("camp-reports"),
+        Some(review_scenes::SceneKind::Still),
+        "camp-reports is a registered still"
+    );
+    let mut f = staged("camp-reports");
+    assert!(f.screen == Screen::Camp, "staged {:?}", f.screen);
+    assert_eq!(f.nav.tab, Tab::Home);
+    assert!(f.game.global_paused(), "the world clock is held");
+    let outcomes = f.game.unacknowledged_outcomes();
+    assert_eq!(outcomes.notices.len(), 2, "two settled outcomes");
+    assert_eq!(outcomes.folded, fixtures::production::CAMP_REPORTS_FOLDED);
+    let lines: Vec<String> = outcomes
+        .notices
+        .iter()
+        .map(|notice| {
+            crate::ui::expedition_notices::outcome_line(
+                &notice.recruit_name,
+                &notice.country_name,
+                &notice.summary,
+            )
+        })
+        .collect();
+    assert_ne!(lines[0], lines[1], "two recruits, two lines");
+    let output = one_frame(&mut f);
+    let painted = painted_text(&output);
+    for line in &lines {
+        assert!(painted.contains(line), "{line:?} in {painted:?}");
+    }
+    let folded = format!(
+        "{} more expedition outcomes · Operations",
+        fixtures::production::CAMP_REPORTS_FOLDED
+    );
+    assert!(painted.contains(&folded), "{folded:?} in {painted:?}");
+    assert_eq!(f.status.toasts.len(), 3, "the whole visible stack");
 }
 
 /// W2-28's close capture (CF-2-04) needs a spitter winding up at its reach:

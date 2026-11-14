@@ -264,6 +264,14 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
         motion: true,
         ..wave3_still("boss-warning", "ux-flow", "boss", None)
     },
+    // Closing phase (R36): the W3-25 expedition toasts, which no other still
+    // shows: two settled outcomes and a folded count on Camp home.
+    wave3_still(
+        "camp-reports",
+        "ux-flow",
+        "active-camp",
+        Some("Go to briefing"),
+    ),
 ];
 
 /// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
@@ -346,6 +354,13 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
         "the paused warning tick: BOSS APPROACHING with the boss name and its countdown at \
          full strength in both modes, top-centre of the field, clear of the HUD and the pause \
          banner; the sidecar's boss_banner_rect is the drawn banner",
+    ),
+    row(
+        "camp-reports",
+        "W3-25, closing",
+        "Camp home with three expedition toasts top-right: the two recruits' Czech Republic \
+         outcomes with their coins and \"3 more expedition outcomes · Operations\"; the same \
+         two lines under Recent reports, amber Go to briefing",
     ),
     // Their "before" scenes.
     row(
@@ -658,9 +673,10 @@ mod tests {
         }
     }
     /// The six W3-27 stills, then the closing phase's boss-warning (the
-    /// W3-14 banner), the one wave-3 still a motion export also takes.
+    /// W3-14 banner), the one wave-3 still a motion export also takes, and
+    /// camp-reports (the W3-25 expedition toasts).
     #[test]
-    fn wave3_registers_its_7_stills_with_wave0_before_proxies() {
+    fn wave3_registers_its_8_stills_with_wave0_before_proxies() {
         let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
         assert_eq!(
             wave3.iter().map(|scene| scene.name).collect::<Vec<_>>(),
@@ -672,6 +688,7 @@ mod tests {
                 "results-liberation-recruit",
                 "takeover-battle",
                 "boss-warning",
+                "camp-reports",
             ]
         );
         for scene in &wave3 {
@@ -717,7 +734,7 @@ mod tests {
     fn wave3_matrix_holds_every_wave3_still_and_its_before_scene() {
         let listed = |name: &str| WAVE3_MATRIX.iter().any(|row| row.scene == name);
         let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
-        assert_eq!(wave3.len(), 7);
+        assert_eq!(wave3.len(), 8);
         for scene in wave3 {
             assert!(listed(scene.name), "{} is not in the matrix", scene.name);
             let proxy = scene.before_proxy.expect("a before proxy");
@@ -801,7 +818,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 3 + 7 + 3
+            46 + 13 + 3 + 8 + 3
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

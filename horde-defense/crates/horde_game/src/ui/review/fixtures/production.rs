@@ -7,7 +7,8 @@
 //! only inside top-level `entitle_*` helpers (the start country, coins,
 //! experience, earlier stage clears, inventory grants, the boss-phase
 //! clock and wound, the boss-warning clock, liberated countries, an
-//! outbreak, a run's drops and the final boss at one hit point; the
+//! outbreak, folded expedition outcomes, a run's drops and the final boss at
+//! one hit point; the
 //! boss-warning still's banner age is presentation state, not game state);
 //! `repo_checks::production_fixtures_stage_features_through_commands`
 //! enforces it for this file only. One exception, sanctioned by
@@ -108,6 +109,7 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "spitter-windup" => prepare_spitter_windup(f),
         "upgrades" => prepare_upgrades(f),
         "camp-home" => prepare_camp_home(f),
+        "camp-reports" => prepare_camp_reports(f),
         "briefing-recruit" => prepare_briefing_recruit(f),
         "equipment-autosell" => prepare_equipment_autosell(f),
         "results-liberation-recruit" => prepare_results_liberation_recruit(f),
@@ -248,6 +250,12 @@ fn entitle_liberated(f: &mut FrontendParts, countries: &[&str]) {
         }
         campaign.world.country_levels.insert((*id).into(), stages);
     }
+}
+/// `count` expedition outcomes folded into the pruning count, as pruning
+/// folds an unacknowledged outcome once the battle list is over its cap.
+fn entitle_folded_outcomes(f: &mut FrontendParts, count: u32) {
+    let strategy = f.game.staging().strategy();
+    strategy.folded_outcomes = strategy.folded_outcomes.saturating_add(count);
 }
 /// An active outbreak in liberated `country`, by the strategy layer's own
 /// rule (its strength is the draw the world clock would make).
@@ -728,6 +736,9 @@ pub(in crate::ui::review) const OUTBREAK_COUNTRY: &str = "FRA";
 const UPGRADES_TICK_CAP: u32 = 60 * 300;
 /// The camp-home expedition fights for twenty seconds before the still.
 const EXPEDITION_TICKS: u32 = 60 * 20;
+/// The camp-reports outcomes pruning folded into one count (an entitlement:
+/// folding needs more settled expeditions than the battle cap keeps).
+pub(in crate::ui::review) const CAMP_REPORTS_FOLDED: u32 = 3;
 
 /// The Upgrades screen after a first round: the journey-upgrades round (a real
 /// stage-0 defense played with the smoke input, withdrawn if it outlasts
@@ -792,6 +803,59 @@ fn prepare_camp_home(f: &mut FrontendParts) {
         f.game.tick(Input::default());
     }
     entitle_outbreak(f, OUTBREAK_COUNTRY);
+    command(f, Command::SelectCountry(SECOND_FRONT.into()));
+    pause(f);
+    f.campaign.selected_country = SECOND_FRONT.into();
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Home;
+}
+
+/// Camp home with expedition outcomes to announce (W3-25, closing): two
+/// recruits sent to the expedition front through `Command::DeploySurvivor`
+/// fight for `EXPEDITION_TICKS` and are recalled through
+/// `Command::RecallSurvivor` (one that settled on its own stays settled), so
+/// two settled outcomes wait unacknowledged beside `CAMP_REPORTS_FOLDED`
+/// folded ones (an entitlement). The next front is chosen, so the primary is
+/// Go to briefing; the first frame toasts all three notices.
+fn prepare_camp_reports(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    entitle_liberated(f, &["DEU", OUTBREAK_COUNTRY, "CHE", "AUT"]);
+    for feature in [
+        CampaignFeature::Companion,
+        CampaignFeature::Recruitment,
+        CampaignFeature::Parallel,
+    ] {
+        learn_feature(f, feature);
+    }
+    let scouts = [recruit(f, "DEU"), recruit(f, OUTBREAK_COUNTRY)];
+    let battles = scouts.map(|id| {
+        let CommandOutcome::Id(battle) = command(
+            f,
+            Command::DeploySurvivor {
+                id,
+                country: EXPEDITION_FRONT.into(),
+                stage: 0,
+            },
+        ) else {
+            panic!("DeploySurvivor answers the expedition's id");
+        };
+        battle
+    });
+    command(f, Command::SetPaused(false));
+    for _ in 0..EXPEDITION_TICKS {
+        f.game.tick(Input::default());
+    }
+    for battle in battles {
+        let live = f
+            .game
+            .battles()
+            .iter()
+            .any(|b| b.id == battle && !b.settled);
+        if live {
+            command(f, Command::RecallSurvivor(battle));
+        }
+    }
+    entitle_folded_outcomes(f, CAMP_REPORTS_FOLDED);
     command(f, Command::SelectCountry(SECOND_FRONT.into()));
     pause(f);
     f.campaign.selected_country = SECOND_FRONT.into();
