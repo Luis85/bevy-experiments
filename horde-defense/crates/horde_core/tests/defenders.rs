@@ -2455,11 +2455,13 @@ fn mode_owner_digest() -> u64 {
 /// Re-recorded at W4-14 (gameplay, class G): Mara's runs aim only when the
 /// aim raises her expected hits per turn, so her turns move; with the old
 /// aim test the W2-54 digest returns, and the takeover code did not move.
+/// Re-recorded again at W4-14 (gameplay, class G): `npc_arrival_factor`
+/// 0.9 -> 0.5 halves Mara's arrivals; the takeover code did not move.
 #[test]
 fn mode_owner_paths_are_byte_identical() {
     assert_eq!(mode_owner_digest(), MODE_OWNER_DIGEST);
 }
-const MODE_OWNER_DIGEST: u64 = 10_179_632_170_315_995_650;
+const MODE_OWNER_DIGEST: u64 = 16_184_185_487_238_931_661;
 
 /// Pin: Mara's `attempts` count moves exactly as the legacy
 /// `finish_attempt` moved it: one per finished Mara run of any outcome,

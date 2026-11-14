@@ -275,7 +275,7 @@
     "npc_health_per_level": 0.35,
     "price_per_level": 0.05
   },
-  "npc_arrival_factor": 0.9,
+  "npc_arrival_factor": 0.5,
   "population_base": 72,
   "population_per_rank": 2,
   "population_cap": 145,

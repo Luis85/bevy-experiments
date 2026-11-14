@@ -132,7 +132,8 @@
 //! and as a recruit taking the main run over (Npc mode), at threat rank 12
 //! for 3600 ticks (`support::progressed_determinism_game`; its doc comment
 //! lists what is staged and what is played through `Game::apply`). The
-//! attempt clock starts 1800 ticks before the boss, so each window holds
+//! attempt clock starts 1800 ticks before the boss (3000 for the takeovers
+//! since W4-14, which halved the Npc arrivals), so each window holds
 //! elites, the new archetypes, the boss and its phases, and the settlement
 //! of the win. They were cut at the wave-4 close, after W4-08, so they hold
 //! every wave-4 rule. They follow the same ledger: a commit that moves one
@@ -217,31 +218,40 @@ const TRACE_RULESET: u32 = 4;
 const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
     [
         0xbed5_e271_4b65_90fe,
-        0xe815_cc4d_881f_ed01,
+        0x6134_1ecf_1c42_2fd8,
         0x3368_f180_97f7_fb5e,
-        0xfcfc_e341_32d9_4df1,
+        0x0118_059a_899f_b437,
         0x7be5_c84d_229d_8d71,
-        0xb5d7_f191_00a3_adf9,
+        0x7a66_2cd4_a007_adc2,
     ],
     [
         0xa6ca_a6de_7fd9_2b1a,
-        0x7c7a_9611_4e5a_81e3,
+        0x77ce_c201_9601_4f8d,
         0x5cc8_bde4_faf0_9763,
-        0x86f4_1f0c_9bb0_d3f2,
+        0x1fb8_dfb5_f912_48c7,
         0x46a2_adc6_720f_8678,
-        0x3f07_e12b_9cf2_9264,
+        0x6fed_c1ce_190a_b8e3,
     ],
 ));
 
 /// Why `PROVISIONAL` moved: `(commit tag, class, reason)`, one per moving
 /// commit. Empty exactly when `PROVISIONAL` is None.
-const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[(
-    "W4-14 aim",
-    MoveClass::G,
-    "the three Npc runs: Mara (Balanced) no longer aims at effective skill 10-13, where two \
+const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
+    (
+        "W4-14 aim",
+        MoveClass::G,
+        "the three Npc runs: Mara (Balanced) no longer aims at effective skill 10-13, where two \
      unaimed shots land more expected hits than one aimed shot, so her turns, shots and \
      kills move; the three Personal runs are unchanged",
-)];
+    ),
+    (
+        "W4-14 arrival",
+        MoveClass::G,
+        "the three Npc runs: `npc_arrival_factor` 0.9 -> 0.5 halves the Npc arrival multiplier, so \
+     the director spawns about half the hostiles (seed 1 at t1800: 4 spawned, 4 kills); the \
+     three Personal runs are unchanged",
+    ),
+];
 
 /// The seeds of the progressed runs.
 const PROGRESSED_SEEDS: [u64; 2] = [1, 0xDEAD_BEEF_2026];
@@ -288,26 +298,36 @@ const PROGRESSED_TRACE: [(u64, ProgressedRun, u64); 4] = [
 const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = Some((
     [
         0x1725_164d_48e7_8d12,
-        0xd93e_9115_3c7e_753d,
+        0xdde4_3342_3062_ecf2,
         0x9169_7e75_2793_cfc0,
-        0x3e4c_4fdc_1bcd_0da9,
+        0x7a68_7210_c8ca_9e1a,
     ],
     [
         0x209f_0b4c_6c60_a4aa,
-        0xa3a4_fbe6_33a3_9c59,
+        0x6214_0267_8e7c_b553,
         0xcaea_9c90_4c7b_2910,
-        0x643b_fdd7_d846_71f7,
+        0xe7f5_5c2e_b155_6d72,
     ],
 ));
 
 /// Why `PROGRESSED_PROVISIONAL` moved: `(commit tag, class, reason)`.
-const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[(
-    "W4-14 aim",
-    MoveClass::G,
-    "the two recruit takeovers (Npc rules): the recruit aims only when the aim raises its \
+const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
+    (
+        "W4-14 aim",
+        MoveClass::G,
+        "the two recruit takeovers (Npc rules): the recruit aims only when the aim raises its \
      expected hits per turn, so its turns and kills \
      move; both still win; the two Hard Capstone runs are unchanged",
-)];
+    ),
+    (
+        "W4-14 arrival",
+        MoveClass::G,
+        "the two recruit takeovers: `npc_arrival_factor` 0.9 -> 0.5 halves their arrivals, so their \
+     window starts earlier (`PROGRESSED_TAKEOVER_BOSS_LEAD` 3000 ticks before the boss, not 1800) \
+     to keep an elite, the new archetypes and the boss phase in it (48 and 52 spawned, 61 and 54 \
+     at W4-09); both still win; the Hard Capstone runs are unchanged",
+    ),
+];
 
 /// The archetypes wave 2 appended (W2-31: six and the splitter's child).
 /// They enter at wave tier 5, so no `GOLDEN` run meets one.

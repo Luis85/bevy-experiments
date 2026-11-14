@@ -74,7 +74,16 @@ fn withdrawal_outside_a_tick_is_still_delivered() {
 fn window_events_share_their_stream_sequence_number() {
     let mut g = game(Mode::Npc);
     enemy(&mut g, 5, 8.0, false);
-    let records = ticks(&mut g, 240);
+    enemy(&mut g, 4, 29.0, false);
+    let mut records = ticks(&mut g, 240);
+    // Since the Npc arrival factor fell to 0.5 (W4-14) no director spawn is
+    // sure to be in the window at tick 240, so play on to the next event.
+    for _ in 0..600 {
+        if !g.attempt().unwrap().events.is_empty() {
+            break;
+        }
+        records.extend(ticks(&mut g, 1));
+    }
     let a = g.attempt().unwrap();
     assert!(!a.events.is_empty());
     for event in &a.events {

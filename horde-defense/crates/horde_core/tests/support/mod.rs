@@ -186,6 +186,10 @@ pub const PROGRESSED_TICKS: u32 = 3600;
 /// so the window holds the late wave, the boss, its phases and (when the
 /// defender wins) the settlement.
 pub const PROGRESSED_BOSS_LEAD: u64 = 1800;
+/// The recruit takeover's lead (W4-14): the Npc rules meet half the
+/// arrivals since the Npc arrival factor fell to 0.5, so its window starts
+/// earlier to keep an elite, the new archetypes and the boss in it.
+pub const PROGRESSED_TAKEOVER_BOSS_LEAD: u64 = 3000;
 /// The coins the progressed campaigns are staged with before they shop.
 pub const PROGRESSED_PURSE: u64 = 400_000;
 /// The liberated countries (three stages each) the campaigns are staged with:
@@ -339,7 +343,10 @@ pub fn progressed_determinism_game_at(seed: u64, run: ProgressedRun, rank: u64) 
     }
     let a = g.staging().attempt().expect("deployed");
     let boss_tick = (a.boss_time() * TICKS_PER_SECOND as f32).ceil() as u64;
-    a.tick = boss_tick.saturating_sub(PROGRESSED_BOSS_LEAD);
+    a.tick = boss_tick.saturating_sub(match run {
+        ProgressedRun::HardCapstone => PROGRESSED_BOSS_LEAD,
+        ProgressedRun::RecruitTakeover => PROGRESSED_TAKEOVER_BOSS_LEAD,
+    });
     g
 }
 

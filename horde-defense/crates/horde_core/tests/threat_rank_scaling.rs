@@ -413,4 +413,8 @@ fn ranks_zero_to_four_snapshot_pinned() {
 }
 
 /// FNV-1a of [`ranks_zero_to_four_lines`], recorded on the parent of W2-32.
-const RANKS_ZERO_TO_FOUR_FNV: u64 = 1_345_734_136_285_417_498;
+/// Re-recorded at W4-14: `npc_arrival_factor` 0.9 -> 0.5 moves only the Npc
+/// lines' `arrival_multiplier` (0.9 -> 0.5 at rank 0, 1.04 x 0.5 at rank 4,
+/// times the front ramp); every Personal line and every other field is as
+/// before.
+const RANKS_ZERO_TO_FOUR_FNV: u64 = 13_936_077_321_097_186_079;
