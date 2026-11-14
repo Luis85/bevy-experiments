@@ -277,7 +277,7 @@ function Test-PackageIntegrity {
 function Test-PlaytestManifest {
     # The manifest v2 rules beyond integrity: version 2, a 40-digit commit, the stamp that commit gives, the
     # workspace's game version, a features list, docs equal to curated_docs and at most 65,536 B, a docs folder
-    # without dead links, and nothing from archive\. Returns one line per problem.
+    # without dead links, and nothing from archive\ or docs\audio\. Returns one line per problem.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]$Manifest,
@@ -314,6 +314,8 @@ function Test-PlaytestManifest {
     foreach ($entry in @($Manifest.files)) {
         $path = ([string]$entry.path).ToLowerInvariant()
         if ($path.StartsWith('archive/') -or $path.Contains('/archive/')) { $problems.Add("archived file in the package: $($entry.path)") }
+        # The v1 audition reel stays in the source tree only (ruling S19, W7-03).
+        if ($path.StartsWith('docs/audio/')) { $problems.Add("audition reel in the package: $($entry.path)") }
     }
     foreach ($dead in @(Test-DocLinkClosure -PackageRoot $PackageRoot)) { $problems.Add("dead doc link: $dead") }
     return $problems.ToArray()

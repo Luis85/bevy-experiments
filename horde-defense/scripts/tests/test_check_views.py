@@ -1,4 +1,4 @@
-"""Self-tests for scripts/check_views.py's check_architecture, on a throwaway workspace.
+"""Self-tests for scripts/check_views.py's check_architecture and check_doc_links, on a throwaway workspace.
 
 Run: python -I -B scripts/tests/test_check_views.py
 """
@@ -103,6 +103,68 @@ class CheckArchitectureTests(unittest.TestCase):
         bare = "| `art/camera.rs` | The camera | Rules | `fit_field` | `field_fits_the_window` |\n"
         self.assertEqual(["ARCHITECTURE.md: row names no module or file: art/camera.rs"],
                          self.errors(CORE_ROW + self.ART_ROW + GAME_ROW + bare))
+
+
+GATE = "A 60 s mix at default sliders reads **-23 ±2 LUFS integrated** with **true peak ≤ 0.95 FS**.\n"
+
+
+class CheckDocLinksTests(unittest.TestCase):
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.workspace = Path(self._directory.name).resolve()
+        self.write("scripts/package_playtest.ps1", "$CuratedDocs = @('PLAYTEST_GUIDE.md')\n")
+        self.write("docs/audio/survival-audition.wav", "RIFF")
+        self.write("docs/JOURNEYS.md", "# Journeys\n")
+        self.write("docs/PLAYTEST_GUIDE.md", "# Guide\n")
+        for name in check_views.LOUDNESS_GATE_DOCS:
+            self.write(name, "# Gate\n\n" + GATE)
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def write(self, name: str, text: str):
+        path = self.workspace / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def errors(self) -> list[str]:
+        return check_views.check_doc_links(self.workspace)[1]
+
+    def test_existing_web_and_anchor_links_pass(self):
+        self.write("docs/GDD.md", "See [journeys](JOURNEYS.md#loop), [web](https://example.com/x.md),\n"
+                                  "[top](#top), [mail](mailto:a@b.c) and [again](plans/../JOURNEYS.md).\n")
+        self.assertEqual([], self.errors())
+        self.assertEqual(2, check_views.check_doc_links(self.workspace)[0])
+
+    def test_a_dead_relative_link_is_an_error(self):
+        self.write("docs/GDD.md", "# GDD\nSee [gone](GONE.md).\n")
+        self.assertEqual(["docs/GDD.md:2: dead link 'GONE.md'"], self.errors())
+
+    def test_links_inside_code_are_not_links(self):
+        self.write("docs/GDD.md", "Inline `[a](GONE.md)` code.\n```\n[b](GONE.md)\n```\n")
+        self.assertEqual([], self.errors())
+
+    def test_no_doc_links_the_v1_audition_reel(self):
+        self.write("docs/AUDIO.md", "Hear [the reel](audio/survival-audition.wav).\n")
+        self.assertEqual(["docs/AUDIO.md:1: links the v1 audition reel in docs/audio/, which is never packaged: "
+                          "'audio/survival-audition.wav'"], self.errors())
+
+    def test_a_packaged_doc_names_nothing_in_docs_audio(self):
+        self.write("docs/PLAYTEST_GUIDE.md", "# Guide\nListen to docs/audio/survival-audition.wav.\n")
+        self.assertEqual(["docs/PLAYTEST_GUIDE.md:2: the playtest package leaves out docs/audio/; "
+                          "a packaged doc names nothing there"], self.errors())
+        # The same words in a doc the package does not ship are fine.
+        self.write("docs/PLAYTEST_GUIDE.md", "# Guide\n")
+        self.write("docs/JOURNEYS.md", "The v1 reel is docs/audio/survival-audition.wav.\n")
+        self.assertEqual([], self.errors())
+
+    def test_each_gate_doc_records_the_loudness_gate(self):
+        name = check_views.LOUDNESS_GATE_DOCS[0]
+        self.write(name, "# Gate\n\n-16 to -14 LUFS.\n")
+        self.assertEqual([f"{name}: does not record the loudness gate "
+                          "('-23 ±2 LUFS integrated' and 'true peak ≤ 0.95 FS')"], self.errors())
+        (self.workspace / name).unlink()
+        self.assertEqual([f"{name}: missing (it records the loudness gate)"], self.errors())
 
 
 if __name__ == "__main__":

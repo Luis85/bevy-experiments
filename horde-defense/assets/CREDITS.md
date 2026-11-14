@@ -124,8 +124,13 @@ dimensions, SHA-256, peak, true peak, loudness and limiter gain reduction; the
 v1 manifest it replaced is kept verbatim as
 `archive/audio/SURVIVAL_PROVENANCE.v1.json`.
 The six Python-synthesized beds and their notices remain intact; the twelve
-earlier one-shot WAVs are archived (see above). See
-`docs/AUDIO_SURVIVAL.md` for the mix, export checks and audition reel.
+earlier one-shot WAVs are archived (see above). No runtime limiter or
+music track is shipped; the mix is calibrated to -23 LUFS at the default
+sliders. The v1 audition reel (pre-production-pass, survival-audition.wav and .csv in
+the source repository's docs/audio folder) is an original export of the v1
+library; it is not shipped. See
+`docs/AUDIO_SURVIVAL.md` in the source repository for the buses, the mix, the
+loudness gate and the export checks.
 
 The survivor-selection pass adds `art/pixel/keyart-v2.png`, an original ImageGen
 edit removing the baked foreground hero from the original pixel menu scene,

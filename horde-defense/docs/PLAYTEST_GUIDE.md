@@ -135,13 +135,40 @@ Keep your ordinary campaign intact and use practice or a separate `LASTLIGHT_SAV
 
 1. Set combat effects to zero and leave Atmosphere audible. Listen for low wind, distant urban detail or daytime nature, with rain/cold air only where the scene supports it. Watch for an obvious repeat boundary over several loops.
 2. Set Atmosphere to zero and restore combat effects. Compare the six legal firearm classes, watch Mara fire, and trigger a turret, trap, grenade blast and Molotov fire. Check that their timbres communicate the source without implying another hit roll or injury. An absorbed hit should differ from health damage.
-3. Pause during a scene transition, open settings, and change both buses. Authoritative combat and strategic clocks remain frozen. Cosmetic ambience may continue more quietly; its fade cannot generate resources or advance recovery. Reduced-effects settings should not silently override your audio levels.
+3. Pause during a scene transition, open settings, and change the audio sliders. Authoritative combat and strategic clocks remain frozen. Cosmetic ambience may continue more quietly; its fade cannot generate resources or advance recovery. Reduced-effects settings should not silently override your audio levels.
 4. Mute Master while a cue is playing, then unmute. Check for complete silence, no delayed burst from a clip that was still loading, and a gentle ambient return. At normal levels, wind and rain should remain behind danger cues and visible enemy windups.
 5. Observe one parallel expedition, then close its observation window. Ordinary fire from every off-screen survivor should not become a wall of sound. Boss/structure alerts still need to be recognizable when relevant to the campaign.
 
-For an offline comparison, listen to the v1 survival audition reel (pre-production-pass), docs/audio/survival-audition.wav in the source repository, and follow its cue timeline, docs/audio/survival-audition.csv. It predates the current library and still plays the retired NpcShot family at 4.81 s. The audio guide (docs/AUDIO_SURVIVAL.md in the source repository) documents the 69 original WAV variations and mixer limits. This reel bypasses the in-game mix and is not a substitute for device listening during combat.
+The audio guide (AUDIO_SURVIVAL.md in the source repository) documents the 275 survival files, the buses, the mix table and the loudness gate. This package ships no audition reel; listen in the game.
 
-Record the country, local stage, weather/lighting tags, defender, master/effects/atmosphere values and whether you used speakers or headphones. File/header checks do not establish listening quality; report masking, repetition or a missing source cue as a playtest result.
+Record the country, local stage, weather/lighting tags, defender, the five audio slider values, the Mono audio setting and whether you used speakers or headphones. File/header checks do not establish listening quality; report masking, repetition or a missing source cue as a playtest result.
+
+## Listening pass
+
+Status: **PENDING** (no human listening pass has been logged for the production-pass mix). The mix is measured offline at -23 ±2 LUFS integrated with true peak at most 0.95 FS at the default sliders; that number does not say how it sounds on your device, which is what this pass checks.
+
+Play one ordinary battle of a few minutes at the default sliders (Master 0.8, Combat effects 0.8, Atmosphere 0.8, Music & stingers 0.7, Interface sounds 0.7), then repeat it with Mono audio on. Listen for:
+
+1. Each firearm class, the turret and the reloads: distinct, never one repeated sample, and no click or clip on a dense volley.
+2. Enemy windups and contacts under a crowd: still audible over gunfire, and always matched by the windup ring or aim line on screen.
+3. A boss arrival and phase: the atmosphere dips under the cue and comes back; the phase label and ring show for the whole hold.
+4. Victory, defeat or withdrawal: one stinger, not cut off, at a level that fits the battle.
+5. The bed against gunfire: wind, rain or city stays behind the guns and warnings and does not sound too forward.
+6. Lane pan: a far-right cue sits a little to the right, and nothing drops out with Mono audio on.
+7. Results and the armory: one loot reveal, one coin sound per sale batch, no sound on hover.
+
+Log one entry per session:
+
+| Field | Value |
+|---|---|
+| Date and build stamp (main menu or `--version`) | |
+| Device: speakers or headphones, and their model | |
+| Output: OS volume and any system effects (spatial sound, loudness equalisation) | |
+| Sliders: Master / Combat effects / Atmosphere / Music & stingers / Interface sounds | |
+| Mono audio: on or off | |
+| Reduced effects: on or off | |
+| Country, stage, weather and defender | |
+| Findings: masking, repetition, harshness, level, pan | |
 
 ## Reporting a bug with a recording
 

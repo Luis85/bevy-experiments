@@ -45,6 +45,10 @@ The later user requests extend the GDD. World validation covers country IDs, pop
 
 Strategic tests cover independent recruited equipment, exclusive survivor roles and equipment reservations, seeded continuation, containment idempotency, and failure reopening a country without free coins. Guard combat is a documented scenario adapter using the shared rules resolver; each guard and each active hostile group receive one action at their own legal one-second boundary. Parallel battle ownership and live reward merging belong to the simulation suite. No offline rewards or pressure are implemented.
 
+## Audio loudness gate
+
+A 60 s mix at default sliders reads **-23 ±2 LUFS integrated** with **true peak ≤ 0.95 FS** (user decision U3, production-pass acceptance G8.5; it replaces the brief's -16 to -14 LUFS). Evidence: `reference_mixed_60s_meets_loudness_gate` on the stage-1 dry and rain beds and `dense_battle_60s_true_peak_at_most_0_95`, both in `crates/horde_audio/tests/offline_mix.rs` and run by the normal workspace tests. At A6-17 the reference mix read -24.2 / -22.9 LUFS (true peak 0.405 / 0.399) and the dense battle's true peak 0.875; no runtime master limiter is used (R3). The numbers are those of the offline render of the shipped library under the runtime policy, not of a device: the listening pass below is the human check. See [AUDIO_SURVIVAL.md](AUDIO_SURVIVAL.md).
+
 ## Pending human checks
 
 These have no automated substitute and do not block a wave. The performance gates themselves live in `docs/PERF_BUDGET.json`.
@@ -55,6 +59,7 @@ These have no automated substitute and do not block a wave. The performance gate
 | Camera feel: a 3x12 field at 2.5x zoom | Play the first defense (3 lanes x 12 yards, zoom 2.5, so on-screen enemy speed rises 2.5x) at 1440x900 and 1050x700@1.35, and judge whether the zoomed field reads and plays well. | pending human check |
 | Sheet upscale on 3-lane sprites at 2.5x | Inspect the intro and intro-small stills of a `capture_review.ps1` run and the 3x12 `weapon-classes` stills for blur, shimmer or uneven texels in the 2.5x sprites. | pending human check |
 | Stepped damage pop (W1-64) | Watch damage numbers in a live battle at 60 fps in normal mode at 1440x900 and 1050x700@1.35 (and `target/production-after/w1-64/damage-motion` and `damage-motion-small`): the punch now steps through x0.85 / 1.0 / 1.15 / 1.3 instead of scaling continuously, so judge whether it still reads as a pop. | pending human check |
+| Listening pass (W7-03) | Follow PLAYTEST_GUIDE.md "Listening pass" on a packaged build at the default sliders, then once with Mono audio: weapon classes, warnings under a crowd, stingers and ducking, the bed against gunfire. Record the device, the five slider values and the Mono audio setting with each finding. The -23 LUFS gate above is measured offline and does not stand in for it. | pending human check |
 | Whole-pixel text placement (W1-64) | Every font face now places glyphs on whole pixels (no subpixel bins). Compare the menu, battle and leveled-armory stills of `target/production-after/w1-64/text-subpixel-on-b` (subpixel bins on) with `text-after` at 1440x900 and 1050x700@1.35, then read body text on those screens live at 1050x700@1.35, and judge whether letter spacing looks uneven. | pending human check |
 
 ## Explicit limits

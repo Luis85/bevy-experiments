@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import sys
+from urllib.parse import unquote
 
 
 def check(workspace: Path) -> tuple[int, list[str]]:
@@ -195,13 +196,91 @@ def check_architecture(workspace: Path) -> tuple[int, list[str]]:
     return len(required), errors
 
 
+# An inline Markdown link's target, as `](target)` or `](<target>)`, with an optional title after it.
+INLINE_LINK = re.compile(r"\]\(\s*<?([^)\s>]+)>?[^)]*\)")
+# An inline code span; links inside one are text.
+CODE_SPAN = re.compile(r"`+[^`]*`+")
+# The v1 audition reel (pre-production-pass), kept in place by ruling S19 and never packaged.
+AUDITION_DIRECTORY = "docs/audio"
+# The docs that record the loudness gate (user decision U3, acceptance G8.5, W7-03).
+LOUDNESS_GATE_DOCS = ("docs/ACCEPTANCE.md", "docs/AUDIO_SURVIVAL.md", "docs/plans/2026-11-05-production-pass.md")
+LOUDNESS_GATE_PHRASES = ("-23 ±2 LUFS integrated", "true peak ≤ 0.95 FS")
+
+
+def curated_docs(workspace: Path) -> list[str]:
+    """The docs the playtest package ships, relative to docs/, read from
+    package_playtest.ps1's `$CuratedDocs = @(...)` line (repo_checks pins the
+    same list)."""
+    script = workspace / "scripts/package_playtest.ps1"
+    if not script.is_file():
+        return []
+    match = re.search(r"^\$CuratedDocs\s*=\s*@\(([^)]*)\)", script.read_text(encoding="utf-8-sig"), re.MULTILINE)
+    return re.findall(r"'([^']+)'", match.group(1)) if match else []
+
+
+def _prose_lines(text: str):
+    """(line number, line) of every line outside a fenced block, with inline
+    code spans removed."""
+    fenced = False
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            continue
+        if not fenced:
+            yield number, CODE_SPAN.sub("", line)
+
+
+def check_doc_links(workspace: Path) -> tuple[int, list[str]]:
+    """Every relative inline link in docs/**/*.md resolves to a file or folder
+    that exists; no doc links into docs/audio/ (the v1 audition reel, which
+    is never packaged); a doc the playtest package ships names nothing in
+    docs/audio/; and each of LOUDNESS_GATE_DOCS records the -23 LUFS gate.
+    Web, mailto and in-page links are not checked. Returns the number of
+    relative links and the errors."""
+    errors: list[str] = []
+    links = 0
+    audition = (workspace / AUDITION_DIRECTORY).resolve()
+    shipped = {f"docs/{name}" for name in curated_docs(workspace)}
+    for path in sorted(workspace.glob("docs/**/*.md")):
+        name = path.relative_to(workspace).as_posix()
+        text = path.read_text(encoding="utf-8-sig")
+        for number, line in _prose_lines(text):
+            if name in shipped and AUDITION_DIRECTORY + "/" in line:
+                errors.append(f"{name}:{number}: the playtest package leaves out {AUDITION_DIRECTORY}/; "
+                              "a packaged doc names nothing there")
+            for target in INLINE_LINK.findall(line):
+                if re.match(r"(?i)(https?:|mailto:)", target) or target.startswith("#"):
+                    continue
+                links += 1
+                resolved = (path.parent / unquote(target.split("#", 1)[0])).resolve()
+                if not resolved.exists():
+                    errors.append(f"{name}:{number}: dead link '{target}'")
+                elif resolved == audition or audition in resolved.parents:
+                    errors.append(f"{name}:{number}: links the v1 audition reel in {AUDITION_DIRECTORY}/, "
+                                  f"which is never packaged: '{target}'")
+    for name in LOUDNESS_GATE_DOCS:
+        path = workspace / name
+        if not path.is_file():
+            errors.append(f"{name}: missing (it records the loudness gate)")
+            continue
+        text = path.read_text(encoding="utf-8-sig").replace("*", "")
+        if not all(phrase in text for phrase in LOUDNESS_GATE_PHRASES):
+            errors.append(f"{name}: does not record the loudness gate ("
+                          + " and ".join(f"'{phrase}'" for phrase in LOUDNESS_GATE_PHRASES) + ")")
+    return links, errors
+
+
 if __name__ == "__main__":
     workspace = Path(__file__).resolve().parent.parent
     count, errors = check(workspace)
     modules, architecture_errors = check_architecture(workspace)
     errors += architecture_errors
+    links, link_errors = check_doc_links(workspace)
+    errors += link_errors
     if errors:
         print("\n".join(errors), file=sys.stderr)
         raise SystemExit(1)
     print(f"PASS: {count} Views; unique IDs, one root, valid parents, no cycles, existing sources")
     print(f"PASS: {modules} modules to depth 2 each have an ARCHITECTURE.md ownership row")
+    print(f"PASS: {links} relative doc links resolve, none into {AUDITION_DIRECTORY}/; "
+          f"the loudness gate is recorded in {len(LOUDNESS_GATE_DOCS)} docs")

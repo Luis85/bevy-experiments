@@ -1823,6 +1823,8 @@ try {
         Assert-True ((Get-Rules $m) -like '*docs are 65537 B, above 65536 B*') (Get-Rules $m)
         $m = Read-Manifest; $m.files = @($m.files) + [pscustomobject]@{ path = 'archive/art/actors-v1.png'; bytes = 5; sha256 = 'x' }
         Assert-True ((Get-Rules $m) -like '*archived file in the package: archive/art/actors-v1.png*') (Get-Rules $m)
+        $m = Read-Manifest; $m.files = @($m.files) + [pscustomobject]@{ path = 'docs/audio/survival-audition.wav'; bytes = 5; sha256 = 'x' }
+        Assert-True ((Get-Rules $m) -like '*audition reel in the package: docs/audio/survival-audition.wav*') (Get-Rules $m)
         # Integrity: a changed file, an unlisted file and a manifest path that leaves the package.
         Write-Utf8NoBom -Path (Join-Path $root 'content\world.json') -Text '{ }'
         Write-Utf8NoBom -Path (Join-Path $root 'extra.txt') -Text 'x'
@@ -1940,7 +1942,7 @@ try {
             Assert-Equal 'PLAYTEST_GUIDE.md' (@($manifest.curated_docs) -join '|') 'curated docs'
             $paths = @($manifest.files | ForEach-Object { $_.path })
             Assert-Equal 'docs/PLAYTEST_GUIDE.md' (@($paths | Where-Object { $_ -like 'docs/*' }) -join '|') 'docs holds the guide only'
-            Assert-Equal 0 @($paths | Where-Object { $_ -like 'archive/*' -or $_ -like '*\*' }).Count 'no archive files, no backslash paths'
+            Assert-Equal 0 @($paths | Where-Object { $_ -like 'archive/*' -or $_ -like 'docs/audio/*' -or $_ -like '*\*' }).Count 'no archive files, no audition reel, no backslash paths'
             foreach ($expected in @('Lastlight.exe', 'LICENSE', 'READ ME.txt', 'Play Lastlight.cmd', 'Battle practice.cmd', 'content/encounters.json', 'content/world.json', 'assets/CREDITS.md')) {
                 Assert-True ($paths -ccontains $expected) "the package has $expected"
             }
