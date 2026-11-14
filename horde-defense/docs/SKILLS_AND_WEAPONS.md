@@ -104,24 +104,29 @@ distinct ids of lowercase letters, digits, `-` or `_`); no rule reads them.
 
 The decision-19 weapon-mastery nodes are appended as catalogue entries 170-177
 (the first 169 ids are pinned by `tests/progression_tree.rs`). Each is
-milestone gated and every perk acts in Personal play only; prices are
-provisional until the wave-4 fit.
+milestone gated and every perk acts in Personal play only. The prices are
+the W4-p fit ("Prices and the tree rules" below), and
+`skills_doc_mastery_table_and_prices_match_the_catalogue` keeps this table
+equal to `skills.json`.
 
 | Id | Effect | Prerequisite | Gate | Price | Counters |
 | --- | --- | --- | --- | --- | --- |
-| `shotgun_pump_drill` | Shotgun cadence ×0.8, reload ×0.8 | `shotgun_training` | 5 victories | 800 | sprinter |
+| `shotgun_pump_drill` | Shotgun cadence ×0.8, reload ×0.8 | `shotgun_training` | 5 victories | 1,000 | sprinter |
 | `marksman_steady_aim` | Marksman damage ×1.15, weak-spot +0.15 | `marksman_training` | 5 victories | 800 | shield-bearer, juggernaut |
 | `shield_breaker` | Armor penetration 4 | `stopping_power` | 5 victories | 1,000 | shield-bearer, juggernaut |
 | `blast_discipline` | Hazard damage ×0.6 | `hardened` | 5 victories | 1,000 | exploder, spitter |
 | `pistol_double_tap` | Pistol cadence ×0.8 | `quick_reload` | 15 victories | 1,200 | – |
 | `smg_spray_control` | SMG reload ×0.7 | `smg_training` | 10 victories | 1,200 | splitter |
 | `rifle_breath_control` | Rifle damage ×1.15 | `rifle_training` | 20 victories | 1,500 | – |
-| `mg_belt_feeder` | Machine gun reload ×0.6 | `machine_gun_training` | 5 victories | 1,500 | sprinter, splitter |
+| `mg_belt_feeder` | Machine gun reload ×0.6 | `machine_gun_training` | 5 victories | 1,200 | sprinter, splitter |
 
 A node with counters opens no later than the first threat rank at which any
 archetype it counters has spawn weight (sprinter and spitter from rank 6,
 exploder and shield-bearer from rank 8, splitter and juggernaut from rank 10):
-its gate is the largest of 5/10/15/20 at or below that rank.
+its gate is the largest of 5/10/15/20 at or below that rank. The tree names
+the counters by their catalogue display names (`campaign::counter_names`):
+a counter node's tooltip and its detail panel carry a "Counters: <names>"
+line.
 
 Additional tagged effects encode target ownership/rank, not repeated additive rank bonuses:
 
@@ -146,6 +151,66 @@ automatically; it cannot be bought repeatedly. The historical six-skill save
 adapter still resolves the corresponding stable IDs. Old saves lacking the new
 training representation preserve their former firearm eligibility through the
 legacy adapter.
+
+## Prices and the tree rules
+
+`skills.json` is the only source of node prices; the W4-p repricing (production
+pass, wave 4) set every one of them. The whole tree costs 96,920 coins for its
+176 buyable nodes (Pistol training is the free root). The tiers that goal 5
+paces cost 2,030 (tier 1), 8,700 (tier 2) and 19,830 (tier 3) coins, a tier
+being every node up to that prerequisite depth that is not gated behind 5 or
+more victories (`sim::tier_cost`; BALANCE_AND_RUN_STATS.md, "Goal 5: progression
+pacing acceptance"). Ladders rise by a fixed step: body rank r costs
+100 + 30 × (r − 1) coins (100 to 670) on all five paths, and the trap, wall and
+turret ranks start at 400, 320 and 240 coins and rise 140 a rank (to 1,660,
+1,580 and 1,500). PROGRESSION.md, "Skill tree prices", lists the blueprint and
+feature prices.
+
+**Value model.** `campaign::tree_value` gives every valued node a gain: the
+change in the natural log of one axis metric (firepower, survival, melee,
+ordnance or fortification) when a synthetic campaign that owns the node's
+prerequisites also owns the node. It is measured at two reference ranks, the
+node's victory gate g and g + 4, against the director's wave pool at that rank
+weighted by spawn weight. A node with several effects sums its gain over the
+axes they touch. Capability nodes (`Unlock`, `FeatureUnlock`, `Blueprint`,
+`WeaponTraining`) carry no value. Nodes are compared only inside a dominance
+group (health, reload, melee, stamina, damage, weak spot, cadence, penetration,
+hazard, ordnance, fortification, armor, and one group per weapon class). The
+model is analysis only: no rule, save or random draw reads it, and it moves no
+digest. `pacing --values` prints it as CSV, one row per node:
+`id,branch,price,gate,axis,group,rank_lo,gain_lo,per_coin_lo,rank_hi,gain_hi,per_coin_hi`
+(BALANCE_AND_RUN_STATS.md, "Pacing CLI").
+
+**The six tree rules** are ordinary tests in
+`crates/horde_core/tests/progression_tree.rs`, so a price edit that breaks one
+fails the workspace tests:
+
+| Rule | Test | Holds when |
+| --- | --- | --- |
+| 1 | `no_valued_node_is_dominated_at_its_reference_states` | No valued node gains nothing, and none is beaten by a node of its group that is no dearer, no later gated, not its ancestor or descendant and gains at least as much at both reference ranks (more at one). Ladder ranks 2 and up take no part |
+| 2 | `cheap_nodes_stay_within_twice_branch_value_per_coin` | A node under 100 coins is worth at most twice its branch's value per coin. No shipped node is under 100, so it guards later cuts |
+| 3 | `no_node_outvalues_its_depth_peers_by_more_than_two_and_a_half_x` | A non-ladder node is worth at most 2.5 times the median value per coin of its branch one prerequisite depth either side |
+| 4 | `ladder_value_per_coin_never_rises` | Each body and structure rank is worth no more per coin than the rank below (Perception by halves, because its gain is a staircase) |
+| 5 | `body_rank_one_is_cheaper_than_its_dedicated_peer` | Vitality 1 < Field fitness, Coordination 1 < Reload drill, Strength 1 < Heavy strike, Endurance 1 < Endurance drill |
+| 6 | `tier_costs_sit_in_design_bands` | Tier 1 in 1,700-2,300, tier 2 in 7,800-9,800, tier 3 in 18,500-22,500 coins |
+
+The rules fixed the shape of the prices before the pacing fit: rule 1 orders
+the ordnance nodes and the structure rank 1s by gain, rule 3 pulls the firearm
+stat nodes down to their gain (Rapid cycling, Stopping power and Combat
+reload), and the coins they lost went to capability nodes that carry no value
+(Marksman proficiency, Machine gun proficiency and Survivor network). The structure ladders' 140-coin
+step keeps the tree-first bot on them until after the first liberation, which
+separates Meet Mara from Operations in the unlock order. The `pacing`
+example's `--fit-tiers` prints the coins earned by a run over a tier's cost,
+which is how the tiers were fitted (design-progression-tree §4, "As built").
+
+**Effect retunes (W4-03).** Four nodes changed effect, not id or position,
+each pinned by a mechanic test in the same file: Steady hands adds 4 damage (a
+worn pistol hits for 16, which keeps the rank-0 Shambler two-shot and adds at
+most 40% per shotgun trigger), Hardened survivor adds 2 armor (a Runner's
+contact still hurts), Quick throw adds one grenade and one Molotov charge and shortens
+ordnance cooldowns to ×0.85, and Combat reload cuts reload time to ×0.75. Each
+trap rank adds one trap charge (PROGRESSION.md, "Fortifications").
 
 ## Owned firearms and class training
 
@@ -222,17 +287,44 @@ parameters, so existing projectiles and fire zones retain coherent saved state
 when authoring files change. Presentation arcs, flames, sound and reduced-effects
 feedback do not resolve a second hit.
 
+## Weapon class presentation
+
+A firearm's class also decides how its shots look and sound. Both are
+presentation only: they change no rule and never read the core RNG.
+
+- **Look.** `art/battlefield/weapon_fx.rs` holds one effect profile per class
+  plus the turret: muzzle flash shape, colour and life, and tracer stroke,
+  colour and life. A shotgun volley paints one shared flash and a short streak
+  per pellet; the machine gun paints its bright tracer on every third volley
+  and a dim one between. The class is the one the attempt deployed with (the
+  gear snapshot's ranged record, else the defender's profile), and each
+  survivor volley lights a muzzle light pool from the same profile. Reduced
+  effects draws no flash and one static class-coloured line per volley. The
+  `weapon-classes-*` review scenes show every class and the turret;
+  ARCHITECTURE.md lists the modules.
+- **Sound.** Each class has its own shot family (AUDIO_SURVIVAL.md,
+  "Library"), and NPC defenders sound like the class they carry. Gun handling
+  that has no simulation event is read from the attempt after each tick
+  (`horde_audio::gun`): the staged reload (magazine out, magazine in, the
+  finishing reload), one shell insert per shotgun shell (at most six), the
+  marksman's bolt 300 ms after a shot, and, with auto-reload off, a dry trigger
+  at most once per 350 ms.
+
 ## Evidence and related contracts
 
 Source: `skill_catalog.rs`, `weapons.rs`, `ordnance.rs`, `campaign.rs`,
-`sim.rs` and `ui/battle/` (`attack.rs`, `field.rs`) in the core/game crates. See
+`campaign/tree_value.rs`, `sim.rs` and `ui/battle/` (`attack.rs`, `field.rs`)
+in the core/game crates. See
 [enemy composition](ENEMY_COMPOSITION.md), [view hierarchy](VIEW_HIERARCHY.md),
 [dated user overrides](EXPANSION.md) and [survival audio](AUDIO_SURVIVAL.md).
 
 The first defense waits for "Begin defense", retains rewards after retreat, leads to
-skills/training and permits immediate retry. Roughly 3–5 runs per early tier is the
-requested pacing target; `cargo run --locked --release -p horde_core --example pacing`
-measures it (see [the foundation pass](plans/2026-11-04-foundation-pass.md)). Country-specific balance proof, human playthrough,
+skills/training and permits immediate retry. The pacing target is tiers 1 / 2 / 3
+affordable at about runs 4 / 8 / 12 with the first victory on runs 2-4; the
+release-only `pacing_targets` rows measure it, and the `pacing` example prints the
+tables (BALANCE_AND_RUN_STATS.md, "Goal 5: progression pacing acceptance" and
+"Pacing CLI"). The pre-production-pass curve is in
+[the foundation pass](plans/2026-11-04-foundation-pass.md). Country-specific balance proof, human playthrough,
 native GUI and listening evidence must be reported separately in
 [VALIDATION.md](VALIDATION.md); this authoring guide establishes no such result.
 

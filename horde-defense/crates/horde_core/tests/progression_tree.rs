@@ -748,3 +748,104 @@ fn blueprint_offers_quote_the_tree_node_price() {
     assert_eq!(game.campaign().coins, legacy);
     assert!(!game.campaign().blueprints[StructureKind::Trap]);
 }
+
+/// docs/SKILLS_AND_WEAPONS.md, where the tree is documented (W7-05).
+const SKILLS_DOC: &str = include_str!("../../../docs/SKILLS_AND_WEAPONS.md");
+
+/// `n` with its thousands separated by commas, as the docs write prices.
+fn with_commas(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The body of the `## <heading>` section of `doc`, up to the next `## `.
+fn doc_section<'a>(doc: &'a str, heading: &str) -> &'a str {
+    let doc_lf = doc.find(&format!("\n## {heading}\n"));
+    let doc_crlf = doc.find(&format!("\n## {heading}\r\n"));
+    let start = doc_lf
+        .or(doc_crlf)
+        .unwrap_or_else(|| panic!("SKILLS_AND_WEAPONS.md has no \"## {heading}\" section"));
+    let body = &doc[start + heading.len() + 4..];
+    body.find("\n## ").map_or(body, |end| &body[..end])
+}
+
+#[test]
+fn skills_doc_mastery_table_and_prices_match_the_catalogue() {
+    // The weapon-mastery table: Id, Effect, Prerequisite, Gate, Price, Counters.
+    let rows: BTreeMap<&str, Vec<&str>> = SKILLS_DOC
+        .lines()
+        .filter_map(|line| line.strip_prefix("| `"))
+        .filter_map(|rest| {
+            let cells: Vec<&str> = rest.split('|').map(str::trim).collect();
+            let id = cells.first()?.strip_suffix('`')?;
+            DECISION_19.contains(&id).then_some((id, cells))
+        })
+        .collect();
+    assert_eq!(
+        rows.keys().copied().collect::<BTreeSet<_>>(),
+        DECISION_19.into_iter().collect::<BTreeSet<_>>(),
+        "the weapon-mastery table lists the eight decision-19 nodes"
+    );
+    let mut wrong = Vec::new();
+    for id in DECISION_19 {
+        let n = node(id);
+        let prerequisites = n
+            .prerequisites
+            .iter()
+            .map(|p| format!("`{p}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let counters = if n.counters.is_empty() {
+            "–".to_owned()
+        } else {
+            n.counters.join(", ")
+        };
+        let expected = [
+            (2, prerequisites),
+            (3, format!("{} victories", n.minimum_victories)),
+            (4, with_commas(n.price)),
+            (5, counters),
+        ];
+        for (column, want) in expected {
+            let got = rows[id].get(column).copied().unwrap_or("");
+            if got != want {
+                wrong.push(format!(
+                    "{id} column {column}: doc {got:?}, catalogue {want:?}"
+                ));
+            }
+        }
+    }
+    assert!(
+        wrong.is_empty(),
+        "the weapon-mastery table drifted from skills.json:\n{}",
+        wrong.join("\n")
+    );
+
+    // The price section states the tier costs and the whole tree's cost.
+    let prices = doc_section(SKILLS_DOC, "Prices and the tree rules");
+    let total: u64 = skills().nodes.iter().map(|n| n.price).sum();
+    let mut numbers: Vec<(String, String)> = (1..=3)
+        .map(|d| (format!("tier {d}"), with_commas(tier_cost(d))))
+        .collect();
+    numbers.push(("the whole tree".to_owned(), with_commas(total)));
+    let missing: Vec<String> = numbers
+        .into_iter()
+        .filter(|(_, n)| !prices.contains(n.as_str()))
+        .map(|(what, n)| format!("{what} {n}"))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "\"Prices and the tree rules\" does not state {missing:?}"
+    );
+    assert!(
+        !SKILLS_DOC.contains("provisional"),
+        "the W4-p prices are fitted, not provisional"
+    );
+}

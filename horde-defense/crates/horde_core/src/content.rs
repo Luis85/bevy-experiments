@@ -345,7 +345,8 @@ pub struct StructureDefinition {
 impl StructureDefinition {
     /// Charges a structure placed at structure mastery `rank` starts with:
     /// `charges + charges_per_rank × rank` (ruling E12). Unchanged at every
-    /// rank while `charges_per_rank` is 0, as every shipped structure is.
+    /// rank while `charges_per_rank` is 0, as for the shipped wall and
+    /// turret; the shipped shrapnel trap authors 1 (W4-03).
     pub fn charges_at_rank(&self, rank: u32) -> u32 {
         self.charges
             .saturating_add(self.charges_per_rank.saturating_mul(rank))

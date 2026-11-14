@@ -27,7 +27,8 @@
 //! `required_docs_sections_exist` is the docs inventory (design-qa-captures
 //! 1.13, ruling W-15): every listed doc carries the section headings its
 //! owner writes. It checks presence only. `docs_drop_retired_loot_claims`
-//! keeps the claims the production pass made false out of `docs/` (W7-04).
+//! and `docs_drop_retired_progression_claims` keep the claims the production
+//! pass made false out of `docs/` (W7-04, W7-05).
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -1224,6 +1225,49 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
         &["## Goal 4: auto-sell pacing and stash growth"],
     ),
     ("docs/PLAYTEST_GUIDE.md", &["## Auto-sell"]),
+    // W7-05, progression-tree: grants, milestones, camp and tree prices, the
+    // tree rules, the class presentation and the pacing CLI.
+    (
+        "docs/PROGRESSION.md",
+        &[
+            "### Level-up grant and rank milestones",
+            "### Camp prices",
+            "### Skill tree prices",
+        ],
+    ),
+    (
+        "docs/SKILLS_AND_WEAPONS.md",
+        &[
+            "## Prices and the tree rules",
+            "## Weapon class presentation",
+        ],
+    ),
+    ("docs/BALANCE_AND_RUN_STATS.md", &["## Pacing CLI"]),
+];
+
+/// Progression claims the production pass made false, with what replaced
+/// each (W7-05, progression-tree). Matched like [`RETIRED_DOC_CLAIMS`].
+const RETIRED_PROGRESSION_CLAIMS: &[(&str, &str)] = &[
+    (
+        "prices are provisional until the wave-4 fit",
+        "W4-p fitted them (SKILLS_AND_WEAPONS.md, \"Prices and the tree rules\")",
+    ),
+    (
+        "prices provisional until W4-p",
+        "W4-p fitted them (PROGRESSION.md, \"Skill tree prices\")",
+    ),
+    (
+        "the Results screen does not show it yet",
+        "Results shows the grant and milestone lines since W3-22",
+    ),
+    (
+        "no shipped structure authors it",
+        "the shrapnel trap authors charges_per_rank 1 since W4-03",
+    ),
+    (
+        "keep their prices, so building and companions open on the same milestones",
+        "W4-p repriced the blueprints and feature unlocks",
+    ),
 ];
 
 /// Claims the production pass made false, with what replaced each (W7-04,
@@ -1260,8 +1304,9 @@ fn retired_claims(name: &str, text: &str, claims: &[(&str, &str)]) -> Vec<String
         .collect()
 }
 
-#[test]
-fn docs_drop_retired_loot_claims() {
+/// Every claim of `claims` a Markdown file under `docs/` (outside
+/// `docs/plans/`) still makes.
+fn retired_claims_in_docs(claims: &[(&str, &str)]) -> Vec<String> {
     let workspace = workspace_directory();
     let mut violations = Vec::new();
     for name in markdown_files(&workspace)
@@ -1271,8 +1316,25 @@ fn docs_drop_retired_loot_claims() {
         let path = workspace.join(name);
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-        violations.extend(retired_claims(name, &text, RETIRED_DOC_CLAIMS));
+        violations.extend(retired_claims(name, &text, claims));
     }
+    violations
+}
+
+#[test]
+fn docs_drop_retired_progression_claims() {
+    let violations = retired_claims_in_docs(RETIRED_PROGRESSION_CLAIMS);
+    assert!(
+        violations.is_empty(),
+        "docs still make retired progression claims ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn docs_drop_retired_loot_claims() {
+    let violations = retired_claims_in_docs(RETIRED_DOC_CLAIMS);
     assert!(
         violations.is_empty(),
         "docs still make retired claims ({}):\n{}",

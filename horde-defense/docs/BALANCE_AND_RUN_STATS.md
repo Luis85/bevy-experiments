@@ -54,6 +54,66 @@ The Normal opening controller uses current enemy positions and only earned, guar
 
 Dedicated tests cover atomic/frozen settings, all three presets, actual damage-source integration, fixed-window DPS and corrupt aggregate rejection, pause/checkpoint equivalence, legacy 11/30 geometry, 302 retained all-outcome records, and saved worker-outbox settlement with one parent owner.
 
+## Pacing CLI
+
+The `pacing` example (`crates/horde_core/examples/pacing.rs`) plays scripted campaigns from a fresh profile and prints when each milestone first holds. The bot acts only through `Game::apply`, the commands the UI sends, so its runs follow the same rules as a player's. Run it inside `horde-defense/` on the release profile (a 20-seed sweep takes minutes):
+
+```powershell
+cargo run --locked --release -p horde_core --example pacing -- [max_runs] [flags]
+```
+
+| Argument | Effect |
+| --- | --- |
+| `max_runs` | A positive number: replaces every selected profile's run limit |
+| `--runs` | Lists every run under the table: index, country and stage, outcome, seconds, coins and the nodes learned in the camp before it |
+| `--csv` | Prints one CSV row per run instead of the table; refused with `--runs` or `--fit-tiers` |
+| `--out PATH` | Writes the output to PATH (UTF-8, no BOM, LF) instead of stdout, so PowerShell's `>` is never needed |
+| `--profile ID` or `--profile all` | Repeatable. Selects registry rows (below), each once, in the order given; `all` adds the whole registry. Without it the three legacy profiles are printed |
+| `--seeds N` | Plays seed indices 0 to N − 1 of every profile (default 1); the cells become `median [p25, p75] reached/seeds` |
+| `--difficulty easy`, `normal` or `hard` | Replaces every selected profile's balance preset; the column heading then ends in `[ISO3, Preset]` |
+| `--country ISO3` | Replaces every selected profile's start country (a `world.json` id), with the same heading |
+| `--fit-tiers a,b,c` | Adds a table: for tier d, the median coins earned by run number a, b, c… (the d-th entry) over tier d's cost. A cell that some seeds did not reach (a `stop_after` row, or past `max_runs`) names `n/m seeds`, and a note follows |
+| `--values` | Prints the skill-tree value table (SKILLS_AND_WEAPONS.md, "Prices and the tree rules") instead; plays no run |
+| `--strategy` | Plays the three strategy rows and prints the goal-3 table (`median [p90]` over `--seeds`) and the G3.10-G3.12 verdicts instead; takes only `max_runs`, `--seeds` and `--out` |
+
+Parsing is strict: an unknown or malformed argument (an unknown profile or country, a seed count of 0, a second `max_runs`) prints the reason and the usage line to stderr and exits with status 2. An `--out` path that cannot be written exits with status 3.
+
+**Output.** With neither `--profile` nor `--seeds` the table is the pre-v2 one: the three legacy profiles at one seed, each cell `runs / battle minutes`, and `> N` for a milestone missed within N runs. Its rows are the first victory and liberation, each tier affordable (with its cost) and its first node, and each feature unlocked. `--profile` or `--seeds` adds the second liberation, `Tier d owned`, the tree exhausted, ranks 5 / 10 / 15 / 20, the first takeover and Operations open. How each milestone is counted, and what a tier is, is in "Goal 5" below. The default `pacing 60 --runs` output is the reference a balance commit diffs against: a commit that moves it on purpose records the before and after rows (production-pass plan §9.6, ruling R28).
+
+**Seeds and statistics.** Seed index 0 plays the profile's own seed, so one seed reproduces the pre-v2 table. Index i > 0 plays `pacing_seed(base, i)`, a SplitMix of `base ^ i`. Profiles and seeds run on parallel threads and are sorted by profile and seed index, so the output does not depend on the thread count. A cell's median is the lower median, with the 25th and 75th percentiles; a seed that never reaches the milestone counts `max_runs + 1`.
+
+**CSV.** The header is
+
+```text
+profile,seed,difficulty,run,country,stage,outcome,elapsed_s,coins,level_grant_coins,milestone_coins,cumulative_coins,rank,level,lanes,defender,kills,learned_count,learned_ids,spent_tree,spent_gear,spent_training,spent_recruit,auto_sold_count,auto_sold_coins,nodes_owned,nodes_left,wallet,boss_ttk_s
+```
+
+followed by `<id>_spawned,<id>_killed,<id>_damage_taken` for every enemy archetype in catalogue order (the per-archetype telemetry). `coins` is what the battle banked, `level_grant_coins` and `milestone_coins` what progression settlement paid after it (PROGRESSION.md, "Level-up grant and rank milestones"), and `cumulative_coins` the running sum of those three and `auto_sold_coins` ("Goal 4" below). `learned_ids` is `;`-separated, `defender` is `player`, `mara` or `recruit-<id>`, the `spent_*` columns split the camp spending before the run, `nodes_left` counts the buyable nodes not yet owned, and `boss_ttk_s` is empty when no boss died.
+
+**Profiles.** The registry (`sim::pacing_registry`; `by_id`) has stable, unique ids and appends rows. Unless a row says otherwise, a profile is `expert-deu`: seed `0x1A571167`, a Germany start, the expert aim (the smoke bot), tree-first spending (in every camp the recommended node while it is affordable, then gear), Normal, the solo plan (the survivor alone, never selling, farming or training) and 60 runs.
+
+| Profile | Differs from `expert-deu` | Read by |
+| --- | --- | --- |
+| `expert-deu` | The acceptance profile (`DEFAULT_PROFILE_ID`) | G5.7-G5.10, G6.16, G6.17; the first legacy column |
+| `novice-deu` | Novice aim | Legacy column, reported |
+| `novice-gear-lux` | Novice aim, gear-first spending, Luxembourg, seed 2026 | Legacy column, reported |
+| `lux-easy`, `lux-normal`, `lux-hard` | Luxembourg on each preset; stop at the first liberation, at most 20 runs | G6.15 |
+| `start-aut`, `start-bgd` | Austria or Bangladesh start; stop at the first victory, at most 20 runs | G6.18 |
+| `manual-sell` | Sells every item `SellUnprotected` would, in camp | Reported |
+| `auto-sell` | Stores the default auto-sell rule, enabled, before the first run | G4.13, the R39 stash report (at 150 runs) |
+| `takeover` | Luxembourg; a ready recruit takes over the main run | Reported (two fields differ, R51) |
+| `farm` | Novice aim; after 2 lost runs in a row on the frontier stage it replays the stage before it once | Reported (two fields differ, R51) |
+| `easy`, `hard` | The Easy or Hard preset | Reported |
+| `long` | 150 runs | Informational, at 5 seeds |
+| `strategy` | Novice aim, gear first, Luxembourg, seed 2026, 120 runs; plays the strategy layer (S1) | G3.10, G3.12 (`--strategy`) |
+| `neighbours-solo`, `neighbours-parallel` | Frees Germany's 3-stage neighbours alone (S2a) or with expeditions (S2b); stops at the fourth liberation | G3.11 (`--strategy`) |
+| `equip-drops` | Wears every drop that beats its loadout, in camp | G5.6 |
+| `goal6-novice` | Novice aim (the goal-6 measurement profile, R56) | G6.11, G6.12 |
+
+The acceptance rows themselves are the release-only `crates/horde_core/tests/pacing_targets.rs` (the goal sections below); the example reports and fits, and gates nothing.
+
+**Smoke.** `cargo run --locked -p horde-defense -- --smoke` validates the content and world catalogues, checks that a saved and resumed fresh battle is identical and that the locked companion cannot deploy, plays the legacy autonomous run, and then plays the campaign proof (`sim::smoke`, also the `campaign_smoke` example of `horde_core`): encounters 1-5 in Personal and then NPC mode, each cleared within six retries on earned rewards. It prints a PASS line and one line per attempt, or the reason and exit 1. A balance change moves it, so its before and after lines go next to the pacing rows in the production-pass plan (§9.2 and §9.6).
+
 ## Goal 4: auto-sell pacing and stash growth
 
 The auto-sell rule (PROGRESSION.md, "Auto-sell") pays coins at settlement, so the run record and the pacing output keep them apart from the battle's own coins:

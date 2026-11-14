@@ -596,6 +596,66 @@ mod tests {
         assert!(text.ends_with('\n'), "the last row ends its line");
     }
 
+    /// docs/BALANCE_AND_RUN_STATS.md, where the CLI is documented (W7-05).
+    const BALANCE_DOC: &str = include_str!("../../../docs/BALANCE_AND_RUN_STATS.md");
+
+    /// The flags `USAGE` names, in order.
+    fn usage_flags() -> Vec<&'static str> {
+        USAGE
+            .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+            .filter(|word| word.starts_with("--"))
+            .collect()
+    }
+
+    #[test]
+    fn pacing_cli_doc_names_every_flag_profile_and_csv_column() {
+        let start = BALANCE_DOC
+            .lines()
+            .position(|l| l.trim_end() == "## Pacing CLI")
+            .expect("BALANCE_AND_RUN_STATS.md has a \"## Pacing CLI\" section");
+        let section: String = BALANCE_DOC
+            .lines()
+            .skip(start + 1)
+            .take_while(|l| !l.starts_with("## "))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let flags = usage_flags();
+        assert_eq!(flags.len(), 10, "USAGE names the ten flags: {flags:?}");
+        for flag in &flags {
+            // Every USAGE flag is one the parser takes.
+            let mut probe = vec![(*flag).to_owned()];
+            match *flag {
+                "--out" => probe.push("x.txt".to_owned()),
+                "--profile" => probe.push("all".to_owned()),
+                "--difficulty" => probe.push("hard".to_owned()),
+                "--country" => probe.push("DEU".to_owned()),
+                "--seeds" => probe.push("2".to_owned()),
+                "--fit-tiers" => probe.push("4,8,12".to_owned()),
+                _ => {}
+            }
+            assert!(parse(&probe).is_ok(), "{flag} parses");
+        }
+        let mut missing: Vec<String> = flags
+            .iter()
+            .filter(|flag| !section.contains(&format!("`{flag}")))
+            .map(|flag| (*flag).to_owned())
+            .collect();
+        missing.extend(
+            pacing_registry()
+                .iter()
+                .filter(|p| !section.contains(&format!("`{}`", p.id)))
+                .map(|p| format!("profile {}", p.id)),
+        );
+        let fixed = design_fixed_columns().join(",");
+        if !section.contains(&fixed) {
+            missing.push(format!("the CSV header {fixed}"));
+        }
+        assert!(
+            missing.is_empty(),
+            "\"## Pacing CLI\" leaves out {missing:?}"
+        );
+    }
+
     fn argv(args: &[&str]) -> Vec<String> {
         args.iter().map(|a| (*a).to_owned()).collect()
     }
