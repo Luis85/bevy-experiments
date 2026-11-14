@@ -261,6 +261,7 @@ The step never touches top-level attempts or reports. A v6 Npc root reads as Com
   - It touches `campaign.balance_settings` only, never the frozen Attempt.balance or RunRecord.balance copies.
   - Its test is `named_preset_follows_the_catalogue_on_load_but_frozen_attempt_balance_does_not`.
 - Otherwise no reconcile is added.
+- **As built (W4-08, 2026-11-14):** wave 4 changed no named preset's BalanceSettings (`balance.json` is unchanged since W2-49), so no reconcile is added. `v6_hard_campaign_deploys_with_current_hard_threat_but_in_flight_snapshot_stays_legacy` (`tests/balance_extras.rs`) pins the first bullet on `save_v6.json`: the loaded settings equal `for_preset(Hard)`, the in-flight attempt and expedition keep `elite_rate_bp` 0 and no boss phase through play and a save round trip, and the next deployment freezes the Hard-scaled elite rate and the Hard boss-phase bonus.
 
 ## 5. RNG keying
 

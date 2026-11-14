@@ -95,6 +95,36 @@
 //! W1-69 (no lane queue, R15) and the wave-2 rules, and `GAMEPLAY_TRACE` is
 //! unchanged by it. V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the
 //! `save_v7.json` pins did not move. `PROVISIONAL` is None again.
+//!
+//! W4-08 is the single re-bless for waves 3 and 4 (rulings P3, R7, R36,
+//! R56, R57). No commit since W2-49 set `PROVISIONAL`: `PROVISIONAL` stayed
+//! None and `PROVISIONAL_CAUSES` empty, and this file's tables are unchanged
+//! from e3f52fa to W4-08, so there is nothing to fold and the log gains no
+//! row. `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6. Why each wave-4 rule leaves the
+//! six runs alone (each is one rank-0 deploy with no country, no camp action
+//! and no worker game; `support::smoke_run`):
+//!
+//! | commit | rule | why no digest moves |
+//! |---|---|---|
+//! | W4-01 | Regional and Capstone boss multipliers (`progression.json` `boss_ranks`) | folded only with a country front position; without a country the boss is a Sector boss and nothing is folded |
+//! | W4-03 | steady_hands, hardened, quick_throw, combat_reload retunes; shrapnel_trap `charges_per_rank` 1 | the nodes are never bought and every `structure_upgrades` rank is 0, so the retuned effects and the extra charge are never applied |
+//! | W4-p | repriced skill tree, `sim::tier_cost`, `Campaign::blueprint_price` | prices and the tier definition are read only by camp purchases, which these runs never make |
+//! | W4-l | auto-sell pacing gate, stash-growth report, `loot::max_drop_tier` in the validator | measurement code and a value-equal refactor; no drop or sale rule changed |
+//! | W4-12 | expedition threat rank follows the recruit (R57) | read only by a worker-game Npc deploy; the runs create no expedition (R57's expected Npc GOLDEN move does not happen) |
+//! | W4-13 | goal-6 measurement profile | acceptance bot only, no balance data (R56) |
+//!
+//! W4-02 and W4-04..n changed no rule (presentation lines, and a tuning
+//! loop that kept no lever), W4-c shipped only its record, and wave 3
+//! changed presentation only. The V1-V6 continuation pins,
+//! `V6_DROP_TRACE_FNV`, the `save_v7.json` pins and the frozen-catalogue
+//! pin did not move either; no continuation pin moved for W4-03's trap
+//! charge (R38), so no charges re-bless reason is owed. Wave 4 changed no
+//! named preset's `BalanceSettings`, so no `Campaign::follow_named_preset`
+//! reconcile is added (design-save-determinism §4).
+//!
+//! `RULESET_VERSION` and `TRACE_RULESET` move 3 -> 4 in W4-08: the bump
+//! names the wave-2 review rule fixes after W2-49 and the wave-4 rules
+//! above, and `GAMEPLAY_TRACE` is unchanged by it. `PROVISIONAL` is None.
 mod support;
 use horde_core::command::Command;
 use horde_core::content::Mode;
@@ -112,7 +142,8 @@ const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 /// W1-69 (user decision, enemies no longer queue behind each other) moved
 /// 0x1A57_1167 Personal. W2-49 (the wave-2 re-bless) folded the wave-2
 /// provisional digests into all six (net class F; outcomes and traces
-/// unchanged); see the re-bless log.
+/// unchanged); see the re-bless log. Waves 3 and 4 (the W4-08 re-bless)
+/// moved none of them.
 const GOLDEN: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xbed5_e271_4b65_90fe),
     (1, Mode::Npc, 0xcffe_0be4_463d_46d6),
@@ -128,7 +159,8 @@ const GOLDEN: [(u64, Mode, u64); 6] = [
 /// maps. The save-v5 and save-v6 re-blesses of `GOLDEN` are format-only: this trace proves
 /// the gameplay outcomes of the same six runs did not move. W1-69 (user
 /// decision, enemies no longer queue behind each other) re-blessed three of
-/// them; see the re-bless log. Wave 2 (W2-49) moved none of them.
+/// them; see the re-bless log. Wave 2 (W2-49) moved none of them, nor did
+/// waves 3 and 4 (W4-08).
 const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),
     (1, Mode::Npc, 0x2966_10f8_ded8_a91f),
@@ -149,12 +181,19 @@ const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
 ///   rank 0 with no country (no elites, no boss phases, no front ramp, no
 ///   difficulty band, no new archetype) and the weighted drop pick still
 ///   makes one draw. Only the label moves.
-const TRACE_RULESET: u32 = 3;
+/// - 4 (W4-08, the wave-3/4 re-bless): the bump names the wave-2 review rule
+///   fixes after W2-49 and the wave-4 rules (boss-rank multipliers, the
+///   effect retunes and the trap charge, the repriced tree, the expedition
+///   threat rank), which move none of the six traces: the traced runs are
+///   one rank-0 deploy with no country, no camp purchase and no expedition
+///   (the W4-08 table in the file header). Only the label moves.
+const TRACE_RULESET: u32 = 4;
 
 /// Provisional `(GOLDEN, GAMEPLAY_TRACE)` digests, in `GOLDEN` order, set by
 /// a digest-moving commit until the wave's re-bless folds them (ruling P3).
 /// None since W2-49 folded the wave-2 causes (W2-05, W2-06, W2-08, W2-52,
-/// W2-09, W2-54) into `GOLDEN`; their reasons are in the re-bless log.
+/// W2-09, W2-54) into `GOLDEN`; their reasons are in the re-bless log. No
+/// wave-3 or wave-4 commit set it, so W4-08 had nothing to fold.
 const PROVISIONAL: Option<([u64; 6], [u64; 6])> = None;
 
 /// Why `PROVISIONAL` moved: `(commit tag, class, reason)`, one per moving

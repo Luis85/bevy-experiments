@@ -27,7 +27,20 @@ const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 ///   unchanged by wave 2 (the traced runs are rank 0 with no country);
 ///   `GOLDEN` moved for format, telemetry and the drop pick
 ///   (tests/determinism.rs).
-pub const RULESET_VERSION: u32 = 3;
+/// - 4 (W4-08, the wave-4 re-bless): names the rule changes since ruleset 3.
+///   The wave-2 review fixes after W2-49 (the opening tier-1 guarantee skips
+///   NPC issue, the stationed spitter's windup guard and aim, the defender
+///   verdicts for an item held elsewhere, the operation-chain ledger copy,
+///   the level-10 advancement cap). Wave 4: Regional and Capstone boss
+///   multipliers (W4-01); the steady_hands, hardened, quick_throw and
+///   combat_reload retunes and one shrapnel-trap charge per mastery rank
+///   (W4-03); the repriced skill tree, the tier cost and the blueprint price
+///   (W4-p); an expedition's threat rank follows its recruit (W4-12). Wave 3
+///   changed presentation only. A recording or save made under ruleset 3
+///   can diverge on replay and now warns. No `GOLDEN` or `GAMEPLAY_TRACE`
+///   digest moved in waves 3 and 4 (the traced runs are rank 0 with no
+///   country, no skill bought and no expedition; tests/determinism.rs).
+pub const RULESET_VERSION: u32 = 4;
 
 /// A save or load failure. `Display` keeps the player-facing wording.
 #[derive(Debug)]
@@ -1159,7 +1172,7 @@ mod tests {
         let envelope: SaveEnvelope = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(envelope.version, SAVE_VERSION);
         assert_eq!(envelope.ruleset_version, Some(RULESET_VERSION));
-        assert_eq!(envelope.ruleset_version, Some(3), "ruleset 3 since W2-49");
+        assert_eq!(envelope.ruleset_version, Some(4), "ruleset 4 since W4-08");
         assert_eq!(
             envelope.content_fingerprint,
             Some(crate::catalog::content_fingerprint())

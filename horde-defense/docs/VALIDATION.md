@@ -441,6 +441,8 @@ Final documentation checks passed **69 source-backed Views**, retaining all 64 p
 
 **Ruleset 3 (W2-49, 10 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 3. The bump names W1-69 (no lane queue) and the wave-2 rules ("Wave-2 re-bless and ruleset 3" below). A debug recording made under ruleset 2 (from W1-20 up to W2-49) now replays with the warning "recorded under ruleset 2, this build uses 3; the replay may diverge", and a save written under ruleset 2 (among them the frozen `save_v7.json`) loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
 
+**Ruleset 4 (W4-08, 14 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 4. The bump names the wave-2 review rule fixes after W2-49 and the wave-4 rules ("Wave-3/4 re-bless and ruleset 4" below). A debug recording made under ruleset 3 (from W2-49 up to W4-08) now replays with the warning "recorded under ruleset 3, this build uses 4; the replay may diverge", and a save written under ruleset 3 loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
+
 ## save_v6.json as cut — 5 November 2026 (W1-01, recorded 7 November in the W1 review)
 
 `crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed. Ruling R12 (wave-1 close, 7 November 2026) accepts the differences: the fixture is frozen evidence and the §11 numbers were estimates. schema-v7.md §11 carries the ruling as a note.
@@ -1259,6 +1261,33 @@ Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_
 - `--smoke` (`smoke.txt`, PASS, exit 0) is byte-identical to `w2-54/smoke.txt` (sha256 846f0b4c...3425fe50).
 - `pacing 60 --runs` (`pacing.txt`) is byte-identical to `w2-54/pacing.txt` (sha256 902cd895...c7f7d738).
 - The 20-seed release acceptance (`pacing_targets.txt`) is in plan §9.2 and §9.6.
+
+## Wave-3/4 re-bless and ruleset 4 — 14 November 2026 (W4-08)
+
+W4-08 is the single save-determinism re-bless for waves 3 and 4 (rulings P3, R7, R36; W4-12 and W4-13 come before it, R56 and R57). No commit since W2-49 set `PROVISIONAL`, so there is nothing to fold: `PROVISIONAL` is None, `PROVISIONAL_CAUSES` is empty, `GOLDEN` moved 0/6 and `GAMEPLAY_TRACE` 0/6, and the re-bless log in `crates/horde_core/tests/determinism.rs` gains no row. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins, the frozen-catalogue pin and `SAVE_VERSION` 7 did not move either.
+
+Why each wave-4 rule leaves the six traced runs alone (each is one rank-0 deploy with no country, no camp action and no worker game):
+
+| Commit | Rule | Why no digest moves |
+|---|---|---|
+| W4-01 | Regional and Capstone boss multipliers | folded only with a country front position; without a country the boss is a Sector boss |
+| W4-03 | steady_hands, hardened, quick_throw and combat_reload retunes; shrapnel_trap `charges_per_rank` 1 | the nodes are never bought and every structure mastery rank is 0 |
+| W4-p | repriced skill tree, tier cost, blueprint price | read only by camp purchases, which the runs never make |
+| W4-l | auto-sell pacing gate, stash-growth report, validator reads `loot::max_drop_tier` | measurement code and a value-equal refactor |
+| W4-12 | expedition threat rank follows the recruit | read only by a worker-game Npc deploy; the runs create no expedition, so R57's expected Npc `GOLDEN` move does not happen |
+| W4-13 | goal-6 measurement profile | acceptance bot only (R56) |
+
+W4-02 and W4-04..n changed no rule, W4-c shipped only its record, and wave 3 changed presentation only. No continuation pin moved for W4-03's trap charge (R38), so no charges re-bless reason is owed.
+
+**No `follow_named_preset`.** Wave 4 changed no named preset's `BalanceSettings` (`balance.json` is unchanged since W2-49), so the conditional `Campaign::follow_named_preset` reconcile of design-save-determinism §4 is not added. `v6_hard_campaign_deploys_with_current_hard_threat_but_in_flight_snapshot_stays_legacy` (`tests/balance_extras.rs`) pins the behaviour that holds without it: the v6 Hard campaign loads with the catalogue's Hard settings, its in-flight attempt and expedition keep their legacy snapshot (`elite_rate_bp` 0, no boss phase) through play and a save round trip, and its next deployment freezes the current Hard threat (the Hard-scaled elite rate, 1,372 bp at the fixture's rank, and the Hard boss-phase bonus). Mutation proofs: skipping `fold_extras` in `Campaign::progression_for` fails it with `left: 915` `right: 1372`, and a v6_to_v7 arm that writes an elite rate into the in-flight snapshot fails it with `left: 1372` `right: 0`.
+
+**Ruleset 4.** `RULESET_VERSION` and `TRACE_RULESET` go from 3 to 4 (ruling P4). The bump names the rule changes since ruleset 3:
+- The wave-2 review fixes after W2-49: the opening tier-1 guarantee skips NPC issue, the stationed spitter's windup guard and aim, the defender verdicts for an item held elsewhere, the operation-chain ledger copy and the level-10 advancement cap.
+- Wave 4: the Regional and Capstone boss multipliers (W4-01), the four effect retunes and one shrapnel-trap charge per mastery rank (W4-03), the repriced skill tree, tier cost and blueprint price (W4-p) and the expedition threat rank that follows the recruit (W4-12).
+
+Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` now asserts the literal ruleset 4 and failed on the parent with `left: Some(3)` `right: Some(4)`.
+
+Smoke, pacing and the plan §9.2 "After W4" column are re-run in the closing phase (R36); the bump itself changes no rule.
 
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 

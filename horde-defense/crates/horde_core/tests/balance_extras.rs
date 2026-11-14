@@ -9,6 +9,9 @@ mod support;
 use horde_core::{
     balance::{BalanceCatalog, BalancePreset, BalanceSettings, PresetExtras, catalog},
     campaign::Campaign,
+    command::Command,
+    content::Mode,
+    progression::catalog as progression_catalog,
     sim::{Game, ParallelBattle, SAVE_VERSION, SaveError},
     world::world,
 };
@@ -402,6 +405,75 @@ fn v6_hard_campaign_loads_as_hard_with_normal_basis() {
     }
     let saved = serde_json::to_value(&g).unwrap();
     assert!(saved["campaign"].get(BASIS).is_none());
+}
+
+/// Pin (W4-08, design-save-determinism §4 "Hard preset after upgrade"):
+/// `PresetExtras` live in the catalogue, so the v6 Hard campaign's next
+/// deployment freezes the current Hard threat (the Hard-scaled elite rate
+/// and the Hard boss-phase bonus at its rank), while the attempt and the
+/// expedition that were in flight when the v6 save was written keep their
+/// legacy snapshot (`elite_rate_bp` 0, no boss phase) through play and a
+/// save round trip. Wave 4 changed no named preset's `BalanceSettings`, so
+/// the loaded settings are the catalogue's Hard and no
+/// `follow_named_preset` reconcile exists.
+#[test]
+fn v6_hard_campaign_deploys_with_current_hard_threat_but_in_flight_snapshot_stays_legacy() {
+    let mut g = v6();
+    let hard = PresetExtras::for_preset(BalancePreset::Hard);
+    assert_eq!(
+        g.campaign().balance_settings,
+        BalanceSettings::for_preset(BalancePreset::Hard),
+        "wave 4 changed no Hard BalanceSettings value"
+    );
+    let live = g.attempt().expect("the v6 fixture has a live attempt");
+    let (stage, frozen) = (live.stage, live.progression.clone());
+    assert!(
+        frozen.rank >= 3,
+        "the legacy snapshot is past the elite gate"
+    );
+    assert_eq!(frozen.elite_rate_bp, 0, "in-flight root snapshot");
+    assert_eq!(frozen.boss_phases, 0, "in-flight root snapshot");
+    let expeditions = |g: &Game| {
+        g.battles()
+            .iter()
+            .filter_map(|b| b.game().attempt())
+            .map(|a| a.progression.clone())
+            .collect::<Vec<_>>()
+    };
+    let in_flight = expeditions(&g);
+    assert!(
+        !in_flight.is_empty(),
+        "the v6 fixture has a live expedition"
+    );
+    for p in &in_flight {
+        assert_eq!((p.elite_rate_bp, p.boss_phases), (0, 0), "{p:?}");
+    }
+
+    advance(&mut g, 120);
+    let mut g = load(serde_json::to_value(&g).unwrap()).unwrap();
+    let a = g.attempt().expect("the in-flight attempt is still live");
+    assert_eq!(a.progression, frozen, "a live snapshot is never refreshed");
+    for (now, then) in expeditions(&g).iter().zip(&in_flight) {
+        assert_eq!(now, then, "an expedition snapshot is never refreshed");
+    }
+
+    g.apply(&Command::Withdraw).unwrap();
+    g.apply(&Command::Deploy {
+        stage,
+        mode: Mode::Personal,
+    })
+    .unwrap();
+    let next = &g.attempt().expect("the next deployment").progression;
+    let base = progression_catalog().elite.bp(next.rank);
+    assert!(base > 0, "rank {} is past the elite gate", next.rank);
+    let scaled = (u64::from(base) * u64::from(hard.elite_rate_pct) / 100).min(10_000) as u32;
+    assert_eq!(next.elite_rate_bp, scaled, "the current Hard elite rate");
+    assert!(next.elite_rate_bp > base, "Hard scales the elite rate up");
+    assert!(
+        next.boss_phases > hard.boss_phase_bonus,
+        "past rank 4 the rank term and the Hard bonus both add a phase: {}",
+        next.boss_phases
+    );
 }
 
 /// Pin: `BalanceSettings` gains no field. A v6 save's Hard settings object
