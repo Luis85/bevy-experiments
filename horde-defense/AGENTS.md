@@ -39,7 +39,7 @@ again at 150 runs (about 6 minutes; name a test to run only its sweeps).
 Each prints a PASS or FAIL summary; a goal5 or goal6 filter runs only those rows and their sweeps.
 docs/BALANCE_AND_RUN_STATS.md "Goal 5" and "Goal 6" define the rows, the tier definition (milestone-gated nodes
 left out) and the milestones (TreeExhausted, OperationsOpen), with their numbers at the wave-4 close: the goal-5
-rows pass, G6.11 and G6.12 are red, and of the goal-3 rows G3.11 is red (plan section 9.6). Once the release build exists,
+rows pass, G6.11 and G6.12 are red (accepted, R60), and the goal-3 rows pass since W4-15 (plan section 9.6). Once the release build exists,
 the first two sweeps take about a minute and the strategy sweep several more. The evaluators' synthetic tests
 (tests/pacing_harness.rs, tests/strategy_pacing.rs) run in the normal suite. The goal-3 table:
 cargo run --locked --release -p horde_core --example pacing -- --strategy --seeds 20 --out PATH.

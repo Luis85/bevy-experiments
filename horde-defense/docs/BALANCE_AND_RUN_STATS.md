@@ -106,7 +106,7 @@ followed by `<id>_spawned,<id>_killed,<id>_damage_taken` for every enemy archety
 | `easy`, `hard` | The Easy or Hard preset | Reported |
 | `long` | 150 runs | Informational, at 5 seeds |
 | `strategy` | Novice aim, gear first, Luxembourg, seed 2026, 120 runs; plays the strategy layer (S1) | G3.10, G3.12 (`--strategy`) |
-| `neighbours-solo`, `neighbours-parallel` | Frees Germany's 3-stage neighbours alone (S2a) or with expeditions (S2b); stops at the fourth liberation | G3.11 (`--strategy`) |
+| `neighbours-solo`, `neighbours-parallel` | Frees Germany's 3-stage neighbours alone (S2a) or with expeditions (S2b, which trains and equips its recruits before they leave: `train_companions`, W4-15); stops at the fourth liberation | G3.11 (`--strategy`) |
 | `equip-drops` | Wears every drop that beats its loadout, in camp | G5.6 |
 | `goal6-novice` | Novice aim (the goal-6 measurement profile, R56) | G6.11, G6.12 |
 

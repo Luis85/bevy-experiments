@@ -131,10 +131,14 @@ survivor, Mara, a recruit takeover) keep the campaign rank, and every
 expedition victory still adds one to the campaign rank.
 
 Measured at the wave-4 close (release, 20 seeds; plan §9.6): the bot's
-recruits leave on their starter loadout, play rank 0 and still clear no
-stage, so G3.11 (`parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`)
-stays at 1.00 against its 0.67 target and waits for a user decision (plan
-§2.5). Only their coins rise.
+recruits left on their starter loadout, played rank 0 and cleared no stage,
+so G3.11 (`parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`)
+read 1.00 against its 0.67 target. W4-14's Npc pass let them clear stages 1
+and 2, and W4-15 (Survivor network at 1,500 coins and the strategy bot's
+`train_companions` step, which trains each recruit to 12 points and equips
+the best stash items that keep its rank) lets them clear every stage: G3.11
+reads 0.67 and passes. The rule reads item levels, not tiers, so a recruit
+on tier-4 drops of item level 1-4 still plays rank 0.
 
 ## Country difficulty band
 
