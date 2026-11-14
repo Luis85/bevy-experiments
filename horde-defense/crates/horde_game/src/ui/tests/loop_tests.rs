@@ -117,7 +117,9 @@ fn win(h: &Harness, f: &mut FrontendParts, step: &str) {
 /// The tree's purchase button for node `id`.
 fn learn_label(f: &FrontendParts, id: &str) -> String {
     match f.game.campaign().node_payment(id).unwrap() {
-        NodePayment::Coins(price) => format!("Learn skill · {price} coins"),
+        NodePayment::Coins(price) => {
+            format!("Learn skill · {} coins", crate::ui::coins::grouped(price))
+        }
         NodePayment::LegacyBodyPoints(points) => format!("Learn skill · {points} legacy CP"),
     }
 }

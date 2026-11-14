@@ -3,6 +3,7 @@
 use super::{
     BattleUi, CampaignUi, Navigation, Screen, Tab, UiCtx, UiParams,
     battle::AttackSelection,
+    coins::grouped,
     damage, loot,
     modal::{AppModal, StorageError},
     toast::{RECOVERY_COPIES, TOAST_LONG_SECS, ToastKind},
@@ -426,7 +427,8 @@ impl UiCtx<'_> {
             self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
             self.status.message = match &outcome {
                 AppOutcome::Command(CommandOutcome::Amount(amount)) => format!(
-                    "{success} +{amount} {}",
+                    "{success} +{} {}",
+                    grouped(*amount),
                     if matches!(
                         command,
                         AppCommand::Game(Command::Salvage(_) | Command::SalvageExpedition { .. })

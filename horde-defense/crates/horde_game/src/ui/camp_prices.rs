@@ -1,6 +1,7 @@
 //! Camp purchase buttons whose labels, enable checks and hover text read the
 //! core camp prices (rulings R10 and D15): `Campaign::recruit_price` and
 //! `Campaign::npc_training_price`, both threat-scaled.
+use super::coins::grouped;
 use horde_core::{
     campaign::{Campaign, Npc},
     sim::Game,
@@ -20,10 +21,11 @@ pub(super) struct PriceButton {
 pub(super) fn training_point(campaign: &Campaign, npc: &Npc) -> PriceButton {
     let price = campaign.npc_training_price();
     PriceButton {
-        label: format!("Buy 1 training CP · {price} coins"),
+        label: format!("Buy 1 training CP · {} coins", grouped(price)),
         enabled: campaign.coins >= price && npc.awarded < campaign.allowance(),
         disabled_hover: format!(
-            "Requires {price} coins and room in the campaign advancement allowance. {}",
+            "Requires {} coins and room in the campaign advancement allowance. {}",
+            grouped(price),
             campaign.allowance_raise_hint()
         ),
     }
@@ -41,8 +43,13 @@ pub(super) fn recruit(game: &Game, country: &str) -> PriceButton {
             .then(|| "Choose a liberated country.".to_owned()),
         (game.strategy().roster.len() >= max)
             .then(|| format!("The roster is full ({max} survivors).")),
-        (campaign.coins < price)
-            .then(|| format!("Requires {price} coins; you have {}.", campaign.coins)),
+        (campaign.coins < price).then(|| {
+            format!(
+                "Requires {} coins; you have {}.",
+                grouped(price),
+                grouped(campaign.coins)
+            )
+        }),
         campaign
             .reserved
             .is_some()
@@ -52,11 +59,12 @@ pub(super) fn recruit(game: &Game, country: &str) -> PriceButton {
     .flatten()
     .collect();
     PriceButton {
-        label: format!("Recruit survivor · {price} coins"),
+        label: format!("Recruit survivor · {} coins", grouped(price)),
         enabled: blockers.is_empty(),
         disabled_hover: if blockers.is_empty() {
             format!(
-                "Requires a liberated country, room in the roster, {price} coins and the active defender in camp."
+                "Requires a liberated country, room in the roster, {} coins and the active defender in camp.",
+                grouped(price)
             )
         } else {
             blockers.join(" ")

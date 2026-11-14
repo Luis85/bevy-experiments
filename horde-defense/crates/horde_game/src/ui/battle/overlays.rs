@@ -7,7 +7,7 @@ use crate::{
     art::{AMBER, INK, RED, TEXT},
     battle_view::{BattleScreen, FieldHint},
     settings::{Action, BindingId, ExtraAction, Settings, binding_text},
-    ui::{UiCtx, hud, progress},
+    ui::{UiCtx, coins::grouped, hud, progress},
 };
 use bevy_egui::egui::{self, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, pos2, vec2};
 
@@ -90,7 +90,9 @@ pub(super) fn corner_hud(
                 ui.label(
                     RichText::new(format!(
                         "{:.0}s · {} kills · +{} coins",
-                        view.elapsed, view.kills, view.coins
+                        view.elapsed,
+                        view.kills,
+                        grouped(view.coins)
                     ))
                     .size(12.),
                 );

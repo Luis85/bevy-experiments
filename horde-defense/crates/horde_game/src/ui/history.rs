@@ -1,5 +1,5 @@
 //! Read-only run analysis from the authoritative, persistent settlement ledger.
-use super::{UiCtx, chrome, muted};
+use super::{UiCtx, chrome, coins::grouped, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, PANEL, RED};
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke, pos2, vec2};
 use horde_core::stats::RunRecord;
@@ -186,14 +186,18 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings
     );
     ui.label(format!(
         "{} coins · {} kill XP + {} completion XP · {} items",
-        r.coins, r.kill_xp, r.completion_xp, r.loot
+        grouped(r.coins),
+        r.kill_xp,
+        r.completion_xp,
+        r.loot
     ));
     // What settlement auto-sold from this run's drops; nothing for a run
     // that sold nothing.
     if r.auto_sold_count > 0 {
         ui.label(format!(
             "Auto-sold {} · +{} coins",
-            r.auto_sold_count, r.auto_sold_coins
+            r.auto_sold_count,
+            grouped(r.auto_sold_coins)
         ));
     }
     muted(

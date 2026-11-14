@@ -3,7 +3,7 @@
 //! expeditions, offers and recent reports, and the footer that owns the
 //! world clock. Every rule is a core read; this module only renders and
 //! queues commands.
-use super::{HomeFocus, Screen, Tab, UiCtx, chrome, muted, primary};
+use super::{HomeFocus, Screen, Tab, UiCtx, chrome, coins::grouped, muted, primary};
 use crate::art::{AMBER, GREEN, RED};
 use bevy_egui::egui::{self, RichText};
 use horde_core::{
@@ -386,7 +386,9 @@ fn offers(ui: &mut egui::Ui, f: &mut UiCtx) {
             chrome::row(ui, |ui| {
                 ui.label(format!(
                     "{} · from {} · {} coins",
-                    offer.name, offer.country_name, offer.price
+                    offer.name,
+                    offer.country_name,
+                    grouped(offer.price)
                 ));
                 if ui.button("Recruit ›").clicked() {
                     f.status.open_recruit(&offer.country_id);
@@ -406,7 +408,8 @@ fn offers(ui: &mut egui::Ui, f: &mut UiCtx) {
         if ui
             .button(format!(
                 "Upgrade: {} · {} coins",
-                upgrade.title, upgrade.price
+                upgrade.title,
+                grouped(upgrade.price)
             ))
             .clicked()
         {

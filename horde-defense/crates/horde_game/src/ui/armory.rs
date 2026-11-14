@@ -1,5 +1,5 @@
 //! Armory presentation. Game changes are queued typed intents.
-use super::{Tab, UiCtx, chrome, mode_selector, muted};
+use super::{Tab, UiCtx, chrome, coins::grouped, mode_selector, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, Color32, Layout, Rect, RichText, Sense, Stroke, vec2};
 use horde_core::{
@@ -447,7 +447,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 if ui
                     .add_enabled(
                         offer.tier_unlocked && offer.affordable,
-                        egui::Button::new(format!("Buy · {} coins", offer.price)),
+                        egui::Button::new(format!("Buy · {} coins", grouped(offer.price))),
                     )
                     .on_disabled_hover_text(if offer.tier_unlocked {
                         NEED_COINS_REASON
@@ -628,7 +628,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             if ui
                 .add_enabled(
                     offer.affordable,
-                    egui::Button::new(format!("Buy · {} coins", offer.price)),
+                    egui::Button::new(format!("Buy · {} coins", grouped(offer.price))),
                 )
                 .on_disabled_hover_text(NEED_COINS_REASON)
                 .clicked()
@@ -1075,7 +1075,10 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
     if ui
         .add_enabled(
             quote > 0,
-            egui::Button::new(format!("Sell unprotected extras · {quote} coins")),
+            egui::Button::new(format!(
+                "Sell unprotected extras · {} coins",
+                grouped(quote)
+            )),
         )
         .on_disabled_hover_text(
             "Nothing to sell. Equipped, protected, locked, favorite and preset items are kept, and sales wait while a defender is deployed.",
@@ -1088,7 +1091,10 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.horizontal_wrapped(|ui| {
             ui.colored_label(
                 AMBER,
-                format!("Sell unused, unprotected extras for {quote} coins?"),
+                format!(
+                    "Sell unused, unprotected extras for {} coins?",
+                    grouped(quote)
+                ),
             );
             if ui.button("Confirm sale").clicked() {
                 f.dispatch(
@@ -1123,7 +1129,7 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .unwrap_or("Equipment");
                 ui.colored_label(
                     AMBER,
-                    format!("Sell {name} #{id} for {} coins?", quote.coins),
+                    format!("Sell {name} #{id} for {} coins?", grouped(quote.coins)),
                 );
                 ui.horizontal(|ui| {
                     if ui.button("Confirm item sale").clicked() {

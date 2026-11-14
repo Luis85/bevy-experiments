@@ -6,6 +6,7 @@
 //! which outcomes are pending.
 use super::{
     Screen, UiCtx,
+    coins::grouped,
     toast::{STACK_VISIBLE, TOAST_LONG_SECS, ToastKind},
 };
 use horde_core::{
@@ -33,7 +34,7 @@ pub(super) fn outcome_line(recruit: &str, country: &str, summary: &ExpeditionSum
     };
     match summary.coins {
         0 => format!("{recruit} {did} {country}"),
-        coins => format!("{recruit} {did} {country} · +{coins} coins"),
+        coins => format!("{recruit} {did} {country} · +{} coins", grouped(coins)),
     }
 }
 
@@ -191,6 +192,12 @@ mod tests {
             "Ada Voss held Poland · +35 coins"
         );
         assert_eq!(kind(&held), ToastKind::Success);
+        // Coins are grouped by thousands, as on every other screen.
+        held.coins = 1_077;
+        assert_eq!(
+            outcome_line("Ada Voss", "Poland", &held),
+            "Ada Voss held Poland · +1,077 coins"
+        );
 
         let mut lost = summary(Outcome::Defeat);
         lost.coins = 12;

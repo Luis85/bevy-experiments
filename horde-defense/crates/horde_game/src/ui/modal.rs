@@ -22,7 +22,7 @@
 //! quote. The notice system closes it on the sale and re-quotes it when core
 //! refuses a stale quote.
 use super::{
-    HomeFocus, StatusUi, UiCtx, chrome, muted, preferences::DraftState,
+    HomeFocus, StatusUi, UiCtx, chrome, coins::grouped, muted, preferences::DraftState,
     primary_action::primary_in_modal,
 };
 use crate::{
@@ -189,16 +189,16 @@ fn auto_sell_title(quote: &AutoSellPreview) -> String {
     format!(
         "Sell {} for {} coins?",
         chrome::count_noun(quote.count as usize, "item", "items"),
-        quote.coins
+        grouped(quote.coins)
     )
 }
 /// "Sell N · +C": the stash apply's amber primary.
 fn auto_sell_confirm(quote: &AutoSellPreview) -> String {
-    format!("Sell {} · +{}", quote.count, quote.coins)
+    format!("Sell {} · +{}", quote.count, grouped(quote.coins))
 }
 /// "Sold N · +C": the toast of a finished stash apply.
 pub(super) fn auto_sold_toast(count: u32, coins: u64) -> String {
-    format!("Sold {count} · +{coins}")
+    format!("Sold {count} · +{}", grouped(coins))
 }
 
 /// "Recruit as <Archetype> · N coins": a Choose-phase button, at the offer's
@@ -207,7 +207,7 @@ fn recruit_as_label(offer: &RecruitOffer, index: usize) -> String {
     format!(
         "Recruit as {} · {} coins",
         offer.archetypes[index].archetype.label(),
-        offer.price
+        grouped(offer.price)
     )
 }
 

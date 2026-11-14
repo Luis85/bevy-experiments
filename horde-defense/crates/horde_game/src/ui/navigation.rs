@@ -1,5 +1,5 @@
 //! Task navigation and active-field wayfinding; authority stays in commands.
-use super::{Screen, Tab, UiCtx, feedback, muted};
+use super::{Screen, Tab, UiCtx, coins::grouped, feedback, muted};
 use crate::{
     art::{AMBER, PANEL, RED},
     runner::SaveIntent,
@@ -62,7 +62,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                         f.dispatch(Command::SetPaused(true), "");
                         f.request_save(SaveIntent::Menu);
                     }
-                    ui.colored_label(AMBER, format!("{} coins", f.game.campaign().coins));
+                    ui.colored_label(AMBER, format!("{} coins", grouped(f.game.campaign().coins)));
                     if ui.available_width() > 230.0 && !f.game.campaign().world.cleared.is_empty() {
                         muted(
                             ui,

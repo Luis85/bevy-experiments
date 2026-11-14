@@ -3,7 +3,9 @@
 //! outcome strip, then inline content (loot, the liberation block, the next
 //! defender) and one action bar of exactly three buttons: [Upgrade]
 //! [continue] [Leave journey]. The upgrade tree lives on `Screen::Upgrades`.
-use super::{Screen, UiCtx, chrome, muted, primary, primary_action::PRIMARY_MIN_SIZE, status};
+use super::{
+    Screen, UiCtx, chrome, coins::grouped, muted, primary, primary_action::PRIMARY_MIN_SIZE, status,
+};
 use crate::art::{AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT};
 use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob, vec2};
 use horde_core::{
@@ -168,18 +170,6 @@ fn defender_suffix(f: &UiCtx, report: &Report) -> String {
             .map_or_else(String::new, |card| format!(" · {}", card.name)),
     }
 }
-/// 1077 as "1,077": coin amounts of the progression lines.
-fn grouped(amount: u64) -> String {
-    let digits = amount.to_string();
-    let mut text = String::with_capacity(digits.len() + digits.len() / 3);
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            text.push(',');
-        }
-        text.push(digit);
-    }
-    text
-}
 /// "Rank 10 milestone · +1,000 coins · <item name>" for each rank milestone
 /// the report's settlement receipt lists, in its (ascending) order. The item
 /// is named from the catalogue; a milestone that stored none names its rank
@@ -262,7 +252,11 @@ fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
         title(TEXT),
     );
     line.append(
-        &format!(" · banked +{} coins · {} items", report.coins, report.loot),
+        &format!(
+            " · banked +{} coins · {} items",
+            grouped(report.coins),
+            report.loot
+        ),
         0.0,
         TextFormat {
             font_id: FontId::proportional(16.0),
@@ -383,12 +377,13 @@ fn recruit_block_model(f: &UiCtx) -> Option<RecruitBlock> {
     Some(match f.game.recruit_offer(country) {
         Ok(offer) => RecruitBlock::Offer {
             country: offer.country_id,
-            label: format!("Recruit from {name} · {} coins", offer.price),
+            label: format!("Recruit from {name} · {} coins", grouped(offer.price)),
         },
         Err(RecruitBlocker::NeedsNode {
             name: node, price, ..
         }) => RecruitBlock::Blocked(format!(
-            "Learn {node} in Upgrades to recruit from {name} ({price} coins)"
+            "Learn {node} in Upgrades to recruit from {name} ({} coins)",
+            grouped(price)
         )),
         Err(blocker) => RecruitBlock::Blocked(format!("Recruit from {name}: {}", blocker.label())),
     })

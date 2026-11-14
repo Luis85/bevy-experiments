@@ -1,7 +1,7 @@
 //! One connected personal progression catalogue. Every rule (state, path,
 //! preview, recommendation, search) is a core query; this screen only renders
 //! them, and purchases go through `Command::BuySkillNode`.
-use super::{UiCtx, muted};
+use super::{UiCtx, coins::grouped, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, TEXT};
 use bevy_egui::egui::{self, Align, Key, Layout, Modifiers, Rect, RichText, Sense, Stroke, vec2};
 use horde_core::campaign::{
@@ -66,7 +66,7 @@ pub(super) fn layout_for_test(ctx: &egui::Context) -> Option<TreeLayout> {
 fn short_price(payment: NodePayment) -> String {
     match payment {
         NodePayment::LegacyBodyPoints(points) => format!("{points} CP"),
-        NodePayment::Coins(price) => format!("{price} c"),
+        NodePayment::Coins(price) => format!("{} c", grouped(price)),
     }
 }
 /// The canvas caption and tone for a core node state.
@@ -75,7 +75,7 @@ fn badge(state: &NodeState) -> (String, Tone) {
         NodeState::Owned => ("OWNED".into(), Tone::Owned),
         NodeState::Buyable(payment) => (short_price(*payment), Tone::Buyable),
         NodeState::NeedsCoins { payment, short } => (
-            format!("{} · need {short}", short_price(*payment)),
+            format!("{} · need {}", short_price(*payment), grouped(*short)),
             Tone::NeedsCoins,
         ),
         NodeState::NeedsPrerequisites { .. } => ("Locked".into(), Tone::Prerequisite),
@@ -101,7 +101,9 @@ fn state_chip(state: &NodeState) -> (String, egui::Color32) {
     match state {
         NodeState::Owned => ("Owned".into(), AMBER),
         NodeState::Buyable(_) => ("Ready to learn".into(), TEXT),
-        NodeState::NeedsCoins { short, .. } => (format!("Short {short} coins"), MUTED_RED),
+        NodeState::NeedsCoins { short, .. } => {
+            (format!("Short {} coins", grouped(*short)), MUTED_RED)
+        }
         NodeState::NeedsPrerequisites { missing } => (
             match missing.as_slice() {
                 [] => "Locked".into(),
@@ -584,7 +586,7 @@ enum DetailAction {
 fn price_label(payment: NodePayment) -> String {
     match payment {
         NodePayment::LegacyBodyPoints(points) => format!("{points} legacy CP"),
-        NodePayment::Coins(price) => format!("{price} coins"),
+        NodePayment::Coins(price) => format!("{} coins", grouped(price)),
     }
 }
 fn chip(ui: &mut egui::Ui, text: &str, color: egui::Color32, filled: bool) {
@@ -736,7 +738,7 @@ fn skill_detail(
             ui.label(format!(
                 "{} steps · {} coins",
                 path.steps.len(),
-                path.total_coins
+                grouped(path.total_coins)
             ));
             if let Some(blocking) = &path.blocking {
                 muted(ui, format!("Blocked until: {blocking}"));
@@ -872,11 +874,11 @@ mod tests {
                 acquire_requirements(&mut campaign, &node.id);
                 let affordable = actual_node(&campaign, &node.id);
                 assert_eq!(affordable.tone, Tone::Buyable);
-                assert_eq!(affordable.badge, format!("{} c", node.price));
+                assert_eq!(affordable.badge, format!("{} c", grouped(node.price)));
                 campaign.coins = node.price - 1;
                 let poor = actual_node(&campaign, &node.id);
                 assert_eq!(poor.tone, Tone::NeedsCoins);
-                assert_eq!(poor.badge, format!("{} c · need 1", node.price));
+                assert_eq!(poor.badge, format!("{} c · need 1", grouped(node.price)));
                 assert!(campaign.can_purchase_node(&node.id).is_err());
                 campaign.coins = 100_000;
                 let before = campaign.coins;

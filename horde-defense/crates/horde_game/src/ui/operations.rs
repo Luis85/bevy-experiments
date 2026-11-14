@@ -1,5 +1,5 @@
 //! Operations presentation. Game changes are queued typed intents.
-use super::{UiCtx, chrome, damage, loot, muted, reticle};
+use super::{UiCtx, chrome, coins::grouped, damage, loot, muted, reticle};
 use crate::art::{self, AMBER, RED};
 use bevy_egui::egui::{self, Sense, vec2};
 use view::country_name;
@@ -100,7 +100,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     report.stage + 1,
                     report.outcome.label(),
                     report.kills,
-                    report.coins
+                    grouped(report.coins)
                 ));
             }
         });
@@ -445,7 +445,7 @@ fn service_record(ui: &mut egui::Ui, record: &horde_core::defenders::ServiceReco
                     "outbreak contained",
                     "outbreaks contained"
                 ),
-                record.coins,
+                grouped(record.coins),
             ),
         );
     }

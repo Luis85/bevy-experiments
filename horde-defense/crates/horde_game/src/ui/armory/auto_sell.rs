@@ -6,7 +6,7 @@
 //! which carries the quote the player confirms.
 use crate::art::{AMBER, INK, TEXT};
 use crate::settings::Settings;
-use crate::ui::{UiCtx, chrome, modal::AppModal, muted};
+use crate::ui::{UiCtx, chrome, coins::grouped, modal::AppModal, muted};
 use bevy_egui::egui::{
     self, Response, Sense, Stroke, StrokeKind, TextStyle, TextWrapMode, WidgetInfo, WidgetText,
     WidgetType, vec2,
@@ -160,10 +160,15 @@ fn panel_model(game: &Game) -> PanelModel {
     };
     PanelModel {
         rule,
-        would_sell: format!("Would sell {} now · +{}", now.count, now.coins),
+        would_sell: format!("Would sell {} now · +{}", now.count, grouped(now.coins)),
         would_sell_detail,
-        last_run: last
-            .map(|last| format!("Last run would have sold {} · +{}", last.count, last.coins)),
+        last_run: last.map(|last| {
+            format!(
+                "Last run would have sold {} · +{}",
+                last.count,
+                grouped(last.coins)
+            )
+        }),
         warning: threshold_warning(rule.sell_below),
         hint,
         apply_blocked,

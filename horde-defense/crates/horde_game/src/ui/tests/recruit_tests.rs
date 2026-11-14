@@ -172,7 +172,10 @@ fn liberation_results_names_missing_survivor_network() {
         panic!("the Recruitment node is missing");
     };
     assert_eq!(name, "Survivor network");
-    let line = format!("Learn {name} in Upgrades to recruit from Germany ({price} coins)");
+    let line = format!(
+        "Learn {name} in Upgrades to recruit from Germany ({} coins)",
+        crate::ui::coins::grouped(price)
+    );
     let output = settle(&h, f);
     assert_eq!(text_count(&output, &line), 1, "{line}");
     assert!(fully_visible(&output, &line));

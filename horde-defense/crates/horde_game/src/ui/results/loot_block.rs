@@ -5,7 +5,7 @@
 //! the offers and each offer's equip command are core's. Inline content,
 //! never one of the screen's actions; static, so reduced effects needs no
 //! second form.
-use crate::ui::{Tab, UiCtx, chrome, muted};
+use crate::ui::{Tab, UiCtx, chrome, coins::grouped, muted};
 use bevy_egui::egui::{self, RichText};
 use horde_core::{
     campaign::AutoSoldReceipt,
@@ -101,7 +101,11 @@ fn sold_line(receipt: &AutoSoldReceipt, rule_enabled: bool) -> SoldLine {
     } else {
         String::new()
     };
-    let text = format!("Auto-sold {} · +{}{kept}", receipt.count, receipt.coins);
+    let text = format!(
+        "Auto-sold {} · +{}{kept}",
+        receipt.count,
+        grouped(receipt.coins)
+    );
     if receipt.count > 0 {
         SoldLine::Sold {
             text,

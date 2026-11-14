@@ -215,6 +215,7 @@ mod briefing;
 mod camp;
 mod camp_prices;
 mod chrome;
+mod coins;
 mod home;
 mod navigation;
 mod onboarding;
