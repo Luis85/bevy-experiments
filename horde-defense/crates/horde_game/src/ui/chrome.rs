@@ -231,9 +231,9 @@ pub(super) fn quality_shape(quality: Quality) -> QualityShape {
 }
 /// Side of the square a quality shape is drawn in beside text.
 pub(super) const QUALITY_SHAPE_SIDE: f32 = 12.0;
-/// Paints `quality`'s shape as one egui shape inside the `side`-wide square
-/// at `center`. Static: nothing here animates, so reduced effects needs no
-/// second form.
+/// Paints `quality`'s shape ([`quality_shape_at`]) inside the `side`-wide
+/// square at `center`. Static: nothing here animates, so reduced effects
+/// needs no second form.
 pub(super) fn paint_quality_shape(
     painter: &egui::Painter,
     quality: Quality,
@@ -241,6 +241,17 @@ pub(super) fn paint_quality_shape(
     side: f32,
     colour: Color32,
 ) {
+    painter.add(quality_shape_at(quality, center, side, colour));
+}
+/// `quality`'s shape as one egui shape inside the `side`-wide square at
+/// `center`: the one shape table every quality marker draws from, the
+/// battlefield fly-up's corner marker included.
+pub(super) fn quality_shape_at(
+    quality: Quality,
+    center: Pos2,
+    side: f32,
+    colour: Color32,
+) -> egui::Shape {
     let r = side * 0.5;
     // A point on the circle of radius `radius`, `turn` of a turn clockwise
     // from straight up.
@@ -249,40 +260,30 @@ pub(super) fn paint_quality_shape(
         center + vec2(angle.sin(), -angle.cos()) * radius
     };
     match quality_shape(quality) {
-        QualityShape::HollowTriangleDown => {
-            painter.add(egui::Shape::closed_line(
-                vec![
-                    at(0.5, r - 1.0),
-                    at(1.0 / 6.0, r - 1.0),
-                    at(5.0 / 6.0, r - 1.0),
-                ],
-                Stroke::new(1.5, colour),
-            ));
-        }
-        QualityShape::Disc => {
-            painter.circle_filled(center, r * 0.8, colour);
-        }
-        QualityShape::Diamond => {
-            painter.add(egui::Shape::convex_polygon(
-                vec![at(0.0, r), at(0.25, r * 0.8), at(0.5, r), at(0.75, r * 0.8)],
-                colour,
-                Stroke::NONE,
-            ));
-        }
-        QualityShape::Square => {
-            painter.rect_filled(
-                egui::Rect::from_center_size(center, egui::Vec2::splat(side * 0.78)),
-                0.0,
-                colour,
-            );
-        }
-        QualityShape::TriangleUp => {
-            painter.add(egui::Shape::convex_polygon(
-                vec![at(0.0, r), at(1.0 / 3.0, r), at(2.0 / 3.0, r)],
-                colour,
-                Stroke::NONE,
-            ));
-        }
+        QualityShape::HollowTriangleDown => egui::Shape::closed_line(
+            vec![
+                at(0.5, r - 1.0),
+                at(1.0 / 6.0, r - 1.0),
+                at(5.0 / 6.0, r - 1.0),
+            ],
+            Stroke::new(1.5, colour),
+        ),
+        QualityShape::Disc => egui::Shape::circle_filled(center, r * 0.8, colour),
+        QualityShape::Diamond => egui::Shape::convex_polygon(
+            vec![at(0.0, r), at(0.25, r * 0.8), at(0.5, r), at(0.75, r * 0.8)],
+            colour,
+            Stroke::NONE,
+        ),
+        QualityShape::Square => egui::Shape::rect_filled(
+            egui::Rect::from_center_size(center, egui::Vec2::splat(side * 0.78)),
+            0.0,
+            colour,
+        ),
+        QualityShape::TriangleUp => egui::Shape::convex_polygon(
+            vec![at(0.0, r), at(1.0 / 3.0, r), at(2.0 / 3.0, r)],
+            colour,
+            Stroke::NONE,
+        ),
         QualityShape::Star => {
             // A star is not convex: a triangle fan from its centre is.
             let mut mesh = egui::Mesh::default();
@@ -294,7 +295,7 @@ pub(super) fn paint_quality_shape(
             for point in 0..10u32 {
                 mesh.add_triangle(0, 1 + point, 1 + (point + 1) % 10);
             }
-            painter.add(egui::Shape::mesh(mesh));
+            egui::Shape::mesh(mesh)
         }
     }
 }

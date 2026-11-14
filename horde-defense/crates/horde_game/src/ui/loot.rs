@@ -226,56 +226,15 @@ fn glint_band(icon: Rect, phase: f32, color: Color32, fade: f32) -> egui::Mesh {
     mesh.add_triangle(0, 2, 3);
     mesh
 }
-/// Half the size of a tier marker, and the radius of the INK disc under it.
+/// Half the side of a tier marker's square, and the radius of the INK disc
+/// under it. The marker is chrome's quality shape, so quality never rests
+/// on colour alone.
 const MARKER_HALF: f32 = 3.0;
 const MARKER_DISC: f32 = 4.5;
 /// The marker sits inside the icon's top-right corner, its disc 1 pt clear
 /// of both edges.
 fn marker_center(icon: Rect) -> egui::Pos2 {
     icon.right_top() + vec2(-MARKER_DISC - 1.0, MARKER_DISC + 1.0)
-}
-/// A drop's tier as a shape, so quality never rests on colour alone: Poor a
-/// hollow point-down triangle, Common a dot, Uncommon a diamond, Rare a
-/// square, Epic a triangle, Legendary a five-point star (the ux-flow shape
-/// set). Fits a square of half-size [`MARKER_HALF`] on `at`.
-fn tier_marker(quality: Quality, at: egui::Pos2, color: Color32) -> egui::Shape {
-    let h = MARKER_HALF;
-    let points = |unit: &[[f32; 2]]| -> Vec<egui::Pos2> {
-        unit.iter().map(|[x, y]| at + vec2(x * h, y * h)).collect()
-    };
-    match quality {
-        Quality::Poor => egui::Shape::closed_line(
-            points(&[[-1.0, -0.8], [1.0, -0.8], [0.0, 1.0]]),
-            Stroke::new(1.0, color),
-        ),
-        Quality::Common => egui::Shape::circle_filled(at, h * 0.8, color),
-        Quality::Uncommon => egui::Shape::convex_polygon(
-            points(&[[0.0, -1.0], [1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]]),
-            color,
-            Stroke::NONE,
-        ),
-        Quality::Rare => {
-            egui::Shape::rect_filled(Rect::from_center_size(at, vec2(h, h) * 1.7), 0.0, color)
-        }
-        Quality::Epic => egui::Shape::convex_polygon(
-            points(&[[0.0, -1.0], [1.0, 0.8], [-1.0, 0.8]]),
-            color,
-            Stroke::NONE,
-        ),
-        Quality::Legendary => {
-            // A star is not convex: a fan from the centre over ten rim
-            // points, the tips at radius 1 and the notches at 0.45.
-            let mut mesh = egui::Mesh::default();
-            mesh.colored_vertex(at, color);
-            for i in 0..10u32 {
-                let radius = if i % 2 == 0 { h } else { h * 0.45 };
-                let angle = std::f32::consts::TAU * i as f32 / 10.0;
-                mesh.colored_vertex(at + vec2(angle.sin(), -angle.cos()) * radius, color);
-                mesh.add_triangle(0, 1 + i, 1 + (i + 1) % 10);
-            }
-            egui::Shape::mesh(mesh)
-        }
-    }
 }
 /// Draws `battle`'s fly-ups; none meets a rect of `keep_clear` (CF-1-09).
 #[allow(clippy::too_many_arguments)]
@@ -377,7 +336,13 @@ pub(super) fn draw_for(
         // The tier marker and its disc: static, the same in reduced effects.
         let marker = marker_center(icon);
         painter.circle_filled(marker, MARKER_DISC, art::INK.gamma_multiply(fade));
-        painter.add(tier_marker(entry.receipt.quality, marker, color));
+        chrome::paint_quality_shape(
+            &painter,
+            entry.receipt.quality,
+            marker,
+            2.0 * MARKER_HALF,
+            color,
+        );
         // Quality and name only: no auto-sell or sale status is ever shown
         // on the battlefield (G4.9, `flyup_never_shows_sale_status`).
         painter.galley(text_at, galley, color);
@@ -723,7 +688,9 @@ mod tests {
         let at = pos2(40.0, 40.0);
         let markers: Vec<_> = Quality::ALL
             .iter()
-            .map(|&quality| tier_marker(quality, at, Color32::WHITE))
+            .map(|&quality| {
+                chrome::quality_shape_at(quality, at, 2.0 * MARKER_HALF, Color32::WHITE)
+            })
             .collect();
         for (i, a) in markers.iter().enumerate() {
             assert!(
@@ -759,6 +726,41 @@ mod tests {
                     Rect::from_center_size(marker_center(icon), vec2(2.0, 2.0) * MARKER_DISC)
                         .contains_rect(marker.visual_bounding_rect()),
                     "{quality:?} marker on its disc"
+                );
+            }
+        }
+    }
+    /// Closing (one shape table): the corner marker a fly-up paints on its
+    /// disc is chrome's quality shape, the one Armory, History and Results
+    /// draw, at the marker's size and in the fly-up's colour.
+    #[test]
+    fn flyup_marker_is_the_chrome_quality_shape() {
+        for reduced in [false, true] {
+            for quality in Quality::ALL {
+                let (shapes, _) = drawn(quality, reduced, 0.3);
+                let (icon, _) = plate(&shapes);
+                let colour = shapes
+                    .iter()
+                    .find_map(|shape| match shape {
+                        egui::Shape::Text(text) => Some(text.fallback_color),
+                        _ => None,
+                    })
+                    .expect("the fly-up's text");
+                let disc = shapes
+                    .iter()
+                    .position(
+                        |shape| matches!(shape, egui::Shape::Circle(c) if c.radius == MARKER_DISC),
+                    )
+                    .unwrap_or_else(|| panic!("{quality:?} marker disc"));
+                assert_eq!(
+                    shapes[disc + 1],
+                    chrome::quality_shape_at(
+                        quality,
+                        marker_center(icon),
+                        2.0 * MARKER_HALF,
+                        colour
+                    ),
+                    "{quality:?} reduced {reduced}"
                 );
             }
         }
