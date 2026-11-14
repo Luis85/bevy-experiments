@@ -64,9 +64,13 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 Sense::click_and_drag(),
             );
             f.battle.arena_rect = Some(r);
-            // The construction overlay swallows the field under it.
+            // The construction overlay swallows the field under it. A review
+            // capture has no pointer at all (CF-1-03): wherever the OS mouse
+            // rests, the aim stays where the scene pinned it and nothing
+            // hovers.
             let pointer = response
                 .hover_pos()
+                .filter(|_| !f.launch.review_capture())
                 .filter(|p| layout.addresses_field(*p, f.battle.construction));
             let hovered = response.hovered() && pointer.is_some();
             f.battle.arena_hover = hovered;

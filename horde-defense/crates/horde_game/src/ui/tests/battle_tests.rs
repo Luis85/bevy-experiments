@@ -1776,3 +1776,76 @@ fn midpoint_label_clears_the_construction_panel() {
         }
     }
 }
+
+/// CF-1-03: a review capture (a still or a frame sequence) never reads the
+/// live OS pointer. With the pointer over the field the aim stays where the
+/// scene pinned it, the field does not hover, and the frame paints exactly
+/// what it paints with no pointer: no hover reticle, no inspector, no
+/// crosshair cursor. An interactive launch still aims with the pointer.
+#[test]
+fn review_capture_aim_ignores_the_os_pointer() {
+    use crate::launch::{LaunchConfig, ReviewOptions};
+    let still = ReviewOptions {
+        capture: Some("headless-review-capture.png".into()),
+        exit: true,
+        ..ReviewOptions::default()
+    };
+    let sequence = ReviewOptions {
+        motion: true,
+        sequence: Some("headless-review-sequence".into()),
+        ..ReviewOptions::default()
+    };
+    for (name, review, pinned) in [
+        ("still capture", Some(still), true),
+        ("sequence capture", Some(sequence), true),
+        ("interactive review", Some(ReviewOptions::default()), false),
+        ("play", None, false),
+    ] {
+        for size in target_sizes() {
+            let mut fixture = fresh_battle(Mode::Personal, true);
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            f.launch = LaunchConfig {
+                scenario: review.is_some().then(|| "max-lanes".to_owned()),
+                review: review.clone(),
+                ..LaunchConfig::default()
+            };
+            h.frame_size(f, View::Battle, vec![], size);
+            let still_frame = h.frame_size(f, View::Battle, vec![], size);
+            let aim = f.battle.aim;
+            let field = field_layout(&h, f).field.rect;
+            let over = pos2(field.left() + field.width() * 0.25, field.center().y);
+            let mut hovered_frame = None;
+            for _ in 0..2 {
+                hovered_frame =
+                    Some(h.frame_size(f, View::Battle, vec![Event::PointerMoved(over)], size));
+            }
+            let hovered_frame = hovered_frame.unwrap();
+            let crosshair =
+                hovered_frame.platform_output.cursor_icon == egui::CursorIcon::Crosshair;
+            let same_paint = hovered_frame.shapes == still_frame.shapes;
+            if pinned {
+                assert_eq!(
+                    f.battle.aim, aim,
+                    "{name} {size:?}: the pointer moved the pinned aim"
+                );
+                assert!(
+                    !f.battle.arena_hover,
+                    "{name} {size:?}: the capture let the field hover"
+                );
+                assert!(!crosshair, "{name} {size:?}: the capture owns the cursor");
+                assert!(
+                    same_paint,
+                    "{name} {size:?}: the pointer changed the painted frame"
+                );
+            } else {
+                // The perturbation half: the same pointer does aim, hover and
+                // paint a reticle readout outside a capture.
+                assert_ne!(f.battle.aim, aim, "{name} {size:?}: the pointer aims");
+                assert!(f.battle.arena_hover, "{name} {size:?}: the field hovers");
+                assert!(crosshair, "{name} {size:?}: the field owns the cursor");
+                assert!(!same_paint, "{name} {size:?}: the reticle readout paints");
+            }
+        }
+    }
+}

@@ -236,6 +236,16 @@ fn select_loot_capture_mode(
     }
 }
 impl crate::launch::LaunchConfig {
+    /// An isolated review that writes evidence: a still (`capture`) or a
+    /// frame sequence. Its frames never read the live OS pointer (CF-1-03):
+    /// the field keeps the scene's pinned aim and draws no hover reticle or
+    /// inspector, so two captures of one scene differ only by the change
+    /// under review. An interactive review and practice keep the pointer.
+    pub(super) fn review_capture(&self) -> bool {
+        self.review.is_some()
+            && !self.practice
+            && (self.capture_path().is_some() || self.sequence_path().is_some())
+    }
     pub(super) fn reticle_capture_preview(&self) -> bool {
         matches!(
             self.scenario.as_deref(),
