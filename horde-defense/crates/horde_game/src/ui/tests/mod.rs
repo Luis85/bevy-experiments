@@ -590,6 +590,7 @@ fn fully_visible(output: &FullOutput, label: &str) -> bool {
 }
 
 mod armory_tests;
+mod autosell_tests;
 mod battle_tests;
 mod boss_banner_tests;
 mod briefing_tests;

@@ -702,3 +702,118 @@ fn every_sell_path_agrees_with_sale_eligibility() {
         );
     }
 }
+
+/// W3-21: every block names its way out. `Game::sale_resolution` is the
+/// typed shortcut the armory offers and `Game::sale_resolution_command` the
+/// command it dispatches; applying that command lifts exactly that block.
+/// A recruit's gear is changed on Operations, so its shortcut is navigation
+/// only, and the blocks with no way out answer `SaleResolution::None`.
+#[test]
+fn sale_resolution_names_the_way_out_of_each_block() {
+    use horde_core::campaign::SaleResolution;
+    let Fixture { game, cases, .. } = fixture();
+    let before = serde_json::to_value(&game).unwrap();
+    let recruit = game
+        .strategy()
+        .roster
+        .iter()
+        .find(|r| r.status == horde_core::strategy::RecruitStatus::Ready)
+        .unwrap()
+        .id;
+    let preset_index = game
+        .campaign()
+        .presets
+        .iter()
+        .position(|p| p.name == "Vest")
+        .unwrap();
+    let slot_of = |id: u64| game.campaign().item(id).unwrap().definition().slot;
+    let mut lifted = 0;
+    for (id, expected) in &cases {
+        let resolution = game.sale_resolution(*id);
+        let command = game.sale_resolution_command(*id);
+        let want = match expected {
+            Err(SaleBlock::Locked) => SaleResolution::Unlock,
+            Err(SaleBlock::Favorite) => SaleResolution::Unfavourite,
+            Err(SaleBlock::EquippedPersonal) => SaleResolution::EquipStarter {
+                mode: Mode::Personal,
+                slot: slot_of(*id),
+            },
+            Err(SaleBlock::EquippedMara) => SaleResolution::EquipStarter {
+                mode: Mode::Npc,
+                slot: slot_of(*id),
+            },
+            Err(SaleBlock::Preset { .. }) => SaleResolution::OpenPreset {
+                index: preset_index,
+            },
+            Err(SaleBlock::RecruitEquipped { .. }) => SaleResolution::OpenRecruit { recruit },
+            _ => SaleResolution::None,
+        };
+        assert_eq!(resolution, want, "{expected:?}");
+        match resolution {
+            SaleResolution::None | SaleResolution::OpenRecruit { .. } => {
+                assert_eq!(command, None, "{expected:?}");
+            }
+            _ => {
+                lifted += 1;
+                let command = command.unwrap_or_else(|| panic!("{expected:?} has a command"));
+                let mut after = game.clone();
+                apply(&mut after, command.clone());
+                assert_ne!(
+                    after.sale_eligibility(*id).as_ref().err(),
+                    expected.as_ref().err(),
+                    "{command:?} lifts {expected:?}"
+                );
+            }
+        }
+    }
+    assert_eq!(lifted, 5, "lock, favourite, two loadouts and the preset");
+    let id_of = |wanted: fn(&SaleBlock) -> bool| {
+        cases
+            .iter()
+            .find(|(_, case)| case.as_ref().err().is_some_and(wanted))
+            .unwrap()
+            .0
+    };
+    let locked = id_of(|block| *block == SaleBlock::Locked);
+    assert_eq!(
+        game.sale_resolution_command(locked),
+        Some(Command::Lock {
+            id: locked,
+            locked: false
+        })
+    );
+    let favorite = id_of(|block| *block == SaleBlock::Favorite);
+    assert_eq!(
+        game.sale_resolution_command(favorite),
+        Some(Command::Favorite {
+            id: favorite,
+            favorite: false
+        })
+    );
+    let preset = id_of(|block| matches!(block, SaleBlock::Preset { .. }));
+    assert_eq!(
+        game.sale_resolution_command(preset),
+        Some(Command::DeletePreset {
+            index: preset_index
+        })
+    );
+    // The starter a loadout falls back to is the journey's own protected
+    // item for that slot, never a recruit's issue kit.
+    let personal = id_of(|block| *block == SaleBlock::EquippedPersonal);
+    let Some(Command::Equip { mode, id: starter }) = game.sale_resolution_command(personal) else {
+        panic!("an equipped item falls back to a starter");
+    };
+    assert_eq!(mode, Mode::Personal);
+    let item = game.campaign().item(starter).unwrap();
+    assert!(item.protected);
+    assert_eq!(item.definition().slot, slot_of(personal));
+    assert!(
+        game.strategy()
+            .roster
+            .iter()
+            .all(|r| !r.npc.loadout.contains(&starter)),
+        "never a recruit's starter"
+    );
+    // Pure reads.
+    assert_eq!(serde_json::to_value(&game).unwrap(), before);
+}

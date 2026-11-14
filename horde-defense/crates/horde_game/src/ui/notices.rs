@@ -129,6 +129,17 @@ impl UiCtx<'_> {
             } => match result {
                 Ok(outcome) => self.command_succeeded(command, outcome, success),
                 Err(error) => {
+                    // A refused stash apply re-quotes its open confirmation.
+                    if matches!(
+                        command,
+                        AppCommand::Game(Command::ApplyAutoSellToStash { .. })
+                    ) {
+                        let fresh = self.game.auto_sell_preview(
+                            &self.game.campaign().auto_sell,
+                            horde_core::sim::AutoSellScope::Stash,
+                        );
+                        self.status.auto_sell_refused(fresh);
+                    }
                     self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
                     self.status.message = error;
                     self.status.message_error = true;
@@ -350,6 +361,19 @@ impl UiCtx<'_> {
         ) = (&command, &outcome)
         {
             self.status.recruit_joined(country, *id);
+        }
+        // The stash apply sold its batch: its confirmation closes and one
+        // toast reports the whole batch.
+        if let (
+            AppCommand::Game(Command::ApplyAutoSellToStash { .. }),
+            AppOutcome::Command(CommandOutcome::Sold { count, coins }),
+        ) = (&command, &outcome)
+        {
+            self.status.auto_sell_sold();
+            self.status.toasts.push(
+                super::modal::auto_sold_toast(*count, *coins),
+                ToastKind::Success,
+            );
         }
         if !success.is_empty() {
             self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);

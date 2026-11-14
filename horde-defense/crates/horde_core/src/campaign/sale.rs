@@ -74,8 +74,12 @@ impl SaleBlock {
     }
 }
 
-/// The shortcut a blocked sale offers. Wired to [`SaleBlock`] with the armory
-/// resolution buttons (wave 3); W1-20 shows only `SaleBlock::label()`.
+/// The shortcut a blocked sale offers beside `SaleBlock::label()` (W3-21).
+/// `Game::sale_resolution` picks it, since a preset's index, a recruit's id
+/// and a loadout's starter need the whole game, and
+/// `Game::sale_resolution_command` is the command it dispatches:
+/// `OpenPreset` deletes that preset (the block's one way out) and
+/// `OpenRecruit` only points to Operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SaleResolution {
     Unlock,

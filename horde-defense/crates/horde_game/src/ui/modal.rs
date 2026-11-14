@@ -15,15 +15,24 @@
 //! two archetypes) and dispatches `Command::RecruitAs`; once the command
 //! answers with the recruit's id the notice system moves it to Joined, whose
 //! primary is "Back to camp".
+//!
+//! The stash apply (W3-21, design-loot-economy §9) confirms the Equipment
+//! Auto-sell panel's "Apply rule to stash now…": it carries the quote it
+//! shows and dispatches `Command::ApplyAutoSellToStash` for exactly that
+//! quote. The notice system closes it on the sale and re-quotes it when core
+//! refuses a stale quote.
 use super::{
-    HomeFocus, StatusUi, UiCtx, muted, preferences::DraftState, primary_action::primary_in_modal,
+    HomeFocus, StatusUi, UiCtx, chrome, muted, preferences::DraftState,
+    primary_action::primary_in_modal,
 };
 use crate::{
-    art::{MUTED, RED},
+    art::{AMBER, MUTED, RED},
     runner::{AppCommand, SaveIntent},
 };
 use bevy_egui::egui::{self, RichText};
-use horde_core::{command::Command, defenders::RecruitOffer};
+use horde_core::{
+    command::Command, defenders::RecruitOffer, quality::Quality, sim::AutoSellPreview,
+};
 
 /// The open application modal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,6 +49,15 @@ pub(crate) enum AppModal {
     Recruit {
         country: String,
         phase: RecruitPhase,
+    },
+    /// "Apply rule to stash now…": sell `quote` from the stash, or keep it.
+    ApplyAutoSell {
+        /// What the modal shows and its primary confirms.
+        quote: AutoSellPreview,
+        /// The confirmation is with the runner; the primary waits for it.
+        pending: bool,
+        /// Core refused a stale quote and this is the new one.
+        requoted: bool,
     },
 }
 
@@ -87,6 +105,7 @@ pub(crate) enum ModalKind {
     Storage,
     DraftWarning,
     Recruit,
+    ApplyAutoSell,
 }
 
 impl AppModal {
@@ -97,16 +116,26 @@ impl AppModal {
             Self::Storage(_) => ModalKind::Storage,
             Self::DraftWarning { .. } => ModalKind::DraftWarning,
             Self::Recruit { .. } => ModalKind::Recruit,
+            Self::ApplyAutoSell { .. } => ModalKind::ApplyAutoSell,
+        }
+    }
+    /// The stash-apply confirmation on a fresh `quote`.
+    pub(super) fn auto_sell(quote: AutoSellPreview) -> Self {
+        Self::ApplyAutoSell {
+            quote,
+            pending: false,
+            requoted: false,
         }
     }
     /// The confirmation an Escape press opens. A storage modal is opened by
-    /// its error and the Recruit modal by its buttons, never by a key.
+    /// its error, the Recruit modal and the stash apply by their buttons,
+    /// never by a key.
     /// Escape leaves Settings by its Back route.
     pub(super) fn confirmation(kind: ModalKind) -> Option<Self> {
         match kind {
             ModalKind::Quit => Some(Self::Quit),
             ModalKind::ReturnToMenu => Some(Self::ReturnToMenu),
-            ModalKind::Storage | ModalKind::Recruit => None,
+            ModalKind::Storage | ModalKind::Recruit | ModalKind::ApplyAutoSell => None,
             ModalKind::DraftWarning => Some(Self::DraftWarning {
                 then: LeaveSettings::Back,
             }),
@@ -148,6 +177,29 @@ pub(super) const NOT_NOW: &str = "Not now";
 pub(super) const BACK_TO_CAMP: &str = "Back to camp";
 pub(super) const STAY_HERE: &str = "Stay here";
 pub(super) const CLOSE: &str = "Close";
+
+/// The stash apply (design-loot-economy §9 "Modal").
+const AUTO_SELL_KEPT: &str =
+    "Locked, favourite, equipped, preset, recruit and shop items are kept.";
+const AUTO_SELL_REQUOTED: &str = "The stash changed. This is the new quote.";
+pub(super) const KEEP_ITEMS: &str = "Keep items";
+
+/// "Sell N items for C coins?": the stash apply's question.
+fn auto_sell_title(quote: &AutoSellPreview) -> String {
+    format!(
+        "Sell {} for {} coins?",
+        chrome::count_noun(quote.count as usize, "item", "items"),
+        quote.coins
+    )
+}
+/// "Sell N · +C": the stash apply's amber primary.
+fn auto_sell_confirm(quote: &AutoSellPreview) -> String {
+    format!("Sell {} · +{}", quote.count, quote.coins)
+}
+/// "Sold N · +C": the toast of a finished stash apply.
+pub(super) fn auto_sold_toast(count: u32, coins: u64) -> String {
+    format!("Sold {count} · +{coins}")
+}
 
 /// "Recruit as <Archetype> · N coins": a Choose-phase button, at the offer's
 /// core price.
@@ -209,6 +261,28 @@ impl StatusUi {
             *phase = RecruitPhase::Joined { recruit_id };
         }
     }
+    /// `Command::ApplyAutoSellToStash` sold its batch: the stash apply is
+    /// done.
+    pub(super) fn auto_sell_sold(&mut self) {
+        if matches!(self.modal, Some(AppModal::ApplyAutoSell { .. })) {
+            self.modal = None;
+        }
+    }
+    /// Core refused the stash apply (a stale quote, a full wallet, a defense
+    /// that began meanwhile): the open modal shows `fresh`, the quote core
+    /// would accept now, and says so when it differs; with nothing left to
+    /// sell it closes. The status line carries core's reason either way.
+    pub(super) fn auto_sell_refused(&mut self, fresh: AutoSellPreview) {
+        let Some(AppModal::ApplyAutoSell { quote, .. }) = &self.modal else {
+            return;
+        };
+        let requoted = (fresh.count, fresh.coins) != (quote.count, quote.coins);
+        self.modal = (fresh.count > 0).then_some(AppModal::ApplyAutoSell {
+            quote: fresh,
+            pending: false,
+            requoted,
+        });
+    }
     /// Closes the open modal: "Stay", "Dismiss", Escape or a backdrop click.
     /// A dismissed save failure is remembered, so the same autosave error
     /// does not reopen the modal every retry until a save succeeds.
@@ -261,6 +335,11 @@ pub(super) fn show(ctx: &egui::Context, f: &mut UiCtx) {
         Some(AppModal::Storage(error)) => show_storage(ctx, f, &error),
         Some(AppModal::DraftWarning { then }) => show_draft_warning(ctx, f, then),
         Some(AppModal::Recruit { country, phase }) => show_recruit(ctx, f, &country, phase),
+        Some(AppModal::ApplyAutoSell {
+            quote,
+            pending,
+            requoted,
+        }) => show_auto_sell(ctx, f, &quote, pending, requoted),
         Some(modal) => show_confirmation(ctx, f, modal == AppModal::Quit),
     }
 }
@@ -415,6 +494,73 @@ fn show_recruit(ctx: &egui::Context, f: &mut UiCtx, country: &str, phase: Recrui
         }
         Some(RecruitChoice::Close) => f.status.close_modal(),
         // A backdrop click closes, as Escape does.
+        None if shown.should_close() => f.status.close_modal(),
+        None => {}
+    }
+}
+
+/// The stash apply: what the stored rule would sell from the stash, by
+/// quality, and the two ways on. Nothing is sold until the amber primary
+/// dispatches `Command::ApplyAutoSellToStash` with the quote shown; the
+/// modal then waits for the runner's answer (`notices.rs`).
+fn show_auto_sell(
+    ctx: &egui::Context,
+    f: &mut UiCtx,
+    quote: &AutoSellPreview,
+    pending: bool,
+    requoted: bool,
+) {
+    let confirm = auto_sell_confirm(quote);
+    let shown = egui::Modal::new(egui::Id::new("lastlight_app_modal")).show(ctx, |ui| {
+        ui.set_max_width(440.0);
+        ui.heading(auto_sell_title(quote));
+        if requoted {
+            ui.label(RichText::new(AUTO_SELL_REQUOTED).color(AMBER));
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            for quality in Quality::ALL.into_iter().rev() {
+                let count = quote.by_quality[quality];
+                if count == 0 {
+                    continue;
+                }
+                chrome::quality_shape_icon(ui, quality, f.settings);
+                ui.colored_label(
+                    chrome::quality_colour(quality, f.settings.palette),
+                    format!("{count} {}", quality.name()),
+                );
+            }
+        });
+        muted(ui, AUTO_SELL_KEPT);
+        ui.add_space(10.0);
+        let mut choice = None;
+        ui.horizontal_wrapped(|ui| {
+            ui.add_enabled_ui(!pending, |ui| {
+                if primary_in_modal(ui, &confirm).clicked() {
+                    choice = Some(true);
+                }
+            });
+            if ui.button(KEEP_ITEMS).clicked() {
+                choice = Some(false);
+            }
+        });
+        choice
+    });
+    match shown.inner {
+        Some(true) => {
+            if let Some(AppModal::ApplyAutoSell { pending, .. }) = &mut f.status.modal {
+                *pending = true;
+            }
+            f.dispatch(
+                Command::ApplyAutoSellToStash {
+                    expect_count: quote.count,
+                    expect_coins: quote.coins,
+                },
+                "",
+            );
+        }
+        Some(false) => f.status.close_modal(),
+        // A backdrop click keeps the items, as Escape does.
         None if shown.should_close() => f.status.close_modal(),
         None => {}
     }

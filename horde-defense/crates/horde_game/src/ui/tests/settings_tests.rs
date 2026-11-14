@@ -1165,7 +1165,7 @@ fn painted(shape: &egui::epaint::Shape, out: &mut Vec<(String, Color32)>) {
     }
 }
 /// Every visible non-text shape of a frame.
-fn painted_shapes(output: &FullOutput) -> Vec<(String, Color32)> {
+pub(super) fn painted_shapes(output: &FullOutput) -> Vec<(String, Color32)> {
     let mut out = Vec::new();
     output
         .shapes

@@ -20,7 +20,7 @@ const AUTO_SELL_OFF: &str = "Auto-sell is off · Equipment › Auto-sell";
 /// A new drop of `definition` at `quality` in the live main run, banked as
 /// the drop site banks it: the stash item, `drop_ids`, `loot` and the
 /// quality counts.
-fn drop_item(f: &mut FrontendParts, definition: usize, quality: Quality) -> u64 {
+pub(super) fn drop_item(f: &mut FrontendParts, definition: usize, quality: Quality) -> u64 {
     let id = f
         .game
         .campaign_mut()
@@ -45,7 +45,7 @@ fn sell_cheap() -> AutoSellRule {
 
 /// Ends the live run with a withdrawal (settlement is the same for every
 /// outcome) and shows its Results.
-fn settle_run(f: &mut FrontendParts) {
+pub(super) fn settle_run(f: &mut FrontendParts) {
     f.game.apply(&Command::Withdraw).unwrap();
     assert!(f.game.attempt().is_none());
     f.game.set_paused(true);

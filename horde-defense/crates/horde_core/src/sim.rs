@@ -31,6 +31,7 @@ mod persistence;
 mod power;
 mod progression_rewards;
 mod recruitment;
+mod sale_resolution;
 mod smoke;
 #[cfg(test)]
 mod spitter_tests;
