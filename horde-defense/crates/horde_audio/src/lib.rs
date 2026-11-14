@@ -24,6 +24,7 @@ pub mod gun;
 pub mod loot;
 pub mod meter;
 pub mod mix;
+pub mod music;
 pub mod pan;
 pub mod render;
 pub mod select;

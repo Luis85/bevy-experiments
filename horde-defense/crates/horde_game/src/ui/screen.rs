@@ -63,6 +63,20 @@ impl Screen {
             Screen::History => "Save and return to run history",
         }
     }
+    /// What the music director scores on this screen and camp tab. The
+    /// briefing is its own entry (scored as the camp); Settings and History
+    /// lie over what was playing.
+    pub fn music(self, tab: Tab) -> horde_audio::music::MusicScreen {
+        use horde_audio::music::MusicScreen;
+        match self {
+            Screen::Menu | Screen::SurvivorSelection => MusicScreen::Menu,
+            Screen::Camp if tab == Tab::Briefing => MusicScreen::Briefing,
+            Screen::Camp => MusicScreen::Camp,
+            Screen::Battle => MusicScreen::Battle,
+            Screen::Results => MusicScreen::Results,
+            Screen::History | Screen::Settings => MusicScreen::Overlay,
+        }
+    }
     pub fn ambience(self) -> ScreenAmbience {
         match self {
             Screen::Menu | Screen::SurvivorSelection => ScreenAmbience::Menu,

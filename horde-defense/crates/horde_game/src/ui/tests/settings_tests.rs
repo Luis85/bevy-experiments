@@ -1414,3 +1414,32 @@ fn seeded_defaults() -> Settings {
         ..Settings::default()
     }
 }
+
+/// A6-15: the Music bus has its slider, and the caption says what it sets
+/// while no music tracks ship.
+#[test]
+fn settings_show_the_music_and_stingers_slider_with_its_caption() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    // Tall enough that the scroll area paints the audio section.
+    let output = h.frame_size(f, View::Settings, vec![], egui::vec2(1280.0, 2400.0));
+    for text in [
+        crate::ui::preferences::MUSIC_SLIDER,
+        crate::ui::preferences::MUSIC_CAPTION,
+    ] {
+        assert!(
+            output
+                .shapes
+                .iter()
+                .any(|shape| shape_has_text(&shape.shape, text)),
+            "{text}"
+        );
+    }
+    assert_eq!(crate::ui::preferences::MUSIC_SLIDER, "Music & stingers");
+    assert_eq!(
+        crate::ui::preferences::MUSIC_CAPTION,
+        "Music tracks are not in this build; this sets victory, defeat and retreat stingers."
+    );
+}

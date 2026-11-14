@@ -273,7 +273,7 @@ fn an_unusable_step_request_is_dropped_and_the_ordinary_tick_still_runs() {
 fn panel_reports_the_live_attempt() {
     let mut game = camp_game();
     game.deploy_country_stage(0, Mode::Personal).unwrap();
-    let text = sim_panel_lines(&game, &Runtime::default(), false).join("\n");
+    let text = sim_panel_lines(&game, &Runtime::default(), false, None).join("\n");
     for needle in [
         "seed",
         "attempt",
@@ -284,6 +284,33 @@ fn panel_reports_the_live_attempt() {
     ] {
         assert!(text.contains(needle), "{needle} in {text}");
     }
+    assert!(!text.contains("music"), "{text}");
+}
+
+/// A6-15: the panel shows the music director's state.
+#[test]
+fn panel_reports_the_music_director() {
+    use horde_audio::music::{BattleInput, MusicInput, MusicScreen};
+    let game = camp_game();
+    let mut music = crate::music::MusicDirection::default();
+    music.advance(
+        &MusicInput {
+            screen: MusicScreen::Battle,
+            battle: Some(BattleInput {
+                enemies_alive: 20,
+                nearest_x_frac: 0.5,
+                hp_frac: 0.5,
+                boss_alive: false,
+                paused: false,
+            }),
+        },
+        16,
+    );
+    let lines = sim_panel_lines(&game, &Runtime::default(), false, Some(&music));
+    assert!(
+        lines.contains(&"music         BattleLow, intensity 0.50, track deferred".to_owned()),
+        "{lines:?}"
+    );
 }
 
 #[test]

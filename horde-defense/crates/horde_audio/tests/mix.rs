@@ -20,10 +20,11 @@ fn source(relative: &str) -> String {
 
 /// The Bevy adapter's audio sources. They execute the mix; they own no number
 /// of it.
-const GAME_AUDIO_SOURCES: [&str; 3] = [
+const GAME_AUDIO_SOURCES: [&str; 4] = [
     "crates/horde_game/src/audio.rs",
     "crates/horde_game/src/sfx.rs",
     "crates/horde_game/src/atmosphere_audio.rs",
+    "crates/horde_game/src/music.rs",
 ];
 
 #[test]

@@ -192,12 +192,18 @@ fn combat_settings(ui: &mut egui::Ui, settings: &mut Settings) {
         "Melee interrupts an unfinished reload. In a defense, Management lists Reload, Strike and Toggle firing.",
     );
 }
+/// The Music bus slider (decision U4): no music tracks ship, so it sets
+/// the attempt stingers.
+pub(super) const MUSIC_SLIDER: &str = "Music & stingers";
+pub(super) const MUSIC_CAPTION: &str =
+    "Music tracks are not in this build; this sets victory, defeat and retreat stingers.";
 fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     chrome::section(ui, "Audio");
     ui.add(egui::Slider::new(&mut settings.master, 0.0..=1.0).text("Master"));
     ui.add(egui::Slider::new(&mut settings.effects, 0.0..=1.0).text("Combat effects"));
     ui.add(egui::Slider::new(&mut settings.ambience, 0.0..=1.0).text("Atmosphere"));
-    ui.add(egui::Slider::new(&mut settings.music, 0.0..=1.0).text("Music & stingers"));
+    ui.add(egui::Slider::new(&mut settings.music, 0.0..=1.0).text(MUSIC_SLIDER));
+    muted(ui, MUSIC_CAPTION);
     ui.add(egui::Slider::new(&mut settings.ui, 0.0..=1.0).text("Interface sounds"));
     ui.checkbox(&mut settings.mono_audio, "Mono audio")
         .on_hover_text("Plays every sound centred, the same in both ears.");

@@ -16,7 +16,13 @@ use crate::{
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_egui::egui;
-use horde_core::{campaign::UpgradeFocus, command::Command, sim::Game, world::world};
+use horde_audio::music::{BattleInput, MusicInput, MusicScreen};
+use horde_core::{
+    campaign::UpgradeFocus,
+    command::Command,
+    sim::{EnemyCondition, Game},
+    world::world,
+};
 
 pub(crate) struct UiCtx<'a> {
     pub(super) game: &'a Game,
@@ -186,6 +192,32 @@ pub(crate) fn ambience_target(
     )
 }
 
+/// What the music director scores: the screen, and on the battle screen
+/// the pressure of the shown battle. A read-only projection.
+pub(crate) fn music_input(game: &Game, screen: Screen, tab: Tab) -> MusicInput {
+    let screen = screen.music(tab);
+    let battle = (screen == MusicScreen::Battle)
+        .then(|| game.attempt())
+        .flatten()
+        .map(|a| {
+            let alive = || {
+                a.enemies
+                    .iter()
+                    .filter(|e| e.condition(a.mode) != EnemyCondition::Defeated)
+            };
+            BattleInput {
+                enemies_alive: alive().count() as u32,
+                nearest_x_frac: alive()
+                    .map(|e| horde_audio::pan::lane_position(e.x, a.width_yards))
+                    .fold(1.0, f32::min),
+                hp_frac: a.hp.max(0) as f32 / a.max_hp.max(1) as f32,
+                boss_alive: alive().any(|e| e.boss),
+                paused: a.paused || game.global_paused(),
+            }
+        });
+    MusicInput { screen, battle }
+}
+
 impl UiCtx<'_> {
     // ----- state transitions -----
 
@@ -230,6 +262,10 @@ impl UiCtx<'_> {
 
     // ----- queries -----
 
+    #[cfg(test)]
+    pub(super) fn music_input(&self) -> MusicInput {
+        music_input(self.game, self.screen, self.tab)
+    }
     #[cfg(test)]
     pub(super) fn ambience_target(&self) -> SceneAudioTarget {
         ambience_target(

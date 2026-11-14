@@ -1849,3 +1849,96 @@ fn review_capture_aim_ignores_the_os_pointer() {
         }
     }
 }
+
+/// The music director's input (A6-15) is read off the screen and the shown
+/// battle, and reading it changes nothing.
+#[test]
+fn music_input_follows_the_screen_and_the_battle() {
+    use horde_audio::music::{MusicInput, MusicScreen};
+    let mut fixture = IsolatedFrontend::new();
+    {
+        let f = &mut fixture.frontend;
+        for (screen, tab, music) in [
+            (Screen::Menu, Tab::Home, MusicScreen::Menu),
+            (Screen::SurvivorSelection, Tab::Home, MusicScreen::Menu),
+            (Screen::Camp, Tab::Home, MusicScreen::Camp),
+            (Screen::Camp, Tab::Armory, MusicScreen::Camp),
+            (Screen::Camp, Tab::Briefing, MusicScreen::Briefing),
+            (Screen::Results, Tab::Briefing, MusicScreen::Results),
+            (Screen::Settings, Tab::Home, MusicScreen::Overlay),
+            (Screen::History, Tab::Home, MusicScreen::Overlay),
+        ] {
+            f.screen = screen;
+            f.nav.tab = tab;
+            assert_eq!(
+                f.ctx().music_input(),
+                MusicInput {
+                    screen: music,
+                    battle: None
+                },
+                "{screen:?} {tab:?}"
+            );
+        }
+    }
+    fixture.deploy();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Battle;
+    for _ in 0..3000 {
+        if !f.game.attempt().unwrap().enemies.is_empty() {
+            break;
+        }
+        f.game.tick(Input::default());
+    }
+    {
+        let a = f.game.attempt_mut().unwrap();
+        assert!(!a.enemies.is_empty(), "the first wave arrived");
+        a.hp = a.max_hp / 2;
+        let width = a.width_yards;
+        for enemy in &mut a.enemies {
+            enemy.hp = enemy.max_hp.max(1);
+            enemy.boss = false;
+            enemy.x = width;
+        }
+        a.enemies[0].x = width * 0.5;
+        a.paused = false;
+    }
+    let before = serde_json::to_value(&f.game).unwrap();
+    let a = f.game.attempt().unwrap();
+    let (count, width, hp) = (
+        a.enemies.len() as u32,
+        a.width_yards,
+        a.hp as f32 / a.max_hp as f32,
+    );
+    let input = f.ctx().music_input();
+    assert_eq!(input.screen, MusicScreen::Battle);
+    let battle = input.battle.expect("the battle is read");
+    assert_eq!(battle.enemies_alive, count);
+    assert_eq!(
+        battle.nearest_x_frac,
+        horde_audio::pan::lane_position(width * 0.5, width)
+    );
+    assert_eq!(battle.hp_frac, hp);
+    assert!(!battle.boss_alive);
+    assert_eq!(battle.paused, f.game.global_paused());
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+
+    // A living boss, then a field of the dead.
+    f.game.attempt_mut().unwrap().enemies[0].boss = true;
+    assert!(f.ctx().music_input().battle.unwrap().boss_alive);
+    {
+        let a = f.game.attempt_mut().unwrap();
+        for enemy in &mut a.enemies {
+            enemy.hp = 0;
+        }
+        a.paused = true;
+    }
+    let battle = f.ctx().music_input().battle.unwrap();
+    assert_eq!(battle.enemies_alive, 0);
+    assert_eq!(battle.nearest_x_frac, 1.0);
+    assert!(!battle.boss_alive);
+    assert!(battle.paused);
+    // The camp does not score a battle that runs elsewhere.
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Home;
+    assert_eq!(f.ctx().music_input().battle, None);
+}

@@ -24,7 +24,7 @@ mod tests;
 mod toast;
 #[cfg(feature = "review")]
 pub(crate) use context::request_save;
-pub(crate) use context::{UiCtx, UiParams, ambience_target};
+pub(crate) use context::{UiCtx, UiParams, ambience_target, music_input};
 pub use plugin::UiPlugin;
 use primary_action::primary;
 #[cfg(test)]

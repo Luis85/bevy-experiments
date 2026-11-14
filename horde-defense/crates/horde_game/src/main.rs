@@ -18,6 +18,7 @@ mod gear_appearance;
 mod inspector;
 mod launch;
 mod logging;
+mod music;
 mod perf_budget;
 mod player_model;
 mod profile;
@@ -138,6 +139,7 @@ fn main() -> AppExit {
         sfx::SfxPlugin,
         ui::UiPlugin,
         atmosphere_audio::AtmosphereAudioPlugin,
+        music::MusicPlugin,
     ));
     #[cfg(feature = "review")]
     if review {
