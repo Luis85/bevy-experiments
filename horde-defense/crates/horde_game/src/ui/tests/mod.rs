@@ -30,6 +30,17 @@ struct IsolatedFrontend {
     directory: PathBuf,
 }
 impl IsolatedFrontend {
+    /// A first launch: the default game and settings on the main menu, with
+    /// no survivor, no country and no saved profile. Nothing is preset, so a
+    /// test can walk the game from "New game" (W3-28).
+    fn first_launch() -> Self {
+        let frontend = test_support::test_frontend();
+        let directory = frontend.paths.campaign().parent().unwrap().to_path_buf();
+        Self {
+            frontend,
+            directory,
+        }
+    }
     fn new() -> Self {
         let mut frontend = test_support::test_frontend();
         let directory = frontend.paths.campaign().parent().unwrap().to_path_buf();
@@ -613,6 +624,7 @@ mod feedback_tests;
 mod frame_tests;
 mod history_tests;
 mod home_tests;
+mod loop_tests;
 mod loot_block_tests;
 mod low_hp_tests;
 mod menu_tests;
