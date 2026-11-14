@@ -11,13 +11,13 @@ mod tests;
 
 pub use backdrop::world_backdrop;
 use backdrop::{box_at, line, paint_ground};
+#[cfg(test)]
+pub(crate) use battlefield::reinforcements_anchor;
 #[cfg(feature = "review")]
 pub use battlefield::{FlashFacts, flash_facts};
 #[cfg(all(test, feature = "review"))]
 pub(crate) use battlefield::{FxCounts, fx_counts};
 pub use battlefield::{FxSource, shooter_class};
-#[cfg(test)]
-pub(crate) use battlefield::reinforcements_anchor;
 pub(crate) use battlefield::{
     HEALTH_BAR_LIFT, OCCLUDER_GAP, enemy_body_box, fx_lifetime, structure_face,
 };

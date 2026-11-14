@@ -2622,12 +2622,7 @@ fn cue_pass_paints_after_the_grade_and_the_vignette() {
                 _ => None,
             })
             .collect();
-        for cue in [
-            "REINFORCEMENTS",
-            "INCOMING",
-            "SIEGE BRUTE",
-            "+150c",
-        ] {
+        for cue in ["REINFORCEMENTS", "INCOMING", "SIEGE BRUTE", "+150c"] {
             assert!(
                 texts.iter().any(|(n, text)| text == cue && *n > grade + 1),
                 "reduced {reduced}: {cue} paints after the vignette: {texts:?}"
