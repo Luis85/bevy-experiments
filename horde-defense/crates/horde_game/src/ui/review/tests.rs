@@ -287,6 +287,9 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     // Closing phase: the UX-16 callout row on Camp home and on Upgrades.
     ("callout-camp", Screen::Camp, Some(Tab::Home)),
     ("callout-upgrades", Screen::Upgrades, None),
+    // Closing phase: the W3-15 low-HP band, personal and observed.
+    ("low-hp", Screen::Battle, None),
+    ("low-hp-observed", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1690,6 +1693,48 @@ fn callout_stills_leave_one_callout_unread_on_camp_and_upgrades() {
     // Every other staged scene still shows its screen without a callout.
     let f = staged("camp-home");
     assert!(crate::ui::onboarding::due(&f.settings, &f.game).is_none());
+}
+
+/// UX-12's low-HP band gets a capture for both defenders it applies to:
+/// the low-hp still is a paused personal defense and low-hp-observed a
+/// paused main-run defense Mara holds, each with the defender at or below
+/// 30% of maximum HP, so both modes draw the band and "· LOW".
+#[test]
+fn low_hp_stills_draw_the_band_for_the_personal_and_the_observed_defender() {
+    use horde_core::content::Mode;
+    for (scene, mode, name) in [
+        ("low-hp", Mode::Personal, "Rook"),
+        // The observed defender's HUD names her in capitals.
+        ("low-hp-observed", Mode::Npc, "MARA"),
+    ] {
+        assert_eq!(
+            review_scenes::lookup(scene),
+            Some(review_scenes::SceneKind::Still),
+            "{scene} is a registered still"
+        );
+        for reduced in [false, true] {
+            let mut f = staged(scene);
+            f.settings.reduced_effects = reduced;
+            assert!(f.screen == Screen::Battle, "{scene} staged {:?}", f.screen);
+            let a = f.game.attempt().expect("a live defense");
+            assert!(a.paused, "{scene}: the still is paused");
+            assert_eq!(a.mode, mode, "{scene}");
+            assert!(
+                a.hp > 0 && i64::from(a.hp) * 100 <= 30 * i64::from(a.max_hp),
+                "{scene}: HP {} / {} is in the band",
+                a.hp,
+                a.max_hp
+            );
+            let (hp, max_hp) = (a.hp, a.max_hp);
+            let painted = painted_text(&one_frame(&mut f));
+            assert!(f.battle.low_hp, "{scene}, reduced {reduced}: the band");
+            let low = format!("{name} · HP {hp} / {max_hp} · LOW");
+            assert!(
+                painted.contains(&low),
+                "{scene}, reduced {reduced}: {low:?} in {painted:?}"
+            );
+        }
+    }
 }
 
 /// W2-28's close capture (CF-2-04) needs a spitter winding up at its reach:

@@ -6,10 +6,10 @@
 //! `Game` mutators (`deploy`, `set_paused`, `sell_item`, ...) appear here
 //! only inside top-level `entitle_*` helpers (the start country, coins,
 //! experience, earlier stage clears, inventory grants, the boss-phase
-//! clock and wound, the boss-warning clock, liberated countries, an
-//! outbreak, folded expedition outcomes, a run's drops and the final boss at
-//! one hit point; the
-//! boss-warning still's banner age is presentation state, not game state);
+//! clock and wound, the boss-warning clock, the low-HP defender's wound,
+//! liberated countries, an outbreak, folded expedition outcomes, a run's
+//! drops and the final boss at one hit point; the boss-warning still's
+//! banner age is presentation state, not game state);
 //! `repo_checks::production_fixtures_stage_features_through_commands`
 //! enforces it for this file only. One exception, sanctioned by
 //! design-qa-captures (operations-observer row): `prepare_operations_observer`
@@ -83,6 +83,9 @@ const BOSS_WALK_TICKS: u32 = 60 * 8;
 /// How far into its 2.0 s the boss-warning still holds the banner: past the
 /// fade-in and before the fade-out, so both modes draw it at full strength.
 const BOSS_WARNING_SHOWN_SECS: f32 = 1.0;
+/// The low-HP scenes' defender HP, in percent of its maximum: inside the
+/// 30% band, clear of its threshold.
+const LOW_HP_SCENE_PCT: i32 = 25;
 /// The spitter-windup rank: the first whose wave tier fields the catalogue
 /// spitter (rank 6 plays wave tier 5, W2-31).
 pub(in crate::ui::review) const SPITTER_WINDUP_RANK: u64 = 6;
@@ -110,6 +113,8 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "upgrades" => prepare_upgrades(f),
         "camp-home" => prepare_camp_home(f),
         "camp-reports" => prepare_camp_reports(f),
+        "low-hp" => prepare_low_hp(f, Mode::Personal),
+        "low-hp-observed" => prepare_low_hp(f, Mode::Npc),
         "callout-camp" => prepare_camp_home(f),
         "callout-upgrades" => {
             prepare_camp_home(f);
@@ -209,6 +214,12 @@ fn entitle_banner_shown(f: &mut FrontendParts) {
         shown: BOSS_WARNING_SHOWN_SECS,
         frame: 0,
     });
+}
+/// The live defender at `percent` of its maximum HP (at least one hit
+/// point), as a defense that took that much damage would stand.
+fn entitle_defender_hp(f: &mut FrontendParts, percent: i32) {
+    let a = f.game.staging().attempt().expect("a live defense");
+    a.hp = (a.max_hp * percent / 100).max(1);
 }
 /// The live boss wounded to half its hit points, its first phase threshold;
 /// the next tick enters the phase by the core's own rule.
@@ -607,6 +618,34 @@ fn prepare_boss_warning(f: &mut FrontendParts) {
     assert!(warned, "the director warns on the next tick");
     pause(f);
     entitle_banner_shown(f);
+}
+
+/// The low-HP band (UX-12, W3-15, closing) for the defender `mode` deploys:
+/// a stage-0 defense after one victory, the personal one played 20 s with
+/// the smoke input and Mara's (`Mode::Npc`, the observed main run) by her
+/// own decisions, then the defender entitled to `LOW_HP_SCENE_PCT` of its
+/// maximum HP and the defense paused, so both modes draw the band static
+/// and the HP text reads "· LOW".
+fn prepare_low_hp(f: &mut FrontendParts, mode: Mode) {
+    entitle_start(f, "DEU");
+    entitle_victories(f, 1);
+    if mode == Mode::Npc {
+        // Mara joins through the Companion node, which needs a liberated
+        // country; Germany stays the front she defends.
+        entitle_liberated(f, &[OUTBREAK_COUNTRY]);
+        learn_feature(f, CampaignFeature::Companion);
+    }
+    deploy(f, 0, mode);
+    for _ in 0..BOSS_PHASE_PLAY_TICKS {
+        assert!(f.game.attempt().is_some(), "the defense stands");
+        let input = match mode {
+            Mode::Personal => horde_core::sim::smoke_input(&f.game),
+            Mode::Npc => Input::default(),
+        };
+        f.game.tick(input);
+    }
+    entitle_defender_hp(f, LOW_HP_SCENE_PCT);
+    pause(f);
 }
 
 /// The id of a catalogue spitter winding up a spit from its station at its

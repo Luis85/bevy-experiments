@@ -287,6 +287,10 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
         "journey-upgrades",
         Some("Back to camp"),
     ),
+    // Closing phase (R36): the W3-15 low-HP band, for the personal defender
+    // and for the observed main run Mara holds.
+    wave3_still("low-hp", "ux-flow", "battle", None),
+    wave3_still("low-hp-observed", "ux-flow", "npc", None),
 ];
 
 /// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
@@ -388,6 +392,17 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
         "W3-24, closing",
         "the Upgrades screen with the same callout row under the camp row, above the tree; \
          amber Back to camp (no round to continue)",
+    ),
+    row(
+        "low-hp",
+        "W3-15, closing",
+        "a paused personal defense at 25% HP: the 8 pt red band inside all four canvas edges, \
+         static at 0.40 in both modes, and \"Rook · HP h / m · LOW\" on the HUD",
+    ),
+    row(
+        "low-hp-observed",
+        "W3-15, closing",
+        "the same band and \"MARA · HP h / m · LOW\" on Mara's paused main-run defense",
     ),
     // Their "before" scenes.
     row(
@@ -701,9 +716,10 @@ mod tests {
     }
     /// The six W3-27 stills, then the closing phase's boss-warning (the
     /// W3-14 banner), the one wave-3 still a motion export also takes, and
-    /// camp-reports (the W3-25 expedition toasts) and the W3-24 callout pair.
+    /// camp-reports (the W3-25 expedition toasts), the W3-24 callout pair and
+    /// the W3-15 low-HP pair.
     #[test]
-    fn wave3_registers_its_10_stills_with_wave0_before_proxies() {
+    fn wave3_registers_its_12_stills_with_wave0_before_proxies() {
         let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
         assert_eq!(
             wave3.iter().map(|scene| scene.name).collect::<Vec<_>>(),
@@ -718,6 +734,8 @@ mod tests {
                 "camp-reports",
                 "callout-camp",
                 "callout-upgrades",
+                "low-hp",
+                "low-hp-observed",
             ]
         );
         for scene in &wave3 {
@@ -763,7 +781,7 @@ mod tests {
     fn wave3_matrix_holds_every_wave3_still_and_its_before_scene() {
         let listed = |name: &str| WAVE3_MATRIX.iter().any(|row| row.scene == name);
         let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
-        assert_eq!(wave3.len(), 10);
+        assert_eq!(wave3.len(), 12);
         for scene in wave3 {
             assert!(listed(scene.name), "{} is not in the matrix", scene.name);
             let proxy = scene.before_proxy.expect("a before proxy");
@@ -847,7 +865,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 3 + 10 + 3
+            46 + 13 + 3 + 12 + 3
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));
