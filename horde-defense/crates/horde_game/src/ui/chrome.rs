@@ -42,8 +42,9 @@ pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     let previous = f.campaign.mode;
     // Its own centred row, so the label meets its buttons wherever it is placed.
+    // "Equipment for", never "Defender": that label is the defender picker's.
     row(ui, |ui| {
-        ui.label("Defender");
+        ui.label("Equipment for");
         ui.selectable_value(&mut f.campaign.mode, Mode::Personal, "You");
         let available = f.game.campaign().npc_available();
         ui.add_enabled_ui(available, |ui| {

@@ -575,15 +575,17 @@ fn defender_picker_label_shares_its_buttons_centre_line() {
         );
         f.act(|c| c.open_preparation(tab));
         let npc = f.game.campaign().npc.name.clone();
-        // The armory's owner picker says "You"; the briefing's defender
-        // picker names the player's card (W3-16).
-        let player = if tab == Tab::Briefing {
-            f.game
+        // The armory's owner picker reads "Equipment for" and says "You";
+        // the briefing's defender picker reads "Defender" and names the
+        // player's card (W3-16). The two never share a label.
+        let (picker, player) = if tab == Tab::Briefing {
+            let card = f
+                .game
                 .defender_card(horde_core::defenders::DefenderId::Player)
-                .unwrap()
-                .name
+                .unwrap();
+            ("Defender", card.name)
         } else {
-            "You".to_owned()
+            ("Equipment for", "You".to_owned())
         };
         for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
             settings::configure(&h.ctx, scale);
@@ -596,12 +598,12 @@ fn defender_picker_label_shares_its_buttons_centre_line() {
                     .center()
                     .y
             };
-            let label = centre("Defender");
+            let label = centre(picker);
             for button in [player.as_str(), npc.as_str()] {
                 let y = centre(button);
                 assert!(
                     (y - label).abs() < 1.0,
-                    "{tab:?} {size:?}: {button} at {y}, Defender at {label}"
+                    "{tab:?} {size:?}: {button} at {y}, {picker} at {label}"
                 );
             }
         }
