@@ -377,9 +377,9 @@ Capstone's one extra transition) folds into the snapshot at deploy
   transitions 0-2; unknown keys are rejected.
 
 The checkpoint lines read these terms, so they follow any retune (W4-02): the
-briefing shows "Regional checkpoint - boss +20% health, +20% reward" or "Final
-stand - boss +40% health, +40% reward" under the boss line, the world panel
-counts a country's checkpoints ("2 checkpoints"), and a Regional victory's
+briefing's boss line names the rank once, with its badge ("REGIONAL BOSS" or
+"CAPSTONE BOSS"), and the terms beside it ("+20% health, +20% reward" or
+"+40% health, +40% reward"), the world panel counts a country's checkpoints ("2 checkpoints"), and a Regional victory's
 Results lead with "Regional checkpoint secured." A checkpoint grants no
 coins of its own and changes no stage theme.
 

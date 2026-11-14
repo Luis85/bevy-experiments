@@ -109,15 +109,16 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
             "Boss: {} · arrives after {:.0}s",
             level.boss_name, forecast.boss_seconds
         ));
-        // The rank is named in words; the amber only repeats it.
+        // The rank is named once, in words, by the badge; the amber only
+        // repeats it, and the terms beside it say what the rank adds.
         if let Some((badge, hint)) = boss_badge(forecast.boss_rank) {
             ui.label(RichText::new(badge).strong().color(AMBER))
                 .on_hover_text(hint);
+            if let Some(terms) = &view.boss_rank_terms {
+                ui.colored_label(AMBER, terms).on_hover_text(hint);
+            }
         }
     });
-    if let Some(line) = &view.boss_rank_line {
-        ui.colored_label(AMBER, line);
-    }
     ui.label(supply_and_difficulty(forecast.supply, forecast.difficulty));
     ui.label(format!(
         "Threat rank {} · arrival groups {} · population cap {} (+ boss) · new gear Lv {}",

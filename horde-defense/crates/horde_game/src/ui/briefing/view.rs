@@ -7,28 +7,22 @@ use horde_core::{
     world::Country,
 };
 
-/// The briefing line for a stage whose boss is `rank` with the catalogue's
-/// `scaling` (`progression.json` `boss_ranks`): "Regional checkpoint" or
-/// "Final stand", then what the rank adds to the boss's health and reward,
-/// e.g. "Regional checkpoint - boss +20% health, +20% reward". A neutral
-/// scaling leaves the name alone; a Sector boss has no line.
-pub(super) fn boss_rank_line(rank: BossRank, scaling: BossRankScaling) -> Option<String> {
-    let name = match rank {
-        BossRank::Sector => return None,
-        BossRank::Regional => "Regional checkpoint",
-        BossRank::Capstone => "Final stand",
-    };
+/// What a stage's boss rank adds to its boss, from the catalogue's
+/// `scaling` (`progression.json` `boss_ranks`), e.g. "+20% health, +20%
+/// reward". The rank itself is named once, by the badge beside the boss
+/// line; a neutral term is left out, and a Sector boss or a neutral scaling
+/// has no terms.
+pub(super) fn boss_rank_terms(rank: BossRank, scaling: BossRankScaling) -> Option<String> {
+    if rank == BossRank::Sector {
+        return None;
+    }
     let added: Vec<String> = [(scaling.health, "health"), (scaling.reward, "reward")]
         .into_iter()
         .map(|(factor, what)| (((factor - 1.0) * 100.0).round() as i32, what))
         .filter(|(percent, _)| *percent > 0)
         .map(|(percent, what)| format!("+{percent}% {what}"))
         .collect();
-    Some(if added.is_empty() {
-        name.to_owned()
-    } else {
-        format!("{name} - boss {}", added.join(", "))
-    })
+    (!added.is_empty()).then(|| added.join(", "))
 }
 
 /// Threat pressure for this deployment and after the next victory, from
@@ -64,9 +58,9 @@ pub(super) struct BriefingView {
     /// The requested stage clamped to `max_stage`.
     pub stage: usize,
     pub level: &'static LevelDefinition,
-    /// The regional-checkpoint or final-stand line of `stage`
-    /// ([`boss_rank_line`] of `Game::stage_boss_rank`).
-    pub boss_rank_line: Option<String>,
+    /// What the rank of `stage`'s boss adds, drawn beside its badge
+    /// ([`boss_rank_terms`] of `Game::stage_boss_rank`).
+    pub boss_rank_terms: Option<String>,
     pub forecast: Result<Forecast, String>,
     pub lanes: u8,
     pub path_yards: f32,
@@ -134,8 +128,8 @@ pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Opt
         max_stage,
         stage,
         level,
-        boss_rank_line: game.stage_boss_rank(&country.id, stage).and_then(|rank| {
-            boss_rank_line(rank, horde_core::progression::catalog().boss_ranks.of(rank))
+        boss_rank_terms: game.stage_boss_rank(&country.id, stage).and_then(|rank| {
+            boss_rank_terms(rank, horde_core::progression::catalog().boss_ranks.of(rank))
         }),
         forecast,
         lanes,
@@ -246,31 +240,26 @@ mod tests {
         assert_eq!(view.blueprints, c.blueprints.iter().filter(|v| **v).count());
     }
 
-    /// W4-02: the line names the rank and the catalogue's health and reward
-    /// terms; a neutral term is left out, a Sector boss has no line.
+    /// W4-02: the terms are the catalogue's health and reward additions; a
+    /// neutral term is left out, and a Sector boss or a neutral scaling has
+    /// none. They never name the rank: the badge does.
     #[test]
-    fn boss_rank_line_reads_the_catalogue_terms() {
+    fn boss_rank_terms_read_the_catalogue_terms() {
         let ranks = &horde_core::progression::catalog().boss_ranks;
-        assert_eq!(boss_rank_line(BossRank::Sector, ranks.sector), None);
+        assert_eq!(boss_rank_terms(BossRank::Sector, ranks.sector), None);
         assert_eq!(
-            boss_rank_line(BossRank::Regional, ranks.regional).as_deref(),
-            Some("Regional checkpoint - boss +20% health, +20% reward")
+            boss_rank_terms(BossRank::Regional, ranks.regional).as_deref(),
+            Some("+20% health, +20% reward")
         );
         assert_eq!(
-            boss_rank_line(BossRank::Capstone, ranks.capstone).as_deref(),
-            Some("Final stand - boss +40% health, +40% reward")
+            boss_rank_terms(BossRank::Capstone, ranks.capstone).as_deref(),
+            Some("+40% health, +40% reward")
         );
         let neutral = BossRankScaling::default();
+        assert_eq!(boss_rank_terms(BossRank::Regional, neutral), None);
+        assert_eq!(boss_rank_terms(BossRank::Capstone, neutral), None);
         assert_eq!(
-            boss_rank_line(BossRank::Regional, neutral).as_deref(),
-            Some("Regional checkpoint")
-        );
-        assert_eq!(
-            boss_rank_line(BossRank::Capstone, neutral).as_deref(),
-            Some("Final stand")
-        );
-        assert_eq!(
-            boss_rank_line(
+            boss_rank_terms(
                 BossRank::Regional,
                 BossRankScaling {
                     health: 1.35,
@@ -278,7 +267,7 @@ mod tests {
                 }
             )
             .as_deref(),
-            Some("Regional checkpoint - boss +35% health")
+            Some("+35% health")
         );
     }
 
