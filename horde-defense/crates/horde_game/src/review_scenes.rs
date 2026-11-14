@@ -257,6 +257,13 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     // W5-10 (design-qa-captures 1.8, ruling W-8): the first storm stage of
     // the world, staged so a motion export holds one lightning pulse.
     wave5_still("storm", "vfx-lighting", "battle", true),
+    // Closing phase (R36): the W3-14 boss banner, which no other still
+    // shows. The still holds it one second into its life on the warning
+    // tick; a motion export resumes from the tick before the warning.
+    ReviewScene {
+        motion: true,
+        ..wave3_still("boss-warning", "ux-flow", "boss", None)
+    },
 ];
 
 /// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
@@ -332,6 +339,13 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
         "W3-16, W3-17",
         "a paused Poland defense held by the recruit: his name on the HUD, his own (male) rig \
          on the field, amber Begin defense, at most two bar rows",
+    ),
+    row(
+        "boss-warning",
+        "W3-14, closing",
+        "the paused warning tick: BOSS APPROACHING with the boss name and its countdown at \
+         full strength in both modes, top-centre of the field, clear of the HUD and the pause \
+         banner; the sidecar's boss_banner_rect is the drawn banner",
     ),
     // Their "before" scenes.
     row(
@@ -643,8 +657,10 @@ mod tests {
             );
         }
     }
+    /// The six W3-27 stills, then the closing phase's boss-warning (the
+    /// W3-14 banner), the one wave-3 still a motion export also takes.
     #[test]
-    fn wave3_registers_its_6_stills_with_wave0_before_proxies() {
+    fn wave3_registers_its_7_stills_with_wave0_before_proxies() {
         let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
         assert_eq!(
             wave3.iter().map(|scene| scene.name).collect::<Vec<_>>(),
@@ -655,6 +671,7 @@ mod tests {
                 "equipment-autosell",
                 "results-liberation-recruit",
                 "takeover-battle",
+                "boss-warning",
             ]
         );
         for scene in &wave3 {
@@ -667,7 +684,7 @@ mod tests {
                 scene.name
             );
             assert!(
-                !scene.practice && !scene.perf && !scene.motion,
+                !scene.practice && !scene.perf && scene.motion == (scene.name == "boss-warning"),
                 "{}",
                 scene.name
             );
@@ -675,6 +692,9 @@ mod tests {
         assert!(list_lines(true).contains(
             &"camp-home\tStill\tfalse\tfalse\tfalse\tGo to briefing\tactive-camp\t3".into()
         ));
+        assert!(
+            list_lines(true).contains(&"boss-warning\tStill\ttrue\tfalse\tfalse\t\tboss\t3".into())
+        );
     }
     #[test]
     fn wave3_matrix_rows_are_unique_registered_stills_with_reasons() {
@@ -697,7 +717,7 @@ mod tests {
     fn wave3_matrix_holds_every_wave3_still_and_its_before_scene() {
         let listed = |name: &str| WAVE3_MATRIX.iter().any(|row| row.scene == name);
         let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
-        assert_eq!(wave3.len(), 6);
+        assert_eq!(wave3.len(), 7);
         for scene in wave3 {
             assert!(listed(scene.name), "{} is not in the matrix", scene.name);
             let proxy = scene.before_proxy.expect("a before proxy");
@@ -781,7 +801,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 3 + 6 + 3
+            46 + 13 + 3 + 7 + 3
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

@@ -280,6 +280,8 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("elite-tells", Screen::Battle, None),
     // W5-10.
     ("storm", Screen::Battle, None),
+    // Closing phase: the W3-14 boss banner.
+    ("boss-warning", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1475,6 +1477,124 @@ fn boss_phase_motion_export_plays_the_whole_hold() {
     }
     let expected: Vec<_> = (0..u64::from(COUNT))
         .map(|k| (k < 23).then(|| (boss, 1, 89 - 4 * k)))
+        .collect();
+    assert_eq!(frames, expected);
+}
+
+// ----- Closing-phase stills -----
+
+/// The W3-14 boss banner gets a deterministic capture: the boss-warning
+/// still is a paused stage-0 defense on the tick its director warned, with
+/// the banner one second into its 2.0 s, so normal and reduced effects both
+/// draw "BOSS APPROACHING" at full strength and the sidecar reports its rect.
+#[test]
+fn boss_warning_still_draws_the_banner_on_the_warning_tick() {
+    assert_eq!(
+        review_scenes::lookup("boss-warning"),
+        Some(review_scenes::SceneKind::Still),
+        "boss-warning is a registered still"
+    );
+    for reduced in [false, true] {
+        let mut f = staged("boss-warning");
+        f.settings.reduced_effects = reduced;
+        assert!(f.screen == Screen::Battle, "staged {:?}", f.screen);
+        let a = f.game.attempt().expect("a live battle");
+        assert!(a.paused, "the still is paused");
+        let due = a.boss_warning_tick().expect("the director warned");
+        assert_eq!(a.tick, due, "paused on the warning tick");
+        assert!(!a.boss_spawned);
+        let output = one_frame(&mut f);
+        let banner = f
+            .battle
+            .boss_banner_rect
+            .unwrap_or_else(|| panic!("reduced {reduced}: the banner is drawn"));
+        assert!(
+            painted_text(&output)
+                .iter()
+                .any(|text| text == "BOSS APPROACHING"),
+            "reduced {reduced}: the banner's title"
+        );
+        // A second frame of the paused still draws the same banner.
+        one_frame(&mut f);
+        assert_eq!(f.battle.boss_banner_rect, Some(banner), "reduced {reduced}");
+    }
+}
+
+/// The capture sidecar reports the boss banner the battle frame painted
+/// (`BattleUi::boss_banner_rect`), on the battle screen only.
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_report_the_boss_banner() {
+    let mut f = staged("boss-warning");
+    one_frame(&mut f);
+    let banner = f.battle.boss_banner_rect.expect("the banner is drawn");
+    let corners = [banner.left(), banner.top(), banner.right(), banner.bottom()];
+    let facts = ReviewFrameFacts::collect(
+        &f.game,
+        &f.launch,
+        &f.settings,
+        f.screen,
+        f.nav.tab,
+        &f.battle,
+    );
+    assert_eq!(facts.boss_banner_rect, Some(corners));
+    for screen in [Screen::Results, Screen::Camp] {
+        let facts = ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            screen,
+            f.nav.tab,
+            &f.battle,
+        );
+        assert_eq!(facts.boss_banner_rect, None, "{screen:?}");
+    }
+}
+
+/// The boss-warning motion export holds the tick before the warning through
+/// the warm-up and resumes one native frame before frame-0000 (as the
+/// boss-phase export does), so frame-0000 draws the warning tick, where the
+/// banner starts, and every later frame is four ticks on, all inside the
+/// banner's 2.0 s.
+#[cfg(feature = "review")]
+#[test]
+fn boss_warning_motion_export_starts_on_the_warning_tick() {
+    use crate::capture_sequence::{COUNT, LAST, frame_index};
+    use crate::runner::ControlFrame;
+    let vars = [
+        ("LASTLIGHT_REVIEW_SCREEN", "boss-warning"),
+        ("LASTLIGHT_REVIEW_MOTION", "1"),
+        ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
+    ];
+    let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+        vars.iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| (*value).into())
+    })
+    .expect("valid export launch");
+    let mut f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
+    assert!(f.game.global_paused(), "the warm-up holds the staged tick");
+    let a = f.game.attempt().expect("a live battle");
+    assert_eq!(a.boss_warning_tick(), None, "staged before the warning");
+    let staged = a.tick;
+    let mut frames = Vec::new();
+    for frame in 1..=LAST {
+        f.flush();
+        f.step();
+        if frame_index(frame).is_some() {
+            let a = f.game.attempt().expect("the defense stands");
+            frames.push((a.tick, a.boss_warning_tick()));
+        }
+        schedule_motion_release(&config, &mut f.runtime, frame);
+        f.runtime.publish(ControlFrame {
+            enabled: true,
+            speed: 1,
+            ..ControlFrame::default()
+        });
+    }
+    let due = staged + 1;
+    let expected: Vec<_> = (0..u64::from(COUNT))
+        .map(|k| (due + 4 * k, Some(due)))
         .collect();
     assert_eq!(frames, expected);
 }

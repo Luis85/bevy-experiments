@@ -371,6 +371,7 @@ Targets: median at most 50 ms in the default row and at most 34 ms with Low late
   - `save_error_fixture_opens_retry_modal`
   - The camera tests from 1.6 (ux-flow and vfx implement them; QA verifies): `arena_fits_full_lanes_and_width_on_the_limiting_axis`, `construction_toggle_keeps_arena_rect`, `observer_uses_fit_field`, the rewritten :1180-1199 test.
 - Done when: green. The W3 matrix runs both sizes and both modes, compare_captures --html is generated, proxy rows close, and the construction-rect CF row is fixed.
+- Closing phase (R36): no still showed the W3-14 boss banner. `boss-warning` (since wave 3, owner ux-flow, before proxy `boss`, motion) is appended with its W3 matrix row: a stage-0 defense after one victory, played 20 s with the smoke input, its clock entitled to one tick before the boss warning. The still plays that tick, pauses on the warning tick and holds the banner 1.0 s into its 2.0 s (`BattleUi` presentation state), so both modes draw it at full strength; the motion export pauses on the tick before and resumes on native frame `FIRST - 1` (`review::motion_release_frame`), so frame-0000 draws the warning tick. The sidecar gains `boss_banner_rect` (`BattleUi::boss_banner_rect`, battle screen only). Tests: `boss_warning_still_draws_the_banner_on_the_warning_tick`, `review_frame_facts_report_the_boss_banner`, `boss_warning_motion_export_starts_on_the_warning_tick`.
 
 ### Wave 5
 - Register storm. The weapon-classes test gains the decision-16 gear-snapshot class assertion. Per-frame manifest fields land.

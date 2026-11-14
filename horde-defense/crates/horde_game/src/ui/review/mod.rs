@@ -118,11 +118,15 @@ pub(crate) fn schedule_gesture_review(
 /// paused, or None when the fixture runs live from startup. The boss-phase
 /// export (CF-2-03) holds the staged entry tick of its 90-tick phase hold
 /// through the capture warm-up and resumes one frame before frame-0000, so
-/// frames 0-22 draw ticks 1-89 of the hold and frame 23 its end.
+/// frames 0-22 draw ticks 1-89 of the hold and frame 23 its end. The
+/// boss-warning export holds the tick before the boss warning the same way,
+/// so frame-0000 draws the warning tick and the banner's first frames.
 #[cfg(feature = "review")]
 pub(crate) fn motion_release_frame(launch: &crate::launch::LaunchConfig) -> Option<u32> {
-    (launch.reviewing("boss-phase") && launch.motion_review() && launch.sequence_path().is_some())
-        .then_some(crate::capture_sequence::FIRST - 1)
+    ((launch.reviewing("boss-phase") || launch.reviewing("boss-warning"))
+        && launch.motion_review()
+        && launch.sequence_path().is_some())
+    .then_some(crate::capture_sequence::FIRST - 1)
 }
 
 /// Capture-service timing bridge: on the release frame the export resumes
@@ -161,6 +165,10 @@ pub(crate) struct ReviewFrameFacts {
     pub(crate) lanes: Option<u8>,
     pub(crate) width_yards: Option<f32>,
     pub(crate) hud_rows: Option<u8>,
+    /// The W3-14 boss banner as the battle frame painted it
+    /// (`BattleUi::boss_banner_rect`), on the battle screen only; None while
+    /// no banner shows.
+    pub(crate) boss_banner_rect: Option<[f32; 4]>,
     /// The battle stage's lighting ("night", "dawn", ...) and whether it is a
     /// storm stage, read by `scripts/measure_field_luminance.py` (W5-09).
     pub(crate) lighting: Option<String>,
@@ -209,6 +217,7 @@ impl ReviewFrameFacts {
             lanes: attempt.map(|a| a.lane_count),
             width_yards: attempt.map(|a| a.width_yards),
             hud_rows: in_battle.then_some(battle.bar_rows),
+            boss_banner_rect: battle.boss_banner_rect.filter(|_| in_battle).map(corners),
             lighting: attempt
                 .map(|a| format!("{:?}", crate::art::scene_look(a).lighting).to_lowercase()),
             storm: attempt.map(|a| crate::art::scene_look(a).storm),

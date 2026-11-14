@@ -364,6 +364,7 @@ mod tests {
             keys,
             [
                 "arena_rect",
+                "boss_banner_rect",
                 "canvas_rect",
                 "effects_rect",
                 "hud_rows",

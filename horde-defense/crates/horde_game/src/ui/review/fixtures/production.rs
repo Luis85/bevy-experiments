@@ -6,8 +6,9 @@
 //! `Game` mutators (`deploy`, `set_paused`, `sell_item`, ...) appear here
 //! only inside top-level `entitle_*` helpers (the start country, coins,
 //! experience, earlier stage clears, inventory grants, the boss-phase
-//! clock and wound, liberated countries, an outbreak, a run's drops and the
-//! final boss at one hit point);
+//! clock and wound, the boss-warning clock, liberated countries, an
+//! outbreak, a run's drops and the final boss at one hit point; the
+//! boss-warning still's banner age is presentation state, not game state);
 //! `repo_checks::production_fixtures_stage_features_through_commands`
 //! enforces it for this file only. One exception, sanctioned by
 //! design-qa-captures (operations-observer row): `prepare_operations_observer`
@@ -78,6 +79,9 @@ const BOSS_PHASE_PLAY_TICKS: u32 = 60 * 20;
 const BOSS_ARRIVAL_TICK_CAP: u32 = 60;
 /// The boss walks in for eight seconds, as in the boss scene.
 const BOSS_WALK_TICKS: u32 = 60 * 8;
+/// How far into its 2.0 s the boss-warning still holds the banner: past the
+/// fade-in and before the fade-out, so both modes draw it at full strength.
+const BOSS_WARNING_SHOWN_SECS: f32 = 1.0;
 /// The spitter-windup rank: the first whose wave tier fields the catalogue
 /// spitter (rank 6 plays wave tier 5, W2-31).
 pub(in crate::ui::review) const SPITTER_WINDUP_RANK: u64 = 6;
@@ -100,6 +104,7 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "battle-mid" => prepare_battle_mid(f),
         "operations-observer" => prepare_operations_observer(f),
         "boss-phase" => prepare_boss_phase(f),
+        "boss-warning" => prepare_boss_warning(f),
         "spitter-windup" => prepare_spitter_windup(f),
         "upgrades" => prepare_upgrades(f),
         "camp-home" => prepare_camp_home(f),
@@ -171,6 +176,29 @@ fn entitle_boss_clock(f: &mut FrontendParts) {
     let a = f.game.staging().attempt().expect("a live defense");
     let boss_tick = (a.boss_time() * 60.0).ceil() as u64;
     a.tick = a.tick.max(boss_tick.saturating_sub(1));
+}
+/// The defense clock one tick before its boss warning is due (the boss's
+/// tick less the level's warning lead, `Attempt::boss_warning_tick`), so the
+/// director sends the warning itself on the next tick.
+fn entitle_warning_clock(f: &mut FrontendParts) {
+    let a = f.game.staging().attempt().expect("a live defense");
+    let boss_tick = (a.boss_time() * 60.0).ceil() as u64;
+    let lead = (content().levels[a.level].boss_timing.warning * 60.0).ceil() as u64;
+    a.tick = a.tick.max(boss_tick.saturating_sub(lead).saturating_sub(1));
+}
+/// The boss banner `BOSS_WARNING_SHOWN_SECS` into the warning the paused
+/// defense just received: presentation state only (`BattleUi`), so a still
+/// draws the banner at full strength where a paused frame adds no time.
+fn entitle_banner_shown(f: &mut FrontendParts) {
+    let a = f.game.attempt().expect("a live defense");
+    let notice = crate::battle_view::BossNotice::of(a);
+    let event = notice.event.expect("the director warned");
+    f.battle.boss_banner = Some(crate::ui::battle::BossBanner {
+        key: (notice.attempt, event.tick),
+        arrived: event.arrived,
+        shown: BOSS_WARNING_SHOWN_SECS,
+        frame: 0,
+    });
 }
 /// The live boss wounded to half its hit points, its first phase threshold;
 /// the next tick enters the phase by the core's own rule.
@@ -531,6 +559,38 @@ fn prepare_boss_phase(f: &mut FrontendParts) {
     });
     assert!(entered, "the wounded boss enters its first phase");
     pause(f);
+}
+
+/// The W3-14 boss banner (closing phase): a stage-0 defense after one
+/// victory (no first-defense lesson over the field), played with the smoke
+/// input for `BOSS_PHASE_PLAY_TICKS`. Then the clock advances to one tick
+/// before the boss warning. A motion export pauses there and resumes one
+/// frame before frame-0000 (`review::motion_release_frame`), so its frames
+/// start on the warning tick, where the banner starts. A still plays the one
+/// tick, so the director warns by its own rule, and pauses with the banner
+/// `BOSS_WARNING_SHOWN_SECS` into its life.
+fn prepare_boss_warning(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    entitle_victories(f, 1);
+    deploy(f, 0, Mode::Personal);
+    for _ in 0..BOSS_PHASE_PLAY_TICKS {
+        assert!(f.game.attempt().is_some(), "the defense stands");
+        let input = horde_core::sim::smoke_input(&f.game);
+        f.game.tick(input);
+    }
+    entitle_warning_clock(f);
+    let a = f.game.attempt().expect("the defense stands");
+    assert_eq!(a.boss_warning_tick(), None, "the warning is still to come");
+    if f.launch.motion_review() && f.launch.sequence_path().is_some() {
+        pause(f);
+        return;
+    }
+    let warned = tick_until(f, 1, Input::default(), |event| {
+        matches!(event, SimEvent::BossWarning { .. })
+    });
+    assert!(warned, "the director warns on the next tick");
+    pause(f);
+    entitle_banner_shown(f);
 }
 
 /// The id of a catalogue spitter winding up a spit from its station at its
