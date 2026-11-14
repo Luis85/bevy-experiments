@@ -453,7 +453,9 @@ impl UiCtx<'_> {
                 self.status.profile_exists = true;
                 self.open_campaign();
             }
-            AppCommand::Game(Command::Deploy { .. }) => {
+            // The Briefing primary is `BeginDefense` (ruling D16); the
+            // defense it deploys opens on its field as a `Deploy` does.
+            AppCommand::Game(Command::Deploy { .. } | Command::BeginDefense { .. }) => {
                 self.status.profile_exists = true;
                 self.start_battle();
             }

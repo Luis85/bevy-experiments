@@ -163,3 +163,36 @@ fn briefing_shows_effective_difficulty_and_capstone_badge() {
     }
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
+
+/// The Briefing primary is `BeginDefense` (W3-16, ruling D16), and a defense
+/// it deploys opens on its field, as `Deploy` did: for the player and for a
+/// recruit. Found by the full-loop walk (W3-28): the defense deployed and
+/// the briefing stayed open over it.
+#[test]
+fn briefing_primary_opens_the_field_of_the_defense_it_deploys() {
+    for recruit_defends in [false, true] {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        let recruit = super::defender_tests::camp_with_recruits(f, &["FRA"])[0];
+        let label = if recruit_defends {
+            let id = horde_core::defenders::DefenderId::Recruit(recruit);
+            f.game.apply(&Command::SetNextDefender(id)).unwrap();
+            format!("Deploy {}", f.game.defender_card(id).unwrap().name)
+        } else {
+            "Deploy personally".to_owned()
+        };
+        f.act(|c| c.open_briefing());
+        f.flush_for_test();
+        h.frame(f, View::Full, vec![]);
+        assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Briefing);
+        assert_eq!(h.screen_primaries(), [label.clone()]);
+        h.click(f, View::Full, &label);
+        assert!(f.game.attempt().is_some(), "{label}: {}", f.status.message);
+        assert!(
+            f.screen == Screen::Battle,
+            "{label}: the deployed defense opens on its field, not {:?}",
+            f.screen
+        );
+    }
+}
