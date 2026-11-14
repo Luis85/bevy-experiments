@@ -36,7 +36,7 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
     );
     let critical = f.status.message_error
         || f.status.message.starts_with("Save could not be read:")
-        || f.status.message.contains("Recovery copies:")
+        || f.status.message.contains(super::toast::RECOVERY_COPIES)
         || f.status.message.starts_with("Original unreadable");
     let applying = f.runtime.pending_commands() > 0;
     let working = f.status.save_pending || applying;
