@@ -332,7 +332,7 @@ fn play_sounds(
         if recorder.is_some() {
             logged_starts.push(LoggedStart {
                 voice: entity.to_bits(),
-                cue: format!("{cue:?}"),
+                cue: horde_audio::cue_log::cue_name(cue),
                 clip: voicing.bank.variant_path(pick.variant),
                 speed: pick.jitter.speed * voicing.speed,
                 lowpass_hz: voicing.lowpass_hz,

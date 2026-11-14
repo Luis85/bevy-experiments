@@ -24,6 +24,13 @@ use serde::{Deserialize, Serialize};
 /// The log's format version, the header line's `cue_log`.
 pub const VERSION: u32 = 1;
 
+/// A cue's name in the log: its Rust identifier ("Pistol", "LootReveal"),
+/// for whoever reads the log. Both writers (the offline render and the
+/// game's recorder) name cues through this one function.
+pub fn cue_name(cue: crate::cue::Cue) -> String {
+    format!("{cue:?}")
+}
+
 /// One started voice.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LoggedStart {
@@ -80,7 +87,7 @@ impl CueLogFrame {
                 .iter()
                 .map(|start| LoggedStart {
                     voice: start.voice,
-                    cue: format!("{:?}", start.cue),
+                    cue: cue_name(start.cue),
                     clip: start.voicing.bank.variant_path(start.variant),
                     speed: start.jitter.speed * start.voicing.speed,
                     lowpass_hz: start.voicing.lowpass_hz,
