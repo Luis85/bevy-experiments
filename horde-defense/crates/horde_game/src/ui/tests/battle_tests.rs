@@ -807,6 +807,53 @@ fn the_first_defense_teaches_on_the_field_and_always_names_the_keys() {
     assert!(!f.settings.show_guidance);
 }
 
+/// Closing: the key legend names every key through `settings::binding_text`,
+/// the W3-10 cycle-attack key included, so a core action a rebind's swap
+/// (`Settings::set_binding`) leaves without a key reads "Unbound", never an
+/// empty key. With Pause unbound the READY and PAUSED banners and the opening
+/// lesson name the bar's button alone.
+#[test]
+fn legend_and_pause_banner_name_rebound_and_unbound_keys() {
+    use settings::{Action, BindingId, ExtraAction};
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    h.click(f, View::Dossier, "Start journey");
+    let painted = |output: &FullOutput, text: &str| {
+        output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
+    };
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Mouse1 fire · Mouse2 melee · R reload · B build · Escape pause · Q cycle attack"
+        ),
+        1
+    );
+    // Cycle attack is unbound, then takes Escape: Pause takes its empty key.
+    let cycle = BindingId::Extra(ExtraAction::CycleAttack);
+    f.settings.set_binding(cycle, String::new());
+    f.settings.set_binding(cycle, "Escape".into());
+    assert_eq!(f.settings.binding(BindingId::Core(Action::Pause)), "");
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Mouse1 fire · Mouse2 melee · R reload · B build · Unbound pause · Escape cycle attack"
+        ),
+        1
+    );
+    assert_eq!(text_count(&output, "READY · Begin defense"), 1);
+    assert!(painted(&output, "Press Begin defense to start."));
+    assert!(!painted(&output, "Begin defense or "));
+    h.click(f, View::Battle, "Begin defense");
+    f.game.tick(Input::default());
+    h.click(f, View::Battle, "Pause");
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(text_count(&output, "PAUSED · Resume defense"), 1);
+    assert!(!painted(&output, " to resume"));
+}
+
 /// The two target battle sizes in points: 1440x900 and 1050x700@1.35.
 fn target_sizes() -> [Vec2; 2] {
     [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)]

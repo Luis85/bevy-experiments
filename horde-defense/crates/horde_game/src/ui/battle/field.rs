@@ -7,7 +7,7 @@ use super::{
     input::{preview_aim, reticle_ownership},
     layout::{BAR_BUTTON_PADDING_Y, BAR_ROW_GAP, PANEL_FILL_ALPHA, occluded_spawn_cues},
     low_hp::{low_hp, low_hp_edge},
-    overlays::{corner_hud, field_hint_callout, incoming_cues, pause_banner},
+    overlays::{corner_hud, field_hint_callout, incoming_cues, key_legend, pause_banner},
     projection,
     retreat::retreat_button,
 };
@@ -243,14 +243,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 f.battle.legend_rect = Some(ui.painter().text(
                     layout.legend_anchor,
                     Align2::LEFT_BOTTOM,
-                    format!(
-                        "{} fire · {} melee · {} reload · {} build · {} pause",
-                        f.settings.bindings[0],
-                        f.settings.bindings[1],
-                        f.settings.bindings[2],
-                        f.settings.bindings[5],
-                        f.settings.bindings[6]
-                    ),
+                    key_legend(f.settings),
                     FontId::proportional(10.),
                     MUTED,
                 ));

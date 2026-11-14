@@ -6,6 +6,7 @@ use super::{
 use crate::{
     art::{AMBER, INK, RED, TEXT},
     battle_view::{BattleScreen, FieldHint},
+    settings::{Action, BindingId, ExtraAction, Settings, binding_text},
     ui::{UiCtx, hud, progress},
 };
 use bevy_egui::egui::{self, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, pos2, vec2};
@@ -122,6 +123,32 @@ pub(super) fn arrival_groups(size: u32) -> String {
         size => format!("groups of {size}"),
     }
 }
+/// The key legend under the bar: fire, melee, reload, build, pause and cycle
+/// attack, each named by its key through `settings::binding_text`, so one a
+/// rebind left without a key reads "Unbound".
+pub(super) fn key_legend(settings: &Settings) -> String {
+    [
+        (BindingId::Core(Action::Fire), "fire"),
+        (BindingId::Core(Action::Melee), "melee"),
+        (BindingId::Core(Action::Reload), "reload"),
+        (BindingId::Core(Action::Build), "build"),
+        (BindingId::Core(Action::Pause), "pause"),
+        (BindingId::Extra(ExtraAction::CycleAttack), "cycle attack"),
+    ]
+    .map(|(id, action)| format!("{} {action}", binding_text(settings.binding(id))))
+    .join(" · ")
+}
+/// The bound Pause key; None when it is unbound.
+fn pause_key(bindings: &[String]) -> Option<&str> {
+    bindings
+        .get(Action::Pause as usize)
+        .map(String::as_str)
+        .filter(|key| !key.is_empty())
+}
+/// " or <Pause key>" after "Begin defense", or nothing without a Pause key.
+fn or_pause_key(bindings: &[String]) -> String {
+    pause_key(bindings).map_or_else(String::new, |key| format!(" or {key}"))
+}
 /// The first-defense lesson for `hint`, naming the player's own keys.
 /// `bindings` follows `settings::Action` order: fire, melee, reload, heal,
 /// brace, build, pause.
@@ -129,11 +156,11 @@ pub(super) fn hint_text(hint: FieldHint, paused: bool, bindings: &[String]) -> S
     let key = |index: usize| bindings.get(index).map_or("?", String::as_str);
     match hint {
         FieldHint::Opening if paused => format!(
-            "Enemies walk in from the right. Hold {} to shoot, {} reloads, {} strikes an enemy at your line. Press Begin defense or {} to start.",
+            "Enemies walk in from the right. Hold {} to shoot, {} reloads, {} strikes an enemy at your line. Press Begin defense{} to start.",
             key(0),
             key(2),
             key(1),
-            key(6)
+            or_pause_key(bindings)
         ),
         FieldHint::Opening | FieldHint::Shoot => format!(
             "Aim at the nearest enemy and hold {} to shoot.",
@@ -184,11 +211,12 @@ pub(super) fn pause_banner(
     view: &BattleScreen,
     bindings: &[String],
 ) -> Rect {
-    let pause = bindings.get(6).map_or("Escape", String::as_str);
-    let text = if view.tick == 0 {
-        format!("READY · Begin defense or {pause}")
-    } else {
-        format!("PAUSED · {pause} to resume")
+    let pause = pause_key(bindings);
+    let text = match (view.tick == 0, pause) {
+        (true, _) => format!("READY · Begin defense{}", or_pause_key(bindings)),
+        (false, Some(pause)) => format!("PAUSED · {pause} to resume"),
+        // Without a Pause key the bar's button is the only way back in.
+        (false, None) => "PAUSED · Resume defense".to_owned(),
     };
     let slot = layout.pause_banner_slot;
     let painter = ui.painter_at(slot);
