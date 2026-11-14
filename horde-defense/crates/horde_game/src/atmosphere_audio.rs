@@ -246,6 +246,7 @@ fn update_ambience(
     assets: Res<AssetServer>,
     target: Res<SceneAudioTarget>,
     ducking: Option<Res<crate::sfx::Ducking>>,
+    recorder: Option<ResMut<crate::sfx::CueLogRecorder>>,
     time: Res<Time>,
     mut layers: Query<(
         &AtmosphereLayer,
@@ -275,6 +276,10 @@ fn update_ambience(
     // The mix's ambience calibration (`horde_audio::mix`, set by the loudness
     // gate): the loops play at the level the offline render meters.
     let calibration = horde_audio::mix::ambience_calibration_gain();
+    // The review cue log takes the gains the loops are set to.
+    if let Some(mut recorder) = recorder {
+        recorder.ambience = gains.map(|gain| gain * calibration * duck);
+    }
     for (layer, mut playback, sink) in &mut layers {
         let volume = Volume::Linear(gains[layer.channel.index()] * calibration * duck);
         // The component covers asynchronous asset/sink creation; the sink covers

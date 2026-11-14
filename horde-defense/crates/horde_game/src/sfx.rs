@@ -33,6 +33,7 @@ use bevy::{
     prelude::*,
 };
 use horde_audio::{
+    cue_log::{CueLogFrame, LoggedStart},
     duck::{DuckGains, Ducker},
     mix::{Sliders, mix},
     pan::{self, Places},
@@ -79,6 +80,19 @@ struct SfxState {
 pub struct Ducking {
     ducker: Ducker,
     pub gains: DuckGains,
+}
+
+/// The review cue log's recorder (`horde_audio::cue_log`). Present only in a
+/// review session with `LASTLIGHT_REVIEW_CUE_LOG`: [`play_sounds`] then adds
+/// one frame per update with the voices it started and faded, and the review
+/// service writes the frames out. Ordinary play has no recorder and logs
+/// nothing.
+#[derive(Resource, Default)]
+pub struct CueLogRecorder {
+    /// The frames not yet written.
+    pub frames: Vec<CueLogFrame>,
+    /// The gains the ambience loops were last set to (`update_ambience`).
+    pub ambience: [f32; 6],
 }
 
 #[derive(Component)]
@@ -204,8 +218,12 @@ fn play_sounds(
     mut cues: MessageReader<CueRequest>,
     mut state: ResMut<SfxState>,
     mut ducking: ResMut<Ducking>,
+    mut recorder: Option<ResMut<CueLogRecorder>>,
     voices: Query<(Entity, &EffectVoice), Without<Fading>>,
 ) {
+    // The review cue log's frame: filled only while a recorder exists.
+    let mut logged_fades: Vec<u64> = Vec::new();
+    let mut logged_starts: Vec<LoggedStart> = Vec::new();
     let sliders = settings.sliders();
     let bus_gains = sliders.bus_gains();
     let reduced = settings.reduced_effects;
@@ -254,6 +272,9 @@ fn play_sounds(
         }
         if let Admission::Steal(victim) = admission {
             live.retain(|voice| voice.id != victim);
+            if recorder.is_some() {
+                logged_fades.push(victim);
+            }
             if let Some((entity, control)) = controls
                 .iter()
                 .find(|(entity, _)| entity.to_bits() == victim)
@@ -308,6 +329,17 @@ fn play_sounds(
             _ => commands.spawn((voice, AudioPlayer::new(handle))),
         }
         .id();
+        if recorder.is_some() {
+            logged_starts.push(LoggedStart {
+                voice: entity.to_bits(),
+                cue: format!("{cue:?}"),
+                clip: voicing.bank.variant_path(pick.variant),
+                speed: pick.jitter.speed * voicing.speed,
+                lowpass_hz: voicing.lowpass_hz,
+                gains: gains.map(|side| side * voice_gain),
+                compensated: horde_audio::duck::compensated(start),
+            });
+        }
         controls.push((entity, control));
         live.push(LiveVoice {
             id: entity.to_bits(),
@@ -318,6 +350,17 @@ fn play_sounds(
     // Real time, like the cue gates: the envelopes run on while the game is
     // paused.
     ducking.gains = ducking.ducker.advance(time.delta_secs(), &live);
+    if let Some(recorder) = recorder.as_mut() {
+        let ambience = recorder.ambience;
+        recorder.frames.push(CueLogFrame {
+            us: time.elapsed().as_micros() as u64,
+            dt_us: time.delta().as_micros() as u64,
+            fades: logged_fades,
+            starts: logged_starts,
+            ambience,
+            density: ducking.gains.density,
+        });
+    }
 }
 /// Both pending PlaybackSettings and live sinks follow their cue's bus. A
 /// compensated voice also follows the density gain: its decoder ramps to it
@@ -637,6 +680,76 @@ mod tests {
         app.world_mut().resource_mut::<Settings>().reduced_effects = true;
         let reduced = start(&mut app, far(SoundCue::Explosion));
         assert_eq!(pan_of(&app, reduced), [1.0 - pan::PAN_DEPTH_REDUCED, 1.0]);
+    }
+
+    /// A6-18: with a recorder, every update logs one cue-log frame: the
+    /// started voice by entity bits with its clip, speed and final
+    /// `[left, right]` gains, a stolen voice as a fade, and the frame's
+    /// ambience and density gains. Without a recorder nothing is logged.
+    #[test]
+    fn started_and_stolen_voices_reach_the_cue_log() {
+        let mut app = pan_app(Settings::default());
+        app.init_resource::<CueLogRecorder>();
+        app.world_mut().resource_mut::<CueLogRecorder>().ambience = [0.25; 6];
+        let voice = start(&mut app, far(SoundCue::Explosion));
+        let settings = Settings::default();
+        let frames = app.world().resource::<CueLogRecorder>().frames.clone();
+        assert_eq!(frames.len(), 1, "one frame per update");
+        let frame = &frames[0];
+        assert_eq!(frame.ambience, [0.25; 6]);
+        assert_eq!(
+            frame.density,
+            app.world().resource::<Ducking>().gains.density
+        );
+        assert!(frame.fades.is_empty());
+        assert_eq!(frame.starts.len(), 1);
+        let logged = &frame.starts[0];
+        let played = app.world().entity(voice).get::<EffectVoice>().unwrap();
+        assert_eq!(logged.voice, voice.to_bits());
+        assert_eq!(logged.cue, "Explosion");
+        assert!(
+            logged.clip.starts_with("audio/") && logged.clip.ends_with(".wav"),
+            "{}",
+            logged.clip
+        );
+        let voice_gain = bus_gain(settings.sliders(), SoundCue::Explosion)
+            * mix(SoundCue::Explosion).level(false)
+            * played.jitter_gain;
+        assert_eq!(
+            logged.gains,
+            [1.0 - pan::PAN_DEPTH, 1.0].map(|side| side * voice_gain)
+        );
+        assert_eq!(logged.compensated, played.compensated);
+        // An update without requests still logs its frame, later in time.
+        app.world_mut()
+            .resource_mut::<Time<Real>>()
+            .advance_by(std::time::Duration::from_millis(20));
+        app.update();
+        let frames = &app.world().resource::<CueLogRecorder>().frames;
+        assert_eq!(frames.len(), 2);
+        assert!(frames[1].starts.is_empty() && frames[1].us >= frames[0].us);
+        // The log reads back as written.
+        let text = horde_audio::cue_log::write(frames);
+        assert_eq!(&horde_audio::cue_log::parse(&text).unwrap(), frames);
+        // A third gun steals the oldest: the frame logs its fade by id.
+        let later = |app: &mut App| {
+            app.world_mut()
+                .resource_mut::<Time<Real>>()
+                .advance_by(std::time::Duration::from_millis(100));
+        };
+        let pistol = start(&mut app, CueRequest::centred(SoundCue::Pistol));
+        later(&mut app);
+        start(&mut app, CueRequest::centred(SoundCue::Rifle));
+        later(&mut app);
+        let smg = start(&mut app, CueRequest::centred(SoundCue::Smg));
+        let frames = &app.world().resource::<CueLogRecorder>().frames;
+        let last = frames.last().unwrap();
+        assert_eq!(last.fades, [pistol.to_bits()]);
+        assert_eq!(last.starts[0].voice, smg.to_bits());
+        // No recorder: nothing is logged and the voice still starts.
+        let mut plain = pan_app(Settings::default());
+        start(&mut plain, far(SoundCue::Explosion));
+        assert!(plain.world().get_resource::<CueLogRecorder>().is_none());
     }
 
     /// The "Mono audio" setting: every voice starts centred, wherever its

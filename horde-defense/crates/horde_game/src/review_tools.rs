@@ -27,6 +27,17 @@ impl Plugin for ReviewToolsPlugin {
                     .after(ui::draw)
                     .run_if(|config: Res<LaunchConfig>| config.capture_path().is_some()),
             );
+        // `LASTLIGHT_REVIEW_CUE_LOG`: the recorder `SfxPlugin` fills, and the
+        // writer that appends its frames to the file.
+        if app
+            .world()
+            .resource::<LaunchConfig>()
+            .cue_log_path()
+            .is_some()
+        {
+            app.init_resource::<crate::sfx::CueLogRecorder>()
+                .add_systems(Last, write_cue_log);
+        }
         // The report reads the frame `PerfPlugin` closes at the end of `Last`,
         // so each phase is attributed to the frame that did the work.
         if app.world().resource::<LaunchConfig>().perf().is_some() {
@@ -35,6 +46,56 @@ impl Plugin for ReviewToolsPlugin {
                 diagnostics::capture_performance.after(diagnostics::PerfSet::CloseFrame),
             );
         }
+    }
+}
+
+/// The open cue log, or why it could not be written (reported once).
+#[derive(Default)]
+enum CueLogFile {
+    #[default]
+    Unopened,
+    Open(std::io::BufWriter<std::fs::File>),
+    Failed,
+}
+/// Appends `frames` to the cue log at `path` as `horde_audio::cue_log` lines:
+/// the header when the file is created, then one line per frame, flushed so a
+/// session that is closed from outside keeps what it played.
+fn append_cue_log(
+    file: &mut CueLogFile,
+    path: &std::path::Path,
+    frames: &[horde_audio::cue_log::CueLogFrame],
+) -> std::io::Result<()> {
+    use std::io::Write;
+    if matches!(file, CueLogFile::Unopened) {
+        if let Some(folder) = path.parent() {
+            std::fs::create_dir_all(folder)?;
+        }
+        let mut writer = std::io::BufWriter::new(std::fs::File::create(path)?);
+        writeln!(writer, "{}", horde_audio::cue_log::header())?;
+        *file = CueLogFile::Open(writer);
+    }
+    let CueLogFile::Open(writer) = file else {
+        return Ok(());
+    };
+    for frame in frames {
+        writeln!(writer, "{}", frame.line())?;
+    }
+    writer.flush()
+}
+/// The review service of the cue log: a file writer, not a widget. Each frame
+/// it drains what `SfxPlugin` recorded into `LASTLIGHT_REVIEW_CUE_LOG`.
+fn write_cue_log(
+    config: Res<LaunchConfig>,
+    mut recorder: ResMut<crate::sfx::CueLogRecorder>,
+    mut file: Local<CueLogFile>,
+) {
+    let frames = std::mem::take(&mut recorder.frames);
+    let Some(path) = config.cue_log_path() else {
+        return;
+    };
+    if let Err(error) = append_cue_log(&mut file, path, &frames) {
+        error!("Cue log {} failed: {error}", path.display());
+        *file = CueLogFile::Failed;
     }
 }
 
@@ -240,6 +301,45 @@ mod tests {
             !unordered,
             "capture_performance and close_frame are unordered"
         );
+    }
+
+    /// A6-18: the cue log on disk is the header plus one line per recorded
+    /// frame, appended across writes, and `horde_audio::cue_log` reads it back
+    /// as recorded.
+    #[test]
+    fn cue_log_file_reads_back_as_recorded() {
+        use horde_audio::cue_log::{self, CueLogFrame, LoggedStart};
+        let frame = |us: u64| CueLogFrame {
+            us,
+            dt_us: 16_667,
+            fades: vec![us],
+            starts: vec![LoggedStart {
+                voice: u64::MAX - us,
+                cue: "Rifle".into(),
+                clip: "audio/sfx/rifle_1.wav".into(),
+                speed: 1.03,
+                lowpass_hz: Some(4_200.0),
+                gains: [0.31, 0.27],
+                compensated: true,
+            }],
+            ambience: [0.1, 0.2, 0.0, 0.05, 0.0, 0.0],
+            density: 0.9,
+        };
+        let folder = std::env::temp_dir().join(format!("lastlight-cue-log-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        let path = folder.join("run").join("cues.jsonl");
+        let mut file = CueLogFile::default();
+        append_cue_log(&mut file, &path, &[frame(1), frame(2)]).unwrap();
+        append_cue_log(&mut file, &path, &[]).unwrap();
+        append_cue_log(&mut file, &path, &[frame(3)]).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.lines().count(), 4);
+        assert_eq!(
+            cue_log::parse(&text).unwrap(),
+            [frame(1), frame(2), frame(3)]
+        );
+        drop(file);
+        std::fs::remove_dir_all(&folder).unwrap();
     }
 
     /// The keys capture_review.ps1 and the camera review read from every

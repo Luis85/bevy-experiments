@@ -35,6 +35,7 @@
 use crate::{
     bank::{AMBIENCE_FILES, BankId},
     cue::Cue,
+    cue_log::CueLogFrame,
     duck::Ducker,
     events::{EventContext, event_requests, push_cue},
     gun::GunTracker,
@@ -53,6 +54,9 @@ use std::{borrow::Cow, collections::BTreeMap, path::Path};
 pub const RATE: u32 = 44_100;
 /// Samples per frame: one 60 Hz tick.
 pub const FRAME_SAMPLES: usize = (RATE / TICKS_PER_SECOND) as usize;
+/// One frame in the cue log's microseconds, rounded up: the last frame of a
+/// render ends on the render's last sample.
+const FRAME_MICROS: u64 = 1_000_000_u64.div_ceil(TICKS_PER_SECOND as u64);
 /// The adapter's ambience crossfade.
 pub const CROSSFADE_SECONDS: f32 = 1.2;
 
@@ -169,6 +173,11 @@ impl Library {
     /// The samples `cue`'s own bank plays for `variant` (variants wrap).
     pub fn clip(&self, cue: Cue, variant: u64) -> &[f32] {
         self.bank_clip(cue.bank(), variant)
+    }
+    /// The samples of the clip at `path`, relative to the asset folder, as a
+    /// cue log names it.
+    pub fn path_clip(&self, path: &str) -> Option<&[f32]> {
+        self.clips.get(path).map(Vec::as_slice)
     }
     /// The samples of `bank`'s `variant` (variants wrap).
     pub fn bank_clip(&self, bank: BankId, variant: u64) -> &[f32] {
@@ -407,14 +416,13 @@ fn normalized(mut weights: [f32; 6]) -> [f32; 6] {
     weights
 }
 
-struct Voice<'a> {
-    id: u64,
-    cue: Cue,
-    started_ms: u64,
+/// A sounding clip, as the executor mixes it: shared by the render and the
+/// cue-log replay ([`crate::cue_log::replay`]).
+pub(crate) struct Playing<'a> {
     /// The fade of a stolen voice, as the runtime's decoder runs it.
-    control: VoiceControl,
+    pub(crate) control: VoiceControl,
     ramp: Ramp,
-    /// The clip at the start's jittered speed.
+    /// The clip at the start's speed, through its low-pass.
     clip: Cow<'a, [f32]>,
     position: usize,
     /// Left and right.
@@ -422,9 +430,114 @@ struct Voice<'a> {
     /// The voice follows the density gain.
     compensated: bool,
 }
+impl<'a> Playing<'a> {
+    /// `clip` from its first sample at `speed`, through the low-pass, at the
+    /// `[left, right]` gains.
+    pub(crate) fn start(
+        clip: &'a [f32],
+        speed: f32,
+        lowpass_hz: Option<f32>,
+        gains: [f32; 2],
+        compensated: bool,
+    ) -> Self {
+        let clip = if speed == 1.0 {
+            Cow::Borrowed(clip)
+        } else {
+            Cow::Owned(pitched(clip, speed))
+        };
+        Self {
+            control: VoiceControl::default(),
+            ramp: Ramp::new(RATE),
+            clip: match lowpass_hz {
+                Some(cutoff) => Cow::Owned(lowpassed(&clip, cutoff, RATE)),
+                None => clip,
+            },
+            position: 0,
+            gains,
+            compensated,
+        }
+    }
+    pub(crate) fn ended(&self) -> bool {
+        self.position >= self.clip.len()
+    }
+    /// The frame's density gain: a compensated voice ramps to it. A fading
+    /// voice keeps its way to silence.
+    pub(crate) fn follow_density(&self, density: f32) {
+        if self.compensated && !self.control.stopping() {
+            self.control.set_target(density);
+        }
+    }
+    /// Mixes the next `count` samples into `sides` from `offset`.
+    pub(crate) fn mix_into(&mut self, sides: &mut [Vec<f32>; 2], offset: usize, count: usize) {
+        let rest = &self.clip[self.position..];
+        let mut played = 0;
+        for (n, source) in rest.iter().take(count).enumerate() {
+            let Some(ramp) = self.ramp.next(&self.control) else {
+                // The fade is over: the voice ends here.
+                played = rest.len();
+                break;
+            };
+            for (side, gain) in sides.iter_mut().zip(self.gains) {
+                side[offset + n] += source * gain * ramp;
+            }
+            played = n + 1;
+        }
+        self.position += played;
+    }
+}
+
+/// Adds the six loops to `block`, the samples from `offset` on, each ramped
+/// linearly from its gain in `from` to its gain in `to`.
+pub(crate) fn mix_loops(
+    library: &Library,
+    block: &mut [f32],
+    offset: usize,
+    from: [f32; 6],
+    to: [f32; 6],
+) {
+    let length = block.len() as f32;
+    for (channel, samples) in library.loops.iter().enumerate() {
+        let (from, to) = (from[channel], to[channel]);
+        if from == 0.0 && to == 0.0 {
+            continue;
+        }
+        for (n, sample) in block.iter_mut().enumerate() {
+            let gain = from + (to - from) * (n as f32 / length);
+            *sample += samples[(offset + n) % samples.len()] * gain;
+        }
+    }
+}
+
+/// The voices' two sides plus the dual-mono ambience.
+pub(crate) fn joined(sides: [Vec<f32>; 2], ambience: &[f32]) -> Stereo {
+    let [mut left, mut right] = sides;
+    for ((left, right), ambience) in left.iter_mut().zip(&mut right).zip(ambience) {
+        *left += ambience;
+        *right += ambience;
+    }
+    Stereo { left, right }
+}
+
+struct Voice<'a> {
+    id: u64,
+    cue: Cue,
+    started_ms: u64,
+    playing: Playing<'a>,
+}
 
 /// Renders `frames` at the scene's sliders and theme.
 pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
+    render_logged(library, frames, scene).0
+}
+
+/// [`render`], and the cue log of what the executor did each frame: the log
+/// the game's review service writes for a real session
+/// ([`crate::cue_log`]). Replaying the log gives the same signal.
+pub fn render_logged(
+    library: &Library,
+    frames: &[Frame],
+    scene: &Scene,
+) -> (Stereo, Vec<CueLogFrame>) {
     let bus_gains = scene.sliders.bus_gains();
     let ambience = bus_gains[Bus::Atmosphere as usize];
     let weights = normalized(scene.weights);
@@ -437,19 +550,24 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
     let mut voices: Vec<Voice> = Vec::new();
     let mut envelope = Envelope::default();
     let mut loop_gains = [0.0_f32; 6];
-    for (index, frame) in frames.iter().enumerate() {
-        let block = &mut out[index * FRAME_SAMPLES..(index + 1) * FRAME_SAMPLES];
-        // Effects.
-        voices.retain(|voice| voice.position < voice.clip.len());
-        let live: Vec<LiveVoice> = voices
+    let mut log = Vec::with_capacity(frames.len());
+    // The sounding voices; a fading one has given up its slot.
+    let live_of = |voices: &[Voice]| -> Vec<LiveVoice> {
+        voices
             .iter()
-            .filter(|voice| !voice.control.stopping())
+            .filter(|voice| !voice.playing.control.stopping())
             .map(|voice| LiveVoice {
                 id: voice.id,
                 cue: voice.cue,
                 started_ms: voice.started_ms,
             })
-            .collect();
+            .collect()
+    };
+    for (index, frame) in frames.iter().enumerate() {
+        let offset = index * FRAME_SAMPLES;
+        // Effects.
+        voices.retain(|voice| !voice.playing.ended());
+        let live = live_of(&voices);
         let now_ms = index as u64 * 1000 / u64::from(TICKS_PER_SECOND);
         let actions = policy.frame_places(
             frame.cues.clone(),
@@ -461,75 +579,38 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         );
         for voice in &voices {
             if actions.fades.contains(&voice.id) {
-                voice.control.fade_out();
+                voice.playing.control.fade_out();
             }
         }
-        for start in actions.starts {
+        // The `[left, right]` gains a start plays at.
+        let gains_of = |start: &VoiceStart| {
+            pan::voice_gains(start.cue, &frame.places, scene.reduced, scene.mono).map(|side| {
+                side * bus_gains[mix(start.cue).bus as usize]
+                    * start.gain
+                    * start.jitter.gain
+                    * start.voicing.gain()
+            })
+        };
+        for start in &actions.starts {
             ducker.trigger(start.cue);
             voices.push(Voice {
-                compensated: start.compensated,
                 id: start.voice,
                 cue: start.cue,
                 started_ms: now_ms,
-                control: VoiceControl::default(),
-                ramp: Ramp::new(RATE),
-                clip: {
-                    let clip = library.bank_clip(start.voicing.bank, start.variant);
-                    let speed = start.jitter.speed * start.voicing.speed;
-                    let clip = if speed == 1.0 {
-                        Cow::Borrowed(clip)
-                    } else {
-                        Cow::Owned(pitched(clip, speed))
-                    };
-                    match start.voicing.lowpass_hz {
-                        Some(cutoff) => Cow::Owned(lowpassed(&clip, cutoff, RATE)),
-                        None => clip,
-                    }
-                },
-                position: 0,
-                gains: pan::voice_gains(start.cue, &frame.places, scene.reduced, scene.mono).map(
-                    |side| {
-                        side * bus_gains[mix(start.cue).bus as usize]
-                            * start.gain
-                            * start.jitter.gain
-                            * start.voicing.gain()
-                    },
+                playing: Playing::start(
+                    library.bank_clip(start.voicing.bank, start.variant),
+                    start.jitter.speed * start.voicing.speed,
+                    start.voicing.lowpass_hz,
+                    gains_of(start),
+                    start.compensated,
                 ),
             });
         }
         // Ducking and density, on the voices that sound from this frame on.
-        let sounding: Vec<LiveVoice> = voices
-            .iter()
-            .filter(|voice| !voice.control.stopping())
-            .map(|voice| LiveVoice {
-                id: voice.id,
-                cue: voice.cue,
-                started_ms: voice.started_ms,
-            })
-            .collect();
-        let ducks = ducker.advance(1.0 / TICKS_PER_SECOND as f32, &sounding);
-        for voice in &voices {
-            // A fading voice keeps its way to silence.
-            if voice.compensated && !voice.control.stopping() {
-                voice.control.set_target(ducks.density);
-            }
-        }
+        let ducks = ducker.advance(1.0 / TICKS_PER_SECOND as f32, &live_of(&voices));
         for voice in &mut voices {
-            let rest = &voice.clip[voice.position..];
-            let offset = index * FRAME_SAMPLES;
-            let mut played = 0;
-            for (n, source) in rest.iter().take(FRAME_SAMPLES).enumerate() {
-                let Some(ramp) = voice.ramp.next(&voice.control) else {
-                    // The fade is over: the voice ends here.
-                    played = rest.len();
-                    break;
-                };
-                for (side, gain) in sides.iter_mut().zip(voice.gains) {
-                    side[offset + n] += source * gain * ramp;
-                }
-                played = n + 1;
-            }
-            voice.position += played;
+            voice.playing.follow_density(ducks.density);
+            voice.playing.mix_into(&mut sides, offset, FRAME_SAMPLES);
         }
         // Ambience.
         let wanted = weights.map(|weight| weight * ambience * frame.context.level());
@@ -538,25 +619,24 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         let next = envelope
             .advance(wanted, ambience == 0.0, 1.0 / TICKS_PER_SECOND as f32)
             .map(|gain| gain * ducks.duck[Bus::Atmosphere as usize]);
-        for (channel, samples) in library.loops.iter().enumerate() {
-            let (from, to) = (loop_gains[channel], next[channel]);
-            if from == 0.0 && to == 0.0 {
-                continue;
-            }
-            let offset = index * FRAME_SAMPLES;
-            for (n, sample) in block.iter_mut().enumerate() {
-                let gain = from + (to - from) * (n as f32 / FRAME_SAMPLES as f32);
-                *sample += samples[(offset + n) % samples.len()] * gain;
-            }
-        }
+        mix_loops(
+            library,
+            &mut out[offset..offset + FRAME_SAMPLES],
+            offset,
+            loop_gains,
+            next,
+        );
         loop_gains = next;
+        log.push(CueLogFrame::from_actions(
+            index as u64 * 1_000_000 / u64::from(TICKS_PER_SECOND),
+            FRAME_MICROS,
+            &actions,
+            gains_of,
+            next,
+            ducks.density,
+        ));
     }
-    let [mut left, mut right] = sides;
-    for ((left, right), ambience) in left.iter_mut().zip(&mut right).zip(&out) {
-        *left += ambience;
-        *right += ambience;
-    }
-    Stereo { left, right }
+    (joined(sides, &out), log)
 }
 
 /// The x in yards the fire bed sounds from: the first burning zone. `None`

@@ -45,6 +45,10 @@ pub struct ReviewOptions {
     pub scale: Option<f32>,
     /// `LASTLIGHT_REVIEW_INPUT_SAVE`: copied generation for the `npc-stutter` fixture.
     pub input_save: Option<PathBuf>,
+    /// `LASTLIGHT_REVIEW_CUE_LOG`: JSON-lines log of the sounds the session
+    /// plays (`horde_audio::cue_log`), by convention
+    /// `target/review/<run>/cues.jsonl`.
+    pub cue_log: Option<PathBuf>,
     /// `LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT` (or the older `..._PARITY_REPORT`).
     pub model_report: Option<PathBuf>,
     pub perf: PerfOptions,
@@ -210,6 +214,8 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_REVIEW_EXIT         Flag: exit after the automated screenshot
     LASTLIGHT_REVIEW_SCALE        UI scale for the fixture
     LASTLIGHT_REVIEW_INPUT_SAVE   Copied save generation (npc-stutter fixture)
+    LASTLIGHT_REVIEW_CUE_LOG      Cue log path (JSON lines of every started and faded
+                                  voice; replay with the horde_audio replay_cue_log example)
     LASTLIGHT_CAPTURE_SEQUENCE    Fresh folder for a fixed-step motion export
                                   (needs a motion review scene; no practice or perf)
     LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT  Player-model review manifest path
@@ -240,6 +246,7 @@ const REVIEW_VARIABLES: &[&str] = &[
     "LASTLIGHT_REVIEW_EXIT",
     "LASTLIGHT_REVIEW_SCALE",
     "LASTLIGHT_REVIEW_INPUT_SAVE",
+    "LASTLIGHT_REVIEW_CUE_LOG",
     "LASTLIGHT_CAPTURE_SEQUENCE",
     "LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT",
     "LASTLIGHT_PLAYER_MODEL_PARITY_REPORT",
@@ -408,6 +415,7 @@ impl LaunchConfig {
                 .string("LASTLIGHT_REVIEW_SCALE")
                 .and_then(|s| s.trim().parse().ok()),
             input_save: env.path("LASTLIGHT_REVIEW_INPUT_SAVE"),
+            cue_log: env.path("LASTLIGHT_REVIEW_CUE_LOG"),
             model_report: env
                 .path("LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT")
                 .or_else(|| env.path("LASTLIGHT_PLAYER_MODEL_PARITY_REPORT")),
@@ -565,6 +573,11 @@ impl LaunchConfig {
     }
     pub fn capture_path(&self) -> Option<&PathBuf> {
         self.review().and_then(|r| r.capture.as_ref())
+    }
+    /// The review cue log's file; read by `ReviewToolsPlugin` only.
+    #[cfg_attr(not(feature = "review"), allow(dead_code))]
+    pub fn cue_log_path(&self) -> Option<&PathBuf> {
+        self.review().and_then(|r| r.cue_log.as_ref())
     }
     pub fn sequence_path(&self) -> Option<&PathBuf> {
         self.review().and_then(|r| r.sequence.as_ref())
@@ -1027,6 +1040,22 @@ mod tests {
         }
         assert!(parse(&[], &base[..2]).is_err(), "motion flag required");
         assert!(parse(&[], &[base[0], base[2]]).is_err(), "scene required");
+    }
+    /// A6-18: `LASTLIGHT_REVIEW_CUE_LOG` is a review variable that names the
+    /// cue log's file; ordinary play has none.
+    #[test]
+    fn cue_log_variable_names_the_review_cue_log() {
+        let name = "LASTLIGHT_REVIEW_CUE_LOG";
+        assert!(REVIEW_VARIABLES.contains(&name));
+        assert!(HELP.contains(name));
+        assert!(parse(&[], &[]).unwrap().cue_log_path().is_none());
+        if cfg!(feature = "review") {
+            let c = parse(&[], &[(name, "target/review/run-1/cues.jsonl")]).unwrap();
+            assert_eq!(
+                c.cue_log_path(),
+                Some(&PathBuf::from("target/review/run-1/cues.jsonl"))
+            );
+        }
     }
     /// W1 review: a playtest launcher (package_playtest.ps1 -Review) blanks
     /// every review variable, so a value left in the player's environment
