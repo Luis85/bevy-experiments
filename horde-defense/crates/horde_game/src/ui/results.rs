@@ -107,9 +107,6 @@ fn reason_line(report: &Report) -> String {
         (false, false) => format!("{cause}. {}", report.tip.trim()),
     }
 }
-/// One outcome line in the page-title face (outcome · country · defense)
-/// with the banked rewards beside it, and at most one muted hint under it.
-/// The header shows the wallet; this strip only names what was banked.
 /// What a victory opened, from core queries: the fronts a liberation
 /// unlocked, then the nodes whose milestone this round reached. A victory
 /// over a Regional boss (`Report.boss_rank`) leads with the checkpoint.
@@ -236,6 +233,9 @@ fn combat_line(run: &RunRecord) -> Option<String> {
     }
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
+/// One outcome line in the page-title face (outcome · country · defense)
+/// with the banked rewards beside it, and at most one muted hint under it.
+/// The header shows the wallet; this strip only names what was banked.
 fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     let label = report.outcome.label();
     let color = match report.outcome {
