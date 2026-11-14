@@ -26,7 +26,8 @@
 //!
 //! `required_docs_sections_exist` is the docs inventory (design-qa-captures
 //! 1.13, ruling W-15): every listed doc carries the section headings its
-//! owner writes. It checks presence only.
+//! owner writes. It checks presence only. `docs_drop_retired_loot_claims`
+//! keeps the claims the production pass made false out of `docs/` (W7-04).
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -1181,7 +1182,8 @@ fn package_link_check_reports_relative_links_only() {
 /// writes into a doc the production pass changes, by heading. Presence only
 /// (ruling W-15): the wording is the owner's, so a heading matches a whole
 /// line, nothing more. W4-10 lists enemy-balance's four docs, W4-11
-/// progression-tree's goal-5 section; W7-08 adds the rest of the inventory.
+/// progression-tree's goal-5 section, W7-04 loot-economy's auto-sell
+/// sections; W7-08 adds the rest of the inventory.
 const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     (
         "docs/ENEMY_COMPOSITION.md",
@@ -1210,7 +1212,90 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
         ],
     ),
     ("docs/WORLD.md", &["### Country difficulty band"]),
+    // W7-04, loot-economy: the auto-sell rule and the loot it settles.
+    ("docs/PROGRESSION.md", &["### Auto-sell"]),
+    ("docs/GDD.md", &["## Auto-sell"]),
+    (
+        "docs/ITEM_QUALITY.md",
+        &["## Auto-sell threshold", "## Quality markers"],
+    ),
+    (
+        "docs/BALANCE_AND_RUN_STATS.md",
+        &["## Goal 4: auto-sell pacing and stash growth"],
+    ),
+    ("docs/PLAYTEST_GUIDE.md", &["## Auto-sell"]),
 ];
+
+/// Claims the production pass made false, with what replaced each (W7-04,
+/// loot-economy). Matched case-insensitively on whitespace-collapsed text,
+/// so a rewrapped sentence still fails; `docs/plans/` quotes them as history
+/// and is not scanned.
+const RETIRED_DOC_CLAIMS: &[(&str, &str)] = &[
+    (
+        "There is no automatic sale system",
+        "the auto-sell rule (PROGRESSION.md, \"Auto-sell\")",
+    ),
+    (
+        "Optional auto-sell is a later",
+        "auto-sell shipped, off by default (GDD.md, \"Auto-sell\")",
+    ),
+    (
+        "twenty-nine equipment definitions",
+        "the catalogue holds 68 definitions since W2-08",
+    ),
+    (
+        "it never buys, sells or trains automatically",
+        "an operation's drops follow the auto-sell rule's expedition toggle",
+    ),
+];
+
+/// Every claim of `claims` that `text` still makes, as
+/// `name: "<claim>" is retired; <replacement>`.
+fn retired_claims(name: &str, text: &str, claims: &[(&str, &str)]) -> Vec<String> {
+    let text = normalized(text);
+    claims
+        .iter()
+        .filter(|(claim, _)| text.contains(&normalized(claim)))
+        .map(|(claim, replacement)| format!("{name}: \"{claim}\" is retired; {replacement}"))
+        .collect()
+}
+
+#[test]
+fn docs_drop_retired_loot_claims() {
+    let workspace = workspace_directory();
+    let mut violations = Vec::new();
+    for name in markdown_files(&workspace)
+        .iter()
+        .filter(|name| name.starts_with("docs/"))
+    {
+        let path = workspace.join(name);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        violations.extend(retired_claims(name, &text, RETIRED_DOC_CLAIMS));
+    }
+    assert!(
+        violations.is_empty(),
+        "docs still make retired claims ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn retired_claim_check_matches_across_wrapped_lines_and_case() {
+    let text = "Sales are strict.\nthere is no\n  AUTOMATIC sale system.\n";
+    assert_eq!(
+        retired_claims(
+            "d.md",
+            text,
+            &[
+                ("There is no automatic sale system", "use the rule"),
+                ("never sells", "n/a"),
+            ]
+        ),
+        vec!["d.md: \"There is no automatic sale system\" is retired; use the rule".to_owned()]
+    );
+}
 
 /// The headings of `required` that no line of `text` equals (trailing
 /// whitespace and a CR ignored), as `name: missing "<heading>"`. A heading

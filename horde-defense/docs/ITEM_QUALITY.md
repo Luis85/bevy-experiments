@@ -52,3 +52,28 @@ at: actual defeated actor [x, y()], including passing displacement
 Save validation bounds receipt count, IDs, definitions, levels, names, ticks and finite battlefield positions. The catalogue requires all six canonical tiers, finite visible RGBA colors, bounded nonnegative weights, an eligible rank-zero distribution, and strictly increasing positive stat/value multipliers. Unknown tiers or malformed metadata reject the generation.
 
 Regression coverage includes all old definitions at levels one and seven, explicit base-quality identity, numerical upgrades and resale value, legendary pistol caps, NPC-issued restrictions, deterministic roll/checkpoint behavior, unchanged combat RNG draws, and exactly-once parallel transfer. The opening 15 country/seed purchase routes, five-template campaign proofs and eight-stage earned routes remain independent of rare-drop equipment.
+
+## Auto-sell threshold
+
+The auto-sell rule ([PROGRESSION.md](PROGRESSION.md), "Auto-sell") sells a drop when its quality is strictly below `AutoSellRule.sell_below`. It compares the item's saved absolute quality (`Item.quality`, the tier its colour shows), never the step the relative roll took, so the threshold means the same for every drop tier. An item without a rolled quality (shop stock and starters) is never a candidate. `sell_below` accepts Common to Legendary; Poor would sell nothing and is refused with `CommandError::AutoSellRuleInvalid`. No threshold sells a Legendary item.
+
+The Equipment Auto-sell panel offers the five accepted values as chips, cheapest first. Each chip paints the shape of the best quality it sells in that quality's palette colour, whatever the marker setting:
+
+| Chip | `sell_below` | Sells |
+| --- | --- | --- |
+| Poor only | Common | Poor |
+| Common and below (default) | Uncommon | Poor, Common |
+| Uncommon and below | Rare | Poor to Uncommon |
+| Rare and below | Epic | Poor to Rare, with the amber warning "Also sells Rare finds." |
+| Epic and below | Legendary | Poor to Epic, with the amber warning "Also sells Rare and Epic finds." |
+
+Relative quality decides how much the default sells. The loot-only tier-2 to tier-4 definitions have a Rare, Epic or Legendary base, and the relative roll moves a drop at most one tier below its base (its only downward step is Poor's −1), so past the first drop tiers few drops are Poor or Common. In the wave-4 measurement (plan §9.7, W4-l) the default rule had sold 2.1% of the items after 60 runs and 1.5% after 150. When the last run's drops still in the stash all sit at or above the threshold and the next threshold would sell something from the stash, the panel says so: "Your recent drops are <Quality> or better; raise the threshold to keep selling". The rule never raises the threshold itself (user decision R58 keeps the default).
+
+## Quality markers
+
+Colour is never the only sign of quality. Settings › Readability & effects has two independent settings, both presentation only:
+
+- **Quality markers**: Colour only (default), Text, Shape, or Text and shape. With Text an item label that showed quality only by colour also names it; with Shape the quality's shape is drawn beside it. The Equipment and History item lists and the Results loot block follow this one setting.
+- **Colour-blind quality palette**: replaces the catalogue colours with Okabe-Ito hues that stay apart under the common colour-vision deficiencies (Poor gray, Common the text colour, Uncommon bluish green, Rare sky blue, Epic reddish purple, Legendary orange).
+
+Each quality has one painted shape, never a font glyph: Poor a hollow downward triangle (the only outline), Common a disc, Uncommon a diamond, Rare a square, Epic an upward triangle and Legendary a star. The battlefield loot fly-up always paints its tier's shape as a corner marker, whatever the setting, and only Rare and better drops glint; with reduced effects the fly-up holds still and only fades, and never glints. The shapes are static, so reduced effects needs no second form.

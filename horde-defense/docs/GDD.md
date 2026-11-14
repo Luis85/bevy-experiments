@@ -388,7 +388,7 @@ A percentage damage bonus in personal play must not automatically become a GURPS
 
 Coins and loot collect automatically because the defender cannot move. Cosmetic drops may appear briefly and travel toward the reward indicator, but never require a pickup click. Drop events resolve before the end-of-attempt summary.
 
-Normal enemies have an authored drop chance. Bosses guarantee a relevant equipment reward in addition to coins. A bounded bad-luck rule or milestone reward protects essential progression. Higher rarity expands useful modifiers or specialization; it does not guarantee that an item suits every build.
+Normal enemies have an authored drop chance (3%, and every twentieth kill drops). Elites always drop, at Uncommon quality or better. Bosses guarantee a relevant equipment reward in addition to coins. A bounded bad-luck rule or milestone reward protects essential progression. Higher rarity expands useful modifiers or specialization; it does not guarantee that an item suits every build.
 
 Drop probability must follow kill volume. For example, a 3% chance across 200 eligible kills produces 6 expected item drops. This is a mathematical expectation, not a guarantee. Avoid a late-game stash flooded by hundreds of low-value notifications.
 
@@ -398,7 +398,11 @@ Sell items in preparation. Show total proceeds before a batch sale. One sale rul
 
 Multiple presets may reference the same owned rifle because only one defender deploys at a time. Deployment reserves the actual item; a preset never creates a duplicate. A protected starter equipment set always remains available.
 
-The baseline stash has no hard gameplay item-capacity limit. Automatically collected equipment is never discarded because a bag is full; sorting, filtering, and aggregated notifications control presentation. Optional auto-sell is a later, explicit preference; it must not be enabled by default for unfamiliar or unique items. Equipping, comparing, and switching a valid loadout are free.
+The baseline stash has no hard gameplay item-capacity limit. Automatically collected equipment is never discarded because a bag is full; sorting, filtering, and aggregated notifications control presentation. Equipping, comparing, and switching a valid loadout are free.
+
+## Auto-sell
+
+Auto-sell is an explicit preference in Equipment, off by default. When the player turns it on, the end of each run sells that run's new drops whose quality is below a threshold the player picks (default: Common and below), in the slots the player selects. It keeps a drop that would upgrade the defender who fought the run, and never sells an item the one sale rule protects: starter, locked, favorited, NPC-issue, equipped, preset, recruit and reserved items. It sells only when a run is settled, never during a battle, and draws no randomness. Expeditions and country operations follow the same rule unless the player turns that off. The result screen shows what was sold and for how much ("Auto-sold N · +C"); the battlefield never shows sale text. A separate "Apply rule to stash now" sells the current stash under the same rule after a confirmation that states the count and the proceeds. [PROGRESSION.md](PROGRESSION.md), "Auto-sell", is the exact rule.
 
 # 16 NPC deployment and training
 
@@ -526,7 +530,7 @@ The player manages construction through tactical pause in both modes. The NPC do
 
 ## Repeats and offline scope
 
-Default deployment runs one attempt. An optional later repeat control can run an already-cleared level for a selected number of attempts, stopping on defeat, an invalid loadout, a new unlock, or the chosen limit. It never silently advances to a new level, trains, spends permanent coins, or sells equipment.
+Default deployment runs one attempt. An optional later repeat control can run an already-cleared level for a selected number of attempts, stopping on defeat, an invalid loadout, a new unlock, or the chosen limit. It never silently advances to a new level, trains, spends permanent coins, or sells equipment beyond what the player's own auto-sell rule sells.
 
 Offline progression is outside the baseline. Pausing or closing the game does not create simulated rewards. Save and resume preserves the actual current attempt.
 

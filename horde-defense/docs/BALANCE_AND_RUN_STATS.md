@@ -44,7 +44,7 @@ The saved `DpsTracker` stores source totals, a bounded ordered bucket window, an
 
 Every newly finished victory, defeat and withdrawal appends one compact `stats::RunRecord`. There is no record-count limit or silent truncation. The existing explicit 64 MiB save-generation limit still protects storage; exceeding it reports a save failure rather than deleting history. Records use deterministic sequence/attempt IDs and simulation ticks, not real-clock timestamps.
 
-Each record captures outcome, country/stage/template, control mode, defender identity, actual geometry, victory threat, full applied balance settings, four equipped gear definitions/qualities/levels/classes, duration, kills/shots/hits/misses, damage by source, average/peak DPS, retained coins, actual credited kill/completion XP, loot count and six quality counts, final/max HP and cause. `duration_seconds()` converts the saved tick duration. These fields describe already-banked transactions and cannot pay them again.
+Each record captures outcome, country/stage/template, control mode, defender identity, actual geometry, victory threat, full applied balance settings, four equipped gear definitions/qualities/levels/classes, duration, kills/shots/hits/misses, damage by source, average/peak DPS, retained coins, actual credited kill/completion XP, loot count and six quality counts, the auto-sold count and coins (`auto_sold_count`, `auto_sold_coins`: what settlement's auto-sell rule sold from this run's drops; both 0 with the rule off and never above the loot count), final/max HP and cause. `duration_seconds()` converts the saved tick duration. These fields describe already-banked transactions and cannot pay them again.
 
 The parent campaign is the sole persistent history owner. Worker campaign copies exclude the parent's history entirely. Finished workers emit records through a saved outbox; parent settlement drains it once, assigns a global history ID, normalizes actual shared completion XP, and tags worker/recruit IDs. This also records recalls/defeats, not just successful operations. Reopening results or restoring a generation cannot append or award the same finished run again. Older saves start with an empty history; prior finalized runs are not fabricated retroactively.
 
@@ -53,6 +53,29 @@ The parent campaign is the sole persistent history owner. Worker campaign copies
 The Normal opening controller uses current enemy positions and only earned, guaranteed purchases. Across DEU/BRA/EGY/USA/ISL and three seeds, every fresh run failed; fourteen purchase routes cleared on run three and one on run four, without equipping loot. First runs banked 282-464 coins. The actual eight-defense USA route and all five templates remained achievable in both modes. These are deterministic simulation proofs, not human playtest or GUI evidence.
 
 Dedicated tests cover atomic/frozen settings, all three presets, actual damage-source integration, fixed-window DPS and corrupt aggregate rejection, pause/checkpoint equivalence, legacy 11/30 geometry, 302 retained all-outcome records, and saved worker-outbox settlement with one parent owner.
+
+## Goal 4: auto-sell pacing and stash growth
+
+The auto-sell rule (PROGRESSION.md, "Auto-sell") pays coins at settlement, so the run record and the pacing output keep them apart from the battle's own coins:
+
+- **Run record.** `auto_sold_count` and `auto_sold_coins` (above). Their source is the report's `auto_sold` receipt, which also keeps the count per quality, the 12 dearest sales and the drops kept because the wallet was full. History's run detail shows "Auto-sold N · +C coins" when the count is above 0.
+- **`pacing --csv`.** One row per run with the columns `auto_sold_count` and `auto_sold_coins` beside `coins`, `level_grant_coins` and `milestone_coins`; `cumulative_coins` adds all four, which is the "earned" a `TierAffordable` milestone reads (Goal 5 below). A sale outside settlement (the `manual-sell` profile's camp sales) reaches the wallet but not `cumulative_coins`.
+- **Profiles.** `auto-sell` is `expert-deu` with one change: before the first run it stores the default rule, enabled (Poor and Common drops, every slot, upgrades kept). `manual-sell` sells every item `SellUnprotected` would in camp instead. To print the per-run rows: `cargo run --locked --release -p horde_core --example pacing -- --profile auto-sell --seeds 20 --csv --out <file>`.
+
+Acceptance G4.13 is one release-only row in `crates/horde_core/tests/pacing_targets.rs`; R39 adds a report beside it:
+
+```powershell
+cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture --test-threads 1 auto_sell_profile_within stash_growth_reported
+```
+
+| Row | Test | Target | Wave-4 close | Verdict |
+| --- | --- | --- | --- | --- |
+| G4.13 | `auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3` | Tiers 1 / 2 / 3 affordable with `auto-sell` within one run of the same build's `expert-deu` (no sales), lower medians over 20 seeds | 4 [4, 4] / 8 [7, 8] / 11 [10, 12] against 4 [4, 4] / 8 [8, 8] / 12 [11, 12] | PASS |
+| R39 report | `stash_growth_reported_for_150_runs` | None; it fails only when a seed misses a requested run or nothing was auto-sold | After run 60: 5,317 [5,270, 5,452] items owned, 112 [104, 127] auto-sold so far. After run 150: 19,615 [19,068, 19,801] owned, 298 [286, 312] auto-sold. Auto-sold coins per run, runs 1-6: 31 / 56 / 68 / 50 / 36 / 25 | Reported |
+
+The evaluators are pure functions in `sim/pacing/loot.rs` (`auto_sell_within_default`, `stash_growth`), pinned on synthetic reports in `tests/pacing_harness.rs`. The gate refuses a baseline that sells, a second sweep that does not auto-sell and unequal seed counts. The stash size is `PacingRun::items_owned`, every item the campaign holds after the run, worn ones included: what a save stores.
+
+Reading. The rule earns little: runs 1-6 bring 266 coins in all against a tier-1 cost of 2,030, so it moves a tier by at most one run (tier 3 arrives one run early). It also removes little: 2.1% of the items after 60 runs and 1.5% after 150, because past the first drop tiers few drops are Poor or Common (ITEM_QUALITY.md, "Auto-sell threshold") and `keep_upgrades` keeps some that are. The stash grows by about 89 items a run over runs 1-60 and 159 a run over runs 61-150. The user kept the drop and sale rules as shipped (R58, 2026-11-14): the closing phase measures the save-clone cost at 5,000 and 20,000 items against the G1.8 gate (p99 at most 1 ms) and changes something only if that gate fails. The numbers are plan §9.7 ("W4-l: stash growth and early auto-sold coins"); the closing phase re-runs both rows at HEAD.
 
 ## Goal 5: progression pacing acceptance
 

@@ -87,13 +87,26 @@ Compare two owned instances of one equipment definition at different levels. Inv
 
 ## Quality, critical enemies and overtaking
 
-Compare Poor, Common, Uncommon, Rare, Epic and Legendary names/borders, the quality filter and Highest quality sort. Keep quality, item Lv and unlock tier distinct. Inspect actual comparison and sale values; an old item with no override must retain its original effective values. Shop offers have fixed base quality, and proficiency never grants an item.
+Compare Poor, Common, Uncommon, Rare, Epic and Legendary names/borders, the quality filter and Highest quality sort. Keep quality, item Lv and unlock tier distinct. Inspect actual comparison and sale values; an old item with no override must retain its original effective values. Shop offers have fixed base quality, and proficiency never grants an item. In Settings → Readability & effects try each Quality markers choice (Colour only, Text, Shape, Text and shape) and the Colour-blind quality palette: every quality must stay tellable apart by its name or its shape alone.
 
 Watch an earned drop at the defeated actor’s position: its quality outline/icon rises and fades for 1.5 real seconds, even at 4× observation. The HUD/debrief receipt says it is already banked. Check the owned item once; flying icons must never require collection, create another item, pay again or change combat randomness.
 
 The user chose to retain GURPS injury rules. In NPC mode a conscious zero/negative-HP hostile can still move/fight with existing injury penalties; inspect signed HP and the explicit CRIT · FIGHTING label. Do not treat zero alone as a kill. Actual dead/unconscious/mortally wounded terminals must stop and become a single paid corpse in the resolving tick. Compare 1×/2×/4× without changing outcomes.
 
 Enemies never block each other (W1-69): faster bodies walk through slower ones without a side step, and every enemy that reaches the line or a wall attacks, so a crowd stacks there. A stack draws slightly fanned out, with one contact band per lane and one windup ring per stack, and every body's own bars. Walls still stop enemies, and traps still cover the whole lane strip.
+
+## Auto-sell
+
+Auto-sell is off in a new journey and in every older save. Before turning it on, finish a run: Results shows the loot line ("Loot N" and the count per quality) and the muted "Auto-sell is off · Equipment › Auto-sell".
+
+1. Open Equipment → Manage equipment → Auto-sell. Turn on "Auto-sell new drops" and read the five threshold chips: Poor only, Common and below (default), Uncommon and below, Rare and below, Epic and below. Each chip shows its best quality's colour and shape. The two highest show an amber warning ("Also sells Rare finds." / "Also sells Rare and Epic finds."). Nothing Legendary is ever auto-sold.
+2. Check the four slot boxes, "Keep upgrades for the defender who ran it" and "Also on expeditions and operations". Any change is stored at once, with no Apply button, and is used when the next run ends; nothing is sold mid-battle.
+3. Play a run with the default rule. The battle screen and the expedition observer show no sale text: drops fly up and bank as before. Results then shows "Auto-sold N · +C"; hover it for the sold items (at most 12, then "and N more"). A drop that would upgrade the defender who fought stays in the stash. However many items sold, one coin sound plays shortly after Results opens, and the Results line is its visual twin. History's run detail shows the same "Auto-sold N · +C coins".
+4. Lock or favourite a Poor or Common drop, equip another and put a third in a preset (shop stock and starters are never auto-sold). Back on the panel, "Would sell N now · +C" counts only the rest (its hover names what is kept and why). Press "Apply rule to stash now…": the dialog asks "Sell N items for C coins?" and names what is kept. Escape or "Keep items" closes it and sells nothing; "Sell N · +C" sells exactly that quote and shows "Sold N · +C". The locked, favourite, equipped and preset items must remain. While a defender is deployed, or when nothing matches, the button is disabled and its hover says why.
+5. Later in the journey, when every recent drop is Uncommon or better, the panel may say "Your recent drops are Uncommon or better; raise the threshold to keep selling". Record whether the default threshold still feels useful, and how large the stash has grown (the default rule sells about 2% of all drops over a long journey).
+6. With recruits on an expedition or operation, turn "Also on expeditions and operations" off and on between stages: drops from a stage settled while it was off are never sold later by the rule, only by Apply rule to stash now.
+
+Record the threshold, the counts and coins Results showed, and any item sold that you expected to keep (with its item ID, quality and where it was equipped). See docs/PROGRESSION.md, "Auto-sell", in the source repository for the exact rule.
 
 ## Gameplay settings, DPS and history
 
@@ -115,7 +128,7 @@ Inspect actual equipment on Character: change an owned outfit/accessory/melee or
 
 Country populations determine local defense counts, with data-driven bounds and overrides. Clear every local defense to liberate a country and open its neighbors. Explicit sea routes keep island fronts connected. Zoom, drag, search and inspect the map; garrison and deployment badges show where survivors are assigned.
 
-Default milestones unlock recruitment after one liberated country, parallel expeditions after two, and garrisons, country operations and plague pressure after four. Each recruited survivor owns training and equipment references. A deployed survivor or guard cannot serve in another role simultaneously. A whole-country operation chains real battles and stops on defeat, recall or liberation; it never buys, sells or trains automatically.
+Default milestones unlock recruitment after one liberated country, parallel expeditions after two, and garrisons, country operations and plague pressure after four. Each recruited survivor owns training and equipment references. A deployed survivor or guard cannot serve in another role simultaneously. A whole-country operation chains real battles and stops on defeat, recall or liberation. It never buys or trains on its own, and it sells only what your auto-sell rule sells while "Also on expeditions and operations" is on.
 
 In strategic practice, resume the world clock and inspect the active outbreak. Respond with a successful defense or assign guards. An unanswered alert reopens the final stage; earned travel routes persist. The seven-minute response window runs in simulation time. Pause and closing the game freeze pressure and income.
 
