@@ -12,7 +12,7 @@ use horde_core::{
 /// A journey in Germany between defenses with Mara open and one Ready
 /// recruit from each of `origins` (liberated neighbours). Returns the
 /// recruits' ids in `origins` order.
-fn camp_with_recruits(f: &mut FrontendParts, origins: &[&str]) -> Vec<u64> {
+pub(super) fn camp_with_recruits(f: &mut FrontendParts, origins: &[&str]) -> Vec<u64> {
     f.game.campaign_mut().choose_start_country("DEU").unwrap();
     f.game.campaign_mut().journey_active = true;
     f.game.campaign_mut().attempts = 1;
@@ -59,7 +59,7 @@ fn name_of(game: &Game, id: DefenderId) -> String {
 
 /// Recruit `id` takes over the main run: chosen with `SetNextDefender`,
 /// deployed with `BeginDefense`, shown paused on the battle screen.
-fn takeover(f: &mut FrontendParts, id: u64) {
+pub(super) fn takeover(f: &mut FrontendParts, id: u64) {
     f.game
         .apply(&Command::SetNextDefender(DefenderId::Recruit(id)))
         .unwrap();

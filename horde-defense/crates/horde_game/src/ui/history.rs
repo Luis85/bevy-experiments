@@ -188,6 +188,14 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings
         "{} coins · {} kill XP + {} completion XP · {} items",
         r.coins, r.kill_xp, r.completion_xp, r.loot
     ));
+    // What settlement auto-sold from this run's drops; nothing for a run
+    // that sold nothing.
+    if r.auto_sold_count > 0 {
+        ui.label(format!(
+            "Auto-sold {} · +{} coins",
+            r.auto_sold_count, r.auto_sold_coins
+        ));
+    }
     muted(
         ui,
         format!(

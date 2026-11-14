@@ -8,6 +8,7 @@ use horde_core::{
     sim::{Outcome, Report},
     world::world,
 };
+mod loot_block;
 fn continue_label(f: &UiCtx) -> &'static str {
     if !f.game.campaign().journey_active || f.game.last_result().is_none() {
         return "Choose a country";
@@ -173,6 +174,9 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
             }
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| actions(ui, f));
+            // Inline content under the actions: the run's loot, then the
+            // liberation block.
+            loot_block::loot_block(ui, f);
             recruit_block(ui, f);
             // Who defends next, between defenses of a running journey.
             if f.game.campaign().journey_active && f.game.last_result().is_some() {
