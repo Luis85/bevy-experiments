@@ -244,20 +244,34 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
             } else {
                 row(
                     "Ranged profile",
-                    format!("{}d{:+} {:?}", before.dice, before.adds, before.damage_kind),
-                    format!("{}d{:+} {:?}", after.dice, after.adds, after.damage_kind),
+                    format!(
+                        "{}d{:+} {}",
+                        before.dice,
+                        before.adds,
+                        before.damage_kind.label()
+                    ),
+                    format!(
+                        "{}d{:+} {}",
+                        after.dice,
+                        after.adds,
+                        after.damage_kind.label()
+                    ),
                     after.expected_basic_damage > before.expected_basic_damage,
                     after.expected_basic_damage < before.expected_basic_damage,
                 );
                 row(
                     "Melee profile",
                     format!(
-                        "{}d{:+} {:?}",
-                        before.melee_dice, before.melee_adds, before.melee_kind
+                        "{}d{:+} {}",
+                        before.melee_dice,
+                        before.melee_adds,
+                        before.melee_kind.label()
                     ),
                     format!(
-                        "{}d{:+} {:?}",
-                        after.melee_dice, after.melee_adds, after.melee_kind
+                        "{}d{:+} {}",
+                        after.melee_dice,
+                        after.melee_adds,
+                        after.melee_kind.label()
                     ),
                     false,
                     false,

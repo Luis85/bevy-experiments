@@ -183,7 +183,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.push_id(recruit.id, |ui| {
             chrome::row(ui, |ui| {
                 ui.strong(&recruit.name);
-                ui.label(format!("{:?} · from {}", recruit.status, country_name(&recruit.origin)));
+                ui.label(format!("{} · from {}", recruit.status.label(), country_name(&recruit.origin)));
                 if let Some(guard) = f.game.strategy().guards.iter().find(|g| g.recruit_id == recruit.id) { ui.colored_label(AMBER, format!("Guarding {}", country_name(&guard.country_id))); }
                 if recruit.status == RecruitStatus::Guarding && ui.button("Release guard").clicked() { f.dispatch(Command::ReleaseGuard(recruit.id), "Guard recalled and recovered."); }
             });
@@ -211,7 +211,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         }
                     });
                     for slot in Slot::ALL {
-                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{:?}: {}", slot, f.game.campaign().item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
+                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{}: {}", slot.label(), f.game.campaign().item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
                             for item in f.game.campaign().items.clone().iter().filter(|i| i.definition().slot == slot) {
                                 let reserved = f.game.campaign().item_reserved(item.id);
                                 if ui.add_enabled(!reserved, egui::Button::selectable(recruit.npc.loadout.contains(&item.id), format!("{} #{} · Lv {}{}", item.definition().name, item.id, item.level, if reserved { " · reserved" } else { "" }))).clicked() { f.dispatch(Command::EquipRecruit { id: recruit.id, item: item.id }, "Survivor equipment updated."); }
@@ -219,7 +219,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         });
                     }
                     let mut proposed = recruit.npc.policy;
-                    egui::ComboBox::from_id_salt(("recruit_policy", recruit.id)).selected_text(format!("{proposed:?}")).show_ui(ui, |ui| { for policy in Policy::ALL { ui.selectable_value(&mut proposed, policy, format!("{policy:?}")); } });
+                    egui::ComboBox::from_id_salt(("recruit_policy", recruit.id)).selected_text(proposed.label()).show_ui(ui, |ui| { for policy in Policy::ALL { ui.selectable_value(&mut proposed, policy, policy.label()); } });
                     if proposed != recruit.npc.policy { f.dispatch(Command::SetRecruitPolicy { id: recruit.id, policy: proposed }, "Survivor policy updated."); }
                 });
             }
@@ -256,7 +256,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     if ui.button("Clear country plan").clicked() { f.dispatch(Command::ClearExpeditionLayout(id), "Country plan cleared; deployed structures remain."); }
                     muted(ui, "Build live: left click places, right click salvages. Pause all is optional.");
                     for kind in StructureKind::ALL {
-                        ui.selectable_value(&mut f.battle.build_kind, kind, format!("{kind:?}"));
+                        ui.selectable_value(&mut f.battle.build_kind, kind, kind.label());
                     }
                 });
                 if let Some(b) = f.game.battles().iter().find(|b| b.id == id)

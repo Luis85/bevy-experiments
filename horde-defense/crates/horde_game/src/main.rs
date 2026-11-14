@@ -29,6 +29,8 @@ mod review_tools;
 mod runner;
 mod settings;
 mod sfx;
+#[cfg(test)]
+mod source_scan;
 mod ui;
 mod visual_assets;
 mod worldmap;

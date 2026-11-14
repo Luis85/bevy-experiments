@@ -5,7 +5,10 @@ use crate::{
     runner::SaveIntent,
 };
 use bevy_egui::egui::{self, Align, Color32, FontId, Layout, RichText, Stroke, pos2};
-use horde_core::{command::Command, content::Mode};
+use horde_core::{
+    command::Command, content::Mode, defenders::DefenderId, sim::Game,
+    skill_catalog::CampaignFeature,
+};
 
 pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
     let header = egui::Panel::top("header")
@@ -108,7 +111,7 @@ impl NavEntry {
             NavEntry::Tab(Tab::Armory) => "Equipment",
             NavEntry::Tab(Tab::Character) => "Character",
             NavEntry::Tab(Tab::Home) => "Camp",
-            NavEntry::Tab(Tab::Survivor) => "Mara",
+            NavEntry::Tab(Tab::Survivor) => CampaignFeature::Companion.label(),
             NavEntry::Tab(Tab::World) => "World map",
             NavEntry::Tab(Tab::Operations) => "Operations",
             // Redirected to the upgrade home; never listed.
@@ -196,6 +199,20 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
     super::onboarding::callout_row(root, f);
 }
 
+/// "Active defense · <who>" while a main defense is on the field: "You" for
+/// the player, otherwise the defender's name from its core card. The mode
+/// does not name anyone: Mara and every recruit defend under `Mode::Npc`.
+pub(super) fn active_defense_label(game: &Game) -> Option<String> {
+    let attempt = game.attempt()?;
+    let who = match attempt.defender() {
+        DefenderId::Player => "You".to_owned(),
+        defender => game
+            .defender_card(defender)
+            .map_or_else(|| "Survivor".to_owned(), |card| card.name),
+    };
+    Some(format!("Active defense · {who}"))
+}
+
 pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
     if !matches!(f.screen, Screen::Camp | Screen::Results) {
         return;
@@ -213,15 +230,8 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
         )
         .show(root, |ui| {
             super::chrome::row(ui, |ui| {
-                if let Some(a) = f.game.attempt() {
-                    ui.strong(format!(
-                        "Active defense · {}",
-                        if a.mode == Mode::Personal {
-                            "You"
-                        } else {
-                            "Mara"
-                        }
-                    ));
+                if let Some(label) = active_defense_label(f.game) {
+                    ui.strong(label);
                 }
                 if fields > 0 {
                     ui.label(super::chrome::count_noun(

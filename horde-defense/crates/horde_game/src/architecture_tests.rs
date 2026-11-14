@@ -102,11 +102,11 @@ struct Scanned {
     test_only: bool,
 }
 
-fn source_directory() -> PathBuf {
+pub(crate) fn source_directory() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
 }
 
-fn is_identifier(c: char) -> bool {
+pub(crate) fn is_identifier(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
@@ -457,6 +457,64 @@ fn child_directory(path: &str) -> String {
         "main.rs" | "lib.rs" | "mod.rs" => prefix,
         _ => format!("{prefix}{}/", file.trim_end_matches(".rs")),
     }
+}
+
+/// One production source file, for scans that read string literals
+/// (`source_scan`): `code` is `text` with comments, string contents and
+/// test-only code blanked, character for character.
+pub(crate) struct ProductionSource {
+    /// `/`-separated, relative to the scanned directory.
+    pub(crate) path: String,
+    pub(crate) text: Vec<char>,
+    pub(crate) code: Vec<char>,
+}
+
+/// `text` as production code: None for a `#![cfg(test)]` file, otherwise the
+/// blanked code and the test modules it declares.
+pub(crate) fn production_code(text: &str) -> Option<(Vec<char>, Vec<String>)> {
+    let mut code = blank_comments_and_strings(text);
+    if file_is_test_only(&code) {
+        return None;
+    }
+    remove_inner_test_blocks(&mut code);
+    let test_modules = remove_test_items(&mut code);
+    Some((code, test_modules))
+}
+
+/// Every production file below `directory`: test-only files, the files of
+/// `#[cfg(test)]` modules and the dev-only `EXCLUDED` trees are left out,
+/// exactly as the needle scans leave them out.
+pub(crate) fn production_sources(directory: &Path) -> Vec<ProductionSource> {
+    let mut sources = Vec::new();
+    let mut test_files = Vec::new();
+    let mut test_directories = Vec::new();
+    for path in rust_sources(directory) {
+        let text = std::fs::read_to_string(directory.join(&path))
+            .unwrap_or_else(|error| panic!("read {path}: {error}"));
+        let Some((code, test_modules)) = production_code(&text) else {
+            continue;
+        };
+        let base = child_directory(&path);
+        for name in test_modules {
+            test_files.push(format!("{base}{name}.rs"));
+            test_directories.push(format!("{base}{name}/"));
+        }
+        sources.push(ProductionSource {
+            path,
+            text: text.chars().collect(),
+            code,
+        });
+    }
+    sources.retain(|source| {
+        !(test_files.contains(&source.path)
+            || test_directories
+                .iter()
+                .any(|directory| source.path.starts_with(directory.as_str()))
+            || EXCLUDED
+                .iter()
+                .any(|prefix| source.path.starts_with(prefix)))
+    });
+    sources
 }
 
 /// The core-RNG scan of `directory`: hits, and the files it actually read.

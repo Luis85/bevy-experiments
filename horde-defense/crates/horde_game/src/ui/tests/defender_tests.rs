@@ -334,3 +334,28 @@ fn mara_hud_name_and_portrait_come_from_her_card() {
     assert_eq!(view.defender, card.hud_name);
     assert!(view.female_portrait);
 }
+
+/// The camp strip above a running main defense names whoever holds it from
+/// the core card (W3-26). `Mode::Npc` is not a name: a recruit defends under it too.
+#[test]
+fn active_defense_strip_names_the_defender_not_the_mode() {
+    use crate::ui::navigation::active_defense_label;
+    let mut fixture = IsolatedFrontend::new();
+    let f = &mut fixture.frontend;
+    assert_eq!(active_defense_label(&f.game), None, "no defense is running");
+    let recruit = camp_with_recruits(f, &["FRA"])[0];
+    takeover(f, recruit);
+    let name = name_of(&f.game, DefenderId::Recruit(recruit));
+    assert_ne!(name, name_of(&f.game, DefenderId::Mara));
+    assert_eq!(
+        active_defense_label(&f.game),
+        Some(format!("Active defense · {name}"))
+    );
+
+    let mut game = Game::default();
+    game.deploy(0, Mode::Personal).unwrap();
+    assert_eq!(
+        active_defense_label(&game).as_deref(),
+        Some("Active defense · You")
+    );
+}

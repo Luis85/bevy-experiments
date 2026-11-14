@@ -90,7 +90,7 @@ impl Tab {
     /// The drill-down's name in its breadcrumb.
     pub fn drill_down_name(self) -> Option<&'static str> {
         match self {
-            Tab::Survivor => Some("Mara"),
+            Tab::Survivor => Some(horde_core::skill_catalog::CampaignFeature::Companion.label()),
             Tab::Operations => Some("Operations"),
             _ => None,
         }

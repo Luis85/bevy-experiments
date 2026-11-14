@@ -121,10 +121,18 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     });
     egui::CollapsingHeader::new("Current equipment & advancement rules").show(ui, |ui| {
-        for slot in Slot::ALL { ui.label(format!("{:?}: {}", slot, f.game.campaign().equipped(Mode::Personal, slot).name)); }
-        muted(ui, "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.");
+        for slot in Slot::ALL {
+            ui.label(format!(
+                "{}: {}",
+                slot.label(),
+                f.game.campaign().equipped(Mode::Personal, slot).name
+            ));
+        }
+        muted(ui, ADVANCEMENT_RULES);
     });
 }
+/// The note under "Current equipment & advancement rules".
+const ADVANCEMENT_RULES: &str = "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.";
 /// Mara's tactical policy (`SetNpcPolicy`).
 pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
     tactics(ui, f, DefenderId::Mara);
@@ -151,10 +159,10 @@ pub(super) fn tactics(ui: &mut egui::Ui, f: &mut UiCtx, defender: DefenderId) {
     };
     let before = proposed.clone();
     egui::ComboBox::from_id_salt("policy")
-        .selected_text(format!("{:?}", proposed.policy))
+        .selected_text(proposed.policy.label())
         .show_ui(ui, |ui| {
             for p in Policy::ALL {
-                ui.selectable_value(&mut proposed.policy, p, format!("{p:?}"));
+                ui.selectable_value(&mut proposed.policy, p, p.label());
             }
         });
     ui.checkbox(&mut proposed.prefer_aim, "Aim when the line is safe");
@@ -183,9 +191,11 @@ pub(super) fn tactics(ui: &mut egui::Ui, f: &mut UiCtx, defender: DefenderId) {
 }
 
 pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
+    // The companion's name is the core record's, never a UI literal.
+    let name = f.game.campaign().npc.name.clone();
     chrome::page_title(
         ui,
-        "Mara Vale",
+        &name,
         "Train and equip your autonomous defender, then review her tactical policy.",
     );
     if !f.game.campaign().npc_available() {
@@ -243,7 +253,7 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .on_disabled_hover_text(row.disabled_hover)
                     .clicked()
                 {
-                    f.dispatch(Command::TrainNpc(row.training), "Survivor trained.");
+                    f.dispatch(Command::TrainNpc(row.training), "Training applied.");
                 }
             });
         });

@@ -242,11 +242,11 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings
                     ui.colored_label(
                         chrome::quality_colour(gear.quality, settings.palette),
                         format!(
-                            "{} · {} · Lv{} · {:?}",
+                            "{} · {} · Lv{} · {}",
                             gear.name,
                             gear.quality.name(),
                             gear.level,
-                            gear.slot
+                            gear.slot.label()
                         ),
                     );
                 });
