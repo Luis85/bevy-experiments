@@ -489,6 +489,36 @@ impl EnemyCatalog {
         (total / weight) as f32
     }
 
+    /// The hostiles one pick from `wave_pool(tier, unlocked)` brings, as
+    /// (members per unit of pick weight, profile) rows: every group member
+    /// and every split child it will release, each child under its own
+    /// profile. The second value is the pool's total pick weight. Borrowed,
+    /// pure: no RNG, no rank scaling (the Npc `defender_power` model).
+    pub(crate) fn pool_members(
+        &self,
+        tier: usize,
+        unlocked: &[BossKind],
+    ) -> (Vec<(f32, &ResolvedEnemy)>, f32) {
+        let pool = self.wave_pool(tier, unlocked);
+        let mut members = Vec::with_capacity(pool.len() + 2);
+        let mut total = 0.0;
+        for entry in &pool {
+            let weight = entry.weight as f32;
+            total += weight;
+            let enemy = &self.resolved[&entry.archetype_id];
+            members.push((weight * f32::from(enemy.group_size), enemy));
+            if let Some(DeathEffect::Split {
+                archetype_id,
+                count,
+            }) = &enemy.death_effect
+                && let Some(child) = self.resolved.get(archetype_id)
+            {
+                members.push((weight * f32::from(*count), child));
+            }
+        }
+        (members, total)
+    }
+
     pub(crate) fn maximum_health(&self, mode: crate::content::Mode) -> i32 {
         self.resolved
             .values()

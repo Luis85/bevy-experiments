@@ -129,12 +129,14 @@ fn strategy_bot_acts_only_through_commands() {
 }
 
 /// W2 review: the S1 row's grand-strategy paths act only through
-/// `Game::apply` too. Seed index 3 of the strategy row reaches them all
+/// `Game::apply` too. Seed index 0 of the strategy row reaches them all
 /// inside 40 runs (25 before W4-01: the Regional and Capstone boss terms
 /// slow the front, and at 25 runs none of seed indices 0-12 still answers
 /// an outbreak with the main run and resumes the country it left; 0-3 and
-/// 6-11 do at 40): country operations once grand strategy unlocks, an
-/// urgent outbreak answered by the main run (`SelectCountry` and
+/// 6-11 did at 40; index 3 until W4-16, whose Npc power readout changes
+/// the archetypes the bot recruits, after which 0, 1, 5-7, 9 and 10 do at
+/// 40 and every index 0-9 but 3 at 50): country operations once grand
+/// strategy unlocks, an urgent outbreak answered by the main run (`SelectCountry` and
 /// `BeginDefense` with no `ContinueJourney`) and by guards, the guards
 /// released once it is contained, the interrupted country resumed, and
 /// the other countries picked by the fewest-stages route. The bot's steps
@@ -144,7 +146,7 @@ fn strategy_bot_acts_only_through_commands() {
 #[test]
 fn s1_strategy_bot_acts_only_through_commands() {
     assert_eq!(
-        s1_paths(3, 40),
+        s1_paths(0, 40),
         BTreeSet::from([
             "AssignGuard",
             "CountryOperation",

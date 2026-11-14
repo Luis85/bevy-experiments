@@ -4239,10 +4239,13 @@ fn outbreak_plan_recommends_the_strongest_selectable_defender() {
     let home = g.campaign().world.cleared[0].clone();
     let hardy = recruit(&mut g, &home);
     let hardier = recruit(&mut g, &home);
-    // Hardier than everyone else: the hardier one is guarding, so the
-    // other is the strongest defender that can be chosen.
-    roster_npc_mut(&mut g, hardy).ht += 10;
-    roster_npc_mut(&mut g, hardier).ht += 16;
+    // Stronger than everyone else: the stronger one is guarding, so the
+    // other is the strongest defender that can be chosen. Guns, not HT:
+    // since W4-16 the Npc power reads what holds a stage (W4-14: the hit
+    // chance and the arrivals decide it, survival does not), so a hardier
+    // recruit no longer reads stronger.
+    roster_npc_mut(&mut g, hardy).guns += 3;
+    roster_npc_mut(&mut g, hardier).guns += 12;
     apply_ok(
         &mut g,
         Command::AssignGuard {
@@ -4347,6 +4350,9 @@ fn defender_power_inputs_match_the_deployed_attempt() {
             snapshot: a.progression.clone(),
             max_hp: a.max_hp,
             balance: a.balance.clone(),
+            level: a.level,
+            lanes: a.lane_count,
+            width_yards: a.width_yards,
         };
         assert_eq!(from_attempt.power(), power, "{defender:?}");
     }

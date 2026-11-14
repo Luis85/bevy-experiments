@@ -213,6 +213,8 @@ impl Game {
             mut profile,
             snapshot: progression,
             balance,
+            lanes: lane_count,
+            width_yards,
             ..
         } = super::power::deployment_inputs_for(
             &self.campaign,
@@ -220,12 +222,12 @@ impl Game {
             loadout,
             character,
             rank,
+            level,
             // Axis 2: the stage's place on the country's front.
             country
                 .zip(country_stage)
                 .map(|(c, stage)| c.front_position(stage)),
         )?;
-        let (lane_count, width_yards) = self.campaign.arena_geometry();
         let mut modifiers = country.map_or_else(Modifiers::default, |c| {
             // The start clamp (design-enemy-balance §8).
             let difficulty = c.effective_difficulty(&self.campaign.world);

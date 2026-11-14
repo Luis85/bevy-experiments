@@ -144,7 +144,19 @@ pub fn defense_succeeds(defense: i32, roll: i32) -> bool {
     roll <= 4 || roll < 17 && roll <= defense
 }
 /// Attack-roll success only: excludes defenses, protection and injury.
+/// Read from a table of the enumeration below: below skill 3 nothing
+/// succeeds, and from skill 16 only the 17 and 18 fail, so 3..=16 covers
+/// every value.
 pub fn attack_success_probability(skill: i32) -> f32 {
+    static TABLE: std::sync::OnceLock<[f32; 14]> = std::sync::OnceLock::new();
+    if skill < 3 {
+        return 0.0;
+    }
+    let table =
+        TABLE.get_or_init(|| std::array::from_fn(|n| enumerate_attack_success(n as i32 + 3)));
+    table[(skill.min(16) - 3) as usize]
+}
+fn enumerate_attack_success(skill: i32) -> f32 {
     let mut count = 0;
     for a in 1..=6 {
         for b in 1..=6 {
@@ -158,8 +170,17 @@ pub fn attack_success_probability(skill: i32) -> f32 {
     count as f32 / 216.0
 }
 /// Threshold enumeration shown in the GDD, intentionally distinct from automatic
-/// success/failure rules at exceptional skill levels.
+/// success/failure rules at exceptional skill levels. Read from a table of
+/// the enumeration below (0 below 3, 1 from 18).
 pub fn threshold_probability(skill: i32) -> f32 {
+    static TABLE: std::sync::OnceLock<[f32; 16]> = std::sync::OnceLock::new();
+    if skill < 3 {
+        return 0.0;
+    }
+    let table = TABLE.get_or_init(|| std::array::from_fn(|n| enumerate_threshold(n as i32 + 3)));
+    table[(skill.min(18) - 3) as usize]
+}
+fn enumerate_threshold(skill: i32) -> f32 {
     let mut count = 0;
     for a in 1..=6 {
         for b in 1..=6 {
@@ -715,6 +736,22 @@ mod tests {
         assert_eq!(attack_success_probability(2), 0.0);
         // No skill can turn 17/18 into successful attacks.
         assert!((attack_success_probability(30) - 212.0 / 216.0).abs() < 0.0001);
+    }
+    /// W4-16: the tables return the enumeration bit for bit at every skill.
+    #[test]
+    fn probability_tables_match_the_enumeration() {
+        for skill in -10..=60 {
+            assert_eq!(
+                attack_success_probability(skill).to_bits(),
+                enumerate_attack_success(skill).to_bits(),
+                "{skill}"
+            );
+            assert_eq!(
+                threshold_probability(skill).to_bits(),
+                enumerate_threshold(skill).to_bits(),
+                "{skill}"
+            );
+        }
     }
     #[test]
     fn critical_boundaries_and_automatic_defenses() {

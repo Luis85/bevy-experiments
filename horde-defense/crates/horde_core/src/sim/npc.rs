@@ -379,8 +379,8 @@ impl Game {
 /// `skill` (before any aim bonus) with weapon `accuracy` who has already
 /// aimed `aimed` seconds at the target. 0 means shoot now; ties shoot
 /// sooner. The target's dodge scales every option alike, so it cancels.
-/// Pure: reads no RNG.
-fn aim_turns_that_pay(skill: i32, accuracy: i32, aimed: u8, most: u8) -> u8 {
+/// Pure: reads no RNG. The Npc `defender_power` model reads it too (W4-16).
+pub(super) fn aim_turns_that_pay(skill: i32, accuracy: i32, aimed: u8, most: u8) -> u8 {
     let rate = |more: u8| {
         rules::attack_success_probability(skill + rules::aim_bonus(accuracy, aimed + more))
             / f32::from(more + 1)
