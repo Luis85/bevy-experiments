@@ -14,6 +14,8 @@
 //! (BuySkillNode) and the gear (BuyItem and Equip). The plans that sell,
 //! farm or hand the main run to a recruit (W2-42) also equip, sell, recruit,
 //! set the next defender and take the replay or frontier deploy through it.
+//! The `train_companions` option (W4-15) trains and equips the recruits
+//! through `BuyRecruitPoint`, `EquipRecruit` and `TrainRecruit`.
 //! As built (W2 review), the non-strategy loop still calls the rest
 //! directly: `Campaign::choose_start_country` (ChooseStart would also deploy
 //! stage 0 and pause), `Game::continue_journey`, `Campaign::enter_country`,
@@ -151,8 +153,9 @@ pub struct PacingPlan {
     pub sell: PacingSell,
     pub defender: PacingDefender,
     pub farm: PacingFarm,
-    /// Train Mara and recruits in camp. Not implemented yet:
-    /// [`simulate_pacing`] rejects a plan that sets it.
+    /// Train and equip the recruits in camp before they defend or leave
+    /// ([`train_companions`]; W4-15, ruling R61), before the tree and gear
+    /// spending. Mara is not trained: no plan deploys her.
     pub train_companions: bool,
     /// The strategy layer (W2-43): recruits, expeditions, guards and camp
     /// time, played by the command-only strategy bot. None is the solo loop.
@@ -169,9 +172,6 @@ impl PacingPlan {
         train_companions: false,
         strategy: None,
     };
-    fn unsupported(&self) -> Option<&'static str> {
-        self.train_companions.then_some("train_companions")
-    }
 }
 /// One scripted player. `id` is the stable registry key; `name` is the
 /// table heading.
@@ -400,6 +400,7 @@ const REGISTRY: [PacingProfile; 20] = [
         name: "neighbours parallel, Germany",
         plan: PacingPlan {
             strategy: Some(StrategyPlan::NEIGHBOURS_PARALLEL),
+            train_companions: true,
             ..PacingPlan::SOLO
         },
         stop_after: Some(Milestone::Liberation(1 + GOAL3_NEIGHBOURS_FREED as u32)),
@@ -897,6 +898,110 @@ fn recruit_when_ready(g: &mut Game) -> Result<u64, String> {
         .map_err(|e| e.to_string())?;
     Ok(before.saturating_sub(g.campaign.coins))
 }
+/// The awarded advancement points [`train_companions`] buys each recruit up
+/// to: the level-1 allowance (`12 + 8(n - 1)` at n = 1), the most a recruit
+/// holds while its expedition threat rank still reads advancement level 1
+/// (`defenders::expedition_threat_rank`; W4-12, ruling R57).
+const COMPANION_TRAINING_POINTS: u32 = 12;
+/// The `train_companions` plan option (W4-15, ruling R61), through commands
+/// only. Every Ready recruit buys training points (`BuyRecruitPoint`) while
+/// its awarded points are under [`COMPANION_TRAINING_POINTS`] and the
+/// campaign allows and affords one, wears the best free stash item per slot
+/// that keeps its expedition threat rank ([`equip_recruit`]), then puts
+/// every unspent point, bought or earned, into Guns (`TrainRecruit`, Guns
+/// first as in the W4-14 calibration). Training never raises the threat rank
+/// on its own (the rank reads awarded points, not how they are spent), so
+/// the bot makes each recruit as strong as its rank allows. `seen` sees each
+/// command before it is applied. Returns the coins spent.
+fn train_companions(g: &mut Game, mut seen: impl FnMut(&Command)) -> u64 {
+    use crate::campaign::NpcTraining;
+    use crate::strategy::RecruitStatus;
+    let before = g.campaign.coins;
+    let ready: Vec<u64> = g
+        .strategy
+        .roster
+        .iter()
+        .filter(|r| r.status == RecruitStatus::Ready)
+        .map(|r| r.id)
+        .collect();
+    let npc = |g: &Game, id: u64| {
+        g.strategy
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .map(|r| (r.npc.awarded, r.npc.unspent))
+    };
+    for id in ready {
+        while npc(g, id).is_some_and(|(awarded, _)| awarded < COMPANION_TRAINING_POINTS)
+            && g.campaign.coins >= g.campaign.npc_training_price()
+        {
+            let buy = Command::BuyRecruitPoint(id);
+            seen(&buy);
+            if g.apply(&buy).is_err() {
+                break;
+            }
+        }
+        equip_recruit(g, id, &mut seen);
+        while npc(g, id).is_some_and(|(_, unspent)| unspent >= NpcTraining::Guns.cost()) {
+            let train = Command::TrainRecruit {
+                id,
+                training: NpcTraining::Guns,
+            };
+            seen(&train);
+            if g.apply(&train).is_err() {
+                break;
+            }
+        }
+    }
+    before.saturating_sub(g.campaign.coins)
+}
+/// The equip step of [`train_companions`]: recruit `id` wears, slot by
+/// slot (ranged first), the stash item of the highest Npc upgrade gain
+/// (`Campaign::upgrade_gain`, which also checks the loadout) that nobody
+/// wears or holds and that leaves its expedition threat rank where it was
+/// (`Campaign::expedition_threat_rank`), through `EquipRecruit`. The rank
+/// reads the item levels, so the step picks low-level drops of a high tier.
+fn equip_recruit(g: &mut Game, id: u64, seen: &mut impl FnMut(&Command)) {
+    use crate::content::Slot;
+    for slot in [Slot::Ranged, Slot::Outfit, Slot::Accessory, Slot::Melee] {
+        let Some(r) = g.strategy.roster.iter().find(|r| r.id == id) else {
+            return;
+        };
+        let c = &g.campaign;
+        let rank = c.expedition_threat_rank(&r.npc);
+        let worn: std::collections::BTreeSet<u64> = g
+            .strategy
+            .roster
+            .iter()
+            .flat_map(|r| r.npc.loadout)
+            .chain(c.player.loadout)
+            .chain(c.npc.loadout)
+            .collect();
+        let best = c
+            .items
+            .iter()
+            .filter(|item| {
+                !worn.contains(&item.id)
+                    && !c.item_reserved(item.id)
+                    && item.definition().slot == slot
+            })
+            .filter(|item| {
+                let mut after = r.npc.clone();
+                after.loadout[slot.index()] = item.id;
+                c.expedition_threat_rank(&after) <= rank
+            })
+            .filter_map(|item| {
+                c.upgrade_gain(Mode::Npc, r.npc.loadout, &r.npc, item.id)
+                    .map(|gain| (gain, item.id))
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0).then(b.1.cmp(&a.1)));
+        if let Some((_, item)) = best {
+            let equip = Command::EquipRecruit { id, item };
+            seen(&equip);
+            let _ = g.apply(&equip);
+        }
+    }
+}
 /// Who a takeover plan sends next: the survivor retries a stage a recruit
 /// lost; otherwise the lowest-id recruit that can defend now, or else the
 /// survivor.
@@ -958,12 +1063,6 @@ pub fn simulate_pacing_seed(
     if profile.plan.strategy.is_some() {
         return simulate_strategy_seed(profile, seed_index).map(|r| r.pacing);
     }
-    if let Some(option) = profile.plan.unsupported() {
-        return Err(format!(
-            "Pacing plan option {option} is not implemented yet ({})",
-            profile.id
-        ));
-    }
     let mut g = pacing_start(profile, seed_index);
     let seed = g.seed;
     g.apply(&Command::ChooseSurvivor(crate::survivors::SurvivorId::Rook))
@@ -996,6 +1095,11 @@ pub fn simulate_pacing_seed(
         let spent_recruit = match plan.defender {
             PacingDefender::Survivor => 0,
             PacingDefender::RecruitWhenReady => recruit_when_ready(&mut g)?,
+        };
+        let spent_training = if plan.train_companions {
+            train_companions(&mut g, |_| {})
+        } else {
+            0
         };
         let before_tree = g.campaign.coins;
         let (learned, spent_tree, spent_gear) = match profile.spend {
@@ -1087,6 +1191,7 @@ pub fn simulate_pacing_seed(
                 learned,
                 spent_tree,
                 spent_gear,
+                spent_training,
                 spent_recruit,
             },
         )?;
@@ -1108,6 +1213,7 @@ struct CampSpend {
     learned: Vec<String>,
     spent_tree: u64,
     spent_gear: u64,
+    spent_training: u64,
     spent_recruit: u64,
 }
 /// The bookkeeping every plan shares (split out of the solo loop by W2-43
@@ -1246,7 +1352,7 @@ impl RunBook {
             learned: spend.learned,
             spent_tree: spend.spent_tree,
             spent_gear: spend.spent_gear,
-            spent_training: 0,
+            spent_training: spend.spent_training,
             spent_recruit: spend.spent_recruit,
             auto_sold_count: r.auto_sold.count,
             auto_sold_coins: r.auto_sold.coins,

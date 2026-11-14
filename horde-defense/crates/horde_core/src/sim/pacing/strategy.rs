@@ -11,7 +11,11 @@
 //! front (`DeploySurvivor`, or `CountryOperation` once the Operations layer is
 //! unlocked), answers an outbreak that would overrun before its next decision
 //! with the main run (`SelectCountry` and `BeginDefense` on the final stage),
-//! and waits `camp_ticks` in camp before every run after the first. The main
+//! and waits `camp_ticks` in camp before every run after the first. With the
+//! `train_companions` plan option (W4-15, ruling R61; S2b sets it) it also
+//! trains and equips each Ready recruit in camp before the tree and gear
+//! spending (`BuyRecruitPoint`, `EquipRecruit`, `TrainRecruit`;
+//! `super::train_companions`), so a recruit leaves trained. The main
 //! run plays like the solo loop: with every option off
 //! ([`StrategyPlan::OFF`]) the bot plays today's solo profile exactly
 //! (`solo_plan_is_todays_profile`).
@@ -26,7 +30,7 @@ use super::targets::{run_cell, verdict};
 use super::{
     CampSpend, Milestone, PacingDefender, PacingFarm, PacingProfile, PacingReport, PacingSell,
     PacingSpend, RunBook, buy_and_equip, lower_quantile, pacing_input, pacing_start,
-    structure_placements, sweep_with_threads,
+    structure_placements, sweep_with_threads, train_companions,
 };
 use crate::balance::BalanceSettings;
 use crate::command::{Command, CommandError, CommandOutcome};
@@ -229,8 +233,6 @@ fn unsupported(profile: &PacingProfile, plan: &StrategyPlan) -> Option<&'static 
     let p = profile.plan;
     if p.equip_drops {
         Some("equip_drops")
-    } else if p.train_companions {
-        Some("train_companions")
     } else if p.sell != PacingSell::Never {
         Some("sell with a strategy plan")
     } else if p.defender != PacingDefender::Survivor {
@@ -520,6 +522,14 @@ impl Bot<'_> {
         }
         Ok(learned)
     }
+    /// The `train_companions` step: trains every Ready recruit before it
+    /// leaves. Returns the coins it spent.
+    fn train(&mut self) -> u64 {
+        let (g, trace) = (&mut self.g, &mut self.trace);
+        train_companions(g, |command| {
+            record(trace, StrategyStep::Command(command.clone()));
+        })
+    }
     fn gear(&mut self) -> Result<(), String> {
         let (g, trace) = (&mut self.g, &mut self.trace);
         smoke_buy_gear_with(g, Mode::Personal, |g, definition| {
@@ -557,6 +567,7 @@ impl Bot<'_> {
             learned,
             spent_tree,
             spent_gear,
+            spent_training: 0,
             spent_recruit,
         })
     }
@@ -711,7 +722,15 @@ fn play(
         }
         bot.count_settled(&mut book);
         let spent_recruit = bot.camp()?;
-        let spend = bot.spend(profile.spend, spent_recruit)?;
+        // train_companions (W4-15): the recruits train before the tree and
+        // gear take the purse, so a recruit leaves trained.
+        let spent_training = if profile.plan.train_companions {
+            bot.train()
+        } else {
+            0
+        };
+        let mut spend = bot.spend(profile.spend, spent_recruit)?;
+        spend.spent_training = spent_training;
         bot.check_unlock(index);
         bot.dispatch()?;
         book.camp(&bot.g, index);

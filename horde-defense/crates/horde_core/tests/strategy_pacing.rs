@@ -706,3 +706,122 @@ fn survivor_network_opens_a_camp_earlier_than_the_w4_p_price() {
         "Survivor network owned after {network} runs, the second liberation after {second}"
     );
 }
+
+/// W4-15 (ruling R61): `PacingPlan.train_companions` is built. Both the
+/// strategy bot and the solo loop accept it, and S2b, the row G3.11
+/// measures, sets it; S1 and S2a do not, so G3.10 and G3.12 read the same
+/// bot as before.
+#[test]
+fn train_companions_is_a_supported_strategy_plan_option() {
+    assert!(row("neighbours-parallel").plan.train_companions);
+    assert!(!row("neighbours-solo").plan.train_companions);
+    assert!(!row(STRATEGY_PROFILE_ID).plan.train_companions);
+    for id in [
+        STRATEGY_PROFILE_ID,
+        "neighbours-parallel",
+        DEFAULT_PROFILE_ID,
+        "takeover",
+    ] {
+        let base = row(id);
+        let profile = PacingProfile {
+            max_runs: 1,
+            plan: PacingPlan {
+                train_companions: true,
+                ..base.plan
+            },
+            ..base
+        };
+        assert!(
+            simulate_pacing_seed(&profile, 0).is_ok(),
+            "{id} with train_companions: {:?}",
+            simulate_pacing_seed(&profile, 0).err()
+        );
+    }
+}
+
+/// W4-15 (ruling R61): with `train_companions` the S2b bot trains and
+/// equips every recruit before each expedition, through commands only.
+/// Replaying its steps, each `DeploySurvivor` finds the recruit holding at
+/// least the level-1 allowance of awarded points (bought with
+/// `BuyRecruitPoint`), no unspent Guns step left (`TrainRecruit`), Guns
+/// trained, and a stash item it was given (`EquipRecruit`); the replayed
+/// game ends on the traced digest.
+#[test]
+fn train_companions_trains_each_recruit_before_its_expedition_through_commands_only() {
+    use horde_core::campaign::NpcTraining;
+    // The advancement points of advancement level 1 (12 + 8(n - 1), n = 1).
+    const LEVEL_ONE_ALLOWANCE: u32 = 12;
+    let profile = row("neighbours-parallel");
+    let trace = simulate_strategy_traced(&profile, 0).expect("the strategy row runs");
+    let mut g = pacing_start(&profile, 0);
+    let mut equipped = BTreeSet::new();
+    let mut expeditions = 0;
+    for step in &trace.steps {
+        match step {
+            StrategyStep::Command(command) => {
+                if let Command::DeploySurvivor { id, .. } | Command::CountryOperation { id, .. } =
+                    command
+                {
+                    let r = g
+                        .strategy()
+                        .roster
+                        .iter()
+                        .find(|r| r.id == *id)
+                        .expect("the recruit is on the roster");
+                    let npc = &r.npc;
+                    assert!(
+                        npc.awarded >= LEVEL_ONE_ALLOWANCE,
+                        "recruit {id} leaves with {} awarded points",
+                        npc.awarded
+                    );
+                    assert!(
+                        npc.unspent < NpcTraining::Guns.cost(),
+                        "recruit {id} leaves with {} unspent points",
+                        npc.unspent
+                    );
+                    assert!(
+                        npc.investments[NpcTraining::Guns] > 0,
+                        "recruit {id} leaves with Guns untrained"
+                    );
+                    assert!(
+                        equipped.contains(id),
+                        "recruit {id} leaves on its starter loadout"
+                    );
+                    expeditions += 1;
+                }
+                let applied = g.apply(command).is_ok();
+                if let Command::EquipRecruit { id, .. } = command
+                    && applied
+                {
+                    equipped.insert(*id);
+                }
+            }
+            StrategyStep::Tick(input) => g.tick(input.clone()),
+            StrategyStep::Idle(ticks) => {
+                for _ in 0..*ticks {
+                    g.tick(Input::default());
+                }
+            }
+        }
+    }
+    assert!(expeditions > 0, "the bot sends expeditions");
+    for kind in ["BuyRecruitPoint", "TrainRecruit", "EquipRecruit"] {
+        assert!(
+            trace.steps.iter().any(|s| matches!(
+                (kind, s),
+                (
+                    "BuyRecruitPoint",
+                    StrategyStep::Command(Command::BuyRecruitPoint(_))
+                ) | (
+                    "TrainRecruit",
+                    StrategyStep::Command(Command::TrainRecruit { .. })
+                ) | (
+                    "EquipRecruit",
+                    StrategyStep::Command(Command::EquipRecruit { .. })
+                )
+            )),
+            "the bot never applies {kind}"
+        );
+    }
+    assert_eq!(g.state_digest(), trace.digest);
+}
