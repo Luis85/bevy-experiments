@@ -221,8 +221,10 @@ fn deploy_at_committed_rank(g: &mut Game, mode: Mode, seed: u64, step: u32) {
 /// W2-40 (design enemy-balance §10, acceptance G6.9): over random sequences
 /// of victories, defeats, withdrawals and npc retreats by the player and
 /// Mara, and of worker expeditions that win or are recalled, the threat rank
-/// equals the committed victories after every step, and every deploy (main
-/// run or worker) freezes that rank in its attempt. Each win is checked to
+/// equals the committed victories after every step, and every main-run
+/// deploy freezes that rank in its attempt. A worker deploy freezes its
+/// recruit's expedition rank instead (W4-12, ruling R57), never above the
+/// committed victories. Each win is checked to
 /// commit exactly one victory and every other step none, so a setup that
 /// stopped winning cannot pass at 0 == 0.
 #[test]
@@ -287,12 +289,25 @@ fn threat_rank_equals_committed_victories() {
                     let battle = g
                         .deploy_survivor(recruit, &home, 0)
                         .unwrap_or_else(|e| panic!("seed {seed} step {step}: {e}"));
-                    // The worker's run freezes the committed rank too.
+                    // The worker's run freezes the recruit's expedition
+                    // rank (W4-12), at most the committed rank.
                     let worker = g.battles().iter().find(|b| b.id == battle).unwrap();
+                    let npc = &g
+                        .strategy()
+                        .roster
+                        .iter()
+                        .find(|r| r.id == recruit)
+                        .unwrap()
+                        .npc;
+                    let frozen = worker.game().attempt().unwrap().progression.rank;
                     assert_eq!(
-                        u64::from(worker.game().attempt().unwrap().progression.rank),
-                        committed_victories(&g),
+                        frozen,
+                        worker.game().campaign().expedition_threat_rank(npc),
                         "seed {seed} step {step}: worker deploy rank"
+                    );
+                    assert!(
+                        u64::from(frozen) <= committed_victories(&g),
+                        "seed {seed} step {step}: worker rank within the committed rank"
                     );
                     let b = g.battles_mut().iter_mut().find(|b| b.id == battle).unwrap();
                     if rng.below(2) == 0 {

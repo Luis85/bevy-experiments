@@ -539,6 +539,20 @@ impl Campaign {
         };
         u32::try_from(victories).unwrap_or(u32::MAX)
     }
+    /// The threat rank an expedition by `npc` plays at (W4-12, ruling R57):
+    /// [`crate::defenders::expedition_threat_rank`] of its advancement level
+    /// and the levels of its loadout items in this campaign's stash (a slot
+    /// this stash does not hold counts as level 1). It is never above
+    /// [`Self::progression_rank`], so an expedition is never harder than
+    /// the main run and a saved expedition attempt keeps its rank within
+    /// the campaign's clears.
+    pub fn expedition_threat_rank(&self, npc: &Npc) -> u32 {
+        let levels = npc
+            .loadout
+            .map(|id| self.item(id).map_or(1, |item| item.level));
+        crate::defenders::expedition_threat_rank(npc.advancement_level(), levels)
+            .min(self.progression_rank())
+    }
     /// The item definition a rank `rank` milestone grants in a game with
     /// `seed` (design-progression-tree §7, ruling E7): a Ranged definition
     /// that is not NPC-only, of a weapon class the campaign is trained in

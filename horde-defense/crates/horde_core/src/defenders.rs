@@ -99,6 +99,28 @@ pub const RECRUIT_IDENTITIES: [(&str, Appearance); 12] = [
 /// campaign allowance stops growing here.
 pub const MAX_ADVANCEMENT_LEVEL: u8 = 10;
 
+/// Threat ranks each advancement level above the first adds to an
+/// expedition (W4-12, ruling R57).
+pub const EXPEDITION_RANKS_PER_ADVANCEMENT_LEVEL: u32 = 1;
+/// Threat ranks each item level above 1 adds to an expedition, averaged over
+/// the four loadout slots (W4-12, ruling R57).
+pub const EXPEDITION_RANKS_PER_ITEM_LEVEL: u32 = 1;
+
+/// The threat rank a recruit's expedition plays at (W4-12, ruling R57): it
+/// follows the recruit, its training and level (`advancement_level`, 1..=10)
+/// and its gear (the item levels of its four loadout slots), never the
+/// campaign rank. A starter recruit (level 1, four level-1 items) plays at
+/// rank 0. Pure: no RNG and no campaign state.
+pub fn expedition_threat_rank(advancement_level: u8, item_levels: [u32; 4]) -> u32 {
+    let training = u32::from(advancement_level.max(1) - 1)
+        .saturating_mul(EXPEDITION_RANKS_PER_ADVANCEMENT_LEVEL);
+    let gear_levels = item_levels.iter().fold(0u32, |sum, level| {
+        sum.saturating_add(level.saturating_sub(1))
+    });
+    let gear = gear_levels.saturating_mul(EXPEDITION_RANKS_PER_ITEM_LEVEL) / 4;
+    training.saturating_add(gear)
+}
+
 /// The table entry for recruit `id` (ids start at 1).
 pub fn recruit_identity(id: u64) -> (&'static str, Appearance) {
     let len = RECRUIT_IDENTITIES.len() as u64;

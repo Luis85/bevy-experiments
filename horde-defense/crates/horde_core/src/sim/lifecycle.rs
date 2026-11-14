@@ -199,6 +199,16 @@ impl Game {
         } else {
             None
         };
+        // An expedition's threat follows its recruit (W4-12, ruling R57):
+        // a worker game carries the recruit as its npc, and every expedition
+        // attempt (an operation's next stage too) is created here. Main runs,
+        // a recruit's takeover among them, keep the campaign rank. The rank
+        // is frozen in the attempt's snapshot, which the save keeps.
+        let rank = if self.worker && mode == Mode::Npc {
+            self.campaign.expedition_threat_rank(&self.campaign.npc)
+        } else {
+            self.campaign.progression_rank()
+        };
         let super::power::DeploymentInputs {
             mut profile,
             snapshot: progression,
@@ -209,7 +219,7 @@ impl Game {
             defender,
             loadout,
             character,
-            self.campaign.progression_rank(),
+            rank,
             // Axis 2: the stage's place on the country's front.
             country
                 .zip(country_stage)
