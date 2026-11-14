@@ -43,6 +43,30 @@ fn figure_height(
         }
     }
 }
+/// How tall the field draws live hostile `e`, from the active visual
+/// catalog: the height `BattleViewModel` gives its `EnemyView`.
+pub fn enemy_height(a: &Attempt, e: &Enemy) -> FigureHeight {
+    let catalog = enemy_visuals::active();
+    let (visual, sprite) = enemy_art(a, e, catalog);
+    figure_height(catalog, e.boss, visual, sprite)
+}
+/// `e`'s resolved visual, if it has one, and its sprite in `catalog`.
+fn enemy_art<'a>(
+    a: &Attempt,
+    e: &'a Enemy,
+    catalog: &'static EnemyVisualCatalog,
+) -> (Option<&'a EnemyVisual>, Option<&'static EnemySprite>) {
+    let visual = e.resolved.as_ref().map(|profile| &profile.visual);
+    let sprite = visual.map_or_else(
+        || {
+            let level_boss = content().levels[a.level].boss;
+            let boss = e.boss.then(|| e.boss_kind.unwrap_or(level_boss));
+            enemy_visuals::legacy_sprite(e.kind, boss)
+        },
+        |visual| visual.sprite,
+    );
+    (visual, catalog.get(sprite))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ContactView {
@@ -602,15 +626,7 @@ fn enemy_view(
     catalog: &'static EnemyVisualCatalog,
 ) -> EnemyView {
     let level_boss = content().levels[a.level].boss;
-    let visual = e.resolved.as_ref().map(|profile| &profile.visual);
-    let sprite = visual.map_or_else(
-        || {
-            let boss = e.boss.then(|| e.boss_kind.unwrap_or(level_boss));
-            enemy_visuals::legacy_sprite(e.kind, boss)
-        },
-        |visual| visual.sprite,
-    );
-    let sprite = catalog.get(sprite);
+    let (visual, sprite) = enemy_art(a, e, catalog);
     let phase = if reduced || !pose.moving {
         0.0
     } else {

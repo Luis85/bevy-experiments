@@ -814,6 +814,11 @@ pub fn prop_animated(
 /// `center` and `size`, `hit` in 0..=1. Drawn by the caller after every prop
 /// (W1-69), so struck props never split the props pass into alternating
 /// texture runs. Draws nothing without the props sheet, like the prop.
+/// The rect a prop of `kind` centred on `center` is drawn in when fitted into
+/// `size`: the one `prop_animated` paints and `prop_hit_outline` strokes.
+pub fn prop_rect(kind: Prop, center: Pos2, size: Vec2) -> Rect {
+    fit(center, size, PROP_RECTS[kind as usize])
+}
 pub fn prop_hit_outline(
     p: &Painter,
     textures: ArtTextures,
@@ -826,7 +831,7 @@ pub fn prop_hit_outline(
         return;
     }
     p.rect_stroke(
-        fit(center, size, PROP_RECTS[kind as usize]),
+        prop_rect(kind, center, size),
         1.,
         bevy_egui::egui::Stroke::new(
             1.,

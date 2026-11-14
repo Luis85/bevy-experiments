@@ -12,7 +12,9 @@ use backdrop::{box_at, line, paint_ground};
 pub use backdrop::{world_atmosphere, world_backdrop};
 #[cfg(test)]
 pub(crate) use battlefield::reinforcements_anchor;
-pub(crate) use battlefield::{HEALTH_BAR_LIFT, OCCLUDER_GAP, fx_lifetime};
+pub(crate) use battlefield::{
+    HEALTH_BAR_LIFT, OCCLUDER_GAP, enemy_body_box, fx_lifetime, structure_face,
+};
 #[cfg(test)]
 pub(crate) use battlefield::{
     MIDPOINT_LABEL, MIDPOINT_LABEL_MIN_WRAP, MIDPOINT_LABEL_SIZE, midpoint_label_place,

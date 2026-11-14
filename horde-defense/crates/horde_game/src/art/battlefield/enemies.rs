@@ -21,6 +21,25 @@ use bevy_egui::egui::{
     self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, pos2, vec2,
 };
 
+/// The box a hostile's sprite is fitted into: `figure_height` tall, centred
+/// on its drawn spot `at`.
+fn body_size(figure_height: f32) -> Vec2 {
+    vec2(figure_height * 1.2, figure_height)
+}
+/// The screen box a live hostile of `height` standing at `drawn` (yards,
+/// lanes, crowd stagger included) is painted in. The damage popups of a
+/// struck wall keep off the front body of its stack (CF-1-07).
+pub(crate) fn body_box(
+    arena: ArenaProjection,
+    drawn: [f32; 2],
+    height: crate::battle_view::FigureHeight,
+) -> Rect {
+    Rect::from_center_size(
+        arena.world(drawn[0], drawn[1]),
+        body_size(height.pixels(arena.lane_height())),
+    )
+}
+
 /// Segments of the batched outline, stun and windup rings.
 const RING_SEGMENTS: u32 = 20;
 
@@ -137,7 +156,7 @@ pub(super) fn paint(
             y + if has_walk { 0. } else { pose.offset[1] },
         );
         let figure_height = e.height.pixels(sy);
-        let size = vec2(figure_height * 1.2, figure_height);
+        let size = body_size(figure_height);
         layers.shadows.shadow(
             at + vec2(1., figure_height * 0.48),
             vec2(sy * 0.26 * (1. + pose.lunge * 0.12), sy * 0.095),
@@ -547,7 +566,7 @@ fn enemy(
             textures,
             actor,
             painted_at,
-            vec2(figure_height * 1.2, figure_height),
+            body_size(figure_height),
             tint(e.tint),
             pose,
         )
@@ -569,7 +588,7 @@ fn enemy(
             textures,
             actor,
             painted_at,
-            vec2(figure_height * 1.2, figure_height),
+            body_size(figure_height),
             HitFlash { strength, reduced },
             pose,
         );

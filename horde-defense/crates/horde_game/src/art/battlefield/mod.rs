@@ -14,6 +14,8 @@ mod enemies;
 mod fx;
 mod ordnance;
 mod structures;
+pub(crate) use enemies::body_box as enemy_body_box;
+pub(crate) use structures::face as structure_face;
 pub mod terrain;
 pub(crate) use enemies::HEALTH_BAR_LIFT;
 #[cfg(test)]

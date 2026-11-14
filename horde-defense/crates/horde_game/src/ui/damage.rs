@@ -50,6 +50,14 @@ struct Bubble {
     /// clear of the popups placed before it (CF-2-06); kept while it stays
     /// clear, so a moved popup does not jump between frames.
     nudge: egui::Vec2,
+    /// Over a struck structure: the side of its drawn face the popup took
+    /// and the x of the popup's edge nearest the face (CF-1-07). Kept for its
+    /// life while that spot stays clear, so the punch and the rise never
+    /// carry it across the face or the stack.
+    off_face: Option<(Side, f32)>,
+    /// The rect `draw_for` last drew it in, outline included; `None` before
+    /// its first frame and on a frame where no clear spot was left for it.
+    placed: Option<Rect>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Side {
@@ -100,6 +108,8 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
         started: 0.0,
         beside: None,
         nudge: egui::Vec2::ZERO,
+        off_face: None,
+        placed: None,
     })
 }
 /// `to` when it lies in the world box `[0, size[0]] x [0, size[1]]`;
@@ -250,6 +260,14 @@ fn base_size(kind: Kind, reduced: bool) -> f32 {
         Kind::Armor | Kind::Defend | Kind::Miss => 18.0,
     }
 }
+/// Unscaled point size of a popup: `base_size`, but every popup over a
+/// struck structure takes the status size (CF-1-07). A wall's number is not
+/// the survivor's own, and at 1050x700@1.35 a 26-pt number is two lanes
+/// tall where every wall of a 17-lane field shows one. The size is one
+/// `popup_sizes` warms already.
+fn drawn_size(kind: Kind, on_structure: bool, reduced: bool) -> f32 {
+    base_size(if on_structure { Kind::Miss } else { kind }, reduced)
+}
 /// Every font size `draw_for` can ask for, each once.
 fn popup_sizes() -> Vec<f32> {
     let mut sizes: Vec<f32> = KINDS
@@ -334,7 +352,7 @@ fn motion(age: f64, reduced: bool) -> (f32, f32, f32) {
     } else {
         1.0
     };
-    let rise = if reduced { 0.0 } else { t * 38.0 };
+    let rise = if reduced { 0.0 } else { t * RISE };
     let fade = if t < 0.6 {
         1.0
     } else {
@@ -342,6 +360,8 @@ fn motion(age: f64, reduced: bool) -> (f32, f32, f32) {
     };
     (scale, rise, fade)
 }
+/// How far a popup drifts upward over its life (none in reduced effects).
+const RISE: f32 = 38.0;
 /// How far over its event point a popup starts at zoom 1.
 const NUMBER_LIFT: f32 = 62.0;
 /// How far a popup's centre stays over a struck hostile's health bar: half a
@@ -385,6 +405,112 @@ fn struck_bar(
         vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
     ))
 }
+/// What the field draws at one structure this frame: its prop's face and the
+/// body of the front enemy in the stack striking it, if any.
+struct StruckProp {
+    id: u64,
+    face: Rect,
+    front: Option<Rect>,
+}
+/// Every structure's drawn face and the drawn body of the front enemy in its
+/// stack: the live hostile striking it that stands nearest the line (then the
+/// lowest id), where `BattleViewModel` draws it. `drawn` caches `blend`'s
+/// positions of `a.enemies` for the frame.
+fn struck_props(
+    a: &Attempt,
+    arena: art::ArenaProjection,
+    blend: SceneBlend,
+    drawn: &mut Option<Vec<[f32; 2]>>,
+) -> Vec<StruckProp> {
+    let positions = drawn.get_or_insert_with(|| blend.positions(&a.enemies));
+    a.structures
+        .iter()
+        .map(|s| StruckProp {
+            id: s.id,
+            face: art::structure_face(arena, s.kind, [s.x(), s.y()], s.footprint_width()),
+            front: a
+                .enemies
+                .iter()
+                .zip(positions.iter())
+                .filter(|(e, _)| e.target_structure == Some(s.id) && e.in_view())
+                .min_by(|(a, at), (b, bt)| at[0].total_cmp(&bt[0]).then(a.id.cmp(&b.id)))
+                .map(|(e, &[x, y])| {
+                    let [dx, dy] = crate::battle_view::crowd_stagger(e.id);
+                    art::enemy_body_box(
+                        arena,
+                        [x + dx, y + dy],
+                        crate::battle_view::enemy_height(a, e),
+                    )
+                }),
+        })
+        .collect()
+}
+/// Where a popup `size` large (at its punch peak, outline included) goes
+/// beside the struck structure `own` (CF-1-07): the side and the x of the
+/// popup's edge nearest the face. The popup sits level with the face and
+/// drifts up `rise` over its life; a spot is clear when that whole path
+/// stays inside `bounds` sideways and off every rect of `avoid` (all drawn
+/// faces and stack fronts). The defender's side of the face first, then past
+/// the stack on the horde's side, then the nearest clear spot further out on
+/// either side; the defender's side when nothing is clear.
+fn off_face_spot(
+    own: &StruckProp,
+    size: egui::Vec2,
+    rise: f32,
+    avoid: &[Rect],
+    bounds: Rect,
+) -> (Side, f32) {
+    let path = |side: Side, edge: f32| {
+        let left = if side == Side::Left {
+            edge - size.x
+        } else {
+            edge
+        };
+        Rect::from_min_max(
+            pos2(left, own.face.center().y - size.y * 0.5 - rise),
+            pos2(left + size.x, own.face.center().y + size.y * 0.5),
+        )
+    };
+    let inside =
+        |rect: Rect| rect.left() >= bounds.left() + 4.0 && rect.right() <= bounds.right() - 4.0;
+    // Slides the spot outward past whatever it meets until it is clear.
+    let clear_from = |side: Side, mut edge: f32| {
+        for _ in 0..=avoid.len() {
+            let rect = path(side, edge);
+            if !inside(rect) {
+                return None;
+            }
+            let met = avoid.iter().filter(|&&other| overlaps(rect, other));
+            let next = if side == Side::Left {
+                met.map(|other| other.left() - KEEP_CLEAR_GAP)
+                    .min_by(f32::total_cmp)
+            } else {
+                met.map(|other| other.right() + KEEP_CLEAR_GAP)
+                    .max_by(f32::total_cmp)
+            };
+            match next {
+                None => return Some(edge),
+                Some(next) => edge = next,
+            }
+        }
+        None
+    };
+    let left = own.face.left() - KEEP_CLEAR_GAP;
+    let right = own.front.map_or(own.face.right(), |front| {
+        front.right().max(own.face.right())
+    }) + KEEP_CLEAR_GAP;
+    clear_from(Side::Left, left)
+        .filter(|&edge| edge == left)
+        .map(|edge| (Side::Left, edge))
+        .or_else(|| {
+            clear_from(Side::Right, right)
+                .filter(|&edge| edge == right)
+                .map(|edge| (Side::Right, edge))
+        })
+        .or_else(|| clear_from(Side::Left, left).map(|edge| (Side::Left, edge)))
+        .or_else(|| clear_from(Side::Right, right).map(|edge| (Side::Right, edge)))
+        .unwrap_or((Side::Left, left))
+}
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     if let Some(a) = f.game.attempt() {
         draw_for(
@@ -411,6 +537,9 @@ struct Draft {
     bounds: Rect,
     /// The struck hostile's health bar it keeps beside, if any.
     bar: Option<Rect>,
+    /// Whether it reports on a struck structure, and so keeps off every
+    /// drawn face and stack front (CF-1-07).
+    off_faces: bool,
     galley: std::sync::Arc<egui::Galley>,
     color: Color32,
     fade: f32,
@@ -426,7 +555,10 @@ fn overlaps(a: Rect, b: Rect) -> bool {
 /// clear, else none when `spot` is clear already, else the shortest move
 /// (upward first on a tie) that stacks it over, under or beside a placed rect
 /// and leaves it inside `bounds` and off every rect of `obstacles` (the HUD
-/// keep-clear and the struck health bar). `None` when no such move exists.
+/// keep-clear, the struck health bar and, for a structure's popup, the drawn
+/// faces and stack fronts). Where no straight move is clear (a full column of
+/// struck walls, CF-1-07), the shortest move made of one sideways and one
+/// vertical such step. `None` when no such move exists.
 fn clear_spot(
     spot: Rect,
     previous: egui::Vec2,
@@ -461,10 +593,26 @@ fn clear_spot(
             ]
         })
         .collect();
-    moves.sort_by(|a, b| a.length().total_cmp(&b.length()).then(a.y.total_cmp(&b.y)));
-    moves
-        .into_iter()
-        .find(|&offset| free(offset) && allowed(offset))
+    let shortest_first = |a: &egui::Vec2, b: &egui::Vec2| {
+        a.length().total_cmp(&b.length()).then(a.y.total_cmp(&b.y))
+    };
+    moves.sort_by(shortest_first);
+    let clear = |offset: &egui::Vec2| free(*offset) && allowed(*offset);
+    if let Some(offset) = moves.iter().copied().find(|offset| clear(offset)) {
+        return Some(offset);
+    }
+    let mut corners: Vec<egui::Vec2> = moves
+        .iter()
+        .filter(|step| step.x != 0.0)
+        .flat_map(|across| {
+            moves
+                .iter()
+                .filter(|step| step.y != 0.0)
+                .map(move |up| vec2(across.x, up.y))
+        })
+        .collect();
+    corners.sort_by(shortest_first);
+    corners.into_iter().find(|offset| clear(offset))
 }
 /// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09), and
 /// none meets another (CF-2-06).
@@ -519,6 +667,8 @@ pub(super) fn draw_for(
     warm_glyphs(ui.ctx(), &mut state.warmed);
     let p = ui.painter_at(arena.effects_clip);
     let mut positions = None;
+    // The faces and stack fronts, built on the first structure popup.
+    let mut props: Option<(Vec<StruckProp>, Vec<Rect>)> = None;
     let mut drafts = Vec::with_capacity(stream.active.len());
     for bubble in &mut stream.active {
         let age = (now - bubble.started).max(0.0);
@@ -533,9 +683,13 @@ pub(super) fn draw_for(
             Kind::Miss => ("MISS".into(), MUTED),
         };
         let color = color.gamma_multiply(fade);
+        let struck = match bubble.target {
+            Target::Actor(id) => a.structures.iter().any(|s| s.id == id).then_some(id),
+            _ => None,
+        };
         let mut job = egui::text::LayoutJob::simple(
             text,
-            display_font(base_size(bubble.kind, reduced) * scale),
+            display_font(drawn_size(bubble.kind, struck.is_some(), reduced) * scale),
             color,
             (arena.rect.width() - 12.0).clamp(1.0, 220.0),
         );
@@ -603,10 +757,59 @@ pub(super) fn draw_for(
             let beside = Rect::from_center_size(center, galley.size()).expand(border);
             center += vec2(0.0, keep_clear_shift(beside, keep_clear));
         }
+        // A structure's number rose from the structure itself, over its
+        // face and the front of its stack (CF-1-07): it sits beside the face
+        // instead, level with it, and drifts up from there. Reduced effects
+        // place it the same way, without the drift.
+        if let Some(id) = struck {
+            let (props, avoid) = props.get_or_insert_with(|| {
+                let props = struck_props(a, arena, blend, &mut positions);
+                let avoid = props
+                    .iter()
+                    .flat_map(|prop| [Some(prop.face), prop.front])
+                    .flatten()
+                    .collect();
+                (props, avoid)
+            });
+            if let Some(own) = props.iter().find(|prop| prop.id == id) {
+                let peak = if reduced {
+                    1.0
+                } else {
+                    SCALE_STEPS[SCALE_STEPS.len() - 1]
+                };
+                let size = galley.size() * (peak / scale) + egui::Vec2::splat(2.0 * border);
+                let at = |(side, edge): (Side, f32)| {
+                    let half = galley.size().x * 0.5 + border;
+                    let x = if side == Side::Left {
+                        edge - half
+                    } else {
+                        edge + half
+                    };
+                    let y = (own.face.center().y - rise)
+                        .max(bounds.top() + galley.size().y * 0.5 + 4.0);
+                    let center = pos2(x, y);
+                    let drawn = Rect::from_center_size(center, galley.size()).expand(border);
+                    center + vec2(0.0, keep_clear_shift(drawn, keep_clear))
+                };
+                let clear = |spot: (Side, f32)| {
+                    let drawn = Rect::from_center_size(at(spot), galley.size()).expand(border);
+                    !avoid.iter().any(|&other| overlaps(drawn, other))
+                };
+                let spot = bubble
+                    .off_face
+                    .filter(|&spot| clear(spot))
+                    .unwrap_or_else(|| {
+                        off_face_spot(own, size, if reduced { 0.0 } else { RISE }, avoid, bounds)
+                    });
+                bubble.off_face = Some(spot);
+                center = at(spot);
+            }
+        }
         drafts.push(Draft {
             spot: Rect::from_center_size(center, galley.size()).expand(border),
             bounds,
             bar,
+            off_faces: struck.is_some(),
             galley,
             color,
             fade,
@@ -630,8 +833,13 @@ pub(super) fn draw_for(
     for i in order {
         let draft = &drafts[i];
         let bubble = &mut stream.active[i];
-        let obstacles = keep_clear.iter().copied().chain(draft.bar);
+        let faces = props
+            .as_ref()
+            .filter(|_| draft.off_faces)
+            .map_or(&[][..], |(_, avoid)| avoid);
+        let obstacles = keep_clear.iter().chain(faces).copied().chain(draft.bar);
         let found = clear_spot(draft.spot, bubble.nudge, &placed, obstacles, draft.bounds);
+        bubble.placed = found.map(|offset| draft.spot.translate(offset));
         if let Some(offset) = found {
             bubble.nudge = offset;
             placed.push(draft.spot.translate(offset));
@@ -1584,6 +1792,118 @@ mod tests {
         }
         assert_eq!(frames, 120, "the stress field stays live");
         assert!(crowded > 0, "some frame draws several popups");
+    }
+    /// CF-1-07: since W1-69 every stacked enemy strikes its wall, so nearly
+    /// every wall of the 17-lane progressed-peak field shows a number or a
+    /// MISS at once. At 1050x700@1.35, run live for five seconds, no popup of
+    /// a struck structure lies on that structure's drawn face or on the drawn
+    /// body of the front enemy in its stack, normal and reduced, and every
+    /// such popup is still drawn. Before, the numbers rose from the wall
+    /// itself and covered the wall column and the front of the stacks.
+    #[test]
+    fn wall_hit_numbers_clear_the_wall_face_and_its_stack_at_small_size() {
+        let mut game = horde_core::sim::maximum_progression_render_fixture().expect("fixture");
+        game.set_paused(false);
+        game.attempt_mut().unwrap().paused = false;
+        let (size, zoom) = TARGET_SIZES[1];
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+        let mut views = [false, true].map(|reduced| {
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, zoom);
+            let settings = Settings {
+                reduced_effects: reduced,
+                ..Settings::default()
+            };
+            (reduced, ctx, settings, Feedback::default())
+        });
+        let (mut drawn, mut hidden, mut stacked) = (0_u32, 0_u32, 0_u32);
+        for frame in 0..300_u32 {
+            game.tick(horde_core::sim::Input::default());
+            let Some(a) = game.attempt() else { break };
+            let layout =
+                crate::ui::battle::BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+            let arena = art::ArenaProjection::for_attempt(layout.field.rect, a)
+                .with_effects_clip(layout.effects_clip);
+            for (reduced, ctx, settings, state) in &mut views {
+                let input = egui::RawInput {
+                    time: Some(f64::from(frame) / 60.0),
+                    screen_rect: Some(canvas),
+                    ..Default::default()
+                };
+                let mut output = ctx.run_ui(input, |ui| {
+                    draw_for(
+                        ui,
+                        a,
+                        arena,
+                        SceneBlend::NONE,
+                        0,
+                        state,
+                        settings,
+                        review::LootCaptureMode::Disabled,
+                        &layout.effects_keep_clear(),
+                    );
+                });
+                output.textures_delta.clear();
+                for bubble in &state.streams[&0].active {
+                    let Target::Actor(id) = bubble.target else {
+                        continue;
+                    };
+                    if !a.structures.iter().any(|s| s.id == id) {
+                        continue;
+                    }
+                    let Some(popup) = bubble.placed else {
+                        hidden += 1;
+                        continue;
+                    };
+                    drawn += 1;
+                    // Its own wall and stack, and every other one: each wall
+                    // of the column is struck.
+                    for wall in &a.structures {
+                        let face = art::structure_face(
+                            arena,
+                            wall.kind,
+                            [wall.x(), wall.y()],
+                            wall.footprint_width(),
+                        );
+                        assert!(
+                            !overlaps(popup, face),
+                            "reduced {reduced}, frame {frame}: popup {popup:?} of structure \
+                             {id} lies on the face {face:?} in lane {}",
+                            wall.lane
+                        );
+                        let front = a
+                            .enemies
+                            .iter()
+                            .filter(|e| e.target_structure == Some(wall.id) && e.in_view())
+                            .min_by(|a, b| a.x.total_cmp(&b.x).then(a.id.cmp(&b.id)));
+                        let Some(front) = front else { continue };
+                        stacked += u32::from(wall.id == id);
+                        let [dx, dy] = crate::battle_view::crowd_stagger(front.id);
+                        let body = art::enemy_body_box(
+                            arena,
+                            [front.x + dx, front.y() + dy],
+                            crate::battle_view::enemy_height(a, front),
+                        );
+                        assert!(
+                            !overlaps(popup, body),
+                            "reduced {reduced}, frame {frame}: popup {popup:?} of structure \
+                             {id} lies on the front body {body:?} of the stack in lane {}",
+                            wall.lane
+                        );
+                    }
+                }
+            }
+        }
+        assert!(drawn > 500, "structure popups were drawn: {drawn}");
+        assert!(
+            stacked > 500,
+            "most had a stack at the structure: {stacked}"
+        );
+        assert_eq!(
+            hidden, 0,
+            "every structure popup found a clear spot (drawn {drawn}, stacked {stacked})"
+        );
     }
     #[test]
     fn punch_is_large_then_settles_while_reduced_feedback_has_no_punch_or_drift() {
