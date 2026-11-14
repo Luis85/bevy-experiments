@@ -609,6 +609,7 @@ mod tests {
                     &mut feedback,
                     review::LootCaptureMode::Disabled,
                     &[],
+                    crate::settings::Palette::Standard,
                     reduced,
                 );
             });
