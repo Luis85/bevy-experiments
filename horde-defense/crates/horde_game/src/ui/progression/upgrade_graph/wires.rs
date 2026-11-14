@@ -31,10 +31,65 @@ impl WireCache {
                     }
                 }
             }
+            separate_stubs(nodes, &mut routes);
             self.routes = std::sync::Arc::new(routes);
             self.layout = Some(fingerprint);
         }
         self.routes.clone()
+    }
+}
+
+/// A wire as it draws off the highlighted path: a long edge is its stub.
+fn drawn_wire(route: &[egui::Vec2]) -> Vec<egui::Vec2> {
+    if route.len() >= 2 && route_length(route) > LONG_EDGE {
+        wire_stub(route, STUB_LENGTH)
+    } else {
+        route.to_vec()
+    }
+}
+
+/// CF-2-01: a long edge draws only its last `STUB_LENGTH` units, so a stub
+/// that arrives along another drawn wire reads as that wire with an
+/// arrowhead at each end (the `pistol_training` stub entered SMG proficiency
+/// from the right along the start of the edge to Spray control). Each such
+/// long edge is routed again to the cheapest route whose stub runs along no
+/// other drawn wire, in edge order; it keeps its route when there is none.
+fn separate_stubs(
+    nodes: &[Node],
+    routes: &mut std::collections::BTreeMap<(usize, usize), Vec<egui::Vec2>>,
+) {
+    let long: Vec<_> = routes
+        .iter()
+        .filter(|(_, route)| route.len() >= 2 && route_length(route) > LONG_EDGE)
+        .map(|(edge, _)| *edge)
+        .collect();
+    for edge in long {
+        let others: Vec<_> = routes
+            .iter()
+            .filter(|(other, _)| **other != edge)
+            .map(|(_, route)| drawn_wire(route))
+            .collect();
+        let apart = |route: &[egui::Vec2]| {
+            let stub = drawn_wire(route);
+            !others.iter().any(|other| shares_segment(&stub, other))
+        };
+        if apart(&routes[&edge]) {
+            continue;
+        }
+        // The run the edge shares with its siblings (its longest leg): of
+        // two routes at one cost, the one that keeps it wins.
+        let trunk = routes[&edge]
+            .windows(2)
+            .max_by(|a, b| (a[1] - a[0]).length().total_cmp(&(b[1] - b[0]).length()))
+            .expect("a long route has a leg")
+            .to_vec();
+        let route = skill_wire_where(nodes, edge.0, edge.1, &|route| {
+            (route_length(route) > LONG_EDGE && apart(route))
+                .then(|| f32::from(u8::from(!shares_segment(route, &trunk))))
+        });
+        if route.len() >= 2 {
+            routes.insert(edge, route);
+        }
     }
 }
 
@@ -114,6 +169,23 @@ pub(super) fn label_spots(points: &[egui::Pos2], lift: f32) -> Vec<(egui::Pos2, 
     spots
 }
 
+/// Whether two wires run along each other: a leg of `a` and a leg of `b`
+/// lie on one line and overlap for more than half a world unit. Legs that
+/// cross or only meet end to end do not count (drawn wires are
+/// axis-aligned).
+pub(super) fn shares_segment(a: &[egui::Vec2], b: &[egui::Vec2]) -> bool {
+    let along = |p: egui::Vec2, q: egui::Vec2, r: egui::Vec2, s: egui::Vec2| {
+        let level = |u: egui::Vec2, v: egui::Vec2| (u.y - v.y).abs() < 0.01;
+        let upright = |u: egui::Vec2, v: egui::Vec2| (u.x - v.x).abs() < 0.01;
+        let overlap =
+            |p: f32, q: f32, r: f32, s: f32| p.max(q).min(r.max(s)) - p.min(q).max(r.min(s)) > 0.5;
+        (level(p, q) && level(r, s) && level(p, r) && overlap(p.x, q.x, r.x, s.x))
+            || (upright(p, q) && upright(r, s) && upright(p, r) && overlap(p.y, q.y, r.y, s.y))
+    };
+    a.windows(2)
+        .any(|v| b.windows(2).any(|w| along(v[0], v[1], w[0], w[1])))
+}
+
 pub(super) fn route_length(route: &[egui::Vec2]) -> f32 {
     route.windows(2).map(|w| (w[1] - w[0]).length()).sum()
 }
@@ -162,6 +234,18 @@ pub(super) fn wire_segment_clear(a: egui::Vec2, b: egui::Vec2, obstacles: &[Rect
 /// Orthogonal ports and open channels keep prerequisites out of every unrelated
 /// icon/caption envelope. All geometry comes from the authored node positions.
 pub(super) fn skill_wire(nodes: &[Node], parent: usize, child: usize) -> Vec<egui::Vec2> {
+    skill_wire_where(nodes, parent, child, &|_| Some(0.0))
+}
+
+/// `skill_wire` over the finished routes `extra` allows, each at its cost
+/// plus that extra: the cheapest direct one, else the cheapest that detours
+/// round one obstacle, else none.
+fn skill_wire_where(
+    nodes: &[Node],
+    parent: usize,
+    child: usize,
+    extra: &dyn Fn(&[egui::Vec2]) -> Option<f32>,
+) -> Vec<egui::Vec2> {
     let obstacles: Vec<_> = nodes.iter().map(skill_obstacle).collect();
     let source = nodes[parent].position;
     let target = nodes[child].position;
@@ -172,63 +256,52 @@ pub(super) fn skill_wire(nodes: &[Node], parent: usize, child: usize) -> Vec<egu
             p + vec2(102.0, 0.0),
         ]
     };
-    let mut best = Vec::new();
-    let mut best_cost = f32::INFINITY;
-    {
-        let mut consider = |path: Vec<egui::Vec2>| {
-            if !path
-                .windows(2)
-                .all(|w| wire_segment_clear(w[0], w[1], &obstacles))
-            {
-                return;
-            }
-            let cost: f32 = route_length(&path) + path.len() as f32 * 8.0;
-            if cost < best_cost {
-                best_cost = cost;
-                best = path;
-            }
-        };
-        for a in ports(source) {
-            for b in ports(target) {
-                consider(vec![a, vec2(a.x, b.y), b]);
-                consider(vec![a, vec2(b.x, a.y), b]);
-            }
+    let best = std::cell::RefCell::new(Vec::new());
+    let best_cost = std::cell::Cell::new(f32::INFINITY);
+    let consider = |mut path: Vec<egui::Vec2>| {
+        if !path
+            .windows(2)
+            .all(|w| wire_segment_clear(w[0], w[1], &obstacles))
+        {
+            return;
+        }
+        let cost = route_length(&path) + path.len() as f32 * 8.0;
+        if cost >= best_cost.get() {
+            return;
+        }
+        // The legs from the ports to the icons' edges.
+        let first = path[0];
+        let last = *path.last().expect("nonempty path");
+        path.insert(0, source + (first - source).normalized() * 34.0);
+        path.push(target + (last - target).normalized() * 34.0);
+        path.dedup_by(|a, b| (*a - *b).length() < 0.01);
+        if let Some(cost) = extra(&path).map(|extra| cost + extra)
+            && cost < best_cost.get()
+        {
+            best_cost.set(cost);
+            *best.borrow_mut() = path;
+        }
+    };
+    for a in ports(source) {
+        for b in ports(target) {
+            consider(vec![a, vec2(a.x, b.y), b]);
+            consider(vec![a, vec2(b.x, a.y), b]);
         }
     }
-    if best.is_empty() {
-        for a in ports(source) {
-            for b in ports(target) {
-                for obstacle in &obstacles {
-                    let mut consider = |path: Vec<egui::Vec2>| {
-                        if !path
-                            .windows(2)
-                            .all(|w| wire_segment_clear(w[0], w[1], &obstacles))
-                        {
-                            return;
-                        }
-                        let cost = route_length(&path) + path.len() as f32 * 8.0;
-                        if cost < best_cost {
-                            best_cost = cost;
-                            best = path;
-                        }
-                    };
-                    for y in [obstacle.top() - 10.0, obstacle.bottom() + 10.0] {
-                        consider(vec![a, vec2(a.x, y), vec2(b.x, y), b]);
-                    }
-                    for x in [obstacle.left() - 10.0, obstacle.right() + 10.0] {
-                        consider(vec![a, vec2(x, a.y), vec2(x, b.y), b]);
-                    }
+    if best_cost.get().is_finite() {
+        return best.into_inner();
+    }
+    for a in ports(source) {
+        for b in ports(target) {
+            for obstacle in &obstacles {
+                for y in [obstacle.top() - 10.0, obstacle.bottom() + 10.0] {
+                    consider(vec![a, vec2(a.x, y), vec2(b.x, y), b]);
+                }
+                for x in [obstacle.left() - 10.0, obstacle.right() + 10.0] {
+                    consider(vec![a, vec2(x, a.y), vec2(x, b.y), b]);
                 }
             }
         }
     }
-    if best.is_empty() {
-        return best;
-    }
-    let first = best[0];
-    let last = *best.last().expect("nonempty path");
-    best.insert(0, source + (first - source).normalized() * 34.0);
-    best.push(target + (last - target).normalized() * 34.0);
-    best.dedup_by(|a, b| (*a - *b).length() < 0.01);
-    best
+    best.into_inner()
 }

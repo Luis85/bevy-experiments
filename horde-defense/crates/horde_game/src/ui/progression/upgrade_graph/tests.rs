@@ -6,8 +6,8 @@ use super::viewport::{
     default_scale, minimap_rect, skill_bounds,
 };
 use super::wires::{
-    LONG_EDGE, STUB_LENGTH, WireCache, route_length, skill_obstacle, skill_wire, stub_label,
-    wire_segment_clear, wire_stub,
+    LONG_EDGE, STUB_LENGTH, WireCache, route_length, shares_segment, skill_obstacle, skill_wire,
+    stub_label, wire_segment_clear, wire_stub,
 };
 use crate::art::{AMBER, TEXT};
 use bevy_egui::egui::{self, Align, Rect, pos2, vec2};
@@ -539,5 +539,142 @@ fn every_stub_label_clears_every_node_envelope_and_other_wire_at_every_zoom() {
             }
         }
         assert!(labels > 0, "scale {scale}: stub labels are drawn");
+    }
+}
+/// CF-2-01: on the skills-survival focus (`field_fitness`), at the
+/// 1440x900@1.0 zoom and the compact 1050x700@1.35 zoom, each cross-graph
+/// stub's label meets no drawn edge and no node's icon, title or caption
+/// envelope, and the stub's own path shares no segment with another drawn
+/// edge. Before, the `pistol_training` -> `smg_training` stub arrived along
+/// y = 0 from the right, over the start of the `smg_training` ->
+/// `smg_spray_control` edge: one line with an arrowhead at each end.
+#[test]
+fn stub_label_clears_every_drawn_edge_and_node_at_both_zooms() {
+    let catalog = horde_core::skill_catalog::skills();
+    let index = |id: &str| catalog.nodes.iter().position(|n| n.id == id).unwrap();
+    let mut nodes = catalogue_nodes();
+    let focus = index("field_fitness");
+    nodes[index("pistol_training")].tone = Tone::Owned;
+    let emphasis = Emphasis {
+        path: [focus].into(),
+        ..Emphasis::default()
+    };
+    let (_, origin) = skill_bounds(&nodes);
+    let routes = WireCache::default().resolve(&nodes);
+    // Every drawn wire in world units, by its (parent, child), as `show`
+    // draws it: a long edge off the highlighted path is its stub.
+    let wires: Vec<_> = routes
+        .iter()
+        .filter(|(_, route)| route.len() >= 2)
+        .map(|(&(parent, child), route)| {
+            let on_path = emphasis.path.contains(&child)
+                && (emphasis.path.contains(&parent) || nodes[parent].tone == Tone::Owned);
+            let stub = route_length(route) > LONG_EDGE && !on_path;
+            let world = if stub {
+                wire_stub(route, STUB_LENGTH)
+            } else {
+                route.clone()
+            };
+            ((parent, child), stub, world)
+        })
+        .collect();
+    let name = |edge: (usize, usize)| {
+        format!(
+            "{} -> {}",
+            catalog.nodes[edge.0].id, catalog.nodes[edge.1].id
+        )
+    };
+    // No stub runs along another drawn edge.
+    let mut stubs = 0;
+    for (edge, stub, points) in &wires {
+        if !stub {
+            continue;
+        }
+        stubs += 1;
+        for (other, _, other_points) in &wires {
+            assert!(
+                other == edge || !shares_segment(points, other_points),
+                "the stub {} {points:?} runs along the drawn edge {} {other_points:?}",
+                name(*edge),
+                name(*other)
+            );
+        }
+    }
+    assert!(
+        wires
+            .iter()
+            .any(|(edge, stub, _)| *stub
+                && *edge == (index("pistol_training"), index("smg_training"))),
+        "pistol_training -> smg_training draws as a stub"
+    );
+    assert!(stubs > 0);
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    // The canvas at 1440x900@1.0 (detail panel beside it) and at the
+    // compact 1050x700@1.35 (778x519 points, detail below).
+    for (size, expected_scale) in [(vec2(1090.0, 640.0), 0.872), (vec2(750.0, 250.0), 0.6)] {
+        let mut view = View::default();
+        view.focus(focus);
+        let mut canvas = Rect::NOTHING;
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(1500.0, 900.0))),
+                ..Default::default()
+            },
+            |ui| {
+                canvas = Graph::skills(&nodes).show(
+                    ui,
+                    egui::Id::new(("cf-2-01", size.x as u32)),
+                    &mut view,
+                    &emphasis,
+                    size,
+                );
+            },
+        );
+        output.textures_delta.clear();
+        let scale = view.scale();
+        assert!((scale - expected_scale).abs() < 0.001, "{size:?}: {scale}");
+        let center = canvas.center() + view.pan;
+        let point = |v: egui::Vec2| center + (v - origin) * scale;
+        let mut labels = 0;
+        for clipped in &output.shapes {
+            let egui::Shape::Text(text) = &clipped.shape else {
+                continue;
+            };
+            if !text.galley.text().starts_with("from ") {
+                continue;
+            }
+            labels += 1;
+            let label = text.galley.rect.translate(text.pos.to_vec2());
+            for node in &nodes {
+                let world = skill_obstacle(node);
+                let envelope =
+                    Rect::from_two_pos(point(world.min.to_vec2()), point(world.max.to_vec2()));
+                assert!(
+                    !label.intersects(envelope),
+                    "{size:?}: the label {:?} at {label:?} meets {}'s envelope {envelope:?}",
+                    text.galley.text(),
+                    node.title
+                );
+            }
+            for (edge, _, points) in &wires {
+                for pair in points.windows(2) {
+                    let span = Rect::from_two_pos(point(pair[0]), point(pair[1]));
+                    assert!(
+                        !(span.min.x < label.max.x
+                            && label.min.x < span.max.x
+                            && span.min.y < label.max.y
+                            && label.min.y < span.max.y),
+                        "{size:?}: the label {:?} at {label:?} lies on the drawn edge {}",
+                        text.galley.text(),
+                        name(*edge)
+                    );
+                }
+            }
+        }
+        assert!(
+            labels >= stubs,
+            "{size:?}: {labels} labels for {stubs} stubs"
+        );
     }
 }
