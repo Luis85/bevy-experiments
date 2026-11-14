@@ -387,8 +387,7 @@ fn offers(ui: &mut egui::Ui, f: &mut UiCtx) {
                     offer.name, offer.country_name, offer.price
                 ));
                 if ui.button("Recruit ›").clicked() {
-                    f.campaign.selected_country = offer.country_id.clone();
-                    f.go_tab(Tab::Operations);
+                    f.status.open_recruit(&offer.country_id);
                 }
             });
         });

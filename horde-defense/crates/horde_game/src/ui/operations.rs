@@ -152,10 +152,9 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                 .on_disabled_hover_text(hire.disabled_hover)
                 .clicked()
             {
-                f.dispatch(
-                    Command::Recruit(f.campaign.selected_country.clone()),
-                    "Survivor recruited with independent protected equipment.",
-                );
+                // The Recruit modal offers the two archetypes and recruits.
+                let country = f.campaign.selected_country.clone();
+                f.status.open_recruit(&country);
             }
         });
         muted(

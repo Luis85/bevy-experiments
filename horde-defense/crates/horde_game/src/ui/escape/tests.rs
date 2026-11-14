@@ -85,13 +85,14 @@ const TABS: [Tab; 9] = [
     Tab::Engineering,
     Tab::Operations,
 ];
-const OVERLAYS: [Overlay; 12] = [
+const OVERLAYS: [Overlay; 13] = [
     Overlay::Rebind,
     Overlay::TextFocus,
     Overlay::AppModal(ModalKind::Quit),
     Overlay::AppModal(ModalKind::ReturnToMenu),
     Overlay::AppModal(ModalKind::Storage),
     Overlay::AppModal(ModalKind::DraftWarning),
+    Overlay::AppModal(ModalKind::Recruit),
     Overlay::NewJourneyModal,
     Overlay::Details,
     Overlay::Popup,
@@ -340,6 +341,16 @@ fn matrix_table() {
             A::CloseModal,
         ),
         (
+            "recruit modal on results closes",
+            with(Overlay::AppModal(ModalKind::Recruit), on(Screen::Results)),
+            A::CloseModal,
+        ),
+        (
+            "recruit modal on operations closes before the tab goes back",
+            with(Overlay::AppModal(ModalKind::Recruit), camp(Tab::Operations)),
+            A::CloseModal,
+        ),
+        (
             "the results More menu is egui's",
             with(Overlay::Popup, on(Screen::Results)),
             A::LeaveToEgui,
@@ -474,7 +485,7 @@ fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
 #[test]
 fn properties() {
     let all = every_context();
-    assert_eq!(all.len(), 7 * 9 * 12 * 512);
+    assert_eq!(all.len(), 7 * 9 * 13 * 512);
     for cx in all {
         let action = escape_action(&cx);
         // A focused text field and an open popup keep Escape for egui, and

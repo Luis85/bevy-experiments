@@ -9,12 +9,21 @@
 //! The draft warning (UX-09, §4 "Settings") opens when a Settings leave
 //! route meets an unapplied difficulty draft: "Apply and return", "Discard
 //! and return" or "Keep editing" (which Escape and a backdrop click also do).
-use super::{StatusUi, UiCtx, preferences::DraftState, primary_action::primary_in_modal};
+//!
+//! The Recruit modal (UX-18, §4 "Recruit modal") has two phases. Choose
+//! shows the core offer (`Game::recruit_offer`: name, origin trait, price and
+//! two archetypes) and dispatches `Command::RecruitAs`; once the command
+//! answers with the recruit's id the notice system moves it to Joined, whose
+//! primary is "Back to camp".
+use super::{
+    HomeFocus, StatusUi, UiCtx, muted, preferences::DraftState, primary_action::primary_in_modal,
+};
 use crate::{
     art::{MUTED, RED},
     runner::{AppCommand, SaveIntent},
 };
 use bevy_egui::egui::{self, RichText};
+use horde_core::{command::Command, defenders::RecruitOffer};
 
 /// The open application modal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,6 +36,20 @@ pub(crate) enum AppModal {
     Storage(StorageError),
     /// Leaving Settings by `then` would drop an unapplied difficulty draft.
     DraftWarning { then: LeaveSettings },
+    /// Recruiting a survivor from liberated `country`.
+    Recruit {
+        country: String,
+        phase: RecruitPhase,
+    },
+}
+
+/// Where the Recruit modal stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RecruitPhase {
+    /// The offer's two archetypes wait for a choice.
+    Choose,
+    /// `Command::RecruitAs` answered with this recruit's id.
+    Joined { recruit_id: u64 },
 }
 
 /// The Settings leave route a draft warning interrupted.
@@ -63,6 +86,7 @@ pub(crate) enum ModalKind {
     ReturnToMenu,
     Storage,
     DraftWarning,
+    Recruit,
 }
 
 impl AppModal {
@@ -72,15 +96,17 @@ impl AppModal {
             Self::ReturnToMenu => ModalKind::ReturnToMenu,
             Self::Storage(_) => ModalKind::Storage,
             Self::DraftWarning { .. } => ModalKind::DraftWarning,
+            Self::Recruit { .. } => ModalKind::Recruit,
         }
     }
     /// The confirmation an Escape press opens. A storage modal is opened by
-    /// its error, never by a key. Escape leaves Settings by its Back route.
+    /// its error and the Recruit modal by its buttons, never by a key.
+    /// Escape leaves Settings by its Back route.
     pub(super) fn confirmation(kind: ModalKind) -> Option<Self> {
         match kind {
             ModalKind::Quit => Some(Self::Quit),
             ModalKind::ReturnToMenu => Some(Self::ReturnToMenu),
-            ModalKind::Storage => None,
+            ModalKind::Storage | ModalKind::Recruit => None,
             ModalKind::DraftWarning => Some(Self::DraftWarning {
                 then: LeaveSettings::Back,
             }),
@@ -117,6 +143,22 @@ pub(super) const KEEP_EDITING: &str = "Keep editing";
 /// same.
 pub(super) const FIX_DRAFT_FIRST: &str = "Fix the highlighted value first.";
 
+/// The Recruit modal (design-ux-flow §4 "Recruit modal").
+pub(super) const NOT_NOW: &str = "Not now";
+pub(super) const BACK_TO_CAMP: &str = "Back to camp";
+pub(super) const STAY_HERE: &str = "Stay here";
+pub(super) const CLOSE: &str = "Close";
+
+/// "Recruit as <Archetype> · N coins": a Choose-phase button, at the offer's
+/// core price.
+fn recruit_as_label(offer: &RecruitOffer, index: usize) -> String {
+    format!(
+        "Recruit as {} · {} coins",
+        offer.archetypes[index].archetype.label(),
+        offer.price
+    )
+}
+
 /// Storage modal titles.
 pub(super) const SAVE_FAILED_TITLE: &str = "Save failed";
 pub(super) const LOAD_FAILED_TITLE: &str = "Save could not be read";
@@ -144,6 +186,27 @@ impl StatusUi {
         if self.modal.as_ref() != Some(&modal) {
             self.modal = Some(modal);
             self.storage_note.clear();
+        }
+    }
+    /// Opens the Recruit modal on the offer of liberated `country`. Results,
+    /// Home's offers and Operations all recruit through it.
+    pub(super) fn open_recruit(&mut self, country: &str) {
+        self.modal = Some(AppModal::Recruit {
+            country: country.into(),
+            phase: RecruitPhase::Choose,
+        });
+    }
+    /// `Command::RecruitAs` for `country` answered with `recruit_id`: the
+    /// Recruit modal still choosing for that country shows who joined.
+    pub(super) fn recruit_joined(&mut self, country: &str, recruit_id: u64) {
+        if let Some(AppModal::Recruit {
+            country: open,
+            phase,
+        }) = &mut self.modal
+            && open == country
+            && *phase == RecruitPhase::Choose
+        {
+            *phase = RecruitPhase::Joined { recruit_id };
         }
     }
     /// Closes the open modal: "Stay", "Dismiss", Escape or a backdrop click.
@@ -197,6 +260,7 @@ pub(super) fn show(ctx: &egui::Context, f: &mut UiCtx) {
         None => {}
         Some(AppModal::Storage(error)) => show_storage(ctx, f, &error),
         Some(AppModal::DraftWarning { then }) => show_draft_warning(ctx, f, then),
+        Some(AppModal::Recruit { country, phase }) => show_recruit(ctx, f, &country, phase),
         Some(modal) => show_confirmation(ctx, f, modal == AppModal::Quit),
     }
 }
@@ -233,6 +297,124 @@ fn show_confirmation(ctx: &egui::Context, f: &mut UiCtx, quit: bool) {
         }
         Some(false) => f.status.close_modal(),
         // A backdrop click stays, as "Stay" does.
+        None if shown.should_close() => f.status.close_modal(),
+        None => {}
+    }
+}
+
+/// What a click in the Recruit modal asks for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RecruitChoice {
+    /// Recruit as the offer's archetype at this index.
+    As(usize),
+    BackToCamp(u64),
+    Close,
+}
+
+/// The Recruit modal. Choose reads the core offer every frame, so its price
+/// and archetypes are always what `RecruitAs` will charge and accept; an
+/// offer core withdraws meanwhile reads its blocker instead.
+fn show_recruit(ctx: &egui::Context, f: &mut UiCtx, country: &str, phase: RecruitPhase) {
+    let offer = f.game.recruit_offer(country);
+    let joined = match phase {
+        RecruitPhase::Choose => None,
+        RecruitPhase::Joined { recruit_id } => Some((
+            recruit_id,
+            f.game
+                .strategy()
+                .roster
+                .iter()
+                .find(|r| r.id == recruit_id)
+                .map_or_else(|| "A survivor".to_owned(), |r| r.name.clone()),
+        )),
+    };
+    let shown = egui::Modal::new(egui::Id::new("lastlight_app_modal")).show(ctx, |ui| {
+        ui.set_max_width(440.0);
+        let mut choice = None;
+        if let Some((recruit_id, name)) = &joined {
+            ui.heading(format!("{name} joined your camp."));
+            ui.label("Their own equipment, training and history start now.");
+            ui.add_space(10.0);
+            ui.horizontal_wrapped(|ui| {
+                if primary_in_modal(ui, BACK_TO_CAMP).clicked() {
+                    choice = Some(RecruitChoice::BackToCamp(*recruit_id));
+                }
+                if ui.button(STAY_HERE).clicked() {
+                    choice = Some(RecruitChoice::Close);
+                }
+            });
+            return choice;
+        }
+        match &offer {
+            Ok(offer) => {
+                ui.heading(format!("Recruit from {}", offer.country_name));
+                ui.label(
+                    RichText::new(format!("{} · {}", offer.name, offer.origin_trait.label()))
+                        .strong(),
+                );
+                muted(ui, offer.origin_trait.blurb());
+                for (index, card) in offer.archetypes.iter().enumerate() {
+                    ui.add_space(8.0);
+                    ui.push_id(("recruit_archetype", index), |ui| {
+                        muted(
+                            ui,
+                            format!(
+                                "{} tactics · ST {} · DX {} · HT {} · Guns {} · Melee {}",
+                                card.policy.label(),
+                                card.st,
+                                card.dx,
+                                card.ht,
+                                card.guns,
+                                card.melee
+                            ),
+                        );
+                        let label = recruit_as_label(offer, index);
+                        // One amber primary: the offer's first archetype.
+                        let clicked = if index == 0 {
+                            primary_in_modal(ui, &label).clicked()
+                        } else {
+                            ui.button(label).clicked()
+                        };
+                        if clicked {
+                            choice = Some(RecruitChoice::As(index));
+                        }
+                    });
+                }
+                ui.add_space(10.0);
+                if ui.button(NOT_NOW).clicked() {
+                    choice = Some(RecruitChoice::Close);
+                }
+            }
+            Err(blocker) => {
+                ui.heading("Recruit a survivor");
+                ui.label(blocker.label());
+                ui.add_space(10.0);
+                if ui.button(CLOSE).clicked() {
+                    choice = Some(RecruitChoice::Close);
+                }
+            }
+        }
+        choice
+    });
+    match shown.inner {
+        Some(RecruitChoice::As(index)) => {
+            if let Ok(offer) = &offer {
+                // The notice system moves the modal to Joined on the id.
+                f.dispatch(
+                    Command::RecruitAs {
+                        country: country.to_owned(),
+                        archetype: offer.archetypes[index].archetype.id().to_owned(),
+                    },
+                    "",
+                );
+            }
+        }
+        Some(RecruitChoice::BackToCamp(recruit_id)) => {
+            f.status.modal = None;
+            f.open_camp_home(Some(HomeFocus::Recruit(recruit_id)));
+        }
+        Some(RecruitChoice::Close) => f.status.close_modal(),
+        // A backdrop click closes, as Escape does.
         None if shown.should_close() => f.status.close_modal(),
         None => {}
     }

@@ -29,7 +29,7 @@ fn unlocked_home(fixture: &mut IsolatedFrontend) -> &mut FrontendParts {
 }
 
 /// Three whole App frames, then the fourth's output.
-fn settle(h: &Harness, f: &mut FrontendParts) -> FullOutput {
+pub(super) fn settle(h: &Harness, f: &mut FrontendParts) -> FullOutput {
     for _ in 0..3 {
         h.frame(f, View::Full, vec![]);
     }
@@ -39,7 +39,7 @@ fn settle(h: &Harness, f: &mut FrontendParts) -> FullOutput {
 /// Liberates Germany: every earlier stage cleared, then its final stage won
 /// on one tick (the boss already spawned, the last enemy down), so the
 /// settled report is a liberation.
-fn liberate_germany(f: &mut FrontendParts) {
+pub(super) fn liberate_germany(f: &mut FrontendParts) {
     let count = world().country("DEU").unwrap().level_count();
     for stage in 0..count - 1 {
         f.game

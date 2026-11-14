@@ -608,6 +608,7 @@ mod navigation_tests;
 mod operations_tests;
 mod primary_tests;
 mod progression_tests;
+mod recruit_tests;
 mod results_tests;
 mod retreat_tests;
 mod settings_tests;

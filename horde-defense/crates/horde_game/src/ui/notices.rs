@@ -343,6 +343,14 @@ impl UiCtx<'_> {
         {
             self.armory.selected_item = Some(*id);
         }
+        // The Recruit modal shows who joined (its "Back to camp" phase).
+        if let (
+            AppCommand::Game(Command::RecruitAs { country, .. }),
+            AppOutcome::Command(CommandOutcome::Id(id)),
+        ) = (&command, &outcome)
+        {
+            self.status.recruit_joined(country, *id);
+        }
         if !success.is_empty() {
             self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
             self.status.message = match &outcome {

@@ -4,7 +4,7 @@ use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob};
 use horde_core::{
     command::Command,
-    defenders::DefenderId,
+    defenders::{DefenderId, RecruitBlocker},
     sim::{Outcome, Report},
     world::world,
 };
@@ -173,6 +173,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
             }
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| actions(ui, f));
+            recruit_block(ui, f);
             // Who defends next, between defenses of a running journey.
             if f.game.campaign().journey_active && f.game.last_result().is_some() {
                 chrome::defender_picker(ui, f);
@@ -187,15 +188,93 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
         });
 }
 
+/// What the liberation block shows, read from core's recruit offer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum RecruitBlock {
+    /// "Recruit from <Country> · N coins": opens the Recruit modal.
+    Offer { country: String, label: String },
+    /// A muted line: the missing node, or the core blocker's own words.
+    Blocked(String),
+}
+
+/// The liberation block of the settled report: only a victory that freed
+/// its country offers a recruit there. The price, the node's name and cost
+/// and every blocker text come from `Game::recruit_offer`.
+fn recruit_block_model(f: &UiCtx) -> Option<RecruitBlock> {
+    let report = f.game.last_result()?;
+    let country = report.country_id.as_deref()?;
+    if report.outcome != Outcome::Victory
+        || !report.country_freed
+        || f.game.attempt().is_some()
+        || !f.game.campaign().world.cleared.iter().any(|c| c == country)
+    {
+        return None;
+    }
+    let name = &report.country_name;
+    Some(match f.game.recruit_offer(country) {
+        Ok(offer) => RecruitBlock::Offer {
+            country: offer.country_id,
+            label: format!("Recruit from {name} · {} coins", offer.price),
+        },
+        Err(RecruitBlocker::NeedsNode {
+            name: node, price, ..
+        }) => RecruitBlock::Blocked(format!(
+            "Learn {node} in Upgrades to recruit from {name} ({price} coins)"
+        )),
+        Err(blocker) => RecruitBlock::Blocked(format!("Recruit from {name}: {}", blocker.label())),
+    })
+}
+
+/// Inline content under the action bar, never a fourth action.
+fn recruit_block(ui: &mut egui::Ui, f: &mut UiCtx) {
+    match recruit_block_model(f) {
+        None => {}
+        Some(RecruitBlock::Offer { country, label }) => {
+            if ui
+                .button(label)
+                .on_hover_text("Choose one of two archetypes; the survivor joins your camp.")
+                .clicked()
+            {
+                f.status.open_recruit(&country);
+            }
+        }
+        Some(RecruitBlock::Blocked(line)) => muted(ui, line),
+    }
+}
+
+/// The continuation the action bar's primary names.
+fn primary_label(f: &UiCtx) -> &'static str {
+    if f.game.attempt().is_some() {
+        "Return to active defense"
+    } else {
+        continue_label(f)
+    }
+}
+/// Whether the bar shows "More" (the replay route).
+fn more_shown(f: &UiCtx) -> bool {
+    f.game.attempt().is_none()
+        && (f.game.campaign().legacy_features || f.game.campaign().victories > 0)
+}
+/// The action bar's buttons in draw order: at most three. Everything else
+/// on Results is inline content (the recruit block, the defender picker).
+#[cfg(test)]
+pub(super) fn action_bar_labels(f: &UiCtx) -> Vec<&'static str> {
+    let mut labels = vec![primary_label(f)];
+    if more_shown(f) {
+        labels.push("More");
+    }
+    if f.game.attempt().is_none() {
+        labels.push(LEAVE_JOURNEY);
+    }
+    labels
+}
+const LEAVE_JOURNEY: &str = "Leave journey";
+
 /// Primary continuation first, then the analysis, the non-navigation extras
 /// and the quiet exit. Destinations the camp row lists are not repeated here.
 fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     let live = f.game.attempt().is_some();
-    let label = if live {
-        "Return to active defense"
-    } else {
-        continue_label(f)
-    };
+    let label = primary_label(f);
     if primary(ui, label).clicked() {
         if live {
             f.go(Screen::Battle);
@@ -208,7 +287,7 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     // The manual save is the header's "Save" (W3-05), so "More" holds only
     // the replay route and is hidden when that is unavailable.
-    if !live && (f.game.campaign().legacy_features || f.game.campaign().victories > 0) {
+    if more_shown(f) {
         ui.menu_button("More", |ui| {
             if ui.button("Plan or replay a defense").clicked() {
                 f.open_preparation(Tab::Briefing);
@@ -222,7 +301,7 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         && ui
             .add_enabled(
                 !f.runtime.durable_transition_pending(),
-                egui::Button::new(RichText::new("Leave journey").color(MUTED)).frame(false),
+                egui::Button::new(RichText::new(LEAVE_JOURNEY).color(MUTED)).frame(false),
             )
             .on_hover_text(
                 "End this journey and return to the main menu. Banked coins, items and upgrades stay.",

@@ -42,14 +42,8 @@ pub(crate) struct Navigation {
 /// What Camp home highlights when a route opens it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum HomeFocus {
-    /// The roster row of this recruit (a recruit who just joined).
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "W3-19's Recruit modal (\"Back to camp\") is its first caller"
-        )
-    )]
+    /// The roster row of this recruit (a recruit who just joined, from the
+    /// Recruit modal's "Back to camp").
     Recruit(u64),
 }
 impl Default for Navigation {

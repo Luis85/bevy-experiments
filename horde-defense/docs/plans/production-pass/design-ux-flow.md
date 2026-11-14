@@ -280,6 +280,8 @@ Choose phase:
 
 On `CommandOutcome::Id(recruit_id)` the phase becomes Joined: "<Name> joined your camp.", with amber "Back to camp" (`open_camp_home(Some(Focus::Recruit(id)))`, which highlights the roster row) and "Stay here". Escape closes the modal. Operations' "Recruit survivor" (operations.rs:149-161) and the Home Offers card open the same modal.
 
+*As built (W3-19, `ui/modal.rs`, `ui/results.rs`):* `AppModal::Recruit{country, phase}` and `ModalKind::Recruit`; `StatusUi::open_recruit` opens it from Results, Home's "Recruit ›" and Operations' "Recruit survivor" (which no longer dispatches `Command::Recruit`). The modal reads `Game::recruit_offer` every frame: one recruit (name and origin trait), two archetype rows (starting policy and stats) and "Recruit as <Archetype> · N coins" at `offer.price`, the first archetype being the modal primary. An offer core withdraws while the modal is open shows the blocker's label and "Close". The notice system moves Choose to Joined on `RecruitAs`'s `CommandOutcome::Id` (`StatusUi::recruit_joined`). The Results block shows only for a victory whose report freed its country; it is "Recruit from <Country> · N coins", the muted "Learn <node> in Upgrades to recruit from <Country> (<node price> coins)" for `RecruitBlocker::NeedsNode`, or the muted "Recruit from <Country>: <blocker label>" for any other blocker. W3-03 had not landed, so the block sits under the existing action row (continue, "More", "Leave journey"), which `results::action_bar_labels` lists.
+
 ### Camp/Home (ui/home.rs, new)
 
 Two columns when the content width is >= 720.
