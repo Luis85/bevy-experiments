@@ -3,12 +3,13 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::Path};
 
 /// The `version` every settings file is written with. A file without the key
-/// predates it and reads as 0. Wave 6 raises it to 2 for the mix migration.
-pub const SETTINGS_VERSION: u32 = 1;
+/// predates it and reads as 0. Version 2 is the calibrated mix: a file below
+/// it has its untouched wave-1 volume defaults migrated on load.
+pub const SETTINGS_VERSION: u32 = 2;
 
 /// Default preference values. Audio owns the volume values; `WAVE1_*` keep
-/// the wave-1 defaults so a later default change can tell an untouched
-/// slider from a chosen one.
+/// the defaults of settings versions 0 and 1, so the version-2 migration can
+/// tell an untouched slider from a chosen one.
 pub mod defaults {
     // The mix defaults live with the mix table; the offline loudness gate
     // renders at the same constants.
@@ -17,15 +18,10 @@ pub mod defaults {
     pub const AMBIENCE: f32 = horde_audio::mix::DEFAULT_AMBIENCE;
     pub const MUSIC: f32 = horde_audio::mix::DEFAULT_MUSIC;
     pub const UI: f32 = horde_audio::mix::DEFAULT_UI;
-    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
     pub const WAVE1_MASTER: f32 = 0.6;
-    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
     pub const WAVE1_EFFECTS: f32 = 0.7;
-    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
     pub const WAVE1_AMBIENCE: f32 = 0.15;
-    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
     pub const WAVE1_MUSIC: f32 = 0.7;
-    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
     pub const WAVE1_UI: f32 = 0.7;
 }
 
@@ -304,9 +300,10 @@ impl Settings {
             .unwrap_or_default()
     }
     /// Reads settings bytes, in order: per-key salvage; before version 1,
-    /// Interface sounds take the effects volume they rode on; volumes are
-    /// clamped and a non-finite one takes its default; `normalise`; the
-    /// version becomes `SETTINGS_VERSION`. Pure: preserving the original is
+    /// Interface sounds take the effects volume they rode on; before version
+    /// 2, `migrate_wave1_defaults`; volumes are clamped and a non-finite one
+    /// takes its default; `normalise`; the version becomes
+    /// `SETTINGS_VERSION`. Pure: preserving the original is
     /// `profile::read_settings`.
     pub fn decode(bytes: &[u8]) -> SettingsDecode {
         let (mut settings, dropped_keys, not_json) =
@@ -319,6 +316,9 @@ impl Settings {
             };
         if settings.version < 1 {
             settings.ui = settings.effects;
+        }
+        if settings.version < 2 {
+            settings.migrate_wave1_defaults();
         }
         settings.clamp_volumes();
         settings.normalise();
@@ -370,6 +370,32 @@ impl Settings {
             ui: self.ui,
             music: self.music,
             ambience: self.ambience,
+        }
+    }
+    /// The version-2 mix migration, per field: a volume still at its wave-1
+    /// default was never chosen and takes the calibrated default; any other
+    /// value is the player's and stays. The comparison is exact: a wave-1
+    /// default round-trips through the file bit for bit. `decode` runs this
+    /// only below version 2, so a wave-1 value picked later is kept.
+    fn migrate_wave1_defaults(&mut self) {
+        for (volume, wave1, current) in [
+            (&mut self.master, defaults::WAVE1_MASTER, defaults::MASTER),
+            (
+                &mut self.effects,
+                defaults::WAVE1_EFFECTS,
+                defaults::EFFECTS,
+            ),
+            (
+                &mut self.ambience,
+                defaults::WAVE1_AMBIENCE,
+                defaults::AMBIENCE,
+            ),
+            (&mut self.music, defaults::WAVE1_MUSIC, defaults::MUSIC),
+            (&mut self.ui, defaults::WAVE1_UI, defaults::UI),
+        ] {
+            if *volume == wave1 {
+                *volume = current;
+            }
         }
     }
     fn clamp_volumes(&mut self) {
@@ -779,6 +805,152 @@ mod tests {
             let bytes = serde_json::to_vec(&settings).unwrap();
             assert_eq!(Settings::decode(&bytes).settings, settings);
         }
+    }
+
+    /// A version-1 file as wave 1 to 5 wrote it, with the five levels given.
+    fn version_1_file(levels: [f32; 5]) -> Vec<u8> {
+        let [master, effects, ambience, music, ui] = levels;
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        value["version"] = 1.into();
+        for (key, level) in [
+            ("master", master),
+            ("effects", effects),
+            ("ambience", ambience),
+            ("music", music),
+            ("ui", ui),
+        ] {
+            value[key] = serde_json::to_value(level).unwrap();
+        }
+        serde_json::to_vec(&value).unwrap()
+    }
+
+    fn levels(settings: &Settings) -> [f32; 5] {
+        [
+            settings.master,
+            settings.effects,
+            settings.ambience,
+            settings.music,
+            settings.ui,
+        ]
+    }
+
+    const WAVE1_LEVELS: [f32; 5] = [
+        defaults::WAVE1_MASTER,
+        defaults::WAVE1_EFFECTS,
+        defaults::WAVE1_AMBIENCE,
+        defaults::WAVE1_MUSIC,
+        defaults::WAVE1_UI,
+    ];
+    const CURRENT_LEVELS: [f32; 5] = [
+        defaults::MASTER,
+        defaults::EFFECTS,
+        defaults::AMBIENCE,
+        defaults::MUSIC,
+        defaults::UI,
+    ];
+
+    #[test]
+    fn settings_defaults_match_horde_audio_constants() {
+        assert_eq!(SETTINGS_VERSION, 2);
+        let fresh = Settings::default();
+        assert_eq!(fresh.sliders(), horde_audio::mix::Sliders::DEFAULT);
+        assert_eq!(levels(&fresh), CURRENT_LEVELS);
+        // The calibrated defaults differ from wave 1 where the mix moved, so
+        // the migration below has something to do.
+        assert_ne!(defaults::MASTER, defaults::WAVE1_MASTER);
+        assert_ne!(defaults::EFFECTS, defaults::WAVE1_EFFECTS);
+        assert_ne!(defaults::AMBIENCE, defaults::WAVE1_AMBIENCE);
+    }
+
+    #[test]
+    fn untouched_wave1_defaults_migrate_once_per_field() {
+        // A wave-1 default survives the JSON round trip bit for bit, so the
+        // exact comparison in the migration is sound.
+        let raw: Settings = serde_json::from_slice(&version_1_file(WAVE1_LEVELS)).unwrap();
+        assert_eq!((raw.version, levels(&raw)), (1, WAVE1_LEVELS));
+        // Every untouched level takes the calibrated default.
+        let migrated = Settings::decode(&version_1_file(WAVE1_LEVELS)).settings;
+        assert_eq!(migrated.version, SETTINGS_VERSION);
+        assert_eq!(levels(&migrated), CURRENT_LEVELS);
+        // Per field: one chosen level stays while the other four migrate.
+        for chosen in 0..5 {
+            let mut file = WAVE1_LEVELS;
+            file[chosen] = 0.35;
+            let mut expected = CURRENT_LEVELS;
+            expected[chosen] = 0.35;
+            let settings = Settings::decode(&version_1_file(file)).settings;
+            assert_eq!(levels(&settings), expected, "field {chosen}");
+        }
+        // Once: the migrated file is written at version 2 and reads back as
+        // itself, also after the player picks a wave-1 value again.
+        let reread = Settings::decode(&serde_json::to_vec(&migrated).unwrap()).settings;
+        assert_eq!(reread, migrated);
+        // The 13-key file from before the version key migrates too; its
+        // Interface sounds first take the effects level they rode on.
+        let old =
+            Settings::decode(br#"{"master": 0.6, "effects": 0.7, "ambience": 0.15}"#).settings;
+        assert_eq!(levels(&old), CURRENT_LEVELS);
+    }
+
+    #[test]
+    fn customised_levels_are_kept() {
+        let chosen = [0.8, 0.45, 0.3, 0.25, 0.35];
+        let settings = Settings::decode(&version_1_file(chosen)).settings;
+        assert_eq!(levels(&settings), chosen);
+        assert_eq!(settings.version, SETTINGS_VERSION);
+        // Close to a wave-1 default is not the wave-1 default.
+        let near = [0.61, 0.69, 0.16, 0.71, 0.0];
+        assert_eq!(
+            levels(&Settings::decode(&version_1_file(near)).settings),
+            near
+        );
+        // The frozen 13-key fixture keeps its three levels; Interface sounds
+        // ride its effects level.
+        let old = Settings::decode(SETTINGS_V0.as_bytes()).settings;
+        assert_eq!(levels(&old), [0.8, 0.45, 0.3, defaults::MUSIC, 0.45]);
+        // Nothing but the levels and the version changes.
+        let before = Settings {
+            version: 1,
+            master: defaults::WAVE1_MASTER,
+            extra_bindings: ExtraBindings {
+                world_clock: "K".into(),
+                cycle_attack: "L".into(),
+            },
+            ..customised()
+        };
+        let after = Settings::decode(&serde_json::to_vec(&before).unwrap()).settings;
+        assert_eq!(
+            after,
+            Settings {
+                version: SETTINGS_VERSION,
+                master: defaults::MASTER,
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn version_2_file_never_remigrates() {
+        // At version 2 a wave-1 value is the player's choice.
+        let chosen = Settings {
+            master: defaults::WAVE1_MASTER,
+            effects: defaults::WAVE1_EFFECTS,
+            ambience: defaults::WAVE1_AMBIENCE,
+            music: defaults::WAVE1_MUSIC,
+            ui: defaults::WAVE1_UI,
+            ..Settings::default()
+        };
+        assert_eq!(chosen.version, 2);
+        let bytes = serde_json::to_vec(&chosen).unwrap();
+        let once = Settings::decode(&bytes).settings;
+        assert_eq!(once, chosen);
+        let twice = Settings::decode(&serde_json::to_vec(&once).unwrap()).settings;
+        assert_eq!(twice, chosen);
+        // A file from a later build is not migrated either.
+        let mut later = serde_json::to_value(&chosen).unwrap();
+        later["version"] = 3.into();
+        let later = Settings::decode(&serde_json::to_vec(&later).unwrap()).settings;
+        assert_eq!(levels(&later), WAVE1_LEVELS);
     }
 
     #[test]

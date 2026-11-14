@@ -85,10 +85,17 @@ fn bus_gains_multiply_master_slider_and_calibration() {
     assert_eq!(wild.bus_gain(Bus::Ui), 0.0);
     assert_eq!(wild.bus_gain(Bus::Music), calibration);
     assert_eq!(wild.bus_gain(Bus::Atmosphere), 0.0);
-    // The new sliders default to the level the cues had on the effects bus,
-    // so the split changes nothing at the defaults.
-    assert_eq!(mix::DEFAULT_UI, mix::DEFAULT_EFFECTS);
-    assert_eq!(mix::DEFAULT_MUSIC, mix::DEFAULT_EFFECTS);
+    // The settings-version-2 targets (ruling S5). Interface sounds and
+    // Music & stingers keep the 0.7 they had on the effects bus before it.
+    assert_eq!(
+        (
+            mix::DEFAULT_MASTER,
+            mix::DEFAULT_EFFECTS,
+            mix::DEFAULT_AMBIENCE
+        ),
+        (0.8, 0.8, 0.5)
+    );
+    assert_eq!((mix::DEFAULT_UI, mix::DEFAULT_MUSIC), (0.7, 0.7));
     assert_eq!(
         Sliders::DEFAULT,
         Sliders {

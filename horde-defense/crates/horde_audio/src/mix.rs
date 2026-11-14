@@ -327,13 +327,15 @@ pub const MIX_CALIBRATION_DB: f32 = -3.1;
 pub const AMBIENCE_CALIBRATION_DB: f32 = 0.0;
 
 /// The default slider values. `Settings::default()` in `horde_game` reads
-/// these, and the offline render gates the mix at them. They hold the v1
-/// values until the calibration step retunes them.
-pub const DEFAULT_MASTER: f32 = 0.6;
-pub const DEFAULT_EFFECTS: f32 = 0.7;
-pub const DEFAULT_AMBIENCE: f32 = 0.15;
-/// "Interface sounds" and "Music & stingers" start at the level their cues
-/// had on the effects bus, so the bus split is silent at the defaults.
+/// these, and the offline render gates the mix at them. They are the
+/// settings-version-2 targets (ruling S5); the calibration step may retune
+/// them in 0.05 steps against the loudness gate. The version 0 and 1 values
+/// stay in `horde_game::settings::defaults::WAVE1_*` for the migration.
+pub const DEFAULT_MASTER: f32 = 0.8;
+pub const DEFAULT_EFFECTS: f32 = 0.8;
+pub const DEFAULT_AMBIENCE: f32 = 0.5;
+/// "Interface sounds" and "Music & stingers" keep the level they had before
+/// the calibrated mix.
 pub const DEFAULT_UI: f32 = 0.7;
 pub const DEFAULT_MUSIC: f32 = 0.7;
 
