@@ -26,7 +26,9 @@
 //! reads; and (W2-21) the pure `defender_power` on the deploy's shared
 //! inputs, the derived `service_record` and the `Recruit.containments`
 //! writer; and (W2-44) the core `Slot::label` and `DamageKind::label` that
-//! replace the slot and damage-kind `Debug` names.
+//! replace the slot and damage-kind `Debug` names; and (W7-06) the
+//! PROGRESSION.md allowance table against the core and the takeover pin of
+//! VALIDATION.md's "every committed victory raises future threat once".
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
@@ -1801,6 +1803,92 @@ fn liberated_count_matches_full_scan() {
     assert_eq!(all.liberated_count(), full_scan_liberated(&all));
 }
 
+/// docs/PROGRESSION.md, where the advancement allowance is documented (W7-06).
+const PROGRESSION_DOC: &str = include_str!("../../../docs/PROGRESSION.md");
+
+/// The cells of the Markdown table row whose first cell starts with `label`.
+fn doc_table_row<'a>(section: &'a str, label: &str) -> Vec<&'a str> {
+    section
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with('|'))
+        .map(|line| {
+            line.trim_matches('|')
+                .split('|')
+                .map(str::trim)
+                .collect::<Vec<_>>()
+        })
+        .find(|cells| cells.first().is_some_and(|c| c.starts_with(label)))
+        .unwrap_or_else(|| panic!("the allowance table has no \"{label}\" row"))
+}
+
+/// The leading number of a table cell ("6 and more" reads 6).
+fn leading_number(cell: &str) -> u32 {
+    let digits: String = cell.chars().take_while(char::is_ascii_digit).collect();
+    digits
+        .parse()
+        .unwrap_or_else(|_| panic!("table cell {cell:?} is not a number"))
+}
+
+#[test]
+fn progression_doc_allowance_table_matches_the_core() {
+    let heading = "### Recruit advancement allowance";
+    let start = PROGRESSION_DOC
+        .lines()
+        .position(|line| line.trim_end() == heading)
+        .unwrap_or_else(|| panic!("PROGRESSION.md has no \"{heading}\" section"));
+    let section: String = PROGRESSION_DOC
+        .lines()
+        .skip(start + 1)
+        .take_while(|line| !line.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let liberated = doc_table_row(&section, "Liberated countries");
+    let caps = doc_table_row(&section, "Advancement cap level");
+    let allowances = doc_table_row(&section, "Allowance");
+    assert_eq!(liberated.len(), caps.len(), "one cap per column");
+    assert_eq!(
+        liberated.len(),
+        allowances.len(),
+        "one allowance per column"
+    );
+    let columns: Vec<u32> = liberated[1..].iter().map(|c| leading_number(c)).collect();
+    assert_eq!(
+        columns,
+        (0..=6).collect::<Vec<_>>(),
+        "the table covers L = 0..=6"
+    );
+    assert!(
+        liberated.last().unwrap().contains("and more"),
+        "the last column says the allowance stops growing"
+    );
+    let ids = country_ids(|_| true, 9);
+    for (n, l) in columns.iter().enumerate() {
+        // A campaign below the first-clear curve, as the table describes.
+        let c = allowance_campaign(&ids[..*l as usize], 0);
+        assert_eq!(
+            leading_number(caps[n + 1]),
+            u32::from(c.advancement_cap_level()),
+            "cap level at L = {l}"
+        );
+        assert_eq!(
+            leading_number(allowances[n + 1]),
+            c.allowance(),
+            "allowance at L = {l}"
+        );
+    }
+    // "6 and more": the last column holds past the sixth liberation.
+    let last = leading_number(allowances.last().unwrap());
+    for l in 7..=9 {
+        assert_eq!(
+            allowance_campaign(&ids[..l], 0).allowance(),
+            last,
+            "L = {l}"
+        );
+    }
+    assert_eq!(last, 12 + 8 * (u32::from(MAX_ADVANCEMENT_LEVEL) - 1));
+}
+
 // ---------------------------------------------------------------------------
 // W2-11: the takeover core (D6 + D8). A Ready recruit defends the main run
 // with its own loadout, tactics and identity. Its roster entry is the
@@ -2182,6 +2270,63 @@ fn takeover_defeat_and_withdraw_return_recruit_ready_and_release_items() {
             .unwrap_or_else(|e| panic!("{label}: {e}"));
         take_over(&mut again, id);
         assert_eq!(status(&again, id), RecruitStatus::Defending, "{label}");
+    }
+}
+
+/// VALIDATION.md's regression guard, "every committed victory raises future
+/// threat once" (production-pass brief §12), holds for a takeover: a
+/// recruit's win on the main run, a replay included, raises the campaign
+/// rank by one and pays the player the completion XP a Mara win pays, the
+/// next deploy plays the raised rank, and a defeat or withdrawal raises
+/// nothing.
+#[test]
+fn takeover_victory_raises_future_threat_once_and_a_loss_does_not() {
+    let (mut g, id) = takeover_ready();
+    for replay in [false, true] {
+        let label = if replay { "replay" } else { "first clear" };
+        let rank = g.campaign().progression_rank();
+        let mut twin = mara_as_recruit(&g, id);
+        take_over(&mut g, id);
+        assert_eq!(g.attempt().unwrap().progression.rank, rank, "{label}");
+        advance(&mut g, 30);
+        advance(&mut twin, 30);
+        win_main(&mut g);
+        win_main(&mut twin);
+        let report = g.last_result().unwrap();
+        assert_eq!(report.defender(), DefenderId::Recruit(id), "{label}");
+        assert_eq!(report.first_clear, !replay, "{label}");
+        assert_eq!(g.campaign().progression_rank(), rank + 1, "{label}");
+        assert_eq!(
+            g.campaign().progression_rank(),
+            twin.campaign().progression_rank(),
+            "{label}: the same rise as a Mara win"
+        );
+        assert!(report.completion_xp > 0, "{label}");
+        assert_eq!(
+            report.completion_xp,
+            twin.last_result().unwrap().completion_xp,
+            "{label}: the completion XP a Mara win pays"
+        );
+    }
+    for loss in [Outcome::Defeat, Outcome::Withdrawal] {
+        let mut lost = g.clone();
+        let rank = lost.campaign().progression_rank();
+        let xp = (lost.campaign().player.level, lost.campaign().player.xp);
+        take_over(&mut lost, id);
+        assert_eq!(lost.attempt().unwrap().progression.rank, rank, "{loss:?}");
+        advance(&mut lost, 30);
+        if loss == Outcome::Defeat {
+            lost.attempt_mut().unwrap().injury.unconscious = true;
+            advance(&mut lost, 1);
+        } else {
+            lost.apply(&Command::Withdraw).unwrap();
+        }
+        let report = lost.last_result().unwrap();
+        assert_eq!(report.outcome, loss);
+        assert_eq!(report.completion_xp, 0, "{loss:?}");
+        assert_eq!(lost.campaign().progression_rank(), rank, "{loss:?}");
+        let c = lost.campaign();
+        assert_eq!((c.player.level, c.player.xp), xp, "{loss:?}");
     }
 }
 

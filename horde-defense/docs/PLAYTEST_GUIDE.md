@@ -132,6 +132,22 @@ Default milestones unlock recruitment after one liberated country, parallel expe
 
 In strategic practice, resume the world clock and inspect the active outbreak. Respond with a successful defense or assign guards. An unanswered alert reopens the final stage; earned travel routes persist. The seven-minute response window runs in simulation time. Pause and closing the game freeze pressure and income.
 
+## Takeover
+
+A recruit can defend the main run in your place. Use Strategy practice.cmd, or a journey with Survivor network bought and a recruit in camp.
+
+1. Finish a run. Results shows a "Defender" row: you, Mara (once Meet Mara is bought) and each recruit; more than three appear in a drop-down. The Briefing has the same picker, and Camp home's Defenders list has "Defend next" on each row with its HP, level and power line. A recruit on guard duty or an expedition is disabled, and its hover names why ("Guarding <country>", "Away on an expedition").
+2. Choose a recruit. The Briefing's main button reads "Deploy <name>"; press it. Nothing about the choice deploys on its own, and during a live defense the picker is hidden.
+3. In battle, the HUD names the recruit (its first name in capitals) with its own portrait, and the field draws its figure, not Mara's. Open Tactics and change the policy or the recall threshold: the change acts at the recruit's next action and is kept on the recruit, not on Mara.
+4. While it defends, Camp home shows "Active defense · <country> · Defense N · <name>" and the recruit as Defending. In Operations, sending, guarding, training or equipping it is refused with "Already defending the front", and nothing changes.
+5. Win once, lose once and retreat once with the recruit. Results and History name it. A win still gives you the completion XP, and the recruit's victories and advancement grow while Mara's stay as they were. After every outcome the recruit is Ready again with its items free, and the continuation sends the same recruit unless you choose another.
+6. Choose a recruit for the next defense, then send it on an expedition or a guard duty. The log says "<name> left the next defense; you will defend next." and the picker shows you selected.
+7. Save and return to the menu during a takeover, then resume: the same recruit defends, with the same items and tactics.
+8. With an outbreak active, press "Plan response" on Camp home or in Operations. The country's Briefing opens on its final stage and nothing deploys until you press the main button.
+9. When an expedition ends, one toast reports it (for example "<recruit> liberated <country> · 2 new fronts"), and Camp home's "Recent reports" keeps the line. Resume the save: the toast does not repeat. During a live, unpaused defense the toast waits until you pause or leave the field.
+
+Record who defended each run, the outcome, whether the names and the figure matched the recruit, every refusal text you saw, and any toast that was missing or repeated. See docs/STRATEGY.md, "Recruit takeover", in the source repository for the exact rules.
+
 ## Controls and recovery
 
 Default keys: primary mouse fires the equipped gun (or a press throws the selected throwable), secondary mouse uses contact melee, **R** reloads, **1/2** use purchased personal abilities, **B** opens/closes live construction, **Escape** pauses, **F** toggles fire, **Q** cycles the unlocked attacks (gun, grenade, Molotov), **P** pauses or resumes the world clock on Camp home, and **F12** captures the native framebuffer. Settings remap essential actions and offer toggle fire, aim assistance, text scaling, outlines, reduced effects, optional blood and independent sound levels. Combat hints reflect the saved bindings.

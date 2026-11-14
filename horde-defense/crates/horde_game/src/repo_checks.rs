@@ -1184,7 +1184,8 @@ fn package_link_check_reports_relative_links_only() {
 /// (ruling W-15): the wording is the owner's, so a heading matches a whole
 /// line, nothing more. W4-10 lists enemy-balance's four docs, W4-11
 /// progression-tree's goal-5 section, W7-04 loot-economy's auto-sell
-/// sections; W7-08 adds the rest of the inventory.
+/// sections, W7-05 progression-tree's and W7-06 campaign-defenders'; W7-08
+/// adds the rest of the inventory.
 const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     (
         "docs/ENEMY_COMPOSITION.md",
@@ -1243,6 +1244,43 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
         ],
     ),
     ("docs/BALANCE_AND_RUN_STATS.md", &["## Pacing CLI"]),
+    // W7-06, campaign-defenders: who defends, the takeover, choosing a
+    // country, expedition outcomes and the recruit allowance.
+    (
+        "docs/STRATEGY.md",
+        &[
+            "## Defenders and the next defense",
+            "## Recruit takeover",
+            "## Expedition outcomes",
+            "## Defender power and service records",
+        ],
+    ),
+    (
+        "docs/JOURNEYS.md",
+        &["## Choosing who defends", "## Choosing a country"],
+    ),
+    (
+        "docs/PROGRESSION.md",
+        &["### Recruit advancement allowance"],
+    ),
+    ("docs/PLAYTEST_GUIDE.md", &["## Takeover"]),
+];
+
+/// Defender claims the production pass made false, with what replaced each
+/// (W7-06, campaign-defenders). Matched like [`RETIRED_DOC_CLAIMS`].
+const RETIRED_DEFENDER_CLAIMS: &[(&str, &str)] = &[
+    (
+        "A survivor has exactly one status: Ready, Deployed or Guarding",
+        "RecruitStatus has four since W1-11: Ready, Guarding, Deployed and Defending (STRATEGY.md)",
+    ),
+    (
+        "The advancement allowance is 12 plus 8 for each first-cleared encounter-template milestone",
+        "the allowance follows liberations since W2-10 (PROGRESSION.md, \"Recruit advancement allowance\")",
+    ),
+    (
+        "retries the reported stage, preserving control mode",
+        "continuing deploys Game::next_defender (JOURNEYS.md, \"Choosing who defends\")",
+    ),
 ];
 
 /// Progression claims the production pass made false, with what replaced
@@ -1329,6 +1367,21 @@ fn docs_drop_retired_progression_claims() {
         "docs still make retired progression claims ({}):\n{}",
         violations.len(),
         violations.join("\n")
+    );
+}
+
+#[test]
+fn docs_drop_retired_defender_claims() {
+    let violations = retired_claims_in_docs(RETIRED_DEFENDER_CLAIMS);
+    assert!(
+        violations.is_empty(),
+        "docs still make retired defender claims ({}):
+{}",
+        violations.len(),
+        violations.join(
+            "
+"
+        )
     );
 }
 
