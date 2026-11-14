@@ -53,3 +53,53 @@ The parent campaign is the sole persistent history owner. Worker campaign copies
 The Normal opening controller uses current enemy positions and only earned, guaranteed purchases. Across DEU/BRA/EGY/USA/ISL and three seeds, every fresh run failed; fourteen purchase routes cleared on run three and one on run four, without equipping loot. First runs banked 282-464 coins. The actual eight-defense USA route and all five templates remained achievable in both modes. These are deterministic simulation proofs, not human playtest or GUI evidence.
 
 Dedicated tests cover atomic/frozen settings, all three presets, actual damage-source integration, fixed-window DPS and corrupt aggregate rejection, pause/checkpoint equivalence, legacy 11/30 geometry, 302 retained all-outcome records, and saved worker-outbox settlement with one parent owner.
+
+## Goal 6: enemy difficulty acceptance
+
+Goal 6 of the production pass gives the enemy side a measured shape (acceptance G6.1-G6.18). The rules (two-axis threat, composition, elites, boss phases and ranks, the country band, the victory-to-threat guard) are ordinary tests and are described in PROGRESSION_SCALING.md and ENEMY_COMPOSITION.md. Six rows are pacing measurements: bots play whole campaigns through `Game::apply`, and `crates/horde_core/tests/pacing_targets.rs` asserts on the result. Every test there is `#[ignore = "release-only"]` (G6.10) and runs after the debug builds:
+
+```powershell
+cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture
+cargo test --locked --release -p horde_core --test pacing_targets goal6 -- --ignored --nocapture --test-threads 1
+```
+
+The second line runs only the goal-6 rows and their sweeps. Each test prints a PASS or FAIL summary with the numbers it read. The evaluators are pure functions in `sim/pacing/goal6.rs`, pinned on synthetic reports in `tests/pacing_harness.rs` (normal suite).
+
+### Profiles
+
+Every sweep is 20 seeds, deterministic per seed. The profiles are rows of the `sim/pacing.rs` registry:
+
+| Profile | Player | Feeds |
+| --- | --- | --- |
+| `expert-deu` | The acceptance profile: Germany start, expert aim, tree-first spending, Normal, the solo plan, 60 runs | G6.16, G6.17; G6.11 and G6.12 printed as information only |
+| `goal6-novice` | `expert-deu` with the novice aim and nothing else (W4-13, user decision R56) | G6.11, G6.12 |
+| `lux-easy`, `lux-normal`, `lux-hard` | Expert, tree first, Luxembourg start on each preset; stops at the first liberation, at most 20 runs | G6.15 |
+| `start-aut`, `start-bgd` | Expert, tree first, Austria (0.85, plays 0.95) and Bangladesh (1.60, plays 1.05) starts; stops at the first victory, at most 20 runs | G6.18 |
+
+G6.11 and G6.12 moved to `goal6-novice` because the expert bot aims almost perfectly (design-enemy-balance §14): a bot's defeat share is a floor, not a measure of how hard the game is for a person. The human difficulty playtest (plan §11) still decides that.
+
+### Rows and how they are read
+
+Cells are the lower median over the 20 seeds, with [p25, p75] unless named.
+
+| Row | Test | Target | Wave-4 close | Verdict |
+| --- | --- | --- | --- | --- |
+| G6.11 | `goal6_defeat_rate_windows` | Defeat share 10-25% in every 20-run window after the first victory | `goal6-novice`: 32 of 37 windows outside (30.5% at offset 0, 0.0% from offset 18); `expert-deu`: 32 of 38 | FAIL |
+| G6.12 | `goal6_no_15_streak_after_run_10` | No seed wins 15 in a row from run 11 | `goal6-novice`: longest streak median 44 [max 50], every seed; `expert-deu`: 49 [max 50] | FAIL |
+| G6.15 | `goal6_lux_easy_at_most_6_runs`, `goal6_lux_hard_at_most_1_5x_normal` | Luxembourg liberated in at most 6 runs on Easy; Hard at most 1.5× Normal | Easy 5 [5, 6], Normal 9 [7, 10], Hard 13 [12, 15] (limit 13.5) | PASS |
+| G6.16 | `goal6_archetype_coverage` | Every catalogue archetype spawned and killed | 18 of 18 | PASS |
+| G6.17 | `goal6_boss_ttk_median_20_60_s` | Boss time-to-kill median 20-60 s | 31.4 s [p25 25.6, p90 47.5] | PASS |
+| G6.18 | `goal6_clamped_starts_first_victory_runs_2_to_4` | A clamped start's median first victory on runs 2-4 | Austria 3 [3, 5], Bangladesh 3 [3, 4] | PASS |
+
+- **Windows (G6.11).** Each seed's runs are aligned on its own first victory. Window `offset` covers the 20 runs from that offset and pools the defeats of every seed that played all 20; a seed that never wins adds nothing and is named as a failure. No minimum seed count applies, so the summary reports how many seeds each window pooled (ruling R37): on `goal6-novice` offsets 0-35 pool 20 seeds and offset 36 pools 19.
+- **Streak (G6.12).** The longest run of consecutive victories from run 11 on, per seed. The rule is per seed, not a median: every offending seed is named.
+- **Runs to liberate (G6.15).** The median `Liberation(1)` run, a seed that never liberates counting 21. A Hard median that lands on such a seed fails as unmeasured, because 21 only bounds it from below (design-enemy-balance W-4 as-built note).
+- **Boss time-to-kill (G6.17).** `RunRecord.boss_ttk_ticks`, the defeat tick less the boss's arrival, pooled over every seed and run.
+
+The numbers are those of plan §9.6 ("W4-p repricing and goal-5 calibration", "W4-04..n tuning loop, resumed on the repriced tree" and "W4-13 goal-6 measurement profile"), measured after the wave-4 rules (Regional and Capstone multipliers, the repriced tree) were in. The expedition rule of W4-12 does not reach them: every goal-6 profile plays the solo plan.
+
+### What the tuning showed
+
+The W4-04..n loop measured every listed enemy lever on the repriced tree: `health_per_rank_late`, the `boss_health` slope past rank 4, `front_ramp_max` in 0.17-0.25, elite `end_bp` and the affix multipliers, and the Capstone health, alone and combined. Inside the G6.17 band (boss TTK p90 at most 60 s) every variant left 32-33 of 38 windows outside 10-25% and a 46-50 win streak, the shipped values' own numbers, so none was kept and `progression.json` and `enemy_catalog.json` ship the wave-2 values plus the W4-01 boss ranks. The cause is the survivor's late power, not the enemy curve: the expert survivor takes no archetype damage in the median run from run 11 and loses no run after run 20, while its power stops growing at about run 30 (level 50, tree exhausted at run 28-30). The rank rises by one per victory and never falls, so a steeper slope builds a wall at one rank (no defeats, then nearly all) instead of a steady share. `goal6-novice` loses more early (the first windows rise past 25%) and still loses no run from about run 25. No other profile the bot's knobs allow (aim, spending, start country, farming, takeover; preset Normal) passes either.
+
+G6.11 and G6.12 are red at the wave-4 close and wait for a user decision (plan §2.5, "G6.11 and G6.12 stay red on the goal-6 measurement profile"); its default is to accept both red for this pass, with `goal6-novice` the measured profile and the human playtest deciding. The closing phase re-runs every `pacing_targets` row at HEAD.

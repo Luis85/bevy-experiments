@@ -23,6 +23,10 @@
 //! `fixtures.rs` operations roster (`prepare_progression`,
 //! `prepare_operations`), which stages through `staging()` and
 //! `deploy_survivor`, as design-qa-captures' operations-observer row allows.
+//!
+//! `required_docs_sections_exist` is the docs inventory (design-qa-captures
+//! 1.13, ruling W-15): every listed doc carries the section headings its
+//! owner writes. It checks presence only.
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -1169,6 +1173,89 @@ fn package_link_check_reports_relative_links_only() {
         vec![
             "PLAYTEST_GUIDE.md:1: `JOURNEYS.md` is not in the playtest package".to_owned(),
             "PLAYTEST_GUIDE.md:1: `audio/x.wav` is not in the playtest package".to_owned(),
+        ]
+    );
+}
+
+/// The docs inventory (design-qa-captures §1.13): the sections each owner
+/// writes into a doc the production pass changes, by heading. Presence only
+/// (ruling W-15): the wording is the owner's, so a heading matches a whole
+/// line, nothing more. W4-10 lists enemy-balance's four docs; W7-08 adds the
+/// rest of the inventory.
+const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
+    (
+        "docs/ENEMY_COMPOSITION.md",
+        &[
+            "## Composition archetypes",
+            "## Elites",
+            "## Boss phases",
+            "## Regional and Capstone bosses",
+        ],
+    ),
+    (
+        "docs/PROGRESSION_SCALING.md",
+        &[
+            "## Two-axis threat",
+            "## Elite rate",
+            "## Regional checkpoints and the Capstone",
+            "## Expedition threat",
+            "## Country difficulty band",
+        ],
+    ),
+    (
+        "docs/BALANCE_AND_RUN_STATS.md",
+        &["## Goal 6: enemy difficulty acceptance"],
+    ),
+    ("docs/WORLD.md", &["### Country difficulty band"]),
+];
+
+/// The headings of `required` that no line of `text` equals (trailing
+/// whitespace and a CR ignored), as `name: missing "<heading>"`. A heading
+/// inside a fenced block does not count.
+fn missing_doc_sections(name: &str, text: &str, required: &[&str]) -> Vec<String> {
+    let mut fenced = false;
+    let mut headings = Vec::new();
+    for line in text.lines() {
+        let line = line.trim_end();
+        if line.trim_start().starts_with("```") {
+            fenced = !fenced;
+        } else if !fenced {
+            headings.push(line);
+        }
+    }
+    required
+        .iter()
+        .filter(|heading| !headings.contains(heading))
+        .map(|heading| format!("{name}: missing \"{heading}\""))
+        .collect()
+}
+
+#[test]
+fn required_docs_sections_exist() {
+    let workspace = workspace_directory();
+    let mut missing = Vec::new();
+    for (name, required) in REQUIRED_DOC_SECTIONS {
+        let path = workspace.join(name);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        missing.extend(missing_doc_sections(name, &text, required));
+    }
+    assert!(
+        missing.is_empty(),
+        "docs inventory sections missing ({}):\n{}",
+        missing.len(),
+        missing.join("\n")
+    );
+}
+
+#[test]
+fn doc_section_check_matches_whole_heading_lines_outside_fences() {
+    let text = "# Doc\r\n## Elites  \r\n## Boss phases and more\n```\n## Fenced\n```\n";
+    assert_eq!(
+        missing_doc_sections("d.md", text, &["## Elites", "## Boss phases", "## Fenced"]),
+        vec![
+            "d.md: missing \"## Boss phases\"".to_owned(),
+            "d.md: missing \"## Fenced\"".to_owned(),
         ]
     );
 }

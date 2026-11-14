@@ -53,6 +53,8 @@ speed and reward multipliers its deployments play (Austria 0.85 plays 0.95,
 Bangladesh 1.60 plays 1.05). Encounter templates provide the five battlefield
 roles; a country can contain more local stages than templates.
 
+### Country difficulty band
+
 Country difficulty spans 0.85-1.60 in whole hundredths. The band follows the
 country's size alone, through the stage count that population already sets,
 never national traits: up to 3 stages 0.85-1.15, 4-9 stages 1.00-1.35, and 10
@@ -69,6 +71,14 @@ and the front order (`fronts_opened_by`), the recommended next front
 (`Campaign::recommendation`, the easiest enterable uncleared country) and
 pacing's routes read the raw value too. Nothing recommends a starting country.
 The clamp is derived, never saved.
+
+Stage count also places a country's boss checkpoints, again from size alone:
+every sixth stage short of the last is a Regional checkpoint and the last
+stage is the Capstone, so only countries of 7 or more stages have a
+checkpoint (23 of 242). Like the difficulty band, the checkpoints follow the
+stage count, never national traits, and say nothing about the place.
+PROGRESSION_SCALING.md ("Regional checkpoints
+and the Capstone", "Country difficulty band") has the encounter terms.
 
 ## Unlock and clear contract
 

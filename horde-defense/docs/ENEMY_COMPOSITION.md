@@ -179,6 +179,81 @@ Pool construction consumes no RNG. The simulation sums the returned weights,
 draws once from its existing serialized RNG, and resolves the chosen ID. Spawn
 rates, live enemy limits and timed bosses remain encounter/director settings.
 
+## Composition archetypes
+
+The seven archetypes of the production pass (W2-29, W2-30, W2-31; design
+enemy-balance §4) are ordinary catalogue records: everything below is their
+authored data read through the snapshot, and the `EnemyKind` column is only
+the legacy category. They spawn only from wave tier 5, which the composition
+floor reaches at threat rank 6 (PROGRESSION_SCALING.md, "Floors across
+template cycles and country changes"), so ranks 0-5 and the five encounter
+templates meet none of them.
+
+| id | Name | Category | Personal: health, speed, damage, windup, armor | NPC: hp / HT / skill / dodge / armor, damage | Behaviour | First tier |
+| --- | --- | --- | --- | --- | --- | ---: |
+| `sprinter` | Sprinter pack | Runner | 16, 1.45, 3, 0.8 s, 0 | 6 / 9 / 10 / 9 / 0, 1d−1 | `group_size` 4 | 5 |
+| `spitter` | Spitter | Runner | 30, 0.55, 6, 1.6 s, 0 | 8 / 10 / 11 / 8 / 0, 1d+1 | `reach` 4 yd, urgency −2 | 5 |
+| `exploder` | Bloater | Shambler | 40, 0.42, 1, 1.5 s, 0 | 10 / 10 / 9 / 6 / 0, 1d+0 | fused burst 1.6 yd, urgency −4 | 6 |
+| `shield-bearer` | Riot shield | Armored | 80, 0.40, 8, 1.4 s, 6 (contact ×0.5) | 12 / 11 / 11 / 7 / 3, 1d+2 | ranged armor 14 (NPC 4) | 6 |
+| `splitter` | Brood husk | Brute | 130, 0.33, 12, 1.8 s, 2 | 18 / 12 / 11 / 6 / 2, 2d+0 | splits into 3 `splitter-brood` | 7 |
+| `juggernaut` | Juggernaut | Demolisher | 420, 0.24, 22, 2.2 s, 6 | 30 / 14 / 12 / 5 / 5, 3d+2 | `stagger_immune`, structure damage ×3 | 7 |
+| `splitter-brood` | Broodling | Runner | 14, 1.0, 3, 0.8 s, 0 | 5 / 9 / 9 / 8 / 0, 1d−2 | split child only, `elite_eligible` false | – |
+
+Rewards (coins / XP): sprinter 2 / 1, spitter 5 / 3, exploder 3 / 2,
+shield-bearer 8 / 5, splitter 9 / 6, juggernaut 20 / 12, broodling 1 / 1. Tags
+(perk targeting only): `swarm` (sprinter, broodling), `ranged` and `hazard`
+(spitter), `volatile` and `hazard` (exploder), `shielded`, `splitting`,
+`heavy` (juggernaut), `brood`.
+
+Every effect is deterministic. The combat RNG is drawn only when an effect
+resolves an NPC roll, so a spawn, a placement or a split draws nothing.
+
+- **Spitter.** It stations at its ranged stop, `min(DEFENSE_LINE + reach,
+  0.5 × arena width)` and never nearer than the line, and its contact test
+  uses that stop. A live non-trap structure ahead of the stop is fought in
+  melee under the shared contact rule, like any hostile (R45). From the
+  station it spits, through the normal windup, at the nearest live non-trap
+  structure between it and the line (walls intercept spit), else the
+  defender, and publishes `Spit`. Personal: the attack's damage times the
+  hazard multiplier, less armor, halved by Brace; NPC: skill plus the range
+  penalty against the defender's dodge. It never winds up or damages from the far
+  half of the arena (`spitter_never_winds_up_or_damages_from_the_far_half`).
+- **Exploder.** Fuse: when its windup completes in contact it detonates
+  instead of attacking. Its target (the defender or a structure) takes the
+  blast and the flat `structure_damage` hits the other structures in the
+  radius; other hostiles are untouched. The exploder leaves with no reward,
+  corpse or kill. Personal: `round(30 × the encounter's enemy damage × the
+  preset's enemy damage)`, on the defender times the hazard multiplier, less
+  armor, halved by Brace; NPC: 3d+0 with no attack roll and a dodge.
+  Killed first, it bursts instead on every other live hostile in the radius
+  (ascending id; Personal `30 − area armor`, NPC 3d+0) and on the structures
+  there, never on the defender, and the kill pays normally. A hostile a burst
+  defeats is reaped on the next tick, so a chain advances one link per tick
+  and ends. Both publish `Detonation`, with a fuse or death trigger.
+- **Splitter.** Its death spawns `min(3, enemy cap − regular hostiles)`
+  broodlings at `max(x, DEFENSE_LINE) + 0.35k` in its lane, with their own
+  stats, and publishes one `Split` with the count. A child is never elite and
+  never splits; it takes and discards the 3% drop roll and never drops, but
+  counts as a kill and pays its own reward. A target missing from the current
+  catalogue falls back to the Runner default.
+- **Shield-bearer.** Its ranged armor adds to its armor against shots and
+  turrets (`HitSource::Shot`, `Turret`) only while it is out of contact; the
+  NPC column adds to its DR the same way. Grenades, fire, traps and melee
+  ignore it, and armor penetration comes off the sum. "In contact" is the
+  defense line, where the contact fraction also halves its base armor; a
+  shield-bearer at a wall face still carries its shield.
+- **Juggernaut.** Hits never stagger it: no hit stop in Personal, and in NPC
+  mode stun, knockdown and a dropped weapon clear after every injury, with the
+  same draw count. Unconsciousness and shock still apply.
+- **Sprinter.** One weighted pick spawns four members in its lane, each
+  0.65 yd behind the last, with no extra draw; each member respects the enemy
+  cap and rolls its own elite.
+
+The defender's spit and fuse damage counts in `hazard_damage_taken`; the
+hazard multiplier is a progression-tree skill seam (SKILLS_AND_WEAPONS.md).
+Every archetype spawns and is killed in the goal-6 sweep (G6.16,
+`goal6_archetype_coverage`: 18 of 18 at the wave-4 close).
+
 ## Elites
 
 Director wave spawns may roll elite (W2-33, design enemy-balance §5). Bosses,
@@ -264,6 +339,49 @@ after `round(interval ticks × m)` and the Siege Brute's recovery after
 down or strikes its attack. Each transition publishes `BossPhase` (value n,
 lasting the hold) and records its tick in `telemetry.boss_phase_ticks`. It
 draws no RNG.
+
+## Regional and Capstone bosses
+
+A country stage's boss has a rank (W2-26, W4-01; design enemy-balance §3,
+ruling W-9): `Capstone` on the country's last stage, `Regional` on every sixth
+stage short of it (0-based stages 5, 11 and 17), `Sector` everywhere else and
+on a deployment without a country (GOLDEN, smoke and practice). The rank comes
+from `FrontPosition::boss_rank()` at deploy and is frozen in the attempt's
+snapshot and copied to its `Report` and `RunRecord`; nothing is saved per
+stage. The rank changes only the timed boss's numbers: it keeps its
+template's `BossKind`, mechanics and phase profile, and regular enemies read
+none of it.
+
+`progression.json` `boss_ranks` (absent: neutral multipliers and the
+Capstone's one extra transition) folds into the snapshot at deploy
+(`ProgressionSnapshot::fold_boss_rank`):
+
+| Rank | Health | Armor | NPC armor | Coins | Damage | Extra transitions |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sector | ×1.0 | ×1.0 | +0 | ×1.0 | ×1.0 | 0 |
+| Regional | ×1.2 | ×1.0 | +0 | ×1.2 | ×1.0 | 0 |
+| Capstone | ×1.4 | ×1.25 | +2 | ×1.4 | ×1.10 | 1 |
+
+- **Health** multiplies the boss's spawn hit points (the template value or
+  the rank's floor, whichever is greater) in both modes; the encounter health
+  guard counts it. Sector has no entry: it is always neutral.
+- **Coins** multiply the boss kill's `boss_reward + completion_bonus`. The
+  Capstone's coin term equals its health term, so a Capstone replay is not a
+  farm.
+- **Armor** and **damage** multiply the rank terms of
+  PROGRESSION_SCALING.md (`boss_armor_per_rank`, `boss_damage_per_rank`),
+  clamped to 1-4, so a Capstone at rank 0 already hits ×1.10 and spawns with
+  `round(armor × 1.25)`. **NPC armor** adds to `npc_boss_armor_add` (at most
+  20). **Extra transitions** add to `boss_phases` (at most 2).
+- Bounds: health, armor, coins and damage ×1-2; NPC armor +0-10; extra
+  transitions 0-2; unknown keys are rejected.
+
+The checkpoint lines read these terms, so they follow any retune (W4-02): the
+briefing shows "Regional checkpoint - boss +20% health, +20% reward" or "Final
+stand - boss +40% health, +40% reward" under the boss line, the world panel
+counts a country's checkpoints ("2 checkpoints"), and a Regional victory's
+Results lead with "Regional checkpoint secured." A checkpoint grants no
+coins of its own and changes no stage theme.
 
 ## Validation limits
 
