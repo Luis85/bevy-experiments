@@ -9,15 +9,16 @@ use horde_core::sim::{
     EarnedAfter, GOAL4_AUTO_SELL_SLACK_RUNS, GOAL4_AUTO_SELL_TIERS, GOAL5_FIRST_VICTORY,
     GOAL5_TIER_WINDOWS, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
     GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
-    GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, Game,
-    LEGACY_PROFILE_IDS, Milestone, MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm,
-    PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend, STASH_GROWTH_RUNS,
-    archetype_coverage, auto_sell_within_default, boss_ttk_median_s, by_id,
-    clamped_start_first_victory, defeat_rate_windows, defeat_windows, equip_dropped_upgrades,
-    longest_win_streak, max_win_streak, median_earned_after, median_run_within, node_depths,
-    node_retired, nodes_left, pacing_registry, pacing_seed, pacing_sweep_with_threads,
-    runs_to_liberate, simulate_pacing, stash_growth, tier_affordable_runs, tree_exhausted,
-    tree_outlasts_liberation, unlock_order,
+    GOAL6_MEASUREMENT_PROFILE_ID, GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN,
+    GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, Game, LEGACY_PROFILE_IDS, Milestone, MilestoneStats,
+    Outcome, PacingAim, PacingDefender, PacingFarm, PacingPlan, PacingProfile, PacingReport,
+    PacingRun, PacingSell, PacingSpend, STASH_GROWTH_RUNS, archetype_coverage,
+    auto_sell_within_default, boss_ttk_median_s, by_id, clamped_start_first_victory,
+    defeat_rate_windows, defeat_windows, equip_dropped_upgrades, longest_win_streak,
+    max_win_streak, median_earned_after, median_run_within, node_depths, node_retired, nodes_left,
+    pacing_registry, pacing_seed, pacing_sweep, pacing_sweep_with_threads, runs_to_liberate,
+    simulate_pacing, stash_growth, tier_affordable_runs, tree_exhausted, tree_outlasts_liberation,
+    unlock_order,
 };
 use horde_core::skill_catalog::{CampaignFeature, SkillNode, skills};
 use horde_core::world::world;
@@ -1108,6 +1109,68 @@ fn w2_42_rows_vary_the_acceptance_profile_only_in_their_named_fields() {
     for p in pacing_registry() {
         let report = simulate_pacing(&PacingProfile { max_runs: 0, ..*p });
         assert!(report.is_ok(), "{}: {report:?}", p.id);
+    }
+}
+
+/// W4-13 (R56): the goal-6 measurement profile is expert-deu with the
+/// novice aim (`aim`: Novice, re-aims every half second and only shoots and
+/// melees) and nothing else: Germany, tree first, Normal, 60 runs, the solo
+/// plan, no stop. It is appended after the legacy and acceptance rows.
+#[test]
+fn goal6_measurement_profile_differs_from_expert_deu_only_in_its_named_fields() {
+    assert_eq!(GOAL6_MEASUREMENT_PROFILE_ID, "goal6-novice");
+    let expert = by_id(DEFAULT_PROFILE_ID).expect("registered");
+    let p = by_id(GOAL6_MEASUREMENT_PROFILE_ID)
+        .unwrap_or_else(|| panic!("{GOAL6_MEASUREMENT_PROFILE_ID} is registered"));
+    assert_ne!(p.name, expert.name);
+    assert_eq!(
+        PacingProfile {
+            id: expert.id,
+            name: expert.name,
+            ..p
+        },
+        PacingProfile {
+            aim: PacingAim::Novice,
+            ..expert
+        }
+    );
+    // The fields G6.11 and G6.12 read, spelled out.
+    assert_eq!(p.difficulty, BalancePreset::Normal);
+    assert_eq!(p.max_runs, 60);
+    assert_eq!(p.stop_after, None);
+    let ids: Vec<&str> = pacing_registry().iter().map(|p| p.id).collect();
+    assert_eq!(&ids[..3], &LEGACY_PROFILE_IDS);
+    assert_eq!(ids.last(), Some(&GOAL6_MEASUREMENT_PROFILE_ID));
+}
+
+/// W4-13 (R56): every seed of the 20-seed goal-6 sweep reaches its first
+/// victory early enough to play at least one whole G6.11 window after it
+/// (by run `max_runs - GOAL6_WINDOW_RUNS`), so the windows and the streaks
+/// measure every seed. The sweep stops each seed at its first victory,
+/// which plays the same runs as the full profile up to there.
+#[test]
+fn goal6_measurement_profile_reaches_the_first_victory_on_every_seed() {
+    let full = by_id(GOAL6_MEASUREMENT_PROFILE_ID)
+        .unwrap_or_else(|| panic!("{GOAL6_MEASUREMENT_PROFILE_ID} is registered"));
+    let latest = full.max_runs - GOAL6_WINDOW_RUNS;
+    let profile = PacingProfile {
+        max_runs: latest,
+        stop_after: Some(Milestone::FirstVictory),
+        ..full
+    };
+    let reports = pacing_sweep(&[profile], 20).expect("the sweep runs");
+    assert_eq!(reports.len(), 20);
+    for r in &reports {
+        let (run, _) = r
+            .milestone(Milestone::FirstVictory)
+            .unwrap_or_else(|| panic!("seed {} never wins in {latest} runs", r.seed_index));
+        assert!(run <= latest, "seed {}: first victory {run}", r.seed_index);
+        assert_eq!(
+            r.runs.len(),
+            run,
+            "seed {} stops at its first victory",
+            r.seed_index
+        );
     }
 }
 

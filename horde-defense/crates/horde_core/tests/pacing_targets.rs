@@ -11,8 +11,11 @@
 //! other two legacy profiles (novice-deu, novice-gear-lux) are reported by
 //! the `pacing` example, not here (design-progression-tree "As built"). The
 //! goal-6 rows (lux-easy, lux-normal, lux-hard, start-aut, start-bgd) are a
-//! second sweep over the same 20 seeds, and the strategy rows (strategy,
-//! neighbours-solo, neighbours-parallel) a third. The auto-sell gate
+//! second sweep over the same 20 seeds. G6.11 and G6.12 assert on the goal-6
+//! measurement profile (goal6-novice, W4-13, ruling R56), swept over the same
+//! 20 seeds and 60 runs, and print the expert-deu verdicts beside it as
+//! information. The strategy rows (strategy, neighbours-solo,
+//! neighbours-parallel) are a third sweep. The auto-sell gate
 //! (G4.13) sweeps auto-sell over the same 20 seeds and 60 runs, and the
 //! stash-growth report (R39) sweeps it again at 150 runs, which takes
 //! several minutes; name a test to run only its sweeps. Each sweep runs once per
@@ -26,13 +29,14 @@ use horde_core::sim::{
     AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, DEFAULT_PROFILE_ID, GOAL4_AUTO_SELL_SLACK_RUNS,
     GOAL4_AUTO_SELL_TIERS, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, GOAL6_CLAMPED_FIRST_VICTORY,
     GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
-    GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_WINDOW_RUNS, Milestone, PacingProfile,
-    PacingReport, RunsToLiberate, STASH_GROWTH_RUNS, STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS,
-    StrategyReport, archetype_coverage, auto_sell_within_default, boss_ttk_median_s, by_id,
-    clamped_start_first_victory, defeat_rate_windows, liberations_and_coins_per_minute,
-    max_win_streak, median_run_within, outbreak_reopens, pacing_archetype_ids, pacing_sweep,
-    parallel_frees_neighbours, runs_to_liberate, stash_growth, strategy_sweep,
-    tier_affordable_runs, tree_outlasts_liberation, unlock_order,
+    GOAL6_MEASUREMENT_PROFILE_ID, GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN,
+    GOAL6_WINDOW_RUNS, Milestone, PacingProfile, PacingReport, RunsToLiberate, STASH_GROWTH_RUNS,
+    STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyReport, archetype_coverage,
+    auto_sell_within_default, boss_ttk_median_s, by_id, clamped_start_first_victory,
+    defeat_rate_windows, liberations_and_coins_per_minute, max_win_streak, median_run_within,
+    outbreak_reopens, pacing_archetype_ids, pacing_sweep, parallel_frees_neighbours,
+    runs_to_liberate, stash_growth, strategy_sweep, tier_affordable_runs, tree_outlasts_liberation,
+    unlock_order,
 };
 use std::sync::OnceLock;
 
@@ -47,6 +51,19 @@ fn expert_sweep() -> &'static [PacingReport] {
         assert_eq!(profile.difficulty, BalancePreset::Normal);
         assert_eq!(profile.max_runs, 60);
         pacing_sweep(&[profile], SEEDS).expect("the expert-deu sweep runs")
+    })
+}
+
+/// The goal-6 measurement profile's sweep (W4-13, ruling R56), played once
+/// and shared by G6.11 and G6.12.
+fn measurement_sweep() -> &'static [PacingReport] {
+    static SWEEP: OnceLock<Vec<PacingReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        let profile = by_id(GOAL6_MEASUREMENT_PROFILE_ID)
+            .expect("the goal-6 measurement profile is registered");
+        assert_eq!(profile.difficulty, BalancePreset::Normal);
+        assert_eq!(profile.max_runs, 60);
+        pacing_sweep(&[profile], SEEDS).expect("the goal-6 measurement sweep runs")
     })
 }
 
@@ -82,6 +99,15 @@ fn lux() -> RunsToLiberate {
 /// Prints the evaluator's verdict and fails on `Err`.
 fn check(name: &str, verdict: Result<String, String>) {
     check_all(name, [verdict]);
+}
+
+/// Prints the verdict of an informational row (R56: expert-deu on G6.11 and
+/// G6.12), which never fails the test.
+fn inform(name: &str, verdict: Result<String, String>) {
+    match verdict {
+        Ok(summary) => println!("{name}: PASS {summary}"),
+        Err(reason) => println!("{name}: FAIL {reason}"),
+    }
 }
 
 /// Prints every verdict, then fails if any is `Err`.
@@ -143,18 +169,26 @@ fn goal5_unlock_order_fortifications_mara_operations() {
 #[test]
 #[ignore = "release-only"]
 fn goal6_defeat_rate_windows() {
+    inform(
+        "goal6_defeat_rate_windows (expert-deu, information)",
+        defeat_rate_windows(expert_sweep(), GOAL6_WINDOW_RUNS),
+    );
     check(
         "goal6_defeat_rate_windows",
-        defeat_rate_windows(expert_sweep(), GOAL6_WINDOW_RUNS),
+        defeat_rate_windows(measurement_sweep(), GOAL6_WINDOW_RUNS),
     );
 }
 
 #[test]
 #[ignore = "release-only"]
 fn goal6_no_15_streak_after_run_10() {
+    inform(
+        "goal6_no_15_streak_after_run_10 (expert-deu, information)",
+        max_win_streak(expert_sweep(), GOAL6_STREAK_FROM_RUN),
+    );
     check(
         "goal6_no_15_streak_after_run_10",
-        max_win_streak(expert_sweep(), GOAL6_STREAK_FROM_RUN),
+        max_win_streak(measurement_sweep(), GOAL6_STREAK_FROM_RUN),
     );
 }
 

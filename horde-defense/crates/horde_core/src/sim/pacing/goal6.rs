@@ -22,6 +22,12 @@ pub const GOAL6_LUX_PROFILE_IDS: [&str; 3] = ["lux-easy", "lux-normal", "lux-har
 /// The start-country rows (ruling W-4): the lowest and highest country
 /// difficulty bands, whose start the clamp holds near 1.0.
 pub const GOAL6_START_PROFILE_IDS: [&str; 2] = ["start-aut", "start-bgd"];
+/// The goal-6 measurement profile (W4-13, R56): G6.11 and G6.12 are
+/// measured on it instead of the acceptance profile, which aims almost
+/// perfectly (design-enemy-balance §14). It is expert-deu with the novice
+/// aim and nothing else changed; the expert-deu numbers of both rows stay
+/// printed as information.
+pub const GOAL6_MEASUREMENT_PROFILE_ID: &str = "goal6-novice";
 /// G6.11: the sliding window, in runs after each seed's first victory.
 pub const GOAL6_WINDOW_RUNS: usize = 20;
 /// G6.11: the pooled defeat rate of every window, in percent (inclusive).

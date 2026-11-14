@@ -33,9 +33,10 @@ mod targets;
 pub use goal6::{
     DefeatWindow, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
     GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
-    GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS,
-    RunsToLiberate, archetype_coverage, boss_ttk_median_s, clamped_start_first_victory,
-    defeat_rate_windows, defeat_windows, longest_win_streak, max_win_streak, runs_to_liberate,
+    GOAL6_MEASUREMENT_PROFILE_ID, GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN,
+    GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, RunsToLiberate, archetype_coverage, boss_ttk_median_s,
+    clamped_start_first_victory, defeat_rate_windows, defeat_windows, longest_win_streak,
+    max_win_streak, runs_to_liberate,
 };
 pub use loot::{
     AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, GOAL4_AUTO_SELL_SLACK_RUNS, GOAL4_AUTO_SELL_TIERS,
@@ -198,7 +199,8 @@ pub struct PacingProfile {
     /// has `n + 1` runs.
     pub stop_after: Option<Milestone>,
 }
-/// The registry key of the acceptance profile (goals 5 and 6).
+/// The registry key of the acceptance profile (goals 5 and 6; G6.11 and
+/// G6.12 are measured on [`GOAL6_MEASUREMENT_PROFILE_ID`] since W4-13).
 pub const DEFAULT_PROFILE_ID: &str = "expert-deu";
 /// The profiles the default table prints, in column order. Their output at
 /// one seed is the pre-v2 table.
@@ -232,7 +234,7 @@ const EXPERT_DEU: PacingProfile = PacingProfile {
     stop_after: None,
 };
 /// Every named profile. Ids are stable and unique; rows are appended.
-const REGISTRY: [PacingProfile; 19] = [
+const REGISTRY: [PacingProfile; 20] = [
     EXPERT_DEU,
     PacingProfile {
         id: "novice-deu",
@@ -412,6 +414,17 @@ const REGISTRY: [PacingProfile; 19] = [
             equip_drops: true,
             ..PacingPlan::SOLO
         },
+        ..EXPERT_DEU
+    },
+    // W4-13 (R56): the goal-6 measurement profile. G6.11 and G6.12 measure
+    // the defeat share and the win streaks with a weaker bot than the
+    // acceptance profile, which aims almost perfectly; it changes only the
+    // aim. Its fields equal novice-deu's, which stays a legacy table column
+    // under its own id, so either row can change without moving the other.
+    PacingProfile {
+        id: GOAL6_MEASUREMENT_PROFILE_ID,
+        name: "novice, tree first, Germany, goal-6 measurement",
+        aim: PacingAim::Novice,
         ..EXPERT_DEU
     },
 ];
