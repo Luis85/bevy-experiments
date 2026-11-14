@@ -531,7 +531,7 @@ mod tests {
         let recruitment = c.feature_unlock(CampaignFeature::Recruitment).unwrap();
         assert_eq!(
             (recruitment.node_id.as_str(), recruitment.cost),
-            ("recruitment_network", 1_700)
+            ("recruitment_network", 1_500)
         );
         assert_eq!(recruitment.liberations_required, 1);
         // Every feature is granted by exactly one catalogue node (a second

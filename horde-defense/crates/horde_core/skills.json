@@ -4027,7 +4027,7 @@
       "id": "recruitment_network",
       "name": "Survivor network",
       "description": "Recruit survivors in liberated countries. Each recruit keeps their own equipment, training and history.",
-      "price": 1700,
+      "price": 1500,
       "prerequisites": [
         "companion_contact"
       ],

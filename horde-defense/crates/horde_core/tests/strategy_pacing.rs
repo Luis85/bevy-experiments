@@ -681,3 +681,28 @@ fn strategy_table_prints_every_goal3_row() {
         assert!(table.contains(row(id).name), "{id} column");
     }
 }
+
+/// W4-15 (ruling R61): Survivor network is priced so that the S2b bot owns
+/// it before the camp that opens Parallel (the camp after the second
+/// liberation), so its recruits are on the roster when the first
+/// expedition can leave. At the W4-p price (1,700 coins) seed index 0
+/// learns it in that camp, a camp too late (plan section 9.6, "W4-c").
+/// Camp milestones count the runs completed before the camp that first
+/// held them.
+#[test]
+fn survivor_network_opens_a_camp_earlier_than_the_w4_p_price() {
+    use horde_core::skill_catalog::CampaignFeature;
+    let profile = PacingProfile {
+        stop_after: Some(Milestone::Liberation(2)),
+        ..row("neighbours-parallel")
+    };
+    let report = simulate_strategy_seed(&profile, 0).expect("the strategy row runs");
+    let second = report.pacing.milestone_or_missing(Milestone::Liberation(2));
+    let network = report
+        .pacing
+        .milestone_or_missing(Milestone::Feature(CampaignFeature::Recruitment));
+    assert!(
+        network < second,
+        "Survivor network owned after {network} runs, the second liberation after {second}"
+    );
+}

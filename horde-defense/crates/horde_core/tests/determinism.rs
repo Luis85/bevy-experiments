@@ -294,19 +294,20 @@ const PROGRESSED_TRACE: [(u64, ProgressedRun, u64); 4] = [
 
 /// Provisional `(PROGRESSED_GOLDEN, PROGRESSED_TRACE)` digests, in
 /// `PROGRESSED_GOLDEN` order (ruling P3, as `PROVISIONAL`).
-/// Set by W4-14, after the W4-09 cut, for the closing-phase re-bless (R59).
+/// Set by W4-14 and moved by W4-15, after the W4-09 cut, for the
+/// closing-phase re-bless (R59, R61).
 const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = Some((
     [
-        0x1725_164d_48e7_8d12,
-        0xdde4_3342_3062_ecf2,
-        0x9169_7e75_2793_cfc0,
-        0x7a68_7210_c8ca_9e1a,
+        0xab72_76a7_4131_2f38,
+        0x6ffd_2abd_5ec5_59b7,
+        0x5278_2b9f_feef_7166,
+        0xa040_f93d_e565_91c4,
     ],
     [
-        0x209f_0b4c_6c60_a4aa,
-        0x6214_0267_8e7c_b553,
-        0xcaea_9c90_4c7b_2910,
-        0xe7f5_5c2e_b155_6d72,
+        0x7aef_2a42_98a6_356a,
+        0x8986_9eb5_4e0b_06ea,
+        0xf483_cce1_2e82_2eaa,
+        0x9e1e_5d57_ab94_5f10,
     ],
 ));
 
@@ -326,6 +327,11 @@ const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
      window starts earlier (`PROGRESSED_TAKEOVER_BOSS_LEAD` 3000 ticks before the boss, not 1800) \
      to keep an elite, the new archetypes and the boss phase in it (48 and 52 spawned, 61 and 54 \
      at W4-09); both still win; the Hard Capstone runs are unchanged",
+    ),
+    (
+        "W4-15 price",
+        MoveClass::G,
+        "all four runs: Survivor network 1,700 -> 1,500 coins, so the staged purse that buys every      node in catalogue order keeps 200 more coins for later nodes and gear, and the four windows      play with a different loadout and node set; all four still win",
     ),
 ];
 

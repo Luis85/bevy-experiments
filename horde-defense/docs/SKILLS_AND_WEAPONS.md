@@ -155,9 +155,10 @@ legacy adapter.
 ## Prices and the tree rules
 
 `skills.json` is the only source of node prices; the W4-p repricing (production
-pass, wave 4) set every one of them. The whole tree costs 96,920 coins for its
+pass, wave 4) set every one of them, and W4-15 lowered Survivor network to
+1,500 coins. The whole tree costs 96,720 coins for its
 176 buyable nodes (Pistol training is the free root). The tiers that goal 5
-paces cost 2,030 (tier 1), 8,700 (tier 2) and 19,830 (tier 3) coins, a tier
+paces cost 2,030 (tier 1), 8,700 (tier 2) and 19,630 (tier 3) coins, a tier
 being every node up to that prerequisite depth that is not gated behind 5 or
 more victories (`sim::tier_cost`; BALANCE_AND_RUN_STATS.md, "Goal 5: progression
 pacing acceptance"). Ladders rise by a fixed step: body rank r costs

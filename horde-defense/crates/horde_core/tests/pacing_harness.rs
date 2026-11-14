@@ -984,9 +984,10 @@ fn equip_drops_profile_wears_dropped_upgrades() {
 }
 
 // Since the W4-p repricing the tree-first bot learns Survivor network
-// (1,700 coins) only after the cheaper nodes that act now, about ten runs
-// after Luxembourg is free, so the first takeover is run 20 at seed 0 (it was
-// run 7 at the 100-coin price). The two takeover tests play 26 runs.
+// (1,700 coins, 1,500 since W4-15) only after the cheaper nodes that act
+// now, about ten runs after Luxembourg is free, so the first takeover is run
+// 19 at seed 0 (run 20 at 1,700, run 7 at the 100-coin price). The two
+// takeover tests play 26 runs.
 #[test]
 fn takeover_profile_records_first_takeover() {
     let profile = PacingProfile {
