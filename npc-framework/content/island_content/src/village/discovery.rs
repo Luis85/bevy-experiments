@@ -23,9 +23,7 @@ fn immovable(world: &World, id: SimId) -> bool {
 }
 
 fn record<'a>(world: &'a World, ctx: &AgentCtx) -> Option<&'a SeenStatics> {
-    if world.get::<RevealsFog>(ctx.entity).is_none() {
-        return None;
-    }
+    world.get::<RevealsFog>(ctx.entity)?;
     world.get::<SeenStatics>(ctx.entity)
 }
 

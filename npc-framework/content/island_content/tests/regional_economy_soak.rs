@@ -193,7 +193,10 @@ fn audit_app(seed: u64) -> App {
     if let Some(text) = economy {
         let patch: Value = serde_json::from_str(&text).expect("REGIONAL_ECONOMY_PATCH is JSON");
         println!("REGIONAL_AUDIT_PATCH {patch}");
-        merge(&mut doc.world["construction"]["world"]["preset"]["living_world"]["economy"], &patch);
+        merge(
+            &mut doc.world["construction"]["world"]["preset"]["living_world"]["economy"],
+            &patch,
+        );
     }
     if let Some(text) = ai {
         let patch: Value = serde_json::from_str(&text).expect("REGIONAL_AI_PATCH is JSON");

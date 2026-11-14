@@ -89,9 +89,7 @@ fn current(world: &World, ctx: &AgentCtx, id: SimId, plot: Entity) -> bool {
 }
 
 pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
-    if world.get::<Villager>(ctx.entity).is_none() {
-        return None;
-    }
+    world.get::<Villager>(ctx.entity)?;
     let known = known_targets(world, ctx);
     let mut rows = Vec::new();
     for (id, plot) in plots(world) {

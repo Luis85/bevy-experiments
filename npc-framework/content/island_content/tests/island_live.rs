@@ -503,10 +503,19 @@ fn goals_unlock_homestead_tiers_paid_in_goods_and_work() {
     village::integrity::validate_colony(app.world()).expect("valid");
 }
 
+/// The feast test's day length (see the test).
+const FEAST_DAY: u64 = 7_200;
+
 #[test]
 fn the_village_gathers_on_the_feast_day_and_mourns_its_dead() {
     let mut app = world_with(|world| {
         quiet(world);
+        // A 7,200-tick day (the shipped day is 24,000): the feast lasts 14%
+        // of the day, and in the 2,400-tick day of the other tests that is
+        // 336 ticks, a walk of about 20 m, so attendance only counted who
+        // happened to stand near a square (the closing run: 16 to 19 of 41).
+        // The bar stays at 20; the day is long enough to walk to the square.
+        short_days(world, FEAST_DAY);
         // One-day seasons from the first spring day: day 2 is autumn.
         economy(world)["tuning"]["days_per_season"] = json!(1);
         economy(world)["tuning"]["founding_day"] = json!(0);
@@ -544,7 +553,7 @@ fn the_village_gathers_on_the_feast_day_and_mourns_its_dead() {
         .affinity
         .insert(old_id, 30_000);
     // The dead is laid to rest on the second morning, and is mourned.
-    run_ticks(app.world_mut(), 2 * DAY + 2);
+    run_ticks(app.world_mut(), 2 * FEAST_DAY + 2);
     let grief = effects(app.world(), "VillageMourning");
     assert_eq!(grief.len(), 1);
     assert!(
@@ -558,14 +567,14 @@ fn the_village_gathers_on_the_feast_day_and_mourns_its_dead() {
             .any(|(mourner, _, _)| *mourner == fond_id)
     );
     // Day 2, the feast: from 0.56 to 0.70 of the day.
-    run_ticks(app.world_mut(), DAY * 60 / 100);
+    run_ticks(app.world_mut(), FEAST_DAY * 60 / 100);
     assert!(
         view::gatherings(app.world())
             .iter()
             .any(|feast| feast.active)
     );
     assert_eq!(effects(app.world(), "VillageGatheringBegan").len(), 1);
-    run_ticks(app.world_mut(), DAY * 15 / 100);
+    run_ticks(app.world_mut(), FEAST_DAY * 15 / 100);
     let held = effects(app.world(), "VillageGathering");
     assert_eq!(held.len(), 1);
     let attended = held[0]["attended"].as_u64().expect("attended");
@@ -596,7 +605,7 @@ fn the_village_gathers_on_the_feast_day_and_mourns_its_dead() {
         .expect("feast");
     assert_eq!(feast.last_attendance, Some(attended as u32));
     assert_eq!(feast.next_day, 6, "next year's feast");
-    run_ticks(app.world_mut(), DAY * 4);
+    run_ticks(app.world_mut(), FEAST_DAY * 4);
     assert!(view::mourning(app.world()).is_empty(), "grief passes");
     village::integrity::validate_colony(app.world()).expect("valid");
 }

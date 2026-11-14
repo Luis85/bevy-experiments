@@ -44,6 +44,12 @@
         {"name": "Buy a coat", "kind": {"Leaf": {"action": "life.buy", "param": {"Name": "clothes"}}}}
       ]}
     ]},
+    {"name": "Gathering", "kind": {"Guard": {"cond": "life.gathering", "abort": "None"}}, "children": [
+      {"name": "At the gathering", "kind": "Selector", "children": [
+        {"name": "Meet at the gathering", "kind": {"Leaf": {"action": "life.socialise", "param": "None"}}},
+        {"name": "Walk to the gathering", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "centre"}}}}
+      ]}
+    ]},
     {"name": "Tired", "kind": {"Guard": {"cond": "life.tired", "abort": "LowerPriority"}}, "children": [
       {"name": "Sleep at home", "kind": {"Leaf": {"action": "life.sleep", "param": "None"}}}
     ]},
@@ -84,6 +90,7 @@
         {"name": "Shelter at home", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "home"}}}}
       ]}
     ]},
+    {"name": "Sell surplus to the boat", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "boat"}}}},
     {"name": "Leisure", "kind": {"Guard": {"cond": "life.wants_leisure", "abort": "None"}}, "children": [
       {"name": "Free time", "kind": "Selector", "children": [
         {"name": "Help a friend", "kind": {"Leaf": {"action": "life.help", "param": "None"}}},
@@ -101,7 +108,6 @@
         {"name": "Consider a new job", "kind": {"Leaf": {"action": "life.change_job", "param": "None"}}},
         {"name": "Build", "kind": {"Leaf": {"action": "life.build", "param": "None"}}},
         {"name": "Carry building materials", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "materials"}}}},
-        {"name": "Sell surplus to the boat", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "boat"}}}},
         {"name": "Harvest the field", "kind": {"Leaf": {"action": "life.harvest", "param": "None"}}},
         {"name": "Sow the field", "kind": {"Leaf": {"action": "life.sow", "param": "None"}}},
         {"name": "Tend the field", "kind": {"Leaf": {"action": "life.tend", "param": "None"}}},

@@ -314,6 +314,46 @@ const BOAT_PRICE_DRIFT: u32 = 0x424f_4131;
 const BOAT_HOLD_SHARE: u32 = 0x424f_4132;
 const BOAT_HOLD_MISSING: u32 = 0x424f_4133;
 
+/// Whether the island can fill an order of `kind` by the next call: a good
+/// a recipe or a crop makes (the production plan answers the order), or a
+/// gathered good nobody eats (its gatherers' surplus goes to the post).
+/// Gathered food (berries) is eaten by the people who gather it and never
+/// reaches the post, and a good that spoils before the next call cannot be
+/// kept for it: neither is announced.
+fn orderable(world: &World, kind: &str, interval_days: u64) -> bool {
+    let Some(registry) = economy_spec::registry(world) else {
+        return false;
+    };
+    let Some(good) = registry.spec.goods.iter().find(|good| good.key == kind) else {
+        return false;
+    };
+    if good
+        .shelf_life_days
+        .is_some_and(|days| u64::from(days) <= interval_days)
+    {
+        return false;
+    }
+    let made = registry
+        .spec
+        .recipes
+        .iter()
+        .any(|recipe| recipe.outputs.iter().any(|output| output.good == kind))
+        || registry
+            .spec
+            .crops
+            .iter()
+            .any(|crop| crop.harvest.good == kind);
+    made || good.food_value.is_none()
+}
+
+/// Whether the island lacks `kind` for an order: nothing of it on offer
+/// anywhere. Being below its stock target is not lacking: a young island is
+/// below every target, and an order is what pulls a trade above it (the
+/// closing run found every good counted short, so no order was announced).
+fn island_lacks(world: &World, kind: &str) -> bool {
+    island_stock(world, kind).0 == 0
+}
+
 /// Whether the island is short of `kind`: less on offer than its target.
 fn island_short(world: &World, kind: &str) -> bool {
     let (offer, target) = island_stock(world, kind);
@@ -477,17 +517,21 @@ fn island_stock(world: &World, kind: &str) -> (u32, u32) {
 }
 
 /// Units of `kind` the island holds above its stock targets that the boat
-/// would buy: its surplus, while the boat is in or due today and buys it.
+/// would buy: its surplus, while the boat is in or due today and buys it,
+/// and what its announced order still wants, at any time.
 pub fn wanted_surplus(world: &World, kind: &str) -> u32 {
     let (Some(spec), Some(merchant)) = (spec(world), world.get_resource::<Merchant>()) else {
         return 0;
     };
     let today = super::calendar(world).0;
     if merchant.docked_until.is_none() && merchant.next_visit_day > today {
-        return 0;
+        // The announced order is laid at the post ahead of the call (a long
+        // walk to the water does not fit in a short stay); surplus waits
+        // for the boat's day.
+        return order_left(merchant, kind);
     }
     let Some(buy) = spec.buys.iter().find(|buy| buy.good == kind) else {
-        return 0;
+        return order_left(merchant, kind);
     };
     let bought = merchant.visit.bought.get(kind).copied().unwrap_or(0);
     let (offer, target) = island_stock(world, kind);
@@ -566,12 +610,14 @@ fn announce(world: &mut World, spec: &MerchantSpec) {
     if made.is_empty() {
         return;
     }
-    // The boat never asks for what the island lacks, and asks first for
-    // what is dear abroad (S2.3); equal factors keep the rotation.
+    // The boat never asks for what the island lacks or cannot deliver by
+    // its next call, and asks first for what is dear abroad (S2.3); equal
+    // factors keep the rotation.
     let start = world.resource::<Merchant>().orders_announced as usize;
     let mut ranked: Vec<(std::cmp::Reverse<u32>, usize, &str)> = (0..made.len())
         .map(|index| made[(start + index) % made.len()])
-        .filter(|good| !island_short(world, good))
+        .filter(|good| !island_lacks(world, good))
+        .filter(|good| orderable(world, good, spec.interval_days))
         .enumerate()
         .map(|(index, good)| (std::cmp::Reverse(outside_factor(world, good)), index, good))
         .collect();

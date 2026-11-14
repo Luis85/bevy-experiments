@@ -450,7 +450,7 @@ fn a_sustained_glut_lowers_output_price_and_realised_margin() {
     // Logs are in surplus even in the undisturbed world (every resident starts
     // with two and few are bought), so the control price is already depressed.
     assert!(
-        village::market::unit_price(glut.world(), "log") < catalog::price("log"),
+        village::market::unit_price(glut.world(), "log") < catalog::price_in(glut.world(), "log"),
         "unsold surplus should hold the learned log price below its seed"
     );
     assert!(

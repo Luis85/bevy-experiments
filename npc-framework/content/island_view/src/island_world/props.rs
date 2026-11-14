@@ -542,7 +542,7 @@ mod tests {
             rotation: 3,
             ..a.clone()
         };
-        let (draw, gone) = changes(&drawn, &[turned.clone()]);
+        let (draw, gone) = changes(&drawn, std::slice::from_ref(&turned));
         assert_eq!(draw, vec![turned]);
         assert_eq!(gone, vec![b.id]);
     }

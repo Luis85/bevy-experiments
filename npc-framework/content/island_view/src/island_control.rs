@@ -982,7 +982,13 @@ mod tests {
         }
         assert_eq!(pending_count(&app, "JoinIsland"), 1);
         assert_eq!(pending_count(&app, "AttachController"), 1);
-        assert!(status(app.world()).unwrap().1.contains("Resume the world"));
+        // Paused, the request waits for time and says so (design 3.4): the
+        // sentence names time and its key, never "Resume the world".
+        let waiting = status(app.world()).unwrap().1.to_lowercase();
+        assert!(
+            waiting.contains("time") && waiting.contains("(space)"),
+            "{waiting}"
+        );
         app.world_mut().resource_mut::<SimControl>().paused = false;
         step(&mut app);
         assert_eq!(player_actions::control(app.world()), ControlState::Native);
@@ -992,7 +998,9 @@ mod tests {
         request_mode(app.world_mut(), IslandMode::Character).unwrap();
         let resumed = status(app.world()).unwrap().1;
         assert!(
-            resumed.contains("WASD") && !resumed.contains("Joining") && !resumed.contains("Resume")
+            resumed.contains("WASD")
+                && !resumed.contains("Arriving")
+                && !resumed.contains("(Space)")
         );
         assert_eq!(pending_count(&app, "JoinIsland"), 0);
         assert_eq!(pending_count(&app, "AttachController"), 0);

@@ -343,6 +343,13 @@ pub const CONDITIONS: &[ConditionInfo] = &[
         "Not busy, inside a leisure block, and not out in the cold (night or winter) without a          coat. Everybody has an evening; sociability decides whether it is spent in company."
     ),
     condition!(
+        "life.gathering",
+        gathering,
+        &[],
+        "The village is gathering and the resident is free to go: no critical need, not in \
+         its sleep block, not out in the cold without a coat."
+    ),
+    condition!(
         "life.meal_due",
         meal_due,
         &[],
@@ -488,6 +495,16 @@ fn family_at_home(world: &World, actor: Entity) -> bool {
         .get::<super::super::demography::Life>(actor)
         .is_some_and(|life| life.partner.is_some())
         || !super::super::demography::children_of(world, home).is_empty()
+}
+
+/// A gathering of the calendar is a village event: it ranks above tiredness
+/// that is not critical, the meal and the chores (shopping, stocking up,
+/// storing, restocking). Critical needs, the night and the cold still win.
+fn gathering(world: &World, actor: Entity) -> bool {
+    super::super::live::attending(world, actor)
+        && !behavior::busy(world, actor)
+        && !super::in_block(world, actor, BlockKind::Sleep)
+        && !(super::super::living::cold(world) && !super::super::living::has_coat(world, actor))
 }
 
 /// A meal block on a day without a sit-down meal yet: everybody stops for

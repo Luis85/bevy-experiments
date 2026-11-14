@@ -4,16 +4,16 @@
 //! function answers with an empty or neutral value in a world without the
 //! regional profile, so a view can call them unconditionally.
 pub mod economy;
-pub use economy::{
-    GoodFlow, GoodSeason, HeldUpLine, MarketLine, NeedAlert, NeedCause, Outlook, PriceLine, Purpose,
-    SeasonSummary, Shortage, Trend, UseLine, WithoutCause, WithoutLine, editor_mode, good_flow,
-    ConsignedView, consigned, need_alert, outlook, price_line, price_lines, season_summaries,
-    season_summary,
-};
 use super::frontier::life_spec::{Shock, Weather};
 use super::resident::{BlockKind, ResidentTraits};
 use super::{Season, demography, fields, merchant, resident, weather};
 use bevy_ecs::prelude::*;
+pub use economy::{
+    ConsignedView, GoodFlow, GoodSeason, HeldUpLine, MarketLine, NeedAlert, NeedCause, Outlook,
+    PriceLine, Purpose, SeasonSummary, Shortage, Trend, UseLine, WithoutCause, WithoutLine,
+    consigned, editor_mode, good_flow, need_alert, outlook, price_line, price_lines,
+    season_summaries, season_summary,
+};
 use npc_framework::prelude::*;
 use serde::Serialize;
 

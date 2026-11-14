@@ -2523,24 +2523,68 @@ mod tests {
         );
     }
 
+    /// The shipped data and the default block hold together on their own
+    /// (the Rust tables they replaced are gone): every tool, recipe good,
+    /// patch good, profession good and recipe resolves to a good of the
+    /// block, every role the code reads is filled by a tag, and fish needs
+    /// the rod.
     #[test]
-    fn registry_reproduces_the_rust_tables_it_replaced() {
-        let registry = EconomyRegistry::new(&EconomySpec::default());
-        assert_eq!(
-            registry.trade_kinds(),
-            crate::village::catalog::FRONTIER_TRADE_KINDS
-        );
-        for kind in registry.trade_kinds() {
-            let good = registry.good(kind).unwrap();
-            assert_eq!(Some(good.base_price), crate::village::catalog::price(kind));
-            assert_eq!(good.food_value, crate::village::catalog::food_restore(kind));
-            assert_eq!(good.gather_tool, crate::village::catalog::gather_tool(kind));
-        }
-        for role in ROLES {
-            assert_eq!(
-                registry.profession(role).unwrap().tool,
-                crate::village::catalog::role_tool(role)
-            );
+    fn shipped_economy_data_resolves_every_reference() {
+        let shipped = crate::worlds::builtin_preset("living_world")
+            .and_then(|preset| preset.living_world)
+            .expect("the shipped world")
+            .economy;
+        for spec in [EconomySpec::default(), shipped] {
+            spec.validate().expect("valid");
+            let goods: BTreeSet<&str> = spec.goods.iter().map(|good| good.key.as_str()).collect();
+            let recipes: BTreeSet<&str> = spec
+                .recipes
+                .iter()
+                .map(|recipe| recipe.key.as_str())
+                .collect();
+            let known = |what: &str, key: &str| {
+                assert!(goods.contains(key), "{what} `{key}` is not a good");
+            };
+            for good in &spec.goods {
+                if let Some(tool) = &good.gather_tool {
+                    known("gather tool", tool);
+                }
+                assert!(
+                    good.item.is_some() || BUILTIN_ITEM_KINDS.contains(&good.key.as_str()),
+                    "good `{}` has no item and is not built in",
+                    good.key
+                );
+            }
+            for recipe in &spec.recipes {
+                for stack in recipe.inputs.iter().chain(&recipe.outputs) {
+                    known("recipe good", &stack.good);
+                }
+                if let Some(tool) = &recipe.tool {
+                    known("recipe tool", tool);
+                }
+            }
+            for patch in &spec.patches {
+                known("patch good", &patch.good);
+            }
+            for profession in &spec.professions {
+                for key in profession.outputs.iter().chain(&profession.wants) {
+                    known("profession good", key);
+                }
+                for tool in profession.tool.iter().chain(&profession.required_tool) {
+                    known("profession tool", tool);
+                }
+                for recipe in &profession.recipes {
+                    assert!(recipes.contains(recipe.as_str()), "recipe `{recipe}`");
+                }
+            }
+            crate::village::roles::from_spec(&spec).expect("every role filled by a tag");
+            let fish = spec
+                .goods
+                .iter()
+                .find(|good| good.key == FISH)
+                .expect("fish");
+            assert_eq!(fish.gather_tool.as_deref(), Some(FISHING_ROD));
+            assert!(fish.gather_tool_required, "fish needs the rod");
         }
     }
 }

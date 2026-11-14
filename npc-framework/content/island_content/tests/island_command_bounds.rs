@@ -73,8 +73,7 @@ fn zero_low_threshold_is_refused() {
     let error = load_with_preset(|preset| {
         preset["needs"]["hunger"]["low_milli"] = serde_json::json!(0);
     })
-    .err()
-    .expect("refused");
+    .expect_err("refused");
     assert!(error.contains("low_milli"), "{error}");
 }
 
@@ -96,8 +95,7 @@ fn recipe_loop_is_refused_not_a_panic() {
         back["outputs"] = saw["inputs"].clone();
         recipes.push(back);
     })
-    .err()
-    .expect("refused");
+    .expect_err("refused");
     assert!(error.contains("economy"), "{error}");
 }
 

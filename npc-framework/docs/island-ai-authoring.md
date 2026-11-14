@@ -201,6 +201,7 @@ schedule or the resident's traits.
 | `life.in_sleep_window` | Inside a sleep block. | nothing |
 | `life.wants_leisure` | Not busy, inside a leisure block, and not out in the cold (night or winter) without a coat. Everybody has an evening; sociability decides whether it is spent in company. | nothing |
 | `life.family_at_home` | Has a partner or a child, and a home, and the village is not gathering. | nothing |
+| `life.gathering` | The village is gathering, the resident is free to attend (no need at or below `gathering_needs_above`), not busy, not in its sleep block, not cold without a coat. | nothing |
 | `life.meal_due` | Not busy, inside a meal block on a day without a sit-down meal yet, carrying food, and the village is not gathering. | nothing |
 | `life.sociable` | Sociability is at least `traits.sociable_min`. | nothing |
 | `life.diligent` | Diligence is 60 or more. | nothing |
@@ -251,14 +252,16 @@ lower-priority work.
 | Thirst | `life.thirsty` LP | drink, buy water, fetch water |
 | Hunger | `life.hungry` LP | eat, buy food, forage |
 | Coat before winter | `life.coat_season` | wear a carried coat, else buy one |
+| Gathering | `life.gathering` | meet at the square, else walk to it (a village event: above non-critical tiredness, the meal and the chores) |
 | Tired | `life.tired` LP | sleep |
 | Cold | `life.cold` LP | warm up |
 | Bedtime | `life.bedtime` LP | go to bed (sleep) |
-| Meal time | `life.wants_meal` | eat |
+| Meal time | `life.meal_due` | go to the table (home or inn), sit down to the day's meal |
 | Chores | none | pick up lost property; put on a coat; fetch hearth fuel when `life.needs_fuel`; stock provisions when `life.has_spare_coins`; replace clothing |
 | Storm | `life.storm` | craft during work hours, else shelter at home |
+| Sell surplus to the boat | none | while the boat is in or due, carry what it buys to the trading post (above the evening: a long walk to the water is finished, not dropped at dusk) |
 | Leisure | `life.wants_leisure` | help a friend, a family evening at home, meet a neighbour (sociable residents), else stroll to the square |
-| Work hours | `life.in_work_window` | change job, build, carry building materials, sell surplus to the boat, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
+| Work hours | `life.in_work_window` | change job, build, carry building materials, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
 | Night | `life.in_sleep_window` | stay home |
 | (last) | none | seek company, idle |
 

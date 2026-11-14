@@ -133,7 +133,7 @@ impl ContentCommand for ReplaceBehavior {
                 })
                 .collect()
         };
-        brains.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        brains.sort_unstable_by_key(|a| a.0);
         if let Err(reason) = replace_trees(world, &self.behavior) {
             record_effect(
                 world,

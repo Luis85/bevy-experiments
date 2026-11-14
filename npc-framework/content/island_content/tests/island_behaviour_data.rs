@@ -109,7 +109,7 @@ fn bad_parameters_and_aborting_not_guards_are_refused() {
             "value": 5, "abort": "None"}}, "children": [
             {"name": "Idle", "kind": {"Leaf": {"action": "life.idle", "param": "None"}}}]}),
         );
-    let error = load(tree).err().expect("refused");
+    let error = load(tree).expect_err("refused");
     assert!(error.contains("unknown need `Courage`"), "{error}");
     let mut tree = shipped_tree();
     tree["root"]["children"]
@@ -121,7 +121,7 @@ fn bad_parameters_and_aborting_not_guards_are_refused() {
             "abort": "LowerPriority"}}, "children": [
             {"name": "Idle", "kind": {"Leaf": {"action": "life.idle", "param": "None"}}}]}),
         );
-    let error = load(tree).err().expect("refused");
+    let error = load(tree).expect_err("refused");
     assert!(
         error.contains("a `not` guard cannot abort lower-priority work"),
         "{error}"

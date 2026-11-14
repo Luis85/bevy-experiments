@@ -35,6 +35,15 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 - Fix: a world chosen for New Game now replaces the window's construction (the
   construction is saved and loaded with its economy and roles), so its save
   continues.
+- Closing fixes: a gathering of the calendar ranks above non-critical
+  tiredness, the meal and the chores (tree data `Gathering`, `life.gathering`),
+  and wakes a daytime rest; selling to the boat ranks above the evening; a
+  meeting starts only between residents not on an errand; the boat orders
+  only what the island can deliver by its next call (made by a recipe or a
+  crop, or a gathered good nobody eats, not spoiling before then, and not
+  lacking entirely) and the island lays the order at the post ahead of the
+  call. The Rust economy tables the data replaced are removed (`price`,
+  `gather_tool`, `role_tool`, `FRONTIER_TRADE_KINDS`).
 
 ### Island game: review fixes (saving, startup, keys, words)
 

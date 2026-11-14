@@ -870,6 +870,8 @@ pub fn place(world: &World, actor: Entity, param: &ParamValue) -> Option<SimPos>
             }
             // Where a meal is eaten (S3.3): at home, else at the nearest
             // inn, else at the square.
+            // Where a meal is eaten (S3.3): at home, else at the nearest
+            // inn, else at the square.
             "meal" => {
                 let id = *world.get::<SimId>(actor)?;
                 if super::colony::home_of(world, id).is_some() {

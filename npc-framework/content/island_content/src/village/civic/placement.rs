@@ -203,9 +203,10 @@ impl Survey {
     ) -> Result<(Plot, SimId), String> {
         let (plot, settlement) = self.check_ground(world, def, x, z, rotation)?;
         if self.open_sites.get(&settlement).copied().unwrap_or(0) >= MAX_OPEN_SITES {
-            return Err(format!(
+            return Err(
                 "Four building sites are already open here. Wait for one to finish or cancel one."
-            ));
+                    .to_string(),
+            );
         }
         Ok((plot, settlement))
     }

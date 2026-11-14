@@ -103,21 +103,6 @@ fn settle_meetings(world: &mut World, now: u64) {
     }
 }
 
-/// A resident walking to the village's gathering does not stop to chat on
-/// the way (a meeting lasts, S3.3): the gathering is the meeting.
-fn on_the_way_to_a_gathering(world: &World, actor: Entity) -> bool {
-    if !super::super::live::attending(world, actor) {
-        return false;
-    }
-    let centre = super::super::frontier::settlements::member(world, actor)
-        .and_then(|settlement| super::super::frontier::settlements::definition(world, settlement))
-        .map(|definition| definition.center);
-    match (centre, world.get::<SimPos>(actor)) {
-        (Some(centre), Some(here)) => here.dist2(centre) > 10_000_i64.pow(2),
-        _ => false,
-    }
-}
-
 pub fn social_available(world: &World, actor: Entity) -> bool {
     if !world.contains_resource::<ColonyState>()
         || !living(world, actor)
@@ -127,7 +112,6 @@ pub fn social_available(world: &World, actor: Entity) -> bool {
             .get::<super::super::production::JobIntent>(actor)
             .is_some()
         || !matches!(super::super::activity(world, actor).0, "idle" | "walking")
-        || on_the_way_to_a_gathering(world, actor)
     {
         return false;
     }
@@ -277,7 +261,23 @@ pub(super) fn tick(world: &mut World, now: u64) {
             continue;
         }
         near.sort_unstable();
-        if !social_available(world, *a)
+        // A meeting lasts (S3.3), so it starts only between residents who are
+        // not on an errand: standing still, or walking in their free time
+        // (a stroll, seeking company). Nobody's errand is stopped by a chat,
+        // and nobody walking to the village's gathering stops on the way.
+        let on_the_way = |entity: Entity| {
+            world
+                .get::<npc_framework::prelude::MoveIntent>(entity)
+                .is_some()
+                && (super::super::live::attending(world, entity)
+                    || world
+                        .get::<super::super::behavior::LifeDecision>(entity)
+                        .is_none_or(|decision| {
+                            decision.goal != super::super::behavior::LifeGoal::Leisure
+                        }))
+        };
+        if on_the_way(*a)
+            || !social_available(world, *a)
             || world
                 .get::<SocialLife>(*a)
                 .expect("social")
@@ -292,6 +292,7 @@ pub(super) fn tick(world: &mut World, now: u64) {
                 // A passer-by does not meet somebody who is indoors.
                 || super::super::indoors::inside_entity(world, *a)
                     != super::super::indoors::inside_entity(world, *b)
+                || on_the_way(*b)
                 || !social_available(world, *b)
                 || world
                     .get::<SocialLife>(*b)
@@ -311,9 +312,6 @@ pub(super) fn tick(world: &mut World, now: u64) {
                     .get_mut::<SocialLife>(person)
                     .expect("social")
                     .last_social_tick = now;
-                world
-                    .entity_mut(person)
-                    .remove::<npc_framework::prelude::MoveIntent>();
                 world
                     .entity_mut(person)
                     .insert(Chatting { with: other, until });

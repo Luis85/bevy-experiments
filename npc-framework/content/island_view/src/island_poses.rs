@@ -470,7 +470,8 @@ pub(crate) fn waits_at(at: Vec2, door: Vec2) -> bool {
 /// faces it too, standing calmly (no work pose: it is not at work). Runs
 /// after the transforms are written; looks only at the workers and the
 /// upgrades under way, never at everybody.
-#[allow(clippy::type_complexity)]
+// A Bevy system: each parameter is a separate query/resource the scheduler injects.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn face_site(
     index: Res<npc_framework::view_helpers::VisualIndex>,
     sims: Res<npc_framework::prelude::SimIndex>,

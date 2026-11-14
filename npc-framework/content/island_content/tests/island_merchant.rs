@@ -391,6 +391,13 @@ fn an_announced_order_is_made_and_sold_at_the_next_call() {
         boat["order_goods"] = json!(1);
         boat["order_units"] = json!(4);
         boat["stay_ticks"] = json!(1_200);
+        // A 7,200-tick day (the shipped day is 24,000): the post is at the
+        // water, 90 to 190 m from the woodcutters, 1,500 to 3,000 ticks of
+        // walking, and a carrier goes home at night. In the 2,400-tick day of
+        // the other boat tests nobody reaches the post before nightfall, so
+        // the order could never be delivered. The island lays the order at
+        // the post ahead of the call (review fix), so one day is enough.
+        short_days(world, 7_200);
     });
     set_journal(app.world_mut(), true, false);
     assert!(until_departures(&mut app, 1, 4_800), "the boat never left");
@@ -404,7 +411,7 @@ fn an_announced_order_is_made_and_sold_at_the_next_call() {
     assert!(line.unit_price > quote, "{line:?} at a quote of {quote}");
     let coins = money(app.world());
     assert!(
-        until_departures(&mut app, 1, 4_800),
+        until_departures(&mut app, 1, 9_600),
         "the boat did not call again"
     );
     let closed = closed_orders(&app);

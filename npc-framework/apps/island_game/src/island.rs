@@ -864,7 +864,18 @@ mod tests {
         drop(restored);
         let fresh_path = dir.join("fallback.json");
         let fallback = session::open(&fresh_path, None, Some(&rules), |_| {}).unwrap();
-        assert!(true);
+        // The title falls back to the island that comes with the game (this
+        // was `frontier::enabled` before the split removed profile gates).
+        let shipped =
+            island_content::worlds::builtin_preset("living_world").expect("shipped island rules");
+        assert_eq!(
+            fallback
+                .world()
+                .resource::<island_content::world_runtime::ActiveWorld>()
+                .0
+                .name,
+            shipped.name
+        );
         assert!(
             session::summary(fallback.world())
                 .issue

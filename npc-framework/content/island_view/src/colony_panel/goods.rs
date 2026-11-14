@@ -363,7 +363,7 @@ pub(crate) fn held_up_lines(lines: &[HeldUpLine], good: &str) -> Vec<String> {
             None => groups.push((key, 1)),
         }
     }
-    groups.sort_by(|a, b| b.1.cmp(&a.1));
+    groups.sort_by_key(|group| std::cmp::Reverse(group.1));
     groups
         .into_iter()
         .take(2)

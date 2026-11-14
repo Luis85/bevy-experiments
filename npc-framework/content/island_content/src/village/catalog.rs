@@ -48,25 +48,6 @@ pub const TOOL_DURABILITY: u32 = 120;
 pub const TOOL_GATHER_PERCENT: u32 = 75;
 pub const BARE_GATHER_PERCENT: u32 = 150;
 
-/// The work tool that speeds gathering this raw good in the regional profile.
-pub fn gather_tool(kind: &str) -> Option<&'static str> {
-    match kind {
-        "log" => Some("axe"),
-        "ore" => Some("pickaxe"),
-        GRAIN => Some(HOE),
-        _ => None,
-    }
-}
-
-/// The work tool a regional gathering profession keeps one of.
-pub fn role_tool(role: Role) -> Option<&'static str> {
-    match role {
-        Role::Woodcutter => Some("axe"),
-        Role::Miner => Some("pickaxe"),
-        Role::Farmer => Some(HOE),
-        _ => None,
-    }
-}
 pub const SAW_LOG_COST: u32 = 1;
 pub const SAW_PLANK_YIELD: u32 = 4;
 // Four full exposed cold days at one wear/tick: thirteen actors need 3.25
@@ -126,33 +107,6 @@ pub const LIVING_TRADE_KINDS: &[&str] = &[
     WARM_CLOTHES,
     WATER,
 ];
-pub const FRONTIER_TRADE_KINDS: &[&str] = &[
-    "axe",
-    "bread",
-    "hammer",
-    "ingot",
-    "log",
-    "ore",
-    "pickaxe",
-    "plank",
-    BERRIES,
-    BOWL,
-    COOKED_MEAL,
-    FIBER,
-    FISH,
-    FISHING_ROD,
-    FLOUR,
-    GRAIN,
-    HIDE,
-    HOE,
-    LEATHER,
-    RAW_MEAT,
-    SPEAR,
-    THREAD,
-    WARM_CLOTHES,
-    WATER,
-];
-
 /// The regional profile registers every good and recipe of its `economy` data
 /// block; the Rust tables below serve the older profiles only.
 pub fn register_frontier(app: &mut App) {
@@ -221,25 +175,23 @@ pub fn durability_in(world: &World, kind: &str) -> Option<u32> {
         .good(kind)?
         .durability
 }
-/// Seed price of a good in this world.
+/// Seed price of a good in this world's data.
 pub fn price_in(world: &World, kind: &str) -> Option<u32> {
-    match super::frontier::economy_spec::registry(world) {
-        Some(registry) => registry.good(kind).map(|good| good.base_price),
-        None => price(kind),
-    }
+    super::frontier::economy_spec::registry(world)?
+        .good(kind)
+        .map(|good| good.base_price)
 }
-/// Hunger restored by a finished edible good in this world.
+/// Hunger restored by a finished edible good in this world's data.
 pub fn food_restore_in(world: &World, kind: &str) -> Option<i32> {
-    match super::frontier::economy_spec::registry(world) {
-        Some(registry) => registry.good(kind).and_then(|good| good.food_value),
-        None => food_restore(kind),
-    }
+    super::frontier::economy_spec::registry(world)?
+        .good(kind)
+        .and_then(|good| good.food_value)
 }
+/// The work tool that speeds gathering `kind`, from this world's data.
 pub fn gather_tool_in(world: &World, kind: &str) -> Option<&'static str> {
-    match super::frontier::economy_spec::registry(world) {
-        Some(registry) => registry.good(kind).and_then(|good| good.gather_tool),
-        None => gather_tool(kind),
-    }
+    super::frontier::economy_spec::registry(world)?
+        .good(kind)
+        .and_then(|good| good.gather_tool)
 }
 /// The tool without which `kind` cannot be gathered at all (a rod for fish).
 pub fn gather_tool_required_in(world: &World, kind: &str) -> Option<&'static str> {
@@ -248,11 +200,11 @@ pub fn gather_tool_required_in(world: &World, kind: &str) -> Option<&'static str
         .filter(|good| good.gather_tool_required)
         .and_then(|good| good.gather_tool)
 }
+/// The work tool a profession keeps one of, from this world's data.
 pub fn role_tool_in(world: &World, role: Role) -> Option<&'static str> {
-    match super::frontier::economy_spec::registry(world) {
-        Some(registry) => registry.profession(role).and_then(|entry| entry.tool),
-        None => role_tool(role),
-    }
+    super::frontier::economy_spec::registry(world)?
+        .profession(role)
+        .and_then(|entry| entry.tool)
 }
 /// Living world: the first good the world's data tags with `tag` (its
 /// coats are the `Clothing` good, its fuel the `Fuel` good, ...), so logic
@@ -364,33 +316,6 @@ pub fn recipes_for(world: &World, role: Role) -> &'static [&'static str] {
         Role::Smith => &[SMELT, TOOL],
         _ => &[],
     }
-}
-pub fn price(kind: &str) -> Option<u32> {
-    Some(match kind {
-        GRAIN => 3,
-        FLOUR => 6,
-        WATER => 1,
-        "log" => 3,
-        "plank" => 2,
-        "ore" => 3,
-        "ingot" => 6,
-        "bread" => 6,
-        BOWL => 8,
-        "hammer" | "axe" | "pickaxe" => 18,
-        RAW_MEAT => 5,
-        HIDE => 4,
-        LEATHER => 10,
-        FIBER => 1,
-        THREAD => 4,
-        COOKED_MEAL => 9,
-        WARM_CLOTHES => 34,
-        SPEAR => 10,
-        BERRIES => 2,
-        FISH => 4,
-        FISHING_ROD => 12,
-        HOE => 14,
-        _ => return None,
-    })
 }
 pub fn outputs(role: Role) -> &'static [&'static str] {
     match role {

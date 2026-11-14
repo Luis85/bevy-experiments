@@ -2101,9 +2101,39 @@ fn greet(world: &mut World, spec: &LiveSpec, played: &[(SimId, Entity)], day: u6
     }
 }
 
+/// A resident resting at home in the day, free to attend, gets up for the
+/// gathering; a night's sleep is not cut short.
+fn wake_for_gathering(world: &mut World) {
+    let now = world.resource::<SimClock>().tick;
+    let Some(mut query) = world.try_query::<(Entity, &SimId, &Villager)>() else {
+        return;
+    };
+    let mut resting: Vec<(SimId, Entity)> = query
+        .iter(world)
+        .filter(|(_, _, person)| person.resting_until > now)
+        .map(|(actor, id, _)| (*id, actor))
+        .collect();
+    resting.sort_unstable_by_key(|(id, _)| *id);
+    for (id, actor) in resting {
+        if !attending(world, actor)
+            || super::resident::in_block(world, actor, super::resident::BlockKind::Sleep)
+            || (super::living::cold(world) && !super::living::has_coat(world, actor))
+        {
+            continue;
+        }
+        if let Some(mut person) = world.get_mut::<Villager>(actor) {
+            person.resting_until = now;
+        }
+        record_effect(world, Some(id), "VillageGatheringWoke", &json!({}));
+    }
+}
+
 /// Attendance of the gathering that is on, and its end.
 fn gather(world: &mut World, played: &[(SimId, Entity)], day: u64) {
     let on = gathering_now(world).cloned();
+    if on.is_some() {
+        wake_for_gathering(world);
+    }
     let running = world.resource::<LiveState>().gathering.clone();
     match (on, running) {
         (Some(spec), running) => {

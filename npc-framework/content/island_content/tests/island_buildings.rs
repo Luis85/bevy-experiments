@@ -622,7 +622,8 @@ fn placement_is_validated_rule_by_rule_with_a_reason() {
         bx,
         bz,
         aturn,
-        "already has 4 open building sites",
+        // The refusal is worded for the player since the review fix pass.
+        "Four building sites are already open here.",
     );
     assert_eq!(civic::sites(app.world()).len(), civic::MAX_OPEN_SITES);
     assert_eq!(open.len(), civic::MAX_OPEN_SITES - 1);

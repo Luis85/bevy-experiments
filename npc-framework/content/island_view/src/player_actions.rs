@@ -872,9 +872,8 @@ pub(crate) fn tick(world: &mut World) {
                 if result.is_err() && retarget_person(world, &pending) {
                     return;
                 }
-                match result {
-                    Err(reason) => feedback(world, format!("At destination: {reason}")),
-                    _ => {}
+                if let Err(reason) = result {
+                    feedback(world, format!("At destination: {reason}"));
                 }
             } else {
                 feedback(

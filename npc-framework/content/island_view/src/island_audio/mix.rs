@@ -521,7 +521,7 @@ mod tests {
         assert!(pitches.iter().all(|p| (0.92..=1.08).contains(p)));
         assert!(pitches.windows(2).any(|w| w[0] != w[1]));
         assert_eq!(pitch(17, 3), pitch(17, 3));
-        assert!(MAX_VOICES >= 4 && MAX_VOICES <= 12);
+        const { assert!(MAX_VOICES >= 4 && MAX_VOICES <= 12) };
     }
 
     #[test]

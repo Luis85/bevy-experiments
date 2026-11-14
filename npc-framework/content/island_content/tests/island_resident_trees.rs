@@ -160,7 +160,7 @@ fn an_unknown_action_or_condition_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["action"] = json!("life.nap");
     let error = refused(&tree);
     assert!(
-        error.contains("behaviour tree file `resident.json`, node 85 `Idle`")
+        error.contains("behaviour tree file `resident.json`, node 89 `Idle`")
             && error.contains("unknown action `life.nap`")
             && error.contains("life.sleep"),
         "{error}"
@@ -169,7 +169,7 @@ fn an_unknown_action_or_condition_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Tired")["kind"]["Guard"]["cond"] = json!("life.sleepy");
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 31 `Tired`")
+        error.contains("`resident.json`, node 35 `Tired`")
             && error.contains("unknown condition `life.sleepy`")
             && error.contains("life.tired"),
         "{error}"
@@ -184,7 +184,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(chores, "Replace clothing")["kind"]["Leaf"]["param"] = json!({"Name": "gold"});
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 52 `Replace clothing`")
+        error.contains("`resident.json`, node 56 `Replace clothing`")
             && error.contains("action `life.buy` does not accept parameter {\"Name\":\"gold\"}")
             && error.contains("provisions"),
         "{error}"
@@ -197,7 +197,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["param"] = json!({"Int": 3});
     let error = refused(&tree);
     assert!(
-        error.contains("node 85 `Idle`") && error.contains("expected no parameter"),
+        error.contains("node 89 `Idle`") && error.contains("expected no parameter"),
         "{error}"
     );
     // A parameter of a shape the format does not have.
@@ -205,7 +205,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["param"] = json!({"Number": 3});
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 85 `Idle`") && error.contains("unknown variant"),
+        error.contains("`resident.json`, node 89 `Idle`") && error.contains("unknown variant"),
         "{error}"
     );
     // A place nobody defined.
@@ -214,7 +214,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
         json!({"Name": "lighthouse"});
     let error = refused(&tree);
     assert!(
-        error.contains("node 83 `Stay home`") && error.contains("centre, home, meal, work"),
+        error.contains("node 87 `Stay home`") && error.contains("centre, home, meal, work"),
         "{error}"
     );
 }
@@ -226,7 +226,7 @@ fn a_guard_that_could_abort_work_without_being_able_to_start_is_refused() {
     child(&mut tree["root"], "Work hours")["kind"]["Guard"]["abort"] = json!("LowerPriority");
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 66 `Work hours`")
+        error.contains("`resident.json`, node 71 `Work hours`")
             && error.contains("`life.in_work_window` does not promise that its branch can start")
             && error.contains("\"abort\": \"None\""),
         "{error}"
@@ -260,7 +260,7 @@ fn a_guard_that_could_abort_work_without_being_able_to_start_is_refused() {
         .push(json!({"name": "Wait", "kind": {"Leaf": {"action": "life.idle", "param": "None"}}}));
     let error = refused(&tree);
     assert!(
-        error.contains("node 31 `Tired`") && error.contains("exactly one child, found 2"),
+        error.contains("node 35 `Tired`") && error.contains("exactly one child, found 2"),
         "{error}"
     );
 }
@@ -285,7 +285,7 @@ fn structural_mistakes_and_a_missing_resident_tree_are_refused() {
     child(&mut tree["root"], "Idle")["kinds"] = json!("Selector");
     let error = refused(&tree);
     assert!(
-        error.contains("node 85 `Idle`") && error.contains("unknown field `kinds`"),
+        error.contains("node 89 `Idle`") && error.contains("unknown field `kinds`"),
         "{error}"
     );
     // Residents need their tree.

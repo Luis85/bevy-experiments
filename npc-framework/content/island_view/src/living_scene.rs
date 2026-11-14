@@ -1954,7 +1954,7 @@ fn wind_and_water(
         let close = near.is_none_or(|eye| {
             eye.distance_squared(Vec2::new(at.x, at.z)) < SWAY_NEAR_M * SWAY_NEAR_M
         });
-        if !close && (index as u32 + *turn) % SWAY_FAR_EVERY != 0 {
+        if !close && !(index as u32 + *turn).is_multiple_of(SWAY_FAR_EVERY) {
             continue;
         }
         let next = sway(&wind, plant.phase, plant.yaw);
