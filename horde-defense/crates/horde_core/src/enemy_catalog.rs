@@ -1105,7 +1105,10 @@ mod tests {
     #[test]
     fn target_urgency_is_authored_data_with_a_legacy_category_default() {
         let catalog = parse(&authored()).unwrap();
-        // The W2-31 exploder (-4) and spitter (-2) author their own urgency.
+        // Only the W2-31 exploder (-4, Shambler-based) and spitter (-2,
+        // Runner-based) author an urgency other than their category default.
+        // runner, caller-pack, skitter and plated-runner author the Runner -3
+        // explicitly; sprinter and splitter-brood omit it and take that -3.
         let authored_urgency = [("exploder", -4.0), ("spitter", -2.0)];
         for id in catalog.archetype_ids() {
             let enemy = catalog.resolve(id).unwrap();
