@@ -823,6 +823,7 @@ fn review_frame_facts_report_the_observer_field() {
         &f.game,
         &f.launch,
         &f.settings,
+        Some(&f.status),
         f.screen,
         f.nav.tab,
         &f.battle,
@@ -851,8 +852,15 @@ fn review_frame_facts_drop_the_observer_off_its_tab() {
         (Screen::Battle, Tab::Operations),
         (Screen::Results, Tab::Operations),
     ] {
-        let facts =
-            ReviewFrameFacts::collect(&f.game, &f.launch, &f.settings, screen, tab, &f.battle);
+        let facts = ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            Some(&f.status),
+            screen,
+            tab,
+            &f.battle,
+        );
         assert_eq!(facts.observer_arena_rect, None, "{screen:?} {tab:?}");
         assert!(!facts.overlays.contains(&"observer"), "{screen:?} {tab:?}");
     }
@@ -880,6 +888,7 @@ fn review_frame_facts_report_the_applied_ui_scale() {
             &f.game,
             &f.launch,
             &f.settings,
+            Some(&f.status),
             f.screen,
             f.nav.tab,
             &f.battle,
@@ -1541,6 +1550,7 @@ fn review_frame_facts_report_the_boss_banner() {
         &f.game,
         &f.launch,
         &f.settings,
+        Some(&f.status),
         f.screen,
         f.nav.tab,
         &f.battle,
@@ -1551,6 +1561,7 @@ fn review_frame_facts_report_the_boss_banner() {
             &f.game,
             &f.launch,
             &f.settings,
+            Some(&f.status),
             screen,
             f.nav.tab,
             &f.battle,
@@ -2300,6 +2311,26 @@ fn save_error_fixture_opens_retry_modal() {
         "the modal shows the OS error"
     );
     assert!(!f.paths.campaign().exists(), "no save was attempted");
+    // The capture sidecar names the modal over the camp (design-qa-captures
+    // 1.8), and drops it once the modal closes.
+    #[cfg(feature = "review")]
+    {
+        let facts = |f: &FrontendParts| {
+            ReviewFrameFacts::collect(
+                &f.game,
+                &f.launch,
+                &f.settings,
+                Some(&f.status),
+                f.screen,
+                f.nav.tab,
+                &f.battle,
+            )
+            .overlays
+        };
+        assert_eq!(facts(&f), ["save-error-modal"]);
+        f.status.modal = None;
+        assert!(facts(&f).is_empty());
+    }
 }
 
 // ----- W5-09: the wave-5 graphics review scenes -----

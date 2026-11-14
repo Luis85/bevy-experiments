@@ -182,10 +182,12 @@ impl ReviewFrameFacts {
     /// The facts of the last drawn pass. Field facts are reported only on
     /// their own screen (the battle field on Battle, the observer's on the
     /// camp's Operations tab), so a stale rect from an earlier pass never is.
+    /// The open application modal (`status`) is an overlay on any screen.
     pub(crate) fn collect(
         game: &Game,
         launch: &crate::launch::LaunchConfig,
         settings: &crate::settings::Settings,
+        status: Option<&super::StatusUi>,
         screen: super::Screen,
         tab: super::Tab,
         battle: &BattleUi,
@@ -204,6 +206,9 @@ impl ReviewFrameFacts {
         }
         if observer.is_some() {
             overlays.push("observer");
+        }
+        if let Some(modal) = status.and_then(|s| s.modal.as_ref()) {
+            overlays.push(modal_overlay(modal));
         }
         Self {
             scene: launch.scenario.clone().unwrap_or_default(),
@@ -225,6 +230,23 @@ impl ReviewFrameFacts {
             ui_scale: crate::settings::applied_scale(settings.scale),
             windows_scale: 1.0,
         }
+    }
+}
+
+/// The sidecar overlay name of an open application modal; a failed save is
+/// `save-error-modal` (design-qa-captures 1.8, the save-error scene).
+#[cfg(feature = "review")]
+fn modal_overlay(modal: &super::modal::AppModal) -> &'static str {
+    use super::modal::{AppModal, StorageError};
+    match modal {
+        AppModal::Quit => "quit-modal",
+        AppModal::ReturnToMenu => "return-to-menu-modal",
+        AppModal::Storage(StorageError::Save { .. }) => "save-error-modal",
+        AppModal::Storage(StorageError::Load { .. }) => "load-error-modal",
+        AppModal::Storage(StorageError::Settings { .. }) => "settings-warning-modal",
+        AppModal::DraftWarning { .. } => "draft-warning-modal",
+        AppModal::Recruit { .. } => "recruit-modal",
+        AppModal::ApplyAutoSell { .. } => "apply-auto-sell-modal",
     }
 }
 

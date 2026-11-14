@@ -927,6 +927,7 @@ fn review_frame_facts_report_arena_rect_and_hud_rows() {
             &f.game,
             &f.launch,
             &f.settings,
+            Some(&f.status),
             f.screen,
             f.nav.tab,
             &f.battle,
@@ -961,6 +962,7 @@ fn review_frame_facts_report_arena_rect_and_hud_rows() {
             &f.game,
             &f.launch,
             &f.settings,
+            Some(&f.status),
             f.screen,
             f.nav.tab,
             &f.battle,
@@ -1018,6 +1020,7 @@ fn battle_bar_rows_measure_todays_bar() {
                 &f.game,
                 &f.launch,
                 &f.settings,
+                Some(&f.status),
                 f.screen,
                 f.nav.tab,
                 &f.battle
