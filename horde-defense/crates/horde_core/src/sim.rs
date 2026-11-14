@@ -35,6 +35,7 @@ mod sale_resolution;
 mod smoke;
 #[cfg(test)]
 mod spitter_tests;
+mod stage_preview;
 mod structures;
 mod telemetry;
 pub use auto_sell::{AutoSellPreview, AutoSellScope, KeptDrop, ResultsLoot, UpgradeOffer};
@@ -75,6 +76,7 @@ pub(crate) use parallel::UNKNOWN_EXPEDITION;
 pub use persistence::{RULESET_VERSION, SaveError};
 pub use power::DeploymentInputs;
 pub use smoke::{desktop_smoke, smoke, smoke_input, smoke_prepare, smoke_seed};
+pub use stage_preview::StagePreview;
 pub use telemetry::CombatTelemetry;
 
 use crate::campaign::{

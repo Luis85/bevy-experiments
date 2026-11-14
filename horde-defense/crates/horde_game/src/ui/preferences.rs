@@ -288,7 +288,8 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui,
         format!(
             "Saved next deployment: {} · {lanes} lanes · {width:.0} yd path",
-            f.game.campaign().balance_settings.preset.name()
+            // A Custom names the preset whose rules it keeps.
+            f.game.campaign().balance_rules_label()
         ),
     );
     if let Some(a) = f.game.attempt() {
@@ -332,6 +333,9 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                 }
             }
         });
+        if let Some(note) = custom_rules_note(campaign, draft, *custom_chosen) {
+            muted(ui, note);
+        }
         for (label, value) in [
             ("Zombie speed", &mut draft.enemy_speed),
             ("Zombie health", &mut draft.enemy_health),
@@ -446,6 +450,28 @@ pub(super) fn draft_state(
         Ok(_) if custom_chosen => DraftState::Pending(Campaign::custom_balance_steps(draft)),
         Ok(_) => DraftState::Pending(vec![draft.clone()]),
     }
+}
+
+/// "Custom keeps the Hard rules …" when applying `draft` would store a
+/// Custom difficulty: the preset whose catalogue extras it keeps, from the
+/// core's own outcome. None for a named preset or an invalid draft.
+fn custom_rules_note(
+    campaign: &Campaign,
+    draft: &horde_core::balance::BalanceSettings,
+    custom_chosen: bool,
+) -> Option<String> {
+    let (settings, basis) = if custom_chosen {
+        campaign.custom_balance_outcome(draft.clone())
+    } else {
+        campaign.balance_outcome(draft.clone())
+    }
+    .ok()?;
+    (settings.preset == horde_core::balance::BalancePreset::Custom).then(|| {
+        format!(
+            "Custom keeps the {} rules for elites, the front ramp and boss phases.",
+            basis.name()
+        )
+    })
 }
 
 impl UiCtx<'_> {

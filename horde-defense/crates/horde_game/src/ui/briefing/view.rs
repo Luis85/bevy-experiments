@@ -2,19 +2,26 @@
 use horde_core::{
     content::{LevelDefinition, Mode, Slot, content},
     defenders::DefenderId,
-    progression::ProgressionSnapshot,
+    progression::{BossRank, ProgressionSnapshot},
     sim::Game,
     world::Country,
 };
 
-/// Threat pressure for this deployment and after the next victory.
+/// Threat pressure for this deployment and after the next victory, from
+/// `Game::stage_preview` of the selected defense.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Forecast {
+    /// What a deploy of this stage stamps: rank, extras and the front ramp.
     pub pressure: ProgressionSnapshot,
-    /// Falls back to `pressure` when the next victory cannot be previewed.
+    /// The same stage one victory later. Falls back to `pressure` when the
+    /// next victory cannot be previewed.
     pub next: ProgressionSnapshot,
     pub boss_seconds: f32,
     pub supply: i64,
+    /// The difficulty the country plays at (the start clamp included).
+    pub difficulty: f32,
+    /// The rank of this stage's boss.
+    pub boss_rank: BossRank,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,10 +77,10 @@ pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Opt
     let max_stage = campaign.world.completed(&country.id).min(levels - 1);
     let stage = stage.min(max_stage);
     let level = &content().levels[stage % 5];
-    let forecast = campaign.deployment_progression(mode).map(|pressure| {
-        let next = campaign
-            .next_victory_progression(mode)
-            .unwrap_or_else(|_| pressure.clone());
+    // Core's preview of this stage: what a deploy here would stamp, the
+    // front ramp and the boss rank included.
+    let forecast = game.stage_preview(&country.id, stage, mode).map(|preview| {
+        let pressure = preview.pressure;
         let balance = &campaign.balance_settings;
         Forecast {
             boss_seconds: level.boss_time.max(pressure.boss_time_floor) * balance.boss_time,
@@ -83,7 +90,9 @@ pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Opt
                 + i64::from(balance.supply))
             .max(0),
             pressure,
-            next,
+            next: preview.next,
+            difficulty: preview.difficulty,
+            boss_rank: preview.boss_rank,
         }
     });
     let lanes = campaign.lane_count();
@@ -223,5 +232,30 @@ mod tests {
             player.defender_name,
             game.defender_card(DefenderId::Player).unwrap().name
         );
+    }
+
+    /// W3-23 (W2 review): the forecast is core's `Game::stage_preview` of
+    /// the selected defense, so a later stage shows W2-26's front ramp and
+    /// its boss rank; the rank-only reading left both out.
+    #[test]
+    fn forecast_reads_the_stage_preview_of_the_selected_defense() {
+        let mut game = started();
+        let last = world().country("DEU").unwrap().level_count() - 1;
+        for stage in 0..last {
+            game.campaign_mut()
+                .record_country_stage_clear(stage)
+                .unwrap();
+        }
+        for defender in [DefenderId::Player, DefenderId::Mara] {
+            for stage in [0, last] {
+                let view = view_model(&game, defender, stage).unwrap();
+                let preview = game.stage_preview("DEU", stage, defender.mode()).unwrap();
+                let forecast = view.forecast.unwrap();
+                assert_eq!(forecast.pressure, preview.pressure, "stage {stage}");
+                assert_eq!(forecast.next, preview.next, "stage {stage}");
+            }
+        }
+        let deep = view_model(&game, DefenderId::Player, last).unwrap();
+        assert!(deep.forecast.unwrap().pressure.front_ramp > 1.0);
     }
 }

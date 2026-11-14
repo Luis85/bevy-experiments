@@ -352,6 +352,21 @@ impl Campaign {
             self.balance_settings.preset
         }
     }
+    /// The player-facing name of the next deployment's difficulty: the
+    /// preset's name, or for Custom the preset whose catalogue extras (elite
+    /// rate, front ramp, boss phases) still apply, "Custom (Hard rules)".
+    pub fn balance_rules_label(&self) -> String {
+        let preset = self.balance_settings.preset;
+        if preset == crate::balance::BalancePreset::Custom {
+            format!(
+                "{} ({} rules)",
+                preset.name(),
+                self.balance_extras_preset().name()
+            )
+        } else {
+            preset.name().to_owned()
+        }
+    }
     /// The catalogue extras the next deployment uses.
     pub fn balance_extras(&self) -> crate::balance::PresetExtras {
         crate::balance::PresetExtras::for_preset(self.balance_extras_preset())

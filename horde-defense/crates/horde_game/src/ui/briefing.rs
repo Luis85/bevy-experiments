@@ -5,8 +5,8 @@ use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
 use horde_core::{
     content::{Mode, content},
     defenders::DefenderId,
+    progression::BossRank,
     sim::Game,
-    world::Country,
 };
 mod view;
 use view::BriefingView;
@@ -104,15 +104,25 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     };
     let (pressure, next_pressure) = (&forecast.pressure, &forecast.next);
-    ui.label(format!(
-        "Boss: {} · arrives after {:.0}s",
-        level.boss_name, forecast.boss_seconds
-    ));
-    ui.label(supply_and_difficulty(f.game, country, forecast.supply));
+    ui.horizontal_wrapped(|ui| {
+        ui.label(format!(
+            "Boss: {} · arrives after {:.0}s",
+            level.boss_name, forecast.boss_seconds
+        ));
+        // The rank is named in words; the amber only repeats it.
+        if let Some((badge, hint)) = boss_badge(forecast.boss_rank) {
+            ui.label(RichText::new(badge).strong().color(AMBER))
+                .on_hover_text(hint);
+        }
+    });
+    ui.label(supply_and_difficulty(forecast.supply, forecast.difficulty));
     ui.label(format!(
         "Threat rank {} · arrival groups {} · population cap {} (+ boss) · new gear Lv {}",
         pressure.rank, pressure.batch_size, pressure.enemy_cap, pressure.item_level
     ));
+    if let Some(line) = front_ramp_line(view.stage, view.levels, pressure.front_ramp) {
+        ui.label(line);
+    }
     ui.label(format!(
         "Next deployment: {} lanes · {:.0} yd path · defender lane {} · +{} character XP on victory",
         view.lanes, view.path_yards, view.defender_lane, view.completion_xp
@@ -127,7 +137,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     egui::CollapsingHeader::new("Next victory").show(ui, |ui| {
         ui.label(format!("Rank {} → {} · groups {} → {} · new gear Lv {} → {}", pressure.rank, next_pressure.rank, pressure.batch_size, next_pressure.batch_size, pressure.item_level, next_pressure.item_level));
-        muted(ui, format!("Threat-only enemy health {:.2}× → {:.2}× · contact damage {:.2}× → {:.2}× · rewards {:.2}× → {:.2}×", pressure.enemy_health, next_pressure.enemy_health, pressure.enemy_damage, next_pressure.enemy_damage, pressure.reward_multiplier, next_pressure.reward_multiplier));
+        muted(ui, format!("Enemy health from threat and front depth {:.2}× → {:.2}× · contact damage {:.2}× → {:.2}× · rewards {:.2}× → {:.2}×", pressure.enemy_health, next_pressure.enemy_health, pressure.enemy_damage, next_pressure.enemy_damage, pressure.reward_multiplier, next_pressure.reward_multiplier));
         ui.label(format!("Completion XP forecast: character {} → {} · lanes {} → {} · population cap {} → {}",view.character_level,view.level_after_victory,view.lanes,view.lanes_after_victory,pressure.enemy_cap,next_pressure.enemy_cap));
         muted(ui,if view.max_level {"Character MAX is reached; victories continue raising future threat."} else if view.defender.mode()==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
         ui.label(format!("Path forecast: {:.0} → {:.0} yd", view.path_yards, view.next_path_yards));
@@ -150,15 +160,33 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.label("Survive until the boss arrives, then defeat it. The timer alone does not clear the defense. Coins and recovered items are banked as you earn them.");
     });
 }
-/// "N build supply · D× regional difficulty" for a deployment in `country`,
-/// D the difficulty it plays at (`Game::effective_country_difficulty`, the
-/// start clamp included).
-fn supply_and_difficulty(game: &Game, country: &Country, supply: i64) -> String {
-    format!(
-        "{supply} build supply · {:.2}× regional difficulty",
-        game.effective_country_difficulty(&country.id)
-            .unwrap_or(country.difficulty)
-    )
+/// "N build supply · D× regional difficulty", D the difficulty the country
+/// plays at (`StagePreview::difficulty`, the start clamp included).
+fn supply_and_difficulty(supply: i64, difficulty: f32) -> String {
+    format!("{supply} build supply · {difficulty:.2}× regional difficulty")
+}
+/// The badge beside the boss line and its hover text: a Regional or
+/// Capstone boss is named by core's rank label; a Sector boss has none.
+fn boss_badge(rank: BossRank) -> Option<(String, &'static str)> {
+    let hint = match rank {
+        BossRank::Sector => return None,
+        BossRank::Regional => "A regional checkpoint: every sixth defense of a long front.",
+        BossRank::Capstone => {
+            "The last defense of this front. Its boss enters one more phase before it falls."
+        }
+    };
+    Some((format!("{} BOSS", rank.label().to_uppercase()), hint))
+}
+/// "Front depth: defense 4 of 9 · enemy health and arrivals ×1.07": the
+/// in-country ramp this stage's snapshot carries, or None on a stage
+/// without one (the first, and every stage of a neutral ramp).
+fn front_ramp_line(stage: usize, levels: usize, ramp: f32) -> Option<String> {
+    (ramp > 1.0).then(|| {
+        format!(
+            "Front depth: defense {} of {levels} · enemy health and arrivals ×{ramp:.2}",
+            stage + 1
+        )
+    })
 }
 /// A briefing column heading; the loadout's carries its one action.
 fn heading(ui: &mut egui::Ui, title: &str) {
@@ -331,15 +359,32 @@ mod tests {
         game.campaign_mut().choose_start_country("BGD").unwrap();
         let bgd = world().country("BGD").unwrap();
         assert_eq!(bgd.difficulty, 1.60);
+        let difficulty = |id: &str| {
+            game.stage_preview(id, 0, Mode::Personal)
+                .unwrap()
+                .difficulty
+        };
         assert_eq!(
-            supply_and_difficulty(&game, bgd, 9),
+            supply_and_difficulty(9, difficulty("BGD")),
             "9 build supply · 1.05× regional difficulty"
         );
         // A country beside the start keeps its raw value.
-        let aut = world().country("AUT").unwrap();
         assert_eq!(
-            supply_and_difficulty(&game, aut, 9),
+            supply_and_difficulty(9, difficulty("AUT")),
             "9 build supply · 0.85× regional difficulty"
+        );
+    }
+
+    /// W3-23: the badge is core's rank label; a Sector boss carries none.
+    #[test]
+    fn boss_badge_names_regional_and_capstone_only() {
+        assert_eq!(boss_badge(BossRank::Sector), None);
+        assert_eq!(boss_badge(BossRank::Regional).unwrap().0, "REGIONAL BOSS");
+        assert_eq!(boss_badge(BossRank::Capstone).unwrap().0, "CAPSTONE BOSS");
+        assert_eq!(front_ramp_line(0, 9, 1.0), None);
+        assert_eq!(
+            front_ramp_line(3, 9, 1.068).unwrap(),
+            "Front depth: defense 4 of 9 · enemy health and arrivals ×1.07"
         );
     }
 }

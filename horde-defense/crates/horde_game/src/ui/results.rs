@@ -6,7 +6,9 @@ use horde_core::{
     command::Command,
     content::content,
     defenders::{DefenderId, RecruitBlocker},
+    progression::BossRank,
     sim::{Outcome, Report},
+    stats::RunRecord,
     world::world,
 };
 mod loot_block;
@@ -150,6 +152,24 @@ fn level_grant_line(report: &Report) -> Option<String> {
         )
     })
 }
+/// "Elite kills 3 · Capstone boss defeated in 25.5 s" from the report's run
+/// record: the elites killed (when any) and the boss time-to-kill (when the
+/// boss fell), a Regional or Capstone boss named by its rank. None when the
+/// run has neither.
+fn combat_line(run: &RunRecord) -> Option<String> {
+    let mut parts = Vec::new();
+    if run.elite_kills > 0 {
+        parts.push(format!("Elite kills {}", run.elite_kills));
+    }
+    if let Some(ticks) = run.boss_ttk_ticks {
+        let seconds = ticks as f32 / 60.0;
+        parts.push(match run.boss_rank {
+            BossRank::Sector => format!("Boss defeated in {seconds:.1} s"),
+            rank => format!("{} boss defeated in {seconds:.1} s", rank.label()),
+        });
+    }
+    (!parts.is_empty()).then(|| parts.join(" · "))
+}
 fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     let label = report.outcome.label();
     let color = match report.outcome {
@@ -196,6 +216,9 @@ fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     }
     if let Some(grant) = level_grant_line(report) {
         ui.add(egui::Label::new(RichText::new(grant).size(13.0).color(TEXT)).wrap());
+    }
+    if let Some(combat) = f.game.results_run().and_then(combat_line) {
+        ui.add(egui::Label::new(RichText::new(combat).size(13.0).color(TEXT)).wrap());
     }
     // The reason is the point of this screen after a loss; after a win it
     // names what opened. Wrapped, never cut.

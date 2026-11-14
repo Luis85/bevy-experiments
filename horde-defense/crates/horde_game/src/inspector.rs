@@ -39,6 +39,19 @@ pub fn target_at(attempt: &Attempt, aim: [f32; 2]) -> Option<Target<'_>> {
         .min_by_key(|s| s.id)
         .map(Target::Structure)
 }
+/// "protection N": the armor every hit on `enemy` meets
+/// (`Attempt::enemy_protection`), and " · M against shots" when the
+/// defender's gunfire meets more (`Attempt::enemy_shot_protection`: a
+/// shield's ranged armor away from the line).
+fn protection_text(attempt: &Attempt, enemy: &Enemy) -> String {
+    let base = attempt.enemy_protection(enemy);
+    let shots = attempt.enemy_shot_protection(enemy);
+    if shots == base {
+        format!("protection {base}")
+    } else {
+        format!("protection {base} · {shots} against shots")
+    }
+}
 pub fn hover(response: &Response, attempt: &Attempt, aim: [f32; 2]) {
     if target_at(attempt, aim).is_some() {
         response.clone().on_hover_ui(|ui| {
@@ -65,14 +78,14 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
             };
             ui.strong(format!("{name} · lane {}", enemy.lane + 1));
             ui.label(format!(
-                "HP {} / {} · protection {}",
+                "HP {} / {} · {}",
                 if attempt.mode == Mode::Npc {
                     enemy.injury.hp
                 } else {
                     enemy.hp
                 },
                 enemy.max_hp,
-                attempt.enemy_protection(enemy)
+                protection_text(attempt, enemy)
             ));
             if enemy.critically_wounded(attempt.mode) {
                 ui.colored_label(AMBER, "CRITICAL · still fighting");
@@ -243,6 +256,51 @@ mod tests {
         assert!(target_at(&attempt, [7.0, 1.5]).is_none());
         assert!(target_at(&attempt, [f32::NAN, 0.5]).is_none());
         assert_eq!(serde_json::to_value(&attempt).unwrap(), before);
+    }
+
+    /// W3-23 (W2 review): a shield-bearer's ranged armor (W2-30/W2-31),
+    /// which the defender's shots meet, is shown beside the base armor; a
+    /// hostile without one, and a shield-bearer at the line, show one number.
+    #[test]
+    fn protection_names_the_armor_shots_meet() {
+        use horde_core::sim::DEFENSE_LINE;
+        for mode in [Mode::Personal, Mode::Npc] {
+            let mut game = Game::default();
+            game.campaign_mut().legacy_features = true;
+            game.campaign_mut().attempts = 1;
+            game.campaign_mut().choose_start_country("DEU").unwrap();
+            game.deploy_country_stage(0, mode).unwrap();
+            let mut attempt = game.attempt_slot_mut().take().unwrap();
+            game.spawn_archetype(&mut attempt, "shield-bearer", 0)
+                .unwrap();
+            game.spawn_enemy(&mut attempt, EnemyKind::Runner, 1, false);
+            attempt.enemies[0].x = 7.0;
+            attempt.enemies[1].x = 7.0;
+            let before = serde_json::to_value(&attempt).unwrap();
+            let shield = &attempt.enemies[0];
+            let base = attempt.enemy_protection(shield);
+            let shots = attempt.enemy_shot_protection(shield);
+            assert!(shots > base, "{mode:?}: the shield stops shots");
+            assert_eq!(
+                protection_text(&attempt, shield),
+                format!("protection {base} · {shots} against shots"),
+                "{mode:?}"
+            );
+            let runner = &attempt.enemies[1];
+            assert_eq!(
+                protection_text(&attempt, runner),
+                format!("protection {}", attempt.enemy_protection(runner)),
+                "{mode:?}"
+            );
+            assert_eq!(serde_json::to_value(&attempt).unwrap(), before);
+            attempt.enemies[0].x = DEFENSE_LINE;
+            let shield = &attempt.enemies[0];
+            assert_eq!(
+                protection_text(&attempt, shield),
+                format!("protection {}", attempt.enemy_protection(shield)),
+                "{mode:?}: the shield is down at the line"
+            );
+        }
     }
 
     /// Since W1-69 a crowd at the line shares one sim spot and only the

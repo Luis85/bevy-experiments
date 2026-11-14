@@ -522,3 +522,53 @@ fn results_shows_rank_10_milestone_headline() {
         assert!(top < open, "{size:?}: the headline sits above Now open");
     }
 }
+
+/// W3-23: Results names the run's elite kills and the boss time-to-kill
+/// from the report's run record (`Game::results_run`); a run with neither
+/// shows no such line.
+#[test]
+fn results_lists_elite_kills_and_boss_ttk() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    assert!(
+        text_top_containing(&output, "oss defeated in").is_none()
+            && text_top_containing(&output, "Elite kills").is_none(),
+        "no elites, no boss: no line"
+    );
+    {
+        let history = std::sync::Arc::make_mut(&mut f.game.campaign_mut().run_history);
+        let run = history.last_mut().unwrap();
+        run.kills = 40;
+        run.elite_kills = 3;
+        run.duration_ticks = 16_000;
+        run.boss_ttk_ticks = Some(1_530);
+        run.boss_rank = horde_core::progression::BossRank::Capstone;
+    }
+    let before = serde_json::to_value(&f.game).unwrap();
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::ResultsWithChrome, vec![], size);
+        assert!(
+            fully_visible(&output, "Elite kills 3 · Capstone boss defeated in 25.5 s"),
+            "{size:?}: the combat line names elites and the boss time-to-kill"
+        );
+    }
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+    // A Sector boss carries no rank word; without elites it stands alone.
+    {
+        let history = std::sync::Arc::make_mut(&mut f.game.campaign_mut().run_history);
+        let run = history.last_mut().unwrap();
+        run.elite_kills = 0;
+        run.boss_rank = horde_core::progression::BossRank::Sector;
+    }
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    assert!(text_top_containing(&output, "Boss defeated in 25.5 s").is_some());
+    assert!(text_top_containing(&output, "Elite kills").is_none());
+}

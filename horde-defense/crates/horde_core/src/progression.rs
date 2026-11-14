@@ -59,6 +59,14 @@ impl FrontPosition {
     }
 }
 impl BossRank {
+    /// The one player-facing name every screen uses for this rank.
+    pub fn label(self) -> &'static str {
+        match self {
+            BossRank::Sector => "Sector",
+            BossRank::Regional => "Regional",
+            BossRank::Capstone => "Capstone",
+        }
+    }
     /// The boss phase transitions this rank adds (ruling W-9): one on a
     /// Capstone, none otherwise.
     pub fn extra_transitions(self) -> u8 {

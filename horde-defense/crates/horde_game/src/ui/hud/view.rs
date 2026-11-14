@@ -228,21 +228,40 @@ pub(in crate::ui) fn danger(attempt: &Attempt) -> DangerReadout {
     } else {
         (Danger::Holding, "LINE HOLDING".into())
     };
-    let winding = attempt
-        .enemies
-        .iter()
-        .filter(|enemy| enemy.contact() && enemy.attack_phase == EnemyPhase::Windup)
+    // Windups at the line, and the spits a stationed spitter winds up
+    // beyond it (`Attempt::spit_target`, the aim line's own test).
+    let windups = || {
+        attempt
+            .enemies
+            .iter()
+            .filter(|enemy| enemy.attack_phase == EnemyPhase::Windup)
+    };
+    let ranged = windups()
+        .filter(|enemy| !enemy.contact() && attempt.spit_target(enemy).is_some())
         .count();
+    let winding = windups().filter(|enemy| enemy.contact()).count() + ranged;
     let detail = if lanes.is_empty() {
-        "No enemy is at the shared defense line.".into()
+        match ranged {
+            0 => "No enemy is at the shared defense line.".into(),
+            1 => "No enemy is at the shared defense line. 1 ranged attack winding up beyond it."
+                .into(),
+            n => format!(
+                "No enemy is at the shared defense line. {n} ranged attacks winding up beyond it."
+            ),
+        }
     } else {
         format!(
-            "Contact lanes: {}. {winding} attacks winding up. Any contact lane can hurt the same defender; target that lane for melee.",
+            "Contact lanes: {}. {winding} attacks winding up{}. Any contact lane can hurt the same defender; target that lane for melee.",
             lanes
                 .iter()
                 .map(u8::to_string)
                 .collect::<Vec<_>>()
-                .join(", ")
+                .join(", "),
+            if ranged > 0 {
+                format!(", {ranged} of them ranged")
+            } else {
+                String::new()
+            }
         )
     };
     DangerReadout {
@@ -382,6 +401,50 @@ mod tests {
             readout
                 .detail
                 .starts_with(&format!("Contact lanes: {lane}. "))
+        );
+    }
+
+    /// W3-23 (W2 review): a stationed spitter winds up beyond the line
+    /// (W2-28, `Attempt::spit_target`), so the windup count and its wording
+    /// include ranged windups, with or without a contact lane.
+    #[test]
+    fn ranged_windups_are_counted_in_the_danger_detail() {
+        use horde_core::{content::EnemyKind, sim::DEFENSE_LINE};
+        let mut game = battle(Mode::Personal);
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        a.events.clear();
+        a.enemies.clear();
+        game.spawn_archetype(&mut a, "spitter", 0).unwrap();
+        let tick = a.tick;
+        let spitter = &mut a.enemies[0];
+        spitter.x = DEFENSE_LINE + spitter.resolved.as_ref().unwrap().reach;
+        spitter.contact_since = Some(tick);
+        assert_eq!(
+            danger(&a).detail,
+            "No enemy is at the shared defense line.",
+            "a stationed spitter that is not winding up adds nothing"
+        );
+        a.enemies[0].attack_phase = EnemyPhase::Windup;
+        assert!(!a.enemies[0].contact());
+        assert!(a.spit_target(&a.enemies[0]).is_some(), "a spit is in hand");
+        assert_eq!(
+            danger(&a).detail,
+            "No enemy is at the shared defense line. 1 ranged attack winding up beyond it."
+        );
+        // With a melee windup at the line both are counted.
+        game.spawn_enemy(&mut a, EnemyKind::Runner, 1, false);
+        let runner = a.enemies.last_mut().unwrap();
+        runner.x = DEFENSE_LINE;
+        runner.attack_phase = EnemyPhase::Windup;
+        assert_eq!(
+            danger(&a).detail,
+            "Contact lanes: 2. 2 attacks winding up, 1 of them ranged. Any contact lane can hurt the same defender; target that lane for melee."
+        );
+        // Without the spit the old wording stands.
+        a.enemies[0].attack_phase = EnemyPhase::Advance;
+        assert_eq!(
+            danger(&a).detail,
+            "Contact lanes: 2. 1 attacks winding up. Any contact lane can hurt the same defender; target that lane for melee."
         );
     }
 }

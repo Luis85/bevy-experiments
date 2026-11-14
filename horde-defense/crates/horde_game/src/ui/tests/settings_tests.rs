@@ -1347,3 +1347,54 @@ fn colour_blind_palette_changes_marker_colours_and_shapes() {
     h.click_size(f, View::Settings, "Colour-blind quality palette", TALL);
     assert_eq!(f.settings.palette, Palette::Standard);
 }
+
+/// W3-23 (design-enemy-balance §7): a Custom difficulty names the preset
+/// whose rules still apply, from core's `Campaign::balance_rules_label`.
+#[test]
+fn preferences_shows_custom_basis_label() {
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    let has = |output: &FullOutput, label: &str| {
+        output
+            .shapes
+            .iter()
+            .any(|s| shape_has_text(&s.shape, label))
+    };
+    f.game
+        .apply(&Command::SetBalance(BalanceSettings::for_preset(
+            BalancePreset::Hard,
+        )))
+        .unwrap();
+    f.screen = Screen::Settings;
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    assert!(has(&output, "Saved next deployment: Hard · "));
+    assert!(
+        !has(&output, "rules)") && !has(&output, "Custom keeps"),
+        "a named preset names no basis"
+    );
+    // The player edits Hard: Custom values on the Hard rules.
+    let mut edited = BalanceSettings::for_preset(BalancePreset::Hard);
+    edited.enemy_speed = 1.5;
+    f.game.apply(&Command::SetBalance(edited)).unwrap();
+    f.prefs.balance_draft = None;
+    assert_eq!(
+        f.game.campaign().balance_settings.preset,
+        BalancePreset::Custom
+    );
+    let before = serde_json::to_value(&f.game).unwrap();
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    assert!(
+        has(&output, "Saved next deployment: Custom (Hard rules) · "),
+        "the saved line names the basis"
+    );
+    assert!(
+        has(
+            &output,
+            "Custom keeps the Hard rules for elites, the front ramp and boss phases."
+        ),
+        "the draft names the rules a Custom keeps"
+    );
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+}
