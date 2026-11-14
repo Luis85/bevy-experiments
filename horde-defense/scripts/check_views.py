@@ -5,20 +5,30 @@ import sys
 from urllib.parse import unquote
 
 
+def _front_matter(text: str) -> tuple[dict[str, str], str] | None:
+    """A View file's front-matter fields and its body, or None when the file
+    does not start with a `---` block."""
+    parts = text.split("---", 2)
+    if len(parts) != 3 or parts[0].strip():
+        return None
+    fields = {}
+    for line in parts[1].splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+            fields[key.strip()] = value.strip().strip('"').strip("'")
+    return fields, parts[2]
+
+
 def check(workspace: Path) -> tuple[int, list[str]]:
     views: dict[str, tuple[Path, dict[str, str]]] = {}
     errors: list[str] = []
     for path in sorted((workspace / "docs/components").glob("*.md")):
         text = path.read_text(encoding="utf-8-sig")
-        parts = text.split("---", 2)
-        if len(parts) != 3 or parts[0].strip():
+        parsed = _front_matter(text)
+        if parsed is None:
             errors.append(f"{path.name}: missing YAML front matter")
             continue
-        fields = {}
-        for line in parts[1].splitlines():
-            if ":" in line:
-                key, value = line.split(":", 1)
-                fields[key.strip()] = value.strip().strip('"').strip("'")
+        fields, body = parsed
         required = {"type", "id", "title", "parent", "status", "source"}
         if missing := required - fields.keys():
             errors.append(f"{path.name}: missing {sorted(missing)}")
@@ -39,7 +49,7 @@ def check(workspace: Path) -> tuple[int, list[str]]:
             for symbol in filter(None, (s.strip() for s in symbols.split(","))):
                 if not re.search(r"\b" + re.escape(symbol) + r"\b", source_text):
                     errors.append(f"{path.name}: source symbol not found: {symbol}")
-        if not parts[2].strip():
+        if not body.strip():
             errors.append(f"{path.name}: empty View description")
     roots = [key for key, (_, fields) in views.items() if fields["parent"] == "null"]
     if roots != ["game"]:
@@ -58,6 +68,99 @@ def check(workspace: Path) -> tuple[int, list[str]]:
     if not views:
         errors.append("No Views documented")
     return len(views), errors
+
+
+# The doc that draws the View tree (one nested `- `id`` list, two spaces per level).
+VIEW_HIERARCHY_DOC = "docs/VIEW_HIERARCHY.md"
+# The Views the production pass added (W7-07; design-qa-captures §1.13, the
+# VIEW_HIERARCHY.md row; waves.md W7-07): each needs a View file and its place
+# in the tree. `journey-upgrades` is the Upgrades screen under its retained id.
+PRODUCTION_VIEWS = (
+    "journey-upgrades",
+    "camp-home",
+    "onboarding-callouts",
+    "defender-picker",
+    "results-loot-block",
+    "recruit-modal",
+    "equipment-auto-sell",
+    "auto-sell-stash-apply",
+    "quit-confirmation",
+    "return-to-menu-confirmation",
+    "storage-error",
+    "draft-warning",
+    "toasts",
+    "battle-layout",
+    "battle-retreat-hold",
+    "battle-boss-banner",
+    "battle-low-hp",
+    "menu-build-stamp",
+)
+# One entry of the tree: indentation, then a backticked View id alone on the line.
+TREE_ENTRY = re.compile(r"^( *)- `([^`]+)`\s*$")
+INVENTORY_LINE = re.compile(r"Current inventory: \*\*(\d+) View files\*\*")
+
+
+def _view_parents(workspace: Path) -> dict[str, str]:
+    """Each View file's id and front-matter parent (files `check` rejects for
+    missing front matter or fields are left out)."""
+    parents: dict[str, str] = {}
+    for path in sorted((workspace / "docs/components").glob("*.md")):
+        parsed = _front_matter(path.read_text(encoding="utf-8-sig"))
+        if parsed is not None and {"id", "parent"} <= parsed[0].keys():
+            parents[parsed[0]["id"]] = parsed[0]["parent"]
+    return parents
+
+
+def check_view_hierarchy(workspace: Path, required: tuple[str, ...] = PRODUCTION_VIEWS) -> tuple[int, list[str]]:
+    """VIEW_HIERARCHY.md's tree lists every View file exactly once, nested
+    under the parent its front matter names (the root at the top level);
+    lists nothing else; states the View count in its "Current inventory"
+    line; and every `required` View has a file. Returns the number of listed
+    Views and the errors."""
+    doc = Path(VIEW_HIERARCHY_DOC).name
+    path = workspace / VIEW_HIERARCHY_DOC
+    if not path.is_file():
+        return 0, [f"{VIEW_HIERARCHY_DOC}: missing"]
+    parents = _view_parents(workspace)
+    errors: list[str] = []
+    listed: dict[str, str] = {}
+    stack: list[str] = []
+    text = path.read_text(encoding="utf-8-sig")
+    fenced = False
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            continue
+        entry = None if fenced else TREE_ENTRY.match(line)
+        if entry is None:
+            continue
+        indent, view_id = len(entry.group(1)), entry.group(2)
+        if indent % 2 or indent // 2 > len(stack):
+            errors.append(f"{doc}:{number}: `{view_id}` is not nested two spaces under a listed View")
+            continue
+        del stack[indent // 2:]
+        parent = stack[-1] if stack else "null"
+        stack.append(view_id)
+        if view_id in listed:
+            errors.append(f"{doc}:{number}: `{view_id}` is listed twice")
+            continue
+        listed[view_id] = parent
+        if view_id not in parents:
+            errors.append(f"{doc}:{number}: lists `{view_id}`, which has no docs/components/{view_id}.md")
+        elif parents[view_id] != parent:
+            errors.append(f"{doc}:{number}: `{view_id}` is listed under `{parent}`, "
+                          f"its View file names parent `{parents[view_id]}`")
+    for view_id in sorted(parents.keys() - listed.keys()):
+        errors.append(f"{doc}: does not list View `{view_id}` (parent `{parents[view_id]}`)")
+    for view_id in required:
+        if view_id not in parents:
+            errors.append(f"docs/components/{view_id}.md: missing (a production-pass View, W7-07)")
+    inventory = INVENTORY_LINE.search(text)
+    if inventory is None:
+        errors.append(f"{doc}: no 'Current inventory: **<n> View files**' line")
+    elif int(inventory.group(1)) != len(parents):
+        errors.append(f"{doc}: says {inventory.group(1)} View files, docs/components has {len(parents)}")
+    return len(listed), errors
 
 
 def _module_name(relative: Path) -> str | None:
@@ -273,6 +376,8 @@ def check_doc_links(workspace: Path) -> tuple[int, list[str]]:
 if __name__ == "__main__":
     workspace = Path(__file__).resolve().parent.parent
     count, errors = check(workspace)
+    listed, hierarchy_errors = check_view_hierarchy(workspace)
+    errors += hierarchy_errors
     modules, architecture_errors = check_architecture(workspace)
     errors += architecture_errors
     links, link_errors = check_doc_links(workspace)
@@ -281,6 +386,8 @@ if __name__ == "__main__":
         print("\n".join(errors), file=sys.stderr)
         raise SystemExit(1)
     print(f"PASS: {count} Views; unique IDs, one root, valid parents, no cycles, existing sources")
+    print(f"PASS: {VIEW_HIERARCHY_DOC} lists all {listed} Views under their parents, "
+          f"the {len(PRODUCTION_VIEWS)} production-pass Views included")
     print(f"PASS: {modules} modules to depth 2 each have an ARCHITECTURE.md ownership row")
     print(f"PASS: {links} relative doc links resolve, none into {AUDITION_DIRECTORY}/; "
           f"the loudness gate is recorded in {len(LOUDNESS_GATE_DOCS)} docs")

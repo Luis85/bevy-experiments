@@ -2,7 +2,7 @@
 type: View
 id: debrief-improvement
 title: "Journey preparation and unlocked routes"
-parent: journey-upgrades
+parent: results
 status: Implemented
 source: "crates/horde_game/src/ui/results.rs::results"
 ---

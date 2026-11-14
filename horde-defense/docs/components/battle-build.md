@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/battle/construction.rs::construction_controls,
 
 Place owned defenses within the left-half construction cells and inspect remaining supply.
 
-- **Entry, exit and actions:** Open Build, select a structure, place a valid preview or salvage an existing structure; close Build to resume the aiming presentation.
+- **Entry, exit and actions:** Open Build defenses (or press B), select a structure, place a valid preview or salvage an existing structure; Close construction or Escape closes it without pausing and resumes the aiming presentation. The panel overlays the field's right side and never rescales the field; an INCOMING chevron marks spawns it covers.
 - **State boundary:** Placement legality, supply, salvage and saved plans belong to core rules; selected kind and cell preview are scene state.
 - **Responsiveness and accessibility:** A bounded scrolling panel explains costs and invalid-placement reasons. Preview labels supplement valid/invalid color.
 

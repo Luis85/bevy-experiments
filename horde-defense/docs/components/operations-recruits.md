@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/operations.rs::operations"
 
 Recruit from liberated countries and issue legal single-defense or country-operation orders.
 
-- **Entry, exit and actions:** Choose an accessible order country, Recruit survivor when legal, then deploy a ready recruit or start Liberate country when unlocked.
+- **Entry, exit and actions:** Choose an accessible order country, "Recruit survivor · N coins" when legal (it opens the Recruit modal on that country's offer), then deploy a ready recruit or start Liberate country when unlocked.
 - **State boundary:** Core gates enforce liberation thresholds, wallet, roster size, status and reservations. Country operations chain real defenses without automatic purchases/training.
 - **Responsiveness and accessibility:** Locked milestones and disabled recruitment reasons are written; each roster entry names status and origin.
 

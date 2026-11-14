@@ -35,8 +35,8 @@ The menu uses the chosen survivor’s cohesive low-ready-pistol art, with plante
 ## Fortification practice
 
 Open construction with **B** or its button. **Combat continues** while the grid
-and supply panel are open, including in observed expeditions. Use **Escape** or
-an explicit Pause action separately if you need time. Place only in the
+and supply panel are open, including in observed expeditions. **Escape** closes
+construction without pausing; press Pause (Escape again, by default) if you need time. Place only in the
 current-lane-count, five-column grid between the contact strip and midpoint. Check cost,
 range and invalid-placement feedback. Try an occupied cell and the right half:
 neither may spend supply. During combat, salvage returns at most half the
@@ -148,9 +148,33 @@ A recruit can defend the main run in your place. Use Strategy practice.cmd, or a
 
 Record who defended each run, the outcome, whether the names and the figure matched the recruit, every refusal text you saw, and any toast that was missing or repeated. See docs/STRATEGY.md, "Recruit takeover", in the source repository for the exact rules.
 
+## Escape
+
+Escape does one thing per press, topmost first. Check each row at 1440x900 and at 1050x700 with 135% interface scale, in normal and reduced effects:
+
+| Where you are | One Escape press |
+|---|---|
+| A rebind prompt in Settings | Cancels it; the old key stays |
+| An open window: the quit or return-to-menu question, a save error, unapplied difficulty changes, Recruit, Apply rule to stash | Closes it; unapplied difficulty changes keeps you editing, and Apply rule to stash sells nothing |
+| An open dropdown or menu, or a text field you are typing in | Closes it, or leaves the field |
+| Operation details, the Operations observer window, an Equipment sale confirmation | Closes it |
+| Main menu | Asks "Quit Last Light?" |
+| Survivor selection, or the world map before Start journey | Main menu |
+| Briefing, Equipment, Character, World map, Mara or Operations | Camp home |
+| Camp home | Results, when the last defense has settled and the journey is running; otherwise asks "Return to the main menu?" |
+| Results | Asks "Return to the main menu?" |
+| Journey upgrades | Results, or Camp home when no defense has settled |
+| Battle, holding Retreat & train | Cancels the hold; nothing else happens |
+| Battle, construction open | Closes construction; the battle keeps running |
+| Battle, otherwise | Pauses or resumes while Pause is bound to Escape (the default); with Pause on another key, Escape does nothing in battle |
+| Run history | Back to where you opened it |
+| Settings | Saves and returns; with an unapplied difficulty change it asks first: Apply and return, Discard and return, or Keep editing |
+
+While "Saving…" shows, Escape goes nowhere. Record any press that did something else, paused a battle you did not mean to pause, or closed two things at once.
+
 ## Controls and recovery
 
-Default keys: primary mouse fires the equipped gun (or a press throws the selected throwable), secondary mouse uses contact melee, **R** reloads, **1/2** use purchased personal abilities, **B** opens/closes live construction, **Escape** pauses, **F** toggles fire, **Q** cycles the unlocked attacks (gun, grenade, Molotov), **P** pauses or resumes the world clock on Camp home, and **F12** captures the native framebuffer. Settings remap essential actions and offer toggle fire, aim assistance, text scaling, outlines, reduced effects, optional blood and independent sound levels. Combat hints reflect the saved bindings.
+Default keys: primary mouse fires the equipped gun (or a press throws the selected throwable), secondary mouse uses contact melee, **R** reloads, **1/2** use purchased personal abilities, **B** opens/closes live construction, **Escape** pauses the battle (see Escape above), **F** toggles fire, **Q** cycles the unlocked attacks (gun, grenade, Molotov), **P** pauses or resumes the world clock on Camp home, and **F12** captures the native framebuffer. Settings remap essential actions and offer toggle fire, aim assistance, text scaling, outlines, reduced effects, optional blood and independent sound levels. Combat hints reflect the saved bindings.
 
 Save and return to the menu, quit, and continue the same deployment. Reload progress, actions, positions, RNG and banked rewards should resume together. A save failure keeps the application open and opens a "Save failed" window with Retry, Open folder, Copy path and Dismiss; an unreadable save or settings file opens the same kind of window at startup. Manual check: Open folder shows the save folder in the file manager (if it does not, Copy path still gives the folder). Never remove a save to test recovery. Use separate practice or `LASTLIGHT_SAVE_DIR` instead.
 

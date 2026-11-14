@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/battle/overlays.rs::corner_hud; crates/horde_g
 
 Show personal identity/portrait, health, ammunition, stamina, boss/time, threat/groups/loot level and essential combat actions.
 
-- **Entry, exit and actions:** Visible during active defense; use Reload, melee, firing toggle or unlocked emergency aid/brace controls as applicable.
+- **Entry, exit and actions:** Visible during active defense. The bar keeps the unlocked Emergency aid and Brace the line; Reload, Strike contact lane and Toggle firing are under Management › Field actions, and their keys and the legend are unchanged. The HUD names the defender from its core card (a recruit's first name in capitals, with its own portrait) and the HP text ends in "· LOW" while the low-HP warning holds.
 - **State boundary:** HUD reads Attempt and its frozen progression/profile snapshot; action controls submit input to the runtime. Displayed values never advance the simulation.
 - **Responsiveness and accessibility:** Mouse alternatives and current binding tooltips supplement remappable keys; numerical readouts accompany bars.
 

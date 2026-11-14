@@ -1,4 +1,5 @@
-"""Self-tests for scripts/check_views.py's check_architecture and check_doc_links, on a throwaway workspace.
+"""Self-tests for scripts/check_views.py's check_view_hierarchy, check_architecture and check_doc_links, on a
+throwaway workspace.
 
 Run: python -I -B scripts/tests/test_check_views.py
 """
@@ -103,6 +104,72 @@ class CheckArchitectureTests(unittest.TestCase):
         bare = "| `art/camera.rs` | The camera | Rules | `fit_field` | `field_fits_the_window` |\n"
         self.assertEqual(["ARCHITECTURE.md: row names no module or file: art/camera.rs"],
                          self.errors(CORE_ROW + self.ART_ROW + GAME_ROW + bare))
+
+
+def view_file(view_id: str, parent: str) -> str:
+    return (f"---\ntype: View\nid: {view_id}\ntitle: \"{view_id}\"\nparent: {parent}\n"
+            f"status: Implemented\nsource: \"docs/VIEW_HIERARCHY.md\"\n---\n\n# {view_id}\n\nA view.\n")
+
+
+TREE = "- `game`\n  - `battle`\n    - `battle-hud`\n  - `results`\n"
+
+
+class CheckViewHierarchyTests(unittest.TestCase):
+    def setUp(self):
+        self._directory = tempfile.TemporaryDirectory()
+        self.workspace = Path(self._directory.name).resolve()
+        for view_id, parent in [("game", "null"), ("battle", "game"), ("battle-hud", "battle"), ("results", "game")]:
+            self.write(f"docs/components/{view_id}.md", view_file(view_id, parent))
+
+    def tearDown(self):
+        self._directory.cleanup()
+
+    def write(self, name: str, text: str):
+        path = self.workspace / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def errors(self, tree: str, count: int = 4, required: tuple[str, ...] = ()) -> list[str]:
+        self.write("docs/VIEW_HIERARCHY.md", f"# Views\n\n{tree}\nCurrent inventory: **{count} View files**.\n")
+        return check_views.check_view_hierarchy(self.workspace, required)[1]
+
+    def test_a_tree_that_matches_the_view_files_passes(self):
+        self.assertEqual([], self.errors(TREE))
+        self.assertEqual(4, check_views.check_view_hierarchy(self.workspace, ())[0])
+        self.assertEqual([], check_views.check(self.workspace)[1])
+
+    def test_an_unlisted_view_is_an_error(self):
+        self.write("docs/components/toasts.md", view_file("toasts", "game"))
+        self.assertEqual(["VIEW_HIERARCHY.md: does not list View `toasts` (parent `game`)"],
+                         self.errors(TREE, count=5))
+
+    def test_a_listed_id_needs_a_view_file(self):
+        self.assertEqual(["VIEW_HIERARCHY.md:7: lists `camp-home`, which has no docs/components/camp-home.md"],
+                         self.errors(TREE + "  - `camp-home`\n"))
+
+    def test_nesting_must_match_the_front_matter_parent(self):
+        tree = "- `game`\n  - `battle`\n  - `battle-hud`\n  - `results`\n"
+        self.assertEqual(["VIEW_HIERARCHY.md:5: `battle-hud` is listed under `game`, "
+                          "its View file names parent `battle`"], self.errors(tree))
+
+    def test_a_view_is_listed_once_and_nested_by_two_spaces(self):
+        self.assertEqual(["VIEW_HIERARCHY.md:7: `results` is listed twice"], self.errors(TREE + "  - `results`\n"))
+        tree = "- `game`\n      - `battle`\n"
+        self.assertIn("VIEW_HIERARCHY.md:4: `battle` is not nested two spaces under a listed View", self.errors(tree))
+
+    def test_entries_inside_a_fenced_block_are_not_the_tree(self):
+        self.assertEqual([], self.errors(TREE + "```\n- `example`\n```\n"))
+
+    def test_the_inventory_line_states_the_view_count(self):
+        self.assertEqual(["VIEW_HIERARCHY.md: says 70 View files, docs/components has 4"], self.errors(TREE, count=70))
+        self.write("docs/VIEW_HIERARCHY.md", "# Views\n\n" + TREE)
+        self.assertEqual(["VIEW_HIERARCHY.md: no 'Current inventory: **<n> View files**' line"],
+                         check_views.check_view_hierarchy(self.workspace, ())[1])
+
+    def test_every_required_production_view_has_a_file(self):
+        self.assertEqual(["docs/components/camp-home.md: missing (a production-pass View, W7-07)"],
+                         self.errors(TREE, required=("results", "camp-home")))
+        self.assertIn("camp-home", check_views.PRODUCTION_VIEWS)
 
 
 GATE = "A 60 s mix at default sliders reads **-23 ±2 LUFS integrated** with **true peak ≤ 0.95 FS**.\n"

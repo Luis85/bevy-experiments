@@ -9,9 +9,9 @@ source: "crates/horde_game/src/ui/preferences.rs::audio_settings"
 
 # Audio settings
 
-Set master, combat-effects and atmospheric volume.
+Set master, combat-effects, atmosphere, music and interface volume, and mono output.
 
-- **Entry, exit and actions:** Adjust the three labeled sliders; save through settings return.
+- **Entry, exit and actions:** Adjust Master, Combat effects, Atmosphere, "Music & stingers" (music tracks are not in this build; it sets the victory, defeat and retreat stingers) and "Interface sounds", or tick "Mono audio"; save through settings return.
 - **State boundary:** Volumes control presentation gain, never combat or strategic timing.
 - **Responsiveness and accessibility:** Important sounds also have visual cues; sliders support quiet or muted play.
 

@@ -1184,8 +1184,8 @@ fn package_link_check_reports_relative_links_only() {
 /// (ruling W-15): the wording is the owner's, so a heading matches a whole
 /// line, nothing more. W4-10 lists enemy-balance's four docs, W4-11
 /// progression-tree's goal-5 section, W7-04 loot-economy's auto-sell
-/// sections, W7-05 progression-tree's and W7-06 campaign-defenders'; W7-08
-/// adds the rest of the inventory.
+/// sections, W7-05 progression-tree's, W7-06 campaign-defenders' and W7-07
+/// ux-flow's; W7-08 adds the rest of the inventory.
 const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     (
         "docs/ENEMY_COMPOSITION.md",
@@ -1264,6 +1264,54 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
         &["### Recruit advancement allowance"],
     ),
     ("docs/PLAYTEST_GUIDE.md", &["## Takeover"]),
+    // W7-07, ux-flow: the loop map, the production-pass UI contract, the
+    // new views and the Escape table.
+    (
+        "docs/JOURNEYS.md",
+        &["## Loop map", "## Every main round ends on Results"],
+    ),
+    (
+        "docs/UI_REDESIGN.md",
+        &[
+            "## Production pass — 14 November 2026",
+            "### Escape and decision 18",
+            "### One amber primary",
+            "### Camp home, Results and Upgrades",
+            "### Modals and toasts",
+            "### Battle layout and the two-row bar",
+        ],
+    ),
+    ("docs/VIEW_HIERARCHY.md", &["## Production pass views"]),
+    ("docs/PLAYTEST_GUIDE.md", &["## Escape"]),
+];
+
+/// Interface claims the production pass made false, with what replaced each
+/// (W7-07, ux-flow). Matched like [`RETIRED_DOC_CLAIMS`].
+const RETIRED_UX_CLAIMS: &[(&str, &str)] = &[
+    (
+        "Every main round returns to upgrades",
+        "every main round ends on Results, one action from Upgrades (JOURNEYS.md, \"Loop map\")",
+    ),
+    (
+        "Each main outcome routes to Journey upgrades",
+        "every main outcome ends on Results since W3-03 (JOURNEYS.md, \"Loop map\")",
+    ),
+    (
+        "Choosing that country immediately deploys a live personal defense",
+        "Start journey opens the first defense paused; later countries are chosen with SelectCountry (W3-18)",
+    ),
+    (
+        "First-country confirmation immediately creates and enters a live personal attempt",
+        "Start journey opens the first defense paused; later countries are chosen with SelectCountry (W3-18)",
+    ),
+    (
+        "In NPC mode open Survivor",
+        "the NPC bar's popup is Tactics and names the defender",
+    ),
+    (
+        "Use **Escape** or an explicit Pause action separately",
+        "Escape closes construction first and pauses only on the next press (PLAYTEST_GUIDE.md, \"Escape\")",
+    ),
 ];
 
 /// Defender claims the production pass made false, with what replaced each
@@ -1382,6 +1430,17 @@ fn docs_drop_retired_defender_claims() {
             "
 "
         )
+    );
+}
+
+#[test]
+fn docs_drop_retired_ux_claims() {
+    let violations = retired_claims_in_docs(RETIRED_UX_CLAIMS);
+    assert!(
+        violations.is_empty(),
+        "docs still make retired interface claims ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
     );
 }
 
