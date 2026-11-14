@@ -653,8 +653,11 @@ fn v6_payload_round_trips_unchanged_through_v7_types() {
 /// (R32, which accepted this guard's update with the §2.5 default), so a
 /// Personal GOLDEN run that levels 1 -> 2 owes the 5-coin grant and its
 /// withdrawal pays it: the run record's `level_grant_coins` and the report's
-/// receipt.
-const WRITTEN_V7_KEYS: [(&str, &str); 13] = [
+/// receipt. W4-14 is not a v7 key: `Enemy.statuses` predates format 7 and
+/// is saved only while a status runs. Mara's GOLDEN runs aim only when the
+/// aim raises her expected hits per turn, so at the sampled tick a hostile
+/// she just hit can hold its hit-stop, which the v6 build never sampled.
+const WRITTEN_V7_KEYS: [(&str, &str); 14] = [
     ("W2-05", "/attempt/telemetry/spawned_by_archetype"),
     ("W2-05", "/attempt/telemetry/kills_by_archetype"),
     ("W2-05", "/attempt/telemetry/damage_taken_by_archetype"),
@@ -668,6 +671,7 @@ const WRITTEN_V7_KEYS: [(&str, &str); 13] = [
     ("W2-52", "/campaign/player/level_grant_paid"),
     ("W2-54", "/campaign/run_history/level_grant_coins"),
     ("W2-54", "/last_result/progression_rewards"),
+    ("W4-14", "/attempt/enemies/statuses"),
 ];
 
 /// Whether `path` is one of [`WRITTEN_V7_KEYS`] or lies below one.

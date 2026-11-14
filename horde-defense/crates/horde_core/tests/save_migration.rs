@@ -1917,6 +1917,20 @@ fn v7_fixture_loads_validates_and_resaves_byte_identically() {
 /// as in the v6 pin.
 const V7_CONTINUATION_FNV: u64 = 0xe548_ad05_21f8_a2ce;
 
+/// The continuation a later rule change moved the pin to, until the
+/// closing-phase re-bless folds it into [`V7_CONTINUATION_FNV`] (ruling P3,
+/// as `PROVISIONAL` in `tests/determinism.rs`); None when nothing moved it.
+const V7_CONTINUATION_PROVISIONAL: Option<u64> = Some(0x4998_700c_0fb6_1012);
+
+/// Why [`V7_CONTINUATION_PROVISIONAL`] moved: `(commit tag, reason)`, one per
+/// moving commit. Empty exactly when it is None.
+const V7_CONTINUATION_CAUSES: &[(&str, &str)] = &[(
+    "W4-14 aim",
+    "the fixture's live root defense is Mara's (Npc rules, deployed in v7): she aims only \
+     when the aim raises her expected hits per turn, so her turns, hits and the enemies' \
+     hit points move; pre-v7 attempts keep the old aim test, so V1-V6 do not move",
+)];
+
 #[test]
 fn v7_fixture_continues_exactly_as_the_wave4_close_did() {
     let mut g = fixture_v7();
@@ -1954,7 +1968,17 @@ fn v7_fixture_continues_exactly_as_the_wave4_close_did() {
     assert!(live > 0, "the live expedition outlasts 600 ticks");
     let fnv = support::fnv1a(trace.as_bytes());
     assert_eq!(trace.lines().count(), 12);
-    assert_eq!(fnv, V7_CONTINUATION_FNV, "{trace}");
+    assert_eq!(
+        V7_CONTINUATION_PROVISIONAL.is_some(),
+        !V7_CONTINUATION_CAUSES.is_empty(),
+        "a provisional v7 continuation needs its causes, and causes need the pin"
+    );
+    assert_ne!(V7_CONTINUATION_PROVISIONAL, Some(V7_CONTINUATION_FNV));
+    assert_eq!(
+        fnv,
+        V7_CONTINUATION_PROVISIONAL.unwrap_or(V7_CONTINUATION_FNV),
+        "{trace}"
+    );
 }
 
 /// Every enemy and balance field save format 7 added (sections 3.1

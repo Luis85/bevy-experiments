@@ -2452,11 +2452,14 @@ fn mode_owner_digest() -> u64 {
 /// player owe `level_grant_paid` mid-run and the withdrawal pays the grant
 /// (coins, ledger and receipt); with a neutral rewards block the W2-09
 /// digest returns, and the takeover code did not move.
+/// Re-recorded at W4-14 (gameplay, class G): Mara's runs aim only when the
+/// aim raises her expected hits per turn, so her turns move; with the old
+/// aim test the W2-54 digest returns, and the takeover code did not move.
 #[test]
 fn mode_owner_paths_are_byte_identical() {
     assert_eq!(mode_owner_digest(), MODE_OWNER_DIGEST);
 }
-const MODE_OWNER_DIGEST: u64 = 6_823_137_652_472_446_824;
+const MODE_OWNER_DIGEST: u64 = 10_179_632_170_315_995_650;
 
 /// Pin: Mara's `attempts` count moves exactly as the legacy
 /// `finish_attempt` moved it: one per finished Mara run of any outcome,

@@ -1,6 +1,6 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 mod support;
-use horde_core::content::{EnemyKind, Mode, StructureKind, content};
+use horde_core::content::{EnemyKind, Mode, Policy, StructureKind, content};
 use horde_core::sim::{DEFENSE_LINE, Game, Input, Outcome};
 use horde_core::status::StatusId;
 use support::{advance, enemy, game, legacy_game, nodes_price, strategic_game};
@@ -658,6 +658,65 @@ fn cautious_policy_aims_when_useful_even_if_optional_aiming_is_disabled() {
     assert!(a.decision.starts_with("Attack: shoot"));
     assert_eq!(a.shots, 1);
     assert_eq!(a.ammo, magazine - 1);
+}
+/// W4-14: an aim is useful only when it raises the expected hits per turn.
+/// At effective skill 12 (Guns 16, 9.5 yards: -4) two unaimed shots land
+/// 2 x 74.1% = 1.48 expected hits, while a one-second Aim (+5 Acc, skill 17)
+/// and its shot land 98.1% in the same two turns. Every policy shoots, the
+/// Marksman too, which used to aim two seconds whatever the odds.
+#[test]
+fn marksman_shoots_unaimed_when_two_shots_land_more_than_one_aimed() {
+    for policy in [Policy::Marksman, Policy::Balanced] {
+        let mut g = game(Mode::Npc);
+        g.campaign_mut().npc.policy = policy;
+        g.campaign_mut().npc.prefer_aim = true;
+        enemy(&mut g, 5, 10.0, false);
+        let a = g.attempt_mut().unwrap();
+        a.profile.ranged_skill = 16;
+        a.profile.npc.skill_bonus = 0;
+        a.profile.npc.accuracy = 5;
+        advance(&mut g, 60);
+        let a = g.attempt().unwrap();
+        assert!(
+            a.decision.starts_with("Attack: shoot"),
+            "{policy:?}: {}",
+            a.decision
+        );
+        assert_eq!((a.shots, a.aim_ticks), (1, 0), "{policy:?}");
+    }
+}
+/// W4-14: a long shot still earns its Aim. At effective skill 9 (Guns 16,
+/// 29 yards: -7) one aimed shot (skill 14, 90.7%) beats two unaimed ones
+/// (2 x 37.5%), so both policies aim for one second and then shoot; the
+/// Marksman's second Aim second (skill 15, 95.4% over three turns) does not
+/// pay, so it no longer takes it.
+#[test]
+fn npc_aims_a_long_shot_for_one_second_when_the_aim_pays() {
+    for policy in [Policy::Marksman, Policy::Balanced] {
+        let mut g = game(Mode::Npc);
+        g.campaign_mut().npc.policy = policy;
+        g.campaign_mut().npc.prefer_aim = true;
+        enemy(&mut g, 5, 29.5, false);
+        let a = g.attempt_mut().unwrap();
+        a.profile.ranged_skill = 16;
+        a.profile.npc.skill_bonus = 0;
+        a.profile.npc.accuracy = 5;
+        advance(&mut g, 60);
+        let a = g.attempt().unwrap();
+        assert!(
+            a.decision.starts_with("Aim at"),
+            "{policy:?}: {}",
+            a.decision
+        );
+        advance(&mut g, 60);
+        let a = g.attempt().unwrap();
+        assert!(
+            a.decision.starts_with("Attack: shoot"),
+            "{policy:?}: {}",
+            a.decision
+        );
+        assert_eq!((a.shots, a.aim_ticks), (1, 60), "{policy:?}");
+    }
 }
 #[test]
 fn risk_preference_changes_low_odds_actions_only_at_the_next_legal_turn() {

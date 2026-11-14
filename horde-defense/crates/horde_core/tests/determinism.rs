@@ -210,14 +210,38 @@ const TRACE_RULESET: u32 = 4;
 
 /// Provisional `(GOLDEN, GAMEPLAY_TRACE)` digests, in `GOLDEN` order, set by
 /// a digest-moving commit until the wave's re-bless folds them (ruling P3).
-/// None since W2-49 folded the wave-2 causes (W2-05, W2-06, W2-08, W2-52,
-/// W2-09, W2-54) into `GOLDEN`; their reasons are in the re-bless log. No
-/// wave-3 or wave-4 commit set it, so W4-08 had nothing to fold.
-const PROVISIONAL: Option<([u64; 6], [u64; 6])> = None;
+/// None from W2-49 (which folded the wave-2 causes W2-05, W2-06, W2-08,
+/// W2-52, W2-09 and W2-54 into `GOLDEN`; their reasons are in the re-bless
+/// log) to W4-08, which had nothing to fold. W4-14 lands after W4-08, so its
+/// moves stay here for the closing-phase re-bless (R59).
+const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
+    [
+        0xbed5_e271_4b65_90fe,
+        0xe815_cc4d_881f_ed01,
+        0x3368_f180_97f7_fb5e,
+        0xfcfc_e341_32d9_4df1,
+        0x7be5_c84d_229d_8d71,
+        0xb5d7_f191_00a3_adf9,
+    ],
+    [
+        0xa6ca_a6de_7fd9_2b1a,
+        0x7c7a_9611_4e5a_81e3,
+        0x5cc8_bde4_faf0_9763,
+        0x86f4_1f0c_9bb0_d3f2,
+        0x46a2_adc6_720f_8678,
+        0x3f07_e12b_9cf2_9264,
+    ],
+));
 
 /// Why `PROVISIONAL` moved: `(commit tag, class, reason)`, one per moving
 /// commit. Empty exactly when `PROVISIONAL` is None.
-const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
+const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[(
+    "W4-14 aim",
+    MoveClass::G,
+    "the three Npc runs: Mara (Balanced) no longer aims at effective skill 10-13, where two \
+     unaimed shots land more expected hits than one aimed shot, so her turns, shots and \
+     kills move; the three Personal runs are unchanged",
+)];
 
 /// The seeds of the progressed runs.
 const PROGRESSED_SEEDS: [u64; 2] = [1, 0xDEAD_BEEF_2026];
@@ -260,10 +284,30 @@ const PROGRESSED_TRACE: [(u64, ProgressedRun, u64); 4] = [
 
 /// Provisional `(PROGRESSED_GOLDEN, PROGRESSED_TRACE)` digests, in
 /// `PROGRESSED_GOLDEN` order (ruling P3, as `PROVISIONAL`).
-const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = None;
+/// Set by W4-14, after the W4-09 cut, for the closing-phase re-bless (R59).
+const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = Some((
+    [
+        0x1725_164d_48e7_8d12,
+        0xd93e_9115_3c7e_753d,
+        0x9169_7e75_2793_cfc0,
+        0x3e4c_4fdc_1bcd_0da9,
+    ],
+    [
+        0x209f_0b4c_6c60_a4aa,
+        0xa3a4_fbe6_33a3_9c59,
+        0xcaea_9c90_4c7b_2910,
+        0x643b_fdd7_d846_71f7,
+    ],
+));
 
 /// Why `PROGRESSED_PROVISIONAL` moved: `(commit tag, class, reason)`.
-const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
+const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[(
+    "W4-14 aim",
+    MoveClass::G,
+    "the two recruit takeovers (Npc rules): the recruit aims only when the aim raises its \
+     expected hits per turn, so its turns and kills \
+     move; both still win; the two Hard Capstone runs are unchanged",
+)];
 
 /// The archetypes wave 2 appended (W2-31: six and the splitter's child).
 /// They enter at wave tier 5, so no `GOLDEN` run meets one.

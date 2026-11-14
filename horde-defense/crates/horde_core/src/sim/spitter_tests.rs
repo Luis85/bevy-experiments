@@ -87,7 +87,9 @@ fn reach_zero_profile_identical() {
     // Characterisation pin: every shipped archetype has reach 0, so the
     // ranged stop is the defense line and every enemy fights as before W2-27.
     // The digests were recorded on the parent commit (before the spitter
-    // mechanics) and must not move.
+    // mechanics) and must not move for reach. The Npc digest was re-recorded
+    // at W4-14 (gameplay): the defender aims only when the aim raises its
+    // expected hits per turn; reach plays no part in that change.
     for width in [8.0, 12.0, 20.0, 30.0] {
         for reach in [0.0, -0.0] {
             assert_eq!(ranged_stop(width, reach).to_bits(), DEFENSE_LINE.to_bits());
@@ -95,7 +97,7 @@ fn reach_zero_profile_identical() {
     }
     for (mode, digest) in [
         (Mode::Personal, 0xc2bf_fafb_4c4d_9cc3),
-        (Mode::Npc, 0x78a0_2cff_258b_e0c7),
+        (Mode::Npc, 0xca3f_9c40_3e33_7caf),
     ] {
         assert_eq!(
             battle_trace(mode, 3600),
