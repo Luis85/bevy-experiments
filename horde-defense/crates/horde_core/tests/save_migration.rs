@@ -1915,21 +1915,25 @@ fn v7_fixture_loads_validates_and_resaves_byte_identically() {
 /// expedition, its settled flag and its worker attempt's tick, hp, RNG state
 /// and enemy count. Campaign coins, items and the strategy RNG are left out,
 /// as in the v6 pin.
-const V7_CONTINUATION_FNV: u64 = 0xe548_ad05_21f8_a2ce;
+///
+/// Re-blessed once, in the closing re-bless (ruling P3), from the W4-09 cut
+/// 0xe548_ad05_21f8_a2ce, class G, cause W4-14 aim (fbedee2): the fixture's
+/// live root defense is Mara's (Npc rules, deployed in v7), and she aims
+/// only when the aim raises her expected hits per turn, so her turns, hits
+/// and the enemies' hit points move. W4-14 arrival does not reach it (the
+/// in-flight attempt keeps its frozen snapshot), nor does W4-15. Pre-v7
+/// attempts keep the old aim test, so V1-V6 do not move.
+const V7_CONTINUATION_FNV: u64 = 0x4998_700c_0fb6_1012;
 
 /// The continuation a later rule change moved the pin to, until the
 /// closing-phase re-bless folds it into [`V7_CONTINUATION_FNV`] (ruling P3,
 /// as `PROVISIONAL` in `tests/determinism.rs`); None when nothing moved it.
-const V7_CONTINUATION_PROVISIONAL: Option<u64> = Some(0x4998_700c_0fb6_1012);
+/// None since the closing re-bless folded W4-14 aim.
+const V7_CONTINUATION_PROVISIONAL: Option<u64> = None;
 
 /// Why [`V7_CONTINUATION_PROVISIONAL`] moved: `(commit tag, reason)`, one per
 /// moving commit. Empty exactly when it is None.
-const V7_CONTINUATION_CAUSES: &[(&str, &str)] = &[(
-    "W4-14 aim",
-    "the fixture's live root defense is Mara's (Npc rules, deployed in v7): she aims only \
-     when the aim raises her expected hits per turn, so her turns, hits and the enemies' \
-     hit points move; pre-v7 attempts keep the old aim test, so V1-V6 do not move",
-)];
+const V7_CONTINUATION_CAUSES: &[(&str, &str)] = &[];
 
 #[test]
 fn v7_fixture_continues_exactly_as_the_wave4_close_did() {

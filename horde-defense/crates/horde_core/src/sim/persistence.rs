@@ -40,7 +40,18 @@ const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 ///   can diverge on replay and now warns. No `GOLDEN` or `GAMEPLAY_TRACE`
 ///   digest moved in waves 3 and 4 (the traced runs are rank 0 with no
 ///   country, no skill bought and no expedition; tests/determinism.rs).
-pub const RULESET_VERSION: u32 = 4;
+/// - 5 (the closing re-bless of the production pass): names the rule
+///   changes since ruleset 4. An Npc aims only when the aim raises its
+///   expected hits per turn (W4-14 aim; an attempt deployed before save
+///   format 7 keeps the old aim test); the Npc arrival factor 0.9 -> 0.5
+///   (W4-14 arrival); Survivor network 1,700 -> 1,500 coins (W4-15).
+///   W4-15's `train_companions` is pacing-bot code and W4-16's power
+///   readout is never saved and decides no command, so neither is a rule.
+///   A recording or save made under ruleset 4 can diverge on replay and now
+///   warns. `GOLDEN` and `GAMEPLAY_TRACE` moved for the three Npc runs, and
+///   the four progressed runs and the v7 continuation moved too
+///   (tests/determinism.rs, tests/save_migration.rs).
+pub const RULESET_VERSION: u32 = 5;
 
 /// A save or load failure. `Display` keeps the player-facing wording.
 #[derive(Debug)]
@@ -1172,7 +1183,11 @@ mod tests {
         let envelope: SaveEnvelope = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(envelope.version, SAVE_VERSION);
         assert_eq!(envelope.ruleset_version, Some(RULESET_VERSION));
-        assert_eq!(envelope.ruleset_version, Some(4), "ruleset 4 since W4-08");
+        assert_eq!(
+            envelope.ruleset_version,
+            Some(5),
+            "ruleset 5 since the closing re-bless"
+        );
         assert_eq!(
             envelope.content_fingerprint,
             Some(crate::catalog::content_fingerprint())

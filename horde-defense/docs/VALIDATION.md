@@ -445,6 +445,8 @@ Final documentation checks passed **69 source-backed Views**, retaining all 64 p
 
 **Ruleset 4 (W4-08, 14 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 4. The bump names the wave-2 review rule fixes after W2-49 and the wave-4 rules ("Wave-3/4 re-bless and ruleset 4" below). A debug recording made under ruleset 3 (from W2-49 up to W4-08) now replays with the warning "recorded under ruleset 3, this build uses 4; the replay may diverge", and a save written under ruleset 3 loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
 
+**Ruleset 5 (the closing re-bless, 14 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 5. The bump names the rule changes since ruleset 4: W4-14's Npc aim test and arrival factor and W4-15's Survivor network price ("Closing re-bless and ruleset 5" below). A debug recording made under ruleset 4 (from W4-08 up to the closing re-bless) now replays with the warning "recorded under ruleset 4, this build uses 5; the replay may diverge", and a save written under ruleset 4 loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
+
 ## save_v6.json as cut — 5 November 2026 (W1-01, recorded 7 November in the W1 review)
 
 `crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed. Ruling R12 (wave-1 close, 7 November 2026) accepts the differences: the fixture is frozen evidence and the §11 numbers were estimates. schema-v7.md §11 carries the ruling as a note.
@@ -1300,6 +1302,30 @@ The wave-4 close adds three pins that guard waves 5-7, on ruleset 4 after W4-08 
 - **`V7_CONTINUATION_FNV`** (`crates/horde_core/tests/save_migration.rs`, `v7_fixture_continues_exactly_as_the_wave4_close_did`): `save_v7.json` continued for 600 idle ticks, sampled every 50, in the v6 continuation line format (the root takeover attempt and each expedition). The root defense and the live Hungarian expedition outlast the window.
 
 Perturbation proofs: each pin plus one fails (`expected 0x1725164d48e78d13, got 0x1725164d48e78d12`; `expected 0x6a779762dcfd6ad0, got 0x6a779762dcfd6acf`; `left: 16521645470565049038` `right: 16521645470565049039`). Threat rank 11 instead of 12 moves all eight progressed digests, and one flipped bit of the loaded v7 game's root attempt RNG moves the continuation (`left: 5659490391580026304`). `GOLDEN`, `GAMEPLAY_TRACE`, the V1-V6 continuation pins and the `save_v7.json` pins are unchanged; `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None.
+
+## Closing re-bless and ruleset 5 — 14 November 2026 (closing)
+
+The closing phase of the production pass runs the one save-determinism re-bless for every pin moved after W4-08 (rulings P3, R36, R59, R61). W4-14 and W4-15 had set `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL`, each with its causes. The re-bless folds them into `GOLDEN`, `GAMEPLAY_TRACE`, `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` and `V7_CONTINUATION_FNV`, resets the three provisional pins to None and their causes to empty, and moves the reasons into the `crates/horde_core/tests/determinism.rs` header (the "closing" rows of the re-bless log, the progressed re-bless log and the anatomy table) and into `V7_CONTINUATION_FNV`'s doc comment in `tests/save_migration.rs`. Before the fold the provisional pins matched HEAD exactly (13 of 13 determinism tests green, `determinism_anatomy` included).
+
+| Family | Moved | Causes (class) | Net (`support::classify`) |
+|---|---|---|---|
+| `GOLDEN` | 3/6: the three Npc runs | W4-14 aim G, W4-14 arrival G | G |
+| `GAMEPLAY_TRACE` | 3/6: the three Npc runs | W4-14 aim G, W4-14 arrival G | G |
+| `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` | 4/4 each | the takeovers: W4-14 aim G, W4-14 arrival G, W4-15 price G; the Hard Capstones: W4-15 price G | G |
+| `V7_CONTINUATION_FNV` | 0xe548ad0521f8a2ce → 0x4998700c0fb61012 | W4-14 aim G | G |
+
+What each cause changed:
+- **W4-14 aim (fbedee2):** an Npc aims only when the aim raises its expected hits per turn. It reaches Mara's three `GOLDEN` runs, the two recruit takeovers and `save_v7.json`'s live root defense (Mara's, deployed in v7). An attempt deployed before save format 7 keeps the old aim test, so V1-V6 do not move.
+- **W4-14 arrival (93321b8):** `npc_arrival_factor` 0.9 → 0.5 halves the Npc arrivals: the three Npc `GOLDEN` runs spawn 4 hostiles by tick 1800 instead of 8 and kill 4 instead of 7, and the takeover windows start 3000 ticks before the boss (`PROGRESSED_TAKEOVER_BOSS_LEAD`; 1800 for the Hard Capstones) so an elite, the new archetypes and a boss phase stay in them (59 → 48 and 62 → 52 spawned). The in-flight v7 fixture keeps its frozen snapshot, so the continuation moves for the aim alone.
+- **W4-15 price (63283a9):** Survivor network 1,700 → 1,500 coins. The progressed staging buys every node the purse affords in catalogue order, so all four runs own a different node set and play a different window. All four still win; the Hard Capstones keep their keys, items and outcome summary (spawned, elites, phase ticks).
+
+**Anatomy.** Before is `determinism_anatomy` on the W4-09 tree fa616e9, exported with `git archive` to `target/closing-rebless/w4-09-src` and built with its own target directory (`target/closing-rebless/anatomy_before_w4-09_fa616e9.txt`). After is HEAD (`target/closing-rebless/determinism_before.out`, run with the provisional pins still set). The three Personal runs are identical in every hash. The three Npc runs move keys (0xbdf9c3b221052103 → 0x3ce0e643620df24d: a sampled hostile holds its hit-stop, `/attempt/enemies/statuses`, registered as W4-14 in `WRITTEN_V7_KEYS`), core, outcome and trace, and keep their items hash 0x9148a6bf065cdfaa. The Hard Capstones move core and trace only. The takeovers move core, items, outcome and trace, and keep their keys. Every moved run's trace moves, so each nets G.
+
+W4-15's `train_companions` (62f90d3) and W4-16 (9f18943) moved no pin, and no wave-5, wave-6 or wave-7 commit set one. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins, the frozen-catalogue pin and `SAVE_VERSION` 7 did not move.
+
+**Ruleset 5.** `RULESET_VERSION` and `TRACE_RULESET` go from 4 to 5 (ruling P4). The bump names the rule changes since ruleset 4: the Npc aim test and the Npc arrival factor (W4-14) and the Survivor network price (W4-15). W4-15's `train_companions` is pacing-bot code, and W4-16's power readout is never saved and decides no command (it feeds the defender cards and `CountryStatus::recommended_defender`), so neither is a rule. The traced `GAMEPLAY_TRACE` moves are the three Npc rows above; W4-15 moves none of the six (the traced runs buy no node).
+
+Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` now asserts the literal ruleset 5 and failed on the parent with `left: Some(4)` `right: Some(5)`; `gameplay_trace_is_recorded_under_the_current_ruleset` failed with `left: 5` `right: 4` until `RULESET_VERSION` moved.
 
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 

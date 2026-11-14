@@ -764,7 +764,7 @@ The full decision and rejection lists (206 decisions, 239 rejected options) are 
 
 | Area | v7 change |
 |---|---|
-| Envelope | `SAVE_VERSION` 7 (v6_to_v7 arm; 8 rejected); `RULESET_VERSION` 2 (W1-20), 3 (W2-49), 4 (W4-08); `SETTINGS_VERSION` 1, then 2 in wave 6; recording FORMAT 1 unchanged; `GAMEPLAY_ENEMY_CAP` 224; `STRESS_ENEMY_CAP` 399 (test/review only); `MAX_WAVE_TIER` 15; `MAX_RUN_DROPS` 4096; `MAX_AUTO_SOLD_LINES` 12. |
+| Envelope | `SAVE_VERSION` 7 (v6_to_v7 arm; 8 rejected); `RULESET_VERSION` 2 (W1-20), 3 (W2-49), 4 (W4-08), 5 (closing re-bless); `SETTINGS_VERSION` 1, then 2 in wave 6; recording FORMAT 1 unchanged; `GAMEPLAY_ENEMY_CAP` 224; `STRESS_ENEMY_CAP` 399 (test/review only); `MAX_WAVE_TIER` 15; `MAX_RUN_DROPS` 4096; `MAX_AUTO_SOLD_LINES` 12. |
 | Campaign | `auto_sell: AutoSellRule`, `next_defender: Option<DefenderId>`, `reserved_recruit: Option<u64>`, `milestones_claimed: BTreeSet<u32>`, `balance_extras_basis: BalancePreset`. |
 | Player | `level_grant_paid: u32`. |
 | Attempt | `"defender"` seat (`DefenderSeat`), `drop_ids`, `drop_tier` (None = pre-v7 legacy loot path). |
@@ -791,6 +791,7 @@ Digest ledger:
 | 3 | 0 | 0 | unchanged | 3 |
 | 4 | G, one re-bless W4-08 | G | unchanged (charges pin re-blessed with reason only if it moves) | 4 |
 | 5-7 | 0 | 0 (PROGRESSED 0/4) | unchanged | 4 |
+| closing re-bless (W4-14, W4-15 after W4-08) | 3/6 (G, the Npc runs: W4-14) | 3/6 (G, W4-14); PROGRESSED 4/4 golden and trace (G: W4-14 the takeovers, W4-15 price all four); V7 continuation moved (G, W4-14 aim) | unchanged | 5 |
 
 ### The freeze (W1-63)
 
@@ -840,6 +841,17 @@ Digest ledger:
 
 **Wave-4 close pins (W4-09, 14 November 2026):** `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` pin four runs on ruleset 4: seeds 1 and 0xDEAD_BEEF_2026, each a Hard Capstone defense by the player and a recruit takeover in Npc mode, rank 12, 3600 ticks of the smoke bot from a staged clock 1800 ticks before the boss (`support::progressed_determinism_game`). `progressed_golden_runs_exercise_elites_boss_phases_and_new_archetypes` proves every window spawns an elite, enters a boss phase and kills a wave-2 archetype, and that the same campaigns at rank 2 fail that check. The family has its own P3 ledger (`PROGRESSED_PROVISIONAL`, None). `V7_CONTINUATION_FNV` pins `save_v7.json` over 600 idle ticks in the v6 line format. `GOLDEN`, `GAMEPLAY_TRACE` and every older pin are unchanged. Waves 5-7 expect PROGRESSED 0/4 and an unchanged V7 continuation; a later move stays provisional for the closing-phase re-bless. Details and perturbation proofs: VALIDATION.md "Progressed determinism pins and the v7 continuation".
 
+**Closing re-bless (14 November 2026; rulings P3, R36, R59, R61):** the closing phase folds every provisional pin set after W4-08, with a reason per digest in the `tests/determinism.rs` header (re-bless log rows "closing" and the progressed re-bless log) and in `V7_CONTINUATION_FNV`'s doc comment; the anatomy before is `determinism_anatomy` on the W4-09 tree (fa616e9) exported to `target/closing-rebless/w4-09-src`, the after is HEAD (`target/closing-rebless/`). Every move nets G: each moved run's trace moves.
+
+| Family | Moved | Cause (commit, class) | Why the move is expected |
+|---|---|---|---|
+| `GOLDEN` / `GAMEPLAY_TRACE` | 3/6 and 3/6, the Npc runs (0x1 0xcffe0be4463d46d6 -> 0x61341ecf1c422fd8 / 0x296610f8ded8a91f -> 0x77cec20196014f8d; 0x1a571167 0x97d93e67bd2bed2f -> 0x0118059a899fb437 / 0x20c2f0bd540515c4 -> 0x1fb8dfb5f91248c7; 0xdeadbeef2026 0x6dcebbedcc7582c9 -> 0x7a662cd4a007adc2 / 0x9d7678e43c2f560f -> 0x6fedc1ce190ab8e3) | W4-14 aim (fbedee2, G), W4-14 arrival (93321b8, G) | Mara aims only when the aim raises her expected hits per turn, and `npc_arrival_factor` 0.9 -> 0.5 halves the Npc arrivals (t1800: 8 -> 4 spawned, 7 -> 4 kills, hp 13 kept). Keys move too: a sampled hostile holds its hit-stop (`/attempt/enemies/statuses`, W4-14 in `WRITTEN_V7_KEYS`). The Personal three are unchanged. |
+| `PROGRESSED_GOLDEN` / `PROGRESSED_TRACE`, the two recruit takeovers | seed 1 0x3d80a50dd3323feb -> 0x6ffd2abd5ec559b7 / 0x96f568d39deb47d9 -> 0x89869eb54e0b06ea; 0xdeadbeef2026 0x5670ca6b321fb553 -> 0xa040f93de56591c4 / 0x6a779762dcfd6acf -> 0x9e1e5d57ab945f10 | W4-14 aim, W4-14 arrival, W4-15 price (63283a9, G) | the recruit's aim test, half the arrivals (the window starts 3000 ticks before the boss so an elite, the new archetypes and a boss phase stay in it: 59 -> 48 and 62 -> 52 spawned) and the price below; both still win |
+| `PROGRESSED_GOLDEN` / `PROGRESSED_TRACE`, the two Hard Capstones | seed 1 0x1725164d48e78d12 -> 0xab7276a741312f38 / 0x209f0b4c6c60a4aa -> 0x7aef2a4298a6356a; 0xdeadbeef2026 0x91697e752793cfc0 -> 0x52782b9ffeef7166 / 0xcaea9c904c7b2910 -> 0xf483cce12e822eaa | W4-15 price (G) | the staging buys every node the purse affords in catalogue order, and Survivor network at 1,500 coins (1,700) leaves 200 more for later nodes, so the node set and the play move; keys, items and outcome (Victory, spawned, elites, phase ticks) are unchanged |
+| `V7_CONTINUATION_FNV` | 0xe548ad0521f8a2ce -> 0x4998700c0fb61012 | W4-14 aim (G) | the fixture's live root defense is Mara's, deployed in v7, so the new aim test applies; the in-flight snapshot keeps its arrivals, and a pre-v7 attempt keeps the old aim test |
+
+W4-15's `train_companions` (62f90d3, pacing-bot code) and W4-16 (9f18943, the power readout, never saved) moved no pin, and no wave-5, wave-6 or wave-7 commit set one. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins and the frozen-catalogue pin are unchanged. `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None with no causes. `RULESET_VERSION` and `TRACE_RULESET` move 4 -> 5: the bump names W4-14 aim, W4-14 arrival and W4-15 price (rules: a defender's aim test, an arrival factor in `progression.json`, a skill price); `train_companions` and the W4-16 readout are not rules (the readout feeds only `CountryStatus::recommended_defender` and the defender cards). Details: VALIDATION.md "Closing re-bless and ruleset 5".
+
 ### Expected moves after the freeze
 
 | Wave | Digest | Expected | Class | Cause (commit) | Re-bless |
@@ -857,7 +869,7 @@ Digest ledger:
 | 4 | GOLDEN and GAMEPLAY_TRACE | yes, if rank-0 inputs move | G | balance (W4-*) | W4-08 |
 | 4 | trap `charges_per_rank` pin | not expected | G | re-blessed in W4-08 with its reason if it moves | W4-08 |
 | 4 | PROGRESSED_GOLDEN (4), PROGRESSED_TRACE, `V7_CONTINUATION_FNV` | new pins | - | cut at the wave-4 close (W4-09) | - |
-| 4, after W4-08 | the Npc GOLDEN and GAMEPLAY_TRACE runs, the two takeover PROGRESSED runs, the v7 continuation; any family W4-15 or W4-16 reaches | yes for W4-14 (measured, §9.6); W4-15 and W4-16 only if their change reaches a pinned run (a `skills.json` price or gate, the `defender_power` reading; W4-16 measured: no pinned run reads it, none moves) | G for W4-14; W4-15 and W4-16 as `support::classify` assigns | the Npc combat pass (W4-14, R59), earlier recruitment and the trained recruits (W4-15, R61: measured, the Survivor network price moves the four PROGRESSED runs, class G; `train_companions` moves none), the Npc power readout (W4-16, R62) | closing phase (`PROVISIONAL` / `PROGRESSED_PROVISIONAL` / `V7_CONTINUATION_PROVISIONAL` until then) |
+| 4, after W4-08 | the Npc GOLDEN and GAMEPLAY_TRACE runs, the two takeover PROGRESSED runs, the v7 continuation; any family W4-15 or W4-16 reaches | yes for W4-14 (measured, §9.6); W4-15 and W4-16 only if their change reaches a pinned run (a `skills.json` price or gate, the `defender_power` reading; W4-16 measured: no pinned run reads it, none moves) | G for W4-14; W4-15 and W4-16 as `support::classify` assigns | the Npc combat pass (W4-14, R59), earlier recruitment and the trained recruits (W4-15, R61: measured, the Survivor network price moves the four PROGRESSED runs, class G; `train_companions` moves none), the Npc power readout (W4-16, R62) | closing phase (`PROVISIONAL` / `PROGRESSED_PROVISIONAL` / `V7_CONTINUATION_PROVISIONAL` until then); folded in the closing re-bless |
 | 5-7 | every family | no | - | any core move: stop and ask the user | - |
 
 ---

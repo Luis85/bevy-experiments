@@ -65,6 +65,9 @@
 //! | 2 | W2-49 | 0x1a571167 Npc | 0x6a2ba00f7e4018d8->0x97d93e67bd2bed2f | unchanged | T W2-05, F W2-06; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1). Anatomy: keys and core move; items, outcome and trace unchanged |
 //! | 2 | W2-49 | 0xdeadbeef2026 Personal | 0x5aaf1f080eb1da92->0x7be5c84d229d8d71 | unchanged | T W2-05, F W2-06, F W2-52, F W2-54; net F | as 0x1 Personal. Anatomy: keys and core move; items, outcome and trace unchanged |
 //! | 2 | W2-49 | 0xdeadbeef2026 Npc | 0xc1bb9ef207925afc->0x6dcebbedcc7582c9 | unchanged | T W2-05, F W2-06; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1). Anatomy: keys and core move; items, outcome and trace unchanged |
+//! | closing | closing | 0x1 Npc | 0xcffe0be4463d46d6->0x61341ecf1c422fd8 | 0x296610f8ded8a91f->0x77cec20196014f8d | G W4-14 aim, G W4-14 arrival; net G | W4-14 aim (fbedee2): Mara (Balanced) aims only when the aim raises her expected hits per turn, so her turns and shots move; W4-14 arrival (93321b8): `npc_arrival_factor` 0.9 -> 0.5 halves the Npc arrivals. t1800 kills 7 -> 4, spawned 8 -> 4, coins 24 -> 14, hp 13 kept. Anatomy: keys (a sampled hostile holds its hit-stop, `/attempt/enemies/statuses`), core, outcome and trace move; items unchanged |
+//! | closing | closing | 0x1a571167 Npc | 0x97d93e67bd2bed2f->0x0118059a899fb437 | 0x20c2f0bd540515c4->0x1fb8dfb5f91248c7 | G W4-14 aim, G W4-14 arrival; net G | as 0x1 Npc. t1800 kills 7 -> 4, spawned 8 -> 4, coins 22 -> 13, hp 13 kept |
+//! | closing | closing | 0xdeadbeef2026 Npc | 0x6dcebbedcc7582c9->0x7a662cd4a007adc2 | 0x9d7678e43c2f560f->0x6fedc1ce190ab8e3 | G W4-14 aim, G W4-14 arrival; net G | as 0x1 Npc. t1800 kills 7 -> 4, spawned 8 -> 4, coins 22 -> 14, hp 13 kept |
 //!
 //! W1-69 is the wave-1 re-bless (ruling R7, folded directly: the user's
 //! 2026-11-06 decision that enemies overlap is the only cause, so no
@@ -140,6 +143,45 @@
 //! sets `PROGRESSED_PROVISIONAL` and appends its cause to
 //! `PROGRESSED_PROVISIONAL_CAUSES`, and the closing-phase re-bless folds them
 //! (rulings P3, R36). Waves 5-7 expect no move (PROGRESSED 0/4).
+//!
+//! **Closing re-bless (rulings P3, R36, R59, R61).** The closing phase of
+//! the production pass folds every provisional pin set after W4-08: W4-14
+//! aim (fbedee2) and W4-14 arrival (93321b8) moved the three Npc `GOLDEN`
+//! and `GAMEPLAY_TRACE` runs (log rows above), the two recruit takeovers
+//! and the v7 continuation (`tests/save_migration.rs`), and W4-15 price
+//! (63283a9) moved all four progressed runs. W4-15's `train_companions`
+//! (62f90d3) and W4-16 (9f18943) moved nothing, and no wave-5, wave-6 or
+//! wave-7 commit set a pin. `GOLDEN` 3/6 and `GAMEPLAY_TRACE` 3/6 (the
+//! three Personal runs are unchanged in both), `PROGRESSED_GOLDEN` 4/4,
+//! `PROGRESSED_TRACE` 4/4 and `V7_CONTINUATION_FNV` moved; every move nets
+//! G (each moved run's trace moves, which `support::classify` ranks first).
+//! The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json`
+//! pins and the frozen-catalogue pin did not move. Progressed re-bless log:
+//!
+//! | run | PROGRESSED_GOLDEN old->new | PROGRESSED_TRACE old->new | class | cause |
+//! |---|---|---|---|---|
+//! | 0x1 HardCapstone | 0x1725164d48e78d12->0xab7276a741312f38 | 0x209f0b4c6c60a4aa->0x7aef2a4298a6356a | G W4-15 price; net G | the staged purse buys every node it affords in catalogue order, and Survivor network at 1,500 coins (was 1,700) leaves 200 more for later nodes, so the node set and the window's play move. Anatomy: core and trace move; keys, items and outcome (Victory, 213 spawned, elites 18/21, phases 16705/17137) unchanged |
+//! | 0x1 RecruitTakeover | 0x3d80a50dd3323feb->0x6ffd2abd5ec559b7 | 0x96f568d39deb47d9->0x89869eb54e0b06ea | G W4-14 aim, G W4-14 arrival, G W4-15 price; net G | the recruit aims only when the aim pays; half the arrivals, so the window starts 3000 ticks before the boss (`PROGRESSED_TAKEOVER_BOSS_LEAD`, was 1800) to keep an elite, the new archetypes and the boss phase in it; the price as above. Still a Victory: spawned 59 -> 48, elites 2/2, phase 14640 -> 14400. Anatomy: core, items, outcome and trace move; keys unchanged |
+//! | 0xdeadbeef2026 HardCapstone | 0x91697e752793cfc0->0x52782b9ffeef7166 | 0xcaea9c904c7b2910->0xf483cce12e822eaa | G W4-15 price; net G | as 0x1 HardCapstone. Anatomy: core and trace move; keys, items and outcome (Victory, 200 spawned, elites 10/14, phases 16752/17184) unchanged |
+//! | 0xdeadbeef2026 RecruitTakeover | 0x5670ca6b321fb553->0xa040f93de56591c4 | 0x6a779762dcfd6acf->0x9e1e5d57ab945f10 | G W4-14 aim, G W4-14 arrival, G W4-15 price; net G | as 0x1 RecruitTakeover. Still a Victory: spawned 62 -> 52, elites 1/1 -> 2/2, phase 14700 -> 14640. Anatomy: core, items, outcome and trace move; keys unchanged |
+//!
+//! Anatomy, W4-09 (fa616e9, `determinism_anatomy` on an exported tree) ->
+//! closing, the moved runs only (the three Personal runs are identical):
+//!
+//! | run | keys | core | items | outcome | trace |
+//! |---|---|---|---|---|---|
+//! | 0x1 Npc | 0xbdf9c3b221052103->0x3ce0e643620df24d | 0x77d9ff0f18cfcf07->0x8bc68eb7ffc43ebf | unchanged 0x9148a6bf065cdfaa | 0x237989fcf5b0919e->0xd9e98636939d3490 | moved |
+//! | 0x1a571167 Npc | 0xbdf9c3b221052103->0x3ce0e643620df24d | 0x1c1a5cda83ff432c->0x5612de3a687bd9be | unchanged 0x9148a6bf065cdfaa | 0x6552fa80f7948cbe->0x84e925834cd1dbfb | moved |
+//! | 0xdeadbeef2026 Npc | 0xbdf9c3b221052103->0x3ce0e643620df24d | 0x713699b0faef6131->0xd1cd92d43eeecfa6 | unchanged 0x9148a6bf065cdfaa | 0xabd2f667ea5645d2->0xcdd66ac45276934e | moved |
+//! | 0x1 HardCapstone | unchanged 0x7cc53f4e2adb718e | 0xad40cb3bccf42a3f->0xd10943ed93c3885d | unchanged 0xd77a4c3be9f87058 | unchanged 0xa5da30c3da8f6d36 | moved |
+//! | 0x1 RecruitTakeover | unchanged 0x92507d97d5f0305b | 0x7369eb1d3d07fbab->0xf988ad5ab12d1736 | 0xa423fafc4e4e1189->0x6a697b7b5f61e995 | 0x7b788fcc44678727->0xb31b80a582687d21 | moved |
+//! | 0xdeadbeef2026 HardCapstone | unchanged 0x7cc53f4e2adb718e | 0xf2d8d02b2cdb5702->0xe0cd126cdf694df8 | unchanged 0xfe8a86e4e51953ee | unchanged 0x9fed1586eb6b5fe0 | moved |
+//! | 0xdeadbeef2026 RecruitTakeover | unchanged 0x92507d97d5f0305b | 0xf4f8c3510afef6b0->0x57dbe78de0b5c97a | 0xa5fc27b8dc9c85ca->0x6cf5b81812470c88 | 0x473abb56e8d93edc->0x7a3c2324e5794a38 | moved |
+//!
+//! `RULESET_VERSION` and `TRACE_RULESET` move 4 -> 5 in the closing
+//! re-bless: the bump names W4-14 aim, W4-14 arrival and W4-15 price, and
+//! its `GAMEPLAY_TRACE` moves are the three Npc rows above.
+//! `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None again.
 mod support;
 use horde_core::command::Command;
 use horde_core::content::Mode;
@@ -163,14 +205,15 @@ const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 /// 0x1A57_1167 Personal. W2-49 (the wave-2 re-bless) folded the wave-2
 /// provisional digests into all six (net class F; outcomes and traces
 /// unchanged); see the re-bless log. Waves 3 and 4 (the W4-08 re-bless)
-/// moved none of them.
+/// moved none of them. The closing re-bless folded W4-14 (the Npc aim and
+/// arrival pass) into the three Npc runs, class G.
 const GOLDEN: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xbed5_e271_4b65_90fe),
-    (1, Mode::Npc, 0xcffe_0be4_463d_46d6),
+    (1, Mode::Npc, 0x6134_1ecf_1c42_2fd8),
     (0x1A57_1167, Mode::Personal, 0x3368_f180_97f7_fb5e),
-    (0x1A57_1167, Mode::Npc, 0x97d9_3e67_bd2b_ed2f),
+    (0x1A57_1167, Mode::Npc, 0x0118_059a_899f_b437),
     (0xDEAD_BEEF_2026, Mode::Personal, 0x7be5_c84d_229d_8d71),
-    (0xDEAD_BEEF_2026, Mode::Npc, 0x6dce_bbed_cc75_82c9),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0x7a66_2cd4_a007_adc2),
 ];
 
 /// `(seed, mode)` -> FNV-1a of the per-tick gameplay trace (tick, hp, coins,
@@ -180,14 +223,15 @@ const GOLDEN: [(u64, Mode, u64); 6] = [
 /// the gameplay outcomes of the same six runs did not move. W1-69 (user
 /// decision, enemies no longer queue behind each other) re-blessed three of
 /// them; see the re-bless log. Wave 2 (W2-49) moved none of them, nor did
-/// waves 3 and 4 (W4-08).
+/// waves 3 and 4 (W4-08). The closing re-bless folded W4-14 into the three
+/// Npc runs, class G.
 const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),
-    (1, Mode::Npc, 0x2966_10f8_ded8_a91f),
+    (1, Mode::Npc, 0x77ce_c201_9601_4f8d),
     (0x1A57_1167, Mode::Personal, 0x5cc8_bde4_faf0_9763),
-    (0x1A57_1167, Mode::Npc, 0x20c2_f0bd_5405_15c4),
+    (0x1A57_1167, Mode::Npc, 0x1fb8_dfb5_f912_48c7),
     (0xDEAD_BEEF_2026, Mode::Personal, 0x46a2_adc6_720f_8678),
-    (0xDEAD_BEEF_2026, Mode::Npc, 0x9d76_78e4_3c2f_560f),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0x6fed_c1ce_190a_b8e3),
 ];
 
 /// The ruleset `GAMEPLAY_TRACE` was recorded under. It follows
@@ -207,133 +251,72 @@ const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
 ///   threat rank), which move none of the six traces: the traced runs are
 ///   one rank-0 deploy with no country, no camp purchase and no expedition
 ///   (the W4-08 table in the file header). Only the label moves.
-const TRACE_RULESET: u32 = 4;
+/// - 5 (the closing re-bless): the bump names W4-14 aim, W4-14 arrival and
+///   W4-15 price. W4-14 moves the three Npc traces, folded in the same
+///   re-bless (the closing rows of the re-bless log); W4-15 moves none of
+///   the six (the traced runs buy no node), and the three Personal traces
+///   are unchanged.
+const TRACE_RULESET: u32 = 5;
 
 /// Provisional `(GOLDEN, GAMEPLAY_TRACE)` digests, in `GOLDEN` order, set by
 /// a digest-moving commit until the wave's re-bless folds them (ruling P3).
-/// None from W2-49 (which folded the wave-2 causes W2-05, W2-06, W2-08,
-/// W2-52, W2-09 and W2-54 into `GOLDEN`; their reasons are in the re-bless
-/// log) to W4-08, which had nothing to fold. W4-14 lands after W4-08, so its
-/// moves stay here for the closing-phase re-bless (R59).
-const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
-    [
-        0xbed5_e271_4b65_90fe,
-        0x6134_1ecf_1c42_2fd8,
-        0x3368_f180_97f7_fb5e,
-        0x0118_059a_899f_b437,
-        0x7be5_c84d_229d_8d71,
-        0x7a66_2cd4_a007_adc2,
-    ],
-    [
-        0xa6ca_a6de_7fd9_2b1a,
-        0x77ce_c201_9601_4f8d,
-        0x5cc8_bde4_faf0_9763,
-        0x1fb8_dfb5_f912_48c7,
-        0x46a2_adc6_720f_8678,
-        0x6fed_c1ce_190a_b8e3,
-    ],
-));
+/// None since the closing re-bless, which folded W4-14 aim and W4-14
+/// arrival into the three Npc runs (their reasons are in the re-bless log).
+const PROVISIONAL: Option<([u64; 6], [u64; 6])> = None;
 
 /// Why `PROVISIONAL` moved: `(commit tag, class, reason)`, one per moving
 /// commit. Empty exactly when `PROVISIONAL` is None.
-const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
-    (
-        "W4-14 aim",
-        MoveClass::G,
-        "the three Npc runs: Mara (Balanced) no longer aims at effective skill 10-13, where two \
-     unaimed shots land more expected hits than one aimed shot, so her turns, shots and \
-     kills move; the three Personal runs are unchanged",
-    ),
-    (
-        "W4-14 arrival",
-        MoveClass::G,
-        "the three Npc runs: `npc_arrival_factor` 0.9 -> 0.5 halves the Npc arrival multiplier, so \
-     the director spawns about half the hostiles (seed 1 at t1800: 4 spawned, 4 kills); the \
-     three Personal runs are unchanged",
-    ),
-];
+const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
 
 /// The seeds of the progressed runs.
 const PROGRESSED_SEEDS: [u64; 2] = [1, 0xDEAD_BEEF_2026];
 
 /// `(seed, run)` -> `Game::state_digest()` after [`PROGRESSED_TICKS`] ticks
 /// of the smoke bot on `support::progressed_determinism_game`. Cut at the
-/// wave-4 close (W4-09), on the W4-08 ruleset 4.
+/// wave-4 close (W4-09), on the W4-08 ruleset 4. The closing re-bless
+/// folded W4-14 (the two takeovers) and W4-15 price (all four), class G.
 const PROGRESSED_GOLDEN: [(u64, ProgressedRun, u64); 4] = [
-    (1, ProgressedRun::HardCapstone, 0x1725_164d_48e7_8d12),
-    (1, ProgressedRun::RecruitTakeover, 0x3d80_a50d_d332_3feb),
+    (1, ProgressedRun::HardCapstone, 0xab72_76a7_4131_2f38),
+    (1, ProgressedRun::RecruitTakeover, 0x6ffd_2abd_5ec5_59b7),
     (
         0xDEAD_BEEF_2026,
         ProgressedRun::HardCapstone,
-        0x9169_7e75_2793_cfc0,
+        0x5278_2b9f_feef_7166,
     ),
     (
         0xDEAD_BEEF_2026,
         ProgressedRun::RecruitTakeover,
-        0x5670_ca6b_321f_b553,
+        0xa040_f93d_e565_91c4,
     ),
 ];
 
 /// `(seed, run)` -> FNV-1a of the per-tick gameplay trace of the same runs
 /// ([`progressed_trace_line`]: the `GAMEPLAY_TRACE` line while the attempt
-/// lives, then the settled report and campaign). Cut at W4-09.
+/// lives, then the settled report and campaign). Cut at W4-09; the closing
+/// re-bless folded W4-14 and W4-15 price, as [`PROGRESSED_GOLDEN`].
 const PROGRESSED_TRACE: [(u64, ProgressedRun, u64); 4] = [
-    (1, ProgressedRun::HardCapstone, 0x209f_0b4c_6c60_a4aa),
-    (1, ProgressedRun::RecruitTakeover, 0x96f5_68d3_9deb_47d9),
+    (1, ProgressedRun::HardCapstone, 0x7aef_2a42_98a6_356a),
+    (1, ProgressedRun::RecruitTakeover, 0x8986_9eb5_4e0b_06ea),
     (
         0xDEAD_BEEF_2026,
         ProgressedRun::HardCapstone,
-        0xcaea_9c90_4c7b_2910,
+        0xf483_cce1_2e82_2eaa,
     ),
     (
         0xDEAD_BEEF_2026,
         ProgressedRun::RecruitTakeover,
-        0x6a77_9762_dcfd_6acf,
+        0x9e1e_5d57_ab94_5f10,
     ),
 ];
 
 /// Provisional `(PROGRESSED_GOLDEN, PROGRESSED_TRACE)` digests, in
-/// `PROGRESSED_GOLDEN` order (ruling P3, as `PROVISIONAL`).
-/// Set by W4-14 and moved by W4-15, after the W4-09 cut, for the
-/// closing-phase re-bless (R59, R61).
-const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = Some((
-    [
-        0xab72_76a7_4131_2f38,
-        0x6ffd_2abd_5ec5_59b7,
-        0x5278_2b9f_feef_7166,
-        0xa040_f93d_e565_91c4,
-    ],
-    [
-        0x7aef_2a42_98a6_356a,
-        0x8986_9eb5_4e0b_06ea,
-        0xf483_cce1_2e82_2eaa,
-        0x9e1e_5d57_ab94_5f10,
-    ],
-));
+/// `PROGRESSED_GOLDEN` order (ruling P3, as `PROVISIONAL`). None since the
+/// closing re-bless, which folded W4-14 aim, W4-14 arrival and W4-15 price
+/// (the progressed re-bless log in the file header).
+const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = None;
 
 /// Why `PROGRESSED_PROVISIONAL` moved: `(commit tag, class, reason)`.
-const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
-    (
-        "W4-14 aim",
-        MoveClass::G,
-        "the two recruit takeovers (Npc rules): the recruit aims only when the aim raises its \
-     expected hits per turn, so its turns and kills \
-     move; both still win; the two Hard Capstone runs are unchanged",
-    ),
-    (
-        "W4-14 arrival",
-        MoveClass::G,
-        "the two recruit takeovers: `npc_arrival_factor` 0.9 -> 0.5 halves their arrivals, so their \
-     window starts earlier (`PROGRESSED_TAKEOVER_BOSS_LEAD` 3000 ticks before the boss, not 1800) \
-     to keep an elite, the new archetypes and the boss phase in it (48 and 52 spawned, 61 and 54 \
-     at W4-09); both still win; the Hard Capstone runs are unchanged",
-    ),
-    (
-        "W4-15 price",
-        MoveClass::G,
-        "all four runs: Survivor network 1,700 -> 1,500 coins, so the staged purse that buys every      node in catalogue order keeps 200 more coins for later nodes and gear, and the four windows      play with a different loadout and node set; all four still win",
-    ),
-];
+const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
 
 /// The archetypes wave 2 appended (W2-31: six and the splitter's child).
 /// They enter at wave tier 5, so no `GOLDEN` run meets one.
