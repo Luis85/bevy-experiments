@@ -27,7 +27,7 @@ Fresh geometry is now controlled by the selected next-run balance settings: Norm
 | `growth_knee_rank` | 4: the rank where health and damage switch to the `_late` slopes (each 0..=0.25), so shop gear stays within about 5-15% of enemy health from rank 4 to 58. Missing knee and late keys keep one slope (`1 + .015 * victories`, `1 + .008 * victories`) |
 | `speed_per_rank` | `1 + .002 * min(victories,50)` |
 | `arrival_per_rank` | `1 + .01 * min(victories,50)` |
-| `npc_arrival_factor` | Additional `.9` multiplier for NPC encounter arrivals |
+| `npc_arrival_factor` | Additional `.5` multiplier for NPC encounter arrivals (0.5..=2.0; `.9` until W4-14, R59): one action per turn caps an NPC defender's kill rate, so its arrivals stay under that cap. On Normal the NPC meets 0.375 x the personal arrivals |
 | `reward_per_rank` | `1 + .03 * min(victories,50)` |
 | `fortification_per_rank` | `1 + .025 * min(victories,50)` |
 | `supply_per_rank`, `max_supply_bonus` | Renewed construction supply bonus `min(40, min(victories,50))` |

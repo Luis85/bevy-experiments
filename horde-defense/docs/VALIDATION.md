@@ -1332,6 +1332,8 @@ The gate is `repo_checks::save_docs_name_the_v7_format_every_migration_step_pin_
 
 **Pins at this commit (source state, not a run).** No commit after W4-09 (`fa616e99`) changes `tests/determinism.rs`, `tests/save_migration.rs` or `tests/fixtures/`: the waves 5-7 builds set no provisional pin, `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None and both cause lists are empty. Whether the pins still hold at the release candidate is the final zero-move record (W5-12, A6-19 and W7-10's record: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6, the V1-V6 continuations, `V7_CONTINUATION_FNV` and the `save_v7.json` identity unchanged). Under ruling R36 that run belongs to the closing phase and is recorded there.
 
+Amended 14 November 2026 (W4-14, R59): the Npc combat balance pass landed after W4-09 and moves Npc runs on purpose, so the pins above are no longer all at their tables. `PROVISIONAL` holds the three Npc `GOLDEN` and `GAMEPLAY_TRACE` digests and `PROGRESSED_PROVISIONAL` the two recruit-takeover runs, each with the cause rows "W4-14 aim" and "W4-14 arrival" (class G); the takeovers start `PROGRESSED_TAKEOVER_BOSS_LEAD` (3000) ticks before the boss. The v7 continuation moved with the aim fix (the fixture's root defense is Mara's) and is held in `V7_CONTINUATION_PROVISIONAL` with `V7_CONTINUATION_CAUSES`, the same ledger shape. The V1-V6 continuations, `V6_DROP_TRACE_FNV`, the `save_v7.json` identity and the frozen-catalogue pin do not move: pre-v7 attempts keep the old aim test and their frozen snapshots. The closing phase folds the provisional pins (plan §9.6, "W4-14 Npc combat balance").
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:
