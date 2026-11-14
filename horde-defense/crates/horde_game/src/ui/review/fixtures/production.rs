@@ -1169,7 +1169,8 @@ fn prepare_elite_tells(f: &mut FrontendParts) {
 }
 
 /// The fx-stress effect load on top of the stress fixture: blood decals on,
-/// a fourth burning zone with its Molotov burst, a grenade burst, and
+/// a fourth burning zone with its Molotov burst, a grenade burst, a felled
+/// boss's kill burst beside the live boss, and
 /// `FX_STRESS_ELITE_PCT` percent elites spread over the crowd. Review-only
 /// staging on a game that never saves; the `stress` perf scene stays bare.
 #[cfg(feature = "review")]
@@ -1195,6 +1196,7 @@ pub(in crate::ui::review) fn entitle_fx_stress_load(f: &mut FrontendParts) {
             grenade.radius,
         ),
     ];
+    let felled_at = ordnance::cell_center([zone.cell[0] + 4, centre.saturating_sub(4)]);
     a.ordnance.fire_zones.push(zone);
     for (projectile, to, radius) in bursts {
         let seq = a.events.iter().map(|e| e.seq).max().unwrap_or(0) + 1;
@@ -1211,6 +1213,39 @@ pub(in crate::ui::review) fn entitle_fx_stress_load(f: &mut FrontendParts) {
             seq,
         });
     }
+    // A felled boss on the staged tick (W5-06): the body it leaves and its
+    // Kill event, as the core logs them, so the x1.8 boss kill burst is in
+    // the load beside the live boss.
+    let boss = a
+        .enemies
+        .iter()
+        .find(|e| e.boss)
+        .expect("the stress field stages a boss")
+        .clone();
+    let level = &content().levels[a.level];
+    let felled = a.next_id;
+    a.next_id += 1;
+    a.corpses.push(horde_core::sim::CorpseRecord {
+        id: felled,
+        kind: boss.kind,
+        boss_kind: Some(boss.boss_kind.unwrap_or(level.boss)),
+        at: felled_at,
+        visual: boss.resolved.as_ref().map(|profile| profile.visual.clone()),
+        tick: a.tick,
+    });
+    let seq = a.events.iter().map(|e| e.seq).max().unwrap_or(0) + 1;
+    a.events.push_back(Event {
+        kind: EventKind::Kill,
+        from: felled_at,
+        to: felled_at,
+        value: (level.boss_reward + level.completion_bonus) as i32,
+        tick: a.tick,
+        actor_id: Some(felled),
+        target_id: None,
+        lane: Some(felled_at[1] as u8),
+        duration_ticks: 0,
+        seq,
+    });
     let hostiles = a.enemies.iter().filter(|e| !e.boss).count();
     let wanted = (hostiles * FX_STRESS_ELITE_PCT).div_ceil(100);
     let is_elite = |e: &horde_core::sim::Enemy| {

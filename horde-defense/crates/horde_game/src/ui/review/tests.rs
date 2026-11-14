@@ -2456,6 +2456,21 @@ fn fx_stress_fixture_carries_the_effect_load() {
     let blasts: Vec<_> = view.fx.iter().filter_map(|e| e.ordnance).collect();
     assert_eq!(blasts.len(), 2, "two bursts: {blasts:?}");
     assert!(blasts.contains(&OrdnanceKind::Grenade) && blasts.contains(&OrdnanceKind::Molotov));
+    // W5-06: a felled boss's kill burst (x1.8) beside the live boss, on the
+    // staged tick, so the newest impacts the spark cap keeps include it.
+    let boss_kills: Vec<_> = view
+        .fx
+        .iter()
+        .filter(|e| e.kind == horde_core::sim::EventKind::Kill && e.boss)
+        .collect();
+    assert_eq!(boss_kills.len(), 1, "one boss kill burst");
+    assert_eq!(boss_kills[0].age, 0.0, "the burst is fresh");
+    assert!(
+        a.enemies
+            .iter()
+            .any(|e| e.boss && Some(e.id) != boss_kills[0].actor_id),
+        "the live boss is another body"
+    );
     let hostiles = a.enemies.iter().filter(|e| !e.boss).count();
     let elites = a
         .enemies
