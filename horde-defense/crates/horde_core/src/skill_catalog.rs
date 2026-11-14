@@ -187,6 +187,18 @@ impl CampaignFeature {
             Self::Operations => "Country operations",
         }
     }
+    /// The feature's stable id. Presentation saves it (settings.json
+    /// `seen_callouts` holds "feature:<id>"), so an id never changes and
+    /// the list is append-only.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Construction => "construction",
+            Self::Companion => "companion",
+            Self::Recruitment => "recruitment",
+            Self::Parallel => "parallel",
+            Self::Operations => "operations",
+        }
+    }
 }
 
 /// Player-facing grouping of skill effects, used for search and filtering.
@@ -1149,5 +1161,29 @@ mod tests {
                 .iter()
                 .all(|g| g.label != "Molotovs")
         );
+    }
+    /// The feature ids are saved in settings.json (`seen_callouts`, as
+    /// "feature:<id>"), so each is pinned here; the list is append-only.
+    #[test]
+    fn campaign_feature_ids_are_stable_and_unique() {
+        let ids: Vec<&str> = CampaignFeature::ALL.iter().map(|f| f.id()).collect();
+        assert_eq!(
+            ids,
+            [
+                "construction",
+                "companion",
+                "recruitment",
+                "parallel",
+                "operations"
+            ]
+        );
+        let unique: BTreeSet<&str> = ids.iter().copied().collect();
+        assert_eq!(unique.len(), CampaignFeature::ALL.len());
+        for id in ids {
+            assert!(
+                !id.is_empty() && id.bytes().all(|b| b.is_ascii_lowercase()),
+                "{id}"
+            );
+        }
     }
 }

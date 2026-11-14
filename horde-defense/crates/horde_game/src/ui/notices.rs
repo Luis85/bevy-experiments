@@ -300,6 +300,8 @@ impl UiCtx<'_> {
                 if let Some(Some(warning)) = open {
                     self.status.modal = Some(AppModal::Storage(StorageError::Settings { warning }));
                 }
+                // The journey startup could not read: seed what it unlocked.
+                super::onboarding::seed_seen_callouts(self.settings, self.game);
                 let campaign = self.game.campaign();
                 self.status.profile_exists = campaign.selected_survivor.is_some()
                     || campaign.attempts > 0
@@ -396,6 +398,8 @@ impl UiCtx<'_> {
         match command {
             AppCommand::NewJourney => {
                 self.menu.new_journey_confirm = false;
+                // The new journey is taught from the start (ruling S4).
+                self.settings.seen_callouts = Some(std::collections::BTreeSet::new());
                 self.status.message_error = false;
                 self.campaign.selected_country = "DEU".into();
                 self.campaign.stage = 0;

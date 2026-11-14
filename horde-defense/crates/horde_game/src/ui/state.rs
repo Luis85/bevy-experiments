@@ -37,6 +37,9 @@ pub(crate) struct Navigation {
     pub(super) battle_reset: bool,
     /// What Camp home highlights when it opens (`open_camp_home`).
     pub(super) home_focus: Option<HomeFocus>,
+    /// The screen and camp tab the onboarding last checked for arrival
+    /// (`onboarding::visit`).
+    pub(super) onboarding_place: Option<(Screen, Tab)>,
 }
 
 /// What Camp home highlights when a route opens it.
@@ -57,6 +60,7 @@ impl Default for Navigation {
             return_world_paused: false,
             battle_reset: false,
             home_focus: None,
+            onboarding_place: None,
         }
     }
 }
@@ -375,6 +379,14 @@ impl FrontendParts {
         } = profile;
         // A startup storage failure opens the storage modal (UX-08): the
         // load failure first, with the settings warning behind it.
+        // A settings file from before the onboarding callouts takes every
+        // callout the loaded journey already unlocked (ruling S4). A save
+        // that could not be read is not that journey: seeding then waits
+        // for "Retry load" or a New game.
+        let mut settings = settings;
+        if load_error.is_none() {
+            super::onboarding::seed_seen_callouts(&mut settings, &game);
+        }
         let modal = super::modal::startup_modal(load_error, settings_warning);
         let mut runtime = Runtime::default();
         if settings_at_risk {

@@ -417,6 +417,16 @@ impl Settings {
             *self.binding_mut(holder) = previous;
         }
     }
+    /// "Restore defaults": every preference takes its default and the
+    /// version the current one. The onboarding seen-set is memory, not a
+    /// preference, so it is kept (ruling S4).
+    pub fn restore_defaults(&mut self) {
+        let seen_callouts = self.seen_callouts.take();
+        *self = Self {
+            seen_callouts,
+            ..Self::default()
+        };
+    }
     pub fn save(&self, path: &Path) -> Result<(), String> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;

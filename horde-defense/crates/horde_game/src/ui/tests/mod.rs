@@ -607,6 +607,7 @@ mod loot_block_tests;
 mod low_hp_tests;
 mod menu_tests;
 mod navigation_tests;
+mod onboarding_tests;
 mod operations_tests;
 mod primary_tests;
 mod progression_tests;

@@ -7,7 +7,16 @@ use horde_core::{
     survivors::SurvivorId,
 };
 
+/// Stages the launch's scenario, if it names one. A staged scene shows its
+/// screen, not onboarding callouts for what the staging unlocked.
 pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
+    stage(f);
+    if f.launch.scenario.is_some() {
+        crate::ui::onboarding::mark_unlocked_seen(&mut f.settings, &f.game);
+    }
+}
+
+fn stage(f: &mut FrontendParts) {
     let launch = f.launch.clone();
     let Some(screen) = launch.scenario.clone() else {
         return;

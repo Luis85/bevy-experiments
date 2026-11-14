@@ -284,7 +284,14 @@ fn startup_settings_are_read_once_and_reused() {
     .save(&path)
     .unwrap();
     let f = FrontendParts::load(&config, startup);
-    assert_eq!(f.settings, startup_value);
+    // The load only seeds the onboarding seen-set (W3-24, ruling S4).
+    assert_eq!(
+        f.settings,
+        Settings {
+            seen_callouts: Some(Default::default()),
+            ..startup_value
+        }
+    );
     // Later saves still go to the same profile file.
     assert_eq!(f.paths.settings(), path);
     std::fs::remove_file(&path).unwrap();
@@ -311,7 +318,7 @@ fn settings_copy_failure_at_startup_keeps_the_original_until_a_save_can_copy_it(
     std::fs::create_dir(&copy).unwrap();
     fixture.frontend = frontend_loaded_from(&directory);
     let f = &mut fixture.frontend;
-    assert_eq!(f.settings, Settings::default());
+    assert_eq!(f.settings, seeded_defaults());
     f.game.campaign_mut().choose_start_country("DEU").unwrap();
     save_in_frame(f, 1);
     assert_eq!(std::fs::read(&path).unwrap(), original);
@@ -330,7 +337,7 @@ fn settings_copy_failure_at_startup_keeps_the_original_until_a_save_can_copy_it(
     std::fs::remove_dir(&copy).unwrap();
     save_in_frame(f, 2);
     assert_eq!(std::fs::read(&copy).unwrap(), original);
-    assert_eq!(Settings::load(&path), Settings::default());
+    assert_eq!(Settings::load(&path), seeded_defaults());
     // Later saves replace only settings.json; the copy keeps the original.
     f.settings.master = 0.4;
     save_in_frame(f, 3);
@@ -384,7 +391,7 @@ fn settings_read_failure_at_startup_copies_the_original_before_the_first_save() 
     real.save(&path).unwrap();
     let original = std::fs::read(&path).unwrap();
     let f = &mut fixture.frontend;
-    assert_eq!(f.settings, Settings::default());
+    assert_eq!(f.settings, seeded_defaults());
     save_in_frame(f, 1);
     let copy = directory.join(crate::profile::UNREADABLE_SETTINGS);
     assert_eq!(std::fs::read(&copy).ok(), Some(original.clone()));
@@ -1397,4 +1404,13 @@ fn preferences_shows_custom_basis_label() {
         "the draft names the rules a Custom keeps"
     );
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+}
+
+/// The defaults a profile load leaves: only the onboarding seen-set is
+/// seeded (W3-24, ruling S4).
+fn seeded_defaults() -> Settings {
+    Settings {
+        seen_callouts: Some(Default::default()),
+        ..Settings::default()
+    }
 }

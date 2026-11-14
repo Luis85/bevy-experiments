@@ -61,7 +61,7 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
                 }
                 chrome::section(ui, "Profile");
                 if ui.button("Restore display, audio & control defaults").clicked() {
-                    *f.settings = Settings::default();
+                    f.settings.restore_defaults();
                     f.prefs.scale_draft = None;
                     f.prefs.cancel_rebind();
                 }

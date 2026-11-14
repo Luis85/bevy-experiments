@@ -192,6 +192,8 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
                 }
             });
         });
+    // The one unlock callout due, under the row (UX-16).
+    super::onboarding::callout_row(root, f);
 }
 
 pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {

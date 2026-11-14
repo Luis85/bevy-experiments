@@ -233,6 +233,9 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
             GREEN,
         );
     }
+    if let Some(line) = mara_timing(f.game, country) {
+        ui.label(line);
+    }
     muted(ui, format!("{} · {}", country.biome, country.culture));
     egui::CollapsingHeader::new("Country conditions and population").show(ui, |ui| {
         ui.label(format!(
@@ -259,6 +262,19 @@ fn defenses_and_difficulty(game: &Game, country: &Country) -> String {
         game.effective_country_difficulty(&country.id)
             .unwrap_or(country.difficulty)
     )
+}
+/// When liberating `country` is what lets the player meet Mara, the
+/// dossier says so before the country is chosen. The rule is core's
+/// (`Game::country_choice_preview`).
+fn mara_timing(game: &Game, country: &Country) -> Option<String> {
+    game.country_choice_preview(&country.id)
+        .filter(|preview| preview.companion_after_liberation)
+        .map(|_| {
+            format!(
+                "Liberate {} to unlock Mara in Journey upgrades.",
+                country.name
+            )
+        })
 }
 fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(country) = world().country(&f.campaign.selected_country) else {

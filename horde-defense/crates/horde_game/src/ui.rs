@@ -106,6 +106,8 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
     toast::advance(ctx, f);
     // Before any reader of the keyboard: Escape is decided and consumed here.
     escape::escape_router(ctx, f);
+    // Arriving at a place marks its unlock callouts seen.
+    onboarding::visit(f);
     ctx.style_mut_of(egui::Theme::Dark, |style| {
         style.animation_time = if f.settings.reduced_effects {
             0.0
@@ -211,6 +213,7 @@ mod camp_prices;
 mod chrome;
 mod home;
 mod navigation;
+mod onboarding;
 use self::camp::camp;
 #[cfg(test)]
 use self::camp::country_dossier;
