@@ -11,7 +11,7 @@ use horde_audio::{
 };
 use std::path::Path;
 
-const UI_CUES: [Cue; 1] = [Cue::Confirm];
+const UI_CUES: [Cue; 3] = [Cue::Confirm, Cue::LootReveal, Cue::CoinBatch];
 const STINGERS: [Cue; 3] = [Cue::Victory, Cue::Defeat, Cue::Retreat];
 /// Cues that announce danger. They are combat cues, so they ride Effects.
 const WARNINGS: [Cue; 5] = [

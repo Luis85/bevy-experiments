@@ -58,9 +58,11 @@ pub enum Family {
     Contact,
     BossPhase,
     BossDeath,
+    /// Battle drops.
+    LootDrop,
 }
 impl Family {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::Guns,
         Self::Turret,
         Self::Death,
@@ -76,6 +78,7 @@ impl Family {
         Self::Contact,
         Self::BossPhase,
         Self::BossDeath,
+        Self::LootDrop,
     ];
     /// Voices of the family that may sound at once.
     pub const fn cap(self) -> usize {
@@ -94,7 +97,8 @@ impl Family {
             | Self::Radio
             | Self::Boss
             | Self::BossPhase
-            | Self::BossDeath => 1,
+            | Self::BossDeath
+            | Self::LootDrop => 1,
         }
     }
     /// Whether a start of this family may steal a voice exactly as important
@@ -130,6 +134,7 @@ pub const fn family(cue: Cue) -> Option<Family> {
         Cue::EnemyContact => Some(Family::Contact),
         Cue::BossPhase => Some(Family::BossPhase),
         Cue::BossDeath => Some(Family::BossDeath),
+        Cue::LootDrop => Some(Family::LootDrop),
         Cue::Throw
         | Cue::Retreat
         | Cue::Damage
@@ -143,7 +148,9 @@ pub const fn family(cue: Cue) -> Option<Family> {
         | Cue::BossExposed
         | Cue::Ability
         | Cue::DryFire
-        | Cue::BoltCycle => None,
+        | Cue::BoltCycle
+        | Cue::LootReveal
+        | Cue::CoinBatch => None,
     }
 }
 

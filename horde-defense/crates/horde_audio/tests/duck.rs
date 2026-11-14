@@ -84,6 +84,14 @@ fn duck_rows_match_the_design_table() {
                 hold: DuckHold::Ms(300),
                 release_ms: 400,
             }),
+            // The loot reveal and the coin batch (A6-14).
+            Cue::LootReveal | Cue::CoinBatch => Some(Duck {
+                atmosphere_db: -3.0,
+                music_db: 0.0,
+                attack_ms: mix::DUCK_ATTACK_MS,
+                hold: DuckHold::Ms(400),
+                release_ms: 400,
+            }),
             _ => None,
         };
         assert_eq!(duck(cue), expected, "{cue:?}");

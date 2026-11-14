@@ -67,6 +67,7 @@ fn caps_are_the_design_table() {
             (Family::Contact, 2),
             (Family::BossPhase, 1),
             (Family::BossDeath, 1),
+            (Family::LootDrop, 1),
         ]
     );
     for cue in Cue::ALL {

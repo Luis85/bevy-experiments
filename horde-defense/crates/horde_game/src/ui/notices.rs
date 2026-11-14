@@ -14,6 +14,7 @@ use crate::{
     },
 };
 use bevy::prelude::*;
+use horde_audio::loot::{ResultsAudioGuard, ResultsLoot};
 use horde_core::{
     command::{Command, CommandOutcome},
     content::Mode,
@@ -44,6 +45,49 @@ pub(super) fn handle_notices(
         f.apply_notice(notice);
     }
     cues.write_batch(buffer.into_iter().map(CueRequest::centred));
+}
+
+/// The cues the Results screen is due at real time `now_ms`: a report's
+/// loot reveal and its one coin batch, once per report
+/// (`horde_audio::loot::ResultsAudioGuard`). Any other screen is silent.
+pub(super) fn results_cues(
+    guard: &mut ResultsAudioGuard,
+    screen: Screen,
+    game: &Game,
+    now_ms: u64,
+) -> Vec<CueRequest> {
+    let results = (screen == Screen::Results)
+        .then(|| game.last_result())
+        .flatten()
+        .map(ResultsLoot::of);
+    guard
+        .observe(results, now_ms)
+        .into_iter()
+        .map(|due| CueRequest {
+            voicing: due.voicing,
+            ..CueRequest::centred(due.cue)
+        })
+        .collect()
+}
+/// Sounds the Results screen. The guard is presentation-local: it is not
+/// saved, and it reads the report without changing anything.
+pub(super) fn results_audio(
+    mut guard: Local<ResultsAudioGuard>,
+    screen: Res<State<Screen>>,
+    session: Res<GameSession>,
+    time: Option<Res<Time<Real>>>,
+    mut cues: MessageWriter<CueRequest>,
+) {
+    let Some(time) = time else {
+        return;
+    };
+    let now_ms = time.elapsed().as_millis() as u64;
+    cues.write_batch(results_cues(
+        &mut guard,
+        *screen.get(),
+        &session.game,
+        now_ms,
+    ));
 }
 
 /// `OnEnter(Screen::Battle)`: a new deployment starts with centred aim,

@@ -301,7 +301,10 @@ const fn legacy_name(family: Cue) -> &'static str {
         | Cue::ReloadOut
         | Cue::ReloadIn
         | Cue::ShellInsert
-        | Cue::BoltCycle => legacy_name(family.legacy_family()),
+        | Cue::BoltCycle
+        | Cue::LootDrop
+        | Cue::LootReveal
+        | Cue::CoinBatch => legacy_name(family.legacy_family()),
         Cue::Pistol => "pistol",
         Cue::Smg => "smg",
         Cue::Shotgun => "shotgun",

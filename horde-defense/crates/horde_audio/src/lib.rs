@@ -21,6 +21,7 @@ pub mod duck;
 pub mod events;
 pub mod export;
 pub mod gun;
+pub mod loot;
 pub mod meter;
 pub mod mix;
 pub mod pan;

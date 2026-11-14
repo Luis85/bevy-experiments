@@ -13,6 +13,7 @@ pub(super) use horde_audio::events::event_sound;
 use horde_audio::{
     events::{EventContext, event_requests},
     gun::GunTracker,
+    loot::{ExpeditionCoins, LootTracker},
     pan::{self, Places},
     render::fire_bed_x,
     voicing::EnemyVoiceIndex,
@@ -56,6 +57,14 @@ pub struct Runtime {
     /// attempt it has not seen, so a load plays no stage burst. An
     /// expedition watched from camp has no gun handling.
     pub(super) guns: GunTracker,
+    /// The root battle's drops (`horde_audio::loot`): a Rare or better drop
+    /// plays `LootDrop` where it fell. Presentation only: never saved; it
+    /// primes on an attempt it has not seen, so a load replays no drop. No
+    /// widget plays a loot sound.
+    pub(super) loot: LootTracker,
+    /// The settled expeditions whose auto-sold batch has been heard: one
+    /// `CoinBatch` each, never during a battle. Presentation only.
+    pub(super) expedition_coins: ExpeditionCoins,
     pub(super) dirty: bool,
     pub(super) save_ticks: u64,
     pub(super) retry_save_at: u64,
@@ -315,9 +324,15 @@ impl Runtime {
             Some(attempt) => {
                 self.guns
                     .observe(BattleId::Root, attempt, &input, cues, &mut self.cue_places);
+                self.loot
+                    .observe(BattleId::Root, attempt, cues, &mut self.cue_places);
             }
-            None => self.guns.retain(|_| false),
+            None => {
+                self.guns.retain(|_| false);
+                self.loot.retain(|_| false);
+            }
         }
+        self.hear_expedition_coins(game, cues);
         if self.save_ticks >= 600 {
             self.dirty = true;
         }
@@ -329,6 +344,14 @@ impl Runtime {
             return true;
         }
         false
+    }
+    /// One `CoinBatch` when a settled expedition's receipt sold anything
+    /// and its notice is new (`horde_audio::loot::ExpeditionCoins`). Ticks
+    /// and commands call it; during a battle it waits.
+    pub(super) fn hear_expedition_coins(&mut self, game: &Game, cues: &mut Vec<SoundCue>) {
+        if self.expedition_coins.observe_game(game) > 0 {
+            push_cue(cues, SoundCue::CoinBatch);
+        }
     }
     /// Turns the game's undrained events into cues now. Ticks call it, and so
     /// does a command that finishes the attempt outside a tick (`Withdraw`

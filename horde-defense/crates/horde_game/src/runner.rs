@@ -23,5 +23,4 @@ pub(crate) use folder::RecordingOpener;
 #[cfg(feature = "review")]
 pub use persistence::PersistenceMetrics;
 pub use plugin::{RuntimeSet, SimRuntimePlugin};
-pub(crate) use runtime::push_cue;
 pub use runtime::{GameSession, Runtime};

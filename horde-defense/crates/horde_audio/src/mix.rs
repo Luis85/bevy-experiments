@@ -310,6 +310,13 @@ pub const fn mix(cue: Cue) -> CueMix {
         // Five variants, and short enough for six shells of a quick reload.
         Cue::ShellInsert => handling(0.44, 80, 5),
         Cue::BoltCycle => handling(0.44, 300, 6),
+        // Loot and coins (A6-14): -6 dB for the drop and the reveal, -8 dB
+        // for the coins, as in the design's table. The drop plays as voiced
+        // (its tier's speed is its information).
+        Cue::LootDrop => row(0.5, 400, 6),
+        Cue::LootReveal => interface(0.5, 400, 4),
+        // One per batch: sales inside 600 ms are one cue.
+        Cue::CoinBatch => interface(0.4, 600, 5),
     }
 }
 
@@ -479,6 +486,7 @@ pub const fn duck(cue: Cue) -> Option<Duck> {
         Cue::BossPhase => ducks(-4.0, 600, 500),
         Cue::Wave => ducks(-4.0, 600, 400),
         Cue::Explosion => ducks(-3.0, 300, 400),
+        Cue::LootReveal | Cue::CoinBatch => ducks(-3.0, 400, 400),
         Cue::Pistol
         | Cue::Smg
         | Cue::Shotgun
@@ -512,7 +520,8 @@ pub const fn duck(cue: Cue) -> Option<Duck> {
         | Cue::ReloadOut
         | Cue::ReloadIn
         | Cue::ShellInsert
-        | Cue::BoltCycle => None,
+        | Cue::BoltCycle
+        | Cue::LootDrop => None,
     }
 }
 

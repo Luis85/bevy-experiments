@@ -1,7 +1,7 @@
 //! The cue list. Append-only: a cue's discriminant indexes the gate tables,
 //! and the synthesized families' discriminants seed their synthesis.
 
-use crate::bank::{BankId, BossStage, EnemyStage, EnemyVoice, GunStage};
+use crate::bank::{BankId, BossStage, EnemyStage, EnemyVoice, GunStage, UiFamily};
 use horde_core::content::BossKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,6 +74,14 @@ pub enum Cue {
     ShellInsert,
     /// The marksman rifle's bolt, after a shot.
     BoltCycle,
+    // Wave 6 (A6-14): loot and coins, heard by `loot`.
+    /// A drop of Rare or better fell in battle (the loot-reveal bank, on
+    /// the Effects bus, where it fell).
+    LootDrop,
+    /// The Results screen shows a run's loot.
+    LootReveal,
+    /// One batch of items sold: an auto-sell receipt or a sale command.
+    CoinBatch,
 }
 
 /// Number of cues; sizes every per-cue table.
@@ -81,7 +89,7 @@ pub const CUE_COUNT: usize = Cue::ALL.len();
 
 impl Cue {
     /// Every cue, in discriminant order.
-    pub const ALL: [Self; 42] = [
+    pub const ALL: [Self; 45] = [
         Self::Pistol,
         Self::Smg,
         Self::Shotgun,
@@ -124,6 +132,9 @@ impl Cue {
         Self::ReloadIn,
         Self::ShellInsert,
         Self::BoltCycle,
+        Self::LootDrop,
+        Self::LootReveal,
+        Self::CoinBatch,
     ];
 
     /// The synthesized family whose WAV variants this cue plays. Alias cues
@@ -136,7 +147,12 @@ impl Cue {
             Self::Kill | Self::EnemyDeath | Self::BossDeath => Self::Impact,
             Self::Victory => Self::Wave,
             Self::Defeat => Self::Structure,
-            Self::Confirm | Self::BossExposed | Self::Ability => Self::Ready,
+            Self::Confirm
+            | Self::BossExposed
+            | Self::Ability
+            | Self::LootDrop
+            | Self::LootReveal
+            | Self::CoinBatch => Self::Ready,
             Self::Block => Self::Armor,
             Self::EnemyWindup => Self::Incoming,
             Self::EnemyContact => Self::Melee,
@@ -166,6 +182,8 @@ impl Cue {
             Self::ReloadIn => BankId::Gun(GunStage::ReloadIn),
             Self::ShellInsert => BankId::Gun(GunStage::ShellInsert),
             Self::BoltCycle => BankId::Gun(GunStage::BoltCycle),
+            Self::LootDrop | Self::LootReveal => BankId::Ui(UiFamily::LootReveal),
+            Self::CoinBatch => BankId::Ui(UiFamily::CoinBatch),
             cue => BankId::Legacy(cue.legacy_family()),
         }
     }

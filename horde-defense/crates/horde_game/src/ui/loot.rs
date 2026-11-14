@@ -138,7 +138,8 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     let projection = art::ArenaProjection::for_attempt(arena, attempt)
         .with_effects_clip(f.battle.effects_rect.unwrap_or(arena));
     let capture = f.launch.loot_capture_mode();
-    if draw_for(
+    // The drop's sound is the runner's (`horde_audio::loot::LootTracker`).
+    draw_for(
         ui,
         projection,
         attempt,
@@ -148,9 +149,7 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         capture,
         &f.battle.effects_keep_clear,
         f.settings.palette,
-    ) {
-        f.notify_rare_loot();
-    }
+    );
 }
 /// The centre of a drop's icon `age` (0..=1) into its rise: 12 + 78 * age pt
 /// above the feet at world `at`, drifting sideways by item id. The rise stops

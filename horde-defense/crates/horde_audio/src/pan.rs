@@ -92,6 +92,7 @@ pub const fn positional(cue: Cue) -> bool {
             | Cue::EnemyContact
             | Cue::EnemyDeath
             | Cue::Block
+            | Cue::LootDrop
     )
 }
 

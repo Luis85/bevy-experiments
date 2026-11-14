@@ -145,7 +145,7 @@ fn each_bus_has_its_own_start_budget() {
             .count();
         assert!(count <= start_budget(bus), "{bus:?}: {count}");
     }
-    assert_eq!(starts.len(), 3 + 1 + 1, "{starts:?}");
+    assert_eq!(starts.len(), 3 + 2 + 1, "{starts:?}");
 }
 
 #[test]

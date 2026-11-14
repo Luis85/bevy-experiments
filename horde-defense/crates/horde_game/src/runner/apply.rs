@@ -103,6 +103,15 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
                 push_cue(ctx.cues, SoundCue::Confirm);
             }
         }
+        // One CoinBatch per sale command that sold anything (R9), never in
+        // a battle; a command may also settle an expedition's batch.
+        if let Ok(outcome) = &result {
+            let in_battle = ctx.game.attempt().is_some();
+            if let Some(cue) = horde_audio::loot::sale_cue(&command, outcome, in_battle) {
+                push_cue(ctx.cues, cue);
+            }
+            ctx.runtime.hear_expedition_coins(ctx.game, ctx.cues);
+        }
         ctx.notice(RuntimeNotice::CommandCompleted {
             command: AppCommand::Game(command),
             result: result

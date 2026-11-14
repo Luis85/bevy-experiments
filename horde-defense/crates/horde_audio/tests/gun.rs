@@ -520,7 +520,7 @@ fn gun_stage_rows() {
         (Cue::ShellInsert, GunStage::ShellInsert, 0.44, 80, 5),
         (Cue::BoltCycle, GunStage::BoltCycle, 0.44, 300, 6),
     ];
-    assert_eq!(rows.map(|row| row.0)[..], Cue::ALL[37..]);
+    assert_eq!(rows.map(|row| row.0)[..], Cue::ALL[37..42]);
     let db = |cue: Cue| 20.0 * (mix(cue).gain / mix(Cue::Reload).gain).log10();
     for (cue, stage, gain, cooldown_ms, priority) in rows {
         let row = mix(cue);

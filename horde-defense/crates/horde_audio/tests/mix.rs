@@ -138,7 +138,10 @@ fn every_cue_has_one_mix_row_bank_and_bus() {
             BankId::Enemy(..) | BankId::Boss(..) | BankId::Gun(_) => {
                 assert!(matches!(cue.legacy_family().bank(), BankId::Legacy(_)));
             }
-            BankId::Ui(_) => panic!("{cue:?} plays {:?}", cue.bank()),
+            // A loot or coin cue (A6-14) falls back to the v1 Ready.
+            BankId::Ui(_) => {
+                assert_eq!(cue.legacy_family(), Cue::Ready, "{cue:?}");
+            }
         }
     }
 }

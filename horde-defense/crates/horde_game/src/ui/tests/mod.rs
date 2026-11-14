@@ -625,6 +625,7 @@ mod frame_tests;
 mod history_tests;
 mod home_tests;
 mod loop_tests;
+mod loot_audio_tests;
 mod loot_block_tests;
 mod low_hp_tests;
 mod menu_tests;

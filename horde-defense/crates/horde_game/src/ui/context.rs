@@ -39,7 +39,11 @@ pub(crate) struct UiCtx<'a> {
     pub(super) history: &'a mut HistoryUi,
     pub(super) prefs: &'a mut SettingsUi,
     pub(super) menu: &'a mut MenuUi,
-    /// UI-originated sound cues, forwarded as `CueRequest` messages.
+    /// UI-originated sound cues, forwarded as `CueRequest` messages. No
+    /// widget writes one today (A6-14: a drop sounds from the runner and
+    /// nothing sounds on hover); this stays the one door a widget would use,
+    /// and `no_widget_hover_writes_a_sound_request` watches it.
+    #[allow(dead_code)]
     pub(super) cues: &'a mut Vec<SoundCue>,
     /// Perf launches only: sub-spans and scene counts inside `ui::draw`.
     pub(super) perf: Option<&'a crate::diagnostics::PerfProbe>,
@@ -264,9 +268,6 @@ impl UiCtx<'_> {
         if self.runtime.enqueue(command, success) && reset {
             self.status.save_pending = true;
         }
-    }
-    pub(super) fn notify_rare_loot(&mut self) {
-        crate::runner::push_cue(self.cues, SoundCue::Ready);
     }
     pub(super) fn request_new_game(&mut self) {
         if self.runtime.reset_in_progress() {

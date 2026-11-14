@@ -310,7 +310,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         },
                     );
                     damage::draw_for(ui,a,projection,f.battle.interpolation.scene(Some(id), a),id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode(),&[]);
-                    if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode(),&[],f.settings.palette) { f.notify_rare_loot(); }
+                    loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode(),&[],f.settings.palette);
                     // The observed expedition's boss sounds are audible in
                     // camp: their banner is the same wall-clock one, keyed
                     // by the battle (worker attempts share ids).

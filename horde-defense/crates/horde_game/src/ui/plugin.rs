@@ -49,7 +49,9 @@ impl Plugin for NavigationPlugin {
         // Notices from this frame's Apply pass (and the previous frame's
         // Advance/Persist passes) become NextState before StateTransition.
         app.add_systems(PreUpdate, notices::handle_notices.after(RuntimeSet::Apply))
-            .add_systems(OnEnter(Screen::Battle), notices::enter_battle);
+            .add_systems(OnEnter(Screen::Battle), notices::enter_battle)
+            // The Results screen's loot reveal and coin batch (A6-14).
+            .add_systems(Update, notices::results_audio);
     }
 }
 

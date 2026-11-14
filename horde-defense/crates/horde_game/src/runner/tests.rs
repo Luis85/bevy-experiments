@@ -1588,3 +1588,81 @@ fn warning_twin_boss_phase() {
         );
     }
 }
+/// One sale command is one coin batch, however many items it sold (R9,
+/// A6-14); a sale that sold nothing is silent.
+#[test]
+fn sell_extras_of_50_plays_one_coin_batch() {
+    let mut host = Host::new();
+    for _ in 0..50 {
+        host.game.campaign_mut().add_item(4).unwrap();
+    }
+    let quote = host.game.sell_extras_quote();
+    assert!(quote > 0);
+    host.runtime.begin_frame(1);
+    host.runtime.enqueue(Command::SellUnprotected, "Sold");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.game.campaign().coins, quote);
+    assert_eq!(host.cues, vec![SoundCue::CoinBatch]);
+    host.cues.clear();
+    // Nothing is left to sell: no coins, no cue.
+    host.runtime.begin_frame(2);
+    host.runtime.enqueue(Command::SellUnprotected, "Sold");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.game.campaign().coins, quote);
+    assert_eq!(host.cues, vec![]);
+    // A single strict sale is a batch of one.
+    let id = host.game.campaign_mut().add_item(4).unwrap();
+    host.runtime.begin_frame(3);
+    host.runtime.enqueue(Command::SellItem(id), "Sold");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.cues, vec![SoundCue::CoinBatch]);
+}
+/// A Rare or better drop sounds from the runner's tracker (A6-14), panned
+/// to where it fell, at its tier's speed; the widgets play nothing.
+#[test]
+fn rare_drop_cue_comes_from_runner_not_widget() {
+    use horde_core::quality::{LootEvent, Quality};
+    let mut host = Host::new();
+    host.deploy();
+    host.runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
+    // The first tick primes the tracker.
+    step(&mut host.ctx());
+    assert!(!host.cues.contains(&SoundCue::LootDrop));
+    let attempt = host.game.attempt_mut().unwrap();
+    let (tick, width) = (attempt.tick, attempt.width_yards);
+    let drop = |item_id, quality| LootEvent {
+        at: [12.0, 1.5],
+        item_id,
+        definition: horde_core::content::content().items[0].id.clone(),
+        level: 1,
+        quality,
+        name: "Test".into(),
+        tick,
+    };
+    attempt.loot_events.push(drop(1, Quality::Uncommon));
+    step(&mut host.ctx());
+    assert!(
+        !host.cues.contains(&SoundCue::LootDrop),
+        "Uncommon is silent"
+    );
+    host.game
+        .attempt_mut()
+        .unwrap()
+        .loot_events
+        .push(drop(2, Quality::Legendary));
+    step(&mut host.ctx());
+    assert!(host.cues.contains(&SoundCue::LootDrop));
+    assert!(!host.cues.contains(&SoundCue::Ready));
+    let places = &host.runtime.cue_places;
+    assert_eq!(
+        places.of(SoundCue::LootDrop),
+        Some(horde_audio::pan::lane_position(12.0, width))
+    );
+    assert_eq!(places.voicing(SoundCue::LootDrop).speed, 1.06);
+    host.cues.clear();
+    step(&mut host.ctx());
+    assert!(!host.cues.contains(&SoundCue::LootDrop), "heard once");
+}

@@ -215,6 +215,8 @@ fn defender_ui_stinger_ambience_centred() {
         Cue::EnemyContact,
         Cue::EnemyDeath,
         Cue::Block,
+        // A battle drop sounds where it fell (A6-14).
+        Cue::LootDrop,
     ];
     let mut places = Places::default();
     for cue in Cue::ALL {
