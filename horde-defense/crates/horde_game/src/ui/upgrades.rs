@@ -41,7 +41,7 @@ pub(super) fn upgrades_continue(f: &UiCtx) -> Option<UpgradesContinue> {
         return None;
     }
     let report = f.game.last_result()?;
-    Some(if results::liberation_settled(f, report) {
+    Some(if results::liberation_settled(f.game, report) {
         UpgradesContinue::ChooseNextCountry
     } else {
         UpgradesContinue::BackToBattle

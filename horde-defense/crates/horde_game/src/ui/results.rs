@@ -14,22 +14,24 @@ use horde_core::{
     content::{Mode, content},
     defenders::{DefenderId, RecruitBlocker},
     progression::BossRank,
-    sim::{Outcome, Report},
+    sim::{Game, Outcome, Report},
     skill_catalog::skills,
     stats::RunRecord,
     world::world,
 };
 mod loot_block;
 /// Whether `report` is the victory that completed its country: the
-/// continuation is then the choice of the next country.
-pub(super) fn liberation_settled(f: &UiCtx, report: &Report) -> bool {
+/// continuation is then the choice of the next country. The one liberation
+/// rule: Results' continue label, Upgrades' continue and Home's primary
+/// (`home::liberation_pending`) all read it.
+pub(super) fn liberation_settled(game: &Game, report: &Report) -> bool {
     report.outcome == Outcome::Victory
         && report
             .country_id
             .as_deref()
             .and_then(|id| world().country(id))
             .is_some_and(|country| {
-                f.game.campaign().world.completed(&country.id) >= country.level_count()
+                game.campaign().world.completed(&country.id) >= country.level_count()
             })
 }
 fn continue_label(f: &UiCtx) -> &'static str {
@@ -37,7 +39,7 @@ fn continue_label(f: &UiCtx) -> &'static str {
         return "Choose a country";
     }
     match f.game.last_result() {
-        Some(report) if liberation_settled(f, report) => "Choose next country",
+        Some(report) if liberation_settled(f.game, report) => "Choose next country",
         Some(report) if report.outcome == Outcome::Victory => "Next defense",
         Some(_) => "Try again",
         None => "Choose a country",

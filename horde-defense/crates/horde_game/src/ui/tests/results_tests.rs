@@ -192,6 +192,37 @@ fn liberated_country_continue_opens_map_and_does_not_autoselect_or_pay_again() {
     assert_eq!(f.game.campaign().run_history.len(), records);
 }
 
+/// One liberation rule: Results' continue label, Upgrades' continue and
+/// Home's primary (`home::liberation_pending`) all read
+/// `results::liberation_settled`, a pure read of the game and its report.
+#[test]
+fn home_and_results_read_one_liberation_rule() {
+    use crate::ui::{home::liberation_pending, results::liberation_settled};
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    let report = f.game.last_result().unwrap().clone();
+    assert!(!liberation_settled(&f.game, &report), "a withdrawal");
+    assert!(!liberation_pending(&f.game));
+    f.game.last_result_mut().as_mut().unwrap().outcome = Outcome::Victory;
+    let report = f.game.last_result().unwrap().clone();
+    assert!(!liberation_settled(&f.game, &report), "a stage short of it");
+    assert!(!liberation_pending(&f.game));
+    let count = world().country("DEU").unwrap().level_count();
+    f.game
+        .campaign_mut()
+        .world
+        .country_levels
+        .insert("DEU".into(), count);
+    assert!(liberation_settled(&f.game, &report));
+    assert!(liberation_pending(&f.game));
+    // Home's rule also needs the journey on and no live defense.
+    f.game.campaign_mut().journey_active = false;
+    assert!(liberation_settled(&f.game, &report));
+    assert!(!liberation_pending(&f.game));
+}
+
 /// W3-03 rewrite: this was one test of the shared upgrade home (header,
 /// camp row, the continue / "More" / "Leave journey" row). Results now has
 /// the header and the three-action bar and no camp row; the row is on

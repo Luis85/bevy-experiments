@@ -11,7 +11,7 @@ use horde_core::{
     command::Command,
     content::Mode,
     defenders::{DefenderId, DefenderOption, PowerBand},
-    sim::{Game, Outcome},
+    sim::Game,
     strategy::{OutbreakOutcome, RecruitStatus},
     world::world,
 };
@@ -53,20 +53,14 @@ impl HomePrimary {
 
 /// Whether the settled report liberated its country while the journey is
 /// still active, so continuing closes the country (core `ContinueJourney`
-/// answers `CountryLiberated`). Results' continue label reads the same rule.
+/// answers `CountryLiberated`). The report half is Results' own rule,
+/// `results::liberation_settled`.
 pub(super) fn liberation_pending(game: &Game) -> bool {
     game.campaign().journey_active
         && game.attempt().is_none()
-        && game.last_result().is_some_and(|report| {
-            report.outcome == Outcome::Victory
-                && report
-                    .country_id
-                    .as_deref()
-                    .and_then(|id| world().country(id))
-                    .is_some_and(|country| {
-                        game.campaign().world.completed(&country.id) >= country.level_count()
-                    })
-        })
+        && game
+            .last_result()
+            .is_some_and(|report| super::results::liberation_settled(game, report))
 }
 
 /// The Home primary, a pure read of the game. The camp footers of the other
