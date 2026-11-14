@@ -175,6 +175,7 @@ pub(crate) fn order_lines(
         let reason = row
             .reason
             .as_deref()
+            .filter(|reason| plain_reason(reason))
             .map(words::sentence)
             .filter(|reason| !reason.is_empty())
             .unwrap_or_else(|| "The next one changes job after the day's work.".to_owned());
@@ -223,12 +224,7 @@ pub(crate) fn order_lines(
         lines.push(OrderLine {
             key: format!("order_{}_{key}", village.0),
             status: OrderStatus::Priority,
-            text: format!(
-                "{}: {}. {}",
-                row.display,
-                level_word(row.level),
-                words::sentence(&row.effect)
-            ),
+            text: priority_text(&row.display, row.level, &row.effect),
             button: Some((
                 "Normal".to_owned(),
                 Action::Priority {
@@ -241,6 +237,29 @@ pub(crate) fn order_lines(
         });
     }
     lines
+}
+
+/// A level in force: "Housing: high. Homes are built sooner." When the
+/// simulation's effect already starts with the level ("High: …"), it is
+/// not said twice.
+pub(crate) fn priority_text(topic: &str, level: PriorityLevel, effect: &str) -> String {
+    let word = level_word(level);
+    let trimmed = effect.trim();
+    let rest = trimmed
+        .get(..word.len() + 1)
+        .filter(|head| head.eq_ignore_ascii_case(&format!("{word}:")))
+        .map_or(trimmed, |_| trimmed[word.len() + 1..].trim_start());
+    format!("{topic}: {word}. {}", words::sentence(rest))
+}
+
+/// Whether the simulation's reason reads as player words: not with a run
+/// of spaces, nor "(s)", nor its "review" and "switching rest" (the sim
+/// rewords it; until then the view's own sentence stands).
+pub(crate) fn plain_reason(reason: &str) -> bool {
+    !reason.contains("  ")
+        && !reason.contains("(s)")
+        && !reason.contains("review")
+        && !reason.contains("switching rest")
 }
 
 /// The block's rows: a head and one row per line; nothing without orders.
@@ -398,6 +417,37 @@ mod tests {
         assert!(order_entries(village, "Harbour", Vec::new()).is_empty());
         let rows = order_entries(village, "Harbour", lines);
         assert_eq!(rows[0].text, "Your orders in Harbour");
+    }
+
+    #[test]
+    fn a_level_and_a_reason_are_said_once_in_player_words() {
+        assert_eq!(
+            priority_text(
+                "Housing",
+                PriorityLevel::High,
+                "High: the planner builds homes sooner"
+            ),
+            "Housing: high. The planner builds homes sooner."
+        );
+        assert_eq!(
+            priority_text(
+                "Food reserve",
+                PriorityLevel::High,
+                "Harbour sees to it first"
+            ),
+            "Food reserve: high. Harbour sees to it first."
+        );
+        assert!(!plain_reason(
+            "1 more farmer(s) wanted: residents move at their next review, once their              switching rest is over"
+        ));
+        assert!(plain_reason("no free place in the village"));
+        let mut row = job("baker", "Baker", 2, Some(3));
+        row.reason = Some("1 more baker(s) wanted: at their next review".into());
+        let lines = order_lines(SimId(1), &[row], &[], &[], false);
+        assert_eq!(
+            lines[0].text,
+            "Bakers: 3 wanted, 2 now. The next one changes job after the day's work."
+        );
     }
 
     #[test]

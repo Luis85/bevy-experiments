@@ -317,12 +317,16 @@ walks to the settlement centre instead and stays outdoors.
     {"kind": "work",    "from": 0,   "to": 700},
     {"kind": "meal",    "from": 250, "to": 300},
     {"kind": "meal",    "from": 600, "to": 650},
-    {"kind": "leisure", "from": 640, "to": 700},
+    {"kind": "leisure", "from": 620, "to": 700},
     {"kind": "sleep",   "from": 700, "to": 1000}
   ],
   "chronotype_shift": 25,
   "diligence_shift": 40,
-  "meal_hunger_threshold": 60000
+  "meal_hunger_threshold": 60000,
+  "chat_ticks": 200,
+  "chat_break_mm": 3000,
+  "meet_cooldown_ticks": 2400,
+  "meet_affinity": 1500
 }
 ```
 
@@ -343,6 +347,11 @@ them, and the tree decides what a window means.
   and as much earlier at diligence 0. A delay as long as the block removes it.
 - `meal_hunger_threshold`: during a meal block a resident carrying food eats
   below this Hunger, without waiting for `hunger_threshold`.
+- `chat_ticks`: how long a meeting lasts; it pays its morale and affinity at
+  the end. `chat_break_mm`: walking further apart than this ends it, unpaid.
+- `meet_cooldown_ticks`: ticks after a meeting before a resident meets again
+  (2400: a few meetings a day). `meet_affinity`: the affinity a finished
+  meeting pays each party; couples form at `demography.pair_affinity`.
 
 Cold is physical, not scheduled: nights and winter are cold whatever the
 schedule says, so a resident whose work block reaches into the night needs a

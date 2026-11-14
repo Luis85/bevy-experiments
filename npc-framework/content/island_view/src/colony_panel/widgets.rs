@@ -537,6 +537,7 @@ pub(super) fn header_tip(header: &str) -> Option<&'static str> {
 /// rather than doing things (buttons).
 fn selector(choices: &[(String, Action)]) -> bool {
     choices.len() > 1
+        && !job_chips(choices)
         && choices.iter().all(|(_, action)| {
             matches!(
                 action,
@@ -548,6 +549,23 @@ fn selector(choices: &[(String, Action)]) -> bool {
                     | Action::Priority { .. }
             )
         })
+}
+
+/// Chips that give one job each its own level: all the same level, each a
+/// different job. They wrap as buttons; they are not one segmented control.
+pub(super) fn job_chips(choices: &[(String, Action)]) -> bool {
+    let levels: Vec<_> = choices
+        .iter()
+        .filter_map(|(_, action)| match action {
+            Action::Priority {
+                profession: Some(_),
+                level,
+                ..
+            } => Some(*level),
+            _ => None,
+        })
+        .collect();
+    levels.len() == choices.len() && levels.windows(2).all(|pair| pair[0] == pair[1])
 }
 
 fn choice_row(world: &mut World, parent: Entity, entry: &Entry) -> Entity {

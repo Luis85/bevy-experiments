@@ -40,7 +40,8 @@ pub struct DemographySpec {
     pub birth_cooldown_days: u32,
     /// Daily chance of a birth for a couple that may have a child.
     pub birth_chance_permille: u32,
-    /// Food units the parents must carry between them before a birth.
+    /// Food units the household can count on before a birth (its members' packs
+    /// plus its share of its settlement's stored food).
     pub birth_food_units: u32,
     /// Most children one household raises at a time.
     pub max_children: u32,
@@ -344,6 +345,11 @@ pub struct MerchantSpec {
     /// Price of an announced good, percent of the island's quote (at least
     /// one coin above it): the order is worth making for.
     pub order_price_percent: u32,
+    /// Net coins the boat may take from the island in a year, percent of the
+    /// island's coins (closing fix): in one visit it sells no more than it
+    /// bought plus this year's share spread over the visits, so imports
+    /// cannot drain the island. 100 lifts the cap.
+    pub trade_balance_percent: u32,
     /// How the outside world's prices and the boat's hold change between
     /// visits (review fix S2.3). Absent: a fixed boat.
     #[serde(default)]
@@ -447,6 +453,7 @@ impl Default for MerchantSpec {
             order_goods: 3,
             order_units: 10,
             order_price_percent: 130,
+            trade_balance_percent: 5,
             drift: MerchantDrift::shipped(),
         }
     }
@@ -747,9 +754,10 @@ pub(super) fn validate_merchant(economy: &EconomySpec) -> Result<(), String> {
     if m.order_goods > 16
         || m.order_units > 1_000
         || !(101..=1_000).contains(&m.order_price_percent)
+        || m.trade_balance_percent > 100
     {
         return Err(
-            "economy: merchant needs order_goods at most 16, order_units at most 1000 and              order_price_percent 101..=1000"
+            "economy: merchant needs order_goods at most 16, order_units at most 1000 and              order_price_percent 101..=1000, trade_balance_percent at most 100"
                 .into(),
         );
     }
@@ -840,6 +848,7 @@ impl MerchantSpec {
         h.u32(self.order_goods);
         h.u32(self.order_units);
         h.u32(self.order_price_percent);
+        h.u32(self.trade_balance_percent);
         let d = &self.drift;
         for value in [
             d.price_step_permille,

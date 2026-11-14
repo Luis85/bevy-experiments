@@ -217,7 +217,7 @@ fn a_project_row_shows_materials_stage_and_progress() {
     };
     assert_eq!(
         unfunded.status(),
-        "waiting for materials; the civic fund cannot pay for them yet"
+        "waiting for materials; the fund cannot pay for them yet"
     );
     let long_unfunded = SiteRow {
         unfunded: true,
@@ -226,7 +226,7 @@ fn a_project_row_shows_materials_stage_and_progress() {
     };
     assert_eq!(
         long_unfunded.status(),
-        "waiting for materials for 3 days; the civic fund cannot pay for them yet"
+        "waiting for materials for 3 days; the fund cannot pay for them yet"
     );
     let ready = site((8, 4), 0);
     assert_eq!(ready.stage(), Stage::Ready);

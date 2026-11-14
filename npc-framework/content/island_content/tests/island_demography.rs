@@ -512,7 +512,9 @@ fn coins_and_goods_are_conserved_across_births_deaths_inheritance_and_boat_trade
             "enabled": true, "first_visit_day": 0, "interval_days": 1,
             "arrive_permille": 20, "stay_ticks": 600, "purse": 300,
             "buys": [{"good": SALT, "max_units": 3, "price_percent": 100}],
-            "sells": [{"good": SALT, "units": 2, "price_percent": 150, "want_units": 10_000}]});
+            "sells": [{"good": SALT, "units": 2, "price_percent": 150, "want_units": 10_000}],
+            // Conservation is the point here, not the trade balance.
+            "trade_balance_percent": 100});
     });
     set_journal(app.world_mut(), true, false);
     run_ticks(app.world_mut(), 2);
@@ -566,6 +568,15 @@ fn coins_and_goods_are_conserved_across_births_deaths_inheritance_and_boat_trade
     // The journal is a ring: look for the inheritance while it is recent.
     let mut inherited = false;
     for _ in 0..120 {
+        // Salt is scarce on the island: the boat sells only what is dear.
+        if let Some(row) = app
+            .world_mut()
+            .resource_mut::<village::market::MarketState>()
+            .commodities
+            .get_mut(SALT)
+        {
+            row.reference_milli = 12_000;
+        }
         run_ticks(app.world_mut(), 100);
         let now = app.world().resource::<SimClock>().tick;
         assert_eq!(ledger(&mut app), (coins, salt), "drift at tick {now}");
@@ -855,4 +866,86 @@ fn a_parent_fetches_food_for_a_hungry_child_with_an_empty_larder() {
     });
     assert!(fed, "no parent brought food home for the child");
     village::integrity::validate_colony(app.world()).expect("valid");
+}
+
+/// A household decides on a child from the food it can count on: what its
+/// members hold and its share of its settlement's stored food, not what one
+/// person happens to carry (closing fix: since the daily meal, packs are
+/// nearly empty between meals and every birth was deferred).
+#[test]
+fn a_household_with_food_in_its_settlements_stores_may_have_a_child() {
+    let mut app = world_with(|world| {
+        quick_lives(world);
+        let life = &mut economy(world)["demography"];
+        life["birth_chance_permille"] = json!(1000);
+        life["birth_food_units"] = json!(4);
+        // The boat's trading post and the market stall are the settlement's
+        // stores of food; the boat itself stays away.
+        economy(world)["merchant"]["enabled"] = json!(true);
+        economy(world)["merchant"]["first_visit_day"] = json!(100);
+    });
+    set_journal(app.world_mut(), true, false);
+    // The stores stand from the first tick.
+    run_ticks(app.world_mut(), 2);
+    let harbour = settlement(app.world(), "harbour");
+    let people = residents(app.world(), harbour);
+    let ((a_id, a), (_, b), (_, stocker)) = (people[0], people[1], people[5]);
+    for actor in [a, b] {
+        young(app.world_mut(), actor);
+    }
+    let house = marry(app.world_mut(), a, b);
+    // Nobody in the house carries food.
+    let foods = [
+        "bread",
+        village::catalog::COOKED_MEAL,
+        village::catalog::BERRIES,
+    ];
+    let strip = |app: &mut App| {
+        for actor in [a, b] {
+            for kind in foods {
+                let held = econ::count(app.world(), actor, kind);
+                if held > 0 {
+                    econ::consume(app.world_mut(), actor, kind, held).expect("eaten");
+                }
+            }
+        }
+    };
+    strip(&mut app);
+    let before = demography::household_food(app.world(), house, harbour);
+    // A neighbour lays bread in a store of the settlement: the house counts
+    // its share of it, though neither parent carries any.
+    let store = civic::depots(app.world(), harbour)
+        .into_iter()
+        .map(|(_, entity)| entity)
+        .find(|entity| {
+            app.world()
+                .get::<civic::Depot>(*entity)
+                .is_some_and(|depot| depot.accepts("bread"))
+        })
+        .expect("a store takes bread");
+    let at = *app.world().get::<SimPos>(store).expect("store position");
+    teleport(app.world_mut(), stocker, at);
+    econ::grant(app.world_mut(), stocker, Item::new("bread").stack(56));
+    civic::depot_deposit(app.world_mut(), stocker, store, "bread", 56).expect("stored");
+    let homes = residents(app.world(), harbour)
+        .into_iter()
+        .filter_map(|(id, _)| colony::home_of(app.world(), id))
+        .collect::<std::collections::BTreeSet<_>>()
+        .len() as u32;
+    let share = demography::household_food(app.world(), house, harbour);
+    assert!(
+        share >= before + 56 / homes.max(1),
+        "{share} (was {before}) with 56 over {homes} homes"
+    );
+    assert_eq!(econ::count(app.world(), a, "bread"), 0);
+    run_ticks(app.world_mut(), 1_201);
+    assert!(
+        !effects(app.world(), "VillageBirth").is_empty(),
+        "deferred: {:?}",
+        effects(app.world(), "VillageBirthDeferred")
+            .iter()
+            .filter(|record| record["couple"][0] == json!(a_id))
+            .map(|record| record["reason"].clone())
+            .collect::<Vec<_>>()
+    );
 }

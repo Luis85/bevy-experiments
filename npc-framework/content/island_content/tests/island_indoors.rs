@@ -19,6 +19,23 @@ use npc_framework::needs::{NeedRegistry, Needs};
 use npc_framework::prelude::*;
 use serde_json::json;
 
+/// Takes every coat a resident wears or carries.
+fn strip_coat(app: &mut App, actor: Entity) {
+    use npc_framework::interaction::items;
+    let garment = village::catalog::WARM_CLOTHES;
+    if let Some(coat) = items::equipped_matching(app.world(), actor, garment)
+        .and_then(|id| app.world().resource::<SimIndex>().get(id))
+    {
+        items::take_from_holder(app.world_mut(), coat);
+        app.world_mut().despawn(coat);
+    }
+    let held = econ::count(app.world(), actor, garment);
+    if held > 0 {
+        econ::consume(app.world_mut(), actor, garment, held).expect("taken");
+    }
+    assert!(!living::has_coat(app.world(), actor));
+}
+
 fn set_need(world: &mut World, actor: Entity, need: &str, value: i32) {
     let id = world.resource::<NeedRegistry>().id(need).expect("need");
     world
@@ -163,25 +180,27 @@ fn indoors_the_hearth_decides_warmth_and_passers_by_cannot_meet_the_resident() {
     let square = village::frontier::settlements::definition(app.world(), harbour)
         .expect("harbour")
         .center;
-    let coatless = |app: &App, actor: Entity| !living::has_coat(app.world(), actor);
-    let (out_id, outside) = *people
-        .iter()
-        .find(|(_, actor)| coatless(&app, *actor))
-        .expect("somebody has no coat");
+    let (out_id, outside) = people[0];
+    strip_coat(&mut app, outside);
     let mut sheltered = None;
     for _ in 0..40 {
         for _ in 0..10 {
             teleport(app.world_mut(), outside, square);
             run_ticks(app.world_mut(), 1);
         }
-        sheltered = people.iter().copied().find(|(id, actor)| {
-            *id != out_id && coatless(&app, *actor) && view::inside(app.world(), *id).is_some()
-        });
+        // Since every bought or granted coat carries its durability (closing
+        // fix), most residents have a real coat: take it off the one found
+        // inside, so the hearth alone decides its warmth.
+        sheltered = people
+            .iter()
+            .copied()
+            .find(|(id, _)| *id != out_id && view::inside(app.world(), *id).is_some());
         if sheltered.is_some() {
             break;
         }
     }
     let (in_id, inside) = sheltered.expect("nobody was indoors at night");
+    strip_coat(&mut app, inside);
     // Since the family evening (review fix S3.3) residents are home well
     // before the night and already warm: chill the one inside so the hearth
     // has something to show.

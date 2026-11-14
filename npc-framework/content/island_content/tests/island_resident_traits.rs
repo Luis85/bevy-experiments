@@ -194,10 +194,13 @@ fn schedule_blocks_are_data_and_move_with_the_chronotype() {
 }
 
 /// Leisure from 5% to 40% of the day, so the first hour of the run covers it.
+/// Meetings may follow each other closely (the shipped cooldown, 2400 ticks,
+/// would allow one or two in the sampled hour, for sociable and unsociable
+/// residents alike).
 fn early_leisure(traits: Value) -> Value {
     json!({
         "traits": traits,
-        "schedule": {"diligence_shift": 100, "blocks": [
+        "schedule": {"diligence_shift": 100, "meet_cooldown_ticks": 300, "blocks": [
             {"kind": "work", "from": 0, "to": 700},
             {"kind": "leisure", "from": 50, "to": 400},
             {"kind": "sleep", "from": 700, "to": 1000}

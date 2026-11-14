@@ -470,7 +470,7 @@ fn stock_lines(
     }
     lines.push((
         Some(Icon::Coins),
-        "Civic fund to spend".to_owned(),
+        "The fund to spend".to_owned(),
         island_content::village::civic::budget(world).to_string(),
         Status::Idle,
     ));
@@ -702,7 +702,7 @@ fn refresh(world: &mut World) {
             if queued == 1 { "" } else { "s" }
         )
     } else if tool.status.is_empty() {
-        "Residents carry the materials and build it; the civic fund pays them.".to_owned()
+        "Residents carry the materials and build it; the fund pays them.".to_owned()
     } else {
         tool.status.clone()
     };

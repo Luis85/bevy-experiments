@@ -195,3 +195,55 @@ fn the_stall_takes_what_a_player_made() {
         .expect_err("untraded");
     assert!(error.starts_with("Nobody on this island trades"), "{error}");
 }
+
+/// Every founder's tool carries the durability of its data, the endowment
+/// stacks included (closing fix: a fisher's rod, a carpenter's rods or a
+/// hunter's spare spear came without one and never wore out), and wears
+/// out with use.
+#[test]
+fn founders_tools_carry_their_durability_and_wear_out() {
+    use npc_framework::crafting::Durability;
+    use npc_framework::interaction::Inventory;
+    let mut app = world_with(|world| only_weather(world, "clear"));
+    // The founders receive their goods on the first tick.
+    run_ticks(app.world_mut(), 2);
+    let mut tools = 0;
+    let mut sample = None;
+    for (_, actor) in all_residents(app.world()) {
+        let items = app
+            .world()
+            .get::<Inventory>(actor)
+            .map(|inventory| inventory.items.clone())
+            .unwrap_or_default();
+        for id in items {
+            let Some(entity) = app.world().resource::<SimIndex>().get(id) else {
+                continue;
+            };
+            let kind = app.world().get::<Item>(entity).expect("item").kind.clone();
+            let Some(full) = village::catalog::durability_in(app.world(), &kind) else {
+                continue;
+            };
+            let durability = app.world().get::<Durability>(entity);
+            assert!(
+                durability.is_some_and(|durability| (1..=full).contains(&durability.current)),
+                "{kind} of a founder has no durability"
+            );
+            tools += 1;
+            if kind == village::catalog::FISHING_ROD {
+                sample = Some((actor, id, kind));
+            }
+        }
+    }
+    // Tools, rods and spears; the founders' coats are worn, not carried.
+    assert!(tools >= 30, "only {tools} durable founder items");
+    // A rod handed out in an endowment wears out after its uses.
+    let (actor, id, kind) = sample.expect("somebody holds a rod");
+    let full = village::catalog::durability_in(app.world(), &kind).expect("rod durability");
+    let holder = app.world().get::<SimId>(actor).copied().expect("id");
+    let rods = econ::count(app.world(), actor, &kind);
+    for _ in 0..full * rods {
+        village::living::wear_tool(app.world_mut(), actor, holder, &kind);
+    }
+    assert_eq!(econ::count(app.world(), actor, &kind), 0);
+    assert!(app.world().resource::<SimIndex>().get(id).is_none());
+}

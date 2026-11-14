@@ -53,8 +53,9 @@ fn settle_meetings(world: &mut World, now: u64) {
         })
         .unwrap_or_default();
     chats.sort_unstable_by_key(|(id, _, _)| *id);
-    let (break_mm,) =
-        (super::super::resident::spec(world).map_or(3000, |spec| spec.schedule.chat_break_mm),);
+    let (break_mm, pay) = super::super::resident::spec(world).map_or((3000, 1500), |spec| {
+        (spec.schedule.chat_break_mm, spec.schedule.meet_affinity)
+    });
     let critical = super::super::policy::active(world).map_or_else(
         || super::super::policy::IslandAiPolicy::default().critical_need,
         |policy| policy.critical_need,
@@ -88,7 +89,7 @@ fn settle_meetings(world: &mut World, now: u64) {
             if paid && let Some(mut social) = world.get_mut::<SocialLife>(person) {
                 social.morale = (social.morale + 1000).min(100_000);
                 let affinity = social.affinity.entry(partner).or_default();
-                *affinity = (*affinity + 250).min(100_000);
+                *affinity = (*affinity + pay).min(100_000);
             }
         }
         if paid {
@@ -229,6 +230,8 @@ pub(super) fn tick(world: &mut World, now: u64) {
     if !world.resource::<ColonyState>().gatherings {
         return;
     }
+    let cooldown =
+        super::super::resident::spec(world).map_or(2400, |spec| spec.schedule.meet_cooldown_ticks);
     // Spatial buckets of the meeting reach: a resident can only meet somebody
     // in its own or a neighbouring bucket, so the pass looks at neighbours
     // instead of at every pair. Candidates keep their identity order, so the
@@ -282,7 +285,7 @@ pub(super) fn tick(world: &mut World, now: u64) {
                 .get::<SocialLife>(*a)
                 .expect("social")
                 .last_social_tick
-                .saturating_add(300)
+                .saturating_add(cooldown)
                 > now
         {
             continue;
@@ -298,7 +301,7 @@ pub(super) fn tick(world: &mut World, now: u64) {
                     .get::<SocialLife>(*b)
                     .expect("social")
                     .last_social_tick
-                    .saturating_add(300)
+                    .saturating_add(cooldown)
                     > now
             {
                 continue;

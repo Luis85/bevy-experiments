@@ -11,6 +11,20 @@ use npc_framework::kernel::journal::set_journal;
 use npc_framework::prelude::*;
 use serde_json::{Value, json};
 
+/// Marks `kind` as dear on the island: its market reference at three times
+/// its base price (the boat sells only what is dear).
+fn dear(app: &mut bevy_app::App, kind: &str) {
+    let base = catalog::price_in(app.world(), kind).expect("a traded good");
+    if let Some(row) = app
+        .world_mut()
+        .resource_mut::<village::market::MarketState>()
+        .commodities
+        .get_mut(kind)
+    {
+        row.reference_milli = base * 3_000;
+    }
+}
+
 /// A boat that lands at once, stays a short while and comes back daily.
 fn quick_boat(world: &mut Value) {
     short_days(world, 2400);
@@ -33,6 +47,8 @@ fn the_boat_calls_on_schedule_and_trades_through_the_trading_post() {
             {"good": "plank", "max_units": 6, "price_percent": 80, "keep_units": 8}
         ]);
         economy(world)["tuning"]["stock_target_days"] = json!(0);
+        // The boat's sales are not capped by its trade balance here.
+        economy(world)["merchant"]["trade_balance_percent"] = json!(100);
     });
     set_journal(app.world_mut(), true, false);
     run_ticks(app.world_mut(), 2);
@@ -66,7 +82,11 @@ fn the_boat_calls_on_schedule_and_trades_through_the_trading_post() {
     // Planks on the post's shelf the moment before the boat lands: residents
     // may buy some in the meantime.
     let mut on_shelf = 14;
+    // Ingots and grain are dear when it lands: the boat sells only against a
+    // real shortage (closing fix).
     let landed = until(&mut app, 200, 1, |app| {
+        dear(app, "ingot");
+        dear(app, catalog::GRAIN);
         let docked = view::boat(app.world()).docked;
         if !docked {
             on_shelf = civic::depot_available(app.world(), post, "plank", None);

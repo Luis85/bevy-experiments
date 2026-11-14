@@ -546,6 +546,37 @@ fn carried_food(world: &World, actor: Entity) -> u32 {
         .sum()
 }
 
+/// The food a household can count on when it decides on a child (closing
+/// fix): what every member of the home holds, plus its share of the food in
+/// its settlement's stores (the stores' food over the settlement's homes).
+/// Not one person's pack at that moment: since the daily sit-down meal a
+/// resident eats what it carries and buys again, so packs are nearly empty
+/// between meals even in a well-fed village.
+pub fn household_food(world: &World, house: SimId, settlement: SimId) -> u32 {
+    let kinds = food_kinds(world);
+    let members = members(world, settlement);
+    let held: u32 = members
+        .iter()
+        .filter(|(id, _)| home_of(world, *id) == Some(house))
+        .map(|(_, actor)| carried_food(world, *actor))
+        .fold(0, u32::saturating_add);
+    let homes: BTreeSet<SimId> = members
+        .iter()
+        .filter_map(|(id, _)| home_of(world, *id))
+        .collect();
+    let stored: u32 = super::civic::depots(world, settlement)
+        .into_iter()
+        .filter_map(|(_, entity)| world.get::<super::civic::Depot>(entity))
+        .map(|depot| {
+            kinds
+                .iter()
+                .map(|kind| depot.stock(kind))
+                .fold(0, u32::saturating_add)
+        })
+        .fold(0, u32::saturating_add);
+    held.saturating_add(stored / (homes.len() as u32).max(1))
+}
+
 /// Hunger the children of this resident's household add to the food this
 /// resident plans to hold, in the milli-units of the Hunger need. The
 /// household's adults share it equally.
@@ -980,8 +1011,11 @@ fn births(world: &mut World, spec: &DemographySpec, day: u64) {
             deferred(world, "max_population");
             continue;
         }
-        if carried_food(world, a) + carried_food(world, b) < spec.birth_food_units {
-            deferred(world, "food_carried");
+        let settlement_of = settlements::member(world, a);
+        if settlement_of.is_none_or(|settlement| {
+            household_food(world, house, settlement) < spec.birth_food_units
+        }) {
+            deferred(world, "household_food");
             continue;
         }
         if [a, b]

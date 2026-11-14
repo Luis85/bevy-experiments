@@ -94,7 +94,7 @@ impl Tip {
                 "The top bar counts residents, morale, food, water and the civic fund. Rest the pointer on a total for its sentence; choose it for the ledger page behind it."
             }
             Self::Build => {
-                "Choose a kind of building below, then a place for it. Residents carry the materials and do the work; the civic fund pays them."
+                "Choose a kind of building below, then a place for it. Residents carry the materials and do the work; the fund pays them."
             }
             Self::Resident => {
                 "Click anybody on the island to see how they are, what they are doing and why they chose it."

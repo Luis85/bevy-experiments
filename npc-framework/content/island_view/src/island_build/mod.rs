@@ -236,6 +236,13 @@ pub(crate) fn card_subject(world: &World) -> Option<SimId> {
 
 /// Whether the build menu or a building card is being read. The alert stack
 /// folds to its header and the marker key hides while it is.
+/// Buildings ordered that time has not opened yet (the Paused pill's count).
+pub(crate) fn orders_waiting(world: &World) -> usize {
+    world
+        .get_resource::<BuildTool>()
+        .map_or(0, BuildTool::queued)
+}
+
 pub(crate) fn column_taken(world: &World) -> bool {
     palette_open(world) || card_subject(world).is_some()
 }

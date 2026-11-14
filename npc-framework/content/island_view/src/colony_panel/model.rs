@@ -254,6 +254,7 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
                 scope: ledger.scope,
                 village: ledger.village_scope,
                 more: ledger.good_more,
+                day_more: ledger.day_more,
                 job_levels: ledger.job_levels,
                 sent: &ledger.sent,
                 page: ledger.economy,
@@ -641,7 +642,7 @@ fn commission_entries(world: &World, summary: &colony::ColonySummary) -> Vec<Ent
         }) {
             rows.push(Entry::action(
                 format!("build{}", plot_id.0),
-                format!("Commission {} · {name}", definition.label),
+                format!("Ask {name} to build {}", definition.label.to_lowercase()),
                 Action::Commission(*builder, plot_id),
             ));
         }

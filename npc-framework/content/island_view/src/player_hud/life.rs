@@ -20,8 +20,26 @@ fn stamp(world: &World) -> Option<LifeStamp> {
     ))
 }
 
+/// A life that ended before it was ever played: the character of an
+/// Oversee start that never arrived. Nothing about its end is shown.
+fn never_played(world: &World) -> bool {
+    world
+        .get_resource::<island_content::village::VillageState>()
+        .and_then(|state| {
+            world
+                .get_resource::<npc_framework::prelude::SimIndex>()?
+                .get(state.played)
+        })
+        .is_some_and(|actor| {
+            world
+                .get::<island_content::village::colony::AwaitingArrival>(actor)
+                .is_some()
+        })
+}
+
 pub(super) fn needs_prompt(world: &World) -> bool {
     dead(world)
+        && !never_played(world)
         && (world.get_resource::<IslandMode>() == Some(&IslandMode::Character)
             || world
                 .get_resource::<LifeView>()
@@ -32,6 +50,9 @@ pub(super) fn needs_prompt(world: &World) -> bool {
 pub(super) fn watching(world: &World) -> bool {
     enabled(world)
         && dead(world)
+        && !never_played(world)
+        // Shape has its own rail and bar at the bottom left.
+        && world.get_resource::<IslandMode>() != Some(&IslandMode::Editor)
         && !needs_prompt(world)
         && !world
             .get_resource::<FrontendGate>()
@@ -148,7 +169,7 @@ pub(super) fn refresh(world: &mut World) {
             if pending {
                 "\n\nA new life is arriving."
             } else if stopped {
-                "\n\nThe world is paused. Press Space to resume before beginning a successor."
+                "\n\nTime is paused. Press Space to let it run before beginning a successor."
             } else {
                 ""
             }

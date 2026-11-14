@@ -420,7 +420,7 @@ impl SiteRow {
                     "waiting for materials".to_owned()
                 };
                 if self.unfunded {
-                    format!("{waiting}; the civic fund cannot pay for them yet")
+                    format!("{waiting}; the fund cannot pay for them yet")
                 } else {
                     waiting
                 }

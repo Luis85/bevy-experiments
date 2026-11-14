@@ -155,6 +155,8 @@ pub(crate) enum Action {
     DismissOrder((u64, u32)),
     /// Priorities: show or hide the jobs that may get their own level.
     JobLevels,
+    /// The day's account: show or fold its lines after the first two.
+    DayMore,
     /// The season-end card (2.6): open it on this season, close it, or
     /// close it onto the Journal.
     SeasonOpen(u32),
@@ -173,6 +175,13 @@ struct Ledger {
     job_levels: bool,
     /// The season whose end card the ledger shows (2.6).
     season_card: Option<u32>,
+    /// The tick the season card opened: it closes by itself after a day of
+    /// running time (closing phase, defect 3).
+    season_opened: Option<u64>,
+    /// The day's account is unfolded.
+    day_more: bool,
+    /// The good whose card was last brought into view.
+    scrolled_good: Option<String>,
     /// The last finished season already offered; `None` before the first
     /// look, so a loaded island does not offer an old season.
     season_seen: Option<Option<u32>>,
@@ -222,6 +231,9 @@ impl Default for Ledger {
             sent: Vec::new(),
             job_levels: false,
             season_card: None,
+            season_opened: None,
+            day_more: false,
+            scrolled_good: None,
             season_seen: None,
             foot: (String::new(), 0.0),
             flash: None,
@@ -725,12 +737,28 @@ pub(crate) fn last_season(world: &World) -> Option<u32> {
 fn offer_season(world: &mut World) {
     let ended = last_season(world);
     let seen = world.resource::<Ledger>().season_seen;
-    {
+    let now = world
+        .get_resource::<SimClock>()
+        .map_or(0, |clock| clock.tick);
+    let day = world
+        .get_resource::<SimConfig>()
+        .map_or(1, |config| config.day_length.max(1));
+    let close_card = {
         let mut state = world.resource_mut::<Ledger>();
         state.season_seen = Some(ended);
         if !state.open {
             state.season_card = None;
         }
+        if state.season_card.is_none() {
+            state.season_opened = None;
+        }
+        season_card_expired(state.season_card.is_some(), state.season_opened, now, day)
+    };
+    // A card nobody closed goes by itself after a day of running time: it
+    // never keeps a third of the screen for the rest of the season.
+    if close_card {
+        world.resource_mut::<Ledger>().season_card = None;
+        close(world);
     }
     // The first look at this island offers nothing; then only a season
     // that ended since the last look.
@@ -753,6 +781,40 @@ fn offer_season(world: &mut World) {
     {
         crate::island_shell::season_toast(world, format!("{name} has ended."));
     }
+}
+
+/// Whether an open season card has stood a day of running time.
+pub(crate) fn season_card_expired(open: bool, opened: Option<u64>, now: u64, day: u64) -> bool {
+    open && opened.is_some_and(|opened| now >= opened.saturating_add(day))
+}
+
+/// Orders this ledger sent that time has not applied yet: the Paused pill
+/// counts them (with Build's and Shape's own).
+pub(crate) fn orders_waiting(world: &World) -> usize {
+    world.get_resource::<Ledger>().map_or(0, |state| {
+        state
+            .sent
+            .iter()
+            .filter(|order| order.refused.is_none())
+            .count()
+    })
+}
+
+/// A good chosen in the table: its card, under its row, is scrolled into
+/// view once (closing phase, defect 11).
+fn bring_card_into_view(world: &mut World) {
+    let (good, scrolled) = {
+        let state = world.resource::<Ledger>();
+        (state.good.clone(), state.scrolled_good.clone())
+    };
+    if good == scrolled {
+        return;
+    }
+    let card = world.resource::<Ledger>().rows.get("stock_detail").copied();
+    if let (Some(_), Some(card)) = (&good, card) {
+        world.trigger(bevy::ui_widgets::ScrollIntoView { entity: card });
+    }
+    world.resource_mut::<Ledger>().scrolled_good = good;
 }
 
 /// [`queue`] for an order of "Your orders": it is remembered until the
@@ -989,6 +1051,10 @@ fn process(world: &mut World) {
                 state.open = true;
                 state.season_card = Some(season);
                 reset_scroll(world);
+                let now = world
+                    .get_resource::<SimClock>()
+                    .map_or(0, |clock| clock.tick);
+                world.resource_mut::<Ledger>().season_opened = Some(now);
             }
             Action::SeasonClose => {
                 world.resource_mut::<Ledger>().season_card = None;
@@ -1005,6 +1071,10 @@ fn process(world: &mut World) {
             Action::JobLevels => {
                 let mut state = world.resource_mut::<Ledger>();
                 state.job_levels = !state.job_levels;
+            }
+            Action::DayMore => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.day_more = !state.day_more;
             }
             Action::DismissOrder(key) => world
                 .resource_mut::<Ledger>()
@@ -1567,6 +1637,7 @@ pub(crate) fn refresh(world: &mut World) {
         }
         let rows = entries(world);
         reconcile(world, rows);
+        bring_card_into_view(world);
     }
     if !open
         && world

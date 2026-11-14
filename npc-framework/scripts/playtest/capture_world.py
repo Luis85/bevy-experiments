@@ -194,7 +194,9 @@ class WorldFlow(HousesFlow):
         for text in self.texts():
             if text.startswith("Day ") and text[4:].split(" ")[0].isdigit():
                 return int(text[4:].split(" ")[0])
-        return None
+        # The top bar shows the day of the season ("Autumn, day 6"); the
+        # merchant and the journal count calendar days, so from the clock.
+        return first_day() + self.state()["tick"] // DAY + 1
 
     def fields(self):
         """Fields: label, plot and how many plots are at each stage."""
@@ -216,6 +218,16 @@ class WorldFlow(HousesFlow):
         mid = ((plot["lo_x"] + plot["hi_x"] + 1) / 2.0, (plot["lo_z"] + plot["hi_z"] + 1) / 2.0)
         self.frame(label + "-24m", mid[0], mid[1], 24, yaw=math.pi * 0.8)
         self.frame(label + "-50m", mid[0], mid[1], 50, yaw=math.pi * 0.8)
+
+
+def first_day():
+    """The calendar day of tick 0 (`village::model::first_day`): the rules'
+    `founding_day`, or two days before winter when it is negative."""
+    tuning = json.loads(SHIPPED.read_text(encoding="utf-8"))["living_world"]["economy"]["tuning"]
+    if tuning.get("founding_day", -1) >= 0:
+        return int(tuning["founding_day"])
+    season = max(1, int(tuning.get("days_per_season", 7)))
+    return max(3 * season - 2, 2 * season)
 
 
 def launch(binary, run, rules, extra_env):
@@ -2866,8 +2878,10 @@ def sound_lines(log_path):
     except OSError:
         return counts
     for line in text.splitlines():
-        if "island_audio:" in line:
-            tail = line.split("island_audio:", 1)[1].strip()
+        # The message, not the module path (`island_view::island_audio::music`)
+        # that a debug line's span also carries.
+        if "island_audio: " in line:
+            tail = line.rsplit("island_audio: ", 1)[1].strip()
             if tail.startswith("layer "):
                 name = tail.split()[1]
                 counts["layers"][name] = counts["layers"].get(name, 0) + 1
@@ -2901,14 +2915,44 @@ def sound11_run(binary, base, report):
         post = xz(flow.world().parts(merchant["post"])["pos"]) if merchant.get("post") else None
         px, pz = (post[0] / 1000.0, post[1] / 1000.0) if post else (0.0, 0.0)
         world, row, street_x, street_z = street(flow)
-        spots = [("coast", px - 6.0, pz, 18), ("woods", px + 6.0, pz + 14.0, 20),
-                 ("village", street_x, street_z, 22), ("oversee", street_x, street_z, 150)]
-        for phase_name, phase in (("day", 0.35), ("night", 0.85)):
+        work_actions = ("life.gather", "life.craft", "life.build", "life.sow", "life.tend", "life.harvest")
+
+        def worker():
+            """A resident at work (felling, crafting, building, farming):
+            their position, action and the tick, or None."""
+            state = flow.state()
+            for entity in state.get("entities", []):
+                comps = entity.get("components", {})
+                leaf = entity.get("active_leaf")
+                action = leaf.get("action") if isinstance(leaf, dict) else None
+                if VILLAGER in comps and "pos" in comps and action in work_actions:
+                    return xz(comps["pos"]), action, state["tick"]
+            return None
+
+        # By day in the morning, when the village works (most residents
+        # socialise, buy and idle in the afternoon).
+        for phase_name, phase in (("day", 0.12), ("night", 0.85)):
             flow.to_phase(phase)
+            flow.call("npc/pause")
+            # The village heard where someone works: by day, step the clock
+            # until a resident fells, crafts, builds or farms (the street of
+            # homes is quiet); else the street.
+            work = None
+            if phase_name == "day":
+                for _ in range(40):
+                    work = worker()
+                    if work:
+                        break
+                    flow.call("npc/step", {"ticks": 120})
+                entry["village_spot"] = ({"at": [work[0][0] / 1000.0, work[0][1] / 1000.0], "action": work[1],
+                                          "tick": work[2]} if work else "street")
+            vx, vz = (work[0][0] / 1000.0, work[0][1] / 1000.0) if work else (street_x, street_z)
+            spots = [("coast", px - 6.0, pz, 18), ("woods", px + 6.0, pz + 14.0, 20),
+                     ("village", vx, vz, 22), ("oversee", street_x, street_z, 150)]
             for label, x, z, distance in spots:
                 flow.look(x, z, distance, f"sound-{phase_name}-{label}", 0.6)
                 flow.call("npc/resume")
-                time.sleep(6.0)
+                time.sleep(10.0 if label == "village" else 6.0)
                 flow.call("npc/pause")
                 flow.snap_now(f"sound-{phase_name}-{label}")
                 entry[f"{phase_name}-{label}"] = sound_lines(flow.log_path)
@@ -2918,22 +2962,29 @@ def sound11_run(binary, base, report):
     return run
 
 
-# Shape placements (`--only shape12`): one of each shipped prop, a field and
-# a garden placed by recorded commands near the village street, shot from
-# close and from above; then one prop removed and the spot shot again.
+# Shape placements (`--only shape12`): the build-site path (review fix
+# S2.1). In build mode a barrel, a garden and a cottage are placed by
+# recorded commands near the village street and shot as sites (stakes and a
+# rail for the barrel and the garden, the scaffold for the cottage); the clock
+# then runs until the barrel's planks are delivered and it is built, shot
+# from the same camera each time. Then the recorded editor switch, and every
+# shipped prop placed in editor mode (standing at once), the signpost and the
+# wheelbarrow at rotation 0 and 1 side by side for the facing; one removed.
 
 SHIPPED_PROPS = ["barrel", "crate_stack", "fence", "flower_bed", "signpost", "flag", "wheelbarrow"]
+SITE = "regional_construction_site_v1"
+PROP = "living_prop_v1"
 
 
-def place_near(flow, command, x0, z0, tries=40):
+def place_near(flow, command, x0, z0, tries=40, spacing=2):
     """Place `command` at the first free cell in a spiral round (x0, z0);
     the receipt and the cell, or the last refusal."""
     last = None
     for step in range(tries):
         ring = 1 + step // 8
         angle = (step % 8) * math.pi / 4
-        x = round(x0 + ring * 2 * math.cos(angle))
-        z = round(z0 + ring * 2 * math.sin(angle))
+        x = round(x0 + ring * spacing * math.cos(angle))
+        z = round(z0 + ring * spacing * math.sin(angle))
         try:
             receipt = flow.call("npc/command", {"cmd": {**command, "x": x, "z": z}})
             flow.call("npc/step", {"ticks": 2})
@@ -2941,6 +2992,35 @@ def place_near(flow, command, x0, z0, tries=40):
         except RuntimeError as error:
             last = str(error)[:200]
     return {"refused": last}
+
+
+def sites(flow):
+    return {sim_id: parts[SITE] for sim_id, parts in flow.world().having(SITE)}
+
+
+def props_at(flow):
+    return {sim_id: parts[PROP] for sim_id, parts in flow.world().having(PROP)}
+
+
+def new_site(flow, before, command, x0, z0, spacing=2, tries=40):
+    """Place in build mode; the placement and the new site's id."""
+    # Props and plots say how they are placed; a building has no mode.
+    mode = {} if command["type"] == "PlaceBuilding" else {"mode": "build"}
+    placed = place_near(flow, {**command, **mode}, x0, z0, tries=tries, spacing=spacing)
+    fresh = [sim_id for sim_id in sites(flow) if sim_id not in before]
+    placed["site"] = fresh[0] if fresh else None
+    return placed
+
+
+def site_middle(site):
+    plot = site["plot"]
+    return ((plot["lo_x"] + plot["hi_x"] + 1) / 2.0, (plot["lo_z"] + plot["hi_z"] + 1) / 2.0)
+
+
+def shot(flow, x, z, distance, label, yaw=0.6, settle=1.2):
+    flow.look(x, z, distance, label, yaw)
+    time.sleep(settle)
+    flow.snap_now(label)
 
 
 def shape12_run(binary, base, report):
@@ -2957,44 +3037,165 @@ def shape12_run(binary, base, report):
         flow.to_phase(0.35)
         flow.call("npc/pause")
         world, row, street_x, street_z = street(flow)
-        placed = {}
-        for index, prop in enumerate(SHIPPED_PROPS):
-            placed[prop] = place_near(flow, {"type": "PlaceProp", "prop": prop, "rotation": index % 4},
-                                      street_x + 6 + index * 2, street_z + 8)
-        placed["field"] = place_near(flow, {"type": "PlacePlot", "plot": "field", "rotation": 0},
-                                     street_x - 14, street_z + 12)
-        placed["garden"] = place_near(flow, {"type": "PlacePlot", "plot": "garden", "rotation": 1},
-                                      street_x + 12, street_z + 16)
-        entry["placed"] = placed
-        # The view reads placed props twice a second.
+        # 1. Build mode: the barrel, the garden and the cottage as sites.
+        barrel = new_site(flow, set(sites(flow)), {"type": "PlaceProp", "prop": "barrel", "rotation": 0},
+                          street_x + 6, street_z + 8)
+        garden = new_site(flow, set(sites(flow)), {"type": "PlacePlot", "plot": "garden", "rotation": 0},
+                          street_x + 14, street_z + 16, spacing=3)
+        cottage = new_site(flow, set(sites(flow)), {"type": "PlaceBuilding", "building": "cottage",
+                                                    "rotation": 0}, street_x, street_z + 9, spacing=3,
+                           tries=64)
+        entry["build"] = {"barrel": barrel, "garden": garden, "cottage": cottage}
+        open_sites = sites(flow)
+        ours = (barrel["site"], garden["site"], cottage["site"])
+        entry["sites_at_start"] = {
+            str(key): {k: value.get(k) for k in ("building", "kind", "cost", "delivered", "work_ticks")}
+            for key, value in open_sites.items() if key in ours}
+        cameras = {}
+        for label, placed, distance in (("barrel", barrel, 7), ("garden", garden, 14), ("cottage", cottage, 20)):
+            site = open_sites.get(placed.get("site"))
+            if site:
+                cameras[label] = (*site_middle(site), distance)
+        entry["cameras"] = cameras
         flow.call("npc/resume")
-        time.sleep(2.0)
+        time.sleep(1.5)
         flow.call("npc/pause")
-        cx, cz = street_x + 12, street_z + 10
-        for label, x, z, distance, yaw in (("shape-props-14m", cx, cz - 2, 14, 0.5),
-                                           ("shape-props-30m", cx, cz, 30, 0.5),
-                                           ("shape-field-20m", street_x - 14, street_z + 12, 20, 0.8),
-                                           ("shape-garden-16m", street_x + 12, street_z + 16, 16, 0.8)):
-            flow.look(x, z, distance, label, yaw)
-            time.sleep(1.5)
-            flow.snap_now(label)
-        # A placed prop removed: its visual goes with it.
-        props = [(sim_id, parts) for sim_id, parts in flow.world().having("living_prop_v1")]
-        entry["props_in_world"] = [[sim_id, parts["living_prop_v1"].get("prop")] for sim_id, parts in props]
-        if props:
-            removed = props[0][0]
+        for label, (x, z, distance) in cameras.items():
+            shot(flow, x, z, distance, f"shape-{label}-site")
+        # 2. The clock runs until the barrel's planks lie there and it and
+        # the garden stand.
+        flow.call("npc/speed", {"multiplier": 10})
+        flow.call("npc/resume")
+        began, delivered_shot, built, timeline = time.monotonic(), False, {}, []
+        while time.monotonic() - began < 9 * 60 and len(built) < 2:
+            time.sleep(2.0)
+            now = sites(flow)
+            tick = flow.state()["tick"]
+            for label, placed in (("barrel", barrel), ("garden", garden)):
+                site_id = placed.get("site")
+                if label in built or site_id is None or label not in cameras:
+                    continue
+                site = now.get(site_id)
+                x, z, distance = cameras[label]
+                if site is not None:
+                    if label == "barrel" and not delivered_shot and site.get("delivered"):
+                        flow.call("npc/pause")
+                        shot(flow, x, z, distance, "shape-barrel-site-delivered")
+                        timeline.append({"tick": tick, "barrel": "delivered", "delivered": site.get("delivered"),
+                                         "work_done": site.get("work_done")})
+                        delivered_shot = True
+                        flow.call("npc/resume")
+                    continue
+                # The site went: the prop (or the field) stands in its place.
+                flow.call("npc/pause")
+                built[label] = tick
+                timeline.append({"tick": tick, label: "built",
+                                 "props": [[sim_id, prop.get("prop")] for sim_id, prop in props_at(flow).items()]})
+                shot(flow, x, z, distance, f"shape-{label}-built", settle=1.5)
+                flow.call("npc/resume")
+        flow.call("npc/pause")
+        flow.call("npc/speed", {"multiplier": 1})
+        entry["timeline"] = timeline
+        entry["built"] = built
+        entry["sites_left"] = {
+            str(key): {k: value.get(k) for k in ("building", "delivered", "work_done", "work_ticks")}
+            for key, value in sites(flow).items()}
+        if "cottage" in cameras:
+            x, z, distance = cameras["cottage"]
+            shot(flow, x, z, distance, "shape-cottage-later")
+        # 3. Editor mode: every shipped prop stands at once; the signpost and
+        # the wheelbarrow at rotation 0 and 1 side by side.
+        entry["editor_switch"] = flow.call("npc/command", {"cmd": {"type": "SetEditorMode", "on": True}})
+        flow.call("npc/step", {"ticks": 2})
+        # Open ground beside the barrel, clear of the houses.
+        ex, ez = street_x + 1, street_z + 11
+        placed = {}
+        pairs = (("signpost", 0), ("signpost", 1), ("wheelbarrow", 0), ("wheelbarrow", 1))
+        for index, (prop, rotation) in enumerate(pairs):
+            placed[f"{prop}-r{rotation}"] = place_near(
+                flow, {"type": "PlaceProp", "prop": prop, "rotation": rotation, "mode": "editor"},
+                ex + index * 3, ez, tries=24)
+        others = [prop for prop in SHIPPED_PROPS if prop not in ("signpost", "wheelbarrow")]
+        for index, prop in enumerate(others):
+            placed[prop] = place_near(
+                flow, {"type": "PlaceProp", "prop": prop, "rotation": index % 4, "mode": "editor"},
+                round(ex + index * 2.5), ez + 7, tries=12)
+        entry["editor"] = placed
+        flow.call("npc/resume")
+        time.sleep(1.5)
+        flow.call("npc/pause")
+        for label, x, z, distance, yaw in (("shape-editor-facing-10m", ex + 4.5, ez, 10, 0.0),
+                                           ("shape-editor-facing-side-10m", ex + 4.5, ez, 10, math.pi / 2),
+                                           ("shape-editor-props-16m", ex + 6, ez + 7, 16, 0.5),
+                                           ("shape-editor-all-30m", ex + 6, ez + 3, 30, 0.5)):
+            shot(flow, x, z, distance, label, yaw, settle=1.5)
+        # 4. A placed prop removed: its visual goes with it.
+        standing = props_at(flow)
+        entry["props_in_world"] = [
+            [sim_id, prop.get("prop"), prop.get("x"), prop.get("z"), prop.get("rotation")]
+            for sim_id, prop in standing.items()]
+        removable = [sim_id for sim_id, prop in standing.items() if prop.get("prop") == "flag"]
+        if removable:
+            removed = removable[0]
             try:
-                entry["removed"] = [removed, flow.call("npc/command", {"cmd": {"type": "RemoveProp", "prop": removed}})]
+                entry["removed"] = [removed, flow.call("npc/command", {"cmd": {"type": "RemoveProp",
+                                                                               "prop": removed}})]
             except RuntimeError as error:
                 entry["removed"] = [removed, str(error)[:200]]
             flow.call("npc/resume")
             time.sleep(1.5)
             flow.call("npc/pause")
-            flow.look(cx, cz - 2, 14, "shape-props-after-removal-14m", 0.5)
-            time.sleep(1.5)
-            flow.snap_now("shape-props-after-removal-14m")
+            shot(flow, ex + 6, ez + 7, 16, "shape-editor-after-removal-16m", 0.5, settle=1.5)
     finally:
         leave(child, flow, run, report, "shape12")
+    return run
+
+
+# The sea at a low sun (`--only sea13`): the camera a new game starts with
+# (the smoke shot's) and one low view over the northern sea, at dawn (06:29
+# and 07:12), noon and dusk. A grid of bright squares on the sea at a
+# grazing sun was the defect; soft glitter is fine.
+
+SEA_PHASES = (("dawn-0629", 0.02), ("dawn-0712", 0.05), ("noon", 0.35), ("dusk", 0.66))
+
+
+def set_camera(flow, pose):
+    entity, _ = flow.camera_entity()
+    for path in ("focus", "distance", "pitch", "yaw"):
+        flow.call("world.mutate_components", {"entity": entity, "component": CAMERA,
+                                              "path": path, "value": pose[path]})
+    time.sleep(0.8)
+
+
+def sea13_run(binary, base, report):
+    run = base / "sea13"
+    child, flow = enter(binary, run, rules_with_weather(base, "clear"), report, {}, 3)
+    entry = report.setdefault("sea13", {})
+    try:
+        for attempt in range(4):
+            try:
+                flow.resize((1280, 720))
+                break
+            except RuntimeError:
+                time.sleep(2.0)
+        _, start = flow.camera_entity()
+        start = {key: start[key] for key in ("focus", "distance", "pitch", "yaw")}
+        entry["start_camera"] = start
+        focus = start["focus"]
+        low = {"focus": [focus[0], -0.11, focus[2] - 170.0], "distance": 70.0, "pitch": 0.3,
+               "yaw": start["yaw"]}
+        entry["low_camera"] = low
+        for name, phase in SEA_PHASES:
+            flow.to_phase(phase)
+            flow.call("npc/pause")
+            entry[name] = {"tick": flow.state()["tick"], "clock": flow.hud_clock()}
+            for label, pose in (("smoke", start), ("low", low)):
+                set_camera(flow, pose)
+                # The swell keeps moving on the view clock while paused.
+                time.sleep(1.2)
+                flow.snap_now(f"sea-{name}-{label}")
+    finally:
+        leave(child, flow, run, report, "sea13")
     return run
 
 
@@ -3006,7 +3207,7 @@ def main():
                                            "scale", "live", "harbour", "harsh", "third", "bodies",
                                            "cast", "precip", "flash", "shocks", "poses", "cottage",
                                            "knight", "stormnight", "block", "upgrade5x6",
-                                           "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12"))
+                                           "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12", "sea13"))
     parser.add_argument("--prefix", default="after", help="--only block: before or after")
     parser.add_argument("--group-only", action="store_true",
                         help="--only cast: the group at the start only")
@@ -3027,7 +3228,7 @@ def main():
         "physical_input_tested": False, "screenshots": {}, "checks": []}
     runs = []
     third = {"bodies", "cast", "precip", "flash", "shocks", "poses", "cottage", "knight", "stormnight",
-             "block", "upgrade5x6", "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12"}
+             "block", "upgrade5x6", "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12", "sea13"}
     try:
         if args.only == "knight":
             runs.append(knight_run(binary, base, report))
@@ -3040,7 +3241,8 @@ def main():
         fifth = {"harbour5": harbour5_run, "homework": homework_run, "fisher": fisher_run,
                  "larger": larger_run, "motion": motion_run, "look6": look6_run, "village7": village7_run,
                  "look8": look8_run, "look10": look10_run,
-                 "deer11": deer11_run, "sound11": sound11_run, "shape12": shape12_run}
+                 "deer11": deer11_run, "sound11": sound11_run, "shape12": shape12_run,
+                 "sea13": sea13_run}
         if args.only in fifth:
             runs.append(fifth[args.only](binary, base, report))
         if args.only == "budget":

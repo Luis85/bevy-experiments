@@ -116,6 +116,13 @@ impl Default for Resources {
 }
 
 /// Whether a resource tool is in hand (then the terrain brush rests).
+/// Patches placed or removed and not applied yet.
+pub(crate) fn waiting(world: &World) -> usize {
+    world
+        .get_resource::<Resources>()
+        .map_or(0, |state| state.inflight.len())
+}
+
 pub(crate) fn active(world: &World) -> bool {
     world
         .get_resource::<Resources>()
@@ -152,6 +159,15 @@ pub(crate) fn step_richness(richness: u32, steps: i32) -> u32 {
     let next = richness as i64 + i64::from(steps) * i64::from(RICHNESS_STEP);
     (next.clamp(i64::from(RICHNESS_MIN), i64::from(RICHNESS_MAX)) as u32) / RICHNESS_STEP
         * RICHNESS_STEP
+}
+
+/// "Grain patch of Harbour" as "grain patch of Harbour": the first letter
+/// only, so a village keeps its capital.
+fn lower_first(text: &str) -> String {
+    let mut letters = text.chars();
+    letters.next().map_or_else(String::new, |first| {
+        first.to_lowercase().chain(letters).collect()
+    })
 }
 
 fn good_words(world: &World, kind: &str) -> String {
@@ -801,7 +817,7 @@ pub(super) fn pointer(world: &mut World) {
                         Some((*id, words.clone())),
                         Some((
                             SimCommand::content(&remove),
-                            format!("Removed the {}.", words.to_lowercase()),
+                            format!("Removed the {}.", lower_first(&words)),
                             thing,
                             false,
                         )),
@@ -931,7 +947,7 @@ fn settle(world: &mut World) {
         } else {
             let removed = words.contains(" of ") || words.ends_with(" patch");
             world.resource_mut::<ShapeTools>().status = if removed {
-                format!("Removed the {}.", words.to_lowercase())
+                format!("Removed the {}.", lower_first(&words))
             } else {
                 format!("Placed a {}.", words.to_lowercase())
             };

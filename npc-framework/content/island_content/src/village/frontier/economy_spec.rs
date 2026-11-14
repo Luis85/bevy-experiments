@@ -1129,6 +1129,10 @@ fn default_professions() -> Vec<ProfessionDef> {
             wants: names(&[LEATHER, FIBER, THREAD]),
             recipes: names(&[SPIN, TAILOR, WEAVE_COAT]),
             endowment: stacks(&[(THREAD, 2)]),
+            // The last tailor of a village stays while somebody lacks a coat
+            // (closing fix: in spring the coat trade emptied, and the chain
+            // stood still when a resident wanted one).
+            essential: true,
             ..profession(Tailor, TAILOR, &hides)
         },
         ProfessionDef {

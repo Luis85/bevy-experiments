@@ -693,7 +693,7 @@ pub struct GuideSection {
     pub mode: &'static str,
     /// `("W A S D", "walk")`, `("Ctrl+S", "save")`: the keys that share a
     /// meaning stand on one line.
-    pub keys: Vec<(String, &'static str)>,
+    pub keys: Vec<(String, String)>,
 }
 
 /// A key as the Guide writes it: "W", "1", "Esc", "Shift+Tab", "[".
@@ -743,36 +743,57 @@ fn mode_name(mode: Mode) -> &'static str {
 /// The Guide's Controls page: every player key per mode, the keys of one
 /// meaning on one line. Developer keys are not in the table, so not here.
 pub fn guide_controls() -> Vec<GuideSection> {
-    let mut sections: Vec<GuideSection> = Vec::new();
+    // A key bound alike in every mode of play is said once, first.
+    let plays = [Live, Oversee, Card, Shape];
+    let everywhere = |key: KeyCode, mods: Mods, does: &str| {
+        plays.iter().all(|mode| {
+            KEYS.iter().any(|(at, bound, held, meaning)| {
+                at == mode && *bound == key && *held == mods && meaning.does == does
+            })
+        })
+    };
+    let mut sections: Vec<GuideSection> = vec![GuideSection {
+        mode: "Every mode",
+        keys: Vec::new(),
+    }];
     for (mode, key, mods, meaning) in KEYS {
-        let name = mode_name(*mode);
-        if sections.last().is_none_or(|section| section.mode != name) {
-            if let Some(index) = sections.iter().position(|section| section.mode == name) {
-                // Rows of a mode are grouped; keep its section where it began.
-                let section = sections.remove(index);
-                sections.push(section);
-            } else {
-                sections.push(GuideSection {
-                    mode: name,
-                    keys: Vec::new(),
-                });
-            }
+        let shared = *mode != Menus && everywhere(*key, *mods, meaning.does);
+        let name = if shared {
+            "Every mode"
+        } else {
+            mode_name(*mode)
+        };
+        if !sections.iter().any(|section| section.mode == name) {
+            sections.push(GuideSection {
+                mode: name,
+                keys: Vec::new(),
+            });
         }
-        let section = sections.last_mut().expect("its section");
-        let label = key_name(*key, *mods);
-        match section
-            .keys
+        let section = sections
             .iter_mut()
-            .find(|(_, does)| *does == meaning.does)
-        {
+            .find(|section| section.mode == name)
+            .expect("its section");
+        let label = key_name(*key, *mods);
+        let does = crate::game_ui::words::capital(meaning.does);
+        match section.keys.iter_mut().find(|(_, said)| *said == does) {
+            // The same key again (it was said for another mode already).
+            Some((keys, _)) if keys.split(' ').any(|held| held == label) => {}
             Some((keys, _)) => {
                 keys.push(' ');
                 keys.push_str(&label);
             }
-            None => section.keys.push((label, meaning.does)),
+            None => section.keys.push((label, does)),
         }
     }
-    let order = [Live, Oversee, Card, Shape, Menus].map(mode_name);
+    let order = [
+        "Every mode",
+        "Live",
+        "Oversee",
+        "A resident's card",
+        "Shape",
+        "Menus",
+    ];
+    sections.retain(|section| !section.keys.is_empty());
     sections.sort_by_key(|section| order.iter().position(|name| *name == section.mode));
     sections
 }
@@ -823,16 +844,30 @@ mod tests {
         let modes: Vec<&str> = guide.iter().map(|section| section.mode).collect();
         assert_eq!(
             modes,
-            ["Live", "Oversee", "A resident's card", "Shape", "Menus"]
+            [
+                "Every mode",
+                "Live",
+                "Oversee",
+                "A resident's card",
+                "Shape",
+                "Menus"
+            ]
         );
-        let live = &guide[0].keys;
-        assert!(live.contains(&("W A S D".to_owned(), "walk")), "{live:?}");
-        assert!(live.contains(&("Ctrl+S".to_owned(), "save")));
-        assert!(live.contains(&("I".to_owned(), "Pouch")));
-        let shape = &guide[3].keys;
-        assert!(shape.contains(&("Ctrl+Z".to_owned(), "undo")));
-        assert!(shape.contains(&("[".to_owned(), "brush smaller")));
-        // No mode has two lines of one meaning.
+        let has = |section: usize, keys: &str, does: &str| {
+            guide[section]
+                .keys
+                .contains(&(keys.to_owned(), does.to_owned()))
+        };
+        // Said once, first: the keys bound alike in every mode of play.
+        assert!(has(0, "Ctrl+S", "Save"), "{:?}", guide[0].keys);
+        assert!(has(0, "Space", "Pause or run time"));
+        assert!(guide[1].keys.iter().all(|(keys, _)| keys != "Ctrl+S"));
+        // Each mode's own, capitalised.
+        assert!(has(1, "W A S D", "Walk"), "{:?}", guide[1].keys);
+        assert!(has(1, "I", "Pouch"));
+        assert!(has(4, "Ctrl+Z", "Undo"));
+        assert!(has(4, "[", "Brush smaller"));
+        // No section has two lines of one meaning.
         for section in &guide {
             for (index, (_, does)) in section.keys.iter().enumerate() {
                 assert!(

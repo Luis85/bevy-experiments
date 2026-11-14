@@ -452,6 +452,14 @@ impl Feed {
             .filter(|alert| alert.kind.severity() != Severity::Info)
             .count()
     }
+    /// Take away the alerts `gone` picks (a dead resident's needs).
+    pub(crate) fn remove_where(&mut self, gone: impl Fn(&Alert) -> bool) {
+        let before = self.entries.len();
+        self.entries.retain(|alert| !gone(alert));
+        if self.entries.len() != before {
+            self.revision = self.revision.wrapping_add(1);
+        }
+    }
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Alert> {
         self.entries.iter()
     }

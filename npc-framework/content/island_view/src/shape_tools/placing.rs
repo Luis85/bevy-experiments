@@ -290,6 +290,10 @@ pub(crate) fn catalog(world: &World) -> Vec<(Kind, String, String)> {
 
 /// An item's name as players read it ("Garden", "Barrel").
 fn name_of(world: &World, kind: Kind, key: &str) -> String {
+    // A patch is named by its good's display, never by its key.
+    if kind == Kind::Patch {
+        return format!("{} patch", crate::island_build::good_name(world, key));
+    }
     catalog(world)
         .into_iter()
         .find(|(of, id, _)| *of == kind && id == key)
@@ -494,6 +498,13 @@ pub(crate) fn holding_item(world: &World) -> bool {
 }
 
 /// Recorded placements still waiting for their tick.
+/// Placements sent and not applied yet.
+pub(crate) fn waiting(world: &World) -> usize {
+    world
+        .get_resource::<Placing>()
+        .map_or(0, |state| state.inflight.len())
+}
+
 pub(crate) fn busy(world: &World) -> bool {
     world
         .get_resource::<Placing>()

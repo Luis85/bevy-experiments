@@ -287,7 +287,7 @@ fit a twelve-day year.
 | `founder_max_age_seasons` | Founders are between coming of age and this; settlers are in the younger half |
 | `pair_affinity`, `courtship_days` | Two housed adults of one settlement, not close kin, court when each has this affinity for the other (a meeting adds 250) and become a couple when that has lasted this many days |
 | `birth_chance_permille`, `birth_cooldown_days` | Daily chance of a birth for a couple that may have a child, and the pause after one |
-| `birth_food_units`, `max_children` | Food units the parents carry between them before a birth; children one household raises at a time |
+| `birth_food_units`, `max_children` | Food units the household can count on before a birth (what its members hold plus its share of the food in its settlement's stores); children one household raises at a time |
 | `child_ration_percent`, `child_starve_days` | A child's hunger as a share of an adult's; days without any food before it dies. When the house has no food, the civic fund buys a hungry child one meal at a time from a store of the settlement |
 | `elder_speed_percent`, `elder_work_percent` | An elder's walking speed and work duration, percent of an adult's |
 | `arrivals_per_visit`, `arrival_grant_coins`, `arrival_food_per_head`, `max_population` | Settlers per boat, the grant the fund gives each (nobody lands while the fund cannot pay it), the food units per head a settlement must hold, and the headcount (children included) above which nobody lands |
@@ -412,11 +412,17 @@ last sailed (the first time `first_visit_day` days after the founding) and stays
 - **`buys`**: from all stores and stalls of the port it buys what lies above
   `keep_units`, up to `max_units` a visit, at `price_percent` of the base price,
   and pays each owner at once (the fund for the settlement's own stock).
-- **`sells`**: it brings `units` of each good. The civic fund buys while the port
-  (its residents' packs and its stores) holds fewer than `want_units`, at
-  `price_percent` of the base price, within what the fund may spend. The goods
-  are laid in the trading post as the settlement's stock and sold on at the
-  market price, which credits the fund.
+- **`sells`**: it brings `units` of each good. Only while the good is dear on the
+  island (its market price above its base price), the civic fund buys what the
+  port (its residents' packs and its stores) holds below `want_units`, or the
+  island below its stock target, at `price_percent` of the base price, within
+  what the fund may spend. The goods are laid in the trading post as the
+  settlement's stock and sold on at the market price, which credits the fund.
+- **`trade_balance_percent`** (default 5): in one visit the boat sells, paid and
+  on consignment, no more than it bought plus this percent of the island's coins
+  spread over a year's visits, so its net gain over a year stays within it. 100
+  lifts the cap.
+- The boat does not buy the island's grain while its flour or bread is dear.
 - **`purse`**: the merchant's coins at the founding. Nothing refills it. Island
   coins plus purse are constant: include `village::merchant::purse(world)` in any
   conservation check. A merchant without coins buys nothing.

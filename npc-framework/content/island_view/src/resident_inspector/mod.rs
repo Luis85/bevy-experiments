@@ -894,7 +894,10 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
                 if let Some(routine) = routine_name(world, entity) {
                     rows.push(Entry::caption(
                         "why_routine",
-                        format!("Follows the routine \u{201c}{routine}\u{201d}."),
+                        format!(
+                            "Daily routine: {}.",
+                            crate::game_ui::words::capital(&routine)
+                        ),
                     ));
                 }
                 rows.push(Entry::choices(

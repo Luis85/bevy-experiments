@@ -112,7 +112,6 @@ pub fn spawn(world: &mut World) {
     super::production::validate(world).expect("regional production graph must be acyclic");
 }
 pub fn tick(world: &mut World) {
-    super::ledger::tick(world);
     activities::tick(world);
     labor::tick(world);
     super::weather::tick(world);

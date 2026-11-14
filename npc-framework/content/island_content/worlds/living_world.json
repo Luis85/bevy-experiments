@@ -1995,7 +1995,7 @@
             "farmer"
           ],
           "template": "novice",
-          "essential": false,
+          "essential": true,
           "endowment": [
             {
               "good": "village_thread",

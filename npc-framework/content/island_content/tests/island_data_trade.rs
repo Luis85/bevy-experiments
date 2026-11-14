@@ -77,7 +77,11 @@ pub fn pottery_world(seed: u64) -> bevy_app::App {
     professions.push(json!({
         "role": "potter", "display": POTTER_DISPLAY, "station": "potter_wheel",
         "outputs": ["clay", "pots"], "wants": ["clay"], "recipes": ["throw_pots"],
-        "aptitudes": ["potter", "carpenter"], "template": "carpenter"
+        "aptitudes": ["potter", "carpenter"], "template": "carpenter",
+        // The last potter stays while pots are wanted. Since founders' rods
+        // wear out (closing fix), fishers run short in the first days and the
+        // only potter moved to fishing before day four.
+        "essential": true
     }));
     economy["buildings"].as_array_mut().expect("buildings").push(json!({
         "id": "pottery", "display": "Pottery",
@@ -179,7 +183,14 @@ fn lives(days: u64) {
     assert!(made("clay") > 0, "no clay was dug: {:?}", state.produced);
     assert!(made("pots") > 0, "no pots were made: {:?}", state.produced);
     let people = potters(&mut app);
-    assert!(!people.is_empty(), "nobody took the potter's trade");
+    assert!(
+        !people.is_empty(),
+        "nobody took the potter's trade: {:?}",
+        changes
+            .iter()
+            .filter(|change| change["to_key"] == "potter" || change["from_key"] == "potter")
+            .collect::<Vec<_>>()
+    );
     let world = app.world();
     let producers = village::view::producers(world, "pots");
     assert!(

@@ -532,11 +532,16 @@ fn refresh(world: &mut World) {
         && !crate::player_hud::active(world);
     let top = crate::island_shell::content_top(world);
     let layout = scale::layout(world);
+    let brushing = !super::other_tool(world);
     for (mut node, rail, computed) in world
         .query_filtered::<(&mut Node, Has<RailRoot>, &ComputedNode), With<ShapeRoot>>()
         .iter_mut(world)
     {
-        let display = if shown { Display::Flex } else { Display::None };
+        let display = if shown && (rail || brushing) {
+            Display::Flex
+        } else {
+            Display::None
+        };
         if node.display != display {
             node.display = display;
         }

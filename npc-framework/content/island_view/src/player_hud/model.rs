@@ -313,7 +313,7 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
                 // named things that can be done with it.
                 let mut buttons = Vec::new();
                 let worn = kind == catalog::WARM_CLOTHES && village["wearing_warm_clothes"] == true;
-                let usable = if catalog::food_restore(kind).is_some() {
+                let usable = if catalog::food_restore_in(world, kind).is_some() {
                     Some((
                         "Eat",
                         "Food restores hunger.",

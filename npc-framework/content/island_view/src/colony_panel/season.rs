@@ -160,7 +160,14 @@ pub(crate) fn season_entries(card: &SeasonCard) -> Vec<Entry> {
         None,
         true,
     ));
+    // Counts stand in the table; "39 to 43" figures are too wide for its
+    // value columns and stand on their own lines under it.
+    let mut spans = Vec::new();
     for (label, ended, before) in &card.rows {
+        if ended.contains(" to ") {
+            spans.push(span_line(label, ended, before.as_deref(), &card.heads));
+            continue;
+        }
         let mut columns = vec![label.clone(), ended.clone()];
         columns.extend(before.clone());
         rows.push(Entry::table(
@@ -169,6 +176,9 @@ pub(crate) fn season_entries(card: &SeasonCard) -> Vec<Entry> {
             None,
             false,
         ));
+    }
+    for (index, line) in spans.into_iter().enumerate() {
+        rows.push(Entry::text(&format!("season_span{index}"), line, false).with(Extra::Strong));
     }
     for (index, line) in card.lines.iter().enumerate() {
         rows.push(Entry::text(&format!("season_line{index}"), line, false).with(Extra::Strong));
@@ -181,6 +191,19 @@ pub(crate) fn season_entries(card: &SeasonCard) -> Vec<Entry> {
         ],
     ));
     rows
+}
+
+/// "Residents: 39 to 43 (Summer: 36 to 39)." / "Fund: 52 to 39 coins."
+pub(crate) fn span_line(
+    label: &str,
+    ended: &str,
+    before: Option<&str>,
+    heads: &(String, Option<String>),
+) -> String {
+    match (before, &heads.1) {
+        (Some(before), Some(name)) => format!("{label}: {ended} ({name}: {before})."),
+        _ => format!("{label}: {ended}."),
+    }
 }
 
 #[cfg(test)]

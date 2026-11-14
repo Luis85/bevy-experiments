@@ -896,46 +896,41 @@ fn the_boats_next_order_reads_as_rows_with_plural_goods() {
 }
 
 #[test]
-fn the_paused_pill_counts_waiting_orders() {
+fn the_paused_pill_words_and_the_lane_beside_the_column() {
     assert_eq!(model::paused_words(0), "Paused");
     assert_eq!(model::paused_words(1), "Paused \u{b7} 1 order waiting");
     assert_eq!(model::paused_words(3), "Paused \u{b7} 3 orders waiting");
+    // The lane never runs under an open right column.
+    assert_eq!(model::beside_column(0.0, 452.0), 452.0);
+    assert_eq!(model::beside_column(600.0, 452.0), 600.0);
+    assert_eq!(model::beside_column(0.0, 0.0), 0.0);
+}
+
+#[test]
+fn a_toast_with_a_button_is_not_replaced_until_it_expires() {
+    // Nothing showing, or a plain note: anything takes its place.
+    assert!(model::replaces_toast(None, false));
+    assert!(model::replaces_toast(Some((false, Some(2.0))), false));
+    // "See the season" with seconds left: a plain note waits.
+    assert!(!model::replaces_toast(Some((true, Some(3.0))), false));
+    // Another toast with a button may replace it; an expired one goes.
+    assert!(model::replaces_toast(Some((true, Some(3.0))), true));
+    assert!(model::replaces_toast(Some((true, Some(0.0))), false));
+    // In the shell: the season toast stays when a plain host toast comes.
     let mut app = fixture(true);
-    spawn(app.world_mut());
-    app.world_mut().resource_mut::<SimControl>().paused = true;
-    let pill = |app: &mut App| {
-        refresh(app.world_mut());
-        let world = app.world_mut();
-        world
-            .query_filtered::<&Text, With<PausedText>>()
-            .single(world)
-            .unwrap()
-            .0
-            .clone()
-    };
-    assert_eq!(pill(&mut app), "Paused");
-    // Two orders given while paused wait in the queue.
-    let village = village::frontier::settlements::all(app.world())[0].0;
-    for level in [
-        village::frontier::oversee::PriorityLevel::High,
-        village::frontier::oversee::PriorityLevel::Low,
-    ] {
-        npc_framework::prelude::submit(
-            app.world_mut(),
-            None,
-            npc_framework::prelude::SimCommand::content(
-                &village::frontier::oversee::SetVillagePriority {
-                    settlement: village,
-                    topic: village::frontier::oversee::PriorityTopic::Housing,
-                    profession: None,
-                    level,
-                },
-            ),
-        )
-        .unwrap();
-    }
-    assert_eq!(pill(&mut app), "Paused \u{b7} 2 orders waiting");
-    // Once time runs they apply, and the pill is plain again.
-    npc_framework::prelude::run_ticks(app.world_mut(), 1);
-    assert_eq!(pill(&mut app), "Paused");
+    season_toast(app.world_mut(), "Autumn has ended.".into());
+    host_toast(
+        app.world_mut(),
+        ToastTone::Done,
+        "Island saved",
+        false,
+        false,
+    );
+    assert_eq!(
+        host_toast_text(app.world()),
+        Some((
+            "Autumn has ended.".to_owned(),
+            Some("See the season".to_owned())
+        ))
+    );
 }

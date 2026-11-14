@@ -271,7 +271,7 @@ pub(super) fn can_forage(world: &World, actor: Entity, kind: &str) -> bool {
     gather_source(world, actor, kind).is_some()
 }
 
-pub(super) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<(SimId, Entity)> {
+pub(crate) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<(SimId, Entity)> {
     if econ::fit(world, actor, &[Item::new(kind)]).is_err() {
         return None;
     }

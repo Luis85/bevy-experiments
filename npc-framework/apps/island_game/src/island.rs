@@ -131,7 +131,12 @@ pub(crate) enum Issue {
 impl Issue {
     /// A save the game cannot recreate: its backup is never deleted.
     pub(crate) fn keeps_forever(&self) -> bool {
-        matches!(self, Self::Older | Self::OtherBuild | Self::Newer)
+        // Every save the game refused, the unreadable one too: it is kept
+        // as "kept-<n>", never pruned with the "previous" backups.
+        matches!(
+            self,
+            Self::Older | Self::OtherBuild | Self::Newer | Self::Unopened(_)
+        )
     }
 }
 
@@ -334,9 +339,10 @@ fn install(
         seed,
         last: Instant::now(),
         active,
-        message: "Island saves automatically | Ctrl+S save now".into(),
+        // Said in the pause menu, never as a toast (closing phase, defect 7).
+        message: "Island saves automatically".into(),
         failed: false,
-        routine: false,
+        routine: true,
         _lock: lock,
         leave_unsaved: false,
         auto_failed: false,
@@ -353,7 +359,7 @@ fn install(
 /// never deleted by the game.
 pub(crate) const KEPT_BACKUPS: usize = 5;
 
-/// The numbers of the backups of `path` of one kind (`previous`, `older`):
+/// The numbers of the backups of `path` of one kind (`previous`, `kept`):
 /// files named exactly `<stem>.<kind>-<digits>.json`, ascending.
 pub(crate) fn backup_numbers(path: &Path, kind: &str) -> Vec<u64> {
     let (Some(folder), Some(stem)) = (
@@ -387,7 +393,9 @@ pub(crate) fn backup_numbers(path: &Path, kind: &str) -> Vec<u64> {
 /// The name the next backup of `path` gets: the highest number plus one, so
 /// the highest is always the newest. Nothing is written.
 pub(crate) fn next_backup(path: &Path, older: bool) -> PathBuf {
-    let kind = if older { "older" } else { "previous" };
+    // "kept" for any save the game refused (older, newer, another build or
+    // unreadable): the name says nothing it cannot know.
+    let kind = if older { "kept" } else { "previous" };
     let number = backup_numbers(path, kind).last().copied().unwrap_or(0) + 1;
     path.with_extension(format!("{kind}-{number}.json"))
 }
@@ -592,7 +600,7 @@ fn behaviour_file(world: &mut World) {
         {
             Ok(()) => (
                 island_view::ToastTone::Done,
-                format!("Behaviour saved to {}.", path.display()),
+                format!("Behaviour saved to {}.", file_name(&path)),
             ),
             Err(error) => {
                 warn!("could not save the behaviour: {error}");
@@ -609,7 +617,7 @@ fn behaviour_file(world: &mut World) {
                     island_view::ToastTone::Failed,
                     format!(
                         "Behaviour not changed: {} could not be read. Save the behaviour to a file first.",
-                        path.display()
+                        file_name(&path)
                     ),
                 )
             }
@@ -626,6 +634,14 @@ fn behaviour_file(world: &mut World) {
         tone == island_view::ToastTone::Failed,
         false,
     );
+}
+
+/// A path as players read it: the file's name, not its folders.
+pub(crate) fn file_name(path: &Path) -> String {
+    path.file_name().map_or_else(
+        || path.display().to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    )
 }
 
 /// The first sentence of every failed save.
@@ -800,7 +816,7 @@ mod tests {
             "island.world.previous-1.json",
             "island.world.previous-4.json",
             "island.world.previous-x.json",
-            "island.world.older-2.json",
+            "island.world.kept-2.json",
         ] {
             std::fs::write(dir.join(name), b"old").unwrap();
         }
@@ -811,7 +827,7 @@ mod tests {
         );
         assert_eq!(
             super::next_backup(&path, true),
-            dir.join("island.world.older-3.json")
+            dir.join("island.world.kept-3.json")
         );
         for _ in 0..6 {
             super::backup(&path, false).unwrap();
@@ -823,7 +839,7 @@ mod tests {
             [6, 7, 8, 9, 10],
             "the five newest stay"
         );
-        assert_eq!(super::backup_numbers(&path, "older"), [2, 3]);
+        assert_eq!(super::backup_numbers(&path, "kept"), [2, 3]);
         assert!(
             dir.join("island.world.previous-x.json").exists(),
             "a file that is not a backup is never deleted"

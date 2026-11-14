@@ -713,7 +713,7 @@ mod tests {
         );
         new_game(app.world_mut(), "Ysolde").unwrap();
         assert_eq!(
-            std::fs::read(path.with_extension("older-1.json")).unwrap(),
+            std::fs::read(path.with_extension("kept-1.json")).unwrap(),
             bytes,
             "New game keeps the older island as a backup of its own kind"
         );
@@ -747,8 +747,9 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"unreadable old save");
         new_game(app.world_mut(), "Ysolde").unwrap();
         assert_eq!(
-            std::fs::read(path.with_extension("previous-1.json")).unwrap(),
-            b"unreadable old save"
+            std::fs::read(path.with_extension("kept-1.json")).unwrap(),
+            b"unreadable old save",
+            "a refused save, unreadable too, is kept under the neutral name"
         );
         drop(app);
         cleanup(&path);

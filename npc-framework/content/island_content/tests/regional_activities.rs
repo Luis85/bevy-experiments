@@ -201,7 +201,7 @@ fn fishing_requires_a_real_nonconsumed_rod_for_the_shared_gather_action() {
         1
     );
     assert!(
-        catalog::food_restore(catalog::FISH).is_none(),
+        catalog::food_restore_in(app.world(), catalog::FISH).is_none(),
         "raw fish requires cooking"
     );
 }

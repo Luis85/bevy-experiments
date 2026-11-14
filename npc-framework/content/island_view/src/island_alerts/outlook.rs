@@ -66,22 +66,32 @@ fn days_status(days: u32) -> Status {
     }
 }
 
-/// "{Village}: food lasts 2 days." and its cousins; one village on the
-/// island drops the name ("Food lasts 2 days.").
-fn days_text(prefix: Option<&str>, what: &str, days: u32) -> String {
-    let body = match days {
-        0 => {
-            return match prefix {
-                Some(name) => format!("{name} has no {what}."),
-                None => format!("There is no {what}."),
-            };
-        }
-        1 => format!("{what} runs out tomorrow."),
-        days => format!("{what} lasts {days} days."),
-    };
-    match prefix {
-        Some(name) => format!("{name}: {body}"),
-        None => crate::game_ui::words::capital(&body),
+/// How long a village's stock of a good lasts, as one sentence right for
+/// any good, a mass noun or a plural: "Harbour has no logs.", "Harbour runs
+/// out of logs tomorrow.", "Harbour has food for 2 days." (closing phase,
+/// defect 6).
+pub(crate) fn stock_line(village: &str, good: &str, days: u32) -> String {
+    match days {
+        0 => format!("{village} has no {good}."),
+        1 => format!("{village} runs out of {good} tomorrow."),
+        days => format!("{village} has {good} for {days} days."),
+    }
+}
+
+/// A coming shortage: "Harbour runs out of logs in 2 days."
+pub(crate) fn runs_out(village: &str, good: &str, days: u32) -> String {
+    match days {
+        0 | 1 => stock_line(village, good, days),
+        days => format!("{village} runs out of {good} in {days} days."),
+    }
+}
+
+/// "1 has no coat", "8 have no coat".
+pub(crate) fn without_coat(count: u32) -> String {
+    if count == 1 {
+        "1 has no coat".to_owned()
+    } else {
+        format!("{count} have no coat")
     }
 }
 
@@ -123,7 +133,7 @@ fn candidates(
                 OutlookLine {
                     topic,
                     status: days_status(days),
-                    text: days_text(prefix, what, days),
+                    text: stock_line(village.name, what, days),
                     tip: goods_tip.clone(),
                     opens: opens_goods(None),
                 },
@@ -141,7 +151,7 @@ fn candidates(
             OutlookLine {
                 topic: Topic::Fuel,
                 status,
-                text: days_text(prefix, &good_name(fuel), days),
+                text: stock_line(village.name, &good_name(fuel), days),
                 tip: goods_tip.clone(),
                 opens: opens_goods(Some(fuel.to_owned())),
             },
@@ -186,19 +196,22 @@ fn candidates(
     }
     if outlook.without_coat > 0 && (outlook.cold_in_days.is_some() || outlook.cold_now) {
         let coats = outlook.without_coat;
-        let (status, text) = match outlook.cold_in_days {
-            _ if outlook.cold_now => (Status::Crit, format!("It is cold: {coats} have no coat.")),
-            Some(0) => (Status::Crit, format!("It is cold: {coats} have no coat.")),
+        let missing = without_coat(coats);
+        let (status, body) = match outlook.cold_in_days {
+            _ if outlook.cold_now => (Status::Crit, format!("it is cold, {missing}.")),
+            Some(0) => (Status::Crit, format!("it is cold, {missing}.")),
             Some(days) => (
                 if days <= 7 {
                     Status::Warn
                 } else {
                     Status::Info
                 },
-                format!("Winter in {days} days: {coats} have no coat."),
+                format!("winter in {days} days, {missing}."),
             ),
-            None => (Status::Info, format!("{coats} have no coat.")),
+            None => (Status::Info, format!("{missing}.")),
         };
+        // The village's name stays when there are several.
+        let text = with_prefix(prefix, &body);
         lines.push((
             OutlookLine {
                 topic: Topic::Cold,
@@ -221,14 +234,7 @@ fn candidates(
         })
     {
         let good = good_name(&short.good);
-        let text = match short.days_left {
-            0 => match prefix {
-                Some(name) => format!("{name} has no {good}."),
-                None => format!("There is no {good}."),
-            },
-            1 => with_prefix(prefix, &format!("{good} runs out in 1 day.")),
-            days => with_prefix(prefix, &format!("{good} runs out in {days} days.")),
-        };
+        let text = runs_out(village.name, &good, short.days_left);
         lines.push((
             OutlookLine {
                 topic: Topic::Shortage,
@@ -375,8 +381,11 @@ mod tests {
         assert_eq!(
             texts(&words(&villages)),
             vec![
-                (Status::Crit, "Harbour: water runs out tomorrow.".to_owned()),
-                (Status::Warn, "Hilltop: food lasts 2 days.".to_owned()),
+                (
+                    Status::Crit,
+                    "Harbour runs out of water tomorrow.".to_owned()
+                ),
+                (Status::Warn, "Hilltop has food for 2 days.".to_owned()),
                 (
                     Status::Warn,
                     "Harbour: 2 residents have no home.".to_owned()
@@ -393,7 +402,7 @@ mod tests {
         assert_eq!(
             texts(&words(&single)),
             vec![
-                (Status::Warn, "Food lasts 2 days.".to_owned()),
+                (Status::Warn, "Hilltop has food for 2 days.".to_owned()),
                 (Status::Info, "1 resident has no work.".to_owned()),
             ]
         );
@@ -414,10 +423,13 @@ mod tests {
         assert_eq!(
             texts(&lines),
             vec![
-                (Status::Warn, "Plank runs out in 2 days.".to_owned()),
+                (
+                    Status::Warn,
+                    "Hilltop runs out of plank in 2 days.".to_owned()
+                ),
                 (
                     Status::Info,
-                    "Winter in 9 days: 11 have no coat.".to_owned()
+                    "Winter in 9 days, 11 have no coat.".to_owned()
                 ),
             ]
         );
@@ -438,8 +450,49 @@ mod tests {
             outlook: &hilltop,
         }]);
         assert_eq!(attention(&lines), 2, "food and homes; work only informs");
-        assert_eq!(super::super::fold_title(2), "Alerts \u{b7} Outlook 2");
+        assert_eq!(super::super::fold_title(2), "Alerts \u{b7} Outlook");
         assert_eq!(super::super::fold_title(0), "Alerts");
+    }
+
+    #[test]
+    fn shortage_and_coat_sentences_are_right_for_any_good_and_count() {
+        assert_eq!(
+            stock_line("Harbour", "logs", 1),
+            "Harbour runs out of logs tomorrow."
+        );
+        assert_eq!(stock_line("Harbour", "logs", 0), "Harbour has no logs.");
+        assert_eq!(
+            stock_line("Harbour", "food", 4),
+            "Harbour has food for 4 days."
+        );
+        assert_eq!(
+            runs_out("Harbour", "logs", 2),
+            "Harbour runs out of logs in 2 days."
+        );
+        assert_eq!(
+            runs_out("Mill", "flour", 1),
+            "Mill runs out of flour tomorrow."
+        );
+        assert_eq!(without_coat(1), "1 has no coat");
+        assert_eq!(without_coat(5), "5 have no coat");
+        // With several villages the cold line keeps the village's name.
+        let mut cold = outlook();
+        cold.cold_now = true;
+        cold.without_coat = 1;
+        let calm = outlook();
+        let lines = words(&[
+            VillageOutlook {
+                id: SimId(1),
+                name: "Harbour",
+                outlook: &cold,
+            },
+            VillageOutlook {
+                id: SimId(2),
+                name: "Mill",
+                outlook: &calm,
+            },
+        ]);
+        assert_eq!(lines[0].text, "Harbour: it is cold, 1 has no coat.");
     }
 
     #[test]

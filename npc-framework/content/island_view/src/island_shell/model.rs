@@ -629,6 +629,22 @@ pub(crate) fn toast_lane(width: f32, workspace: f32, goal: f32) -> (f32, f32, f3
     toast_lane_for(width, workspace, goal, false)
 }
 
+/// The lane's right inset beside an open right column `column` px wide
+/// (0: none): never less than the column.
+pub(crate) fn beside_column(right: f32, column: f32) -> f32 {
+    right.max(column)
+}
+
+/// Whether a new host toast may take the place of the one showing:
+/// `current` is (has a button, seconds left). A toast with a button is kept
+/// until it expires, unless the new one has a button too.
+pub(crate) fn replaces_toast(current: Option<(bool, Option<f32>)>, new_has_button: bool) -> bool {
+    match current {
+        Some((true, Some(left))) if left > 0.0 => new_has_button,
+        _ => true,
+    }
+}
+
 /// The Paused pill's words: "Paused", "Paused · 1 order waiting",
 /// "Paused · 3 orders waiting".
 pub(crate) fn paused_words(waiting: usize) -> String {

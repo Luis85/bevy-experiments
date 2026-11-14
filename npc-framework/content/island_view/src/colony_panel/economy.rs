@@ -28,7 +28,7 @@ pub(crate) enum Trend {
 impl Trend {
     pub(crate) fn text(self) -> String {
         match self {
-            Self::Unknown => "…".into(),
+            Self::Unknown => "\u{2013}".into(),
             Self::Steady => "steady".into(),
             Self::Rising(by) => format!("up {by}"),
             Self::Falling(by) => format!("down {by}"),
@@ -292,12 +292,9 @@ pub(crate) fn stock_rows(world: &World, scope: Scope) -> Vec<StockRow> {
     let trends = world.get_resource::<StockTrends>();
     let usage = day_use(world, scope);
     let prices = world.get_resource::<super::goods::EconomyCache>();
-    let mut kinds: Vec<&str> = catalog::trade_kinds(world).to_vec();
-    for (held_scope, kind) in totals.keys() {
-        if *held_scope == scope && !kinds.contains(&kind.as_str()) {
-            kinds.push(kind);
-        }
-    }
+    // The catalog's goods only: a diary or a keepsake in a pack is not a
+    // good of the island's market (closing phase, defect 18).
+    let kinds: Vec<&str> = catalog::trade_kinds(world).to_vec();
     kinds
         .into_iter()
         .map(|kind| StockRow {
@@ -323,37 +320,6 @@ pub(crate) fn stock_rows(world: &World, scope: Scope) -> Vec<StockRow> {
 /// profession's `display` from the world's data, else the trade's own name.
 pub(crate) fn trade_display(world: &World, role: Role) -> String {
     capitalised(&village::frontier::economy_spec::trade_label(world, role).replace('_', " "))
-}
-
-/// What the overseer wants of a trade and why, when it differs from who
-/// works it now: one plain line under the trade's row. `reason` is the
-/// simulation's sentence; nothing shows without a target or when they agree.
-pub(crate) fn wanted_line(
-    name: &str,
-    workers: u32,
-    wanted: Option<u32>,
-    reason: Option<&str>,
-) -> Option<String> {
-    let wanted = wanted?;
-    if wanted == workers {
-        return None;
-    }
-    let people = |count: u32| {
-        if count == 1 {
-            "1 worker".to_owned()
-        } else {
-            format!("{count} workers")
-        }
-    };
-    let because = reason
-        .map(crate::game_ui::words::sentence)
-        .filter(|reason| !reason.is_empty())
-        .map_or_else(String::new, |reason| format!(" {reason}"));
-    Some(format!(
-        "{name}: {} now, {} wanted.{because}",
-        people(workers),
-        people(wanted)
-    ))
 }
 
 /// Which table the Economy page shows.
@@ -645,6 +611,8 @@ pub(super) struct View<'a> {
     pub(super) village: Option<SimId>,
     /// The narrow ledger's good card has its fold open.
     pub(super) more: bool,
+    /// The day's account shows all its lines.
+    pub(super) day_more: bool,
     /// Priorities: the jobs that may get their own level are shown.
     pub(super) job_levels: bool,
     /// Orders sent from the ledger that wait or were refused.
@@ -711,7 +679,7 @@ pub(crate) fn day_lines(
     boat: Option<(&str, Option<VisitLine>, Option<VisitLine>)>,
     orders: &[String],
 ) -> Vec<String> {
-    let mut lines = vec![format!("Civic fund: {fund} coins.")];
+    let mut lines = vec![format!("The fund: {fund} coins.")];
     let Some((where_, this_visit, last_visit)) = boat else {
         return lines;
     };
@@ -739,8 +707,9 @@ pub(crate) fn day_lines(
     lines
 }
 
-/// The day's account of the colony for the Economy page, from the world.
-fn day_entries(world: &World) -> Vec<Entry> {
+/// The day's account of the colony for the Economy page, from the world:
+/// its first two lines, the rest under a fold (closing phase, defect 11).
+fn day_entries(world: &World, open: bool) -> Vec<Entry> {
     let fund = world
         .get_resource::<village::VillageState>()
         .map_or(0, |state| state.fund);
@@ -758,9 +727,10 @@ fn day_entries(world: &World) -> Vec<Entry> {
     let where_ = if boat.docked {
         "The merchant boat is in at the trading post.".to_owned()
     } else {
+        // In the top bar's calendar, never the running day count.
         format!(
-            "The merchant boat's next call is on day {}.",
-            boat.next_visit_day
+            "The merchant boat's next call is {}.",
+            crate::game_ui::words::when(world, boat.next_visit_tick)
         )
     };
     let orders = crate::island_shell::model::boat_order_lines(
@@ -779,14 +749,33 @@ fn day_entries(world: &World) -> Vec<Entry> {
         &orders,
     );
     let mut rows = vec![Entry::text("day_title", "Today on the island", true)];
+    let more = lines.len().saturating_sub(DAY_SHOWN);
     rows.extend(
         lines
             .into_iter()
             .enumerate()
+            .take(if open { usize::MAX } else { DAY_SHOWN })
             .map(|(index, line)| Entry::text(&format!("day_{index}"), line, false)),
     );
+    if more > 0 {
+        rows.push(
+            Entry::action(
+                "day_more",
+                if open {
+                    "Less of today".to_owned()
+                } else {
+                    format!("More of today ({more})")
+                },
+                Action::DayMore,
+            )
+            .with(super::model::Extra::Fold(open)),
+        );
+    }
     rows
 }
+
+/// Lines of the day's account shown before its fold.
+const DAY_SHOWN: usize = 2;
 
 /// Ledger rows for the Economy page: the day's account, the village filter,
 /// the Goods or Jobs switch, then one table. Goods are grouped; a selected good has a detail
@@ -797,6 +786,7 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
         scope,
         village: chosen,
         more,
+        day_more,
         job_levels,
         sent,
         page,
@@ -817,7 +807,7 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
     let chosen = chosen
         .filter(|id| scopes.iter().any(|(candidate, _)| *candidate == Some(*id)))
         .or_else(|| pick_village(world, None));
-    let mut rows = day_entries(world);
+    let mut rows = day_entries(world, day_more);
     // Goods: the whole island and each village. Jobs and Priorities: the
     // villages only, and no row at all with one village.
     let chips: Vec<(String, Action)> = scopes
@@ -1235,14 +1225,8 @@ pub(crate) fn target_entries(world: &World, settlement: SimId) -> Vec<Entry> {
                     .unwrap_or(Icon::Work),
             )),
         );
-        if let Some(line) = wanted_line(
-            &capitalised(&row.display),
-            row.current,
-            row.wanted,
-            row.reason.as_deref(),
-        ) {
-            rows.push(Entry::caption(&format!("{key}_why"), line));
-        }
+        // How the job stands against the player's number is said once, in
+        // "Your orders" above the table.
         if row.adjustable {
             rows.push(Entry::choices(
                 &format!("{key}_set"),
@@ -1470,27 +1454,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_trade_wanted_otherwise_says_by_how_much_and_why() {
-        assert_eq!(
-            wanted_line("Baker", 2, None, None),
-            None,
-            "nothing while the village decides"
-        );
-        assert_eq!(
-            wanted_line("Baker", 2, Some(2), None),
-            None,
-            "nothing when they agree"
-        );
-        assert_eq!(
-            wanted_line("Baker", 1, Some(3), Some("every baker seat is taken: build another bakery")),
-            Some(
-                "Baker: 1 worker now, 3 workers wanted. Every baker seat is taken: build another bakery."
-                    .to_owned()
-            )
-        );
-    }
-
-    #[test]
     fn the_steps_build_on_the_target_or_on_who_works_now() {
         // The village decides: the first press starts from who works it.
         assert_eq!(next_wanted(3, None, TargetStep::More), Some(4));
@@ -1509,7 +1472,7 @@ mod tests {
 
     #[test]
     fn the_days_account_says_the_fund_and_the_boats_trade() {
-        assert_eq!(day_lines(40, None, &[]), ["Civic fund: 40 coins."]);
+        assert_eq!(day_lines(40, None, &[]), ["The fund: 40 coins."]);
         let orders = ["Next call wants 10 planks at 14 coins each.".to_owned()];
         assert_eq!(
             day_lines(
@@ -1522,7 +1485,7 @@ mod tests {
                 &orders
             ),
             [
-                "Civic fund: 40 coins.",
+                "The fund: 40 coins.",
                 "The merchant boat's next call is on day 9.",
                 "Its last call: it bought 12 goods from the island for 80 coins and sold 1 good for 9 coins.",
                 "Next call wants 10 planks at 14 coins each."

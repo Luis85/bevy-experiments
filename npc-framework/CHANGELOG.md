@@ -44,6 +44,16 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
   lacking entirely) and the island lays the order at the post ahead of the
   call. The Rust economy tables the data replaced are removed (`price`,
   `gather_tool`, `role_tool`, `FRONTIER_TRADE_KINDS`).
+- Soak fixes: a household decides on a child from the food it can count on
+  (its members' packs and its share of its settlement's stores); every granted
+  unit of a durable good carries its durability (founders' spears, rods and
+  hammers wear); the last tailor of a village stays while somebody lacks a coat;
+  the boat sells only goods that are dear on the island, within a trade balance
+  (`merchant.trade_balance_percent`, 5), and does not buy grain while flour or
+  bread is dear; a thirsty resident fetches water at a nearer well instead of
+  walking to a far seller; meetings come every `meet_cooldown_ticks` (2400) and
+  pay `meet_affinity` (1500); the season ledger closes before the new day's
+  flows and counts the days a village ran short of food, water or fuel.
 
 ### Island game: review fixes (saving, startup, keys, words)
 

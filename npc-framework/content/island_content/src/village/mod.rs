@@ -330,6 +330,12 @@ fn colony_demand_changed(world: &mut World) {
 }
 
 fn tick(world: &mut World) {
+    // The ledger closes a season before anything of the new day happens
+    // (closing fix: it ran after the day's levy and grants, so a season's
+    // closing fund already held the next day's flows).
+    if world.contains_resource::<ledger::SeasonLedger>() {
+        ledger::tick(world);
+    }
     ai::tick(world);
     homestead::tick(world);
     colony::tick(world);

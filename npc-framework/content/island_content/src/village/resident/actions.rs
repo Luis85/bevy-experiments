@@ -531,6 +531,19 @@ fn buy_one(world: &mut World, actor: Entity, kind: &str) -> Step {
     let Some(seller) = ai::market_supplier(world, actor, kind) else {
         return Err("no affordable seller offers it");
     };
+    // A thirsty resident does not walk past a well to a far seller (closing
+    // fix: two residents walked over 100 m to buy water and fell to Thirst
+    // 6,373): when a patch of the good is nearer than the seller, the
+    // selector's next leaf fetches it there.
+    if let (Some(here), Some(at)) = (
+        world.get::<SimPos>(actor).copied(),
+        world.get::<SimPos>(seller).copied(),
+    ) && let Some((_, patch)) = ai::gather_source(world, actor, kind)
+        && let Some(well) = world.get::<SimPos>(patch).copied()
+        && here.dist2(well) < here.dist2(at)
+    {
+        return Err("a patch of it is nearer than any seller");
+    }
     if !ai::approach_work(world, actor, seller) {
         return Ok(());
     }

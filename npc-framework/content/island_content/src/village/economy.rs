@@ -131,6 +131,12 @@ pub fn grant(world: &mut World, holder: Entity, item: Item) {
             }
         }
     }
+    // Every unit of a good with a `durability` in data carries it, founders'
+    // endowments and imports included (closing fix: endowment tools had
+    // none, and an item without durability never wears out).
+    let durability = (!def.stackable)
+        .then(|| catalog::durability_in(world, &item.kind))
+        .flatten();
     while remaining > 0 {
         let add = remaining.min(def.max_stack.max(1));
         let (_, e) = spawn_sim(
@@ -140,6 +146,11 @@ pub fn grant(world: &mut World, holder: Entity, item: Item) {
                 Perceivable::new(crate::world::kinds::ITEM),
             ),
         );
+        if let Some(durability) = durability {
+            world
+                .entity_mut(e)
+                .insert(npc_framework::crafting::Durability::new(durability));
+        }
         items::put_in_inventory(world, holder, e);
         remaining -= add;
     }

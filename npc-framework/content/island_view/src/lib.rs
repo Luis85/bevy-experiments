@@ -116,6 +116,11 @@ pub fn clear_island_toast(world: &mut World) {
 pub fn take_island_toast_retry(world: &mut World) -> bool {
     island_shell::take_toast_retry(world)
 }
+/// Put a scrolling `body` of `root` beside the kit's scroll rail (shown only
+/// while it overflows), as the ledger's pages have.
+pub fn attach_scroll_rail(world: &mut World, root: Entity, body: Entity, prefix: &str) -> Entity {
+    panel_scroll::attach_rail(world, root, body, prefix)
+}
 /// Whether the played character sleeps (the host may run the clock faster).
 pub fn island_player_asleep(world: &World) -> bool {
     player_hud::player_asleep(world)

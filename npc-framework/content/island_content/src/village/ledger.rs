@@ -48,6 +48,10 @@ pub struct SeasonTally {
     pub used: BTreeMap<String, u64>,
     pub spoiled: BTreeMap<String, u64>,
     pub tools_worn: u32,
+    /// Days of the season on which some village had less than a day of
+    /// food, water or fuel, by which.
+    pub short_days: BTreeMap<String, u32>,
+    /// What ran short on the most days, and on how many.
     pub worst_shortage: Option<(String, u32)>,
 }
 
@@ -96,6 +100,11 @@ impl SimHashResource for SeasonLedger {
             hash_map64(h, &tally.used);
             hash_map64(h, &tally.spoiled);
             h.u32(tally.tools_worn);
+            h.u32(tally.short_days.len() as u32);
+            for (what, days) in &tally.short_days {
+                h.str(what);
+                h.u32(*days);
+            }
             h.opt(tally.worst_shortage.as_ref(), |h, (good, days)| {
                 h.str(good);
                 h.u32(*days);
@@ -177,15 +186,27 @@ pub fn tick(world: &mut World) {
         .back()
         .is_some_and(|tally| tally.season == index)
     {
-        // Once a day: the shortest stock of any village this season.
+        // Once a day: food, water or fuel some village has less than a
+        // day of (closing fix: the single good with the fewest days left was
+        // always a side good nobody keeps, such as berries, at 0 days, so the
+        // ledger never showed a real shortage).
         let now = world.resource::<SimClock>().tick;
         if now.is_multiple_of(world.resource::<SimConfig>().day_length.max(1)) {
-            let worst = super::frontier::settlements::all(world)
-                .into_iter()
-                .filter_map(|(id, _)| super::view::economy::outlook(world, id).next_shortage)
-                .min_by(|a, b| (a.days_left, &a.good).cmp(&(b.days_left, &b.good)));
-            if let Some(worst) = worst {
-                shortage(world, &worst.good, worst.days_left);
+            let mut short: BTreeSet<&'static str> = BTreeSet::new();
+            for (id, _) in super::frontier::settlements::all(world) {
+                let outlook = super::view::economy::outlook(world, id);
+                for (what, days) in [
+                    ("food", outlook.food_days),
+                    ("water", outlook.water_days),
+                    ("fuel", outlook.fuel_days),
+                ] {
+                    if days == Some(0) {
+                        short.insert(what);
+                    }
+                }
+            }
+            for what in short {
+                shortage(world, what);
             }
         }
         return;
@@ -231,15 +252,19 @@ pub fn spoiled(world: &mut World, good: &str, units: u32) {
 pub fn tool_worn(world: &mut World) {
     with_open(world, |tally| tally.tools_worn += 1);
 }
-/// Records a good's fewest days left, keeping the worst of the season.
-pub fn shortage(world: &mut World, good: &str, days_left: u32) {
+/// Counts a day on which some village had less than a day of `what` (food,
+/// water or fuel), and keeps the season's worst: the most such days.
+pub fn shortage(world: &mut World, what: &str) {
     with_open(world, |tally| {
+        let days = tally.short_days.entry(what.to_owned()).or_default();
+        *days += 1;
+        let days = *days;
         if tally
             .worst_shortage
             .as_ref()
-            .is_none_or(|(_, worst)| days_left < *worst)
+            .is_none_or(|(_, worst)| days > *worst)
         {
-            tally.worst_shortage = Some((good.to_owned(), days_left));
+            tally.worst_shortage = Some((what.to_owned(), days));
         }
     });
 }

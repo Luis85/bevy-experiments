@@ -268,6 +268,14 @@ pub struct ScheduleSpec {
     pub chat_ticks: u64,
     /// A meeting ends early, paying nothing, beyond this distance (mm).
     pub chat_break_mm: i32,
+    /// Ticks after a meeting before a resident meets again (closing fix:
+    /// 300 gave nine or ten meetings a day; 2400 leaves a few, and matches
+    /// the 2400-tick window in which a meeting counts as company for morale).
+    pub meet_cooldown_ticks: u64,
+    /// Affinity a meeting pays each party: a few meetings a day pay about
+    /// what ten short ones did (ten at 250), so couples still form at
+    /// `demography.pair_affinity` (closing fix: at 600 no couple formed).
+    pub meet_affinity: i32,
 }
 
 impl Default for ScheduleSpec {
@@ -286,6 +294,8 @@ impl Default for ScheduleSpec {
             meal_hunger_threshold: 60_000,
             chat_ticks: 200,
             chat_break_mm: 3000,
+            meet_cooldown_ticks: 2400,
+            meet_affinity: 1500,
         }
     }
 }
@@ -516,6 +526,8 @@ impl BehaviorSpec {
         h.i32(self.schedule.meal_hunger_threshold);
         h.u64(self.schedule.chat_ticks);
         h.i32(self.schedule.chat_break_mm);
+        h.u64(self.schedule.meet_cooldown_ticks);
+        h.i32(self.schedule.meet_affinity);
         h.u32(self.places.len() as u32);
         for place in &self.places {
             h.str(&place.key);

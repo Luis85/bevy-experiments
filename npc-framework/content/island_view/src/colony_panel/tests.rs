@@ -243,6 +243,21 @@ fn the_right_column_holds_the_ledger_or_the_inspector_never_both() {
 }
 
 #[test]
+fn the_season_card_closes_by_itself_after_a_day_of_running_time() {
+    let day = 2400;
+    assert!(
+        !season_card_expired(false, Some(0), 10 * day, day),
+        "not open"
+    );
+    assert!(
+        !season_card_expired(true, None, 10 * day, day),
+        "no opening tick"
+    );
+    assert!(!season_card_expired(true, Some(100), 100 + day - 1, day));
+    assert!(season_card_expired(true, Some(100), 100 + day, day));
+}
+
+#[test]
 fn colony_policy_button_queues_and_reports_the_actual_application() {
     let mut app = fixture();
     let before = state_hash(app.world_mut());
@@ -1130,6 +1145,24 @@ fn a_villages_jobs_table_sends_the_wanted_headcount_and_hands_it_back() {
             "wanted": trade.current + 1,
         })
     );
+    // The Paused pill counts the player's own order (closing phase, 2).
+    assert_eq!(orders_waiting(app.world()), 1);
+    run_ticks(app.world_mut(), 2);
+    process(app.world_mut());
+    assert_eq!(orders_waiting(app.world()), 0, "applied: nothing waits");
+    // A command the game submits itself is not the player's order.
+    let Action::Target { step, .. } = controls[1].1.clone() else {
+        panic!("a Target choice");
+    };
+    let mut command = economy::target_command(app.world(), village, &trade.key, step).unwrap();
+    // The same number again: the order below still reads as before.
+    command.wanted = Some(trade.current + 1);
+    npc_framework::prelude::submit(app.world_mut(), None, SimCommand::content(&command)).unwrap();
+    assert_eq!(
+        orders_waiting(app.world()),
+        0,
+        "a raw submit is not counted"
+    );
     run_ticks(app.world_mut(), 2);
     process(app.world_mut());
     assert_eq!(
@@ -1144,12 +1177,14 @@ fn a_villages_jobs_table_sends_the_wanted_headcount_and_hands_it_back() {
     );
     let message = app.world().resource::<Ledger>().message.clone();
     assert!(message.contains("wanted"), "{message}");
-    // Now and wanted differ: the simulation's reason is under the row.
-    let why = rows
+    // Now and wanted differ: "Your orders" says how the job stands, once;
+    // no second line under the row.
+    let order = rows
         .iter()
-        .find(|entry| entry.key == format!("{key}_why"))
-        .expect("the reason line");
-    assert!(why.text.contains("wanted."), "{}", why.text);
+        .find(|entry| entry.key == format!("order_{}_job_{}", village.0, trade.key))
+        .expect("the order line");
+    assert!(order.text.contains("wanted"), "{}", order.text);
+    assert!(rows.iter().all(|entry| entry.key != format!("{key}_why")));
 
     // The village decides again.
     app.world_mut()
@@ -1600,4 +1635,48 @@ fn the_price_change_stands_apart_from_the_price() {
     assert_eq!(widgets::split_change("4"), ("4", None));
     assert_eq!(widgets::split_change("\u{2013}"), ("\u{2013}", None));
     assert_eq!(widgets::split_change("up 3"), ("up 3", None));
+}
+
+#[test]
+fn job_chips_at_one_level_wrap_as_buttons_not_a_selector() {
+    use village::frontier::oversee::PriorityLevel;
+    let chip = |job: &str, level| {
+        (
+            job.to_owned(),
+            Action::Priority {
+                settlement: SimId(1),
+                topic: "jobs",
+                profession: Some(job.to_owned()),
+                level,
+            },
+        )
+    };
+    let chips = [
+        chip("miner", PriorityLevel::High),
+        chip("smith", PriorityLevel::High),
+        chip("baker", PriorityLevel::High),
+    ];
+    assert!(widgets::job_chips(&chips));
+    // One topic's levels are one segmented control.
+    let levels = [
+        (
+            "Low".to_owned(),
+            Action::Priority {
+                settlement: SimId(1),
+                topic: "housing",
+                profession: None,
+                level: PriorityLevel::Low,
+            },
+        ),
+        (
+            "High".to_owned(),
+            Action::Priority {
+                settlement: SimId(1),
+                topic: "housing",
+                profession: None,
+                level: PriorityLevel::High,
+            },
+        ),
+    ];
+    assert!(!widgets::job_chips(&levels));
 }

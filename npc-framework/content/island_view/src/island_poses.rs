@@ -656,6 +656,9 @@ pub(crate) struct IslandPoseContext<'w, 's> {
             Has<EcologyWork>,
             // A stage of work at a homestead upgrade, at its door.
             Has<island_content::village::live::UpgradeWork>,
+            // A stage of work at a civic construction site (a building,
+            // a plot or a prop the village builds).
+            Has<island_content::village::civic::SiteWork>,
         ),
     >,
     leaves: Query<'w, 's, (&'static ActiveLeaf, &'static Brain)>,
@@ -680,8 +683,9 @@ impl IslandPoseContext<'_, '_> {
             self.config.as_ref()?,
             self.index.as_ref()?,
         );
-        let (person, inventory, building, restoring, upgrading) = self.people.get(actor).ok()?;
-        let building = building || upgrading;
+        let (person, inventory, building, restoring, upgrading, site_work) =
+            self.people.get(actor).ok()?;
+        let building = building || upgrading || site_work;
         let carrying = inventory.and_then(|inventory| {
             goods::bulk_load(inventory.items.iter().filter_map(|id| {
                 let item = self.items.get(index.get(*id)?).ok()?;
@@ -736,6 +740,53 @@ impl IslandPoseContext<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A resident working a stage at a civic construction site (`SiteWork`:
+    /// a building, a plot or a prop the village builds) hammers, as a
+    /// cottage or upgrade builder does; the work sound follows the pose.
+    #[test]
+    fn a_civic_site_builder_hammers() {
+        use bevy::ecs::system::RunSystemOnce;
+        use island_content::village::civic::SiteWork;
+        use npc_framework::prelude::{SimId, SimPos};
+        let mut world = World::new();
+        world.insert_resource(IslandPoses);
+        world.insert_resource(SimClock::default());
+        world.insert_resource(SimConfig::default());
+        world.insert_resource(SimIndex::default());
+        let villager = Villager {
+            role: Role::from_key("carpenter"),
+            name: "Builder".into(),
+            home: SimPos::new(0, 0),
+            workplace: SimId(1),
+            base_speed: 60,
+            next_decision: 0,
+            resting_until: 0,
+            rest_rate: 0,
+            life: 1,
+        };
+        let idle = world.spawn(villager.clone()).id();
+        let builder = world
+            .spawn((
+                villager,
+                SiteWork {
+                    site: SimId(9),
+                    ends: 100,
+                    ticks: 60,
+                },
+            ))
+            .id();
+        let poses = world
+            .run_system_once(move |island: IslandPoseContext| {
+                (
+                    island.pose(idle, None, None, None, false),
+                    island.pose(builder, None, None, None, false),
+                )
+            })
+            .expect("poses");
+        assert_eq!(poses.1, Some(Pose::Hammer));
+        assert_ne!(poses.0, Some(Pose::Hammer));
+    }
 
     #[test]
     fn a_data_only_trade_works_with_the_generic_hammer() {

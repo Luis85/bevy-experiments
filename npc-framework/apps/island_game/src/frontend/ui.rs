@@ -313,9 +313,32 @@ pub(crate) fn plain_details(reason: &str) -> String {
         .iter()
         .find(|(words, _)| reason.contains(words))
         .map_or_else(
-            || reason.trim().to_owned(),
+            || without_folders(reason.trim()),
             |(_, plain)| (*plain).to_owned(),
         )
+}
+
+/// A message with each absolute path cut to its file's name ("unreadable
+/// save C:\Users\me\island.world.json: ..." reads "unreadable save
+/// island.world.json: ..."). The folder is on the card's Copy button.
+pub(crate) fn without_folders(text: &str) -> String {
+    text.split(' ')
+        .map(|word| {
+            let bytes = word.as_bytes();
+            let rooted = word.starts_with('/')
+                || word.starts_with('\\')
+                || (bytes.len() > 2 && bytes[1] == b':' && matches!(bytes[2], b'\\' | b'/'));
+            if !rooted {
+                return word.to_owned();
+            }
+            let (path, tail) = word
+                .strip_suffix(':')
+                .map_or((word, ""), |path| (path, ":"));
+            let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
+            format!("{name}{tail}")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The title's card for `summary`, with the save's file name and the name
@@ -559,7 +582,7 @@ enum GuideLine {
     /// A mode's heading on the Controls page.
     Heading(&'static str),
     /// A key from the island's one key table (`island_view::guide_controls`).
-    Keys(String, &'static str),
+    Keys(String, String),
 }
 
 /// One page of the Guide: a few sentences and the keys that belong to them.
@@ -756,8 +779,12 @@ fn rebuild(world: &mut World) {
             .id()
     } else {
         let wide = matches!(screen, Screen::Settings | Screen::Controls);
+        // The world list takes a second column only when there is a choice.
+        let worlds = world
+            .get_resource::<super::worlds::WorldChoice>()
+            .map_or(0, |choice| choice.entries.len());
         let width = match screen {
-            Screen::New => 840,
+            Screen::New if worlds > 1 => 840,
             _ if wide => 560,
             _ => 440,
         };
@@ -865,20 +892,27 @@ fn rebuild(world: &mut World) {
                     ("Continue from the autosave", Action::ContinueAutosave),
                     ("Continue from my save", Action::Continue),
                 ] {
+                    let lead = action == Action::ContinueAutosave;
                     let entity = button(
                         world,
                         pair,
                         &mut tab,
                         text,
-                        Kind::Secondary,
+                        if lead { Kind::Primary } else { Kind::Secondary },
                         Surface::Paper,
                         None,
                         action,
                     );
                     rename(world, entity, text);
                     w::set_enabled(world, entity, ready);
+                    if lead && ready {
+                        first = Some(entity);
+                    }
                 }
             }
+            // With a newer autosave the card's two choices are the ways to
+            // continue; no third Continue below them (closing phase, 16).
+            let continues = summary.can_continue && summary.autosave_newer.is_none();
             let buttons = column(world, panel, 8.0);
             if let Some(mut node) = world.get_mut::<Node>(buttons) {
                 node.width = px(320);
@@ -886,7 +920,7 @@ fn rebuild(world: &mut World) {
             }
             // With a usable save Continue leads, with who and when on its
             // second line; without one New game does.
-            if summary.can_continue {
+            if continues {
                 let resume = w::control(
                     world,
                     buttons,
@@ -951,7 +985,7 @@ fn rebuild(world: &mut World) {
                     first = Some(new);
                 }
             }
-            if summary.can_continue {
+            if continues {
                 let oversee = button(
                     world,
                     buttons,
@@ -1024,9 +1058,10 @@ fn rebuild(world: &mut World) {
                 node.min_height = px(0);
                 node.flex_shrink = 1.0;
             }
+            let several = world.resource::<super::worlds::WorldChoice>().entries.len() > 1;
             let left = column(world, body, 10.0);
-            let right = column(world, body, 8.0);
-            for side in [left, right] {
+            let right = several.then(|| column(world, body, 8.0));
+            for side in std::iter::once(left).chain(right) {
                 if let Some(mut node) = world.get_mut::<Node>(side) {
                     node.flex_grow = 1.0;
                     node.flex_basis = px(0);
@@ -1149,6 +1184,24 @@ fn rebuild(world: &mut World) {
                 world.entity_mut(line).insert(Part::Secondary);
                 w::set_enabled(world, card, ready && valid && summary.can_start);
                 world.entity_mut(card).insert(BeginButton);
+                // Live is the way the game is meant to begin: its card
+                // carries the honey edge of a primary choice.
+                if action == Action::Begin {
+                    world.spawn((
+                        ChildOf(card),
+                        Name::new("Primary edge"),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: px(0),
+                            top: px(8),
+                            bottom: px(8),
+                            width: px(3),
+                            border_radius: BorderRadius::all(px(2)),
+                            ..default()
+                        },
+                        BackgroundColor(t::HONEY_500),
+                    ));
+                }
             }
             w::paragraph(
                 world,
@@ -1196,7 +1249,7 @@ fn rebuild(world: &mut World) {
                 Action::Back,
             );
             // Only the island that comes with the game: nothing to choose.
-            if entries.len() > 1 {
+            if let Some(right) = right {
                 world_list(world, right, surface, &entries, chosen, world_tab, ready);
             }
         }
@@ -1320,8 +1373,10 @@ fn rebuild(world: &mut World) {
                 w::paragraph(world, panel, line, t::BODY, Tone::text(surface));
             }
             let foot = row(world, panel, 8.0);
-            // Back is the safe choice, and the first.
-            first = Some(button(
+            // Back is the safe choice, and the first. It has focus from the
+            // start, so no tooltip: one would lie over "Quit without saving"
+            // beside it (closing phase, defect 21).
+            let back = button(
                 world,
                 foot,
                 &mut tab,
@@ -1330,7 +1385,11 @@ fn rebuild(world: &mut World) {
                 surface,
                 Some("Esc"),
                 Action::Back,
-            ));
+            );
+            world
+                .entity_mut(back)
+                .remove::<island_view::game_ui::tooltip::Tooltip>();
+            first = Some(back);
             let leave = button(
                 world,
                 foot,
@@ -1419,12 +1478,14 @@ fn rebuild(world: &mut World) {
                         w::paragraph(world, body, text, t::BODY, Tone::text(surface));
                     }
                     GuideLine::Key(keys, what) => key_row(world, body, surface, keys, what),
-                    GuideLine::Keys(keys, what) => key_row(world, body, surface, &keys, what),
+                    GuideLine::Keys(keys, what) => key_row(world, body, surface, &keys, &what),
                     GuideLine::Heading(mode) => {
                         w::label(world, body, mode, t::SUBHEADING, Tone::text(surface));
                     }
                 }
             }
+            // A long page (Controls) shows how much is left to read.
+            island_view::attach_scroll_rail(world, panel, body, "Guide");
             let foot = row(world, panel, 8.0);
             first = Some(button(
                 world,
@@ -2144,11 +2205,11 @@ mod tests {
     fn the_older_island_card_names_the_file_and_the_backup() {
         use crate::island::Issue;
         let file = "island.world.json";
-        let backup = "island.world.older-1.json";
+        let backup = "island.world.kept-1.json";
         let card = title_card(&summary_with(Some(Issue::Older), None), file, backup).unwrap();
         assert_eq!(card.title, "Your island is from an older version");
         assert!(card.lines[0].ends_with("The file is untouched: island.world.json."));
-        assert!(card.lines[1].ends_with("kept beside it as island.world.older-1.json."));
+        assert!(card.lines[1].ends_with("kept beside it as island.world.kept-1.json."));
         assert!(card.copy_folder && card.details.is_none());
         let refused = Issue::Unopened(
             "This file is not a local Island Village save; choose a different --island-save path."
@@ -2165,6 +2226,19 @@ mod tests {
             let card = title_card(&summary_with(Some(issue), None), file, backup).unwrap();
             assert!(card.copy_folder, "{}", card.title);
         }
+        let unreadable = Issue::Unopened(
+            r"unreadable save C:\Users\me\island-village\island.world.json: expected value".into(),
+        );
+        let card = title_card(&summary_with(Some(unreadable), None), file, backup).unwrap();
+        assert_eq!(
+            card.details.as_deref(),
+            Some("unreadable save island.world.json: expected value"),
+            "no folders in the details"
+        );
+        assert_eq!(
+            without_folders("could not read /home/me/island.world.json"),
+            "could not read island.world.json"
+        );
         let card = title_card(&summary_with(None, Some("disk full")), file, backup).unwrap();
         assert_eq!(card.title, "The game has to be restarted");
         assert_eq!(card.details.as_deref(), Some("disk full"));

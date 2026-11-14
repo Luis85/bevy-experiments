@@ -98,6 +98,8 @@ pub(crate) struct Alerts {
     /// A need alert's reason by alert serial, read on the scan's beat
     /// (2.4): the short form, the full sentence and since when.
     reasons: BTreeMap<u64, (String, String, u64, Option<String>)>,
+    /// A Compact window's stack was opened with Show.
+    compact_open: bool,
     /// The folded rows the stack shows: their first alert's serial, the
     /// head of People and the residents (2.4).
     groups: BTreeMap<u64, (String, Vec<SimId>)>,
@@ -157,6 +159,7 @@ impl Default for Alerts {
             fresh_heard: None,
             scanned: false,
             reasons: BTreeMap::new(),
+            compact_open: false,
             groups: BTreeMap::new(),
             outlook: None,
             outlook_read: None,
@@ -279,7 +282,7 @@ fn spawn(world: &mut World) {
         world.entity_mut(text).insert(CountText(critical));
     }
     // Folded, the header also counts the outlook's urgent lines (2.5).
-    let outlook_badge = w::badge(world, header, Surface::Chrome, Status::Warn, "0");
+    let outlook_badge = w::badge(world, header, Surface::Chrome, Status::Info, "0");
     world.entity_mut(outlook_badge).insert(OutlookFoldBadge);
     let text = world
         .get::<Children>(outlook_badge)
@@ -698,6 +701,29 @@ pub(crate) fn track(world: &mut World) {
 /// the simulation's `need_alert` on the scan's beat (twice a second at
 /// most), never per frame. Rows rebuild only when a reason changed.
 fn read_reasons(world: &mut World) {
+    // A resident who has died needs nothing: their need alerts go (the
+    // death has its own row; closing phase, defect 1).
+    let gone: Vec<u64> = world
+        .resource::<Alerts>()
+        .feed
+        .iter()
+        .filter(|alert| model::need_of(alert.kind).is_some())
+        .filter(|alert| {
+            alert.subject.is_none_or(|subject| {
+                world
+                    .get_resource::<SimIndex>()
+                    .and_then(|index| index.get(SimId(subject)))
+                    .is_none_or(|entity| !village::living(world, entity))
+            })
+        })
+        .map(|alert| alert.serial)
+        .collect();
+    if !gone.is_empty() {
+        world
+            .resource_mut::<Alerts>()
+            .feed
+            .remove_where(|alert| gone.contains(&alert.serial));
+    }
     let wanted: Vec<(u64, u32, &'static str, u64)> = world
         .resource::<Alerts>()
         .feed
@@ -1092,6 +1118,7 @@ fn process(world: &mut World) {
     let inspecting = crate::resident_inspector::open(world)
         || crate::island_build::column_taken(world)
         || crate::colony_panel::open(world);
+    let compact = scale::layout(world).class == LayoutClass::Compact;
     for opens in outlook_opens {
         match opens {
             outlook::Opens::Goods(village, good) => crate::colony_panel::show_economy(
@@ -1135,6 +1162,9 @@ fn process(world: &mut World) {
                         state.collapsed = false;
                         close_inspector = true;
                     }
+                    // In a Compact window the stack is folded unless the
+                    // player opened it (closing phase, defect 8).
+                    Request::Collapse if compact => state.compact_open = !state.compact_open,
                     Request::Collapse => state.collapsed = !state.collapsed,
                     Request::Journal => open_journal = true,
                     Request::Outlook(_) => {}
@@ -1676,14 +1706,21 @@ fn set_text<M: Component>(world: &mut World, value: &str) {
     }
 }
 
-/// The folded header's title: "Alerts · Outlook 2" (the shapes and counts
-/// stand beside it), "Alerts" when the outlook has nothing urgent.
+/// The folded header's title: "Alerts · Outlook" (its count stands in its
+/// own badge beside it, once), "Alerts" when the outlook has nothing urgent.
 pub(crate) fn fold_title(outlook: usize) -> String {
     if outlook == 0 {
         "Alerts".to_owned()
     } else {
-        format!("Alerts \u{b7} Outlook {outlook}")
+        "Alerts \u{b7} Outlook".to_owned()
     }
+}
+
+/// Whether the stack shows its header only: a card or page is read, the
+/// player folded it, or the window is Compact and the player has not opened
+/// it there.
+pub(crate) fn folded(compact: bool, collapsed: bool, compact_open: bool, inspecting: bool) -> bool {
+    inspecting || if compact { !compact_open } else { collapsed }
 }
 
 /// Read the Village outlook when the game hour changed, at most twice a
@@ -1904,8 +1941,13 @@ fn refresh(world: &mut World) {
             let state = world.resource::<Alerts>();
             (
                 (state.feed.revision, state.view_revision),
-                // A Compact window shows the header only.
-                state.collapsed || inspecting || scale::layout(world).class == LayoutClass::Compact,
+                // A Compact window shows the header only, until Show.
+                folded(
+                    scale::layout(world).class == LayoutClass::Compact,
+                    state.collapsed,
+                    state.compact_open,
+                    inspecting,
+                ),
             )
         };
         let stack = stack(world);

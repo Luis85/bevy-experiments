@@ -448,7 +448,7 @@ pub(super) fn wear_gather_tool(world: &mut World, actor: Entity, id: SimId, kind
 
 /// One completed work unit (a gather, a hunt, a build stage) wears the
 /// actor's usable `tool`; a spent tool breaks for good (review fix S2.2).
-pub(crate) fn wear_tool(world: &mut World, actor: Entity, id: SimId, tool: &str) {
+pub fn wear_tool(world: &mut World, actor: Entity, id: SimId, tool: &str) {
     let Some(item) = usable_tool(world, actor, tool) else {
         return;
     };

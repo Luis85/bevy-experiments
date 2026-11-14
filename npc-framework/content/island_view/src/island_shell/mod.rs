@@ -1252,6 +1252,17 @@ fn set_host_toast(
         crate::game_ui::sound::play(world, sound);
     }
     if let Some(mut state) = world.get_resource_mut::<ShellState>() {
+        // A toast with a button stays until it expires (closing phase,
+        // defect 7): a plain note does not take its place.
+        if !model::replaces_toast(
+            state
+                .host
+                .as_ref()
+                .map(|toast| (toast.button.is_some(), toast.left)),
+            button.is_some(),
+        ) {
+            return;
+        }
         let stay = if button.is_some() {
             HOST_BUTTON_STAY
         } else {
@@ -1505,21 +1516,50 @@ fn place_totals(world: &mut World, second: bool) {
     }
 }
 
+/// The player's own orders that time has not applied yet: the ledger's, the
+/// build menu's and Shape's. Never the commands the game sends for itself
+/// (closing phase, defect 2).
+pub(crate) fn orders_waiting(world: &World) -> usize {
+    crate::colony_panel::orders_waiting(world)
+        + crate::island_build::orders_waiting(world)
+        + crate::shape_tools::orders_waiting(world)
+}
+
+/// How wide the right column stands open in Oversee (0 when empty), with
+/// its margin.
+fn right_column(world: &World, class: LayoutClass) -> f32 {
+    if *world.resource::<IslandMode>() != IslandMode::Inspector {
+        return 0.0;
+    }
+    let column = crate::colony_panel::column(world);
+    let column = if column == model::Column::Empty && crate::island_build::column_taken(world) {
+        model::Column::Inspector
+    } else {
+        column
+    };
+    match column {
+        model::Column::Empty => 0.0,
+        column => model::column_width(column, class) + t::SCREEN_MARGIN,
+    }
+}
+
 fn refresh_totals(world: &mut World, shown: bool, class: LayoutClass) {
     let second = model::totals_on_second_row(class, shown);
     place_totals(world, second);
     show::<TotalsGroup>(world, shown);
     show::<TotalsDivider>(world, shown && !second);
     show::<TotalsRow>(world, second);
-    let counting = world
-        .get_resource::<npc_framework::kernel::commands::CommandQueue>()
-        .is_some_and(|queue| !queue.pending.is_empty());
+    let counting = orders_waiting(world) > 0;
+    let width = scale::layout(world).width;
     let (left, right, drop) = model::toast_lane_for(
-        scale::layout(world).width,
+        width,
         crate::player_hud::workspace_width(world),
         crate::player_hud::GOAL_EDGE,
         counting,
     );
+    // The open right column (a ledger page, a card, the build menu) is
+    // never covered: the lane is centred in what is left beside it.
+    let right = model::beside_column(right, right_column(world, class));
     // Shape's resources panel stands right of the rail: the lane (the
     // Paused pill and the toasts) is centred in what is left beside it, so
     // an export's toast never covers the panel's goods.
@@ -1776,9 +1816,7 @@ fn refresh(world: &mut World) {
     // Orders given while paused wait for time to run (3.4): the pill counts
     // them. `set_text` writes only a change.
     let waiting = if clock.stopped {
-        world
-            .get_resource::<npc_framework::kernel::commands::CommandQueue>()
-            .map_or(0, |queue| queue.pending.len())
+        orders_waiting(world)
     } else {
         0
     };

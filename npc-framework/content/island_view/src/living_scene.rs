@@ -1342,7 +1342,9 @@ fn spawn_landscape(
     commands.insert_resource(ShoreFoam(shallows.clone()));
     let water = materials.add(StandardMaterial {
         base_color: Color::srgb(0.075, 0.31, 0.39),
-        perceptual_roughness: 0.27,
+        // A little rough, so a low sun spreads into soft glitter rather
+        // than hard spots.
+        perceptual_roughness: 0.36,
         reflectance: 0.5,
         metallic: 0.08,
         ..default()
@@ -1795,6 +1797,10 @@ fn install_camera_fog(
 const SWAY_NEAR_M: f32 = 70.0;
 const SWAY_FAR_EVERY: u32 = 4;
 
+/// Half the width, in grid steps, over which the swell's normals take their
+/// slope (see [`swell_mesh`]).
+const NORMAL_REACH_STEPS: f32 = 2.0;
+
 fn swell_mesh(time: f32, half_extent: f32, downwind: Vec2, strength: f32) -> Mesh {
     let cells = 32;
     let step = half_extent / cells as f32;
@@ -1819,10 +1825,16 @@ fn swell_mesh(time: f32, half_extent: f32, downwind: Vec2, strength: f32) -> Mes
         for x in -cells..=cells {
             let (x, z) = (x as f32 * step, z as f32 * step);
             let h = wave(x, z);
-            // The slope from a small difference: the light runs along the
-            // swells.
-            let dx = (wave(x + 1.5, z) - wave(x - 1.5, z)) / 3.0;
-            let dz = (wave(x, z + 1.5) - wave(x, z - 1.5)) / 3.0;
+            // The slope over the grid's own spacing, so the light runs along
+            // the swells the mesh can draw. A slope taken over a metre or two
+            // keeps ripples a few times shorter than a grid step: the
+            // vertices then catch a low sun in a lattice of bright diamonds
+            // (one per vertex) instead of one glittering surface. Averaging
+            // over four steps keeps the long, slow undulation the grid draws
+            // smoothly and drops the swells only a few steps long.
+            let reach = step * NORMAL_REACH_STEPS;
+            let dx = (wave(x + reach, z) - wave(x - reach, z)) / (2.0 * reach);
+            let dz = (wave(x, z + reach) - wave(x, z - reach)) / (2.0 * reach);
             let normal = Vec3::new(-dx * 0.55 * sea, 1.0, -dz * 0.55 * sea)
                 .normalize()
                 .to_array();
@@ -2977,6 +2989,51 @@ mod tests {
         let point = raised_point(Some(&terrain), SimPos::new(500, 500), 2.1);
         assert!((point.y - 6.8).abs() < 0.0001);
     }
+    /// A low sun shows any normal that jumps from one swell vertex to the
+    /// next as a lattice of bright diamonds. Neighbouring normals must turn
+    /// gently, in any wind direction and on a small or large sea (7.7° with
+    /// the slope taken over 3 m; under 4° over four grid steps).
+    #[test]
+    fn the_swell_turns_gently_from_vertex_to_vertex_so_a_low_sun_draws_no_lattice() {
+        for half_extent in [246.0, 352.0] {
+            for downwind in [Vec2::X, Vec2::new(0.6, 0.8), Vec2::new(-0.7, 0.7)] {
+                for time in [0.0, 3.0, 7.7] {
+                    let mesh = swell_mesh(time, half_extent, downwind, 1.0);
+                    let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
+                        mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+                    else {
+                        panic!("swell positions")
+                    };
+                    let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
+                        mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
+                    else {
+                        panic!("swell normals")
+                    };
+                    let step = half_extent / 32.0;
+                    let key =
+                        |p: &[f32; 3]| ((p[0] / step).round() as i32, (p[2] / step).round() as i32);
+                    let at: std::collections::BTreeMap<(i32, i32), Vec3> = positions
+                        .iter()
+                        .zip(normals)
+                        .map(|(p, n)| (key(p), Vec3::from_array(*n)))
+                        .collect();
+                    let mut worst = 0.0_f32;
+                    for (&(x, z), normal) in &at {
+                        for next in [(x + 1, z), (x, z + 1)] {
+                            if let Some(other) = at.get(&next) {
+                                worst = worst.max(normal.angle_between(*other).to_degrees());
+                            }
+                        }
+                    }
+                    assert!(
+                        worst < 4.0,
+                        "{half_extent} {downwind} {time}: neighbours {worst:.2}°"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn seasons_recolour_without_changing_topology_and_large_oceans_stay_bounded() {
         let terrain = plateau(4700);

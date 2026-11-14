@@ -463,6 +463,15 @@ fn finish_stroke(world: &mut World) {
 }
 
 /// A placing or resource tool is in hand: the terrain brush rests.
+/// Shape's edits that time has not applied yet, for the Paused pill: a
+/// stroke counts once, a placement and a patch each once.
+pub(crate) fn orders_waiting(world: &World) -> usize {
+    let strokes = world
+        .get_resource::<ShapeTools>()
+        .is_some_and(|tools| tools.queued() > 0);
+    usize::from(strokes) + placing::waiting(world) + resources::waiting(world)
+}
+
 pub(crate) fn other_tool(world: &World) -> bool {
     resources::active(world) || placing::active(world)
 }

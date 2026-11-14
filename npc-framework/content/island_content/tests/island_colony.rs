@@ -28,11 +28,14 @@ fn social_relationships_require_real_proximity_and_obey_gathering_policy() {
     // Fixture relocation isolates proximity; no production/survival claim.
     app.world_mut().entity_mut(a).insert(SimPos::new(100, 100));
     app.world_mut().entity_mut(b).insert(SimPos::new(200, 100));
-    app.world_mut().resource_mut::<SimClock>().tick = 300;
+    // A resident meets again only `schedule.meet_cooldown_ticks` (2400)
+    // after its last meeting (closing fix: it was 300).
+    app.world_mut().resource_mut::<SimClock>().tick = 2_400;
     colony::tick(app.world_mut());
     // A meeting lasts `schedule.chat_ticks` (200) and pays at its end
-    // (review fix S3.3): advance to its end and settle it.
-    app.world_mut().resource_mut::<SimClock>().tick = 500;
+    // (review fix S3.3) and pays `schedule.meet_affinity` (1500): advance to its
+    // end and settle it.
+    app.world_mut().resource_mut::<SimClock>().tick = 2_600;
     colony::tick(app.world_mut());
     assert_eq!(
         app.world()
@@ -40,11 +43,11 @@ fn social_relationships_require_real_proximity_and_obey_gathering_policy() {
             .unwrap()
             .affinity
             .get(&rowan),
-        Some(&250)
+        Some(&1500)
     );
     assert_eq!(
         app.world().get::<SocialLife>(b).unwrap().affinity.get(&ada),
-        Some(&250)
+        Some(&1500)
     );
     let events = app.world().resource::<ColonyState>().social_events;
     ColonyAct {
@@ -55,7 +58,7 @@ fn social_relationships_require_real_proximity_and_obey_gathering_policy() {
     }
     .perform(app.world_mut())
     .unwrap();
-    app.world_mut().resource_mut::<SimClock>().tick = 600;
+    app.world_mut().resource_mut::<SimClock>().tick = 5_100;
     colony::tick(app.world_mut());
     assert_eq!(app.world().resource::<ColonyState>().social_events, events);
     assert!(colony::social_target(app.world(), a).is_none());

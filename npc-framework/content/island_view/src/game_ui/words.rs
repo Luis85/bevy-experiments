@@ -87,7 +87,7 @@ fn day_index(world: &bevy::prelude::World, tick: u64) -> u64 {
 }
 
 /// When `tick` was, in the one calendar the player sees: "today",
-/// "yesterday", else "Autumn, day 4", with ", year 2" from the second
+/// "yesterday", "tomorrow", else "Autumn, day 4", with ", year 2" from the second
 /// year on. Lower case where it is relative; capitalise at the start of a
 /// line.
 pub fn when(world: &bevy::prelude::World, tick: u64) -> String {
@@ -111,6 +111,9 @@ pub fn date_words(day: u64, today: u64, season_days: u64) -> String {
     }
     if day + 1 == today {
         return "yesterday".to_owned();
+    }
+    if day == today + 1 {
+        return "tomorrow".to_owned();
     }
     calendar_words(day, season_days)
 }
@@ -166,6 +169,24 @@ pub fn capital(text: &str) -> String {
     })
 }
 
+/// The glossary's words for the old ones a simulation sentence may carry.
+pub fn glossary(text: &str) -> String {
+    let mut out = text.to_owned();
+    for (old, new) in [
+        ("Settlements", "Villages"),
+        ("settlements", "villages"),
+        ("Settlement", "Village"),
+        ("settlement", "village"),
+        ("The civic fund", "The fund"),
+        ("the civic fund", "the fund"),
+        ("Civic fund", "The fund"),
+        ("civic fund", "fund"),
+    ] {
+        out = out.replace(old, new);
+    }
+    out
+}
+
 /// Whether time is paused now (no `SimControl` counts as paused). Words
 /// about time appear only then; while time runs no sentence mentions it.
 pub fn paused(world: &bevy::prelude::World) -> bool {
@@ -189,8 +210,11 @@ pub fn village_refused(reason: &str) -> String {
     format!("The village could not do that. {}", sentence(reason))
 }
 
-/// The simulation's words as a sentence: capital first, full stop last.
+/// The simulation's words as a sentence: capital first, full stop last, and
+/// the glossary's words for its own ("settlement" is a village, the "civic
+/// fund" the fund).
 pub fn sentence(reason: &str) -> String {
+    let reason = glossary(reason);
     let mut letters = reason.trim().chars();
     let mut out: String = letters.next().map_or_else(String::new, |first| {
         first.to_uppercase().chain(letters).collect()
@@ -232,10 +256,19 @@ mod tests {
         // Seven-day seasons; day index 19 is the sixth day of autumn.
         assert_eq!(date_words(19, 19, 7), "today");
         assert_eq!(date_words(18, 19, 7), "yesterday");
+        assert_eq!(date_words(20, 19, 7), "tomorrow");
         assert_eq!(date_words(17, 19, 7), "Autumn, day 4");
         assert_eq!(calendar_words(19, 7), "Autumn, day 6");
         assert_eq!(calendar_words(21, 7), "Winter, day 1");
         assert_eq!(calendar_words(28, 7), "Spring, day 1, year 2");
         assert_eq!(capital("today"), "Today");
+        assert_eq!(
+            sentence("too far from any settlement; build within 48 m of a centre"),
+            "Too far from any village; build within 48 m of a centre."
+        );
+        assert_eq!(
+            sentence("the civic fund cannot pay"),
+            "The fund cannot pay."
+        );
     }
 }

@@ -1099,3 +1099,61 @@ fn three_residents_with_one_reason_fold_into_one_alert() {
     assert_eq!(head, "3 residents in Harbour are starving");
     assert_eq!(who.len(), 3);
 }
+
+#[test]
+fn a_missing_or_dead_residents_need_alerts_go_and_other_rows_stay() {
+    let mut app = fixture();
+    track(app.world_mut());
+    let (living, _) = resident(&app, Role::Farmer);
+    {
+        let mut state = app.world_mut().resource_mut::<Alerts>();
+        for (kind, subject) in [
+            (model::AlertKind::Starving, living.0),
+            (model::AlertKind::Dehydrated, 999_999),
+            (model::AlertKind::Death, 999_999),
+        ] {
+            state.feed.push(
+                model::Incoming {
+                    kind,
+                    subject: Some(subject),
+                    focus: None,
+                    text: format!("{kind:?} {subject}"),
+                    tick: 0,
+                },
+                0.0,
+            );
+        }
+    }
+    read_reasons(app.world_mut());
+    let left: Vec<(model::AlertKind, Option<u32>)> = app
+        .world()
+        .resource::<Alerts>()
+        .feed
+        .iter()
+        .map(|alert| (alert.kind, alert.subject))
+        .collect();
+    assert!(left.contains(&(model::AlertKind::Starving, Some(living.0))));
+    assert!(
+        left.contains(&(model::AlertKind::Death, Some(999_999))),
+        "the death stays"
+    );
+    assert!(
+        !left.contains(&(model::AlertKind::Dehydrated, Some(999_999))),
+        "nobody to be thirsty: the need alert goes"
+    );
+}
+
+#[test]
+fn show_opens_the_stack_in_a_compact_window() {
+    // Compact folds the stack until the player asks; Show then opens it.
+    assert!(folded(true, false, false, false));
+    assert!(
+        !folded(true, true, true, false),
+        "Show overrides the Compact fold"
+    );
+    // Wider windows keep the player's own fold.
+    assert!(folded(false, true, true, false));
+    assert!(!folded(false, false, false, false));
+    // Inspecting a resident always folds it.
+    assert!(folded(true, false, true, true));
+}

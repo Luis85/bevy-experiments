@@ -224,7 +224,11 @@ pub(crate) fn placement(
         ground,
         (lo.1 + hi.1 + 1) as f32 * 0.5,
     );
-    let yaw = -f32::from(view.rotation % 4) * std::f32::consts::FRAC_PI_2;
+    // The sim turns a prop's front a quarter turn from -z towards -x per
+    // step (`frontier::props`, as buildings' `plot_for`): +90° about Y, the
+    // same yaw the build scene gives a building's frame. The models face
+    // their front along local -Z.
+    let yaw = f32::from(view.rotation % 4) * std::f32::consts::FRAC_PI_2;
     let root = Transform::from_translation(centre).with_rotation(Quat::from_rotation_y(yaw));
     let turn = Quat::from_rotation_y(look.turn);
     let model = |at: Vec3| {
@@ -510,12 +514,13 @@ mod tests {
         let (root, models) = placement(&view(5, "fence", "", 0), &fence, 0.4);
         assert_eq!(root.translation, Vec3::new(11.0, 0.4, -3.5));
         assert_eq!(models.len(), 1);
-        let (turned, _) = placement(&view(5, "fence", "", 1), &fence, 0.4);
-        let ahead = turned.rotation * Vec3::X;
-        assert!(
-            (ahead - Vec3::Z).length() < 1e-4 || (ahead + Vec3::Z).length() < 1e-4,
-            "{ahead}"
-        );
+        // The front (local -Z) turns as the sim's front cell does
+        // (`frontier::props::front`): -z, -x, +z, +x for rotations 0 to 3.
+        for (rotation, front) in [(0, -Vec3::Z), (1, -Vec3::X), (2, Vec3::Z), (3, Vec3::X)] {
+            let (turned, _) = placement(&view(5, "wheelbarrow", "", rotation), &fence, 0.4);
+            let ahead = turned.rotation * -Vec3::Z;
+            assert!((ahead - front).length() < 1e-4, "{rotation}: {ahead}");
+        }
         // The fence model is put back on its middle: its origin a unit off.
         let shift = models[0].translation.length();
         assert!((shift - fence.scale).abs() < 1e-4, "{shift}");

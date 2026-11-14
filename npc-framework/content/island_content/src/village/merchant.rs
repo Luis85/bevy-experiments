@@ -67,6 +67,8 @@ pub struct VisitTotals {
     /// Units and coins of goods the boat sold to the civic fund.
     pub sold_units: u32,
     pub sold_coins: u32,
+    /// Worth, at the boat's price, of what it laid out on consignment.
+    pub consigned_coins: u32,
     pub settlers: u32,
     pub bought: Goods,
     pub sold: Goods,
@@ -148,6 +150,7 @@ fn hash_visit(h: &mut Fnv64, visit: &VisitTotals) {
         visit.bought_coins,
         visit.sold_units,
         visit.sold_coins,
+        visit.consigned_coins,
         visit.settlers,
     ] {
         h.u32(value);
@@ -671,6 +674,12 @@ fn buy_exports(world: &mut World, spec: &MerchantSpec, settlement: SimId) {
     buy_order(world, settlement);
     let now = world.resource::<SimClock>().tick;
     for buy in &spec.buys {
+        // Grain is not surplus while the island is short of the flour or
+        // bread made from it (closing fix: the boat bought grain and sold the
+        // island flour and bread at the same call).
+        if feeds_a_dear_good(world, &buy.good) {
+            continue;
+        }
         let Some(unit) = price(world, &buy.good, buy.price_percent) else {
             continue;
         };
@@ -767,6 +776,35 @@ fn buy_exports(world: &mut World, spec: &MerchantSpec, settlement: SimId) {
     }
 }
 
+/// Whether `kind` is the island's grain while something made from it (its
+/// flour, its bread) is dear (above its base price). Only the grain: fuel
+/// goes into every oven, and logs must still leave as surplus.
+fn feeds_a_dear_good(world: &World, kind: &str) -> bool {
+    let Some(registry) = economy_spec::registry(world) else {
+        return false;
+    };
+    if kind != super::roles::roles(world).grain {
+        return false;
+    }
+    let dear = |good: &str| {
+        market::unit_price(world, good)
+            .zip(catalog::price_in(world, good))
+            .is_some_and(|(price, base)| price > base)
+    };
+    let outputs = |input: &str| -> Vec<&str> {
+        registry
+            .spec
+            .recipes
+            .iter()
+            .filter(|recipe| recipe.inputs.iter().any(|stack| stack.good == input))
+            .flat_map(|recipe| recipe.outputs.iter().map(|stack| stack.good.as_str()))
+            .collect()
+    };
+    outputs(kind)
+        .into_iter()
+        .any(|made| dear(made) || outputs(made).into_iter().any(dear))
+}
+
 /// The announced order is bought first, at its price, from whatever lies at
 /// the port's stores and stalls (never the boat's own consigned goods), up
 /// to what it still wants and the purse can pay; each owner is paid at once.
@@ -856,9 +894,38 @@ fn buy_order(world: &mut World, settlement: SimId) {
 /// ([`MERCHANT_OWNER`]) and paid to the boat's purse when residents buy it.
 fn sell_imports(world: &mut World, spec: &MerchantSpec, settlement: SimId, post: Entity) {
     let now = world.resource::<SimClock>().tick;
+    // The trade balance (closing fix): this visit's sales stay within what
+    // the boat bought plus its share of `trade_balance_percent` of the
+    // island's coins a year.
+    let allowance = {
+        let island: u64 = world
+            .try_query::<&Wallet>()
+            .map(|mut query| {
+                query
+                    .iter(world)
+                    .map(|wallet| u64::from(wallet.coins))
+                    .sum()
+            })
+            .unwrap_or(0)
+            + u64::from(world.resource::<VillageState>().fund);
+        let year_days = super::days_per_season(world).max(1) * 4;
+        let visits = (year_days / spec.interval_days.max(1)).max(1);
+        (island * u64::from(spec.trade_balance_percent) / 100 / visits) as u32
+    };
     for sell in &spec.sells {
         let Some(unit) = price(world, &sell.good, sell.price_percent) else {
             continue;
+        };
+        let budget = {
+            let visit = &world.resource::<Merchant>().visit;
+            if spec.trade_balance_percent >= 100 {
+                u32::MAX
+            } else {
+                visit
+                    .bought_coins
+                    .saturating_add(allowance)
+                    .saturating_sub(visit.sold_coins.saturating_add(visit.consigned_coins))
+            }
         };
         let aboard = world
             .resource::<Merchant>()
@@ -876,19 +943,20 @@ fn sell_imports(world: &mut World, spec: &MerchantSpec, settlement: SimId, post:
         let dear = market::unit_price(world, &sell.good)
             .zip(catalog::price_in(world, &sell.good))
             .is_some_and(|(price, base)| price > base);
-        let short = if dear {
-            target.saturating_sub(offer).min(sell.want_units)
+        // Only against a real shortage (closing fix): the port's kept level
+        // counted even while the good was cheap, so the boat sold staples at
+        // every call and the island's coins drained to its purse.
+        let lacking = if dear {
+            sell.want_units
+                .saturating_sub(port_stock(world, settlement, &sell.good))
+                .max(target.saturating_sub(offer).min(sell.want_units))
         } else {
             0
         };
-        let lacking = sell
-            .want_units
-            .saturating_sub(port_stock(world, settlement, &sell.good))
-            .max(short);
         let room = world
             .get::<Depot>(post)
             .map_or(0, |depot| depot.room(None, now));
-        let wanted = aboard.min(lacking).min(room);
+        let wanted = aboard.min(lacking).min(room).min(budget / unit.max(1));
         let units = wanted.min(civic::budget(world) / unit);
         let consign = wanted - units;
         if consign > 0 {
@@ -902,6 +970,10 @@ fn sell_imports(world: &mut World, spec: &MerchantSpec, settlement: SimId, post:
             }
             merchant.hold.retain(|_, units| *units > 0);
             merchant.visit.sold_units += consign;
+            merchant.visit.consigned_coins = merchant
+                .visit
+                .consigned_coins
+                .saturating_add(consign.saturating_mul(unit));
             *merchant.visit.sold.entry(sell.good.clone()).or_default() += consign;
             *merchant.imported.entry(sell.good.clone()).or_default() += u64::from(consign);
         }
