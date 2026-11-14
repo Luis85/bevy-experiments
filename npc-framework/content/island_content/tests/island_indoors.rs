@@ -433,8 +433,12 @@ fn nights(count: u64) {
         let asleep = housed
             .iter()
             .filter(|(id, actor)| {
+                // In its own bed, or in a guest bed it rented at an inn far
+                // from home (ADR 0041; more residents work far afield since
+                // the closing fixes).
                 view::repose(world, *actor) == Repose::Asleep
-                    && view::inside(world, *id) == colony::home_of(world, *id)
+                    && (view::inside(world, *id) == colony::home_of(world, *id)
+                        || inn_guest(world, *id))
             })
             .count();
         (asleep, housed.len())
@@ -450,7 +454,20 @@ fn nights(count: u64) {
             println!("SLEEP night={night} permille={permille} asleep={asleep}/{housed}");
             assert!(
                 asleep * 100 >= housed * least_percent,
-                "night {night} at {permille}: {asleep} of {housed} asleep in their own bed"
+                "night {night} at {permille}: {asleep} of {housed} asleep in their own bed;                  the others: {:?}",
+                all_residents(app.world())
+                    .into_iter()
+                    .filter(|(id, actor)| {
+                        view::repose(app.world(), *actor) != Repose::Asleep
+                            || view::inside(app.world(), *id) != colony::home_of(app.world(), *id)
+                    })
+                    .map(|(id, actor)| (
+                        id.0,
+                        view::activity_label(app.world(), actor),
+                        view::repose(app.world(), actor),
+                        village::economy::need(app.world(), actor, "Energy"),
+                    ))
+                    .collect::<Vec<_>>()
             );
             let offenders = resting_outside(app.world());
             assert!(offenders.is_empty(), "{offenders:?}");

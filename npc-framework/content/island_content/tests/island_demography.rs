@@ -29,6 +29,9 @@ fn quick_lives(world: &mut Value) {
     let life = &mut economy(world)["demography"];
     life["courtship_days"] = json!(1);
     life["birth_chance_permille"] = json!(0);
+    // These tests make their couples themselves; the founding couples of
+    // the shipped data (closing fix B) would pair the same founders.
+    life["founding_couples_percent"] = json!(0);
 }
 
 fn life(world: &World, actor: Entity) -> Life {
@@ -948,4 +951,34 @@ fn a_household_with_food_in_its_settlements_stores_may_have_a_child() {
             .map(|record| record["reason"].clone())
             .collect::<Vec<_>>()
     );
+}
+
+/// The shipped data founds the island with couples (closing fix B): in every
+/// settlement `founding_couples_percent` of the housed adults arrive paired
+/// and share a home, so a first child is possible in the first season.
+#[test]
+fn the_island_is_founded_with_couples_under_one_roof() {
+    let mut app = world_with(|world| only_weather(world, "clear"));
+    run_ticks(app.world_mut(), 2);
+    let spec = village::frontier::spec(app.world())
+        .expect("living world")
+        .economy
+        .demography
+        .founding_couples_percent;
+    assert!(spec > 0);
+    let mut couples = 0;
+    for (id, actor) in all_residents(app.world()) {
+        let Some(partner) = life(app.world(), actor).partner else {
+            continue;
+        };
+        couples += 1;
+        assert_eq!(
+            colony::home_of(app.world(), id),
+            colony::home_of(app.world(), partner),
+            "a founding couple shares a home"
+        );
+    }
+    // Both partners are counted.
+    assert!(couples >= 2 && couples % 2 == 0, "{couples} partners");
+    assert!(couples <= 42 * spec as usize / 100 + 2);
 }

@@ -247,3 +247,28 @@ fn founders_tools_carry_their_durability_and_wear_out() {
     assert_eq!(econ::count(app.world(), actor, &kind), 0);
     assert!(app.world().resource::<SimIndex>().get(id).is_none());
 }
+
+/// The ledger closes a season on the calendar's own boundary (closing fix
+/// C3): from founding day 5 with three-day seasons, the founding season
+/// ends with day 5, at tick one day in, not three days in.
+#[test]
+fn the_ledger_turns_with_the_calendar() {
+    let mut app = world_with(|world| {
+        only_weather(world, "clear");
+        short_days(world, 1200);
+        economy(world)["tuning"]["days_per_season"] = json!(3);
+        economy(world)["tuning"]["founding_day"] = json!(5);
+    });
+    run_ticks(app.world_mut(), 1_199);
+    assert_eq!(
+        app.world().resource::<ledger::SeasonLedger>().seasons.len(),
+        1
+    );
+    run_ticks(app.world_mut(), 2);
+    let seasons = &app.world().resource::<ledger::SeasonLedger>().seasons;
+    assert_eq!(seasons.len(), 2, "the season turned on calendar day 6");
+    let closed = &seasons[0];
+    let end = closed.end.as_ref().expect("closed");
+    // The next season opens with what the last one closed with.
+    assert_eq!(seasons[1].start.fund, end.fund);
+}

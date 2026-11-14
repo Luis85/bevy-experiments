@@ -159,8 +159,10 @@ fn lives(days: u64) {
     set_journal(app.world_mut(), true, false);
     let mut changes: Vec<Value> = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
-    for _ in 0..days * 8 {
-        run_ticks(app.world_mut(), day / 8);
+    // Often enough that the ring buffer never turns between two reads: a
+    // busier village (closing fix A) journals more in an eighth of a day.
+    for _ in 0..days * 48 {
+        run_ticks(app.world_mut(), day / 48);
         for entry in &app.world().resource::<Journal>().entries {
             if let JournalKind::Effect {
                 effect,

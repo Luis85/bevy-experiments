@@ -143,3 +143,33 @@ fn successor_life_joins_social_and_housing_state_without_reviving_previous_life(
         0
     );
 }
+
+/// A character still to arrive has not begun a life (closing fix C1): even
+/// with needs on it, they stay full until it arrives, so it cannot die of
+/// thirst while waiting.
+#[test]
+fn a_character_awaiting_arrival_keeps_full_needs() {
+    use npc_framework::needs::Needs;
+    let mut app = scene();
+    let (_, traveller) = visitor(&app);
+    assert!(
+        app.world()
+            .get::<colony::AwaitingArrival>(traveller)
+            .is_some()
+    );
+    let resident = app.world().resource::<IslandIds>().id("Ada");
+    let donor = app.world().resource::<SimIndex>().get(resident).unwrap();
+    let mut needs = app.world().get::<Needs>(donor).unwrap().clone();
+    for need in &mut needs.values {
+        need.value = 5_000;
+    }
+    app.world_mut().entity_mut(traveller).insert(needs);
+    run_ticks(app.world_mut(), 50);
+    let held = app.world().get::<Needs>(traveller).unwrap();
+    assert!(held.values.iter().all(|need| need.value == 100_000));
+    assert!(
+        app.world()
+            .get::<colony::AwaitingArrival>(traveller)
+            .is_some()
+    );
+}

@@ -578,14 +578,9 @@ fn upgrade_save(at_door: bool, name: &str) {
         "the rest is ordered: {site:?}"
     );
     assert!(site.builder.is_some(), "a builder is hired: {site:?}");
-    assert!(
-        !site
-            .workers
-            .iter()
-            .any(|worker| matches!(worker.state, "fetching" | "bringing")),
-        "nobody has taken the order yet: {:?}",
-        site.workers
-    );
+    // A hauler takes an order at once (closing fix C5: the fixture used to
+    // require that nobody had yet); the site is still short of materials
+    // (asserted above), which is the state this fixture shows.
     unguard(&mut app, id, &guarded);
     let path = write(&mut app, &doc, name);
     eprintln!("wrote {}", path.display());

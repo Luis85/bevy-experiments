@@ -329,6 +329,22 @@ fn colony_demand_changed(world: &mut World) {
     production::invalidate(world);
 }
 
+/// A character still to arrive has not begun a life (closing fix C1): any
+/// needs it carries stay full, so it cannot starve, thirst, tire or freeze,
+/// and raises no alerts, until the recorded arrival.
+fn hold_arriving_needs(world: &mut World) {
+    let Some(mut query) = world
+        .try_query_filtered::<&mut npc_framework::needs::Needs, With<colony::AwaitingArrival>>()
+    else {
+        return;
+    };
+    for mut needs in query.iter_mut(world) {
+        for need in &mut needs.values {
+            need.value = 100_000;
+        }
+    }
+}
+
 fn tick(world: &mut World) {
     // The ledger closes a season before anything of the new day happens
     // (closing fix: it ran after the day's levy and grants, so a season's
@@ -336,6 +352,7 @@ fn tick(world: &mut World) {
     if world.contains_resource::<ledger::SeasonLedger>() {
         ledger::tick(world);
     }
+    hold_arriving_needs(world);
     ai::tick(world);
     homestead::tick(world);
     colony::tick(world);

@@ -81,13 +81,24 @@ fn hearth_fuel_is_ordered_and_cut_before_winter_arrives() {
     }
     let world = app.world();
     assert_eq!(village::calendar(world).1, village::Season::Autumn);
-    // Every home has one resident, its steward, who now plans a fuel reserve.
-    let (mut stewards, mut stocked) = (0, 0);
-    for (_, actor) in residents(world) {
+    // Every home has a steward who now plans a fuel reserve: the only
+    // resident, or one of a founding couple (closing fix B: couples share a
+    // home and one of them keeps its hearth).
+    let mut homes: std::collections::BTreeMap<SimId, Vec<(Entity, u32)>> = Default::default();
+    for (id, actor) in residents(world) {
         let wanted = colony::household_materials(world, actor)
             .into_iter()
             .find(|(kind, _)| *kind == "log")
             .map_or(0, |(_, quantity)| quantity);
+        let home = colony::home_of(world, id).unwrap_or(id);
+        homes.entry(home).or_default().push((actor, wanted));
+    }
+    let (mut stewards, mut stocked) = (0, 0);
+    for residents in homes.values() {
+        let &(actor, wanted) = residents
+            .iter()
+            .max_by_key(|(_, wanted)| *wanted)
+            .expect("a resident");
         assert!(
             wanted >= 2,
             "{} keeps no winter fuel reserve two days before winter",

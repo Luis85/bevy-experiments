@@ -269,3 +269,28 @@ fn a_chosen_world_loaded_into_a_running_window_saves_and_continues() {
         state_hash(again.world_mut())
     );
 }
+
+/// A save whose version and content hash match but whose snapshot layout this
+/// build cannot read (a resource missing a field the build expects) was made
+/// by another build (closing fix C4: it was answered as unreadable).
+#[test]
+fn a_layout_this_build_cannot_read_is_another_build() {
+    let (_, mut snap) = saved();
+    let ledger = snap
+        .resources
+        .get_mut("island_season_ledger_v1")
+        .expect("the ledger is saved");
+    for season in ledger["seasons"].as_array_mut().expect("seasons") {
+        season.as_object_mut().expect("season").remove("short_days");
+    }
+    let mut fresh = island();
+    // The stamps match, so the quick check cannot tell; the load can.
+    assert!(matches!(
+        island_save::check_island_save(fresh.world_mut(), &snap),
+        IslandSaveCheck::Current | IslandSaveCheck::OtherBuild
+    ));
+    assert_eq!(
+        island_save::load_island_save(fresh.world_mut(), &snap).err(),
+        Some(IslandSaveCheck::OtherBuild)
+    );
+}

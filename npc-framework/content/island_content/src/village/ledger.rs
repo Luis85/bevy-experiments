@@ -122,9 +122,13 @@ pub fn register(app: &mut bevy_app::App) {
 }
 
 /// Seasons since the founding at the current tick.
+/// Seasons since the founding season, on the calendar's own boundaries
+/// (closing fix C3: counting from tick 0 ignored the founding day, so a
+/// season closed days after the calendar's season had turned).
 fn season_index(world: &World) -> u32 {
-    let day = world.resource::<SimClock>().tick / world.resource::<SimConfig>().day_length.max(1);
-    (day / super::days_per_season(world).max(1)) as u32
+    let per = super::days_per_season(world).max(1);
+    let day = super::calendar(world).0;
+    (day / per).saturating_sub(super::first_day(world) / per) as u32
 }
 
 /// The island's running totals now.

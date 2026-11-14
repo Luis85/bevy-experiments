@@ -72,7 +72,7 @@ pub(super) fn market_supplier(world: &World, buyer: Entity, kind: &str) -> Optio
             {
                 return None;
             }
-            let price = super::market::asking_price(world, *seller, kind)?;
+            let price = super::market::price_for(world, buyer, *seller, kind)?;
             if super::production::purchase_bid_limit(world, buyer, kind)
                 .is_some_and(|limit| price > limit)
             {
@@ -572,8 +572,15 @@ pub(super) fn hunt(world: &mut World, actor: Entity) -> bool {
             Some(target),
         );
         // Living world: the hunter keeps walking while its prey stays near
-        // where it was going; it re-paths only once the prey moved away.
-        if !econ::near(world, actor, prey)
+        // where it was going; it re-paths only once the prey moved away, or
+        // once it is blocked, so the route recovery's detours and its giving
+        // up apply (closing fix: a hunter stood blocked for 1433 ticks).
+        let blocked = matches!(
+            world.get::<MoveStatus>(actor),
+            Some(MoveStatus::Blocked { .. })
+        );
+        if !blocked
+            && !econ::near(world, actor, prey)
             && world
                 .get::<MoveIntent>(actor)
                 .is_some_and(|intent| intent.goal.dist2(at) <= STALK_REPATH_MM.pow(2))
@@ -853,6 +860,17 @@ struct VitalRules {
 fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) {
     let mut v = *world.get::<Vitality>(e).expect("vitality");
     if v.died_at.is_some() {
+        return;
+    }
+    // A character still to arrive has not begun a life (closing fix C1): its
+    // needs stay full, it cannot starve, thirst or freeze, and it raises no
+    // alerts until the recorded arrival.
+    if world.get::<super::colony::AwaitingArrival>(e).is_some() {
+        if let Some(mut needs) = world.get_mut::<npc_framework::needs::Needs>(e) {
+            for need in &mut needs.values {
+                need.value = 100_000;
+            }
+        }
         return;
     }
     let hunger = econ::need(world, e, "Hunger");
@@ -1384,7 +1402,13 @@ fn civic_levy(world: &mut World, day: u64, people: &[(SimId, Entity)]) {
         relief = super::civic::raise_relief_levy(world, wanted - (fund - site_hold));
         fund = world.resource::<VillageState>().fund;
     }
-    let mut grantable = fund.saturating_sub(site_hold);
+    // Floor grants never outrun what the day's levies raised (closing fix
+    // A): they spent the fund's reserve, and the fund sat at 0. The village
+    // feeds itself through funded demand at the makers' cost
+    // (`market::price_for`); the grant only tops up from today's levy.
+    let mut grantable = fund
+        .saturating_sub(site_hold)
+        .min(contributed.saturating_add(relief));
     for (_, e) in people {
         let mut wallet = world.get_mut::<Wallet>(*e).expect("wallet");
         let grant = floor.saturating_sub(wallet.coins).min(grantable);

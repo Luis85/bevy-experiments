@@ -279,7 +279,7 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
                         true,
                     )
                 });
-                if need != "energy" && !stock.keys().any(|kind| depth::helps(need, kind)) {
+                if need != "energy" && !stock.keys().any(|kind| depth::helps(world, need, kind)) {
                     rows.push(Row::note(
                         "need_none",
                         format!("Nothing in your pouch helps your {word}"),
@@ -292,7 +292,7 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
             }
             for (kind, count) in stock
                 .iter()
-                .filter(|(kind, _)| filter.is_none_or(|need| depth::helps(need, kind)))
+                .filter(|(kind, _)| filter.is_none_or(|need| depth::helps(world, need, kind)))
             {
                 rows.push(Row {
                     item: true,

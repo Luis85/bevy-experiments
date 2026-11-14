@@ -252,14 +252,12 @@ pub(crate) fn priority_text(topic: &str, level: PriorityLevel, effect: &str) -> 
     format!("{topic}: {word}. {}", words::sentence(rest))
 }
 
-/// Whether the simulation's reason reads as player words: not with a run
-/// of spaces, nor "(s)", nor its "review" and "switching rest" (the sim
-/// rewords it; until then the view's own sentence stands).
+/// Whether the simulation's reason reads as player words. Its old Jobs
+/// sentence broke a line inside the string, leaving a run of spaces; that
+/// one falls back to the view's own sentence (the sim now writes plain
+/// singular and plural).
 pub(crate) fn plain_reason(reason: &str) -> bool {
     !reason.contains("  ")
-        && !reason.contains("(s)")
-        && !reason.contains("review")
-        && !reason.contains("switching rest")
 }
 
 /// The block's rows: a head and one row per line; nothing without orders.
@@ -441,8 +439,9 @@ mod tests {
             "1 more farmer(s) wanted: residents move at their next review, once their              switching rest is over"
         ));
         assert!(plain_reason("no free place in the village"));
+        assert!(plain_reason("1 more baker wanted"));
         let mut row = job("baker", "Baker", 2, Some(3));
-        row.reason = Some("1 more baker(s) wanted: at their next review".into());
+        row.reason = Some("1 more baker(s) wanted:    at their next review".into());
         let lines = order_lines(SimId(1), &[row], &[], &[], false);
         assert_eq!(
             lines[0].text,

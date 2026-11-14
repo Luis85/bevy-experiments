@@ -192,14 +192,16 @@ pub(super) fn need_reason(world: &World, key: &str) -> Option<String> {
     view::need_reason(world, entity, need_name(key)?)
 }
 
-/// Whether a good in the pouch helps a need.
-pub(super) fn helps(key: &str, kind: &str) -> bool {
+/// Whether a good in the pouch helps a need: food by this world's catalog
+/// (its goods' food values), never a table of its own.
+pub(super) fn helps(world: &World, key: &str, kind: &str) -> bool {
     use island_content::village::catalog;
+    let food = catalog::food_restore_in(world, kind).is_some();
     match key {
-        "hunger" => catalog::food_restore(kind).is_some(),
+        "hunger" => food,
         "thirst" => kind == catalog::WATER,
         "warmth" => kind == catalog::WARM_CLOTHES || kind == "log",
-        "health" => catalog::food_restore(kind).is_some() || kind == catalog::WATER,
+        "health" => food || kind == catalog::WATER,
         _ => false,
     }
 }

@@ -908,6 +908,33 @@ fn move_home(world: &mut World, resident: SimId, house: SimId) -> bool {
     moved
 }
 
+/// The founding couples (closing fix B): in every settlement,
+/// `founding_couples_percent` of the housed adult founders arrive paired, in
+/// identity order, two by two, sharing a home.
+fn found_couples(world: &mut World, spec: &DemographySpec) {
+    if spec.founding_couples_percent == 0 {
+        return;
+    }
+    for (settlement, _) in settlements::all(world) {
+        let adults: Vec<(SimId, Entity)> = members(world, settlement)
+            .into_iter()
+            .filter(|(id, actor)| {
+                world
+                    .get::<Life>(*actor)
+                    .is_some_and(|life| life.partner.is_none() && life.stage == LifeStage::Adult)
+                    && home_of(world, *id).is_some()
+                    && world
+                        .get::<Villager>(*actor)
+                        .is_some_and(|person| person.role != Role::Visitor)
+            })
+            .collect();
+        let couples = adults.len() * spec.founding_couples_percent as usize / 100 / 2;
+        for pairs in adults.as_chunks::<2>().0.iter().take(couples) {
+            pair(world, pairs[0], pairs[1], settlement);
+        }
+    }
+}
+
 fn pair(world: &mut World, a: (SimId, Entity), b: (SimId, Entity), settlement: SimId) {
     for ((_, actor), (other, _)) in [(a, b), (b, a)] {
         let mut life = world.get_mut::<Life>(actor).expect("life");
@@ -1579,7 +1606,8 @@ pub fn tick(world: &mut World) {
     }
     world.resource_mut::<Demography>().last_day = Some(day);
     if last.is_none() {
-        // The founding day: nothing has happened yet.
+        // The founding day: nothing has happened yet but the founding couples.
+        found_couples(world, &spec);
         return;
     }
     lay_to_rest(world);

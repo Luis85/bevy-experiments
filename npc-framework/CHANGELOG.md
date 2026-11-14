@@ -54,6 +54,13 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
   walking to a far seller; meetings come every `meet_cooldown_ticks` (2400) and
   pay `meet_affinity` (1500); the season ledger closes before the new day's
   flows and counts the days a village ran short of food, water or fuel.
+- Last sim round: a staple's need about to go unmet is demand at the makers' cost
+  (`market::price_for`, `stock::reservation`), so bakers bake for residents short
+  of coin; floor grants never exceed the day's levies; the island is founded
+  with couples (`demography.founding_couples_percent`, 40); an arriving
+  character's needs stay full; Jobs reasons are plain sentences; the ledger
+  turns on the calendar's season; a save layout this build cannot read is
+  another build's; a blocked hunter re-paths.
 
 ### Island game: review fixes (saving, startup, keys, words)
 

@@ -5,7 +5,7 @@ island crate is built while the simulation is being edited.
 Run from npc-framework:
   python scripts/playtest/capture_ui_live9.py
       [--binary target/npc-out/closing-ui/frozen/island_game.exe]
-      [--only probe,title-cards,new,outlook,goods,orders,paused,alerts,season,shape,why,pause,guide]
+      [--only probe,title-cards,new,outlook,goods,orders,alerts,season,shape,why,pause,states]
 
 The binary may also come from ISLAND_GAME_EXE. PNGs, texts and summary.json
 go to target/npc-out/ui-live9/<section>/.
@@ -648,6 +648,122 @@ def pause_menu(flow, report, checks):
     flow.size_shots("guide-controls")
 
 
+# --- The five states the last pass did not reach -----------------------------
+#
+# Each is made by recorded commands (`npc/command`, the same path the ledger
+# uses) and clock steps on a save of this build, never by writing state:
+# - Nobody makes / Show {job} in Jobs: `SetProfessionTarget` miller 0 in
+#   Harbour, one day: the mill has open places and nobody in them; Flour's
+#   card says so and links to Jobs (then the scroll-and-flash).
+# - Held up: the same order; the bakery's bread now waits for flour, so
+#   Flour's card has "Held up: Bread waits for …" (line 8, its tooltip).
+# - Compact fold: the Flour card at 1280x690 (below 700 high is Compact).
+# - Folded alert row: `SetProfessionTarget` water_keeper 0 in Harbour, up to
+#   four days in quarter days: nobody sells water, so Harbour's residents
+#   go thirsty for one reason and fold into "N residents in Harbour are …".
+# - The season toast's button: `season_toast` from base0 (two days before
+#   winter) with Economy open; the host no longer toasts autosaves over it.
+
+COMPACT = (1280, 690)
+SETTLEMENT = "living_world_settlement_v1"
+
+
+def settlement_id(flow, key="harbour"):
+    """The village's SimId from the operator read (a capture helper only;
+    nothing the player sees is read this way)."""
+    for entity in flow.state()["entities"]:
+        settlement = entity.get("components", {}).get(SETTLEMENT)
+        if settlement and settlement.get("key") == key:
+            return entity["sim_id"]
+    raise RuntimeError(f"no settlement {key!r}")
+
+
+def want(flow, settlement, profession, wanted):
+    """A recorded `SetProfessionTarget`, applied by two ticks."""
+    receipt = flow.call("npc/command", {"cmd": {"type": "SetProfessionTarget", "settlement": settlement,
+                                                "profession": profession, "wanted": wanted}})
+    flow.report.setdefault("commands", []).append({"profession": profession, "wanted": wanted,
+                                                   "receipt": receipt})
+    flow.call("npc/step", {"ticks": 2})
+    time.sleep(0.5)
+
+
+def flour_card(flow):
+    flow.open_page("Economy")
+    time.sleep(0.8)
+    if flow.has_widget("Goods"):
+        flow.click("Goods")
+        time.sleep(0.6)
+    return press(flow, "Flour")
+
+
+def nobody_makes_and_held_up(flow, report, checks):
+    continue_oversee(flow)
+    harbour = settlement_id(flow)
+    want(flow, harbour, "miller", 0)
+    step_days(flow, 1)
+    keep_watching(flow)
+    opened = flour_card(flow)
+    time.sleep(1.0)
+    card = flow.dump("flour-card")
+    link = next((text for text in card if text.startswith("Show ") and text.endswith(" in Jobs")), None)
+    held = [text for text in card if text.startswith("Held up")]
+    report["state_nobody_makes"] = {"opened": opened, "nobody": [t for t in card if t.startswith("Nobody")],
+                                    "link": link}
+    report["state_held_up"] = held
+    checks.append({"check": "Flour's card says nobody makes it and links to Jobs",
+                   "ok": link is not None, "card": card[:40]})
+    checks.append({"check": "Flour's card says what is held up for it", "ok": bool(held), "held": held})
+    flow.size_shots("state-flour-card")
+    entity = text_entity(flow, "Held up", LEDGER)
+    if entity:
+        flow.hover(entity)
+        flow.snap("live9-state-held-up-tip-1280x720", SIZES[0])
+    # The narrow ledger: Compact, where the card folds after its first lines.
+    flow.settle(COMPACT)
+    time.sleep(1.2)
+    texts = flow.panel_texts(LEDGER)
+    more = [text for text in texts if text.startswith("More about")]
+    report["state_compact_fold"] = {"more": more, "texts": texts[:40]}
+    checks.append({"check": "the good card folds in a Compact window", "ok": bool(more)})
+    flow.snap(f"live9-state-compact-fold-{COMPACT[0]}x{COMPACT[1]}", COMPACT)
+    if more:
+        press(flow, more[0])
+        time.sleep(0.8)
+        flow.snap(f"live9-state-compact-fold-open-{COMPACT[0]}x{COMPACT[1]}", COMPACT)
+    flow.settle(SIZES[0])
+    time.sleep(1.0)
+    if link:
+        press(flow, link)
+        time.sleep(0.25)
+        flow.snap("live9-state-show-job-flash-1280x720", SIZES[0])
+        time.sleep(1.0)
+        flow.dump("show-job-after")
+        flow.snap("live9-state-show-job-after-1280x720", SIZES[0])
+
+
+def folded_alert_row(flow, report, checks):
+    continue_oversee(flow)
+    harbour = settlement_id(flow)
+    want(flow, harbour, "water_keeper", 0)
+    found = None
+    for _ in range(16):
+        step_days(flow, 0.25)
+        keep_watching(flow)
+        found = next((text for text in flow.panel_texts("Village alerts") if " residents in " in text), None)
+        if found:
+            break
+    report["state_alert_fold"] = {"row": found, "texts": flow.panel_texts("Village alerts")}
+    checks.append({"check": "residents with one reason fold into one alert row", "ok": found is not None,
+                   "row": found})
+    flow.size_shots("state-alerts-folded")
+    if found:
+        flow.click(found)
+        time.sleep(1.0)
+        flow.dump("state-alerts-people")
+        flow.size_shots("state-alerts-fold-people")
+
+
 def base(name):
     return MADE / f"{name}.json"
 
@@ -720,7 +836,11 @@ SECTIONS = {"probe": probe_parts,
                                ("season-toast", base("base0"), [season_toast])],
             "shape": lambda: [("shape", base("base3"), [shape])],
             "why": lambda: [("why", base("base3"), [why])],
-            "pause": lambda: [("pause", base("base3"), [pause_menu])]}
+            "pause": lambda: [("pause", base("base3"), [pause_menu])],
+            # The five states the last pass did not reach (see above).
+            "states": lambda: [("state-goods", base("base3"), [nobody_makes_and_held_up]),
+                               ("state-alerts", base("base3"), [folded_alert_row]),
+                               ("state-season-toast", base("base0"), [season_toast])]}
 
 
 if __name__ == "__main__":

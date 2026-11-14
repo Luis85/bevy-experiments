@@ -381,11 +381,27 @@ fn gap_reason(
         );
     }
     let n = wanted - current;
-    (
-        GapCause::Waiting { n },
-        format!(
-            "{n} more {trade}(s) wanted: residents move at their next review, once their              switching rest is over and they are between tasks."
-        ),
+    (GapCause::Waiting { n }, waiting_sentence(n, trade))
+}
+
+/// "One more farmer is wanted." / "Three more farmers are wanted." and how
+/// residents change job (closing fix C2: plain sentences, no "(s)").
+fn waiting_sentence(n: u32, trade: &str) -> String {
+    let count = match n {
+        1 => "One".to_owned(),
+        2 => "Two".to_owned(),
+        3 => "Three".to_owned(),
+        4 => "Four".to_owned(),
+        5 => "Five".to_owned(),
+        _ => n.to_string(),
+    };
+    let (who, verb) = if n == 1 {
+        (trade.to_owned(), "is")
+    } else {
+        (format!("{trade}s"), "are")
+    };
+    format!(
+        "{count} more {who} {verb} wanted. Residents change job one at a time, after the day's work."
     )
 }
 

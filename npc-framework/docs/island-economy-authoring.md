@@ -288,6 +288,7 @@ fit a twelve-day year.
 | `pair_affinity`, `courtship_days` | Two housed adults of one settlement, not close kin, court when each has this affinity for the other (a meeting adds 250) and become a couple when that has lasted this many days |
 | `birth_chance_permille`, `birth_cooldown_days` | Daily chance of a birth for a couple that may have a child, and the pause after one |
 | `birth_food_units`, `max_children` | Food units the household can count on before a birth (what its members hold plus its share of the food in its settlement's stores); children one household raises at a time |
+| `founding_couples_percent` | Percent of each settlement's founding adults who arrive as couples sharing a home (40) |
 | `child_ration_percent`, `child_starve_days` | A child's hunger as a share of an adult's; days without any food before it dies. When the house has no food, the civic fund buys a hungry child one meal at a time from a store of the settlement |
 | `elder_speed_percent`, `elder_work_percent` | An elder's walking speed and work duration, percent of an adult's |
 | `arrivals_per_visit`, `arrival_grant_coins`, `arrival_food_per_head`, `max_population` | Settlers per boat, the grant the fund gives each (nobody lands while the fund cannot pay it), the food units per head a settlement must hold, and the headcount (children included) above which nobody lands |

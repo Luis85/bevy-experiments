@@ -276,6 +276,40 @@ pub fn asking_price(world: &World, seller: Entity, kind: &str) -> Option<u32> {
     })
 }
 
+/// Whether `kind` is a staple: water, a food, a fuel or the winter coat.
+pub fn is_staple(world: &World, kind: &str) -> bool {
+    let roles = super::roles::roles(world);
+    kind == roles.drink
+        || kind == roles.garment
+        || roles.fuels.contains(&kind)
+        || catalog::food_restore_in(world, kind).is_some()
+}
+
+/// The price `buyer` pays `seller` for one unit of `kind` (closing fix A).
+/// For a staple a resident's planned bid below the asking price stands, as
+/// long as it covers what the seller's own inputs cost (`reservation_for`:
+/// input cost plus the maker's margin, or the raw floor for a gathered
+/// good) and any minimum the seller listed: a need about to go unmet is
+/// served at a price that still pays the maker, never below it.
+pub fn price_for(world: &World, buyer: Entity, seller: Entity, kind: &str) -> Option<u32> {
+    let asking = asking_price(world, seller, kind)?;
+    if !is_staple(world, kind) {
+        return Some(asking);
+    }
+    let Some(bid) = super::production::purchase_bid_limit(world, buyer, kind) else {
+        return Some(asking);
+    };
+    let floor = reservation_for(world, seller, kind)
+        .unwrap_or(1)
+        .max(
+            listing(world, seller, kind)
+                .and_then(|offer| offer.minimum_unit_price)
+                .unwrap_or(1),
+        )
+        .max(1);
+    Some(asking.min(bid.max(floor)))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TradeQuote {
     pub unit_price: u32,
@@ -300,7 +334,7 @@ pub fn quote(
     if !econ::near(world, buyer, seller) {
         return Err("move within 1.5 m of the trader".into());
     }
-    let unit_price = asking_price(world, seller, kind).ok_or("this good is not traded here")?;
+    let unit_price = price_for(world, buyer, seller, kind).ok_or("this good is not traded here")?;
     let total = unit_price.checked_mul(n).ok_or("price overflow")?;
     // A seller fond of a played character takes something off (regional).
     let discount = super::live::discount_percent(world, buyer, seller);

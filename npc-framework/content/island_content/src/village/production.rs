@@ -789,9 +789,50 @@ impl Builder<'_> {
         let price = market::unit_price(self.world, kind)
             .unwrap_or(u32::MAX)
             .max(1);
+        // A staple's need about to go unmet is demand even when the buyer
+        // cannot pay today's price (closing fix A): it is funded at what the
+        // good costs its makers (`stock::reservation`: input cost plus margin,
+        // or the raw floor), and the buyer bids that; a seller takes the bid
+        // only while it covers its own inputs (`market::price_for`).
+        let floor = if market::is_staple(self.world, kind) {
+            super::stock::reservation(self.world, kind)
+                .unwrap_or(price)
+                .clamp(1, price)
+        } else {
+            price
+        };
         let budget = self.budget.entry(actor).or_default();
         let buying = missing.saturating_sub(self_made);
-        let mut funded = buying.min(*budget / price);
+        let at_price = buying.min(*budget / price);
+        if floor < price && at_price < buying && *budget > 0 {
+            let funded = buying.min(*budget / floor).max(at_price);
+            if funded > at_price {
+                let limit = (*budget / funded.max(1)).clamp(floor, price);
+                self.plan
+                    .bid_limits
+                    .entry(actor)
+                    .or_default()
+                    .entry(kind.into())
+                    .and_modify(|prior| *prior = (*prior).min(limit))
+                    .or_insert(limit);
+                *budget = budget.saturating_sub(funded * limit);
+                let target = self
+                    .plan
+                    .procurement
+                    .entry(actor)
+                    .or_default()
+                    .entry(kind.into())
+                    .or_default();
+                *target = target
+                    .saturating_add(own)
+                    .saturating_add(funded)
+                    .saturating_add(self_made);
+                let requests = self.requests.entry(kind.into()).or_default();
+                *requests = requests.saturating_add(funded).saturating_add(self_made);
+                return;
+            }
+        }
+        let mut funded = at_price;
         if funded == 0 && buying > 0 && *budget > 0 {
             // A one-unit household counter-bid is real cash, not fictitious
             // executable demand at a quote the actor cannot afford.

@@ -45,6 +45,10 @@ pub struct DemographySpec {
     pub birth_food_units: u32,
     /// Most children one household raises at a time.
     pub max_children: u32,
+    /// Percent of each settlement's founding adults who arrive as couples,
+    /// sharing a home (closing fix B: with none, the first couple formed only
+    /// in mid-year).
+    pub founding_couples_percent: u32,
     /// A child's hunger as a share of an adult's.
     pub child_ration_percent: u32,
     /// Days a child may go unfed before it dies.
@@ -79,6 +83,7 @@ impl Default for DemographySpec {
             birth_chance_permille: 300,
             birth_food_units: 3,
             max_children: 3,
+            founding_couples_percent: 40,
             child_ration_percent: 50,
             child_starve_days: 3,
             elder_speed_percent: 75,
@@ -485,9 +490,10 @@ impl DemographySpec {
                 d.birth_chance_permille <= 1_000
                     && d.birth_cooldown_days <= 10_000
                     && d.birth_food_units <= 64
-                    && d.max_children <= 8,
+                    && d.max_children <= 8
+                    && d.founding_couples_percent <= 100,
                 "birth_chance_permille must be 0..=1000, birth_cooldown_days at most 10000, \
-                 birth_food_units at most 64 and max_children at most 8",
+                 birth_food_units at most 64, max_children at most 8 and                  founding_couples_percent at most 100",
             ),
             (
                 d.child_ration_percent <= 200 && (1..=1_000).contains(&d.child_starve_days),
@@ -536,6 +542,7 @@ impl DemographySpec {
             self.birth_chance_permille,
             self.birth_food_units,
             self.max_children,
+            self.founding_couples_percent,
             self.child_ration_percent,
             self.child_starve_days,
             self.elder_speed_percent,

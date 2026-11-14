@@ -638,12 +638,17 @@ fn live_depth_words_are_plain_and_counted() {
     };
     assert!(depth::tier_gives(&stranger).starts_with("Nothing yet"));
     assert_eq!(depth::tier_word("close friend"), "Close friend");
+    // Food is what this world's catalog says feeds, read from its data.
+    let app = island_content::new_sim_app(7, "living_world");
+    let world = app.world();
     assert!(depth::helps(
+        world,
         "thirst",
         island_content::village::catalog::WATER
     ));
-    assert!(depth::helps("hunger", "bread") && !depth::helps("hunger", "log"));
-    assert!(!depth::helps("energy", "bread"));
+    assert!(depth::helps(world, "hunger", "bread") && !depth::helps(world, "hunger", "log"));
+    assert!(depth::helps(world, "health", "bread"));
+    assert!(!depth::helps(world, "energy", "bread"));
 }
 
 #[test]

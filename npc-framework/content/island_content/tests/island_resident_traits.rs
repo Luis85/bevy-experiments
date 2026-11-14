@@ -22,6 +22,10 @@ const STEP: u64 = 20;
 fn app_with(behavior: Value, seed: u64) -> App {
     let mut doc = island_content::scenario::scenario_doc("living_world").expect("scenario");
     doc.world["construction"]["world"]["preset"]["living_world"]["behavior"] = behavior;
+    // Traits are compared on residents living alone: a founding couple
+    // (closing fix B) spends its evenings at home whatever its traits.
+    doc.world["construction"]["world"]["preset"]["living_world"]["economy"]["demography"]["founding_couples_percent"] =
+        serde_json::json!(0);
     island_content::scenario::load_scenario(&doc, seed)
         .expect("edited behaviour loads")
         .app
@@ -196,7 +200,7 @@ fn schedule_blocks_are_data_and_move_with_the_chronotype() {
 /// Leisure from 5% to 40% of the day, so the first hour of the run covers it.
 /// Meetings may follow each other closely (the shipped cooldown, 2400 ticks,
 /// would allow one or two in the sampled hour, for sociable and unsociable
-/// residents alike).
+/// residents alike), but not so closely that both reach the cap.
 fn early_leisure(traits: Value) -> Value {
     json!({
         "traits": traits,

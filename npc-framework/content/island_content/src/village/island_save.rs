@@ -152,11 +152,11 @@ pub fn check_against(world: &mut World, snap: &WorldSnapshot, current: u32) -> I
     if stamped != content_hash(world) {
         return IslandSaveCheck::OtherBuild;
     }
+    // Same version and content, but a layout this build cannot read (a
+    // registered component or resource whose fields differ): another build
+    // made it (closing fix C4: it was answered as unreadable).
     match snapshot::check(world, snap) {
         Ok(()) => IslandSaveCheck::Current,
-        Err(LoadError::Bad(reason)) => IslandSaveCheck::Unreadable {
-            reason: format!("This save cannot be read: {reason}."),
-        },
         Err(_) => IslandSaveCheck::OtherBuild,
     }
 }
@@ -186,8 +186,11 @@ pub fn load_island_save(
         .map(crate::world_runtime::ActiveWorld::canonical);
     let expected = snapshot::save(world).map_err(unreadable)?;
     super::integrity::validate_snapshot_structure(&expected, snap).map_err(unreadable)?;
-    let report = snapshot::load(world, snap, LoadMode::Strict)
-        .map_err(|error| unreadable(format!("This save could not be loaded: {error}.")))?;
+    // A layout this build cannot parse is another build's save.
+    let report = snapshot::load(world, snap, LoadMode::Strict).map_err(|error| match error {
+        LoadError::Bad(_) => IslandSaveCheck::OtherBuild,
+        error => unreadable(format!("This save could not be loaded: {error}.")),
+    })?;
     if !report.defaulted.is_empty() || !report.skipped.is_empty() {
         return Err(unreadable("This save is incomplete.".into()));
     }
