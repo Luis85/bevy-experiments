@@ -117,7 +117,7 @@ pub(in crate::ui) fn view_model(game: &Game) -> Option<HudView> {
 /// name and the appearance stamped on the attempt ("YOU" before a survivor
 /// is chosen); a defender without a card falls back to the attempt.
 fn identity(game: &Game, a: &Attempt) -> (String, bool) {
-    let stamped = a.profile.appearance == Appearance::Female;
+    let stamped = a.defender_appearance() == Appearance::Female;
     match a.defender() {
         DefenderId::Player => (
             game.campaign()
