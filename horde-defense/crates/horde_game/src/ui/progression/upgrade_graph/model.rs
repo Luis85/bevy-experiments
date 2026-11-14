@@ -64,6 +64,24 @@ pub(in crate::ui::progression) struct Node {
     pub tone: Tone,
     pub icon: Icon,
     pub prerequisites: Vec<usize>,
+    /// "Counters: Shield-bearer, Juggernaut" for a node authored against
+    /// enemy archetypes (names from core), else empty.
+    pub counters: String,
+}
+impl Node {
+    /// The canvas hover text: the title and badge, the counters line when
+    /// the node has one, then the hint.
+    pub(in crate::ui::progression) fn tooltip(&self) -> String {
+        let counters = if self.counters.is_empty() {
+            String::new()
+        } else {
+            format!("\n{}", self.counters)
+        };
+        format!(
+            "{} · {}{counters}\nSelect for effects and purchase action.",
+            self.title, self.badge
+        )
+    }
 }
 
 /// Per-frame emphasis the screen computed from core queries.

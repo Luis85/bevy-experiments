@@ -4,6 +4,7 @@ use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob};
 use horde_core::{
     command::Command,
+    content::content,
     defenders::{DefenderId, RecruitBlocker},
     sim::{Outcome, Report},
     world::world,
@@ -102,6 +103,53 @@ fn defender_suffix(f: &UiCtx, report: &Report) -> String {
             .map_or_else(String::new, |card| format!(" · {}", card.name)),
     }
 }
+/// 1077 as "1,077": coin amounts of the progression lines.
+fn grouped(amount: u64) -> String {
+    let digits = amount.to_string();
+    let mut text = String::with_capacity(digits.len() + digits.len() / 3);
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            text.push(',');
+        }
+        text.push(digit);
+    }
+    text
+}
+/// "Rank 10 milestone · +1,000 coins · <item name>" for each rank milestone
+/// the report's settlement receipt lists, in its (ascending) order. The item
+/// is named from the catalogue; a milestone that stored none names its rank
+/// and coins only.
+fn milestone_headlines(report: &Report) -> Vec<String> {
+    report
+        .progression_rewards
+        .milestones
+        .iter()
+        .map(|milestone| {
+            let item = milestone
+                .item_definition
+                .as_ref()
+                .and_then(|id| content().item(id))
+                .map_or_else(String::new, |definition| format!(" · {}", definition.name));
+            format!(
+                "Rank {} milestone · +{} coins{item}",
+                milestone.rank,
+                grouped(milestone.coins)
+            )
+        })
+        .collect()
+}
+/// "Level 6 reached · +77 coins": the level-up grant the receipt paid, or
+/// None when the report paid none.
+fn level_grant_line(report: &Report) -> Option<String> {
+    let rewards = &report.progression_rewards;
+    (rewards.level_coins > 0).then(|| {
+        format!(
+            "Level {} reached · +{} coins",
+            rewards.level_to,
+            grouped(rewards.level_coins)
+        )
+    })
+}
 fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     let label = report.outcome.label();
     let color = match report.outcome {
@@ -142,6 +190,13 @@ fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     let full = line.text.clone();
     ui.add(egui::Label::new(line).truncate())
         .on_hover_text(full);
+    // What progression settlement paid with this report, above "Now open".
+    for headline in milestone_headlines(report) {
+        ui.add(egui::Label::new(RichText::new(headline).size(14.0).strong().color(AMBER)).wrap());
+    }
+    if let Some(grant) = level_grant_line(report) {
+        ui.add(egui::Label::new(RichText::new(grant).size(13.0).color(TEXT)).wrap());
+    }
     // The reason is the point of this screen after a loss; after a win it
     // names what opened. Wrapped, never cut.
     let next = if report.outcome == Outcome::Victory {

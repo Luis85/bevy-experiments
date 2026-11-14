@@ -233,31 +233,17 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
             (n.combat_ticks as f32 / 60.0).min(120.0)
         ),
     );
-    for t in NpcTraining::ALL {
-        if matches!(
-            t,
-            NpcTraining::Intelligence | NpcTraining::HitPoints | NpcTraining::Fatigue
-        ) {
-            continue;
-        }
-        ui.push_id(t.name(), |ui| {
+    for row in training_rows(&n) {
+        ui.push_id(row.label, |ui| {
             chrome::row(ui, |ui| {
-                ui.strong(t.name());
-                ui.label(format!("{} CP", t.cost()));
-                let supported = t != NpcTraining::Strength || n.st < 20;
+                ui.strong(row.label);
+                ui.label(format!("{} CP", row.cost));
                 if ui
-                    .add_enabled(
-                        supported && n.unspent >= t.cost(),
-                        egui::Button::new("Train"),
-                    )
-                    .on_disabled_hover_text(if !supported {
-                        "Supported Strength maximum is 20."
-                    } else {
-                        "Earn or buy enough training CP first."
-                    })
+                    .add_enabled(row.enabled, egui::Button::new("Train"))
+                    .on_disabled_hover_text(row.disabled_hover)
                     .clicked()
                 {
-                    f.dispatch(Command::TrainNpc(t), "Survivor trained.");
+                    f.dispatch(Command::TrainNpc(row.training), "Survivor trained.");
                 }
             });
         });
@@ -271,11 +257,44 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::section(ui, "Tactical policy");
     policy(ui, f);
     egui::CollapsingHeader::new("Character ledger & combat rules").show(ui, |ui| {
-        ui.label(format!("Creation budget {} CP · ST {} · DX {} · IQ {} (informational) · HT {}", n.creation.budget, n.st, n.dx, n.iq, n.ht));
-        muted(ui, "Free survivor with campaign recovery. Redistribution refunds advancement; historical awards and the campaign allowance remain intact. HP and FP derive from ST and HT; direct HP, FP and IQ training are outside the supported scope.");
+        ui.label(format!("Creation budget {} CP · ST {} · DX {} · HT {}", n.creation.budget, n.st, n.dx, n.ht));
+        muted(ui, "Free survivor with campaign recovery. Redistribution refunds advancement; historical awards and the campaign allowance remain intact. HP and FP derive from ST and HT.");
         muted(ui, "GURPS Fourth Edition Lite (August 2004), supported subset. Attack success precedes active defense and armor. A shot resolves once. Zero HP requires consciousness checks; it does not mean death. Stun and knockdown allow recovery.");
         for skill in [8, 10, 12, 14, 16] { ui.label(format!("Skill {skill}: {:.1}% attack-roll success, before defense/armor", horde_core::rules::attack_success_probability(skill) * 100.0)); }
     });
+}
+
+/// One training row of a survivor defender (Mara or a recruit).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct TrainingRow {
+    pub training: NpcTraining,
+    pub label: &'static str,
+    pub cost: u32,
+    pub enabled: bool,
+    pub disabled_hover: &'static str,
+}
+/// The rows `npc` can train: core's `NpcTraining::TRAINABLE`, in its order,
+/// for Mara's page and the recruit rows in Operations alike. A row is
+/// enabled when the survivor has the CP and, for Strength, room under the
+/// supported maximum.
+pub(super) fn training_rows(npc: &horde_core::campaign::Npc) -> Vec<TrainingRow> {
+    NpcTraining::TRAINABLE
+        .into_iter()
+        .map(|training| {
+            let supported = training != NpcTraining::Strength || npc.st < 20;
+            TrainingRow {
+                training,
+                label: training.name(),
+                cost: training.cost(),
+                enabled: supported && npc.unspent >= training.cost(),
+                disabled_hover: if supported {
+                    "Earn or buy enough training CP first."
+                } else {
+                    "Supported Strength maximum is 20."
+                },
+            }
+        })
+        .collect()
 }
 
 pub(super) fn mode_selector(ui: &mut egui::Ui, f: &mut UiCtx) {

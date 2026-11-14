@@ -4,7 +4,9 @@
 use super::{UiCtx, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, TEXT};
 use bevy_egui::egui::{self, Align, Key, Layout, Modifiers, Rect, RichText, Sense, Stroke, vec2};
-use horde_core::campaign::{Campaign, NodePayment, NodeState, PreviewStat, StatDelta};
+use horde_core::campaign::{
+    Campaign, NodePayment, NodeState, PreviewStat, StatDelta, counter_names,
+};
 use horde_core::command::Command;
 use horde_core::skill_catalog::{SkillEffect, SkillNode, search_nodes, skills, upgrade_goals};
 use std::collections::BTreeSet;
@@ -50,6 +52,11 @@ pub(super) struct TreeLayout {
 pub(super) fn selected_node_for_test(ctx: &egui::Context) -> Option<String> {
     ctx.data(|d| d.get_temp::<TreeState>(egui::Id::new(TREE_ID)))
         .map(|state| skills().nodes[state.view.selected].id.clone())
+}
+/// The canvas hover text of node `id` in `campaign`.
+#[cfg(test)]
+pub(super) fn tooltip_for_test(campaign: &Campaign, id: &str) -> String {
+    catalogue_nodes_for(campaign)[index_of(id).expect("catalogue node")].tooltip()
 }
 #[cfg(test)]
 pub(super) fn layout_for_test(ctx: &egui::Context) -> Option<TreeLayout> {
@@ -142,9 +149,16 @@ fn catalogue_nodes_for(campaign: &Campaign) -> Vec<Node> {
                     .iter()
                     .filter_map(|id| catalog.nodes.iter().position(|p| p.id == *id))
                     .collect(),
+                counters: counters_line(node).unwrap_or_default(),
             }
         })
         .collect()
+}
+/// "Counters: Shield-bearer, Juggernaut": the enemy archetypes the node is
+/// authored against, by their core catalogue names. None without counters.
+fn counters_line(node: &SkillNode) -> Option<String> {
+    let names = counter_names(node);
+    (!names.is_empty()).then(|| format!("Counters: {}", names.join(", ")))
 }
 fn index_of(id: &str) -> Option<usize> {
     skills().nodes.iter().position(|n| n.id == id)
@@ -669,6 +683,9 @@ fn skill_detail(
     let body = |ui: &mut egui::Ui, f: &mut UiCtx, action: &mut Option<DetailAction>| {
         let campaign = f.game.campaign();
         ui.label(&node.description);
+        if let Some(counters) = counters_line(node) {
+            ui.colored_label(AMBER, counters);
+        }
         let preview = campaign.node_stat_preview(&node.id);
         if !preview.is_empty() {
             ui.add_space(6.0);

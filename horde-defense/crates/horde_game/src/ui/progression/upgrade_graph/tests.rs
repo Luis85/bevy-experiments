@@ -52,6 +52,7 @@ fn catalogue_nodes() -> Vec<Node> {
                 .iter()
                 .map(|id| catalog.nodes.iter().position(|p| p.id == *id).unwrap())
                 .collect(),
+            counters: String::new(),
         })
         .collect()
 }
@@ -74,6 +75,7 @@ fn authored_branch(branch: &str) -> Vec<Node> {
                 .iter()
                 .filter_map(|p| authored.iter().position(|n| &n.id == p))
                 .collect(),
+            counters: String::new(),
         })
         .collect()
 }
@@ -180,6 +182,7 @@ fn arrows_pick_the_nearest_node_in_that_direction() {
         tone: Tone::Buyable,
         icon: Icon::Firearm,
         prerequisites: vec![],
+        counters: String::new(),
     };
     let nodes = vec![
         at(0.0, 0.0),
@@ -268,6 +271,7 @@ fn default_scale_keeps_a_short_title_and_state_on_distinct_readable_rows() {
         tone: Tone::Prerequisite,
         icon: Icon::Firearm,
         prerequisites: vec![],
+        counters: String::new(),
     }];
     let ctx = egui::Context::default();
     crate::settings::install_font(&ctx);

@@ -30,7 +30,9 @@ use progression::legacy_training_default;
 pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining, Player, Skill};
 pub(crate) use sale::SalePlan;
 pub use sale::{SaleBlock, SaleOrigin, SaleQuote, SaleRefs, SaleResolution};
-pub use tree_view::{NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta};
+pub use tree_view::{
+    NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta, counter_names,
+};
 pub use view::{FeatureUnlock, NodeStatus, OfferPreview, UpgradeFocus};
 pub use world::Placement;
 

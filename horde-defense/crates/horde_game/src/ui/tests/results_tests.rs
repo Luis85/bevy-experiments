@@ -422,3 +422,103 @@ fn a_liberation_names_the_freed_country_and_the_fronts_it_opened() {
         assert_eq!(text_count(&output, "1 liberated"), 1, "{size:?}");
     }
 }
+
+/// The top of the first painted text run that contains `label`.
+fn text_top_containing(output: &FullOutput, label: &str) -> Option<f32> {
+    fn find(shape: &egui::epaint::Shape, label: &str) -> Option<f32> {
+        match shape {
+            egui::epaint::Shape::Text(text) if text.galley.text().contains(label) => {
+                Some(text.pos.y)
+            }
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().find_map(|s| find(s, label)),
+            _ => None,
+        }
+    }
+    output.shapes.iter().find_map(|c| find(&c.shape, label))
+}
+
+/// W3-22: the level-up grant the settlement paid with this report is one
+/// line read from the receipt; a report that paid none shows no such line.
+#[test]
+fn results_shows_level_grant_line() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    assert!(
+        text_top_containing(&output, "reached · +").is_none(),
+        "no grant, no line"
+    );
+    let report = f.game.last_result_mut().as_mut().unwrap();
+    report.progression_rewards.level_from = 1;
+    report.progression_rewards.level_to = 6;
+    report.progression_rewards.level_coins = 1_077;
+    let before = serde_json::to_value(&f.game).unwrap();
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::ResultsWithChrome, vec![], size);
+        assert!(
+            fully_visible(&output, "Level 6 reached · +1,077 coins"),
+            "{size:?}: the grant line names the level reached and the coins paid"
+        );
+    }
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+}
+
+/// W3-22 (design-progression-tree §7): a paid rank milestone is a headline
+/// above "Now open", from the receipt: rank, coins and the granted item.
+#[test]
+fn results_shows_rank_10_milestone_headline() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    // Ten victories open the rank-10 node, so "Now open" is on screen too.
+    f.game.campaign_mut().victories = 10;
+    let definition = horde_core::content::ItemDefId::at(0);
+    let item = horde_core::content::content()
+        .item(&definition)
+        .unwrap()
+        .name
+        .clone();
+    let report = f.game.last_result_mut().as_mut().unwrap();
+    report.outcome = Outcome::Victory;
+    report.progression_rewards.milestones = vec![
+        horde_core::sim::MilestoneReward {
+            rank: 10,
+            coins: 1_000,
+            item_id: Some(1),
+            item_definition: Some(definition),
+        },
+        // An item that could not be stored: coins and rank only.
+        horde_core::sim::MilestoneReward {
+            rank: 15,
+            coins: 1_500,
+            item_id: None,
+            item_definition: None,
+        },
+    ];
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    let headline = format!("Rank 10 milestone · +1,000 coins · {item}");
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::ResultsWithChrome, vec![], size);
+        assert!(fully_visible(&output, &headline), "{size:?}: {headline}");
+        assert!(
+            fully_visible(&output, "Rank 15 milestone · +1,500 coins"),
+            "{size:?}: a milestone without an item names rank and coins"
+        );
+        let top = text_top_containing(&output, &headline).unwrap();
+        let open = text_top_containing(&output, "Now open in the tree")
+            .unwrap_or_else(|| panic!("{size:?}: Now open line"));
+        assert!(top < open, "{size:?}: the headline sits above Now open");
+    }
+}

@@ -5,7 +5,6 @@ use bevy_egui::egui::{self, Sense, vec2};
 use view::country_name;
 mod view;
 use horde_core::{
-    campaign::NpcTraining,
     command::Command,
     content::{Policy, Slot, StructureKind},
     world::world,
@@ -206,8 +205,9 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     ui.horizontal_wrapped(|ui| {
                         let buy = super::camp_prices::training_point(f.game.campaign(), &recruit.npc);
                         if ui.add_enabled(buy.enabled, egui::Button::new(buy.label)).on_disabled_hover_text(buy.disabled_hover).clicked() { f.dispatch(Command::BuyRecruitPoint(recruit.id), "Training point awarded to the selected survivor."); }
-                        for training in [NpcTraining::Guns, NpcTraining::Melee, NpcTraining::Health, NpcTraining::Strength, NpcTraining::Dexterity] {
-                            if ui.add_enabled(recruit.npc.unspent >= training.cost() && (training != NpcTraining::Strength || recruit.npc.st < 20), egui::Button::new(format!("{} · {} CP", training.name(), training.cost()))).on_disabled_hover_text(if training == NpcTraining::Strength && recruit.npc.st >= 20 { "Supported Strength maximum is 20." } else { "Earn or buy enough training CP first." }).clicked() { f.dispatch(Command::TrainRecruit { id: recruit.id, training }, "Selected survivor trained."); }
+                        // The same rows as Mara's page (core's trainable list).
+                        for row in super::character::training_rows(&recruit.npc) {
+                            if ui.add_enabled(row.enabled, egui::Button::new(format!("{} · {} CP", row.label, row.cost))).on_disabled_hover_text(row.disabled_hover).clicked() { f.dispatch(Command::TrainRecruit { id: recruit.id, training: row.training }, "Selected survivor trained."); }
                         }
                     });
                     for slot in Slot::ALL {

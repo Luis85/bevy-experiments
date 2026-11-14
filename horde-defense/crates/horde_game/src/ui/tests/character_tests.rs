@@ -172,3 +172,73 @@ fn character_max_has_an_explicit_full_bar_and_next_deployment_lane_preview() {
             .any(|s| shape_has_text(&s.shape, "Next deployment: 17 lanes"))
     );
 }
+
+/// W3-22 (G5.4, PT10): Mara's and a recruit's training lists are core's
+/// `NpcTraining::TRAINABLE` through one shared row model, and neither screen
+/// names IQ, HP or FP training any more.
+#[test]
+fn training_lists_have_no_iq_hp_fp_text() {
+    use horde_core::campaign::NpcTraining;
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().journey_active = true;
+    f.game.campaign_mut().attempts = 1;
+    let untrainable = [
+        NpcTraining::Intelligence,
+        NpcTraining::HitPoints,
+        NpcTraining::Fatigue,
+    ];
+    let rows = character::training_rows(&f.game.campaign().npc);
+    assert_eq!(
+        rows.iter().map(|r| r.training).collect::<Vec<_>>(),
+        NpcTraining::TRAINABLE
+    );
+    for row in &rows {
+        assert!(
+            !row.label
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .any(|word| matches!(word, "IQ" | "HP" | "FP")),
+            "{}",
+            row.label
+        );
+    }
+    f.act(|c| c.open_preparation(Tab::Survivor));
+    let output = h.frame(f, View::WorldWithChrome, vec![]);
+    for training in NpcTraining::TRAINABLE {
+        assert_eq!(text_count(&output, training.name()), 1, "{training:?}");
+    }
+    for training in untrainable {
+        assert_eq!(text_count(&output, training.name()), 0, "{training:?}");
+    }
+    assert!(
+        !output.shapes.iter().any(|s| shape_has_text(&s.shape, "IQ")),
+        "Mara's page names no IQ"
+    );
+    // The collapsed ledger and the recruit rows in Operations: neither
+    // source filters the rows by hand or prints the removed text.
+    for (file, source) in [
+        ("character.rs", include_str!("../character.rs")),
+        ("operations.rs", include_str!("../operations.rs")),
+    ] {
+        for gone in [
+            "IQ",
+            "informational",
+            "NpcTraining::Intelligence",
+            "NpcTraining::HitPoints",
+            "NpcTraining::Fatigue",
+            "NpcTraining::ALL",
+        ] {
+            assert!(!source.contains(gone), "{file} still has {gone:?}");
+        }
+    }
+    assert!(
+        include_str!("../character.rs").contains("NpcTraining::TRAINABLE"),
+        "the shared rows iterate core's TRAINABLE"
+    );
+    assert!(
+        include_str!("../operations.rs").contains("training_rows("),
+        "the recruit rows use the shared model"
+    );
+}

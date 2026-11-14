@@ -408,10 +408,7 @@ impl<'a> Graph<'a> {
                     node.tone.badge_color().gamma_multiply(fade.max(0.45)),
                 );
             }
-            response.on_hover_text(format!(
-                "{} · {}\nSelect for effects and purchase action.",
-                node.title, node.badge
-            ));
+            response.on_hover_text(node.tooltip());
         }
         if self.minimap(ui, id, view, emphasis, rect, (bounds, origin)) {
             clicked = true;

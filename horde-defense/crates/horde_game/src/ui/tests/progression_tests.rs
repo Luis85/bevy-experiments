@@ -242,3 +242,67 @@ fn the_compact_layout_keeps_at_least_half_the_tree_for_the_canvas() {
     assert!(learn.top() > layout.canvas.bottom());
     assert!(h.ctx.content_rect().contains_rect(learn));
 }
+
+/// W3-22: a node authored against enemy archetypes names them, by their
+/// catalogue names, in its canvas tooltip and in the detail panel; a node
+/// with no counters says nothing. The perk's class stats are previewed.
+#[test]
+fn counter_node_tooltip_names_its_archetypes() {
+    use horde_core::enemy_catalog::enemy_catalog;
+    let mut fixture = upgrade_home();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    let names = |node: &horde_core::skill_catalog::SkillNode| -> Vec<String> {
+        node.counters
+            .iter()
+            .map(|id| {
+                enemy_catalog()
+                    .resolve(id)
+                    .expect("catalogue archetype")
+                    .name
+            })
+            .collect()
+    };
+    let counter_nodes: Vec<_> = skills()
+        .nodes
+        .iter()
+        .filter(|n| !n.counters.is_empty())
+        .collect();
+    assert!(counter_nodes.len() >= 6, "the decision-19 counter nodes");
+    for node in &counter_nodes {
+        let tooltip = progression::tooltip_for_test(f.game.campaign(), &node.id);
+        let line = format!("Counters: {}", names(node).join(", "));
+        assert_eq!(
+            tooltip.lines().nth(1),
+            Some(line.as_str()),
+            "{}: {tooltip}",
+            node.id
+        );
+        assert_eq!(tooltip.lines().count(), 3, "{}", node.id);
+    }
+    let plain = progression::tooltip_for_test(f.game.campaign(), "steady_hands");
+    assert!(!plain.contains("Counters"), "{plain}");
+    assert_eq!(plain.lines().count(), 2);
+
+    // The detail panel of a selected counter node carries the same line and
+    // the preview rows of its perk.
+    let node = skills().node("shotgun_pump_drill").unwrap();
+    f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
+        node.id.clone(),
+    ));
+    h.frame(f, View::Results, vec![]);
+    let output = h.frame(f, View::Results, vec![]);
+    assert_eq!(selected(&h), node.id);
+    let line = format!("Counters: {}", names(node).join(", "));
+    assert_eq!(text_count(&output, &line), 1, "{line}");
+    let preview = f.game.campaign().node_stat_preview(&node.id);
+    assert_eq!(preview.len(), 2, "cadence and reload");
+    for delta in &preview {
+        assert_eq!(
+            text_count(&output, &delta.stat.label()),
+            1,
+            "{}",
+            delta.stat.label()
+        );
+    }
+}

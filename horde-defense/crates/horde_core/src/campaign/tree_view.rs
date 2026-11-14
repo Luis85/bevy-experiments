@@ -234,6 +234,18 @@ impl StatDelta {
     }
 }
 
+/// The display names of the enemy archetypes `node` is authored to answer
+/// (`SkillNode::counters`), in authored order, read from the enemy
+/// catalogue. An id the loaded catalogue does not resolve keeps its id, so
+/// a screen never drops a counter. Empty for a node with no counters.
+pub fn counter_names(node: &SkillNode) -> Vec<String> {
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    node.counters
+        .iter()
+        .map(|id| catalog.resolve(id).map_or_else(|_| id.clone(), |e| e.name))
+        .collect()
+}
+
 /// "1 defense" / "3 defenses".
 fn count(n: u64, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
@@ -809,6 +821,29 @@ impl Campaign {
 mod tests {
     use super::*;
     use crate::survivors::SurvivorId;
+
+    #[test]
+    fn counter_names_are_catalogue_names_in_authored_order() {
+        let catalog = crate::enemy_catalog::enemy_catalog();
+        let mut counters = 0;
+        for node in &skills().nodes {
+            let names = counter_names(node);
+            assert_eq!(names.len(), node.counters.len(), "{}", node.id);
+            for (id, name) in node.counters.iter().zip(&names) {
+                assert_eq!(*name, catalog.resolve(id).unwrap().name, "{}", node.id);
+                assert_ne!(name, id, "{}: a display name, not the id", node.id);
+                counters += 1;
+            }
+        }
+        assert!(counters >= 6, "the decision-19 nodes author counters");
+        // An id the catalogue does not know keeps its id.
+        let mut probe = skills().node("shield_breaker").unwrap().clone();
+        probe.counters.push("no-such-archetype".into());
+        assert_eq!(
+            counter_names(&probe).last().map(String::as_str),
+            Some("no-such-archetype")
+        );
+    }
 
     #[test]
     fn perk_preview_stats_have_labels_formats_and_neutral_snapshot_values() {
