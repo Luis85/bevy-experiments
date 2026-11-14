@@ -54,6 +54,49 @@ The Normal opening controller uses current enemy positions and only earned, guar
 
 Dedicated tests cover atomic/frozen settings, all three presets, actual damage-source integration, fixed-window DPS and corrupt aggregate rejection, pause/checkpoint equivalence, legacy 11/30 geometry, 302 retained all-outcome records, and saved worker-outbox settlement with one parent owner.
 
+## Goal 5: progression pacing acceptance
+
+Goal 5 of the production pass paces the skill tree against the campaign (acceptance G5.1-G5.11). The tree's own rules are ordinary tests in `crates/horde_core/tests/progression_tree.rs` (rules 1-6 of design-progression-tree §3): no valued node is dominated, a node under 100 coins is worth at most twice its branch per coin (both G5.11), no node outvalues its depth peers by more than 2.5×, a ladder's value per coin never rises, a body rank 1 is cheaper than its dedicated peer, and the tier costs sit in their bands. Four rows are pacing measurements: the bot plays whole campaigns through `Game::apply`, and `crates/horde_core/tests/pacing_targets.rs` asserts on the result. Like the goal-6 rows they are `#[ignore = "release-only"]` and run after the debug builds:
+
+```powershell
+cargo test --locked --release -p horde_core --test pacing_targets goal5 -- --ignored --nocapture --test-threads 1
+```
+
+The filter runs only the four goal5_* rows and their one sweep. Each test prints a PASS or FAIL summary with the numbers it read. The evaluators are pure functions in `sim/pacing/targets.rs`, pinned on synthetic reports in `tests/pacing_harness.rs` (normal suite).
+
+The sweep is `expert-deu` over 20 seeds, deterministic per seed: Germany start, the expert aim (the smoke bot), tree-first spending (in every camp it learns the recommended node while it can afford it, then buys gear), Normal, the solo plan, 60 runs. The other two legacy profiles, `novice-deu` and `novice-gear-lux`, are printed by the `pacing` example and gate nothing.
+
+### Milestones and the tier definition
+
+A milestone counts the runs completed when it first holds. Camp milestones (Fortifications, Mara, `OperationsOpen`, `TierOwned`) are checked in camp after spending, before run n + 1, and count n; the others are checked after run n and count n. A seed that never reaches a milestone counts 61, one past `max_runs`.
+
+- **Tier (`sim::tier_cost`).** Tier d is every node of prerequisite depth 1 to d (the starter root, Pistol training, is depth 0), less the nodes gated at 5 victories or more (`TIER_GATE_VICTORIES`). Those nodes open only with the rank milestones, so they are not part of what a tier window measures. The tiers cost 2,030 / 8,700 / 19,830 coins, inside the bands 1,700-2,300 / 7,800-9,800 / 18,500-22,500 that `tier_costs_sit_in_design_bands` checks. 23 nodes are gated: the eight decision-19 perks (5 to 20 victories) and ranks 18-20 of the five body ladders (5 victories). Six of the perks sit at depth 2 or 3, so the definition matters: `pistol_double_tap` and `smg_spray_control` would be in tier 2, and `shotgun_pump_drill`, `shield_breaker`, `blast_discipline` and `rifle_breath_control` in tier 3. The whole tree, gated nodes included, is 176 buyable nodes for 96,920 coins.
+- **`TierAffordable(d)`.** The coins earned so far reach `tier_cost(d)`. Earned is cumulative and ignores spending: each run's banked coins, its level-up grant, its rank-milestone coins and its auto-sold coins.
+- **`TierOwned(d)`, report only.** The player owns every node of depth d, gated nodes included. The `pacing` example prints it as "Tier d owned" beside the affordable rows when it is given `--profile` or `--seeds`; it gates nothing. `--fit-tiers a,b,c` prints the median coins earned by each named run over the tier's cost, which is how the prices were fitted.
+- **`Liberation(n)`.** After the run at least n countries are liberated (`world.cleared`).
+- **`TreeExhausted`.** After the run no unowned, non-retired node is left (`sim::tree_exhausted`, ruling W-3). A retired node is one no campaign can buy: today only the price-0 starter root, granted when the campaign is created.
+- **`OperationsOpen`.** The Operations page is reachable: `Game::operations_available()` (ruling W-2), which the camp UI also reads. It holds once the Recruitment, Parallel or Operations feature is unlocked (Survivor network, Parallel command, Country operations), or once a recruit or an expedition exists (older saves). Fortifications is the Construction feature (Field engineering) and Mara the Companion feature (Meet Mara).
+
+### Rows and how they are read
+
+Cells are the lower median over the 20 seeds, with [p25, p75].
+
+| Row | Test | Target | Wave-4 close | Verdict |
+| --- | --- | --- | --- | --- |
+| G5.7 | `goal5_first_victory_run_2_to_4` | Median first victory on runs 2-4 | 3 [3, 4] | PASS |
+| G5.8 | `goal5_tiers_affordable_3_5_7_9_11_13` | Tiers 1 / 2 / 3 affordable at about runs 4 / 8 / 12, one run either side | 4 [4, 4] / 8 [8, 8] / 12 [11, 12] | PASS |
+| G5.9 | `goal5_tree_outlasts_second_liberation` | Median `TreeExhausted` after median `Liberation(2)`, and a median of at least 1 node bought after it | Liberation(2) 19 [18, 20], tree exhausted 28 [27, 29], 74 [68, 81] nodes bought after it | PASS |
+| G5.10 | `goal5_unlock_order_fortifications_mara_operations` | Fortifications <= Mara <= Operations in every seed, and the medians rise strictly | 3 [3, 4] / 16 [15, 17] / 19 [18, 19] | PASS |
+
+- **Nodes bought after a liberation (G5.9).** The nodes learned in the camps before runs l + 1 onwards, where l is the run that reached `Liberation(2)`. A seed that never reaches it fails the row and is named.
+- **Unlock order (G5.10).** Per seed the order only has to hold with ties, so a camp that buys Meet Mara and Survivor network together passes its seed; the medians must still differ. That tie is why the row was red before W4-p (Mara and Operations both 15 [14, 17]).
+
+The numbers are those of plan §9.6 ("W4-p repricing and goal-5 calibration"), measured on the repriced tree. No later wave-4 row moves them: the W4-04..n loop kept no lever (one rejected variant broke the unlock order), W4-12's expedition rule does not reach a solo profile, W4-13 changes only the goal-6 bot, and W4-08 changed no balance data. The closing phase re-runs every `pacing_targets` row at HEAD.
+
+### What the repricing did
+
+Before W4-p a tier cost every node up to its depth (930 / 5,190 / 11,675 coins once W2-41 added the decision-19 perks), so the tiers were affordable at runs 3 / 6 / 8, and Mara and Operations opened in the same camp. W4-p repriced `skills.json` to the tree rules (design-progression-tree §4 "As built") and added the tier definition. The tree-first bot buys the cheapest affordable node that acts now, so the structure ladders' 140-coin step and Survivor network at 1,700 coins keep it on the ladders until after the first liberation, which separates Mara from Operations. The tree is exhausted at about run 28, after which the survivor's power stops growing; that is what the goal-6 windows read (below, "What the tuning showed").
+
 ## Goal 6: enemy difficulty acceptance
 
 Goal 6 of the production pass gives the enemy side a measured shape (acceptance G6.1-G6.18). The rules (two-axis threat, composition, elites, boss phases and ranks, the country band, the victory-to-threat guard) are ordinary tests and are described in PROGRESSION_SCALING.md and ENEMY_COMPOSITION.md. Six rows are pacing measurements: bots play whole campaigns through `Game::apply`, and `crates/horde_core/tests/pacing_targets.rs` asserts on the result. Every test there is `#[ignore = "release-only"]` (G6.10) and runs after the debug builds:

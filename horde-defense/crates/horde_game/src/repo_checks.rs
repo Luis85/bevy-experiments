@@ -1180,8 +1180,8 @@ fn package_link_check_reports_relative_links_only() {
 /// The docs inventory (design-qa-captures §1.13): the sections each owner
 /// writes into a doc the production pass changes, by heading. Presence only
 /// (ruling W-15): the wording is the owner's, so a heading matches a whole
-/// line, nothing more. W4-10 lists enemy-balance's four docs; W7-08 adds the
-/// rest of the inventory.
+/// line, nothing more. W4-10 lists enemy-balance's four docs, W4-11
+/// progression-tree's goal-5 section; W7-08 adds the rest of the inventory.
 const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     (
         "docs/ENEMY_COMPOSITION.md",
@@ -1204,7 +1204,10 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     ),
     (
         "docs/BALANCE_AND_RUN_STATS.md",
-        &["## Goal 6: enemy difficulty acceptance"],
+        &[
+            "## Goal 5: progression pacing acceptance",
+            "## Goal 6: enemy difficulty acceptance",
+        ],
     ),
     ("docs/WORLD.md", &["### Country difficulty band"]),
 ];
