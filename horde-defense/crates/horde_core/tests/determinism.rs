@@ -125,11 +125,30 @@
 //! `RULESET_VERSION` and `TRACE_RULESET` move 3 -> 4 in W4-08: the bump
 //! names the wave-2 review rule fixes after W2-49 and the wave-4 rules
 //! above, and `GAMEPLAY_TRACE` is unchanged by it. `PROVISIONAL` is None.
+//!
+//! **Progressed families (W4-09).** `PROGRESSED_GOLDEN` and
+//! `PROGRESSED_TRACE` pin four runs the six above never reach: seeds 1 and
+//! 0xDEAD_BEEF_2026, each as the player on the Hard preset's Capstone stage
+//! and as a recruit taking the main run over (Npc mode), at threat rank 12
+//! for 3600 ticks (`support::progressed_determinism_game`; its doc comment
+//! lists what is staged and what is played through `Game::apply`). The
+//! attempt clock starts 1800 ticks before the boss, so each window holds
+//! elites, the new archetypes, the boss and its phases, and the settlement
+//! of the win. They were cut at the wave-4 close, after W4-08, so they hold
+//! every wave-4 rule. They follow the same ledger: a commit that moves one
+//! sets `PROGRESSED_PROVISIONAL` and appends its cause to
+//! `PROGRESSED_PROVISIONAL_CAUSES`, and the closing-phase re-bless folds them
+//! (rulings P3, R36). Waves 5-7 expect no move (PROGRESSED 0/4).
 mod support;
 use horde_core::command::Command;
 use horde_core::content::Mode;
-use horde_core::sim::{Game, RULESET_VERSION};
-use support::{Anatomy, MoveClass, OutcomeSummary, advance, smoke_run};
+use horde_core::defenders::DefenderId;
+use horde_core::progression::BossRank;
+use horde_core::sim::{CombatTelemetry, Game, RULESET_VERSION, SAVE_VERSION};
+use support::{
+    Anatomy, MoveClass, OutcomeSummary, PROGRESSED_RANK, PROGRESSED_TICKS, ProgressedRun, advance,
+    progressed_run, smoke_run,
+};
 
 const TICKS: u32 = 1800;
 const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
@@ -200,11 +219,72 @@ const PROVISIONAL: Option<([u64; 6], [u64; 6])> = None;
 /// commit. Empty exactly when `PROVISIONAL` is None.
 const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
 
+/// The seeds of the progressed runs.
+const PROGRESSED_SEEDS: [u64; 2] = [1, 0xDEAD_BEEF_2026];
+
+/// `(seed, run)` -> `Game::state_digest()` after [`PROGRESSED_TICKS`] ticks
+/// of the smoke bot on `support::progressed_determinism_game`. Cut at the
+/// wave-4 close (W4-09), on the W4-08 ruleset 4.
+const PROGRESSED_GOLDEN: [(u64, ProgressedRun, u64); 4] = [
+    (1, ProgressedRun::HardCapstone, 0x1725_164d_48e7_8d12),
+    (1, ProgressedRun::RecruitTakeover, 0x3d80_a50d_d332_3feb),
+    (
+        0xDEAD_BEEF_2026,
+        ProgressedRun::HardCapstone,
+        0x9169_7e75_2793_cfc0,
+    ),
+    (
+        0xDEAD_BEEF_2026,
+        ProgressedRun::RecruitTakeover,
+        0x5670_ca6b_321f_b553,
+    ),
+];
+
+/// `(seed, run)` -> FNV-1a of the per-tick gameplay trace of the same runs
+/// ([`progressed_trace_line`]: the `GAMEPLAY_TRACE` line while the attempt
+/// lives, then the settled report and campaign). Cut at W4-09.
+const PROGRESSED_TRACE: [(u64, ProgressedRun, u64); 4] = [
+    (1, ProgressedRun::HardCapstone, 0x209f_0b4c_6c60_a4aa),
+    (1, ProgressedRun::RecruitTakeover, 0x96f5_68d3_9deb_47d9),
+    (
+        0xDEAD_BEEF_2026,
+        ProgressedRun::HardCapstone,
+        0xcaea_9c90_4c7b_2910,
+    ),
+    (
+        0xDEAD_BEEF_2026,
+        ProgressedRun::RecruitTakeover,
+        0x6a77_9762_dcfd_6acf,
+    ),
+];
+
+/// Provisional `(PROGRESSED_GOLDEN, PROGRESSED_TRACE)` digests, in
+/// `PROGRESSED_GOLDEN` order (ruling P3, as `PROVISIONAL`).
+const PROGRESSED_PROVISIONAL: Option<([u64; 4], [u64; 4])> = None;
+
+/// Why `PROGRESSED_PROVISIONAL` moved: `(commit tag, class, reason)`.
+const PROGRESSED_PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
+
+/// The archetypes wave 2 appended (W2-31: six and the splitter's child).
+/// They enter at wave tier 5, so no `GOLDEN` run meets one.
+const NEW_ARCHETYPES: [&str; 7] = [
+    "exploder",
+    "splitter",
+    "splitter-brood",
+    "spitter",
+    "shield-bearer",
+    "sprinter",
+    "juggernaut",
+];
+
 /// The ledger rules: provisional digests carry causes, every cause names its
-/// commit and reason, and causes never outlive the provisional pin.
-fn check_ledger(
-    provisional: Option<([u64; 6], [u64; 6])>,
+/// commit and reason, and causes never outlive the provisional pin. `tables`
+/// are the family's pinned `(GOLDEN, TRACE)` digests; a provisional pin equal
+/// to them moves nothing.
+fn check_ledger<const N: usize>(
+    provisional: Option<([u64; N], [u64; N])>,
     causes: &[(&str, MoveClass, &str)],
+    tables: ([u64; N], [u64; N]),
 ) -> Result<(), String> {
     for (tag, class, reason) in causes {
         if tag.trim().is_empty() || reason.trim().is_empty() {
@@ -225,18 +305,32 @@ fn check_ledger(
              PROVISIONAL_CAUSES"
                 .into(),
         ),
-        Some((golden, trace)) => {
-            if golden == GOLDEN.map(|(_, _, d)| d) && trace == GAMEPLAY_TRACE.map(|(_, _, d)| d) {
-                Err("PROVISIONAL equals GOLDEN and GAMEPLAY_TRACE: reset it to None".into())
-            } else {
-                Ok(())
-            }
+        Some(pins) if pins == tables => {
+            Err("PROVISIONAL equals the pinned tables: reset it to None".into())
         }
+        Some(_) => Ok(()),
     }
 }
 
+/// The `(GOLDEN, GAMEPLAY_TRACE)` digests of the six smoke runs.
+fn golden_tables() -> ([u64; 6], [u64; 6]) {
+    (GOLDEN.map(|(_, _, d)| d), GAMEPLAY_TRACE.map(|(_, _, d)| d))
+}
+
+/// The `(PROGRESSED_GOLDEN, PROGRESSED_TRACE)` digests of the four
+/// progressed runs.
+fn progressed_tables() -> ([u64; 4], [u64; 4]) {
+    (
+        PROGRESSED_GOLDEN.map(|(_, _, d)| d),
+        PROGRESSED_TRACE.map(|(_, _, d)| d),
+    )
+}
+
 /// The digests the tests pin: `PROVISIONAL` when set, the tables otherwise.
-fn pinned(table: &[(u64, Mode, u64); 6], provisional: Option<[u64; 6]>) -> [(u64, Mode, u64); 6] {
+fn pinned<T: Copy, const N: usize>(
+    table: &[(u64, T, u64); N],
+    provisional: Option<[u64; N]>,
+) -> [(u64, T, u64); N] {
     let mut pins = *table;
     if let Some(digests) = provisional {
         for (pin, digest) in pins.iter_mut().zip(digests) {
@@ -277,6 +371,98 @@ fn observed_run(seed: u64, mode: Mode) -> (Game, u64, OutcomeSummary) {
         summary.observe(g);
     });
     (g, hash, summary)
+}
+
+/// One tick of a progressed run's trace: [`trace_line`] while the attempt
+/// lives; once it has settled, the report's outcome, kills and coins and the
+/// campaign's victories, coins and liberated countries.
+fn progressed_trace_line(g: &Game) -> String {
+    if g.attempt().is_some() {
+        return trace_line(g);
+    }
+    let r = g
+        .last_result()
+        .expect("a settled progressed run has a report");
+    let c = g.campaign();
+    format!(
+        "settled {:?} kills{} coins{} | victories{} coins{} cleared{:?}\n",
+        r.outcome, r.kills, r.coins, c.victories, c.coins, c.world.cleared
+    )
+}
+
+/// The telemetry of a progressed run: its live attempt's, or its report's
+/// once the attempt settled.
+fn progressed_telemetry(g: &Game) -> &CombatTelemetry {
+    g.attempt()
+        .map(|a| &a.telemetry)
+        .or_else(|| g.last_result().map(|r| &r.telemetry))
+        .expect("a progressed run has an attempt or a report")
+}
+
+/// The progressed run's end: outcome (None while live), kills, spawned,
+/// elites, boss phase ticks and new-archetype kills. Its FNV is the
+/// anatomy's outcome hash.
+fn progressed_outcome(g: &Game) -> String {
+    let t = progressed_telemetry(g);
+    let new: Vec<_> = t
+        .kills_by_archetype
+        .iter()
+        .filter(|(id, _)| NEW_ARCHETYPES.contains(&id.as_str()))
+        .collect();
+    format!(
+        "outcome {:?} spawned {} elites {}/{} phases {:?} new kills {new:?}",
+        g.attempt()
+            .is_none()
+            .then(|| g.last_result().map(|r| r.outcome))
+            .flatten(),
+        t.spawned,
+        t.elites_killed,
+        t.elites_spawned,
+        t.boss_phase_ticks
+    )
+}
+
+/// The progressed run of `seed` and `run` with its trace hash, from one pass.
+fn observed_progressed_run(seed: u64, run: ProgressedRun) -> (Game, u64) {
+    let mut hash = support::fnv1a(b"");
+    let g = progressed_run(seed, run, |g| {
+        hash = support::fnv1a_extend(hash, progressed_trace_line(g).as_bytes());
+    });
+    (g, hash)
+}
+
+/// What a progressed run must have exercised: an elite spawned, a boss
+/// phase entered and a new archetype killed.
+fn progressed_exercise(g: &Game) -> Result<(), String> {
+    let t = progressed_telemetry(g);
+    let mut missing = Vec::new();
+    if t.elites_spawned == 0 {
+        missing.push("no elite spawned");
+    }
+    if t.boss_phase_ticks.is_empty() {
+        missing.push("no boss phase entered");
+    }
+    if !t
+        .kills_by_archetype
+        .iter()
+        .any(|(id, kills)| *kills > 0 && NEW_ARCHETYPES.contains(&id.as_str()))
+    {
+        missing.push("no new archetype killed");
+    }
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(missing.join(", "))
+    }
+}
+
+/// A saved game's digest after a save, decode and validation round trip.
+fn reloaded_digest(g: &Game) -> u64 {
+    let payload: serde_json::Value =
+        serde_json::from_str(&g.to_save_json().expect("the game saves")).unwrap();
+    Game::from_payload(payload, SAVE_VERSION)
+        .expect("the saved game decodes and validates")
+        .state_digest()
 }
 
 /// Pin (W1-13, R2): the mode owner's seat is never written, so the default
@@ -352,6 +538,103 @@ fn seeded_headless_runs_reach_the_pinned_state_digests() {
 }
 
 #[test]
+fn progressed_runs_reach_the_pinned_state_digests_and_traces() {
+    let golden = pinned(&PROGRESSED_GOLDEN, PROGRESSED_PROVISIONAL.map(|p| p.0));
+    let trace = pinned(&PROGRESSED_TRACE, PROGRESSED_PROVISIONAL.map(|p| p.1));
+    let mut mismatches = Vec::new();
+    for ((seed, run, expected), (_, _, expected_trace)) in golden.into_iter().zip(trace) {
+        let (g, hash) = observed_progressed_run(seed, run);
+        let digest = g.state_digest();
+        println!("golden ({seed:#x}, ProgressedRun::{run:?}, {digest:#018x}),");
+        println!("trace  ({seed:#x}, ProgressedRun::{run:?}, {hash:#018x}),");
+        println!("// {seed:#x} {run:?}: {}", progressed_outcome(&g));
+        if digest != expected {
+            mismatches.push(format!(
+                "seed {seed:#x} {run:?} state: expected {expected:#018x}, got {digest:#018x}"
+            ));
+        }
+        if hash != expected_trace {
+            mismatches.push(format!(
+                "seed {seed:#x} {run:?} gameplay: expected {expected_trace:#018x}, got {hash:#018x}"
+            ));
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "The progressed runs diverged from their pins:\n{}\n\n\
+         If this change is intentional, set PROGRESSED_PROVISIONAL and append its cause \
+         to PROGRESSED_PROVISIONAL_CAUSES in tests/determinism.rs (see the file header).",
+        mismatches.join("\n")
+    );
+}
+
+/// W4-09 (design-save-determinism section 9): every progressed run starts
+/// from the campaign it names, a valid save, and its window spawns an elite,
+/// enters a boss phase and kills a new archetype; the four end states differ
+/// and save validly. Perturbation: the same campaigns at rank 2 (below the
+/// elite rank 3, wave tier 5 and the rank-4 boss phases) fail the check, so
+/// it is not vacuous.
+#[test]
+fn progressed_golden_runs_exercise_elites_boss_phases_and_new_archetypes() {
+    let mut digests = std::collections::BTreeSet::new();
+    for (seed, run, _) in PROGRESSED_GOLDEN {
+        let what = format!("seed {seed:#x} {run:?}");
+        let start = support::progressed_determinism_game(seed, run);
+        let a = start.attempt().expect("the progressed defense is live");
+        assert_eq!(a.mode, run.mode(), "{what}");
+        assert_eq!(u64::from(a.progression.rank), PROGRESSED_RANK, "{what}");
+        assert!(!a.boss_spawned && !a.paused, "{what}");
+        assert!(!a.structures.is_empty(), "{what}: the defender built");
+        match run {
+            ProgressedRun::HardCapstone => {
+                assert_eq!(a.defender(), DefenderId::Player, "{what}");
+                assert_eq!(a.progression.boss_rank, BossRank::Capstone, "{what}");
+                assert_eq!(
+                    start.campaign().balance_settings.preset,
+                    horde_core::balance::BalancePreset::Hard,
+                    "{what}"
+                );
+            }
+            ProgressedRun::RecruitTakeover => {
+                assert!(
+                    matches!(a.defender(), DefenderId::Recruit(_)),
+                    "{what}: a recruit holds the main run"
+                );
+                assert_eq!(a.progression.boss_rank, BossRank::Sector, "{what}");
+            }
+        }
+        assert_eq!(
+            reloaded_digest(&start),
+            start.state_digest(),
+            "{what}: the staged start is a valid save"
+        );
+        let (end, _) = observed_progressed_run(seed, run);
+        progressed_exercise(&end).unwrap_or_else(|missing| panic!("{what}: {missing}"));
+        assert_eq!(
+            reloaded_digest(&end),
+            end.state_digest(),
+            "{what}: the end state is a valid save"
+        );
+        digests.insert(end.state_digest());
+    }
+    assert_eq!(digests.len(), 4, "every progressed run has its own state");
+
+    for seed in PROGRESSED_SEEDS {
+        for run in ProgressedRun::ALL {
+            let early = support::smoke_drive(
+                support::progressed_determinism_game_at(seed, run, 2),
+                PROGRESSED_TICKS,
+                |_| {},
+            );
+            assert!(
+                progressed_exercise(&early).is_err(),
+                "seed {seed:#x} {run:?} at rank 2 exercises everything: the check is vacuous"
+            );
+        }
+    }
+}
+
+#[test]
 fn gameplay_trace_is_recorded_under_the_current_ruleset() {
     assert_eq!(
         TRACE_RULESET, RULESET_VERSION,
@@ -362,33 +645,47 @@ fn gameplay_trace_is_recorded_under_the_current_ruleset() {
 
 #[test]
 fn provisional_digests_name_their_causes() {
-    check_ledger(PROVISIONAL, PROVISIONAL_CAUSES).unwrap();
+    check_ledger(PROVISIONAL, PROVISIONAL_CAUSES, golden_tables()).unwrap();
+    check_ledger(
+        PROGRESSED_PROVISIONAL,
+        PROGRESSED_PROVISIONAL_CAUSES,
+        progressed_tables(),
+    )
+    .unwrap();
 
-    let golden = GOLDEN.map(|(_, _, d)| d);
-    let trace = GAMEPLAY_TRACE.map(|(_, _, d)| d);
+    let tables = golden_tables();
+    let (golden, trace) = tables;
     let mut moved = golden;
     moved[0] ^= 1;
     let cause = [("W9-99", MoveClass::F, "a planted format move")];
-    assert!(check_ledger(None, &[]).is_ok());
-    assert!(check_ledger(Some((moved, trace)), &cause).is_ok());
+    assert!(check_ledger::<6>(None, &[], tables).is_ok());
+    assert!(check_ledger(Some((moved, trace)), &cause, tables).is_ok());
     assert!(
-        check_ledger(Some((moved, trace)), &[]).is_err(),
+        check_ledger(Some((moved, trace)), &[], tables).is_err(),
         "provisional digests without a cause"
     );
     assert!(
-        check_ledger(None, &cause).is_err(),
+        check_ledger::<6>(None, &cause, tables).is_err(),
         "a cause left behind after the re-bless"
     );
     assert!(
-        check_ledger(Some((golden, trace)), &cause).is_err(),
+        check_ledger(Some((golden, trace)), &cause, tables).is_err(),
         "a provisional pin that moves nothing"
     );
     for blank in [("", MoveClass::F, "a reason"), ("W9-99", MoveClass::F, " ")] {
         assert!(
-            check_ledger(Some((moved, trace)), &[blank]).is_err(),
+            check_ledger(Some((moved, trace)), &[blank], tables).is_err(),
             "a cause without a commit tag or reason: {blank:?}"
         );
     }
+    // The progressed family keeps the same rules against its own tables.
+    let progressed = progressed_tables();
+    let mut moved = progressed.1;
+    moved[3] ^= 1;
+    assert!(check_ledger(Some((progressed.0, moved)), &cause, progressed).is_ok());
+    assert!(check_ledger(Some((progressed.0, moved)), &[], progressed).is_err());
+    assert!(check_ledger(Some(progressed), &cause, progressed).is_err());
+    assert!(check_ledger::<4>(None, &cause, progressed).is_err());
 }
 
 /// A small payload with the real shape: campaign items, a receipt list and an
@@ -581,6 +878,19 @@ fn determinism_anatomy() {
         let anatomy = Anatomy::of(&payload, g.state_digest(), trace, summary.digest());
         println!("({seed:#x}, Mode::{mode:?}) {anatomy}");
         println!("// {summary}");
+    }
+    for (seed, run, _) in PROGRESSED_GOLDEN {
+        let (g, trace) = observed_progressed_run(seed, run);
+        let payload = serde_json::to_value(&g).unwrap();
+        let outcome = progressed_outcome(&g);
+        let anatomy = Anatomy::of(
+            &payload,
+            g.state_digest(),
+            trace,
+            support::fnv1a(outcome.as_bytes()),
+        );
+        println!("({seed:#x}, ProgressedRun::{run:?}) {anatomy}");
+        println!("// {outcome}");
     }
 }
 

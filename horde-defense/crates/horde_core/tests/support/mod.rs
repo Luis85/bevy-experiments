@@ -1,11 +1,14 @@
 //! Helpers shared by the integration test crates. Each test binary uses a
 //! different subset, so unused items are expected.
 #![allow(dead_code)]
-use horde_core::balance::BalanceSettings;
-use horde_core::campaign::Campaign;
-use horde_core::content::{EnemyKind, Mode, Policy};
-use horde_core::sim::{Game, Input, smoke_input};
+use horde_core::balance::{BalancePreset, BalanceSettings};
+use horde_core::campaign::{Campaign, NpcTraining};
+use horde_core::command::{Command, CommandOutcome};
+use horde_core::content::{EnemyKind, ItemDefId, Mode, Policy, Slot, StructureKind, content};
+use horde_core::defenders::DefenderId;
+use horde_core::sim::{Game, Input, TICKS_PER_SECOND, construction_lane_order, smoke_input};
 use horde_core::skill_catalog::skills;
+use horde_core::world::world;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fmt;
@@ -139,6 +142,221 @@ pub fn smoke_run(seed: u64, mode: Mode, ticks: u32, mut observe: impl FnMut(&Gam
     }
     g.deploy(0, mode).unwrap();
     g.set_paused(false);
+    for _ in 0..ticks {
+        let input = smoke_input(&g);
+        g.tick(input);
+        observe(&g);
+    }
+    g
+}
+
+// ---------------------------------------------------------------------------
+// The progressed determinism runs (W4-09; design-save-determinism section 9,
+// "Extra coverage (wave 4)"). `tests/determinism.rs` pins their state digests
+// (PROGRESSED_GOLDEN) and gameplay traces (PROGRESSED_TRACE).
+// ---------------------------------------------------------------------------
+
+/// The two progressed campaigns `PROGRESSED_GOLDEN` pins, per seed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProgressedRun {
+    /// The player defends the Capstone (last) stage of the front on the
+    /// Hard preset.
+    HardCapstone,
+    /// A trained, equipped recruit takes the main run over (Npc mode) on the
+    /// front's first stage, on the default preset.
+    RecruitTakeover,
+}
+
+impl ProgressedRun {
+    pub const ALL: [Self; 2] = [Self::HardCapstone, Self::RecruitTakeover];
+    /// The attempt mode the run deploys in.
+    pub fn mode(self) -> Mode {
+        match self {
+            Self::HardCapstone => Mode::Personal,
+            Self::RecruitTakeover => Mode::Npc,
+        }
+    }
+}
+
+/// The campaign threat rank (`Campaign::victories`) of the progressed runs.
+pub const PROGRESSED_RANK: u64 = 12;
+/// How many ticks the smoke bot drives a progressed run.
+pub const PROGRESSED_TICKS: u32 = 3600;
+/// The staged attempt clock starts this many ticks before the boss is due,
+/// so the window holds the late wave, the boss, its phases and (when the
+/// defender wins) the settlement.
+pub const PROGRESSED_BOSS_LEAD: u64 = 1800;
+/// The coins the progressed campaigns are staged with before they shop.
+pub const PROGRESSED_PURSE: u64 = 400_000;
+/// The liberated countries (three stages each) the campaigns are staged with:
+/// they unlock Companion, Recruitment and Parallel, and the recruit comes
+/// from the second.
+pub const PROGRESSED_LIBERATED: [&str; 4] = ["ALA", "ALB", "ASM", "AND"];
+/// The active front (three stages): its Capstone is stage 2.
+pub const PROGRESSED_FRONT: &str = "AIA";
+
+/// The highest-tier catalogue item for `slot` the campaign can buy now (the
+/// last of equal tiers in catalogue order); NPC-only items only for an npc.
+fn best_purchasable(g: &Game, slot: Slot, npc: bool) -> Option<usize> {
+    let unlocked = g.campaign().unlocked();
+    content()
+        .items
+        .iter()
+        .enumerate()
+        .filter(|(_, i)| {
+            i.slot == slot && i.purchasable() && i.tier <= unlocked && (npc || !i.npc_only)
+        })
+        .max_by_key(|(_, i)| i.tier)
+        .map(|(n, _)| n)
+}
+
+/// Buys the best item for every slot and returns the new item ids.
+fn buy_best_gear(g: &mut Game, npc: bool) -> Vec<u64> {
+    let mut ids = Vec::new();
+    for slot in Slot::ALL {
+        if let Some(n) = best_purchasable(g, slot, npc) {
+            match g.apply(&Command::BuyItem(ItemDefId::at(n))) {
+                Ok(CommandOutcome::Id(id)) => ids.push(id),
+                other => panic!("buying {}: {other:?}", content().items[n].name),
+            }
+        }
+    }
+    ids
+}
+
+/// The game a progressed run starts from, at [`PROGRESSED_RANK`]: see
+/// [`progressed_determinism_game_at`].
+pub fn progressed_determinism_game(seed: u64, run: ProgressedRun) -> Game {
+    progressed_determinism_game_at(seed, run, PROGRESSED_RANK)
+}
+
+/// A progressed campaign at threat `rank`, deployed and with its attempt
+/// clock [`PROGRESSED_BOSS_LEAD`] ticks before the boss. Built here, not by
+/// the review render fixtures.
+///
+/// Staged through the test-support seams, because no short legal command
+/// sequence reaches them: the world (the [`PROGRESSED_LIBERATED`] countries
+/// liberated, [`PROGRESSED_FRONT`] the active front at its Capstone for
+/// [`ProgressedRun::HardCapstone`] and at its first stage for
+/// [`ProgressedRun::RecruitTakeover`]), the victories (the threat rank), the
+/// attempt count, the purse and, after the deploy, the attempt clock.
+///
+/// Played through `Game::apply`: the Hard preset (HardCapstone only), every
+/// skill node the purse buys in catalogue order, the best gear for the
+/// player (equipped), and for RecruitTakeover a recruit from the second
+/// liberated country in the best gear, trained until no training or point
+/// is left to buy, chosen as the next defender. Then `BeginDefense`, and the
+/// defender builds walls, turrets and traps lane by lane while supply lasts.
+pub fn progressed_determinism_game_at(seed: u64, run: ProgressedRun, rank: u64) -> Game {
+    let mut g = Game::default();
+    g.set_seed(seed);
+    if run == ProgressedRun::HardCapstone {
+        g.apply(&Command::SetBalance(BalanceSettings::for_preset(
+            BalancePreset::Hard,
+        )))
+        .expect("the Hard preset applies to a new campaign");
+    }
+    let front_count = world()
+        .country(PROGRESSED_FRONT)
+        .expect("the progressed front exists")
+        .level_count();
+    let stage = match run {
+        ProgressedRun::HardCapstone => front_count - 1,
+        ProgressedRun::RecruitTakeover => 0,
+    };
+    {
+        let c = g.staging().campaign();
+        c.choose_start_country(PROGRESSED_FRONT)
+            .expect("the progressed front can be chosen");
+        c.world
+            .country_levels
+            .insert(PROGRESSED_FRONT.into(), stage);
+        for id in PROGRESSED_LIBERATED {
+            let count = world().country(id).expect("a staged country").level_count();
+            c.world.country_levels.insert(id.into(), count);
+            c.world.cleared.push(id.into());
+            if !c.world.unlocked.iter().any(|u| u == id) {
+                c.world.unlocked.push(id.into());
+            }
+        }
+        c.victories = rank;
+        c.attempts = rank;
+        c.coins = PROGRESSED_PURSE;
+    }
+    while let Some(id) = skills()
+        .nodes
+        .iter()
+        .find(|n| g.campaign().can_purchase_node(&n.id).is_ok())
+        .map(|n| n.id.clone())
+    {
+        g.apply(&Command::BuySkillNode(id))
+            .expect("a purchasable node buys");
+    }
+    for id in buy_best_gear(&mut g, false) {
+        g.apply(&Command::Equip {
+            mode: Mode::Personal,
+            id,
+        })
+        .expect("the player equips bought gear");
+    }
+    let defender = match run {
+        ProgressedRun::HardCapstone => DefenderId::Player,
+        ProgressedRun::RecruitTakeover => {
+            let id = match g.apply(&Command::Recruit(PROGRESSED_LIBERATED[1].into())) {
+                Ok(CommandOutcome::Id(id)) => id,
+                other => panic!("recruiting: {other:?}"),
+            };
+            for item in buy_best_gear(&mut g, true) {
+                g.apply(&Command::EquipRecruit { id, item })
+                    .expect("the recruit equips bought gear");
+            }
+            loop {
+                let mut trained = false;
+                for training in NpcTraining::ALL {
+                    trained |= g.apply(&Command::TrainRecruit { id, training }).is_ok();
+                }
+                if !trained && g.apply(&Command::BuyRecruitPoint(id)).is_err() {
+                    break;
+                }
+            }
+            DefenderId::Recruit(id)
+        }
+    };
+    g.apply(&Command::SetNextDefender(defender))
+        .expect("the defender is selectable");
+    g.apply(&Command::BeginDefense { stage })
+        .expect("the progressed defense deploys");
+    let lanes = g.attempt().expect("deployed").lane_count;
+    for (kind, column) in [
+        (StructureKind::Wall, 0),
+        (StructureKind::Turret, 1),
+        (StructureKind::Trap, 3),
+    ] {
+        for lane in construction_lane_order(lanes) {
+            // Supply runs out part-way; a refused placement changes nothing.
+            let _ = g.apply(&Command::Place { kind, lane, column });
+        }
+    }
+    let a = g.staging().attempt().expect("deployed");
+    let boss_tick = (a.boss_time() * TICKS_PER_SECOND as f32).ceil() as u64;
+    a.tick = boss_tick.saturating_sub(PROGRESSED_BOSS_LEAD);
+    g
+}
+
+/// The progressed run of `seed` and `run`: [`progressed_determinism_game`]
+/// driven by `smoke_input` for [`PROGRESSED_TICKS`] ticks. `observe` sees
+/// the game after every tick.
+pub fn progressed_run(seed: u64, run: ProgressedRun, observe: impl FnMut(&Game)) -> Game {
+    smoke_drive(
+        progressed_determinism_game(seed, run),
+        PROGRESSED_TICKS,
+        observe,
+    )
+}
+
+/// Drives `g` with `smoke_input` for `ticks` ticks; `observe` sees the game
+/// after every tick.
+pub fn smoke_drive(mut g: Game, ticks: u32, mut observe: impl FnMut(&Game)) -> Game {
     for _ in 0..ticks {
         let input = smoke_input(&g);
         g.tick(input);

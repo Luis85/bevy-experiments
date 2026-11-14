@@ -1908,6 +1908,55 @@ fn v7_fixture_loads_validates_and_resaves_byte_identically() {
     ));
 }
 
+/// FNV-1a of the v7 fixture continued for 600 idle ticks (sampled every 50),
+/// pinned at the wave-4 close (W4-09) on ruleset 4; it guards waves 5-7.
+/// Each line is the v6 continuation line: the root attempt (tick, hp, loot,
+/// coins, RNG state, level and every enemy's id, hp and x) plus, per
+/// expedition, its settled flag and its worker attempt's tick, hp, RNG state
+/// and enemy count. Campaign coins, items and the strategy RNG are left out,
+/// as in the v6 pin.
+const V7_CONTINUATION_FNV: u64 = 0xe548_ad05_21f8_a2ce;
+
+#[test]
+fn v7_fixture_continues_exactly_as_the_wave4_close_did() {
+    let mut g = fixture_v7();
+    let mut trace = String::new();
+    for t in 0..600u32 {
+        g.tick(Input::default());
+        if t % 50 == 49 {
+            let a = g.attempt().expect("the root defense outlasts 600 ticks");
+            trace.push_str(&format!(
+                "t{} hp{} loot{} coins{} rng{} level{} enemies{:?}",
+                a.tick,
+                a.hp,
+                a.loot,
+                a.coins,
+                a.rng.state,
+                a.level,
+                a.enemies
+                    .iter()
+                    .map(|e| (e.id, e.hp, e.x.to_bits()))
+                    .collect::<Vec<_>>()
+            ));
+            for battle in g.battles() {
+                let worker = battle.game().attempt();
+                trace.push_str(&format!(
+                    " | b{} settled{} {:?}",
+                    battle.id,
+                    battle.settled,
+                    worker.map(|a| (a.tick, a.hp, a.rng.state, a.enemies.len()))
+                ));
+            }
+            trace.push('\n');
+        }
+    }
+    let live = g.battles().iter().filter(|b| !b.settled).count();
+    assert!(live > 0, "the live expedition outlasts 600 ticks");
+    let fnv = support::fnv1a(trace.as_bytes());
+    assert_eq!(trace.lines().count(), 12);
+    assert_eq!(fnv, V7_CONTINUATION_FNV, "{trace}");
+}
+
 /// Every enemy and balance field save format 7 added (sections 3.1
 /// `balance_extras_basis` and 3.8-3.12) survives load and resave with the
 /// same saved text, and the loaded game digests to the saved checksum.
