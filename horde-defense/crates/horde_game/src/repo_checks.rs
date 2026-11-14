@@ -29,6 +29,15 @@
 //! owner writes. It checks presence only. `docs_drop_retired_loot_claims`
 //! and `docs_drop_retired_progression_claims` keep the claims the production
 //! pass made false out of `docs/` (W7-04, W7-05).
+//!
+//! `playtest_guide_covers_the_production_loop` keeps the playtest guide's
+//! loop sections (Loop, Escape, Auto-sell, Takeover, Listening pass,
+//! Click-to-photon) and what they must say. `acceptance_ledger_lists_every_production_pass_row`
+//! keeps docs/ACCEPTANCE.md listing every criterion of the production-pass
+//! acceptance matrix, with each function its Proof names defined in a file
+//! its Defined in column lists, and `acceptance_lists_every_pending_human_check`
+//! keeps its pending human checks equal to the plan's (W7-08).
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -582,7 +591,14 @@ fn skipped_directory(name: &str) -> bool {
 /// Every `.md` in the workspace outside [`skipped_directory`] folders, as
 /// `/`-separated paths relative to the workspace, sorted.
 fn markdown_files(workspace: &Path) -> Vec<String> {
-    fn walk(root: &Path, directory: &Path, found: &mut Vec<String>) {
+    workspace_files(workspace, workspace, &["md"])
+}
+
+/// Every file below `directory` with one of `extensions` (case-insensitive),
+/// outside [`skipped_directory`] folders, as `/`-separated paths relative to
+/// `workspace`, sorted.
+fn workspace_files(workspace: &Path, directory: &Path, extensions: &[&str]) -> Vec<String> {
+    fn walk(root: &Path, directory: &Path, extensions: &[&str], found: &mut Vec<String>) {
         let entries = std::fs::read_dir(directory)
             .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()));
         for entry in entries {
@@ -595,18 +611,19 @@ fn markdown_files(workspace: &Path) -> Vec<String> {
             let name = parts.join("/");
             if path.is_dir() {
                 if !skipped_directory(&name) {
-                    walk(root, &path, found);
+                    walk(root, &path, extensions, found);
                 }
-            } else if path
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
-            {
+            } else if path.extension().is_some_and(|extension| {
+                extensions
+                    .iter()
+                    .any(|wanted| extension.eq_ignore_ascii_case(wanted))
+            }) {
                 found.push(name);
             }
         }
     }
     let mut found = Vec::new();
-    walk(workspace, workspace, &mut found);
+    walk(workspace, directory, extensions, &mut found);
     found.sort();
     found
 }
@@ -1283,6 +1300,38 @@ const REQUIRED_DOC_SECTIONS: &[(&str, &[&str])] = &[
     ),
     ("docs/VIEW_HIERARCHY.md", &["## Production pass views"]),
     ("docs/PLAYTEST_GUIDE.md", &["## Escape"]),
+    // W7-08, qa-captures: the rest of the inventory. The playtest guide's
+    // loop sections (checked more closely by
+    // `playtest_guide_covers_the_production_loop`), the acceptance ledger,
+    // the audio guide W7-03 rewrote, the later user requirements, the full
+    // verify and the ownership table.
+    (
+        "docs/PLAYTEST_GUIDE.md",
+        &["## Loop", "## Listening pass", "## Click-to-photon"],
+    ),
+    (
+        "docs/ACCEPTANCE.md",
+        &[
+            "## Production pass criteria",
+            "## Audio loudness gate",
+            "## Pending human checks",
+        ],
+    ),
+    (
+        "docs/AUDIO_SURVIVAL.md",
+        &[
+            "## Loudness gate",
+            "## Buses and sliders",
+            "## Mix table",
+            "## Mastering and headroom",
+        ],
+    ),
+    (
+        "docs/EXPANSION.md",
+        &["## Production pass requirements — November 2026"],
+    ),
+    ("docs/VALIDATION.md", &["## Full verify"]),
+    ("docs/ARCHITECTURE.md", &["## Ownership"]),
 ];
 
 /// Interface claims the production pass made false, with what replaced each
@@ -1518,6 +1567,487 @@ fn doc_section_check_matches_whole_heading_lines_outside_fences() {
         vec![
             "d.md: missing \"## Boss phases\"".to_owned(),
             "d.md: missing \"## Fenced\"".to_owned(),
+        ]
+    );
+}
+
+/// The playtest guide's production-loop sections (design-qa-captures 13,
+/// W7-08): the loop a tester walks, then the four checks along it.
+const PLAYTEST_LOOP_SECTIONS: &[&str] = &[
+    "## Loop",
+    "## Escape",
+    "## Auto-sell",
+    "## Takeover",
+    "## Listening pass",
+    "## Click-to-photon",
+];
+
+/// What a loop section must say, matched like [`RETIRED_DOC_CLAIMS`]: the
+/// stops of the loop, and for the two human checks a `Status:` line (pending
+/// until a pass is logged) and, for click-to-photon, the protocol's camera,
+/// shots and targets (design-qa-captures 1.14).
+const PLAYTEST_SECTION_FACTS: &[(&str, &[&str])] = &[
+    (
+        "## Loop",
+        &[
+            "Results",
+            "Upgrade",
+            "Back to battle",
+            "Back to camp",
+            "Camp home",
+            "Recruit",
+        ],
+    ),
+    ("## Listening pass", &["Status:"]),
+    (
+        "## Click-to-photon",
+        &[
+            "Status:",
+            "240 fps",
+            "20 single shots",
+            "50 ms",
+            "34 ms",
+            "67 ms",
+        ],
+    ),
+];
+
+/// The body of the section under `heading` (a whole line outside fences, as
+/// [`missing_doc_sections`] matches it): the lines after it up to the next
+/// heading of its level or higher. None when the heading is absent.
+fn section_body(text: &str, heading: &str) -> Option<String> {
+    let level = heading.chars().take_while(|c| *c == '#').count();
+    let mut fenced = false;
+    let mut body: Option<Vec<&str>> = None;
+    for line in text.lines() {
+        let line = line.trim_end();
+        if line.trim_start().starts_with("```") {
+            fenced = !fenced;
+        } else if !fenced {
+            let hashes = line.chars().take_while(|c| *c == '#').count();
+            if hashes > 0 && line[hashes..].starts_with(' ') {
+                if body.is_some() && hashes <= level {
+                    break;
+                }
+                if line == heading {
+                    body = Some(Vec::new());
+                    continue;
+                }
+            }
+        }
+        if let Some(lines) = body.as_mut() {
+            lines.push(line);
+        }
+    }
+    body.map(|lines| lines.join("\n"))
+}
+
+/// The loop sections `text` lacks and the facts its sections leave out.
+fn playtest_loop_violations(name: &str, text: &str) -> Vec<String> {
+    let mut violations = missing_doc_sections(name, text, PLAYTEST_LOOP_SECTIONS);
+    for (heading, facts) in PLAYTEST_SECTION_FACTS {
+        let Some(body) = section_body(text, heading) else {
+            continue;
+        };
+        let body = normalized(&body);
+        violations.extend(
+            facts
+                .iter()
+                .filter(|fact| !body.contains(&normalized(fact)))
+                .map(|fact| format!("{name}: \"{heading}\" does not say \"{fact}\"")),
+        );
+    }
+    violations
+}
+
+#[test]
+fn playtest_guide_covers_the_production_loop() {
+    let name = "docs/PLAYTEST_GUIDE.md";
+    let violations = playtest_loop_violations(name, &read_workspace_file(name));
+    assert!(
+        violations.is_empty(),
+        "the playtest guide does not cover the production loop ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn section_body_stops_at_the_next_heading_of_its_level() {
+    let text = "# Guide\n## Loop\nResults then\n### Detail\nUpgrade\n```\n## Fenced\n```\n\
+                ## Escape\nMenu\n";
+    assert_eq!(
+        section_body(text, "## Loop").as_deref(),
+        Some("Results then\n### Detail\nUpgrade\n```\n## Fenced\n```")
+    );
+    assert_eq!(section_body(text, "## Escape").as_deref(), Some("Menu"));
+    assert_eq!(section_body(text, "## Takeover"), None);
+    let violations = playtest_loop_violations("g.md", "## Loop\nResults, Upgrade.\n");
+    assert!(violations.contains(&"g.md: missing \"## Click-to-photon\"".to_owned()));
+    assert!(violations.contains(&"g.md: \"## Loop\" does not say \"Back to camp\"".to_owned()));
+    assert!(!violations.iter().any(|v| v.contains("\"Upgrade\"")));
+}
+
+/// The production-pass acceptance matrix, which says every one of its rows
+/// is also listed in the acceptance ledger (W7-08).
+const PRODUCTION_ACCEPTANCE: &str = "docs/plans/production-pass/acceptance.md";
+/// The acceptance ledger and its two production-pass sections.
+const ACCEPTANCE_LEDGER: &str = "docs/ACCEPTANCE.md";
+const LEDGER_PRODUCTION_SECTION: &str = "## Production pass criteria";
+const LEDGER_HUMAN_CHECKS: &str = "## Pending human checks";
+/// The production-pass plan and its list of pending human checks.
+const PRODUCTION_PLAN: &str = "docs/plans/2026-11-05-production-pass.md";
+const PLAN_HUMAN_CHECKS: &str = "## 11. Human checks pending";
+
+/// Backticked names in a ledger Proof cell that are not functions, with
+/// what each is.
+const PROOF_NAMES_THAT_ARE_NOT_FUNCTIONS: &[(&str, &str)] = &[
+    ("boss_phases", "the attempt-scoped saved field"),
+    (
+        "interface_total_not_above_baseline_v3",
+        "a PERF_BUDGET.json gate that measure_performance.ps1 evaluates",
+    ),
+    (
+        "old_campaign_filter_sells_recruit_equipped_item",
+        "W1-18's characterisation, inverted and renamed by W1-20",
+    ),
+    (
+        "pacing_targets",
+        "the release test target tests/pacing_targets.rs",
+    ),
+    ("save_clone", "the horde_core example"),
+    ("shipped_smoke_seconds", "a frame-report key"),
+    (
+        "valid_overs",
+        "a summary.json key of measure_performance.ps1",
+    ),
+];
+
+/// The cells of a Markdown table row, trimmed, with an escaped `\|` kept
+/// inside its cell as `|`. None for a line that is not a row and for the
+/// separator row.
+fn table_cells(line: &str) -> Option<Vec<String>> {
+    let inner = line.trim().strip_prefix('|')?.strip_suffix('|')?;
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut characters = inner.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character == '\\' && characters.peek() == Some(&'|') {
+            cell.push('|');
+            characters.next();
+        } else if character == '|' {
+            cells.push(cell.trim().to_owned());
+            cell.clear();
+        } else {
+            cell.push(character);
+        }
+    }
+    cells.push(cell.trim().to_owned());
+    let separator = cells
+        .iter()
+        .all(|cell| !cell.is_empty() && cell.chars().all(|c| matches!(c, '-' | ':')));
+    (!separator).then_some(cells)
+}
+
+/// The body rows of every table in `text`: rows whose first cell is not
+/// `header`.
+fn table_rows(text: &str, header: &str) -> Vec<Vec<String>> {
+    text.lines()
+        .filter_map(table_cells)
+        .filter(|cells| cells[0] != header)
+        .collect()
+}
+
+/// The functions a Proof cell names: every backticked lower-case token whose
+/// last `::` segment is an identifier with an underscore. Paths
+/// (`tests/auto_sell.rs`) and keys (`egui.battlefield_primitives.max`) are
+/// not names; an elided name (`foo_...`) is kept, so the check reports it.
+fn cited_functions(cell: &str) -> Vec<String> {
+    let identifier = |name: &str| {
+        name.contains('_')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    };
+    cell.split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|token| {
+            token.chars().all(|c| {
+                c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | ':' | '/' | '.')
+            })
+        })
+        .filter_map(|token| token.rsplit("::").next())
+        .filter(|name| {
+            identifier(name) || (name.contains("...") && identifier(&name.replace('.', "")))
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The functions a source text defines: the name after a line-leading
+/// `fn` (past `pub`, `const`, `async` and `unsafe`), `def` or `function`.
+fn defined_functions(text: &str) -> Vec<String> {
+    const MODIFIERS: &[&str] = &[
+        "pub(crate) ",
+        "pub(super) ",
+        "pub ",
+        "const ",
+        "async ",
+        "unsafe ",
+    ];
+    const KEYWORDS: &[&str] = &["fn ", "def ", "function ", "Function "];
+    let mut found = Vec::new();
+    for line in text.lines() {
+        let mut rest = line.trim_start();
+        while let Some(after) = MODIFIERS
+            .iter()
+            .find_map(|modifier| rest.strip_prefix(modifier))
+        {
+            rest = after.trim_start();
+        }
+        let Some(after) = KEYWORDS
+            .iter()
+            .find_map(|keyword| rest.strip_prefix(keyword))
+        else {
+            continue;
+        };
+        let name: String = after
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+            .collect();
+        if !name.is_empty() {
+            found.push(name);
+        }
+    }
+    found
+}
+
+/// Every function defined under `crates/` and `scripts/` (Rust, Python and
+/// PowerShell), by name, with the files that define it.
+fn function_index(workspace: &Path) -> BTreeMap<String, BTreeSet<String>> {
+    let mut index: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for top in ["crates", "scripts"] {
+        for name in workspace_files(workspace, &workspace.join(top), &["rs", "py", "ps1"]) {
+            for function in defined_functions(&read_workspace_file(&name)) {
+                index.entry(function).or_default().insert(name.clone());
+            }
+        }
+    }
+    index
+}
+
+/// What the ledger's production section gets wrong against the matrix:
+/// a criterion without a row, a row that is not a criterion, a row without
+/// the five cells (AC, Criterion, Proof, Defined in, Wave), a Proof name
+/// that no code defines, a defined name whose files Defined in leaves out,
+/// and a listed file that is missing or defines none of the row's names.
+/// Defined in is a comma-separated list of backticked workspace paths, or
+/// `—` for a row that names no function.
+fn ledger_violations(
+    matrix: &str,
+    section: &str,
+    functions: &BTreeMap<String, BTreeSet<String>>,
+    file_exists: &dyn Fn(&str) -> bool,
+) -> Vec<String> {
+    let criteria: Vec<String> = table_rows(matrix, "AC")
+        .into_iter()
+        .map(|cells| cells[0].clone())
+        .collect();
+    let rows = table_rows(section, "AC");
+    let mut violations: Vec<String> = criteria
+        .iter()
+        .filter(|id| !rows.iter().any(|row| &row[0] == *id))
+        .map(|id| format!("{id}: no row in the ledger"))
+        .collect();
+    for row in &rows {
+        let id = &row[0];
+        if !criteria.contains(id) {
+            violations.push(format!("{id}: not a criterion of {PRODUCTION_ACCEPTANCE}"));
+        }
+        let [_, _, proof, defined_in, _] = row.as_slice() else {
+            violations.push(format!(
+                "{id}: {} cells, not AC, Criterion, Proof, Defined in, Wave",
+                row.len()
+            ));
+            continue;
+        };
+        let files: Vec<String> = if defined_in == "—" {
+            Vec::new()
+        } else {
+            defined_in
+                .split(',')
+                .map(|file| file.trim().trim_matches('`').to_owned())
+                .collect()
+        };
+        for file in files.iter().filter(|file| !file_exists(file)) {
+            violations.push(format!("{id}: `{file}` does not exist"));
+        }
+        let mut used = BTreeSet::new();
+        for name in cited_functions(proof) {
+            if PROOF_NAMES_THAT_ARE_NOT_FUNCTIONS
+                .iter()
+                .any(|(listed, _)| *listed == name)
+            {
+                continue;
+            }
+            let Some(defined) = functions.get(&name) else {
+                violations.push(format!(
+                    "{id}: `{name}` is not a function under crates/ or scripts/"
+                ));
+                continue;
+            };
+            let listed: Vec<&String> = files
+                .iter()
+                .filter(|file| defined.contains(*file))
+                .collect();
+            if listed.is_empty() {
+                violations.push(format!(
+                    "{id}: `{name}` is defined in {}, which Defined in does not list",
+                    defined.iter().cloned().collect::<Vec<_>>().join(", ")
+                ));
+            }
+            used.extend(listed.into_iter().cloned());
+        }
+        for file in files.iter().filter(|file| !used.contains(*file)) {
+            violations.push(format!(
+                "{id}: `{file}` defines none of the row's functions"
+            ));
+        }
+    }
+    violations
+}
+
+/// A workspace file's text, by `/`-separated workspace path.
+fn read_workspace_file(name: &str) -> String {
+    let path = workspace_directory().join(name);
+    std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
+}
+
+#[test]
+fn acceptance_ledger_lists_every_production_pass_row() {
+    let workspace = workspace_directory();
+    let ledger = read_workspace_file(ACCEPTANCE_LEDGER);
+    let section = section_body(&ledger, LEDGER_PRODUCTION_SECTION)
+        .unwrap_or_else(|| panic!("{ACCEPTANCE_LEDGER} has no \"{LEDGER_PRODUCTION_SECTION}\""));
+    let violations = ledger_violations(
+        &read_workspace_file(PRODUCTION_ACCEPTANCE),
+        &section,
+        &function_index(&workspace),
+        &|file| workspace.join(file).is_file(),
+    );
+    assert!(
+        violations.is_empty(),
+        "{ACCEPTANCE_LEDGER} does not list the production-pass criteria ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn acceptance_ledger_check_reports_missing_rows_unknown_names_and_unlisted_files() {
+    let matrix = "| AC | Criterion | Proof | Wave |\n|---|---|---|---|\n\
+                  | G1.1 | a | `x_test` | 1 |\n| G1.2 | b | `y_test` | 1 |\n\
+                  | G1.3 | c | d | 7 |\n";
+    let section = "| AC | Criterion | Proof | Defined in | Wave |\n|---|---|---|---|---|\n\
+                   | G1.1 | a \\| b | `x_test`, `tests/a.rs`, `elided_...` | `a.rs`, `b.rs` | 1 |\n\
+                   | G1.3 | c | `z_test`, `w_test` | — | 7 |\n| G9.9 | e | f | — |\n";
+    let mut functions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    functions
+        .entry("x_test".to_owned())
+        .or_default()
+        .insert("a.rs".to_owned());
+    functions
+        .entry("z_test".to_owned())
+        .or_default()
+        .insert("c.rs".to_owned());
+    let violations = ledger_violations(matrix, section, &functions, &|file| file != "b.rs");
+    assert_eq!(
+        violations,
+        vec![
+            "G1.2: no row in the ledger".to_owned(),
+            "G1.1: `b.rs` does not exist".to_owned(),
+            "G1.1: `elided_...` is not a function under crates/ or scripts/".to_owned(),
+            "G1.1: `b.rs` defines none of the row's functions".to_owned(),
+            "G1.3: `z_test` is defined in c.rs, which Defined in does not list".to_owned(),
+            "G1.3: `w_test` is not a function under crates/ or scripts/".to_owned(),
+            format!("G9.9: not a criterion of {PRODUCTION_ACCEPTANCE}"),
+            "G9.9: 4 cells, not AC, Criterion, Proof, Defined in, Wave".to_owned(),
+        ]
+    );
+    assert_eq!(
+        defined_functions(
+            "pub(crate) fn a_b() {}\n    async fn c<T>()\ndef d_e(x):\n\
+             function Get-X {\n// fn not_this\n"
+        ),
+        vec!["a_b", "c", "d_e", "Get-X"]
+    );
+}
+
+/// A check's name without a trailing parenthetical, so the plan's
+/// "Stepped damage pop (CF-1-04, W1-64)" and the ledger's "Stepped damage
+/// pop (W1-64)" name the same check.
+fn check_name(cell: &str) -> String {
+    match cell.strip_suffix(')').and_then(|rest| rest.rfind(" (")) {
+        Some(open) => cell[..open].trim().to_owned(),
+        None => cell.trim().to_owned(),
+    }
+}
+
+/// Checks pending in one list and absent from the other.
+fn human_check_violations(plan: &str, ledger: &str) -> Vec<String> {
+    let names = |section: &str| -> BTreeSet<String> {
+        table_rows(section, "Check")
+            .iter()
+            .map(|cells| check_name(&cells[0]))
+            .collect()
+    };
+    let (plan, ledger) = (names(plan), names(ledger));
+    let mut violations: Vec<String> = plan
+        .difference(&ledger)
+        .map(|name| format!("\"{name}\" is pending in the plan but not in {ACCEPTANCE_LEDGER}"))
+        .collect();
+    violations.extend(
+        ledger
+            .difference(&plan)
+            .map(|name| format!("\"{name}\" is in {ACCEPTANCE_LEDGER} but not in the plan's list")),
+    );
+    violations
+}
+
+#[test]
+fn acceptance_lists_every_pending_human_check() {
+    let plan = read_workspace_file(PRODUCTION_PLAN);
+    let plan = section_body(&plan, PLAN_HUMAN_CHECKS)
+        .unwrap_or_else(|| panic!("{PRODUCTION_PLAN} has no \"{PLAN_HUMAN_CHECKS}\""));
+    let ledger = read_workspace_file(ACCEPTANCE_LEDGER);
+    let ledger = section_body(&ledger, LEDGER_HUMAN_CHECKS)
+        .unwrap_or_else(|| panic!("{ACCEPTANCE_LEDGER} has no \"{LEDGER_HUMAN_CHECKS}\""));
+    let violations = human_check_violations(&plan, &ledger);
+    assert!(
+        violations.is_empty(),
+        "the pending human checks differ ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn human_check_names_ignore_a_trailing_parenthetical() {
+    assert_eq!(
+        check_name("Stepped damage pop (CF-1-04, W1-64)"),
+        "Stepped damage pop"
+    );
+    assert_eq!(check_name("Click-to-photon run"), "Click-to-photon run");
+    let plan = "| Check | Wave |\n|---|---|\n| A (x) | 1 |\n| B | 2 |\n";
+    let ledger = "| Check | Status |\n|---|---|\n| A (y) | pending |\n| C | pending |\n";
+    assert_eq!(
+        human_check_violations(plan, ledger),
+        vec![
+            format!("\"B\" is pending in the plan but not in {ACCEPTANCE_LEDGER}"),
+            format!("\"C\" is in {ACCEPTANCE_LEDGER} but not in the plan's list"),
         ]
     );
 }

@@ -16,6 +16,21 @@ Use **Battle practice.cmd** to try fortifications immediately, or **Strategy pra
 
 If the default graphics backend fails on your device, the optional **Play Lastlight (DirectX12).cmd** launcher sets DirectX 12 for that process only. The ordinary launcher keeps automatic backend selection. This fallback has native capture evidence, not verified foreground performance or an OS playthrough on every device.
 
+## Loop
+
+Walk one whole loop once per build, at 1440x900 and at 1050x700 with 135% interface scale. On every screen exactly one button is amber (the primary), and each Escape press does one thing (see Escape below).
+
+1. On the main menu choose New game (amber on a fresh profile; Resume journey is amber once a journey exists). Pick Rook, press Continue as Rook, select the infected starting country and press Start journey. The first defense opens paused; Begin defense starts it.
+2. Lose the defense, or hold Retreat & train. Results opens with exactly three buttons: Upgrade, the continuation (Try again) and Leave journey. Upgrade is amber after a loss whose recommended node you can buy now, otherwise the continuation is. The loot line and the Defender row sit above the bar.
+3. Press Upgrade. Journey upgrades shows the whole tree with Back to battle (amber) and Back to camp. Buy one node and watch the coins drop.
+4. Press Back to battle: the next defense deploys live. Win it, and Results offers Next defense as the continuation.
+5. Play Next defense through the country's last defense. The liberation Results names the country and the fronts it opened; once Survivor network is bought it offers "Recruit from <Country>", otherwise it names the node you are missing.
+6. Press "Recruit from <Country>". The Recruit window offers two archetypes, each with its origin trait; press "Recruit as <archetype>" (it shows the price), then Back to camp.
+7. Camp home is the camp's first page: the next defense with its defender picker, the Defenders list, alerts, expeditions, offers and recent reports, with the world clock in its footer. Press Defend next on the new recruit. The amber button is Choose next country.
+8. On the World map choose a front and press Plan defense; nothing deploys yet. The Briefing's amber button reads "Deploy <recruit>": press it and the recruit defends (see Takeover).
+
+Record every screen whose amber button, button count or Escape result differed from this list, and the step where the loop stopped.
+
 ## Cursor and impact feedback
 
 Move from a menu/control into a focused unobscured battlefield and back. Expect the system crosshair over the field, with the standard pointer for UI, popups and focus loss; the crosshair must track the mouse without visible lag. Read exact ammo or selected throwable charges at the cursor; fire and reload to compare pips/progress with the corner HUD. Construction hides the resource ring while preserving its placement/aim cursor.
@@ -28,7 +43,7 @@ The menu uses the chosen survivor’s cohesive low-ready-pistol art, with plante
 
 1. Choose and confirm a personal survivor, then choose a starting country and enter a personal defense. Move the mouse to aim and hold the primary button to fire. Reload with **R** or its button. The character stays at the left-center lane (lane 2 in the Normal three-lane opening).
 2. Let one enemy reach an outer lane's line. Its source lane and windup identify the danger. Any contact lane can threaten the same survivor. Point at that lane and use the secondary button or the selected-contact melee button. Melee consumes stamina and commits recovery; no target means no stamina cost.
-3. Watch the boss countdown. The timer announces the boss; only defeating it clears the level. A "BOSS APPROACHING" banner shows at the top of the field for 2 s of real time (the same at 1×, 2× and 4×; a paused battle holds it), then "<BOSS> HAS ARRIVED" for 1.5 s. At 30% HP or less a red band frames the screen and the HP bar reads "LOW"; both stay until HP is back above 35%. Read the exposure and reinforcement cues. Pause at any point with **Escape**.
+3. Watch the boss countdown. The timer announces the boss; only defeating it clears the level. A "BOSS APPROACHING" banner shows at the top of the field for 2 s of real time (the same at 1×, 2× and 4×; a paused battle holds it), then "<BOSS> HAS ARRIVED" for 1.5 s. At 30% HP or less a red band frames the screen and the HP bar reads "LOW"; both stay until HP is back above 35%. Read the exposure and reinforcement cues. Pause at any point with **Escape** (the default Pause key; with construction open the first press only closes it, see Escape below).
 4. Retreat when overwhelmed (hold **Retreat & train** for 0.8 s; one click only shows the hint), then inspect retained rewards and **Rest & train skills**. Use the shared graph to buy an eligible improvement, compare/equip owned gear and Continue. Training permits a weapon class; it does not grant the item. Starter pistol proficiency is innate and starter equipment stays protected. Record attempts and purchases: roughly 3–5 early runs is the pacing target, with final country-specific balance evidence reported separately.
 5. After learning companion access and meeting its liberation milestone, try Mara as an alternative defender. Watch a few legal one-second actions and inspect the log. A missed attack, a successful defense and absorbed injury are different outcomes. Changing policy does not reset an action timer.
 
@@ -222,6 +237,28 @@ Log one entry per session:
 | Reduced effects: on or off | |
 | Country, stage, weather and defender | |
 | Findings: masking, repetition, harshness, level, pan | |
+
+## Click-to-photon
+
+Status: **PENDING** (no click-to-photon run has been logged for the production-pass build). This measures how long a mouse click takes to reach the screen.
+
+1. Use a 60 Hz display. Note the GPU, its driver, the refresh rate, whether hardware-accelerated GPU scheduling (HAGS) is on, and the build stamp on the main menu.
+2. Start Battle practice.cmd, unpause, aim at mid-field and fire 20 single shots, at least 1 s apart.
+3. Film the mouse button and the muzzle area together with a phone at 240 fps or more (one frame is 4.17 ms at 240 fps).
+4. For each click, count the frames from the button bottoming out to the first changed muzzle-flash or tracer pixel: ms = frames x 1000 / fps.
+5. Repeat steps 2-4 in three rows, restarting the game after each Settings change: VSync on with Low latency off (the default), Low latency on, and VSync off with Low latency off. In each row also note whether the drawn reticle trails the system cursor during fast flicks.
+
+Targets: a median of at most 50 ms in the default row and at most 34 ms with Low latency on. Any single click over 67 ms is a finding: report it with its row and frame count.
+
+| Field | VSync on, Low latency off (default) | Low latency on | VSync off |
+|---|---|---|---|
+| Date and build stamp | | | |
+| GPU, driver, refresh rate, HAGS | | | |
+| Camera fps | | | |
+| Frames per click (20 values) | | | |
+| Median ms | | | |
+| Max ms | | | |
+| Reticle trails the cursor? | | | |
 
 ## Reporting a bug with a recording
 
