@@ -5,7 +5,7 @@ use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
 use horde_core::{
     content::{Mode, content},
     defenders::DefenderId,
-    progression::BossRank,
+    progression::{BossRank, BossRankScaling, catalog},
     sim::Game,
 };
 mod view;
@@ -111,11 +111,12 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ));
         // The rank is named once, in words, by the badge; the amber only
         // repeats it, and the terms beside it say what the rank adds.
-        if let Some((badge, hint)) = boss_badge(forecast.boss_rank) {
+        let scaling = catalog().boss_ranks.of(forecast.boss_rank);
+        if let Some((badge, hint)) = boss_badge(forecast.boss_rank, scaling) {
             ui.label(RichText::new(badge).strong().color(AMBER))
-                .on_hover_text(hint);
+                .on_hover_text(&hint);
             if let Some(terms) = &view.boss_rank_terms {
-                ui.colored_label(AMBER, terms).on_hover_text(hint);
+                ui.colored_label(AMBER, terms).on_hover_text(&hint);
             }
         }
     });
@@ -170,16 +171,24 @@ fn supply_and_difficulty(supply: i64, difficulty: f32) -> String {
     format!("{supply} build supply · {difficulty:.2}× regional difficulty")
 }
 /// The badge beside the boss line and its hover text: a Regional or
-/// Capstone boss is named by core's rank label; a Sector boss has none.
-fn boss_badge(rank: BossRank) -> Option<(String, &'static str)> {
-    let hint = match rank {
+/// Capstone boss is named by core's rank label; a Sector boss has none. The
+/// hover counts the phases the rank's `scaling` adds (`extra_transitions`).
+fn boss_badge(rank: BossRank, scaling: BossRankScaling) -> Option<(String, String)> {
+    let place = match rank {
         BossRank::Sector => return None,
         BossRank::Regional => "A regional checkpoint: every sixth defense of a long front.",
-        BossRank::Capstone => {
-            "The last defense of this front. Its boss enters one more phase before it falls."
-        }
+        BossRank::Capstone => "The last defense of this front.",
     };
-    Some((format!("{} BOSS", rank.label().to_uppercase()), hint))
+    let phases = match scaling.extra_transitions {
+        0 => String::new(),
+        1 => " Its boss enters one more phase before it falls.".to_owned(),
+        2 => " Its boss enters two more phases before it falls.".to_owned(),
+        n => format!(" Its boss enters {n} more phases before it falls."),
+    };
+    Some((
+        format!("{} BOSS", rank.label().to_uppercase()),
+        format!("{place}{phases}"),
+    ))
 }
 /// "Front depth: defense 4 of 9 · enemy health and arrivals ×1.07": the
 /// in-country ramp this stage's snapshot carries, or None on a stage
@@ -380,11 +389,43 @@ mod tests {
     }
 
     /// W3-23: the badge is core's rank label; a Sector boss carries none.
+    /// Its hover counts the phases the rank adds from the catalogue's
+    /// `extra_transitions`, so a retune never leaves it naming a phase the
+    /// boss does not enter.
     #[test]
     fn boss_badge_names_regional_and_capstone_only() {
-        assert_eq!(boss_badge(BossRank::Sector), None);
-        assert_eq!(boss_badge(BossRank::Regional).unwrap().0, "REGIONAL BOSS");
-        assert_eq!(boss_badge(BossRank::Capstone).unwrap().0, "CAPSTONE BOSS");
+        let ranks = &catalog().boss_ranks;
+        assert_eq!(boss_badge(BossRank::Sector, ranks.sector), None);
+        let (regional, hint) = boss_badge(BossRank::Regional, ranks.regional).unwrap();
+        assert_eq!(regional, "REGIONAL BOSS");
+        assert_eq!(
+            hint,
+            "A regional checkpoint: every sixth defense of a long front."
+        );
+        let (capstone, hint) = boss_badge(BossRank::Capstone, ranks.capstone).unwrap();
+        assert_eq!(capstone, "CAPSTONE BOSS");
+        assert_eq!(
+            hint,
+            "The last defense of this front. Its boss enters one more phase before it falls."
+        );
+        let neutral = BossRankScaling::default();
+        assert_eq!(
+            boss_badge(BossRank::Capstone, neutral).unwrap().1,
+            "The last defense of this front."
+        );
+        assert_eq!(
+            boss_badge(
+                BossRank::Regional,
+                BossRankScaling {
+                    extra_transitions: 2,
+                    ..neutral
+                }
+            )
+            .unwrap()
+            .1,
+            "A regional checkpoint: every sixth defense of a long front. Its boss enters two \
+             more phases before it falls."
+        );
         assert_eq!(front_ramp_line(0, 9, 1.0), None);
         assert_eq!(
             front_ramp_line(3, 9, 1.068).unwrap(),

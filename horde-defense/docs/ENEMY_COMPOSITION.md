@@ -378,10 +378,15 @@ Capstone's one extra transition) folds into the snapshot at deploy
 
 The checkpoint lines read these terms, so they follow any retune (W4-02): the
 briefing's boss line names the rank once, with its badge ("REGIONAL BOSS" or
-"CAPSTONE BOSS"), and the terms beside it ("+20% health, +20% reward" or
-"+40% health, +40% reward"), the world panel counts a country's checkpoints ("2 checkpoints"), and a Regional victory's
-Results lead with "Regional checkpoint secured." A checkpoint grants no
-coins of its own and changes no stage theme.
+"CAPSTONE BOSS"), and the terms beside it in the order health, armor,
+damage, reward ("+20% health, +20% reward"; the Capstone's "+40% health,
++25% armor, +10% damage, +40% reward" for a personal defense and "+40%
+health, +2 armor, +10% damage, +40% reward" for Mara or a recruit, whose
+boss armor is the `npc_armor_add` term). The badge's hover counts the
+phases `extra_transitions` adds ("one more phase" on the Capstone). The
+world panel counts a country's checkpoints ("2 checkpoints"), and a
+Regional victory's Results lead with "Regional checkpoint secured." A
+checkpoint grants no coins of its own and changes no stage theme.
 
 ## Validation limits
 

@@ -199,9 +199,10 @@ fn briefing_primary_opens_the_field_of_the_defense_it_deploys() {
 
 /// W4-02: the briefing of a Regional stage (every sixth, short of the last)
 /// names the checkpoint and what `progression.json` `boss_ranks.regional`
-/// adds; the last stage names the Capstone and its terms; a Sector stage has
-/// neither. The rank is named once, by the W3-23 badge, and the amber terms
-/// beside it carry no second name ("Regional checkpoint", "Final stand").
+/// adds; the last stage names the Capstone and its terms, the authored armor
+/// and damage among them; a Sector stage has neither. The rank is named
+/// once, by the W3-23 badge, and the amber terms beside it carry no second
+/// name ("Regional checkpoint", "Final stand").
 #[test]
 fn briefing_names_regional_checkpoint_on_checkpoint_stage() {
     let country = world()
@@ -226,7 +227,7 @@ fn briefing_names_regional_checkpoint_on_checkpoint_stage() {
         .insert(country.id.clone(), last);
     f.act(|c| c.open_preparation(Tab::Briefing));
     let regional = "+20% health, +20% reward";
-    let capstone = "+40% health, +40% reward";
+    let capstone = "+40% health, +25% armor, +10% damage, +40% reward";
     for (stage, text, expected) in [
         (checkpoint, "REGIONAL BOSS", true),
         (checkpoint, regional, true),

@@ -7,21 +7,40 @@ use horde_core::{
     world::Country,
 };
 
-/// What a stage's boss rank adds to its boss, from the catalogue's
-/// `scaling` (`progression.json` `boss_ranks`), e.g. "+20% health, +20%
-/// reward". The rank itself is named once, by the badge beside the boss
-/// line; a neutral term is left out, and a Sector boss or a neutral scaling
-/// has no terms.
-pub(super) fn boss_rank_terms(rank: BossRank, scaling: BossRankScaling) -> Option<String> {
+/// What a stage's boss rank adds to its boss for a `mode` defender, from the
+/// catalogue's `scaling` (`progression.json` `boss_ranks`), in the order
+/// health, armor, damage, reward, e.g. "+40% health, +25% armor, +10%
+/// damage, +40% reward". A personal boss's armor is the `armor` multiplier;
+/// an Npc boss's is the armor `npc_armor_add` adds ("+2 armor"). The rank
+/// itself is named once, by the badge beside the boss line; a neutral term
+/// is left out, and a Sector boss or a neutral scaling has no terms.
+pub(super) fn boss_rank_terms(
+    rank: BossRank,
+    scaling: BossRankScaling,
+    mode: Mode,
+) -> Option<String> {
     if rank == BossRank::Sector {
         return None;
     }
-    let added: Vec<String> = [(scaling.health, "health"), (scaling.reward, "reward")]
-        .into_iter()
-        .map(|(factor, what)| (((factor - 1.0) * 100.0).round() as i32, what))
-        .filter(|(percent, _)| *percent > 0)
-        .map(|(percent, what)| format!("+{percent}% {what}"))
-        .collect();
+    let percent = |factor: f32, what: &str| {
+        let percent = ((factor - 1.0) * 100.0).round() as i32;
+        (percent > 0).then(|| format!("+{percent}% {what}"))
+    };
+    let armor = match mode {
+        Mode::Personal => percent(scaling.armor, "armor"),
+        Mode::Npc => {
+            (scaling.npc_armor_add > 0).then(|| format!("+{} armor", scaling.npc_armor_add))
+        }
+    };
+    let added: Vec<String> = [
+        percent(scaling.health, "health"),
+        armor,
+        percent(scaling.damage, "damage"),
+        percent(scaling.reward, "reward"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     (!added.is_empty()).then(|| added.join(", "))
 }
 
@@ -58,8 +77,9 @@ pub(super) struct BriefingView {
     /// The requested stage clamped to `max_stage`.
     pub stage: usize,
     pub level: &'static LevelDefinition,
-    /// What the rank of `stage`'s boss adds, drawn beside its badge
-    /// ([`boss_rank_terms`] of `Game::stage_boss_rank`).
+    /// What the rank of `stage`'s boss adds against this defender, drawn
+    /// beside its badge ([`boss_rank_terms`] of `Game::stage_boss_rank` in
+    /// the defender's mode).
     pub boss_rank_terms: Option<String>,
     pub forecast: Result<Forecast, String>,
     pub lanes: u8,
@@ -129,7 +149,11 @@ pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Opt
         stage,
         level,
         boss_rank_terms: game.stage_boss_rank(&country.id, stage).and_then(|rank| {
-            boss_rank_terms(rank, horde_core::progression::catalog().boss_ranks.of(rank))
+            boss_rank_terms(
+                rank,
+                horde_core::progression::catalog().boss_ranks.of(rank),
+                mode,
+            )
         }),
         forecast,
         lanes,
@@ -240,34 +264,88 @@ mod tests {
         assert_eq!(view.blueprints, c.blueprints.iter().filter(|v| **v).count());
     }
 
-    /// W4-02: the terms are the catalogue's health and reward additions; a
-    /// neutral term is left out, and a Sector boss or a neutral scaling has
-    /// none. They never name the rank: the badge does.
+    /// W4-02: the terms are every catalogue addition the defender meets, in
+    /// the order health, armor, damage, reward: the Capstone's authored
+    /// armor 1.25 and damage 1.1 included. A personal defense names the
+    /// armor multiplier, an Npc one the armor `npc_armor_add` adds. A neutral
+    /// term is left out, and a Sector boss or a neutral scaling has none.
+    /// They never name the rank: the badge does.
     #[test]
     fn boss_rank_terms_read_the_catalogue_terms() {
         let ranks = &horde_core::progression::catalog().boss_ranks;
-        assert_eq!(boss_rank_terms(BossRank::Sector, ranks.sector), None);
+        for mode in [Mode::Personal, Mode::Npc] {
+            assert_eq!(boss_rank_terms(BossRank::Sector, ranks.sector, mode), None);
+            assert_eq!(
+                boss_rank_terms(BossRank::Regional, ranks.regional, mode).as_deref(),
+                Some("+20% health, +20% reward")
+            );
+        }
         assert_eq!(
-            boss_rank_terms(BossRank::Regional, ranks.regional).as_deref(),
-            Some("+20% health, +20% reward")
+            boss_rank_terms(BossRank::Capstone, ranks.capstone, Mode::Personal).as_deref(),
+            Some("+40% health, +25% armor, +10% damage, +40% reward")
         );
         assert_eq!(
-            boss_rank_terms(BossRank::Capstone, ranks.capstone).as_deref(),
-            Some("+40% health, +40% reward")
+            boss_rank_terms(BossRank::Capstone, ranks.capstone, Mode::Npc).as_deref(),
+            Some("+40% health, +2 armor, +10% damage, +40% reward")
         );
         let neutral = BossRankScaling::default();
-        assert_eq!(boss_rank_terms(BossRank::Regional, neutral), None);
-        assert_eq!(boss_rank_terms(BossRank::Capstone, neutral), None);
+        for mode in [Mode::Personal, Mode::Npc] {
+            assert_eq!(boss_rank_terms(BossRank::Regional, neutral, mode), None);
+            assert_eq!(boss_rank_terms(BossRank::Capstone, neutral, mode), None);
+        }
         assert_eq!(
             boss_rank_terms(
                 BossRank::Regional,
                 BossRankScaling {
                     health: 1.35,
                     ..neutral
-                }
+                },
+                Mode::Personal
             )
             .as_deref(),
             Some("+35% health")
+        );
+        // The armor term follows the defender: a multiplier alone is a
+        // personal term, an addition alone an Npc one.
+        let armored = BossRankScaling {
+            armor: 1.5,
+            ..neutral
+        };
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, armored, Mode::Personal).as_deref(),
+            Some("+50% armor")
+        );
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, armored, Mode::Npc),
+            None
+        );
+    }
+
+    /// The briefing's terms are those of its defender's mode.
+    #[test]
+    fn briefing_terms_follow_the_defender_mode() {
+        let mut game = started();
+        let country = game.campaign().world.active_country().unwrap().id.clone();
+        let last = game
+            .campaign()
+            .world
+            .active_country()
+            .unwrap()
+            .level_count()
+            - 1;
+        game.campaign_mut()
+            .world
+            .country_levels
+            .insert(country, last);
+        let personal = view_model(&game, DefenderId::Player, last).unwrap();
+        let npc = view_model(&game, DefenderId::Mara, last).unwrap();
+        assert_eq!(
+            personal.boss_rank_terms.as_deref(),
+            Some("+40% health, +25% armor, +10% damage, +40% reward")
+        );
+        assert_eq!(
+            npc.boss_rank_terms.as_deref(),
+            Some("+40% health, +2 armor, +10% damage, +40% reward")
         );
     }
 
