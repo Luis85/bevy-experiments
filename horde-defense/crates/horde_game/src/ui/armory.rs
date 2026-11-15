@@ -371,9 +371,9 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
         muted(
             ui,
             format!(
-                "{} · {} projectile(s) per shot · {:.0}° spread",
+                "{} · {} per shot · {:.0}° spread",
                 weapon.class.name(),
-                weapon.pellets,
+                chrome::count_noun(weapon.pellets as usize, "projectile", "projectiles"),
                 weapon.spread_radians.to_degrees()
             ),
         );

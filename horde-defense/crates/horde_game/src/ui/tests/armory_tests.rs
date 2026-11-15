@@ -543,6 +543,36 @@ fn equipment_shows_inventory_above_the_fold_at_both_review_sizes() {
     }
 }
 
+/// CF-3-07 (closing): the comparison's weapon line pluralises its count
+/// noun ("1 projectile", "9 projectiles") instead of "projectile(s)".
+#[test]
+fn weapon_line_pluralises_projectiles() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    // A single-projectile marksman rifle and the 9-pellet double-barrel.
+    for (definition, line) in [
+        (4, "Rifle · 1 projectile per shot · 0° spread"),
+        (28, "Shotgun · 9 projectiles per shot · "),
+    ] {
+        assert_eq!(
+            horde_core::weapons::WeaponSpec::from_item(&content().items[definition]).pellets,
+            if definition == 4 { 1 } else { 9 }
+        );
+        let id = f.game.campaign_mut().add_item(definition).unwrap();
+        f.armory.selected_item = Some(id);
+        // A wide, tall frame keeps the whole comparison column on screen.
+        let output = h.frame_size(f, View::Armory, vec![], vec2(1440.0, 2400.0));
+        let has = |text: &str| output.shapes.iter().any(|s| shape_has_text(&s.shape, text));
+        assert!(
+            has(line),
+            "{definition}: {line} is not painted: {:?}",
+            super::loot_block_tests::painted_text(&output)
+        );
+        assert!(!has("projectile(s)"), "{definition}: placeholder plural");
+    }
+}
+
 #[test]
 fn equipment_keeps_its_loadout_comparison_on_screen_at_desktop_size() {
     let mut fixture = IsolatedFrontend::new();
