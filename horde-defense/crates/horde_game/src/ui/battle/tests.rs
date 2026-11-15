@@ -328,3 +328,58 @@ fn bar_rows_count_rows_by_vertical_centre() {
     rows.add(rect(0.0, 196.0, 218.0));
     assert_eq!(rows.rows(), 3);
 }
+
+/// Closing: a core action a rebind left without a key (Pause rebound to R
+/// takes Reload's key away, to Mouse1 Fire's, to Mouse2 Contact melee's) is
+/// named "<action> is unbound" with where to bind it, never as an empty key,
+/// in the opening lesson and in its own lesson; the gun's hover, the
+/// personal buttons' hovers and the Field actions shortcuts read "Unbound".
+#[test]
+fn hints_name_an_unbound_core_action_and_where_to_bind_it() {
+    use crate::battle_view::FieldHint;
+    use crate::settings::{Action, BindingId, Settings};
+    use overlays::hint_text;
+    for (key, action, lesson) in [
+        ("R", Action::Reload, FieldHint::Reload),
+        ("Mouse1", Action::Fire, FieldHint::Shoot),
+        ("Mouse2", Action::Melee, FieldHint::Contact),
+    ] {
+        let mut settings = Settings::default();
+        settings.set_binding(BindingId::Core(Action::Pause), key.into());
+        assert_eq!(settings.binding(BindingId::Core(action)), "");
+        let unbound = format!("{} is unbound", action.name());
+        for (hint, paused) in [(FieldHint::Opening, true), (lesson, false)] {
+            let text = hint_text(hint, paused, &settings.bindings);
+            assert!(text.contains(&unbound), "{text}");
+            assert!(text.contains("Settings › Controls"), "{text}");
+            assert!(!text.contains("  ") && !text.contains(" ,"), "{text}");
+        }
+        assert_eq!(
+            attack::key_text(&settings, action),
+            crate::settings::UNBOUND
+        );
+    }
+    // The bound lessons keep their wording.
+    let settings = Settings::default();
+    assert_eq!(
+        hint_text(FieldHint::Opening, true, &settings.bindings),
+        "Enemies walk in from the right. Hold Mouse1 to shoot, R reloads, Mouse2 strikes an enemy at your line. Press Begin defense or Escape to start."
+    );
+    assert_eq!(
+        attack::gun_hint("Rifle", &settings),
+        "Rifle: hold Mouse1 to fire."
+    );
+    assert_eq!(attack::key_text(&settings, Action::Heal), "1");
+    let mut settings = Settings::default();
+    settings.set_binding(BindingId::Core(Action::Pause), "Mouse1".into());
+    assert_eq!(
+        attack::gun_hint("Rifle", &settings),
+        "Rifle: Fire is unbound, bind it in Settings › Controls."
+    );
+    let mut settings = Settings::default();
+    settings.set_binding(BindingId::Core(Action::Pause), "1".into());
+    assert_eq!(
+        attack::key_text(&settings, Action::Heal),
+        crate::settings::UNBOUND
+    );
+}

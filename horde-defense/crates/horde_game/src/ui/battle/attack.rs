@@ -1,12 +1,13 @@
 use super::{
     BarRows,
     input::{AttackSelection, assisted_aim, select_attack, target_cell},
+    overlays::{CONTROLS, unbound},
     projection,
 };
 use crate::{
     art::{AMBER, MUTED, RED, TEXT},
     battle_view::{self, BattleScreen},
-    settings::Action,
+    settings::{Action, BindingId, Settings, binding_text},
     ui::{UiCtx, chrome},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Stroke, pos2, vec2};
@@ -25,9 +26,7 @@ pub(super) fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScr
         for (selection, label) in AttackSelection::ALL.into_iter().zip(ATTACK_LABELS) {
             let slot = selection.ordnance().map(|kind| view.slot(kind));
             let unlocked = slot.is_none_or(|slot| slot.unlocked);
-            let fire = &f.settings.bindings[Action::Fire as usize];
-            let (mut hint, color) =
-                throwable_state(label, slot, || format!("{class}: hold {fire} to fire."));
+            let (mut hint, color) = throwable_state(label, slot, || gun_hint(class, f.settings));
             if unlocked && !cycle.is_empty() {
                 hint.push_str(&format!(" {cycle} cycles attacks."));
             }
@@ -82,6 +81,19 @@ pub(super) fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScr
     };
     ui.add(egui::Label::new(RichText::new(&helper).size(11.0).color(MUTED)).truncate())
         .on_hover_text(helper);
+}
+/// The gun selector's hover: hold the Fire key to fire, or, with Fire
+/// unbound, where to bind it (never an empty key).
+pub(super) fn gun_hint(class: &str, settings: &Settings) -> String {
+    match settings.binding(BindingId::Core(Action::Fire)) {
+        "" => format!("{class}: {}, bind it in {CONTROLS}.", unbound(Action::Fire)),
+        fire => format!("{class}: hold {fire} to fire."),
+    }
+}
+/// The key a battle button names for `action` (hover or shortcut text):
+/// its key, or "Unbound" through `settings::binding_text`.
+pub(super) fn key_text(settings: &Settings, action: Action) -> &str {
+    binding_text(settings.binding(BindingId::Core(action)))
 }
 /// Hover reason and label colour of one attack selector. A locked throwable
 /// names where it is learned; an unlocked one states its charges or cooldown.
@@ -176,13 +188,13 @@ pub(super) fn personal_controls(
     if view.heal {
         f.battle.pending.heal |= rows
             .widget(ui.button("Emergency aid"))
-            .on_hover_text(&f.settings.bindings[Action::Heal as usize])
+            .on_hover_text(key_text(f.settings, Action::Heal))
             .clicked();
     }
     if view.brace {
         f.battle.pending.brace |= rows
             .widget(ui.button("Brace the line"))
-            .on_hover_text(&f.settings.bindings[Action::Brace as usize])
+            .on_hover_text(key_text(f.settings, Action::Brace))
             .clicked();
     }
 }
@@ -198,7 +210,7 @@ pub(super) fn field_actions(
     view: &BattleScreen,
 ) {
     let action = |ui: &mut egui::Ui, f: &UiCtx, label: &str, action: Action| {
-        ui.add(egui::Button::new(label).shortcut_text(&f.settings.bindings[action as usize]))
+        ui.add(egui::Button::new(label).shortcut_text(key_text(f.settings, action)))
     };
     chrome::section(ui, "Field actions");
     f.battle.pending.reload |= action(ui, f, "Reload", Action::Reload).clicked();

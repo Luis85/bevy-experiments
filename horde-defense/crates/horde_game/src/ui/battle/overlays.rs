@@ -140,12 +140,22 @@ pub(super) fn key_legend(settings: &Settings) -> String {
     .map(|(id, action)| format!("{} {action}", binding_text(settings.binding(id))))
     .join(" · ")
 }
-/// The bound Pause key; None when it is unbound.
-fn pause_key(bindings: &[String]) -> Option<&str> {
+/// Where the player binds an action a rebind left without a key.
+pub(super) const CONTROLS: &str = "Settings › Controls";
+/// The bound key of the core `action`; None when it is unbound.
+fn core_key(bindings: &[String], action: Action) -> Option<&str> {
     bindings
-        .get(Action::Pause as usize)
+        .get(action as usize)
         .map(String::as_str)
         .filter(|key| !key.is_empty())
+}
+/// "<action> is unbound", naming the action as Settings › Controls does.
+pub(super) fn unbound(action: Action) -> String {
+    format!("{} is unbound", action.name())
+}
+/// The bound Pause key; None when it is unbound.
+fn pause_key(bindings: &[String]) -> Option<&str> {
+    core_key(bindings, Action::Pause)
 }
 /// " or <Pause key>" after "Begin defense", or nothing without a Pause key.
 fn or_pause_key(bindings: &[String]) -> String {
@@ -153,29 +163,59 @@ fn or_pause_key(bindings: &[String]) -> String {
 }
 /// The first-defense lesson for `hint`, naming the player's own keys.
 /// `bindings` follows `settings::Action` order: fire, melee, reload, heal,
-/// brace, build, pause.
+/// brace, build, pause. A key a rebind left unbound is never shown empty:
+/// the lesson says "<action> is unbound" and where to bind it.
 pub(super) fn hint_text(hint: FieldHint, paused: bool, bindings: &[String]) -> String {
-    let key = |index: usize| bindings.get(index).map_or("?", String::as_str);
+    let key = |action: Action| core_key(bindings, action);
     match hint {
-        FieldHint::Opening if paused => format!(
-            "Enemies walk in from the right. Hold {} to shoot, {} reloads, {} strikes an enemy at your line. Press Begin defense{} to start.",
-            key(0),
-            key(2),
-            key(1),
-            or_pause_key(bindings)
-        ),
-        FieldHint::Opening | FieldHint::Shoot => format!(
-            "Aim at the nearest enemy and hold {} to shoot.",
-            key(0)
-        ),
-        FieldHint::Reload => format!(
-            "Press {} in a quiet moment: reloading is free, an empty gun is not.",
-            key(2)
-        ),
-        FieldHint::Contact => format!(
-            "An enemy at your line hurts you. Aim at its lane and press {} to strike it.",
-            key(1)
-        ),
+        FieldHint::Opening if paused => {
+            let shoot = key(Action::Fire)
+                .map_or_else(|| unbound(Action::Fire), |k| format!("Hold {k} to shoot"));
+            let reload = key(Action::Reload)
+                .map_or_else(|| unbound(Action::Reload), |k| format!("{k} reloads"));
+            let strike = key(Action::Melee).map_or_else(
+                || unbound(Action::Melee),
+                |k| format!("{k} strikes an enemy at your line"),
+            );
+            let bind = match [Action::Fire, Action::Reload, Action::Melee]
+                .into_iter()
+                .filter(|&action| key(action).is_none())
+                .count()
+            {
+                0 => String::new(),
+                1 => format!(" Bind it in {CONTROLS}."),
+                _ => format!(" Bind them in {CONTROLS}."),
+            };
+            format!(
+                "Enemies walk in from the right. {shoot}, {reload}, {strike}.{bind} Press Begin defense{} to start.",
+                or_pause_key(bindings)
+            )
+        }
+        FieldHint::Opening | FieldHint::Shoot => match key(Action::Fire) {
+            Some(k) => format!("Aim at the nearest enemy and hold {k} to shoot."),
+            None => format!(
+                "{}: bind it in {CONTROLS}, then aim at the nearest enemy and hold it to shoot.",
+                unbound(Action::Fire)
+            ),
+        },
+        FieldHint::Reload => match key(Action::Reload) {
+            Some(k) => format!(
+                "Press {k} in a quiet moment: reloading is free, an empty gun is not."
+            ),
+            None => format!(
+                "{}: bind it in {CONTROLS}. Reloading in a quiet moment is free, an empty gun is not.",
+                unbound(Action::Reload)
+            ),
+        },
+        FieldHint::Contact => match key(Action::Melee) {
+            Some(k) => format!(
+                "An enemy at your line hurts you. Aim at its lane and press {k} to strike it."
+            ),
+            None => format!(
+                "An enemy at your line hurts you. {}: bind it in {CONTROLS} to strike it.",
+                unbound(Action::Melee)
+            ),
+        },
         FieldHint::Banked => "Coins and items are already banked. Kill the boss to win, or Retreat & train to spend them.".to_owned(),
     }
 }
