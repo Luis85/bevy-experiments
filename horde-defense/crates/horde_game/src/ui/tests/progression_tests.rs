@@ -295,14 +295,25 @@ fn counter_node_tooltip_names_its_archetypes() {
     assert_eq!(selected(&h), node.id);
     let line = format!("Counters: {}", names(node).join(", "));
     assert_eq!(text_count(&output, &line), 1, "{line}");
+    // Each preview row reads its stat, then the value before and after the
+    // perk, in that order ("What changes"). Mutation proof (closing): rows
+    // dropped from the detail panel, and rows with before and after swapped,
+    // each fail here.
     let preview = f.game.campaign().node_stat_preview(&node.id);
     assert_eq!(preview.len(), 2, "cadence and reload");
+    let runs: Vec<String> = text_runs(&output).into_iter().map(|run| run.text).collect();
     for delta in &preview {
+        let label = delta.stat.label();
+        assert_eq!(text_count(&output, &label), 1, "{label}");
+        let at = runs.iter().position(|run| *run == label).unwrap();
         assert_eq!(
-            text_count(&output, &delta.stat.label()),
-            1,
-            "{}",
-            delta.stat.label()
+            runs[at + 1..at + 3],
+            [
+                delta.stat.format(delta.before),
+                delta.stat.format(delta.after)
+            ],
+            "{label}: before, then after"
         );
+        assert_ne!(delta.before, delta.after, "{label}: the perk changes it");
     }
 }
