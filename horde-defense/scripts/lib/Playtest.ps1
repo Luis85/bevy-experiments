@@ -7,8 +7,8 @@
 # ZipFile lives in System.IO.Compression.FileSystem on .NET Framework 4.x (Windows PowerShell 5.1).
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 
-# The docs a package ships, relative to docs/, and the size limit of the whole packaged docs folder.
-# repo_checks::playtest_guide_has_no_links_outside_the_package pins the same list.
+# The size limit of the whole packaged docs folder. The curated list is $CuratedDocs in package_playtest.ps1;
+# repo_checks::playtest_guide_has_no_links_outside_the_package pins that list and holds the same limit.
 $script:PlaytestDocsLimitBytes = 65536
 $script:PlaytestManifestVersion = 2
 
