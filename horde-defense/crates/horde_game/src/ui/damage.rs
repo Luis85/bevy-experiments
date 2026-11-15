@@ -374,36 +374,57 @@ const BAR_CLEARANCE: f32 = 21.0;
 fn number_lift(arena: art::ArenaProjection) -> f32 {
     NUMBER_LIFT.max(arena.lane_height() * art::HEALTH_BAR_LIFT + BAR_CLEARANCE)
 }
-/// The health bar `art::battlefield` paints this frame over the live hostile
-/// a popup reports on: over its body where `BattleViewModel` draws it, at the
+/// The cue `art::battlefield` paints this frame over the body of a struck
+/// hostile, which a popup on it keeps clear of.
+#[derive(Clone, Copy)]
+enum StruckCue {
+    /// Its health bar.
+    Bar(Rect),
+    /// The plate of its "CRIT · FIGHTING" callout, which replaces the bar
+    /// of a critically wounded hostile (CF-3-12).
+    Crit(Rect),
+}
+impl StruckCue {
+    fn rect(self) -> Rect {
+        match self {
+            Self::Bar(rect) | Self::Crit(rect) => rect,
+        }
+    }
+}
+/// The cue `art::battlefield` paints this frame over the live hostile a
+/// popup reports on: over its body where `BattleViewModel` draws it, at the
 /// blended position plus its crowd stagger. A hostile walks on after the
-/// hit, so this is not the bar over `bubble.at`, the body at the hit (W1
-/// review). `None` where no bar is painted: the hostile is gone, at full HP
-/// or critically wounded (`battle_view::health_view`). `drawn` caches
-/// `blend`'s positions of `a.enemies` for the frame.
-fn struck_bar(
+/// hit, so this is not the cue over `bubble.at`, the body at the hit (W1
+/// review). `None` where none is painted: the hostile is gone or at full HP
+/// (`battle_view::health_view`). `drawn` caches `blend`'s positions of
+/// `a.enemies` for the frame; `p` lays out the CRIT callout.
+fn struck_cue(
+    p: &egui::Painter,
     a: &Attempt,
     arena: art::ArenaProjection,
     blend: SceneBlend,
     drawn: &mut Option<Vec<[f32; 2]>>,
     bubble: &Bubble,
-) -> Option<Rect> {
+) -> Option<StruckCue> {
     let Target::Actor(id) = bubble.target else {
         return None;
     };
     let index = a.enemies.iter().position(|e| e.id == id)?;
-    let crate::battle_view::HealthView::Bar { boss, .. } =
-        crate::battle_view::health_view(&a.enemies[index], a.mode)
-    else {
+    let health = crate::battle_view::health_view(&a.enemies[index], a.mode);
+    if health == crate::battle_view::HealthView::Hidden {
         return None;
-    };
+    }
     let [x, y] = drawn.get_or_insert_with(|| blend.positions(&a.enemies))[index];
     let [dx, dy] = crate::battle_view::crowd_stagger(id);
     let sy = arena.lane_height();
-    Some(Rect::from_center_size(
-        arena.world(x + dx, y + dy) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
-        vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
-    ))
+    let at = arena.world(x + dx, y + dy);
+    Some(match health {
+        crate::battle_view::HealthView::Bar { boss, .. } => StruckCue::Bar(Rect::from_center_size(
+            at + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+            vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
+        )),
+        _ => StruckCue::Crit(art::crit_plate(p, at, sy)),
+    })
 }
 /// What the field draws at one structure this frame: its prop's face and the
 /// body of the front enemy in the stack striking it, if any.
@@ -535,7 +556,8 @@ struct Draft {
     /// Where a moved popup must stay: the field, or the effects clip over an
     /// actor.
     bounds: Rect,
-    /// The struck hostile's health bar it keeps beside, if any.
+    /// The struck hostile's health bar it keeps beside, if any, or the CRIT
+    /// callout plate it keeps clear of (CF-3-12).
     bar: Option<Rect>,
     /// Whether it reports on a struck structure, and so keeps off every
     /// drawn face and stack front (CF-1-07).
@@ -704,26 +726,35 @@ pub(super) fn draw_for(
         } else {
             arena.effects_clip
         };
+        let border = if reduced { 1.0 } else { 2.0 };
+        let cue = struck_cue(&p, a, arena, blend, &mut positions, bubble);
+        // A critical hostile's CRIT callout reaches higher than a bar: the
+        // popup starts over its plate (CF-3-12).
+        let lift = match cue {
+            Some(StruckCue::Crit(plate)) => number_lift(arena)
+                .max(world.y - plate.top() + KEEP_CLEAR_GAP + galley.size().y * 0.5 + border),
+            _ => number_lift(arena),
+        };
         let center = pos2(
             world.x.clamp(
                 bounds.left() + galley.size().x * 0.5 + 4.0,
                 bounds.right() - galley.size().x * 0.5 - 4.0,
             ),
-            (world.y - number_lift(arena) - rise).max(bounds.top() + galley.size().y * 0.5 + 4.0),
+            (world.y - lift - rise).max(bounds.top() + galley.size().y * 0.5 + 4.0),
         );
-        let border = if reduced { 1.0 } else { 2.0 };
         // The headroom is the HUD band's too: a popup that would meet a HUD
         // rect drops under it (CF-1-09), the same in reduced effects.
         let drawn = Rect::from_center_size(center, galley.size()).expand(border);
         let mut center = center + vec2(0.0, keep_clear_shift(drawn, keep_clear));
         // Dropped under the HUD, a top-lane number would sit on the struck
-        // hostile's own health bar for its whole life: it goes beside the
-        // bar instead, right or else left, still clear of the HUD (W1 review).
-        // The bar walks on with the hostile, so the number follows the bar
-        // painted this frame for the rest of its life, on the side it first
-        // took while that side stays on the field; once no bar is painted
-        // (the hostile died, or is down critical), beside the last one.
-        let painted = struck_bar(a, arena, blend, &mut positions, bubble);
+        // hostile's own health bar (or CRIT callout, CF-3-12) for its whole
+        // life: it goes beside the bar instead, right or else left, still
+        // clear of the HUD (W1 review). The bar walks on with the hostile,
+        // so the number follows the bar painted this frame for the rest of
+        // its life, on the side it first took while that side stays on the
+        // field; once no bar is painted (the hostile died), beside the last
+        // one.
+        let painted = cue.map(StruckCue::rect);
         let bar = match (painted, bubble.beside) {
             (Some(bar), Some(_)) => Some(bar),
             (Some(bar), None) => Rect::from_center_size(center, galley.size())
@@ -808,7 +839,12 @@ pub(super) fn draw_for(
         drafts.push(Draft {
             spot: Rect::from_center_size(center, galley.size()).expand(border),
             bounds,
-            bar,
+            // A CRIT plate stays an obstacle whether or not the popup went
+            // beside it, so keeping popups apart never moves one onto it.
+            bar: bar.or(match cue {
+                Some(StruckCue::Crit(plate)) => Some(plate),
+                _ => None,
+            }),
             off_faces: struck.is_some(),
             galley,
             color,
@@ -1583,6 +1619,67 @@ mod tests {
                             "{lanes}x{width}, x {x} in {size:?}, age {age}: the ARMOR popup \
                              at {drawn:?} left the body at {over}"
                         );
+                    }
+                }
+            }
+        }
+    }
+    /// CF-3-12: a critically wounded hostile in an Npc battle shows its
+    /// "CRIT · FIGHTING" callout in place of its health bar, and a popup kept
+    /// clear of the bar did not keep clear of the callout: in the pinned
+    /// damage-4x still at 1440x900 the "13" covered the start of "FIGHTING",
+    /// the decision tell of the NPC review. A popup on a critical hostile now
+    /// meets neither the callout plate nor a HUD rect, fresh, at the punch
+    /// peak and late, at both target sizes, mid-field and in the top lane
+    /// (where the HUD keep-clear drops it), across the lane.
+    #[test]
+    fn a_popup_on_a_critical_hostile_keeps_clear_of_its_crit_callout() {
+        for (size, zoom) in TARGET_SIZES {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+            for (lanes, width) in ZOOMED_FIELDS.into_iter().chain([(9, 20.0)]) {
+                for lane in [0, lanes / 2] {
+                    for x in (1..(width / 1.6) as u32).map(|i| i as f32 * 1.6) {
+                        let (mut game, id) = top_lane_runner(lanes, width, x);
+                        let a = game.attempt_mut().unwrap();
+                        a.mode = Mode::Npc;
+                        let enemy = &mut a.enemies[0];
+                        enemy.lane = lane;
+                        enemy.injury.hp = 0;
+                        assert!(enemy.critically_wounded(Mode::Npc));
+                        let feet = [enemy.x, enemy.y()];
+                        a.events.push_back(Event {
+                            to: feet,
+                            target_id: Some(id),
+                            lane: Some(lane),
+                            ..hit(a, 13, EventKind::Hit, 1)
+                        });
+                        let a = game.attempt().unwrap();
+                        let ctx = egui::Context::default();
+                        crate::settings::install_font(&ctx);
+                        crate::settings::configure(&ctx, zoom);
+                        let mut state = Feedback::default();
+                        for age in [0.0, 0.06, 0.5, 0.85] {
+                            let (arena, drawn) = draw_kept_clear(&ctx, &mut state, a, canvas, age);
+                            let drawn = drawn.expect("a damage number is drawn");
+                            let [dx, dy] = crate::battle_view::crowd_stagger(id);
+                            let at = arena.world(feet[0] + dx, feet[1] + dy);
+                            let painter = egui::Painter::new(
+                                ctx.clone(),
+                                egui::LayerId::background(),
+                                canvas,
+                            );
+                            let plate = art::crit_plate(&painter, at, arena.lane_height());
+                            assert!(
+                                !overlaps(drawn, plate),
+                                "{lanes}x{width}, lane {lane}, x {x} in {size:?}, age {age}: \
+                                 the number at {drawn:?} covers the CRIT callout at {plate:?}"
+                            );
+                            assert!(
+                                arena.effects_clip.contains_rect(drawn),
+                                "{lanes}x{width}, lane {lane}, x {x} in {size:?}, age {age}: \
+                                 {drawn:?} left the effects clip"
+                            );
+                        }
                     }
                 }
             }

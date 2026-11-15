@@ -2689,6 +2689,67 @@ fn every_cue_primitive_has_an_ink_backing_with_contrast_at_least_3() {
     }
 }
 
+/// CF-3-12: the damage popups keep clear of a critical hostile's CRIT
+/// callout through `crit_plate`, so it is the plate the cue pass paints
+/// under "CRIT · FIGHTING" mid-field, at both target sizes.
+#[test]
+fn crit_plate_is_the_painted_crit_callout_plate() {
+    use crate::battle_view::HealthView;
+    for (size, zoom) in [
+        (vec2(1440.0, 900.0), 1.0),
+        (vec2(1050.0, 700.0) / 1.35, 1.35),
+    ] {
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+        let clip = Rect::from_min_max(
+            canvas.min + vec2(24.0, 124.0),
+            canvas.max - vec2(24.0, 84.0),
+        );
+        let game = horde_core::sim::peak_render_fixture().expect("peak fixture");
+        let a = game.attempt().unwrap();
+        let mut view =
+            BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+        view.enemies.retain(|e| !e.boss);
+        view.enemies.truncate(1);
+        view.boss_phase = None;
+        view.enemies[0].health = HealthView::Critical;
+        view.enemies[0].position = [view.width * 0.5, f32::from(view.lanes) * 0.5];
+        let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
+        let [x, y] = view.enemies[0].drawn();
+        let at = arena.world(x, y);
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, zoom);
+        crate::visual_assets::publish_source_flash_masks(&ctx);
+        let input = egui::RawInput {
+            screen_rect: Some(canvas),
+            ..Default::default()
+        };
+        let mut plate = None;
+        let mut output = ctx.run_ui(input, |ui| {
+            let p = ui.painter().with_clip_rect(clip);
+            enemies::paint(&p, arena, &view, textures(), false, false, rig_shadow());
+            plate = Some(crit_plate(&p, at, arena.lane_height()));
+        });
+        output.textures_delta.clear();
+        let plate = plate.expect("a plate");
+        let painted: Vec<Rect> = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Rect(rect) if rect.fill == enemies::CALLOUT_BACKING => Some(rect.rect),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(painted.len(), 1, "{size:?}: one CRIT plate, {painted:?}");
+        assert!(
+            (painted[0].min - plate.min).length() < 0.01
+                && (painted[0].max - plate.max).length() < 0.01,
+            "{size:?}: crit_plate {plate:?}, painted {:?}",
+            painted[0]
+        );
+    }
+}
+
 /// A cue painted without its helper would dodge the guard above: no hostile
 /// or event painter of the battlefield draws text itself, so every field
 /// label goes through `cue` and its INK plate.

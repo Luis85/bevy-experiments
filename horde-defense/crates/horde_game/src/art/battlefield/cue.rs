@@ -327,6 +327,20 @@ fn callouts(p: &Painter, block: Vec<Label>, floor: f32) {
     }
 }
 
+/// The plate `label` paints on where no clip moves it, laid out with `p`'s
+/// fonts: the rect other overlays keep clear of (CF-3-12).
+pub(super) fn plate(p: &Painter, label: &Label) -> Rect {
+    let galley = p.layout_no_wrap(
+        label.text.clone().into_owned(),
+        FontId::proportional(label.size),
+        label.color,
+    );
+    label
+        .align
+        .anchor_size(label.at, galley.size())
+        .expand(CALLOUT_PAD)
+}
+
 /// The outline of a coin pop-up at `alpha`: INK, fading with the number.
 fn coin_outline(alpha: f32) -> C {
     C::from_rgba_unmultiplied(

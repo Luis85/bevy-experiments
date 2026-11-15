@@ -254,7 +254,7 @@ pub(super) fn cues(
             HealthView::Critical => batch.label(Label::amber(
                 at + vec2(0.0, -sy * CRIT_LIFT),
                 Align2::CENTER_BOTTOM,
-                "CRIT · FIGHTING",
+                CRIT_TEXT,
                 font * CRIT_FONT,
             )),
             HealthView::Hidden => {}
@@ -305,6 +305,25 @@ const CRIT_FONT: f32 = 0.8;
 /// How far over its feet, in lane heights, the bottom of a critically
 /// wounded hostile's CRIT callout sits.
 const CRIT_LIFT: f32 = 0.44;
+
+/// The callout a critically wounded hostile shows in place of its bar.
+const CRIT_TEXT: &str = "CRIT · FIGHTING";
+
+/// The plate under the CRIT callout of a critically wounded hostile drawn
+/// at `at` on a field of lane height `sy`, laid out with `p`'s fonts where
+/// no clip moves it. The damage popups keep clear of it as of a health bar
+/// (CF-3-12).
+pub(crate) fn crit_plate(p: &Painter, at: Pos2, sy: f32) -> Rect {
+    cue::plate(
+        p,
+        &Label::amber(
+            at + vec2(0.0, -sy * CRIT_LIFT),
+            Align2::CENTER_BOTTOM,
+            CRIT_TEXT,
+            cue::font(sy) * CRIT_FONT,
+        ),
+    )
+}
 
 /// How far over its feet, in lane heights, a hostile's name callout is
 /// centred.
