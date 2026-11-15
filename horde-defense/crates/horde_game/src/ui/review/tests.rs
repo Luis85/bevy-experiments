@@ -2608,47 +2608,100 @@ fn additive_colors(shape: &egui::Shape) -> usize {
     }
 }
 
-/// The additive colours of each of 96 live fx-stress frames, drawn as the
-/// App draws them (one tick a frame).
+/// What one live fx-stress frame draws of the effects reduced effects
+/// leave out.
 #[cfg(feature = "review")]
-fn fx_stress_sequence(reduced: bool) -> Vec<usize> {
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct FxStressFrame {
+    /// The frame's additive colours, read off the painted shapes: the light
+    /// pools (`light::pools_mesh`) and the loot glint are the field's only
+    /// additive paint.
+    additive: usize,
+    /// The frame's muzzle flash polygons and sky-flash alpha
+    /// (`art::flash_facts`, the painter's own rules).
+    flashes: crate::art::FlashFacts,
+    /// The burst keyframe parts drawn (core, shock ring, fireball, bloom,
+    /// tongues and the rest; `art::burst_keyframe_parts`), beyond the
+    /// reduced static ring.
+    burst_keyframes: usize,
+}
+
+/// Each of 96 live fx-stress frames, drawn as the App draws them (one tick
+/// a frame).
+#[cfg(feature = "review")]
+fn fx_stress_sequence(reduced: bool) -> Vec<FxStressFrame> {
     use horde_core::{command::Command, sim::Input};
     let mut f = staged("fx-stress");
     f.settings.reduced_effects = reduced;
     f.game.apply(&Command::SetPaused(false)).expect("unpause");
+    let arena = egui::Rect::from_min_size(egui::pos2(24.0, 124.0), egui::vec2(1392.0, 692.0));
     (0..96)
         .map(|_| {
             f.game.tick(Input::default());
             let output = one_frame(&mut f);
-            output
-                .shapes
-                .iter()
-                .map(|clipped| additive_colors(&clipped.shape))
-                .sum()
+            let reduced = f.settings.reduced_effects;
+            let a = f.game.attempt().expect("the stress field stands");
+            FxStressFrame {
+                additive: output
+                    .shapes
+                    .iter()
+                    .map(|clipped| additive_colors(&clipped.shape))
+                    .sum(),
+                flashes: crate::art::flash_facts(a, f.battle.sky_clock(), reduced),
+                burst_keyframes: crate::art::burst_keyframe_parts(
+                    arena,
+                    &fx_view(&f, reduced),
+                    a,
+                    reduced,
+                ),
+            }
         })
         .collect()
 }
 
 /// Acceptance G7.4 (reduced MOTION gate, the headless half): 96 live frames
-/// of fx-stress in reduced effects paint no additive vertex, so no light
-/// pool, muzzle flash, burst glow or sky flash. The same 96 frames with
-/// normal effects paint additive vertices in every frame, which proves the
-/// detector sees them. The pixel half (frame-to-frame luminance) is
-/// `scripts/measure_field_luminance.py motion` on a capture_motion export,
-/// with `--sidecar` the capture_review sidecar `<mode>/<scene>[-small].json`
-/// of the same scene, viewport and mode (the export's manifest.json has no
-/// `arena_rect`; docs/VALIDATION.md, "Full verify").
+/// of fx-stress in reduced effects paint no additive vertex (no light pool
+/// or loot glint), no muzzle flash polygon and no burst keyframe part (the
+/// bursts are the static solid or dashed ring). The same 96 frames with
+/// normal effects light every frame, draw muzzle flashes and play burst
+/// keyframes, which proves each detector sees what it rules out.
+/// fx-stress is a night stage, so its sky-flash alpha is zero in both
+/// modes; the reduced storm export's zero sky flash is
+/// `motion_exports_flash_in_normal_mode_and_never_in_reduced`. The pixel half
+/// (frame-to-frame luminance) is `scripts/measure_field_luminance.py motion`
+/// on a capture_motion export, with `--sidecar` the capture_review sidecar
+/// `<mode>/<scene>[-small].json` of the same scene, viewport and mode (the
+/// export's manifest.json has no `arena_rect`; docs/VALIDATION.md, "Full
+/// verify").
 #[cfg(feature = "review")]
 #[test]
 fn reduced_96_frame_fx_stress_sequence_has_no_additive_vertex() {
     let normal = fx_stress_sequence(false);
     assert_eq!(normal.len(), 96);
     assert!(
-        normal.iter().all(|&additive| additive > 0),
+        normal.iter().all(|frame| frame.additive > 0),
         "normal effects light every frame: {normal:?}"
     );
+    assert!(
+        normal
+            .iter()
+            .any(|frame| frame.flashes.muzzle_flash_count > 0),
+        "normal effects draw muzzle flashes: {normal:?}"
+    );
+    assert!(
+        normal.iter().any(|frame| frame.burst_keyframes > 0),
+        "normal effects play burst keyframes: {normal:?}"
+    );
     let reduced = fx_stress_sequence(true);
-    assert_eq!(reduced, [0; 96], "reduced effects paint no additive vertex");
+    let lit: Vec<_> = reduced
+        .iter()
+        .enumerate()
+        .filter(|(_, frame)| **frame != FxStressFrame::default())
+        .collect();
+    assert!(
+        lit.is_empty(),
+        "reduced effects paint no additive vertex, muzzle flash, sky flash or burst keyframe: {lit:?}"
+    );
 }
 
 // ----- W5-10: the storm scene and the motion manifest's flash counters -----

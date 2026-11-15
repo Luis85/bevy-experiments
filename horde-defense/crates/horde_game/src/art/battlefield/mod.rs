@@ -246,6 +246,24 @@ impl FxCounts {
         ]
     }
 }
+/// The burst parts the frame `battlefield` paints of `view` in `r` beyond
+/// the reduced static ring (`SolidRing`, `Dash`): the core, shock ring,
+/// fireball, debris, puffs, smoke, glints, bloom and tongues of the six
+/// keyframes. Zero in reduced effects.
+#[cfg(all(test, feature = "review"))]
+pub(crate) fn burst_keyframe_parts(
+    r: Rect,
+    view: &BattleViewModel,
+    a: &Attempt,
+    reduced: bool,
+) -> usize {
+    use explosion::Part;
+    explosion::drawn(ArenaProjection::for_attempt(r, a), view, reduced)
+        .iter()
+        .filter(|prim| !matches!(prim.part, Part::SolidRing | Part::Dash))
+        .count()
+}
+
 /// The effect counts of the frame `battlefield` paints of `view` in `r`.
 #[cfg(all(test, feature = "review"))]
 pub(crate) fn fx_counts(

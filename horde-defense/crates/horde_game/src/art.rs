@@ -16,7 +16,7 @@ pub(crate) use battlefield::reinforcements_anchor;
 #[cfg(feature = "review")]
 pub use battlefield::{FlashFacts, flash_facts};
 #[cfg(all(test, feature = "review"))]
-pub(crate) use battlefield::{FxCounts, fx_counts};
+pub(crate) use battlefield::{FxCounts, burst_keyframe_parts, fx_counts};
 pub use battlefield::{FxSource, shooter_class};
 pub(crate) use battlefield::{
     HEALTH_BAR_LIFT, OCCLUDER_GAP, enemy_body_box, fx_lifetime, structure_face,

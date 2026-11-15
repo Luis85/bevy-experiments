@@ -439,6 +439,15 @@ pub(crate) fn blasts(arena: ArenaProjection, view: &BattleViewModel) -> Vec<Blas
     out
 }
 
+/// The parts of every burst `view` shows, in burst order: what [`paint`]
+/// draws.
+pub(crate) fn drawn(arena: ArenaProjection, view: &BattleViewModel, reduced: bool) -> Vec<Prim> {
+    blasts(arena, view)
+        .iter()
+        .flat_map(|blast| prims(blast, reduced))
+        .collect()
+}
+
 /// World pass, above the actors: every live burst.
 pub(super) fn paint(
     p: &Painter,
@@ -447,10 +456,7 @@ pub(super) fn paint(
     reduced: bool,
     textures: ArtTextures,
 ) {
-    let prims: Vec<_> = blasts(arena, view)
-        .iter()
-        .flat_map(|blast| prims(blast, reduced))
-        .collect();
+    let prims = drawn(arena, view, reduced);
     let sprite = |prim: &&Prim| matches!(prim.geom, Geom::Sprite { .. });
     for prim in prims
         .iter()
