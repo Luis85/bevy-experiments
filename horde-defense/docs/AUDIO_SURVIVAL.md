@@ -8,17 +8,17 @@ The audio is presentation. Weapon selection and resolved simulation events choos
 
 A 60 s mix at default sliders reads **-23 ±2 LUFS integrated** with **true peak ≤ 0.95 FS**. This is the user's decision (U3, 2026-11-05) and replaces the brief's -16 to -14 LUFS. It is measured on the offline render of the shipped library under the runtime policy, metered with the BS.1770-4 meter in `horde_audio::meter` (4x oversampled true peak):
 
-- `reference_mixed_60s_meets_loudness_gate`: 8 s Camp with two Confirm cues, 44 s of the seed-1 level-0 battle, 8 s Results with the victory stinger, on the stage-1 dry bed and on the rain bed.
+- `reference_mixed_60s_meets_loudness_gate`: 8 s Camp with two Confirm cues, 44 s of the seed-1 level-0 battle (its drops heard through the runner's `LootTracker`), 8 s Results with the victory stinger, the loot reveal (150 ms) and one coin batch (450 ms) on the `ResultsAudioGuard` timing, on the stage-1 dry bed and on the rain bed.
 - `dense_battle_60s_true_peak_at_most_0_95`: the maximum-progression battle fixture.
 - `max_sliders_60s_is_logged`: every slider at 1.0, logged only (ignored).
 
-Measured at A6-17 (2026-11-14) at the default sliders:
+Measured in the closing phase (2026-11-15) at the default sliders, after the Results part gained the loot reveal and coin batch (A6-17 read -24.2 for the stage-1 reference and -23.1 / 0.875 TP for the dense battle):
 
 | Scene | Integrated (LUFS) | Short-term max | Momentary max | Sample peak (FS) | True peak (FS) |
 |---|---|---|---|---|---|
-| `reference_mixed_60s`, stage-1 | -24.2 | -21.5 | -19.1 | 0.390 | 0.405 |
+| `reference_mixed_60s`, stage-1 | -24.1 | -21.5 | -19.1 | 0.390 | 0.405 |
 | `reference_mixed_60s`, rain | -22.9 | -20.5 | -19.6 | 0.380 | 0.399 |
-| `dense_battle_60s` | -23.1 | -21.6 | -19.1 | 0.823 | 0.875 |
+| `dense_battle_60s` | -23.0 | -21.5 | -18.7 | 0.832 | 0.885 |
 | `max_sliders_60s` (logged) | -20.3 | -17.6 | -15.2 | 0.609 | 0.632 |
 
 No runtime master limiter is used: the measured true peak stays under 0.95 FS (ruling R3). Before the production pass the same reference mix read -47.0 (stage-1) and -42.4 (rain) LUFS; the before and after tables are in the production-pass plan, section 9.3. Only the stage-1 dry and rain beds are gated; the wind, cold and urban beds are not.

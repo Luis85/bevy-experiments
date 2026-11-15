@@ -39,6 +39,7 @@ use crate::{
     duck::Ducker,
     events::{EventContext, event_requests, push_cue},
     gun::GunTracker,
+    loot::{LootTracker, ResultsAudioGuard, ResultsLoot},
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, mix},
     pan::{self, Places},
@@ -47,7 +48,10 @@ use crate::{
     voicing::{EnemyVoiceIndex, Voicing, lowpassed},
     wav,
 };
-use horde_core::sim::{BattleId, Game, TICKS_PER_SECOND, smoke_input};
+use horde_core::{
+    quality::Quality,
+    sim::{BattleId, Game, TICKS_PER_SECOND, smoke_input},
+};
 use std::{borrow::Cow, collections::BTreeMap, path::Path};
 
 /// The render's sample rate, the rate of the shipped effect clips.
@@ -651,11 +655,12 @@ pub fn fire_bed_x(zones: &[horde_core::ordnance::FireZone]) -> Option<f32> {
 /// tick, and returns the cues each tick requests: the root battle's events
 /// through [`event_requests`], plus the fire bed while a fire zone burns, as
 /// the runner's `tick_sounds` does, then the gun's handling through the
-/// [`GunTracker`], as the runner's `run_tick` does. A tick without an
-/// attempt is a paused frame.
+/// [`GunTracker`] and the new drops through the [`LootTracker`], as the
+/// runner's `run_tick` does. A tick without an attempt is a paused frame.
 pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
     let mut voices = EnemyVoiceIndex::default();
     let mut guns = GunTracker::default();
+    let mut loot = LootTracker::default();
     (0..ticks)
         .map(|_| {
             let input = smoke_input(game);
@@ -693,6 +698,7 @@ pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
             }
             if let Some(attempt) = game.attempt() {
                 guns.observe(BattleId::Root, attempt, &input, &mut cues, &mut places);
+                loot.observe(BattleId::Root, attempt, &mut cues, &mut places);
             }
             Frame {
                 cues,
@@ -718,8 +724,12 @@ pub const REFERENCE_RESULTS_SECONDS: u32 = 8;
 /// seed 1, Personal, level 0).
 ///
 /// The results open with the battle's stinger: the one its last tick played,
-/// or the victory stinger when the battle is still running after 44 s. The
-/// loot reveal and the coin batch join the results when those cues exist.
+/// or the victory stinger when the battle is still running after 44 s. Then
+/// the [`ResultsAudioGuard`] plays the loot reveal and one coin batch on its
+/// own timing (design-audio.md, the reference scene). The scene always has
+/// both: the reveal voices the report's best drop, or a Rare one when the
+/// run dropped nothing or is still running, and settlement counts as having
+/// auto-sold at least one item.
 pub fn reference_mixed_60s(battle: &mut Game) -> Vec<Frame> {
     let idle = |context| Frame::centred(Vec::new(), context);
     let mut frames =
@@ -744,6 +754,27 @@ pub fn reference_mixed_60s(battle: &mut Game) -> Vec<Frame> {
     ]);
     if !finished {
         frames[results].cues.push(Cue::Victory);
+    }
+    let report = battle
+        .last_result()
+        .filter(|_| finished)
+        .map(ResultsLoot::of);
+    let shown = ResultsLoot {
+        attempt_id: report.map_or(0, |report| report.attempt_id),
+        best: report
+            .and_then(|report| report.best)
+            .or(Some(Quality::Rare)),
+        auto_sold: report.map_or(0, |report| report.auto_sold).max(1),
+    };
+    let mut guard = ResultsAudioGuard::default();
+    for (index, frame) in frames[results..].iter_mut().enumerate() {
+        let now_ms = index as u64 * 1000 / u64::from(TICKS_PER_SECOND);
+        for due in guard.observe(Some(shown), now_ms) {
+            push_cue(&mut frame.cues, due.cue);
+            if let Some(voicing) = due.voicing {
+                frame.places.voice(due.cue, voicing);
+            }
+        }
     }
     frames
 }

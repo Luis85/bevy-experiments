@@ -11,6 +11,7 @@
 
 use horde_audio::{
     cue::Cue,
+    loot::{COIN_BATCH_DELAY_MS, LOOT_REVEAL_DELAY_MS, reveal_voicing},
     meter::Loudness,
     mix::{self, Bus, CONTEXT_GAIN, mix},
     render::{
@@ -21,7 +22,7 @@ use horde_audio::{
     voices::{LiveVoice, bus_cap},
     wav,
 };
-use horde_core::{content::Mode, sim::Game};
+use horde_core::{content::Mode, quality::Quality, sim::Game};
 use std::path::{Path, PathBuf};
 
 /// Every bus audible.
@@ -325,6 +326,63 @@ fn reference_scene_is_camp_battle_results() {
         .filter(|cue| matches!(cue, Cue::Victory | Cue::Defeat | Cue::Retreat))
         .count();
     assert_eq!(stingers, 1, "one stinger ends the scene's battle");
+    // The results reveal the loot and sell a batch (design-audio.md 205),
+    // on the runtime's own Results timing.
+    let results = &frames[3_120..];
+    let at = |cue: Cue| -> Vec<usize> {
+        (0..results.len())
+            .filter(|index| results[*index].cues.contains(&cue))
+            .collect()
+    };
+    let frame_of = |ms: u64| (ms * 60).div_ceil(1000) as usize;
+    assert_eq!(at(Cue::LootReveal), [frame_of(LOOT_REVEAL_DELAY_MS)]);
+    assert_eq!(at(Cue::CoinBatch), [frame_of(COIN_BATCH_DELAY_MS)]);
+    assert_eq!(
+        results[frame_of(LOOT_REVEAL_DELAY_MS)]
+            .places
+            .voicing(Cue::LootReveal),
+        reveal_voicing(Quality::Rare),
+        "the battle is still running at 44 s: the reveal stands in a Rare drop"
+    );
+}
+
+/// The battle frames hear a new drop of Rare or better as the runner's
+/// `run_tick` does (its `LootTracker`), and a lesser drop not at all.
+#[test]
+fn battle_frames_hear_rare_drops_as_the_runner_does() {
+    let battle = |seed| {
+        let mut game = Game::default();
+        game.set_seed(seed);
+        game.campaign_mut().attempts = 1;
+        game.deploy(0, Mode::Personal).unwrap();
+        game.set_paused(false);
+        game
+    };
+    let drops = |frames: &[Frame]| -> Vec<Option<f32>> {
+        frames
+            .iter()
+            .filter(|frame| frame.cues.contains(&Cue::LootDrop))
+            .map(|frame| frame.places.of(Cue::LootDrop))
+            .collect()
+    };
+    // Seed 19 drops one Rare item in its first 44 s; seed 2 one Uncommon.
+    let mut rare = battle(19);
+    let frames = render::battle_frames(&mut rare, 44 * 60);
+    let quality: Vec<Quality> = rare
+        .attempt()
+        .unwrap()
+        .loot_events
+        .iter()
+        .map(|event| event.quality)
+        .collect();
+    assert_eq!(quality, [Quality::Rare]);
+    let heard = drops(&frames);
+    assert_eq!(heard.len(), 1, "{heard:?}");
+    assert!(heard[0].is_some(), "the drop sounds from where it fell");
+    let mut uncommon = battle(2);
+    let frames = render::battle_frames(&mut uncommon, 44 * 60);
+    assert_eq!(uncommon.attempt().unwrap().loot_events.len(), 1);
+    assert_eq!(drops(&frames), []);
 }
 
 /// Runs in the normal test pass: ten seconds of the reference scene (camp into
