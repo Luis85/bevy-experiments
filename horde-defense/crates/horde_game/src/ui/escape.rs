@@ -9,8 +9,10 @@
 //! The topmost overlay answers first, in [`Overlay`]'s order. With no overlay
 //! the screen answers: the menu asks to quit, a camp tab goes back to Camp
 //! home, Upgrades goes back to Results (or to Camp home with no settled
-//! report), Camp home and Results ask to return to the main menu, and the battle
-//! cancels a retreat hold, else closes construction or, only when Pause is bound to Escape (decision 18),
+//! report), Camp home goes back to a settled Results while the journey runs
+//! and no defense is live, else asks to return to the main menu; Results asks
+//! to return to the main menu; and the battle cancels a retreat hold, else
+//! closes construction or, only when Pause is bound to Escape (decision 18),
 //! passes the press on to the Pause binding. Settings saves and returns,
 //! unless the difficulty draft is unapplied: then the press opens the draft
 //! warning, and the next one closes it ("Keep editing").
