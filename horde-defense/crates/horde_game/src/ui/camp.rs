@@ -45,7 +45,8 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
             match f.tab {
                 Tab::World => country_action(ui, f),
                 Tab::Home => home::home_footer(ui, f),
-                Tab::Operations if f.game.attempt().is_none() => {}
+                // Every other page, the Mara and Operations drill-downs
+                // included, has the Prepare primary (design-ux-flow §1).
                 _ => briefing::mission_actions(ui, f),
             }
             ui.add_space(5.0);

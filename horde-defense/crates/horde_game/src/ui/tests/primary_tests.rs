@@ -208,7 +208,9 @@ const MATRIX: &[MatrixRow] = &[
             x.frontend.nav.tab = Tab::Operations;
         },
         Screen::Camp,
-        Expect::Nothing,
+        // Closing: the Operations drill-down has the Prepare footer primary
+        // between defenses too (design-ux-flow §1, JOURNEYS loop map).
+        Expect::Label("Go to briefing"),
     ),
     (
         "camp-armory-live",
