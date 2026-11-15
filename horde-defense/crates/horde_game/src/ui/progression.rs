@@ -32,6 +32,8 @@ struct TreeState {
     learned: Option<(usize, String)>,
     /// The branch the compact chip row last scrolled to (CF-3-20).
     chip_branch: Option<String>,
+    /// The compact detail's head column as last drawn, in points (CF-3-30).
+    head_height: f32,
 }
 /// A purchase sent this session that has not yet shown up as owned.
 #[derive(Clone)]
@@ -441,8 +443,18 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
     let body_height = (region.bottom() - ui.cursor().top()).max(150.0);
     let mut action = None;
     let canvas = if compact {
-        // The detail goes below so the canvas keeps more than half the height.
-        let canvas_height = (body_height * 0.62).max(120.0);
+        // The detail goes below so the canvas keeps more than half the height,
+        // but never the head column's: a short window (the status row and a
+        // callout band over 1050x700@1.35) gives the canvas only what the
+        // head leaves, so the Learn button and its disabled reason stay whole
+        // (CF-3-30). The reserve is a not-owned head (name row, Learn, one
+        // reason line), or the head last drawn when that was taller, so the
+        // canvas does not jump as the selection moves between nodes.
+        let spacing = ui.spacing().item_spacing.y;
+        let head = state.head_height.max(COMPACT_HEAD_ROWS + 2.0 * spacing);
+        let canvas_height = (body_height * 0.62)
+            .min(body_height - 8.0 - head)
+            .max(COMPACT_CANVAS_MIN);
         let canvas = graph.show(
             ui,
             id,
@@ -452,13 +464,12 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
         );
         ui.add_space(4.0);
         let detail_height = (body_height - canvas_height - 8.0).max(60.0);
-        ui.allocate_ui_with_layout(
+        let detail = ui.allocate_ui_with_layout(
             vec2(width, detail_height),
             Layout::top_down(Align::Min),
-            |ui| {
-                action = skill_detail(ui, f, &state, selected, true, detail_height);
-            },
+            |ui| skill_detail(ui, f, &state, selected, true, detail_height),
         );
+        (action, state.head_height) = detail.inner;
         canvas
     } else {
         let detail_width = if width >= 1000.0 { 310.0 } else { 260.0 };
@@ -477,7 +488,7 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
                 Layout::top_down(Align::Min),
                 |ui| {
                     ui.set_width(detail_width);
-                    action = skill_detail(ui, f, &state, selected, false, body_height);
+                    action = skill_detail(ui, f, &state, selected, false, body_height).0;
                 },
             );
             canvas
@@ -740,8 +751,15 @@ fn chip(ui: &mut egui::Ui, text: &str, color: egui::Color32, filled: bool) {
         });
 }
 
+/// The compact head's rows without their spacing: the 28-pt name row, the
+/// 34-pt Learn button and one 12-pt reason line (CF-3-30).
+const COMPACT_HEAD_ROWS: f32 = 28.0 + 34.0 + 17.0;
+/// The compact canvas's least height: a row of nodes with their labels.
+const COMPACT_CANVAS_MIN: f32 = 96.0;
+
 /// Name, state chip, the one Learn action with its disabled reason, then
-/// what changes, the requirement checklist and the path summary.
+/// what changes, the requirement checklist and the path summary. Returns the
+/// action and, in the compact layout, the height the head column drew.
 fn skill_detail(
     ui: &mut egui::Ui,
     f: &mut UiCtx,
@@ -749,7 +767,7 @@ fn skill_detail(
     index: usize,
     compact: bool,
     height: f32,
-) -> Option<DetailAction> {
+) -> (Option<DetailAction>, f32) {
     let node = &skills().nodes[index];
     let mut action = None;
     let head = |ui: &mut egui::Ui, action: &mut Option<DetailAction>| {
@@ -899,13 +917,18 @@ fn skill_detail(
             );
         }
     };
+    let mut head_height = 0.0;
     if compact {
         ui.horizontal_top(|ui| {
             let left = (ui.available_width() * 0.5).clamp(220.0, 420.0);
-            ui.allocate_ui_with_layout(vec2(left, height), Layout::top_down(Align::Min), |ui| {
-                ui.set_width(left);
-                head(ui, &mut action);
-            });
+            head_height = ui
+                .allocate_ui_with_layout(vec2(left, height), Layout::top_down(Align::Min), |ui| {
+                    ui.set_width(left);
+                    head(ui, &mut action);
+                })
+                .response
+                .rect
+                .height();
             ui.separator();
             ui.allocate_ui_with_layout(
                 vec2(ui.available_width(), height),
@@ -928,7 +951,7 @@ fn skill_detail(
             .max_height((height - used).max(60.0))
             .show(ui, |ui| body(ui, f, &mut action));
     }
-    action
+    (action, head_height)
 }
 
 fn is_body_node(node: &SkillNode) -> bool {

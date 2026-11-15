@@ -1963,6 +1963,73 @@ fn callout_stills_leave_one_callout_unread_on_camp_and_upgrades() {
     assert!(crate::ui::onboarding::due(&f.settings, &f.game).is_none());
 }
 
+/// CF-3-30: with the status row and the callout band over the compact tree
+/// at 1050x700@1.35, the skill detail's head column (name and chip, Learn,
+/// the disabled reason) is drawn whole: the reason line lies inside the
+/// screen and inside its clip, as the canvas leaves the head its height.
+#[test]
+fn compact_skill_detail_draws_the_disabled_reason_whole_under_the_callout() {
+    let mut f = staged("callout-upgrades");
+    f.settings.scale = 1.35;
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1050.0, 700.0) / 1.35);
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    crate::settings::configure(&ctx, 1.35);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    let mut last = None;
+    for _ in 0..4 {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        output.textures_delta.clear();
+        last = Some(output);
+    }
+    let output = last.expect("frames ran");
+    fn walk(
+        shape: &egui::epaint::Shape,
+        clip: egui::Rect,
+        out: &mut Vec<(String, egui::Rect, egui::Rect)>,
+    ) {
+        match shape {
+            egui::epaint::Shape::Text(t) => out.push((
+                t.galley.text().to_owned(),
+                t.galley.rect.translate(t.pos.to_vec2()),
+                clip,
+            )),
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, clip, out)),
+            _ => {}
+        }
+    }
+    let mut texts = Vec::new();
+    for clipped in &output.shapes {
+        walk(&clipped.shape, clipped.clip_rect, &mut texts);
+    }
+    let callout = crate::ui::onboarding::due(&f.settings, &f.game).expect("a callout is due");
+    let line = crate::ui::onboarding::text(callout, &f.settings);
+    assert!(
+        texts.iter().any(|(text, ..)| *text == line),
+        "the callout band shows"
+    );
+    let (text, rect, clip) = texts
+        .iter()
+        .find(|(text, ..)| text.starts_with("Need ") && text.ends_with(" more coins"))
+        .unwrap_or_else(|| panic!("the disabled reason is painted: {texts:?}"));
+    assert!(
+        screen.contains_rect(*rect),
+        "{text:?} at {rect:?} lies inside the screen {screen:?}"
+    );
+    assert!(
+        clip.contains_rect(*rect),
+        "{text:?} at {rect:?} lies inside its clip {clip:?}"
+    );
+}
+
 /// UX-12's low-HP band gets a capture for both defenders it applies to:
 /// the low-hp still is a paused personal defense and low-hp-observed a
 /// paused main-run defense Mara holds, each with the defender at or below
