@@ -169,6 +169,48 @@ fn boss_banner_visible_at_1_2s_and_gone_after_2s_wall_at_speed_4() {
     assert!(painted(&output, "BOSS IN 00:0"), "the HUD countdown");
 }
 
+/// Attempt ids restart at 1 in a new journey, and the first defense warns on
+/// the same tick: the new journey's warning still gets its banner, so the
+/// wave alert never sounds without its visual twin.
+#[test]
+fn a_new_journey_announces_a_warning_on_the_same_attempt_and_tick() {
+    let mut fixture = personal_before_warning();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    let mut clock = Clock::new();
+    clock.frame(&h, f, View::Battle, 1);
+    let output = clock.run(&h, f, View::Battle, 1, 30);
+    assert!(painted(&output, APPROACHING), "the old journey's warning");
+    let announced = f.battle.boss_banner.expect("a banner").key;
+    // 2.1 s: the banner is over, the boss is still 2.9 s out.
+    let output = clock.run(&h, f, View::Battle, 1, 96);
+    assert!(!painted(&output, APPROACHING), "the old banner is over");
+    assert!(f.game.attempt().unwrap().enemies.iter().all(|e| !e.boss));
+    // Leave before the boss arrives and start a new journey.
+    f.game.set_paused(true);
+    f.screen = Screen::Menu;
+    f.act(|c| c.dispatch(AppCommand::NewJourney, ""));
+    f.flush_for_test();
+    assert!(!f.status.message_error, "{}", f.status.message);
+    assert!(f.game.attempt().is_none(), "the new journey has no attempt");
+    // Its first defense, one tick before the same warning.
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.deploy_country_stage(0, Mode::Personal).unwrap();
+    f.game.set_paused(false);
+    f.screen = Screen::Battle;
+    let (boss, warning) = boss_ticks(f);
+    f.game.attempt_mut().unwrap().tick = boss - warning - 1;
+    clock.frame(&h, f, View::Battle, 1);
+    let output = clock.run(&h, f, View::Battle, 1, 30);
+    assert_eq!(
+        f.battle.boss_banner.map(|banner| banner.key),
+        Some(announced),
+        "the same attempt id and warning tick"
+    );
+    assert!(painted(&output, APPROACHING), "the new journey's warning");
+    f.runtime.finish_storage_for_test();
+}
+
 /// The arrival banner lasts 1.5 s of wall time, and only running time
 /// counts: a paused battle holds the banner where it is.
 #[test]

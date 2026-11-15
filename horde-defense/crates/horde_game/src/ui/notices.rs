@@ -364,6 +364,7 @@ impl UiCtx<'_> {
                 self.campaign.improvement_focus = None;
                 self.armory.selected_item = None;
                 self.armory.pending_sale = None;
+                self.battle.clear_boss_banners();
                 if let Some(a) = self.game.attempt() {
                     self.battle.aim = [a.width_yards * 0.5, a.defender_position()[1]];
                     self.campaign.mode = a.mode;
@@ -457,6 +458,7 @@ impl UiCtx<'_> {
                 self.armory.pending_sale = None;
                 self.battle.loot_feedback = loot::Feedback::default();
                 self.battle.damage_feedback = damage::Feedback::default();
+                self.battle.clear_boss_banners();
                 self.campaign.observed = None;
                 self.status.profile_exists = true;
                 self.battle.fire_latched = false;

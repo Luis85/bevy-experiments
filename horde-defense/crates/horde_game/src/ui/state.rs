@@ -276,6 +276,13 @@ impl BattleUi {
         self.retreat_hold = None;
         self.retreat_hold_spent = true;
     }
+    /// A new or reloaded journey: attempt ids start over, so a banner kept
+    /// for the old journey's attempt would mark the new one's warning as
+    /// already announced.
+    pub(super) fn clear_boss_banners(&mut self) {
+        self.boss_banner = None;
+        self.observer_boss_banner = None;
+    }
     pub(super) fn set_construction(&mut self, open: bool) {
         self.construction = open;
         if !open {
