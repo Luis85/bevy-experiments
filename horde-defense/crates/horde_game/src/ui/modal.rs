@@ -583,7 +583,8 @@ fn show_draft_warning(ctx: &egui::Context, f: &mut UiCtx, then: LeaveSettings) {
         ui.set_max_width(440.0);
         ui.heading(DRAFT_WARNING_TITLE);
         ui.label(
-            "The difficulty draft differs from what the next run uses.              Leaving Settings without applying it drops the draft.",
+            "The difficulty draft differs from what the next run uses. Leaving \
+             Settings without applying it drops the draft.",
         );
         let invalid = matches!(draft, DraftState::Invalid);
         if invalid {

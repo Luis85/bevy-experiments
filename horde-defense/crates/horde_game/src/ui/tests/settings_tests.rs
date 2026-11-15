@@ -796,6 +796,16 @@ fn dirty_draft_escape_opens_warning() {
     h.frame(f, View::Full, vec![]);
     let output = h.frame(f, View::Full, vec![]);
     assert_eq!(text_count(&output, DRAFT_WARNING_TITLE), 1);
+    // The body reads as two sentences one space apart.
+    assert_eq!(
+        text_count(
+            &output,
+            "The difficulty draft differs from what the next run uses. Leaving \
+             Settings without applying it drops the draft."
+        ),
+        1,
+        "the draft warning body"
+    );
     assert_eq!(text_count(&output, DISCARD_AND_RETURN), 1);
     assert_eq!(text_count(&output, KEEP_EDITING), 1);
     assert_eq!(modal_primaries(&h), [APPLY_AND_RETURN]);
