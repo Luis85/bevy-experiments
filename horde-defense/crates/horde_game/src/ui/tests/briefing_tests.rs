@@ -186,7 +186,7 @@ fn briefing_primary_opens_the_field_of_the_defense_it_deploys() {
         f.flush_for_test();
         h.frame(f, View::Full, vec![]);
         assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Briefing);
-        assert_eq!(h.screen_primaries(), [label.clone()]);
+        assert_eq!(h.screen_primaries(), std::slice::from_ref(&label));
         h.click(f, View::Full, &label);
         assert!(f.game.attempt().is_some(), "{label}: {}", f.status.message);
         assert!(

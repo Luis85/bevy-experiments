@@ -151,7 +151,11 @@ fn between_runs(fixture: &mut IsolatedFrontend) {
     f.game.campaign_mut().journey_active = true;
 }
 
-const MATRIX: &[(&str, fn(&mut IsolatedFrontend), Screen, Expect)] = &[
+/// A matrix row: its name, how it prepares the fixture, the screen it lands
+/// on and what that screen's primaries must be.
+type MatrixRow = (&'static str, fn(&mut IsolatedFrontend), Screen, Expect);
+
+const MATRIX: &[MatrixRow] = &[
     (
         "menu",
         |x| x.frontend.screen = Screen::Menu,

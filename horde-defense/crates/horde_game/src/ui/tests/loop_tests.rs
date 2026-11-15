@@ -452,7 +452,11 @@ fn full_loop(target: Target) {
         offer.price
     );
     h.frame(f, View::Full, vec![]);
-    assert_eq!(modal_primaries(&h), [recruit_as.clone()], "{target:?}");
+    assert_eq!(
+        modal_primaries(&h),
+        std::slice::from_ref(&recruit_as),
+        "{target:?}"
+    );
     h.click(f, View::Full, &recruit_as);
     let roster = &f.game.strategy().roster;
     assert_eq!(roster.len(), 1, "{target:?}: {}", f.status.message);
