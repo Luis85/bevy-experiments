@@ -854,6 +854,38 @@ fn legend_and_pause_banner_name_rebound_and_unbound_keys() {
     assert!(!painted(&output, " to resume"));
 }
 
+/// CF-3-31: an observed (Npc) battle's legend names only the keys that act
+/// while observing, build and pause: the core runs fire, melee and reload
+/// only in a personal defense, and the observed bar has no attack selector
+/// to cycle. The personal legend is unchanged.
+#[test]
+fn observed_battle_legend_names_only_build_and_pause() {
+    let h = Harness::new();
+    let mut fixture = fresh_battle(Mode::Npc, true);
+    let f = &mut fixture.frontend;
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(text_count(&output, "B build · Escape pause"), 1);
+    for absent in ["Mouse1 fire", "Mouse2 melee", "R reload", "cycle attack"] {
+        assert!(
+            !output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, absent)),
+            "the observed legend names {absent:?}"
+        );
+    }
+    let mut fixture = fresh_battle(Mode::Personal, true);
+    let f = &mut fixture.frontend;
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Mouse1 fire · Mouse2 melee · R reload · B build · Escape pause · Q cycle attack"
+        ),
+        1
+    );
+}
+
 /// The two target battle sizes in points: 1440x900 and 1050x700@1.35.
 fn target_sizes() -> [Vec2; 2] {
     [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)]

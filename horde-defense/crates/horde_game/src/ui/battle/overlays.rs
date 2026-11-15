@@ -10,6 +10,7 @@ use crate::{
     ui::{UiCtx, coins::grouped, hud, progress},
 };
 use bevy_egui::egui::{self, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, pos2, vec2};
+use horde_core::content::Mode;
 
 pub(super) fn corner_hud(
     ui: &mut egui::Ui,
@@ -129,20 +130,33 @@ pub(super) fn arrival_groups(size: u32) -> String {
         size => format!("groups of {size}"),
     }
 }
-/// The key legend under the bar: fire, melee, reload, build, pause and cycle
-/// attack, each named by its key through `settings::binding_text`, so one a
-/// rebind left without a key reads "Unbound".
-pub(super) fn key_legend(settings: &Settings) -> String {
-    [
+/// The key legend under the bar, each key named through
+/// `settings::binding_text`, so one a rebind left without a key reads
+/// "Unbound". A personal defense names fire, melee, reload, build, pause and
+/// cycle attack; an observed one only build and pause, the keys that act
+/// while observing (CF-3-31): the core runs the manual actions only in a
+/// personal defense, and the observed bar has no attack selector to cycle.
+pub(super) fn key_legend(settings: &Settings, mode: Mode) -> String {
+    const PERSONAL: [(BindingId, &str); 6] = [
         (BindingId::Core(Action::Fire), "fire"),
         (BindingId::Core(Action::Melee), "melee"),
         (BindingId::Core(Action::Reload), "reload"),
         (BindingId::Core(Action::Build), "build"),
         (BindingId::Core(Action::Pause), "pause"),
         (BindingId::Extra(ExtraAction::CycleAttack), "cycle attack"),
-    ]
-    .map(|(id, action)| format!("{} {action}", binding_text(settings.binding(id))))
-    .join(" · ")
+    ];
+    const OBSERVED: [(BindingId, &str); 2] = [
+        (BindingId::Core(Action::Build), "build"),
+        (BindingId::Core(Action::Pause), "pause"),
+    ];
+    let keys: &[(BindingId, &str)] = match mode {
+        Mode::Personal => &PERSONAL,
+        Mode::Npc => &OBSERVED,
+    };
+    keys.iter()
+        .map(|&(id, action)| format!("{} {action}", binding_text(settings.binding(id))))
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 pub(super) use crate::settings::CONTROLS;
 /// The bound key of the core `action`; None when it is unbound.

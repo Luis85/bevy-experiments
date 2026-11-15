@@ -243,7 +243,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 f.battle.legend_rect = Some(ui.painter().text(
                     layout.legend_anchor,
                     Align2::LEFT_BOTTOM,
-                    key_legend(f.settings),
+                    key_legend(f.settings, view.mode),
                     FontId::proportional(10.),
                     MUTED,
                 ));
