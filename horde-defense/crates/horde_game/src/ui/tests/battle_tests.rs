@@ -2152,3 +2152,53 @@ fn shot_fx_never_mutates_attempt() {
         }
     }
 }
+
+/// CF-3 (closing): the right battle HUD card is painted inside its layout
+/// rect, so the compact PAUSED tag keeps its gap under the card. The card's
+/// four lines grew its frame about 8 pt past `hud_right`, onto the tag.
+/// Checked with the boss incoming and present, at both target sizes, on the
+/// 7x16 field whose banner is the tag under the card.
+#[test]
+fn right_hud_card_is_painted_inside_its_layout_rect() {
+    for size in target_sizes() {
+        for boss in [false, true] {
+            let mut fixture = sized_battle(7, 16, true);
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            if boss {
+                let mut attempt = f.game.attempt_slot_mut().take().unwrap();
+                attempt.boss_spawned = true;
+                f.game
+                    .spawn_enemy(&mut attempt, horde_core::content::EnemyKind::Brute, 0, true);
+                *f.game.attempt_slot_mut() = Some(attempt);
+            }
+            let output = h.frame_size(f, View::Battle, vec![], size);
+            let label = if boss { "BOSS ·" } else { "BOSS IN" };
+            assert!(
+                text_runs(&output)
+                    .iter()
+                    .any(|run| run.text.starts_with(label)),
+                "{size:?}: {label} is not painted"
+            );
+            let layout = field_layout(&h, f);
+            let right = layout.hud_right;
+            let card = painted_rects(&output)
+                .into_iter()
+                .filter(|shape| shape.fill == Color32::from_black_alpha(220))
+                .map(|shape| shape.rect.expand(shape.stroke.width * 0.5))
+                .find(|rect| (rect.left() - right.left()).abs() < 1.0)
+                .unwrap_or_else(|| panic!("{size:?}: the right HUD card is not painted"));
+            assert!(
+                right.expand(0.5).contains_rect(card),
+                "{size:?} boss {boss}: the card {card:?} leaves hud_right {right:?}"
+            );
+            // The tag slot keeps its whole gap under the painted card.
+            let slot = layout.pause_banner_slot;
+            assert!(
+                slot.top() - card.bottom() >= slot.top() - right.bottom() - 0.5
+                    && slot.top() > card.bottom(),
+                "{size:?} boss {boss}: the card {card:?} meets the tag slot {slot:?}"
+            );
+        }
+    }
+}

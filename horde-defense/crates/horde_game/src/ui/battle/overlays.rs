@@ -68,6 +68,10 @@ pub(super) fn corner_hud(
             .inner_margin(6)
             .show(ui, |ui| {
                 ui.set_width(176.);
+                // Four lines inside `hud_right`'s 86 pt: at the shared 7 pt
+                // gap the card grew about 8 pt past it, onto the PAUSED tag
+                // slot under it (CF-3).
+                ui.spacing_mut().item_spacing.y = 3.0;
                 match view.boss {
                     hud::BossReadout::Present {
                         health,
