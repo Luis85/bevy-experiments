@@ -2334,3 +2334,230 @@ fn save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap() {
         vec!["docs/ARCHITECTURE.md: does not say \"`SETTINGS_VERSION` 2\"".to_owned()]
     );
 }
+
+/// The audio guide and its mix table: every row of the "## Mix table"
+/// section states `horde_audio::mix::mix` exactly, and every cue that is not
+/// retired is listed once, so a retune cannot leave the table stale.
+const AUDIO_GUIDE: &str = "docs/AUDIO_SURVIVAL.md";
+const MIX_TABLE_SECTION: &str = "## Mix table";
+
+/// The cue a mix-table name stands for.
+fn mix_table_cue(name: &str) -> Option<horde_audio::cue::Cue> {
+    use horde_audio::cue::Cue;
+    Some(match name {
+        "Pistol" => Cue::Pistol,
+        "SMG" => Cue::Smg,
+        "Shotgun" => Cue::Shotgun,
+        "Rifle" => Cue::Rifle,
+        "Marksman" => Cue::Marksman,
+        "Machine gun" => Cue::MachineGun,
+        "Turret shot" => Cue::TurretShot,
+        "Impact" => Cue::Impact,
+        "Armor" => Cue::Armor,
+        "Block" => Cue::Block,
+        "Kill" => Cue::Kill,
+        "Enemy death" => Cue::EnemyDeath,
+        "Damage" => Cue::Damage,
+        "Melee" => Cue::Melee,
+        "Structure" => Cue::Structure,
+        "Trap" => Cue::Trap,
+        "Explosion" => Cue::Explosion,
+        "Molotov" => Cue::Molotov,
+        "Fire" => Cue::Fire,
+        "Reload" => Cue::Reload,
+        "Throw" => Cue::Throw,
+        "Ready" => Cue::Ready,
+        "Magazine out" => Cue::ReloadOut,
+        "magazine in" => Cue::ReloadIn,
+        "Shell insert" => Cue::ShellInsert,
+        "Bolt" => Cue::BoltCycle,
+        "Dry trigger" => Cue::DryFire,
+        "Enemy windup" => Cue::EnemyWindup,
+        "Enemy contact" => Cue::EnemyContact,
+        "Boss" => Cue::Boss,
+        "Boss arrival" => Cue::BossArrival,
+        "Boss phase" => Cue::BossPhase,
+        "Boss death" => Cue::BossDeath,
+        "Boss exposed" => Cue::BossExposed,
+        "Ability" => Cue::Ability,
+        "Wave" => Cue::Wave,
+        "Incoming" => Cue::Incoming,
+        "Loot drop" => Cue::LootDrop,
+        "Victory" => Cue::Victory,
+        "Defeat" => Cue::Defeat,
+        "Retreat" => Cue::Retreat,
+        "Confirm" => Cue::Confirm,
+        "Loot reveal" => Cue::LootReveal,
+        "Coin batch" => Cue::CoinBatch,
+        _ => return None,
+    })
+}
+
+/// A bus as the mix table names it.
+fn mix_table_bus(bus: horde_audio::mix::Bus) -> &'static str {
+    use horde_audio::mix::Bus;
+    match bus {
+        Bus::Master => "Master",
+        Bus::Effects => "Effects",
+        Bus::Ui => "UI",
+        Bus::Music => "Music",
+        Bus::Atmosphere => "Atmosphere",
+    }
+}
+
+/// A mix-table number cell: `" / "`-separated, one value per cue group or
+/// one for the whole row, a parenthetical note left out ("160 (one shared
+/// gate)").
+fn mix_table_values(cell: &str) -> Vec<String> {
+    let mut plain = String::new();
+    let mut depth = 0_u32;
+    for character in cell.chars() {
+        match character {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => plain.push(character),
+            _ => {}
+        }
+    }
+    plain
+        .split(" / ")
+        .map(|value| value.trim().to_owned())
+        .collect()
+}
+
+/// What `section` (a "Cues | Bus | Gain | Cooldown (ms) | Priority" table)
+/// states differently from `mix`. A row's cue groups are `" / "`-separated
+/// and the cues of one group `", "`-separated; each number column holds one
+/// value per group or one for the row.
+fn mix_table_violations(
+    section: &str,
+    mix: impl Fn(horde_audio::cue::Cue) -> horde_audio::mix::CueMix,
+) -> Vec<String> {
+    use horde_audio::cue::Cue;
+    let mut violations = Vec::new();
+    let mut listed = Vec::new();
+    for cells in table_rows(section, "Cues") {
+        let [cues, bus, gain, cooldown, priority] = &cells[..] else {
+            violations.push(format!(
+                "{AUDIO_GUIDE}: {cells:?} is not a five-cell mix row"
+            ));
+            continue;
+        };
+        let groups: Vec<&str> = cues.split(" / ").collect();
+        let columns = [
+            ("gain", mix_table_values(gain)),
+            ("cooldown", mix_table_values(cooldown)),
+            ("priority", mix_table_values(priority)),
+        ];
+        for (column, values) in &columns {
+            if values.len() != 1 && values.len() != groups.len() {
+                violations.push(format!(
+                    "{AUDIO_GUIDE}: \"{cues}\" has {} {column} values for {} cue groups",
+                    values.len(),
+                    groups.len()
+                ));
+            }
+        }
+        for (index, group) in groups.iter().enumerate() {
+            for name in group.split(", ").map(str::trim) {
+                let Some(cue) = mix_table_cue(name) else {
+                    violations.push(format!("{AUDIO_GUIDE}: \"{name}\" names no cue"));
+                    continue;
+                };
+                listed.push(cue);
+                let row = mix(cue);
+                if bus.as_str() != mix_table_bus(row.bus) {
+                    violations.push(format!(
+                        "{AUDIO_GUIDE}: {name} rides {bus}, mix::mix says {}",
+                        mix_table_bus(row.bus)
+                    ));
+                }
+                let actual = [
+                    row.gain.to_string(),
+                    row.cooldown_ms.to_string(),
+                    row.priority.to_string(),
+                ];
+                for ((column, values), actual) in columns.iter().zip(actual) {
+                    let stated = if values.len() == 1 {
+                        values.first()
+                    } else {
+                        values.get(index)
+                    };
+                    let Some(stated) = stated else { continue };
+                    let same = match *column {
+                        "gain" => stated.parse::<f32>() == Ok(row.gain),
+                        "cooldown" => stated.parse::<u32>() == Ok(row.cooldown_ms),
+                        _ => stated.parse::<u8>() == Ok(row.priority),
+                    };
+                    if !same {
+                        violations.push(format!(
+                            "{AUDIO_GUIDE}: {name} {column} is {stated}, mix::mix says {actual}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    for cue in Cue::ALL {
+        let times = listed.iter().filter(|listed| **listed == cue).count();
+        match (mix(cue).retired, times) {
+            (true, 0) | (false, 1) => {}
+            (true, _) => violations.push(format!("{AUDIO_GUIDE}: retired {cue:?} is listed")),
+            (false, times) => violations.push(format!(
+                "{AUDIO_GUIDE}: {cue:?} is listed {times} times, not once"
+            )),
+        }
+    }
+    violations
+}
+
+#[test]
+fn audio_guide_mix_table_matches_the_mix_rows() {
+    let guide = read_workspace_file(AUDIO_GUIDE);
+    let section = section_body(&guide, MIX_TABLE_SECTION)
+        .unwrap_or_else(|| panic!("{AUDIO_GUIDE} has no \"{MIX_TABLE_SECTION}\""));
+    let violations = mix_table_violations(&section, horde_audio::mix::mix);
+    assert!(
+        violations.is_empty(),
+        "{AUDIO_GUIDE} \"{MIX_TABLE_SECTION}\" is stale ({}):\n{}",
+        violations.len(),
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn mix_table_check_reports_each_stale_cell_and_every_missing_cue() {
+    use horde_audio::{cue::Cue, mix::mix};
+    let table = "| Cues | Bus | Gain | Cooldown (ms) | Priority |\n|---|---|---|---|---|\n\
+                 | Pistol, Rifle / Shotgun | Effects | 0.9 / 0.8 | 80 / 120 | 9 |\n\
+                 | Kill / Laser | UI | 0.5 | 160 (one shared gate) / 1 / 2 | 6 |\n";
+    let violations = mix_table_violations(table, mix);
+    for expected in [
+        "Shotgun gain is 0.8, mix::mix says 1",
+        "\"Kill / Laser\" has 3 cooldown values for 2 cue groups",
+        "Kill rides UI, mix::mix says Effects",
+        "\"Laser\" names no cue",
+        "Smg is listed 0 times, not once",
+    ] {
+        assert!(
+            violations.iter().any(|v| v.ends_with(expected)),
+            "{expected} in {violations:#?}"
+        );
+    }
+    // The cells that agree with the rows are not reported.
+    for agreed in [
+        ": Pistol ",
+        ": Rifle ",
+        "Shotgun cooldown",
+        "Kill gain",
+        "Kill priority",
+    ] {
+        assert!(
+            !violations.iter().any(|v| v.contains(agreed)),
+            "{agreed} in {violations:#?}"
+        );
+    }
+    // A retired cue is left out of the table and never reported.
+    assert!(mix(Cue::NpcShot).retired);
+    assert!(!violations.iter().any(|v| v.contains("NpcShot")));
+}
