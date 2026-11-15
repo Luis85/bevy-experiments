@@ -176,7 +176,11 @@ cargo test --locked -p <crate> [--test <file>]    # the inner loop while you wor
 Keep at most two Cargo builders active, preferably one for a cold Bevy build; each checkout needs its own
 build output directory.
 
-Timings (busy machine): fresh build ~15 min, `verify --quick` ~5 min, full `verify` 40–50 min (run it once, last).
+Timings (measured November 2026, warm build): `verify --quick` ~23 min, full `verify` ~31 min, `verify --island`
+~13 min; a cold build adds 15–20 min and about 110 GB under `target/debug` (run the full gate once, last). Unit
+tests run with `cargo test --lib --bins`, one process per crate; integration tests run under nextest, one process
+per test, which is most of the time (a view or host test binary is 70–100 MB and takes ~0.5 s to start).
+Keep `CARGO_INCREMENTAL` the same across runs: switching it rebuilds every workspace crate.
 
 Headless CLI (`cargo run --locked -p npcctl -- <cmd>`; JSON out, exit 0 ok / 1 check failed / 2 usage error):
 

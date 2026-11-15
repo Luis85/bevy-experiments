@@ -5,8 +5,9 @@
 //! ```
 //!
 //! Runs, in order: `fmt` (`cargo fmt --check`), `clippy` (`-D warnings`, all
-//! targets), `test` (`cargo nextest run --workspace` plus doc tests, or
-//! `cargo test --workspace` when nextest is missing), `arch_fitness`
+//! targets), `test` (`cargo nextest run --workspace` for the integration
+//! tests, `cargo test --workspace --lib --bins` for the unit tests, plus doc
+//! tests; or `cargo test --workspace` when nextest is missing), `arch_fitness`
 //! (`xtask/tests/arch_fitness.rs`), `replays` (`npcctl replay verify` on every
 //! `tests/replays/*.json`), `goldens` (no pending insta snapshots) and `deny`
 //! (`cargo deny check`, when installed). Every step runs even when an earlier
@@ -407,6 +408,13 @@ fn step_test(ctx: &Ctx) -> Outcome {
             &filter,
         ];
         let nextest = cargo(ctx, &args, &envs);
+        // The unit tests nextest left out (see [`UNIT_TARGETS`]).
+        let unit = cargo(
+            ctx,
+            &["test", "--workspace", "--lib", "--bins", "--no-fail-fast"],
+            &envs,
+        );
+        let unit_counts = cargo_test_counts(&unit.text);
         // nextest does not run doc tests.
         let doc = cargo(
             ctx,
@@ -414,13 +422,18 @@ fn step_test(ctx: &Ctx) -> Outcome {
             &envs,
         );
         let doc_counts = cargo_test_counts(&doc.text);
-        let ok = nextest.ok && doc.ok;
+        let ok = nextest.ok && unit.ok && doc.ok;
         let mut summary = match nextest_summary(&nextest.text) {
             Some(s) => format!("nextest: {s}"),
             None => format!("nextest failed: {}", first_error(&nextest.text)),
         };
+        let _ = write!(summary, "; unit tests: {}", unit_counts.describe());
+        if unit_counts.results == 0 && !unit.ok {
+            let _ = write!(summary, " (failed: {})", first_error(&unit.text));
+        }
         let _ = write!(summary, "; doc tests: {}", doc_counts.describe());
         let mut failed = nextest_failures(&nextest.text);
+        failed.extend(cargo_test_failures(&unit.text));
         failed.extend(cargo_test_failures(&doc.text));
         if !failed.is_empty() {
             let _ = write!(summary, "; failed: {}", short_list(&failed, 10));
@@ -428,8 +441,15 @@ fn step_test(ctx: &Ctx) -> Outcome {
         if ctx.quick {
             let _ = write!(summary, "; --quick skipped {}", slow_test_names());
         }
-        // nextest last, so the tail shows its failures and summary.
-        let log = format!("{}\n{}", doc.text, nextest.text);
+        // nextest and the unit tests' failure reports last, so the tail
+        // shows the failures and the summary.
+        let log = format!(
+            "{}\n{}\n{}\n{}",
+            doc.text,
+            unit.text,
+            nextest.text,
+            libtest_failure_excerpt(&unit.text)
+        );
         return Outcome::new(ok, summary, log);
     }
 
@@ -479,19 +499,30 @@ fn step_test_island(ctx: &Ctx, envs: &[(&str, &str)]) -> Outcome {
         args.extend(["--no-fail-fast", "--color", "never", "-E"].map(String::from));
         args.push(island_nextest_filter(ISLAND_SLOW));
         let nextest = cargo_owned(ctx, &args, envs);
+        // The unit tests nextest left out (see [`UNIT_TARGETS`]).
+        let mut args: Vec<String> = vec!["test".to_owned()];
+        args.extend(island_package_args());
+        args.extend(["--lib", "--bins", "--no-fail-fast"].map(String::from));
+        let unit = cargo_owned(ctx, &args, envs);
+        let unit_counts = cargo_test_counts(&unit.text);
         // nextest does not run doc tests.
         let mut args: Vec<String> = vec!["test".to_owned()];
         args.extend(island_package_args());
         args.extend(["--doc", "--no-fail-fast"].map(String::from));
         let doc = cargo_owned(ctx, &args, envs);
         let doc_counts = cargo_test_counts(&doc.text);
-        let ok = nextest.ok && doc.ok;
+        let ok = nextest.ok && unit.ok && doc.ok;
         let mut summary = match nextest_summary(&nextest.text) {
             Some(s) => format!("{scope}: nextest: {s}"),
             None => format!("{scope}: nextest failed: {}", first_error(&nextest.text)),
         };
+        let _ = write!(summary, "; unit tests: {}", unit_counts.describe());
+        if unit_counts.results == 0 && !unit.ok {
+            let _ = write!(summary, " (failed: {})", first_error(&unit.text));
+        }
         let _ = write!(summary, "; doc tests: {}", doc_counts.describe());
         let mut failed = nextest_failures(&nextest.text);
+        failed.extend(cargo_test_failures(&unit.text));
         failed.extend(cargo_test_failures(&doc.text));
         if !failed.is_empty() {
             let _ = write!(summary, "; failed: {}", short_list(&failed, 10));
@@ -499,8 +530,15 @@ fn step_test_island(ctx: &Ctx, envs: &[(&str, &str)]) -> Outcome {
         if !slow.is_empty() {
             let _ = write!(summary, "; --island skipped {slow}");
         }
-        // nextest last, so the tail shows its failures and summary.
-        let log = format!("{}\n{}", doc.text, nextest.text);
+        // nextest and the unit tests' failure reports last, so the tail
+        // shows the failures and the summary.
+        let log = format!(
+            "{}\n{}\n{}\n{}",
+            doc.text,
+            unit.text,
+            nextest.text,
+            libtest_failure_excerpt(&unit.text)
+        );
         return Outcome::new(ok, summary, log);
     }
 
@@ -899,6 +937,15 @@ fn step_deny(ctx: &Ctx) -> Outcome {
 // ---------------------------------------------------------------------------
 // Test helpers
 
+/// Unit tests: the tests inside lib and bin targets. nextest starts one
+/// process per test, and a view or host test binary is 70 to 100 MB, so
+/// start-up alone cost about half a second per test (581 `island_view` unit
+/// tests: about 12 s each under load, 13 s for all of them in one process).
+/// The `test` step therefore leaves these targets out of nextest and runs
+/// them with `cargo test --lib --bins`: one process per target, the same
+/// tests. Integration tests keep nextest's process per test.
+const UNIT_TARGETS: &str = "kind(lib) | kind(bin)";
+
 fn nextest_filter(quick: bool) -> String {
     // arch_fitness has its own step.
     let mut excluded = vec!["binary_id(xtask::arch_fitness)".to_owned()];
@@ -909,7 +956,7 @@ fn nextest_filter(quick: bool) -> String {
                 .map(|(pkg, _, bin)| format!("binary_id({pkg}::{bin})")),
         );
     }
-    format!("not ({})", excluded.join(" | "))
+    format!("not ({}) & not ({UNIT_TARGETS})", excluded.join(" | "))
 }
 
 /// `-p island_content -p island_view -p island_game`.
@@ -926,16 +973,16 @@ fn island_package_args() -> Vec<String> {
 }
 
 /// The nextest filter of `--island`: the packages come from `-p`, so only
-/// the slow binaries are named.
+/// the slow binaries are named; the unit tests run apart ([`UNIT_TARGETS`]).
 fn island_nextest_filter(slow: &[(&str, &str)]) -> String {
     if slow.is_empty() {
-        return "all()".to_owned();
+        return format!("not ({UNIT_TARGETS})");
     }
     let excluded: Vec<String> = slow
         .iter()
         .map(|(pkg, bin)| format!("binary_id({pkg}::{bin})"))
         .collect();
-    format!("not ({})", excluded.join(" | "))
+    format!("not ({}) & not ({UNIT_TARGETS})", excluded.join(" | "))
 }
 
 fn island_slow_names() -> String {
@@ -1391,6 +1438,18 @@ mod tests {
     }
 
     #[test]
+    fn nextest_leaves_the_unit_tests_to_cargo_test_in_every_tier() {
+        // Unit tests (lib and bin targets) run with `cargo test --lib --bins`.
+        for f in [nextest_filter(true), nextest_filter(false)] {
+            assert!(f.ends_with("& not (kind(lib) | kind(bin))"), "{f}");
+        }
+        assert_eq!(
+            nextest_filter(false),
+            "not (binary_id(xtask::arch_fitness)) & not (kind(lib) | kind(bin))"
+        );
+    }
+
+    #[test]
     fn island_tier_names_its_packages_and_slow_binaries() {
         assert_eq!(
             island_package_args(),
@@ -1404,10 +1463,11 @@ mod tests {
                 "island_game"
             ]
         );
-        assert_eq!(island_nextest_filter(&[]), "all()");
+        assert_eq!(island_nextest_filter(&[]), "not (kind(lib) | kind(bin))");
         assert_eq!(
             island_nextest_filter(&[("island_content", "a"), ("island_view", "b")]),
-            "not (binary_id(island_content::a) | binary_id(island_view::b))"
+            "not (binary_id(island_content::a) | binary_id(island_view::b)) \
+             & not (kind(lib) | kind(bin))"
         );
         // Every slow binary belongs to an island package.
         assert!(
