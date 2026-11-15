@@ -324,8 +324,9 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
 
 /// The inline content above the action bar: the outcome strip, the run's
 /// loot, the liberation block, the next defender and the upgrades hint.
-/// Its only controls are the whitelisted inline ones ("Equip", "Recruit
-/// from ...", the defender picker and the status line's own).
+/// Its only controls are the whitelisted inline ones ("Equip", a recruit's
+/// "Operations ›", "Recruit from ...", the defender picker and the status
+/// line's own).
 fn debrief(ui: &mut egui::Ui, f: &mut UiCtx) {
     // The title's mixed-size line box rounds a fraction above its row;
     // this keeps it inside the scroll viewport's clip.

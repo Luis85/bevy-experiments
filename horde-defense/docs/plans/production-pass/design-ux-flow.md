@@ -242,8 +242,8 @@ pub fn fit_field(maximum: Rect, lanes: u8, width: f32, reserve_top: f32) -> Rect
 ### Results (ui/results.rs)
 
 Results hides the camp row and keeps the outcome strip (it appends ` · <name>` for a non-player defender), then these content blocks:
-- **Loot:** "Drops: 3 Common · 1 Uncommon · 1 Rare" with quality markers.
-  - Up to 3 "Better than equipped" rows from `Game::results_upgrades(&Report)`, which reads `Report.drop_ids`. Each row has "Equip" for Player or Mara; for a recruit it shows "Better than <Name>'s gear · Operations".
+- **Loot:** "Loot N", then one "<count> <Quality>" per quality that dropped, best first, with quality markers (as built, W3-20; first drafted as "Drops: 3 Common · 1 Uncommon · 1 Rare").
+  - Up to 2 upgrade rows (`UPGRADE_ROWS`, `ui/results/loot_block.rs`) from `Game::results_loot()`, whose offers keep one a slot, largest gain first. *As built (W3-20; design-loot-economy §9 "As built"):* the player's row reads "Better than equipped: <item> · <Slot> +<gain>" with "Equip" (the offer's own command); Mara's reads "Better than Mara's gear:" with "Equip"; a recruit's reads "Better than <Name>'s gear:" with "Operations ›", which opens Operations and equips nothing. This line first named `Game::results_upgrades(&Report)` and 3 rows.
   - "Auto-sold N · +C" from `Report.auto_sold`, or the muted "Auto-sell is off · Equipment › Auto-sell".
   - The block is hidden when there are 0 drops.
 - **Level grant:** "Level N · +C coins", hidden when zero.
@@ -256,7 +256,7 @@ Results hides the camp row and keeps the outcome strip (it appends ` · <name>` 
 Action bar: `Panel::bottom("results_actions")`, exactly [Upgrade] [continue_label] [Leave journey]. Amber goes to the `results_primary` choice, and positions are fixed.
 - "More", "Plan or replay a defense" and "Save journey" are removed (results.rs:200-212). Replays stay reachable from the Briefing "Local defense" picker; Save moves to the header.
 
-Inline whitelist: defender picker items, "Recruit from …", "Equip", and status "Details"/"Dismiss". If Results is drawn with no last_result, it redirects to Home.
+Inline whitelist: defender picker items, "Recruit from …", "Equip", a recruit's upgrade-row "Operations ›" (`loot_block_tests`), and status "Details"/"Dismiss". If Results is drawn with no last_result, it redirects to Home.
 
 ### Upgrades (ui/upgrades.rs, new)
 
