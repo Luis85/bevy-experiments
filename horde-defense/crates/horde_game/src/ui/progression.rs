@@ -583,10 +583,12 @@ fn toolbar(
         // the selected node's branch; a second row would cost the canvas
         // its half of the compact tree.
         // Top-aligned, starting one control high like ui.horizontal (whose
-        // centring would drop the controls by half the bar strip).
+        // centring would drop the controls by half the bar strip); the
+        // controls centre among themselves, as the match count and the
+        // small Clear button did on the shared row.
         let row = vec2(ui.available_width(), ui.spacing().interact_size.y);
         ui.allocate_ui_with_layout(row, Layout::left_to_right(Align::Min), |ui| {
-            controls(ui, state);
+            ui.horizontal(|ui| controls(ui, state));
             ui.separator();
             // A solid bar in its own strip under the chips (CF-3-16): egui's
             // floating bar was drawn over their lower half. It also shows

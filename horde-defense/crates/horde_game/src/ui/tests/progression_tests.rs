@@ -459,6 +459,26 @@ fn compact_toolbar_keeps_the_selected_branch_chip_in_view() {
                 "{node}: {label} stays in view"
             );
         }
+        // The controls share one centre line: the match count and the small
+        // Clear button sit level with Recommended, not top-aligned.
+        let line = button_frame(&output, "Recommended")
+            .expect("Recommended painted")
+            .center()
+            .y;
+        let mut level = vec![("Path to…", button_frame(&output, "Path to…"))];
+        if !search.is_empty() {
+            let count = format!("{} matches", search_nodes(search).len());
+            let count_rect = visible_runs(&output, &count).first().copied();
+            level.push(("the match count", count_rect));
+            level.push(("Clear", button_frame(&output, "Clear")));
+        }
+        for (label, rect) in level {
+            let rect = rect.unwrap_or_else(|| panic!("{node}: {label} painted"));
+            assert!(
+                (rect.center().y - line).abs() <= 1.5,
+                "{node}: {label} {rect:?} is off the controls' centre line {line}"
+            );
+        }
     }
 }
 
