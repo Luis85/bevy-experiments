@@ -106,6 +106,9 @@ pub(crate) struct CampaignUi {
     pub(super) improvement_focus: Option<RecommendationAction>,
     /// Search text the tree applies once on its next draw (review scenes).
     pub(super) tree_search_seed: Option<String>,
+    /// A world position (as `SkillNode::position`) the tree centres once on
+    /// its next draw, keeping the focused node selected (review scenes).
+    pub(super) tree_centre_seed: Option<[f32; 2]>,
     /// The expedition shown on the operations tab.
     pub(super) observed: Option<u64>,
 }
@@ -485,6 +488,7 @@ impl FrontendParts {
                 map: MapCache::default(),
                 improvement_focus: None,
                 tree_search_seed: None,
+                tree_centre_seed: None,
                 observed: None,
             },
             armory: ArmoryUi::default(),

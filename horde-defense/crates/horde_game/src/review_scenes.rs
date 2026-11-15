@@ -291,6 +291,17 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     // and for the observed main run Mara holds.
     wave3_still("low-hp", "ux-flow", "battle", None),
     wave3_still("low-hp-observed", "ux-flow", "npc", None),
+    // Closing phase (R36): W2-41's close capture item, which also closes
+    // design-progression-tree §3 item 8. skills-firearms, centred on Double
+    // tap, leaves the column's 380 row below the canvas; this still centres
+    // its 190 row, so the 0, 190 and 380 rows and the rifle_training ->
+    // rifle_breath_control route fit at both sizes.
+    wave2_still(
+        "skills-firearms-column",
+        "progression-tree",
+        "skills",
+        false,
+    ),
 ];
 
 /// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
@@ -520,7 +531,8 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
     row(
         "battle",
         "W3-12, W3-29",
-        "at most two bar rows; the pause banner clear of the lanes (CF-1-01)",
+        "at most two bar rows; the pause banner clear of the lanes (CF-1-01); the controls \
+         legend clear of the bar at both sizes (CF-1-08)",
     ),
     row(
         "construction",
@@ -572,6 +584,171 @@ pub fn expected_stills(matrix: &[MatrixRow]) -> Vec<String> {
                 CAPTURE_SIZES
                     .iter()
                     .map(move |(suffix, ..)| format!("{mode}/{}{suffix}.png", row.scene))
+            })
+        })
+        .collect()
+}
+
+/// The closing phase's own still matrix (R36), read beside `WAVE3_MATRIX`,
+/// each scene at both `CAPTURE_SIZES` in both `CAPTURE_MODES`
+/// (`expected_stills`): the capture items plan §7 "Wave-2 close" hands to the
+/// closing phase (W2-37's phase hold, W2-41's Firearms column and
+/// design-progression-tree §3 item 8), the CF-1-01 and CF-1-08 stills the W3
+/// matrix leaves out (damage, peak) and the wave-5 stills the plan §11 human
+/// checks read. No scene is also a W3 row.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const CLOSING_MATRIX: &[MatrixRow] = &[
+    // Plan §7 "Wave-2 close" capture items.
+    row(
+        "boss-phase",
+        "W2-37, W2-55, CF-2-05",
+        "a rank-5 boss paused in its phase hold on the 7x16 field: \"PHASE 1 - BREACH\" over \
+         the \"EXPOSED · FIRE NOW\" callout, both on their ink backing (CF-2-05), and the amber \
+         ring on the boss's feet, clear of the HUD, the bar and the pause banner; the reduced \
+         ring has the same radii",
+    ),
+    row(
+        "skills-firearms",
+        "W2-41, W2-55, CF-2-02",
+        "Journey upgrades on Double tap (-1780, 0), the column's 0 row; the stub label into \
+         Reload drill clear of Steady hands (CF-2-02)",
+    ),
+    row(
+        "skills-firearms-column",
+        "W2-41, closing",
+        "the -1780 column's 190 and 380 rows (Pump drill, Breath control) beside Rifle \
+         proficiency, with the Rifle proficiency -> Breath control wire between them; no node, \
+         title or stub label on another (design-progression-tree §3 item 8)",
+    ),
+    // CF-1-01 and CF-1-08 stills outside the W3 matrix.
+    row(
+        "damage",
+        "W3-12, W3-29",
+        "the paused damage target: the pause banner clear of the bottom lane and its damage \
+         number (CF-1-01); the controls legend clear of the bar at both sizes (CF-1-08)",
+    ),
+    row(
+        "peak",
+        "W3-12, W3-29",
+        "the pause banner clear of the bottom-lane barricade (CF-1-01); at most two bar rows \
+         and the controls legend clear of the bar at both sizes (CF-1-08)",
+    ),
+    // Wave-5 stills (plan §11: the weapon-classes review, the night and storm
+    // look).
+    row(
+        "weapon-classes-pistol",
+        "W5-03, W5-09",
+        "the pistol's weapon_fx profile one tick after its shot, distinct from the other \
+         classes; no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-smg",
+        "W5-03, W5-09",
+        "the SMG's weapon_fx profile one tick after its shot, distinct from the other classes; \
+         no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-shotgun",
+        "W5-03, W5-09, CF-1-12",
+        "the shotgun fan one tick after its shot: one flash and nine pellet streaks, one MISS \
+         per shot; no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-rifle",
+        "W5-03, W5-09",
+        "the rifle's weapon_fx profile one tick after its shot, distinct from the other classes; \
+         no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-marksman",
+        "W5-03, W5-09",
+        "the marksman's weapon_fx profile one tick after its shot, distinct from the other \
+         classes; no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-machine-gun",
+        "W5-03, W5-09",
+        "the machine gun's tracers one tick after its shot, distinct from the other classes; \
+         no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-turret",
+        "W5-03, W5-09",
+        "the placed turret's own weapon_fx profile on its first shot, distinct from every hand \
+         weapon; no muzzle flash in reduced",
+    ),
+    row(
+        "storm",
+        "W5-01, W5-02, W5-10",
+        "the world's first storm stage at a lightning pulse: the storm grade and sky flash with \
+         every cue on its ink backing; reduced draws the static storm grade and no flash",
+    ),
+    row(
+        "night-checkpoint",
+        "W5-01, W5-09",
+        "the checkpoint stage at night: the night grade with every cue readable on its ink \
+         backing; field mean L at most 0.70 of dawn-reference (measure_field_luminance.py)",
+    ),
+    row(
+        "dawn-reference",
+        "W5-09",
+        "the same country's dawn stage on the same lanes and width, paused at tick 0 with no \
+         enemies: the night gate's reference",
+    ),
+    row(
+        "elite-tells",
+        "W5-07, W5-09",
+        "one elite of every shipped affix, each ring and marker on its ink backing in the cue \
+         pass; no pulse in reduced",
+    ),
+];
+
+/// The viewports of a motion export (`capture_motion.ps1 -Viewport`), the
+/// motion twins of `CAPTURE_SIZES`.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const MOTION_VIEWPORTS: [&str; 2] = ["normal", "small"];
+
+/// The motion exports the closing phase reads (R36), each at both
+/// `MOTION_VIEWPORTS`, normal and `-ReducedEffects` (`expected_motion`).
+#[cfg_attr(not(test), allow(dead_code))]
+pub const CLOSING_MOTION: &[MatrixRow] = &[
+    row(
+        "boss-phase",
+        "W2-37, W2-56 (CF-2-03)",
+        "the ring on the boss's feet and the PHASE label in every frame of the 90-tick hold, \
+         the ring changing frame to frame in normal and static in reduced",
+    ),
+    row(
+        "storm",
+        "W5-02, W5-10",
+        "a lightning pulse lit in two neighbouring frames in normal (manifest sky_flash above \
+         0), luminance step below 0.2 (measure_field_luminance.py storm); no flash in any \
+         reduced frame",
+    ),
+    row(
+        "weapon-classes-shotgun",
+        "W5-03, CF-1-12",
+        "each shot one flash, nine pellet streaks and at most one MISS; no flash in reduced",
+    ),
+    row(
+        "weapon-classes-machine-gun",
+        "W5-03",
+        "the bright tracer on every third volley; no flash in reduced",
+    ),
+];
+
+/// The motion exports a capture run of `matrix` reads, named as the wave
+/// reviews leave them: `motion/<scene>-<viewport>-<mode>`, in matrix order,
+/// each scene normal then small, normal then reduced.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn expected_motion(matrix: &[MatrixRow]) -> Vec<String> {
+    matrix
+        .iter()
+        .flat_map(|row| {
+            MOTION_VIEWPORTS.iter().flat_map(move |viewport| {
+                CAPTURE_MODES
+                    .iter()
+                    .map(move |mode| format!("motion/{}-{viewport}-{mode}", row.scene))
             })
         })
         .collect()
@@ -822,6 +999,114 @@ mod tests {
             [("", 1440, 900, 1.0), ("-small", 1050, 700, 1.35)]
         );
     }
+    /// CF-1-08: the battle row reads the legend as well as the bar rows.
+    #[test]
+    fn wave3_battle_row_reads_the_controls_legend_at_both_sizes() {
+        let battle = WAVE3_MATRIX
+            .iter()
+            .find(|row| row.scene == "battle")
+            .expect("battle is in the W3 matrix");
+        assert!(
+            battle
+                .shows
+                .contains("the controls legend clear of the bar at both sizes (CF-1-08)"),
+            "{}",
+            battle.shows
+        );
+    }
+    /// The closing phase's own reading list (R36): the plan §7 Wave-2 close
+    /// capture items (W2-37's phase hold, W2-41's Firearms column and
+    /// design-progression-tree §3 item 8), the CF-1-01 and CF-1-08 stills the
+    /// W3 matrix leaves out (damage, peak) and the wave-5 stills the §11
+    /// human checks read. Each scene is read once: none is also a W3 row.
+    #[test]
+    fn closing_matrix_rows_are_unique_registered_stills_outside_the_w3_matrix() {
+        let mut names: Vec<_> = CLOSING_MATRIX.iter().map(|row| row.scene).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), CLOSING_MATRIX.len(), "duplicate matrix scene");
+        for row in CLOSING_MATRIX {
+            assert_eq!(lookup(row.scene), Some(SceneKind::Still), "{}", row.scene);
+            assert!(!row.changed_by.is_empty(), "{}: a changing row", row.scene);
+            assert!(!row.shows.is_empty(), "{}: what it must show", row.scene);
+            assert!(
+                !WAVE3_MATRIX.iter().any(|w3| w3.scene == row.scene),
+                "{} is already a W3 row",
+                row.scene
+            );
+        }
+        let listed = |name: &str| CLOSING_MATRIX.iter().any(|row| row.scene == name);
+        for name in [
+            "boss-phase",
+            "skills-firearms",
+            "skills-firearms-column",
+            "damage",
+            "peak",
+        ] {
+            assert!(listed(name), "{name} is not in the closing matrix");
+        }
+        for scene in stills()
+            .filter(|scene| scene.since_wave == 5 || scene.name.starts_with("weapon-classes-"))
+        {
+            assert!(
+                listed(scene.name),
+                "wave-5 still {} is not in the closing matrix",
+                scene.name
+            );
+        }
+        let stills = expected_stills(CLOSING_MATRIX);
+        assert_eq!(stills.len(), CLOSING_MATRIX.len() * 4);
+        assert!(stills.contains(&"reduced/skills-firearms-column-small.png".to_owned()));
+    }
+    /// The motion exports the closing phase reads, as capture_motion.ps1
+    /// leaves them in the wave reviews: `motion/<scene>-<viewport>-<mode>`
+    /// for both viewports and both modes. boss-phase plays W2-37's 90-tick
+    /// hold (CF-2-03's fix), storm a lightning pulse, and the shotgun and
+    /// machine-gun galleries their weapon_fx (design-qa-captures item 14).
+    #[test]
+    fn closing_motion_rows_are_motion_scenes_at_both_viewports_in_both_modes() {
+        for name in [
+            "boss-phase",
+            "storm",
+            "weapon-classes-shotgun",
+            "weapon-classes-machine-gun",
+        ] {
+            assert!(
+                CLOSING_MOTION.iter().any(|row| row.scene == name),
+                "{name} is not a closing motion row"
+            );
+        }
+        for row in CLOSING_MOTION {
+            let scene = REVIEW_SCENES
+                .iter()
+                .find(|scene| scene.name == row.scene)
+                .unwrap_or_else(|| panic!("{} is registered", row.scene));
+            assert!(scene.motion, "capture_motion accepts {}", row.scene);
+            assert!(!row.changed_by.is_empty() && !row.shows.is_empty());
+        }
+        let boss = CLOSING_MOTION
+            .iter()
+            .find(|row| row.scene == "boss-phase")
+            .expect("boss-phase motion");
+        assert!(
+            boss.shows.contains("90-tick hold") && boss.shows.contains("static in reduced"),
+            "{}",
+            boss.shows
+        );
+        assert_eq!(
+            expected_motion(&[row("boss-phase", "W2-37", "the hold")]),
+            [
+                "motion/boss-phase-normal-normal",
+                "motion/boss-phase-normal-reduced",
+                "motion/boss-phase-small-normal",
+                "motion/boss-phase-small-reduced",
+            ]
+        );
+        assert_eq!(
+            expected_motion(CLOSING_MOTION).len(),
+            CLOSING_MOTION.len() * 4
+        );
+    }
     #[test]
     fn workshop_prefixes_need_an_id() {
         assert_eq!(lookup("model-parity-rook"), Some(SceneKind::Workshop));
@@ -865,7 +1150,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 3 + 12 + 3
+            46 + 13 + 4 + 12 + 3
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

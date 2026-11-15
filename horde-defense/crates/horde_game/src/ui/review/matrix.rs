@@ -277,7 +277,11 @@ fn stage(f: &mut FrontendParts) {
                 .find(|i| !i.protected)
                 .map(|i| i.id);
         }
-        "skills" | "skills-survival" | "skills-ordnance" | "skills-firearms" => {
+        "skills"
+        | "skills-survival"
+        | "skills-ordnance"
+        | "skills-firearms"
+        | "skills-firearms-column" => {
             f.screen = Screen::Upgrades;
             f.nav.tab = Tab::Skills;
             f.campaign.improvement_focus =
@@ -287,10 +291,19 @@ fn stage(f: &mut FrontendParts) {
                         "skills-ordnance" => "grenade_training",
                         // W2-55: the Firearms column at x = -1780.
                         "skills-firearms" => "pistol_double_tap",
+                        // Closing phase: Pump drill, the column's 190 row.
+                        "skills-firearms-column" => "shotgun_pump_drill",
                         _ => "pistol_training",
                     }
                     .into(),
                 ));
+            if screen == "skills-firearms-column" {
+                // No node focus fits the 190 and 380 rows in the compact
+                // canvas, so centre the point between Pump drill (-1780,
+                // 190), Breath control (-1780, 380) and Rifle proficiency
+                // (-1220, 190), the two ends of W2-41's route.
+                f.campaign.tree_centre_seed = Some([-1500.0, 285.0]);
+            }
         }
         "skills-search" => {
             // A search with a goal path: "reload" matches, and the focused

@@ -290,6 +290,12 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     // Closing phase: the W3-15 low-HP band, personal and observed.
     ("low-hp", Screen::Battle, None),
     ("low-hp-observed", Screen::Battle, None),
+    // Closing phase: W2-41's Firearms column at -1780, rows 0 to 380.
+    (
+        "skills-firearms-column",
+        Screen::Upgrades,
+        Some(Tab::Skills),
+    ),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1961,6 +1967,111 @@ fn skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes() {
             node.name,
             layout.canvas
         );
+    }
+}
+
+/// Two frames of the staged Upgrades tree at `size` (logical points) and UI
+/// `scale`, with the context that drew them.
+fn staged_tree_frames(
+    scene: &str,
+    size: egui::Vec2,
+    scale: f32,
+) -> (egui::Context, egui::FullOutput) {
+    let mut f = staged(scene);
+    assert!(
+        f.screen == Screen::Upgrades,
+        "{scene}: staged {:?}",
+        f.screen
+    );
+    f.settings.scale = scale;
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    crate::settings::configure(&ctx, scale);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    let mut output = None;
+    for _ in 0..2 {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut frame = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        frame.textures_delta.clear();
+        output = Some(frame);
+    }
+    (ctx, output.expect("two frames"))
+}
+
+/// W2-41's close capture item, which also closes design-progression-tree §3
+/// item 8 ("milestone-gated nodes do not collide in position: validator plus
+/// capture"): the Firearms column at x = -1780 must be evidenced at its 0,
+/// 190 and 380 rows (Double tap, Pump drill, Breath control) with both ends
+/// of the rifle_training -> rifle_breath_control route, at 1440x900@1.0 and
+/// at 1050x700@1.35. skills-firearms frames the 0 row at both sizes (the test
+/// above) but, centred on Double tap, paints Breath control below the canvas
+/// even at 1440x900 (title at y 898.7 under the canvas bottom 886). No node
+/// focus fits the 190 and 380 rows in the 195-pt compact canvas: centred on
+/// Pump drill, Breath control's title lands at y 411 under the bottom 384.6
+/// and Rifle proficiency's ends at x 767.8 past the right edge 763.8. So
+/// skills-firearms-column selects Pump drill and centres the point between
+/// the three nodes, (-1500, 285).
+#[test]
+fn skills_firearms_column_frames_the_1780_rows_and_the_breath_control_route_at_both_sizes() {
+    const SCENE: &str = "skills-firearms-column";
+    let catalog = horde_core::skill_catalog::skills();
+    let ids = [
+        "shotgun_pump_drill",
+        "rifle_breath_control",
+        "rifle_training",
+    ];
+    let names: Vec<&str> = ids
+        .iter()
+        .map(|id| catalog.node(id).expect("catalogue node").name.as_str())
+        .collect();
+    for (id, y) in [
+        ("pistol_double_tap", 0.0),
+        ("shotgun_pump_drill", 190.0),
+        ("rifle_breath_control", 380.0),
+    ] {
+        assert_eq!(catalog.node(id).expect(id).position, [-1780.0, y], "{id}");
+    }
+    assert!(
+        catalog
+            .node("rifle_breath_control")
+            .expect("rifle_breath_control")
+            .prerequisites
+            .iter()
+            .any(|p| p == "rifle_training"),
+        "Breath control is reached from Rifle proficiency"
+    );
+    assert_eq!(
+        review_scenes::lookup(SCENE),
+        Some(review_scenes::SceneKind::Still),
+        "{SCENE} is a registered still"
+    );
+    for (size, scale) in [
+        (egui::vec2(1440.0, 900.0), 1.0),
+        (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+    ] {
+        let (ctx, output) = staged_tree_frames(SCENE, size, scale);
+        assert_eq!(
+            crate::ui::progression::selected_node_for_test(&ctx).as_deref(),
+            Some("shotgun_pump_drill"),
+            "scale {scale}: the focus selects Pump drill"
+        );
+        let layout = crate::ui::progression::layout_for_test(&ctx).expect("a tree layout");
+        assert_eq!(layout.compact, scale > 1.0, "scale {scale}");
+        for name in &names {
+            let titles = text_bounds(&output, name);
+            assert!(
+                titles.iter().any(|rect| layout.canvas.contains_rect(*rect)),
+                "scale {scale}: {name:?} painted inside the canvas {:?}: {titles:?}",
+                layout.canvas
+            );
+        }
     }
 }
 

@@ -294,6 +294,9 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
         }
         state.focus_key = focus;
     }
+    if let Some([x, y]) = f.campaign.tree_centre_seed.take() {
+        state.view.focus_on_point(vec2(x, y));
+    }
     state.view.selected = state.view.selected.min(catalog.nodes.len() - 1);
     if let Some(pending) = state.pending.take() {
         if f.game

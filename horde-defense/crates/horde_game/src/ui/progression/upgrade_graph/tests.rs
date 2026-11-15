@@ -173,6 +173,22 @@ fn zoom_is_bounded_and_keeps_the_point_under_the_cursor() {
     assert!((before - after).length() < 1e-3);
     assert_eq!(view.scale(), 1.5);
 }
+/// A review still centres a point between rows; the selection stays, and
+/// a later focus or zoom returns to the ordinary node centring.
+#[test]
+fn a_focus_point_keeps_the_selection_until_the_view_moves() {
+    let mut view = View::default();
+    view.focus(7);
+    view.focus_on_point(vec2(-1500.0, 285.0));
+    assert_eq!(view.selected, 7);
+    assert!(view.focus_selected);
+    assert_eq!(view.focus_point, Some(vec2(-1500.0, 285.0)));
+    view.zoom_by(0.8);
+    assert_eq!(view.focus_point, None);
+    view.focus_on_point(vec2(0.0, 0.0));
+    view.focus(3);
+    assert_eq!((view.selected, view.focus_point), (3, None));
+}
 #[test]
 fn arrows_pick_the_nearest_node_in_that_direction() {
     let at = |x: f32, y: f32| Node {

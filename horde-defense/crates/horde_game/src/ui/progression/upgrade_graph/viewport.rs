@@ -25,6 +25,10 @@ pub(in crate::ui::progression) struct View {
     /// Screen offset of the layout centre from the canvas centre.
     pub(super) pan: egui::Vec2,
     pub(super) focus_selected: bool,
+    /// A world position the focus centres instead of the selected node's
+    /// (a review still that frames several rows); any pan, zoom, focus or
+    /// frame clears it.
+    pub(super) focus_point: Option<egui::Vec2>,
     pub(super) frame: Option<Rect>,
     pub(super) canvas_size: egui::Vec2,
 }
@@ -35,6 +39,7 @@ impl Default for View {
             scale: 0.0,
             pan: egui::Vec2::ZERO,
             focus_selected: true,
+            focus_point: None,
             frame: None,
             canvas_size: egui::Vec2::ZERO,
         }
@@ -45,12 +50,21 @@ impl View {
     pub(in crate::ui::progression) fn focus(&mut self, index: usize) {
         self.selected = index;
         self.focus_selected = true;
+        self.focus_point = None;
+        self.frame = None;
+    }
+    /// Keep the selection but centre the world `position` (placed as a node
+    /// position) on the next passes, until the view is moved.
+    pub(in crate::ui::progression) fn focus_on_point(&mut self, position: egui::Vec2) {
+        self.focus_selected = true;
+        self.focus_point = Some(position);
         self.frame = None;
     }
     /// Fit a world-space rectangle (a branch) on the next pass.
     pub(in crate::ui::progression) fn frame_world(&mut self, world: Rect) {
         self.frame = Some(world);
         self.focus_selected = false;
+        self.focus_point = None;
     }
     pub(super) fn scale(&self) -> f32 {
         if self.scale > 0.0 { self.scale } else { 1.0 }
@@ -67,6 +81,7 @@ impl View {
         self.pan = anchor - (anchor - self.pan) * (new / old);
         self.scale = new;
         self.focus_selected = false;
+        self.focus_point = None;
         self.frame = None;
     }
 }
@@ -107,6 +122,7 @@ impl<'a> Graph<'a> {
         if canvas.dragged() {
             view.pan += canvas.drag_delta();
             view.focus_selected = false;
+            view.focus_point = None;
             view.frame = None;
         }
         if let Some(pointer) = ui
@@ -142,9 +158,11 @@ impl<'a> Graph<'a> {
         }
         let scale = view.scale;
         if view.focus_selected
-            && let Some(node) = self.nodes.get(view.selected)
+            && let Some(position) = view
+                .focus_point
+                .or_else(|| self.nodes.get(view.selected).map(|node| node.position))
         {
-            view.pan = -(node.position - origin) * scale - vec2(0.0, 26.0 * scale);
+            view.pan = -(position - origin) * scale - vec2(0.0, 26.0 * scale);
         }
         view.pan = bounded_pan(view.pan, rect.size(), bounds, scale);
         view.focus_selected = false;
@@ -456,6 +474,7 @@ impl<'a> Graph<'a> {
                 view.scale,
             );
             view.focus_selected = false;
+            view.focus_point = None;
             view.frame = None;
             ui.ctx().request_repaint();
         }
