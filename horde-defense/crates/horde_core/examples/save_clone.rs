@@ -1,24 +1,26 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 //! Save-clone benchmark (W1-50, G1.8). Times [`Game::save_snapshot`], the
 //! main-thread copy the runtime hands to its storage worker on every save,
-//! over `save_clone_fixture(1000 | 2500 | 5000)`: the synthetic stress game
-//! (three unsettled expeditions, 150 run records, 1,500 corpses) with its
-//! stash sized to that many items. It also breaks the copy down per
+//! over `save_clone_fixture(1000 | 2500 | 5000 | 20000)`: the synthetic
+//! stress game (three unsettled expeditions, 150 run records, 1,500 corpses)
+//! with its stash sized to that many items. It also breaks the copy down per
 //! component and times the storage worker's `serde_json::to_vec`, off the
 //! main thread, for scale. Fixture creation is excluded.
 //!
 //! Gate (docs/PERF_BUDGET.json `save_clone`): p99 at the 1,000-item fixture
 //! within `p99_ms_max` in the dev and playtest profiles; release is
-//! informational. `--out <path>` writes the JSON report, `--profile-name`
-//! labels it (default `dev` with debug assertions, else `release`) and
-//! `--iterations` overrides the 1,000 timed iterations.
+//! informational. `sizes` reads every fixture against the same `p99_ms_max`
+//! (R58), informational for the exit code. `--out <path>` writes the JSON
+//! report, `--profile-name` labels it (default `dev` with debug assertions,
+//! else `release`) and `--iterations` overrides the 1,000 timed iterations.
 use horde_core::sim::{Game, save_clone_fixture};
 use serde::Serialize;
 use std::hint::black_box;
 use std::time::Instant;
 
-/// The stash sizes measured; the gate reads the first.
-pub const ITEM_COUNTS: [usize; 3] = [1000, 2500, 5000];
+/// The stash sizes measured; the gate reads the first. 5,000 and 20,000 are
+/// the default auto-sell stash after about 60 and 150 runs (R58).
+pub const ITEM_COUNTS: [usize; 4] = [1000, 2500, 5000, 20_000];
 /// Untimed iterations before each timed series.
 pub const WARMUP: usize = 50;
 /// Timed iterations per series.
@@ -73,6 +75,15 @@ pub struct Gate {
     pub p99_ms: f64,
     pub pass: bool,
 }
+/// One measured stash size against the gate's `p99_ms_max` (R58: the
+/// closing phase reads the 5,000 and 20,000-item sizes against the same 1 ms
+/// as the gated fixture). Informational: the exit code follows `gate` only.
+#[derive(Debug, Serialize)]
+pub struct SizeVerdict {
+    pub items: usize,
+    pub p99_ms: f64,
+    pub pass: bool,
+}
 #[derive(Debug, Serialize)]
 pub struct Output {
     pub version: u32,
@@ -81,6 +92,8 @@ pub struct Output {
     pub cpu: String,
     pub notes: Vec<&'static str>,
     pub gate: Gate,
+    /// Every report's `save_snapshot` p99 against `gate.p99_ms_max`.
+    pub sizes: Vec<SizeVerdict>,
     pub reports: Vec<SaveCloneReport>,
 }
 
@@ -159,6 +172,14 @@ pub fn output(profile: &str, reports: Vec<SaveCloneReport>) -> Result<Output, St
         ))?;
     let p99_ms = gated_report.save_snapshot.p99_ms;
     let gated = profiles.iter().any(|p| p == profile);
+    let sizes = reports
+        .iter()
+        .map(|r| SizeVerdict {
+            items: r.items,
+            p99_ms: r.save_snapshot.p99_ms,
+            pass: r.save_snapshot.p99_ms <= p99_ms_max,
+        })
+        .collect();
     Ok(Output {
         version: 1,
         profile: profile.to_owned(),
@@ -182,6 +203,7 @@ pub fn output(profile: &str, reports: Vec<SaveCloneReport>) -> Result<Output, St
             p99_ms,
             pass: p99_ms <= p99_ms_max,
         },
+        sizes,
         reports,
     })
 }
@@ -300,6 +322,35 @@ mod tests {
         assert!(output("release", Vec::new()).is_err(), "no gated fixture");
         let release = output("release", vec![measure(&g, 1)]).unwrap();
         assert!(!release.gate.gated, "release is informational");
+    }
+
+    /// R58: the closing phase measures the auto-sell stash after about 60
+    /// and 150 runs (5,000 and 20,000 items) against the same 1 ms gate, so
+    /// both sizes are measured and each report carries its own verdict.
+    #[test]
+    fn save_clone_measures_the_r58_stash_sizes() {
+        assert!(
+            ITEM_COUNTS.contains(&5000) && ITEM_COUNTS.contains(&20_000),
+            "R58 sizes in {ITEM_COUNTS:?}"
+        );
+        let g = save_clone_fixture(20_000).expect("20,000-item fixture");
+        let large = measure(&g, 1);
+        assert_eq!((large.items, large.workers), (20_000, 3));
+        let mut gated = measure(&save_clone_fixture(ITEM_COUNTS[0]).unwrap(), 1);
+        gated.save_snapshot.p99_ms = 0.5;
+        let mut over = large;
+        over.save_snapshot.p99_ms = 1.5;
+        let dev = output("dev", vec![gated, over]).expect("gate reads the budget");
+        let verdicts: Vec<_> = dev
+            .sizes
+            .iter()
+            .map(|s| (s.items, s.p99_ms, s.pass))
+            .collect();
+        assert_eq!(verdicts, [(1000, 0.5, true), (20_000, 1.5, false)]);
+        assert!(
+            dev.gate.pass,
+            "the budget gate still reads the 1,000-item report"
+        );
     }
 
     /// W1 review: a 1,000-item fixture that falls short gates the next
