@@ -1947,7 +1947,7 @@ try {
             }
         }
 
-        Test-Case 'package_playtest packs a stamped executable into a version 2 zip that verify_playtest passes' {
+        Test-Case 'package_playtest packs a stamped executable into a version 2 zip that verify_playtest passes, and leaves nothing behind on a failure' {
             $package = Join-Path $scriptsDirectory 'package_playtest.ps1'
             $output = Join-Path $temporary 'packages'
             $git = Invoke-Native -FilePath (Resolve-Tool 'git') -Arguments @('rev-parse', 'HEAD') -LogStem (Join-Path $temporary 'logs\package-git') -TimeoutSeconds 30 -WorkingDirectory $workspace
@@ -1960,8 +1960,17 @@ try {
             $log = (Read-Log $r.Out) + (Read-Log $r.Err)
             Assert-True ($r.ExitCode -ne 0 -and $log -match 'expected the stamp') "stale executable; $log"
             Assert-Equal 0 @(Get-ChildItem -LiteralPath $output | Where-Object { $_.Name -like 'Lastlight-playtest-*' }).Count 'no package after a refusal'
-            # The fake names both stamps, so the case holds for a clean and for a dirty working tree.
+            # The fake names both stamps, so the cases below hold for a clean and for a dirty working tree.
             [Environment]::SetEnvironmentVariable('HORDE_FAKE_VERSION', "Lastlight: Horde Defense v$playtestVersion ($short) v$playtestVersion ($short+dirty)", 'Process')
+            # A failure after the copies began (here a curated doc that links outside the package) leaves no
+            # half-built folder or zip behind either.
+            $deadDocs = Join-Path $temporary 'package-dead-docs'
+            New-Item -ItemType Directory -Force -Path $deadDocs | Out-Null
+            Write-Utf8NoBom -Path (Join-Path $deadDocs 'PLAYTEST_GUIDE.md') -Text "# Guide`n[design](GDD.md)`n"
+            $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments ($base + @('-DocsDirectory', $deadDocs)) -LogStem (Join-Path $temporary 'logs\package-dead-link') -TimeoutSeconds 600
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0 -and $log -match 'link outside the package' -and $log -match 'GDD\.md') "dead doc link; $log"
+            Assert-Equal 0 @(Get-ChildItem -LiteralPath $output | Where-Object { $_.Name -like 'Lastlight-playtest-*' }).Count 'no package after a failed doc check'
             $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $base -LogStem (Join-Path $temporary 'logs\package') -TimeoutSeconds 600
             $log = (Read-Log $r.Out) + (Read-Log $r.Err)
             Assert-Equal 0 $r.ExitCode "package_playtest; $log"
