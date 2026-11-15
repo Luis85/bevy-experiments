@@ -358,6 +358,7 @@ The 13 existing keys and `bindings: [String; 8]` are unchanged.
 - The upgrade metric.
 - Music director state.
 - BattleLayout, FieldFit, `BattleUi.{observer_arena_rect, occluded_lanes, bar_rows}`.
+- The boss banners, `BattleUi.{boss_banner, observer_boss_banner, boss_banner_rect}` (W3-14; wall clock, presentation only).
 - RenderPlan.
 - Storm tagging (`STORM_THEME_IDS=["depot"]`) and the sky-flash schedule (wall clock).
 - Elite tells (asset).
