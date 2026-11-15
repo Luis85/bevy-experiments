@@ -85,6 +85,41 @@ fn stage_preview_is_the_snapshot_a_deploy_of_that_stage_stamps() {
     );
 }
 
+/// Closing: `StagePreview::rank_phases` is what the stage's boss rank adds
+/// to the boss's phases at the previewed threat, after the two-phase cap.
+/// A Hard Sector boss past rank 4 already has the cap (the rank gate plus
+/// Hard's `boss_phase_bonus`), so a Hard Capstone there adds none; Normal
+/// at rank 5 and Hard at rank 0 add the catalogue's one transition, and a
+/// Sector or Regional boss adds none.
+#[test]
+fn stage_preview_counts_the_phases_the_boss_rank_adds() {
+    let last = world().country("DEU").unwrap().level_count() - 1;
+    for (preset, rank, phases, capstone_adds) in [
+        (BalancePreset::Hard, 5, 2, 0),
+        (BalancePreset::Normal, 5, 2, 1),
+        (BalancePreset::Hard, 0, 1, 1),
+        (BalancePreset::Normal, 0, 1, 1),
+    ] {
+        let mut g = started("DEU", 0);
+        g.apply(&Command::SetBalance(BalanceSettings::for_preset(preset)))
+            .unwrap();
+        g.campaign_mut()
+            .world
+            .country_levels
+            .insert("DEU".into(), last);
+        g.campaign_mut().victories = rank;
+        let context = format!("{preset:?} rank {rank}");
+        for mode in MODES {
+            let capstone = g.stage_preview("DEU", last, mode).unwrap();
+            assert_eq!(capstone.boss_rank, BossRank::Capstone, "{context}");
+            assert_eq!(capstone.pressure.boss_phases, phases, "{context}");
+            assert_eq!(capstone.rank_phases, capstone_adds, "{context}");
+            assert_eq!(g.stage_preview("DEU", 0, mode).unwrap().rank_phases, 0);
+            assert_eq!(g.stage_preview("USA", 5, mode).unwrap().rank_phases, 0);
+        }
+    }
+}
+
 #[test]
 fn boss_rank_labels_are_the_player_facing_names() {
     assert_eq!(BossRank::Sector.label(), "Sector");

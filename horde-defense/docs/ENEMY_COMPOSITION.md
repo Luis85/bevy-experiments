@@ -390,7 +390,10 @@ health, +2 armor, +40% reward" for Mara or a recruit, whose boss armor is the
 `npc_armor_add` term and whose damage term is what the rank adds to the Npc
 boss's blows at the previewed threat, "+1 damage" from rank 11 and left out
 below it). The badge's hover counts the
-phases `extra_transitions` adds ("one more phase" on the Capstone). The
+phases the rank adds at the previewed threat (`StagePreview::rank_phases`:
+`extra_transitions` after the two-phase cap), "one more phase" on the
+Capstone except on Hard rules past rank 4, where a Sector boss already has
+both phases and the Capstone adds none. The
 world panel counts a country's checkpoints ("2 checkpoints"), and a
 Regional victory's Results lead with "Regional checkpoint secured." A
 checkpoint grants no coins of its own and changes no stage theme.

@@ -5,7 +5,7 @@ use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
 use horde_core::{
     content::{Mode, content},
     defenders::DefenderId,
-    progression::{BossRank, BossRankScaling, catalog},
+    progression::BossRank,
     sim::Game,
 };
 mod view;
@@ -111,8 +111,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ));
         // The rank is named once, in words, by the badge; the amber only
         // repeats it, and the terms beside it say what the rank adds.
-        let scaling = catalog().boss_ranks.of(forecast.boss_rank);
-        if let Some((badge, hint)) = boss_badge(forecast.boss_rank, scaling) {
+        if let Some((badge, hint)) = forecast_badge(forecast) {
             ui.label(RichText::new(badge).strong().color(AMBER))
                 .on_hover_text(&hint);
             if let Some(terms) = &view.boss_rank_terms {
@@ -170,16 +169,22 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
 fn supply_and_difficulty(supply: i64, difficulty: f32) -> String {
     format!("{supply} build supply · {difficulty:.2}× regional difficulty")
 }
+/// The boss badge of the previewed stage: its rank, and the phases that
+/// rank adds at the previewed threat (`StagePreview::rank_phases`).
+fn forecast_badge(forecast: &view::Forecast) -> Option<(String, String)> {
+    boss_badge(forecast.boss_rank, forecast.rank_phases)
+}
 /// The badge beside the boss line and its hover text: a Regional or
 /// Capstone boss is named by core's rank label; a Sector boss has none. The
-/// hover counts the phases the rank's `scaling` adds (`extra_transitions`).
-fn boss_badge(rank: BossRank, scaling: BossRankScaling) -> Option<(String, String)> {
+/// hover counts the `extra_phases` the rank adds to this deployment's boss,
+/// none once the phase cap leaves nothing to add.
+fn boss_badge(rank: BossRank, extra_phases: u8) -> Option<(String, String)> {
     let place = match rank {
         BossRank::Sector => return None,
         BossRank::Regional => "A regional checkpoint: every sixth defense of a long front.",
         BossRank::Capstone => "The last defense of this front.",
     };
-    let phases = match scaling.extra_transitions {
+    let phases = match extra_phases {
         0 => String::new(),
         1 => " Its boss enters one more phase before it falls.".to_owned(),
         2 => " Its boss enters two more phases before it falls.".to_owned(),
@@ -360,6 +365,48 @@ mod tests {
     use super::*;
     use horde_core::{survivors::SurvivorId, world::world};
 
+    /// Closing: the Capstone hover counts the phases its rank adds at the
+    /// previewed threat, not the catalogue's term. Past rank 4 a Hard Sector
+    /// boss already has the two-phase cap (the rank gate plus Hard's
+    /// `boss_phase_bonus`), so a Hard Capstone there adds none; Normal at
+    /// rank 5 and Hard at rank 0 still add one.
+    #[test]
+    fn capstone_hover_counts_the_phases_its_rank_adds() {
+        use horde_core::balance::{BalancePreset, BalanceSettings};
+        use horde_core::command::Command;
+        const ONE_MORE: &str = "Its boss enters one more phase before it falls.";
+        for (preset, rank, says) in [
+            (BalancePreset::Hard, 5, false),
+            (BalancePreset::Normal, 5, true),
+            (BalancePreset::Hard, 0, true),
+        ] {
+            let mut game = Game::default();
+            game.campaign_mut()
+                .choose_survivor(SurvivorId::Rook)
+                .unwrap();
+            game.campaign_mut().choose_start_country("DEU").unwrap();
+            game.apply(&Command::SetBalance(BalanceSettings::for_preset(preset)))
+                .unwrap();
+            let last = world().country("DEU").unwrap().level_count() - 1;
+            game.campaign_mut()
+                .world
+                .country_levels
+                .insert("DEU".into(), last);
+            game.campaign_mut().victories = rank;
+            assert_eq!(u64::from(game.campaign().progression_rank()), rank);
+            let view = view::view_model(&game, DefenderId::Player, last).unwrap();
+            let forecast = view.forecast.as_ref().unwrap();
+            assert_eq!(forecast.boss_rank, BossRank::Capstone);
+            let (badge, hint) = forecast_badge(forecast).unwrap();
+            assert_eq!(badge, "CAPSTONE BOSS");
+            assert_eq!(
+                hint.contains(ONE_MORE),
+                says,
+                "{preset:?} rank {rank}: {hint}"
+            );
+        }
+    }
+
     /// The briefing's supply line shows the difficulty the deployment plays
     /// (`Game::effective_country_difficulty`): Bangladesh's raw 1.60 is
     /// clamped to 1.05 as the start country (W2 review).
@@ -389,40 +436,37 @@ mod tests {
     }
 
     /// W3-23: the badge is core's rank label; a Sector boss carries none.
-    /// Its hover counts the phases the rank adds from the catalogue's
-    /// `extra_transitions`, so a retune never leaves it naming a phase the
-    /// boss does not enter.
+    /// Its hover counts the phases the rank adds at the previewed threat
+    /// (closing: core's `StagePreview::rank_phases`, at most the catalogue's
+    /// `extra_transitions`), so it never names a phase the boss does not
+    /// enter.
     #[test]
     fn boss_badge_names_regional_and_capstone_only() {
-        let ranks = &catalog().boss_ranks;
-        assert_eq!(boss_badge(BossRank::Sector, ranks.sector), None);
-        let (regional, hint) = boss_badge(BossRank::Regional, ranks.regional).unwrap();
+        let ranks = &horde_core::progression::catalog().boss_ranks;
+        assert_eq!(
+            boss_badge(BossRank::Sector, ranks.sector.extra_transitions),
+            None
+        );
+        let (regional, hint) =
+            boss_badge(BossRank::Regional, ranks.regional.extra_transitions).unwrap();
         assert_eq!(regional, "REGIONAL BOSS");
         assert_eq!(
             hint,
             "A regional checkpoint: every sixth defense of a long front."
         );
-        let (capstone, hint) = boss_badge(BossRank::Capstone, ranks.capstone).unwrap();
+        let (capstone, hint) =
+            boss_badge(BossRank::Capstone, ranks.capstone.extra_transitions).unwrap();
         assert_eq!(capstone, "CAPSTONE BOSS");
         assert_eq!(
             hint,
             "The last defense of this front. Its boss enters one more phase before it falls."
         );
-        let neutral = BossRankScaling::default();
         assert_eq!(
-            boss_badge(BossRank::Capstone, neutral).unwrap().1,
+            boss_badge(BossRank::Capstone, 0).unwrap().1,
             "The last defense of this front."
         );
         assert_eq!(
-            boss_badge(
-                BossRank::Regional,
-                BossRankScaling {
-                    extra_transitions: 2,
-                    ..neutral
-                }
-            )
-            .unwrap()
-            .1,
+            boss_badge(BossRank::Regional, 2).unwrap().1,
             "A regional checkpoint: every sixth defense of a long front. Its boss enters two \
              more phases before it falls."
         );

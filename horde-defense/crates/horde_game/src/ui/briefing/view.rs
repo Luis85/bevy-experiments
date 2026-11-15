@@ -69,6 +69,9 @@ pub(super) struct Forecast {
     pub difficulty: f32,
     /// The rank of this stage's boss.
     pub boss_rank: BossRank,
+    /// The boss phases that rank adds at this threat
+    /// (`StagePreview::rank_phases`), after the phase cap.
+    pub rank_phases: u8,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -144,6 +147,7 @@ pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Opt
             next: preview.next,
             difficulty: preview.difficulty,
             boss_rank: preview.boss_rank,
+            rank_phases: preview.rank_phases,
         }
     });
     let lanes = campaign.lane_count();

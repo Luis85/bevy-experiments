@@ -16,6 +16,11 @@ pub struct StagePreview {
     /// The snapshot a deploy of this stage stamps now: the threat rank, the
     /// preset extras, the stage's front ramp and its boss rank.
     pub pressure: ProgressionSnapshot,
+    /// The boss phases the stage's boss rank adds to `pressure`: its
+    /// `boss_phases` less those of the same threat with no boss rank folded,
+    /// so the two-phase cap is counted (a Hard Capstone past rank 4 adds
+    /// none). 0 for a Sector boss.
+    pub rank_phases: u8,
     /// The same stage one victory later (rank + 1, the lanes after that
     /// victory), so the two differ only by what the victory changes.
     pub next: ProgressionSnapshot,
@@ -44,6 +49,10 @@ impl Game {
         let front = Some(country.front_position(stage));
         let rank = campaign.progression_rank();
         let pressure = campaign.progression_for(mode, rank, campaign.lane_count(), front)?;
+        // Without a front nothing of the boss rank is folded; the front ramp
+        // moves no phase.
+        let unranked = campaign.progression_for(mode, rank, campaign.lane_count(), None)?;
+        let rank_phases = pressure.boss_phases.saturating_sub(unranked.boss_phases);
         // Past the supported threat the next victory cannot be previewed.
         let next = campaign
             .progression_for(
@@ -56,6 +65,7 @@ impl Game {
         Ok(StagePreview {
             difficulty: country.effective_difficulty(&campaign.world),
             boss_rank: pressure.boss_rank,
+            rank_phases,
             pressure,
             next,
         })
