@@ -1749,7 +1749,7 @@ fn read_outlook(world: &mut World) {
         state.outlook_elapsed = 0.0;
         state.outlook_read = Some((epoch, hour));
     }
-    let villages: Vec<(SimId, String, village::view::Outlook)> =
+    let villages: Vec<(SimId, String, village::view::Outlook, Option<String>)> =
         village::frontier::settlements::all(world)
             .into_iter()
             .filter_map(|(id, entity)| {
@@ -1757,15 +1757,21 @@ fn read_outlook(world: &mut World) {
                     .get::<village::frontier::Settlement>(entity)?
                     .label
                     .clone();
-                Some((id, name, village::view::outlook(world, id)))
+                Some((
+                    id,
+                    name,
+                    village::view::outlook(world, id),
+                    village::view::housing_line(world, id),
+                ))
             })
             .collect();
     let views: Vec<outlook::VillageOutlook> = villages
         .iter()
-        .map(|(id, name, outlook)| outlook::VillageOutlook {
+        .map(|(id, name, outlook, housing)| outlook::VillageOutlook {
             id: *id,
             name,
             outlook,
+            housing: housing.as_deref(),
         })
         .collect();
     let fuel = village::roles::roles(world).fuel;

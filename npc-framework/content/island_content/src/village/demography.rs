@@ -376,6 +376,20 @@ pub fn crowding(world: &World, settlement: SimId) -> (u32, u32) {
     (crowded, largest)
 }
 
+/// Households of a settlement in a home with too few beds: waiting for a
+/// home, and holding back their next child for want of a bed (`no_bed`).
+pub fn households_waiting(world: &World, settlement: SimId) -> u32 {
+    homes(world, settlement)
+        .into_iter()
+        .filter(|(id, entity)| {
+            let capacity = world
+                .get::<Household>(*entity)
+                .map_or(0, |home| home.capacity);
+            occupancy(world, *id) > capacity
+        })
+        .count() as u32
+}
+
 /// Sizes of the families of a settlement that live in a home with too few
 /// beds, largest first.
 pub fn crowded_families(world: &World, settlement: SimId) -> Vec<u32> {

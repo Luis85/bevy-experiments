@@ -42,8 +42,8 @@ pub(crate) use placement::{place, place_prop_site};
 pub use planner::{can_build_home, find_site, find_site_around, house_homeless, largest_home_beds};
 pub use sites::{
     begin_work, budget, build_tool_percent, cancel as cancel_site, cancel_work, check_delivery,
-    deliver, fund_hold, funding, levy_capacity, material_orders, open_sites, outstanding_cost,
-    reserve, site_budget,
+    deliver, fund_hold, funding, home_waits_for, levy_capacity, material_orders, open_sites,
+    outstanding_cost, reserve, site_budget,
 };
 pub(crate) use sites::{builder_tool, removable, remove_finished};
 pub(crate) use sites::{note_grants, raise_building_levy, raise_relief_levy, settle_earmark};

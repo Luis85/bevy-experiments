@@ -71,6 +71,14 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
   (`StapleAdvances`, hashed). Restockers no longer carry the boat's order off
   the trading post to the village stall. `view::economy::stock_plan` gives
   target, held and in work per good. `catalog::food_restore` is removed.
+- Closing change set: each food's share of the settlement's daily use (and so
+  of its planned stock) follows what was eaten over the market window
+  (`stock::FoodEaten`, hashed), with a floor of a twentieth so a new food can
+  enter; the total stays the hunger. A steward's winter fuel reserve waits
+  while a home being built in its settlement lacks logs
+  (`civic::home_waits_for`). A supplied site interrupts lower work in the
+  resident tree (`Site ready to build`, `life.site_needs_builder`).
+  `view::housing_line` says how many households wait for a home.
 
 ### Island game: review fixes (saving, startup, keys, words)
 

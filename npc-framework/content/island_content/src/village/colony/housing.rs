@@ -172,9 +172,19 @@ pub fn household_materials(world: &World, actor: Entity) -> Vec<(&'static str, u
     // Heat demand reaches the woodcutters before the cold does: in the regional
     // profile a steward keeps a fuel reserve from a few days before winter until
     // it ends, instead of ordering one log when the hearth is already going out.
+    // A home being built for people waiting for a bed comes first: while it
+    // still lacks fuel logs, the reserve waits and only the hearth's own
+    // need is ordered (closing fix).
+    let fuel = super::super::roles::roles(world).fuel;
     let reserve = super::super::frontier::settlements::member(world, actor).map_or_else(
         || winter_fuel_reserve(world),
-        |region| fuel_level_reserve(world, region, winter_fuel_reserve(world)),
+        |region| {
+            if crate::village::civic::home_waits_for(world, region, fuel) {
+                0
+            } else {
+                fuel_level_reserve(world, region, winter_fuel_reserve(world))
+            }
+        },
     );
     let wanted = lighting.max(reserve);
     if wanted > 0 {

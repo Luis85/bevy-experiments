@@ -11,7 +11,7 @@ use bevy_ecs::prelude::*;
 pub use economy::{
     ConsignedView, GoodFlow, GoodSeason, HeldUpLine, MarketLine, NeedAlert, NeedCause, Outlook,
     PriceLine, Purpose, SeasonSummary, Shortage, Trend, UseLine, WithoutCause, WithoutLine,
-    consigned, editor_mode, good_flow, need_alert, outlook, price_line, price_lines,
+    consigned, editor_mode, good_flow, housing_line, need_alert, outlook, price_line, price_lines,
     season_summaries, season_summary,
 };
 use npc_framework::prelude::*;
@@ -436,8 +436,32 @@ pub fn daily_use(world: &World, settlement: SimId) -> Vec<UseView> {
         })
         .collect();
     let held: u64 = foods.iter().map(|(_, _, units)| units).sum();
-    for (kind, restore, units) in &foods {
-        let share = (hunger * units).checked_div(held).unwrap_or(
+    // Each food's share of the hunger is its share of the hunger restored by
+    // what the settlement ate in the recent window (closing fix: a share by
+    // the stock held let a food in plenty grow its own target, and berries
+    // spoiled as fast as they were eaten). Every food keeps a floor of a
+    // twentieth of the total, so a new food can still enter. Before anything
+    // has been eaten, the stock held decides, as before.
+    let eaten: Vec<u64> = foods
+        .iter()
+        .map(|(kind, restore, _)| {
+            super::stock::eaten_recently(world, settlement, kind).saturating_mul(*restore)
+        })
+        .collect();
+    let restored: u64 = eaten.iter().sum();
+    let floor = (restored / 20).max(1);
+    let weights: Vec<u64> = if restored > 0 {
+        eaten.iter().map(|units| units + floor).collect()
+    } else {
+        foods.iter().map(|(_, _, units)| *units).collect()
+    };
+    let total: u64 = if restored > 0 {
+        weights.iter().sum()
+    } else {
+        held
+    };
+    for ((kind, restore, _), weight) in foods.iter().zip(&weights) {
+        let share = (hunger * weight).checked_div(total).unwrap_or(
             if *kind == super::roles::roles(world).baked {
                 hunger
             } else {

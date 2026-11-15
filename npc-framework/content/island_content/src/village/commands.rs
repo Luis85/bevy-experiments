@@ -466,6 +466,9 @@ impl VillageAct {
                 };
                 econ::consume(world, actor, kind, 1)?;
                 super::ledger::used(world, kind, 1);
+                if need == "Hunger" {
+                    super::stock::record_eaten(world, actor, kind, 1);
+                }
                 econ::restore(world, actor, need, amount);
                 record_effect(
                     world,

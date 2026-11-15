@@ -465,6 +465,18 @@ pub struct Shortage {
     pub cause_sentence: String,
 }
 
+/// The outlook's housing line (closing fix): "N households are waiting for
+/// a home", `None` when none is. Households in a home with too few beds wait
+/// for the planner to build (the Housing priority in Oversee is the
+/// player's lever) and hold back their next child meanwhile.
+pub fn housing_line(world: &World, settlement: SimId) -> Option<String> {
+    match demography::households_waiting(world, settlement) {
+        0 => None,
+        1 => Some("1 household is waiting for a home".to_owned()),
+        n => Some(format!("{n} households are waiting for a home")),
+    }
+}
+
 /// A village at a glance.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Outlook {

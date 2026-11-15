@@ -423,6 +423,22 @@ pub fn work_target(world: &World, actor: Entity) -> Option<(SimId, Entity)> {
         })
 }
 
+/// Whether a home being built in `settlement` still lacks `kind`: a house
+/// for people waiting for a bed outranks stock work for the same materials
+/// (closing fix: on seed 11 three houses waited a week for two to four logs
+/// the stewards' winter reserves took, and were cancelled).
+pub fn home_waits_for(world: &World, settlement: SimId, kind: &str) -> bool {
+    open_sites(world, settlement)
+        .into_iter()
+        .any(|(_, entity)| {
+            world.get::<ConstructionSite>(entity).is_some_and(|site| {
+                site.missing(kind) > 0
+                    && super::definition(world, &site.building)
+                        .is_some_and(|def| matches!(def.kind, BuildingKind::Home { .. }))
+            })
+        })
+}
+
 /// Starts one stage of building work at a supplied site.
 pub fn begin_work(world: &mut World, actor: Entity, site: Entity) -> Result<(), String> {
     if !living(world, actor) {

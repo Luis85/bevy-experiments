@@ -60,10 +60,69 @@ impl SimHashResource for TradeVolume {
     }
 }
 
+/// Food eaten per settlement and good, one entry per market round, over the
+/// same window as [`TradeVolume`]: the share of each food in a settlement's
+/// daily use (`view::daily_use`) follows what its people actually ate, so a
+/// food held in plenty does not grow its own target (closing fix).
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+pub struct FoodEaten {
+    /// Units eaten since the last market round.
+    pub pending: Round,
+    /// The last rounds, oldest first; at most `trade_window_rounds`.
+    pub rounds: Vec<Round>,
+}
+impl SimHashResource for FoodEaten {
+    const NAME: &'static str = "regional_food_eaten_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        hash_round(h, &self.pending);
+        h.u32(self.rounds.len() as u32);
+        for round in &self.rounds {
+            hash_round(h, round);
+        }
+    }
+    fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
+        Some(npc_framework::snapshot::serde_resource_fns::<Self>())
+    }
+}
+
 /// Regional profile only.
 pub fn register(app: &mut App) {
     app.init_resource::<TradeVolume>()
-        .register_sim_resource::<TradeVolume>();
+        .register_sim_resource::<TradeVolume>()
+        .init_resource::<FoodEaten>()
+        .register_sim_resource::<FoodEaten>();
+}
+
+/// Books `units` of `kind` eaten by `actor` in its settlement.
+pub(super) fn record_eaten(world: &mut World, actor: Entity, kind: &str, units: u32) {
+    if !world.contains_resource::<FoodEaten>() {
+        return;
+    }
+    let Some(settlement) = super::frontier::settlements::member(world, actor) else {
+        return;
+    };
+    let mut eaten = world.resource_mut::<FoodEaten>();
+    let entry = eaten
+        .pending
+        .entry(settlement)
+        .or_default()
+        .entry(kind.into())
+        .or_default();
+    *entry = entry.saturating_add(units);
+}
+
+/// Units of `kind` eaten in a settlement over the window (pending round
+/// included).
+pub fn eaten_recently(world: &World, settlement: SimId, kind: &str) -> u64 {
+    world.get_resource::<FoodEaten>().map_or(0, |eaten| {
+        eaten
+            .rounds
+            .iter()
+            .chain(std::iter::once(&eaten.pending))
+            .filter_map(|round| round.get(&settlement)?.get(kind))
+            .map(|units| u64::from(*units))
+            .sum()
+    })
 }
 
 fn tuning(world: &World) -> Option<&super::frontier::economy_spec::EconomyTuning> {
@@ -106,6 +165,12 @@ pub(super) fn close_round(world: &mut World) {
     volume.rounds.push(round);
     let extra = volume.rounds.len().saturating_sub(window);
     volume.rounds.drain(..extra);
+    if let Some(mut eaten) = world.get_resource_mut::<FoodEaten>() {
+        let round = std::mem::take(&mut eaten.pending);
+        eaten.rounds.push(round);
+        let extra = eaten.rounds.len().saturating_sub(window);
+        eaten.rounds.drain(..extra);
+    }
 }
 
 /// Units of `kind` sold in a settlement per day, from the moving sum.

@@ -14,6 +14,9 @@ pub(crate) enum Topic {
     Homes,
     Work,
     Cold,
+    /// Households waiting for a home (a bed too few): a warning below
+    /// food, water and cold.
+    Housing,
     Shortage,
 }
 
@@ -47,6 +50,9 @@ pub(crate) struct VillageOutlook<'a> {
     pub(crate) id: SimId,
     pub(crate) name: &'a str,
     pub(crate) outlook: &'a Outlook,
+    /// The simulation's housing sentence ("2 households are waiting for a
+    /// home"), `None` when no household waits.
+    pub(crate) housing: Option<&'a str>,
 }
 
 fn rank(status: Status) -> u8 {
@@ -172,6 +178,25 @@ fn candidates(
                 opens: Some(Opens::Homes),
             },
             u32::MAX - outlook.homeless,
+        ));
+    }
+    // One homes line per village: residents with no home at all come
+    // first; only without them is a household waiting for a home said.
+    if let Some(housing) = village.housing.filter(|_| outlook.homeless == 0) {
+        let waiting = housing
+            .split_whitespace()
+            .next()
+            .and_then(|count| count.parse::<u32>().ok())
+            .unwrap_or(1);
+        lines.push((
+            OutlookLine {
+                topic: Topic::Housing,
+                status: Status::Warn,
+                text: with_prefix(prefix, &format!("{}.", housing.trim_end_matches('.'))),
+                tip: "Opens the build tray on Homes.".to_owned(),
+                opens: Some(Opens::Homes),
+            },
+            u32::MAX - waiting,
         ));
     }
     if outlook.idle_hands > 0 {
@@ -371,11 +396,13 @@ mod tests {
                 id: SimId(1),
                 name: "Hilltop",
                 outlook: &hilltop,
+                housing: None,
             },
             VillageOutlook {
                 id: SimId(2),
                 name: "Harbour",
                 outlook: &harbour,
+                housing: None,
             },
         ];
         assert_eq!(
@@ -398,6 +425,7 @@ mod tests {
             id: SimId(1),
             name: "Hilltop",
             outlook: &hilltop,
+            housing: None,
         }];
         assert_eq!(
             texts(&words(&single)),
@@ -419,6 +447,7 @@ mod tests {
             id: SimId(1),
             name: "Hilltop",
             outlook: &cold,
+            housing: None,
         }]);
         assert_eq!(
             texts(&lines),
@@ -448,6 +477,7 @@ mod tests {
             id: SimId(1),
             name: "Hilltop",
             outlook: &hilltop,
+            housing: None,
         }]);
         assert_eq!(attention(&lines), 2, "food and homes; work only informs");
         assert_eq!(super::super::fold_title(2), "Alerts \u{b7} Outlook");
@@ -485,14 +515,83 @@ mod tests {
                 id: SimId(1),
                 name: "Harbour",
                 outlook: &cold,
+                housing: None,
             },
             VillageOutlook {
                 id: SimId(2),
                 name: "Mill",
                 outlook: &calm,
+                housing: None,
             },
         ]);
         assert_eq!(lines[0].text, "Harbour: it is cold, 1 has no coat.");
+    }
+
+    #[test]
+    fn households_waiting_for_a_home_are_a_warning_below_food_water_and_cold() {
+        let mut harbour = outlook();
+        harbour.food_days = Some(2);
+        harbour.cold_now = true;
+        harbour.without_coat = 2;
+        let calm = outlook();
+        let villages = [
+            VillageOutlook {
+                id: SimId(1),
+                name: "Harbour",
+                outlook: &harbour,
+                housing: Some("1 household is waiting for a home"),
+            },
+            VillageOutlook {
+                id: SimId(2),
+                name: "Mill",
+                outlook: &calm,
+                housing: Some("3 households are waiting for a home"),
+            },
+        ];
+        let lines = words(&villages);
+        assert_eq!(
+            texts(&lines),
+            vec![
+                (
+                    Status::Crit,
+                    "Harbour: it is cold, 2 have no coat.".to_owned()
+                ),
+                (Status::Warn, "Harbour has food for 2 days.".to_owned()),
+                (
+                    Status::Warn,
+                    "Mill: 3 households are waiting for a home.".to_owned()
+                ),
+            ],
+            "the worst village's line, below food and cold, the name kept"
+        );
+        assert_eq!(lines[2].opens, Some(Opens::Homes));
+        // One village: no name, and the singular is the simulation's own.
+        let lines = words(&[VillageOutlook {
+            id: SimId(1),
+            name: "Mill",
+            outlook: &calm,
+            housing: Some("1 household is waiting for a home"),
+        }]);
+        assert_eq!(
+            texts(&lines),
+            vec![(
+                Status::Warn,
+                "1 household is waiting for a home.".to_owned()
+            )]
+        );
+        // Residents with no home at all: one homes line, theirs.
+        let mut homeless = outlook();
+        homeless.homeless = 2;
+        let lines = words(&[VillageOutlook {
+            id: SimId(1),
+            name: "Mill",
+            outlook: &homeless,
+            housing: Some("1 household is waiting for a home"),
+        }]);
+        assert_eq!(
+            texts(&lines),
+            vec![(Status::Warn, "2 residents have no home.".to_owned())]
+        );
     }
 
     #[test]
@@ -502,6 +601,7 @@ mod tests {
             id: SimId(1),
             name: "Hilltop",
             outlook: &calm,
+            housing: None,
         }]);
         assert_eq!(
             texts(&lines),
@@ -517,6 +617,7 @@ mod tests {
             id: SimId(1),
             name: "Hilltop",
             outlook: &fasting,
+            housing: None,
         }]);
         assert_eq!(lines[0].text, "All is well.");
     }
@@ -535,6 +636,7 @@ mod tests {
             id: SimId(4),
             name: "Mill",
             outlook: &all,
+            housing: None,
         };
         let opens: Vec<(Topic, Option<Opens>)> = candidates(
             &village,

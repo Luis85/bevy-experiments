@@ -106,7 +106,9 @@
     {"name": "Work hours", "kind": {"Guard": {"cond": "life.in_work_window", "abort": "None"}}, "children": [
       {"name": "Profession", "kind": "Selector", "children": [
         {"name": "Consider a new job", "kind": {"Leaf": {"action": "life.change_job", "param": "None"}}},
-        {"name": "Build", "kind": {"Leaf": {"action": "life.build", "param": "None"}}},
+        {"name": "Site ready to build", "kind": {"Guard": {"cond": "life.site_needs_builder", "abort": "LowerPriority"}}, "children": [
+          {"name": "Build", "kind": {"Leaf": {"action": "life.build", "param": "None"}}}
+        ]},
         {"name": "Carry building materials", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "materials"}}}},
         {"name": "Harvest the field", "kind": {"Leaf": {"action": "life.harvest", "param": "None"}}},
         {"name": "Sow the field", "kind": {"Leaf": {"action": "life.sow", "param": "None"}}},

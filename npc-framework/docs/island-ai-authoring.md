@@ -261,7 +261,7 @@ lower-priority work.
 | Storm | `life.storm` | craft during work hours, else shelter at home |
 | Sell surplus to the boat | none | while the boat is in or due, carry what it buys to the trading post (above the evening: a long walk to the water is finished, not dropped at dusk) |
 | Leisure | `life.wants_leisure` | help a friend, a family evening at home, meet a neighbour (sociable residents), else stroll to the square |
-| Work hours | `life.in_work_window` | change job, build, carry building materials, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
+| Work hours | `life.in_work_window` | change job, build (a `life.site_needs_builder` guard: a supplied site interrupts the lower work), carry building materials, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
 | Night | `life.in_sleep_window` | stay home |
 | (last) | none | seek company, idle |
 

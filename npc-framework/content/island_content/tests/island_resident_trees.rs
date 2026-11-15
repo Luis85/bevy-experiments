@@ -160,7 +160,7 @@ fn an_unknown_action_or_condition_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["action"] = json!("life.nap");
     let error = refused(&tree);
     assert!(
-        error.contains("behaviour tree file `resident.json`, node 89 `Idle`")
+        error.contains("behaviour tree file `resident.json`, node 90 `Idle`")
             && error.contains("unknown action `life.nap`")
             && error.contains("life.sleep"),
         "{error}"
@@ -197,7 +197,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["param"] = json!({"Int": 3});
     let error = refused(&tree);
     assert!(
-        error.contains("node 89 `Idle`") && error.contains("expected no parameter"),
+        error.contains("node 90 `Idle`") && error.contains("expected no parameter"),
         "{error}"
     );
     // A parameter of a shape the format does not have.
@@ -205,7 +205,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
     child(&mut tree["root"], "Idle")["kind"]["Leaf"]["param"] = json!({"Number": 3});
     let error = refused(&tree);
     assert!(
-        error.contains("`resident.json`, node 89 `Idle`") && error.contains("unknown variant"),
+        error.contains("`resident.json`, node 90 `Idle`") && error.contains("unknown variant"),
         "{error}"
     );
     // A place nobody defined.
@@ -214,7 +214,7 @@ fn a_bad_leaf_parameter_is_refused_naming_the_file_and_the_node() {
         json!({"Name": "lighthouse"});
     let error = refused(&tree);
     assert!(
-        error.contains("node 87 `Stay home`") && error.contains("centre, home, meal, work"),
+        error.contains("node 88 `Stay home`") && error.contains("centre, home, meal, work"),
         "{error}"
     );
 }
@@ -285,7 +285,7 @@ fn structural_mistakes_and_a_missing_resident_tree_are_refused() {
     child(&mut tree["root"], "Idle")["kinds"] = json!("Selector");
     let error = refused(&tree);
     assert!(
-        error.contains("node 89 `Idle`") && error.contains("unknown field `kinds`"),
+        error.contains("node 90 `Idle`") && error.contains("unknown field `kinds`"),
         "{error}"
     );
     // Residents need their tree.
