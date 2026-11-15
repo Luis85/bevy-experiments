@@ -1270,6 +1270,44 @@ The 20-seed release acceptance, post-W1-69 (W2-01, W2-03 and W2-04 "before" runs
 
 Still failing, all wave-4 work (W4-04..n, W4-p, W4-c): `goal5_tiers_affordable_3_5_7_9_11_13`, `goal5_unlock_order_fortifications_mara_operations`, `goal6_defeat_rate_windows`, `goal6_lux_hard_at_most_1_5x_normal`, `goal6_no_15_streak_after_run_10` and `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`.
 
+**W4-01 and W4-03 before/after (closing phase, 2026-11-15; ISO-7).** Neither row wrote its tables when it landed (both commit bodies leave them to the closing phase, R36), and the W4-p "before" below (1b59e20, on the wave-4 branch before integration) already holds W4-01 to W4-03, so this block isolates them. On the integrated branch W4-01 (75d73723) sits on f461c72d, not on its wave-4 branch parent 79b7c0a, and W4-02 (8107c2d8) sits between W4-01 and W4-03 (1b6fc341). Each commit's `horde-defense` tree was extracted with `git archive` into `target/production-after-wave4/src/<commit>/` and run there against the shared target dir, after `cargo clean -p` of the workspace members in both profiles (a tree extracted under the target root is otherwise taken as fresh against the previous tree's build, and the first attempt measured one binary four times). Commands: `cargo run --locked --release -p horde_core --example pacing -- 60 --runs --out .../pacing.txt`, `cargo run --locked -p horde-defense -- --smoke`, and at f461c72d, 75d73723 and 1b6fc341 the W4-p block's 20-seed `cargo test --locked --release -p horde_core --test pacing_targets -- goal --ignored --nocapture`. Outputs are in `target/production-after-wave4/commits/<commit>/` (`pacing.txt`, `smoke.txt`, `pacing_targets_goal.out.txt`; UTF-8, LF; not committed).
+- 79b7c0a and f461c72d reproduce the wave-2 close byte for byte: `pacing.txt` sha256 902cd895...c7f7d738 and `smoke.txt` 846f0b4c...425fe50, the files in `target/production-after-wave2/`. The wave-3 and wave-5 picks and the wave-2 review fixes moved neither, so f461c72d is a valid "before" for W4-01.
+- W4-02 moved neither: 8107c2d8 equals 75d73723 in both files (its lines are presentation reads).
+
+Default pacing, runs / battle minutes, f461c72d → 75d73723 (W4-01) → 1b6fc341 (W4-03):
+
+| Milestone | expert, tree first, DEU | novice, tree first, DEU | novice, gear first, LUX |
+|---|---|---|---|
+| First victory | 2 / 6 → 2 / 6 → 3 / 10 | 3 / 9 → 3 / 9 → 6 / 20 | 2 / 7 (unchanged) |
+| First liberation | 14 / 62 → 15 / 65 → 16 / 67 | 15 / 60 → 15 / 61 → 19 / 79 | 5 / 18 (unchanged) |
+| Tier 1 / 2 / 3 / 4 affordable (runs) | 2 / 5 / 7 / 9 → unchanged → 3 / 6 / 9 / 10 | 3 / 6 / 9 / 10 → unchanged → 3 / 8 / 11 / 13 | 2 / 5 / 8 / 9 (unchanged; tier 3 at 30 → 30 → 31 battle min, tier 4 at 34 → 35 → 35) |
+| Fortifications / Mara / Recruitment unlocked | 2 / 14 / 14 → 2 / 15 / 15 → 3 / 16 / 16 | 3 / 15 / 15 → unchanged → 6 / 19 / 19 | 2 / 5 / 5 (unchanged) |
+| Parallel defenses / Country operations unlocked | 17 / 23 → 18 / 24 → 19 / 25 | 18 / 24 → unchanged → 22 / 28 | 8 / 20 (unchanged; 30 / 83 → 30 / 84 → 31 / 84 battle min) |
+| Defeats in 60 runs (runs) | 5 (1, 3, 7, 8, 9) → 6 (1, 3, 7, 8, 9, 11) → 7 (1, 2, 4, 7, 8, 11, 12) | 6 (1, 2, 4, 7, 8, 9) → unchanged → 10 (1, 2, 3, 4, 5, 7, 10, 11, 14, 15) | 2 (1, 3) (unchanged) |
+| Coins over 60 runs | 505,870 → 499,097 → 481,918 | 496,870 → 521,969 → 457,633 | 547,785 → 583,193 → 589,581 |
+
+W4-01 is balance on purpose (rulings W-6 and W-9): the expert's one new defeat is run 11 on DEU stage 6, the first Regional checkpoint (boss health x1.2), and the first liberation and every later unlock come one run later. Where no defeat is added, the Regional and Capstone reward multipliers (x1.2, x1.4) raise the coins: novice DEU +25,099, LUX +35,408. W4-03 is balance on purpose (design-progression-tree §1): steady_hands gives +4 damage instead of +8 and hardened +2 armor instead of +3, so the early runs are weaker. The expert loses run 2 at DEU stage 1 and its first victory moves to run 3. The novice buys the same opening nodes with a weaker aim and loses DEU stage 1 five times: it wins first at run 6 instead of 3, loses 10 runs instead of 6 and frees DEU 4 runs later. The gear-first LUX profile does not lean on these nodes and keeps every milestone.
+
+Smoke: PASS at all five commits. W4-01 moved nothing: `smoke.txt` at 75d73723 equals f461c72d's byte for byte. W4-03 moved only the Personal lines: stage 1 attempt 3 195.1 s, 149 kills, 615 coins → 199.4 s, 151 kills, 622 coins; stage 4 230 kills, 2,128 coins → 233 kills, 2,151 coins; stages 2, 3 and 5 by under a second with the same kills and coins. Failed attempts stay Personal 2 and Npc 3, every Npc line and the legacy autonomous Defeat (70 kills, 240 coins in 174.0 s) are unchanged.
+
+The 20-seed release acceptance (`pacing_targets -- goal`), f461c72d → 75d73723 → 1b6fc341. Cells are the lower median [p25, p75]:
+
+| Row | f461c72d (before W4-01) | 75d73723 (W4-01) | 1b6fc341 (W4-03) | Gate |
+|---|---|---|---|---|
+| First victory | 3 [2, 4] | 3 [2, 4] | 3 [3, 4] | runs 2-4, pass |
+| Tier 1 / 2 / 3 affordable | 3 [2, 3] / 5 [5, 6] / 8 [8, 9] | unchanged | 3 [3, 3] / 6 [5, 6] / 8 [8, 9] | tiers 2 and 3 fail (the W4-p tier definition and prices) |
+| Liberation(2) / Tree exhausted | 17 [16, 18] / 26 [25, 27] | 18 [17, 19] / 27 [26, 28] | 18 [17, 20] / 27 [26, 29] | pass |
+| Nodes bought after Liberation(2) | 20 [17, 27] | 19 [12, 27] | 17 [11, 22] | at least 1, pass |
+| Fortifications / Mara / Operations | 3 [2, 4] / 14 [13, 15] / 14 [13, 15] | 3 [2, 4] / 15 [14, 16] / 15 [14, 16] | 3 [3, 4] / 15 [14, 17] / 15 [14, 17] | medians tie, fail (W4-p) |
+| Defeat windows outside 10-25% | 35 of 39 (0.0% to 16.2%) | 34 of 39 (0.0% to 18.0%) | 33 of 38 (0.0% to 18.2%) | 0, fail |
+| Longest win streak from run 11 | median 50, max 50 | median 49, max 50 | median 49, max 50 | under 15, fail |
+| LUX Easy / Normal / Hard | 4 [4, 5] / 5 [5, 6] / 9 [8, 11] | 4 [4, 5] / 7 [6, 7] / 11 [10, 11] | 5 [5, 6] / 7 [6, 7] / 11 [10, 12] | Hard fails throughout (9 > 7.5, then 11 > 10.5) |
+| Boss TTK | 25.5 s [p25 21.5, p90 36.4], 1,090 kills | 27.6 s [p25 22.8, p90 42.1], 1,083 kills | 28.1 s [p25 23.5, p90 43.5], 1,073 kills | median 20-60 s, pass |
+| AUT / BGD clamped starts | 4 [2, 4] / 3 [2, 4] | unchanged | 4 [2, 4] / 3 [3, 4] | runs 2-4, pass |
+| Archetype coverage | 18 of 18 | 18 of 18 | 18 of 18 | pass |
+
+The f461c72d column is the wave-2 close's acceptance (§9.2 "After W2"). The 1b6fc341 column equals the W4-p Before column (1b59e20) row for row, so that baseline is the post-W4-01..03 state. W4-01 moves the goal-6 rows it was written for: boss TTK +2.1 s with the Regional and Capstone health, LUX Normal and Hard each 2 runs later, and the defeat windows slightly fuller. G6.11 and G6.12 stay red, as W4-04..n and W4-13 later found (accepted, R60). W4-03 leaves the goal-6 rows within a run and moves tier 2 from run 5 to run 6. No digest moved at either commit (both bodies; W4-08 found nothing to fold).
+
 W4-p repricing and goal-5 calibration (2026-11-13; R55 runs it before the enemy tuning loop resumes). `cargo test --locked --release -p horde_core --test pacing_targets -- goal --ignored --nocapture` (expert-deu, Normal, 20 seeds, 60 runs; the goal-6 rows 20 seeds), before on the parent commit 1b59e20 and after on the repriced `skills.json`. Cells are the lower median [p25, p75].
 
 | Row | Before | After | Gate |
