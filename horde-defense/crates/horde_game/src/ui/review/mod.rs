@@ -329,14 +329,32 @@ impl crate::launch::LaunchConfig {
                 || (self.motion_review() && self.sequence_path().is_some()))
     }
     pub(super) fn damage_capture_mode(&self) -> LootCaptureMode {
-        let allowed = matches!(self.scenario.as_deref(), Some("damage" | "damage-4x"));
-        select_loot_capture_mode(
-            if allowed { Some("quality-loot") } else { None },
+        let scenario = self.scenario.as_deref();
+        let allowed = matches!(scenario, Some("damage" | "damage-4x"));
+        // A weapon-class still pins the popup clock too, so its missed
+        // shot's MISS is drawn whatever the capture waited (CF-3-23); its
+        // motion export keeps the live clock.
+        let still_only = scenario.is_some_and(|scene| {
+            fixtures::production::WEAPON_CLASS_SCENES
+                .iter()
+                .any(|(name, ..)| *name == scene)
+        });
+        let mode = select_loot_capture_mode(
+            if allowed || still_only {
+                Some("quality-loot")
+            } else {
+                None
+            },
             self.motion_review(),
             self.sequence_path().is_some(),
             self.capture_path().is_some(),
             self.practice,
-        )
+        );
+        if still_only && mode != LootCaptureMode::Still {
+            LootCaptureMode::Disabled
+        } else {
+            mode
+        }
     }
     pub(super) fn loot_capture_mode(&self) -> LootCaptureMode {
         select_loot_capture_mode(

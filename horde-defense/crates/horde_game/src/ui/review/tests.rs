@@ -3104,3 +3104,108 @@ fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
         );
     }
 }
+
+/// CF-3-23: a weapon-class still draws its missed shot's one MISS whatever
+/// the capture waited. Outside damage and damage-4x the popup clock of a
+/// still was the wall clock, so the volley's MISS (CF-1-12) faded or expired
+/// before the capture frame: it showed in 1 of 4 shotgun stills and in no
+/// rifle still. Staged as the capture stages them, with the capture frame
+/// 2 s after the first (past a popup's 0.9 s life), weapon-classes-shotgun
+/// and weapon-classes-rifle each paint exactly one MISS at full strength, at
+/// 1440x900@1.0 and 1050x700@1.35, at one spot in normal and reduced effects
+/// (each label's centre inside the other: normal draws the fresh label at
+/// its punch scale).
+#[test]
+fn weapon_class_stills_draw_one_miss_at_one_spot_in_both_modes() {
+    fn misses(output: &egui::FullOutput) -> Vec<(egui::Rect, u8)> {
+        fn walk(shape: &egui::epaint::Shape, found: &mut Vec<(egui::Rect, u8)>) {
+            match shape {
+                egui::epaint::Shape::Text(text) if text.galley.text() == "MISS" => {
+                    let alpha = text
+                        .galley
+                        .job
+                        .sections
+                        .first()
+                        .map_or(0, |section| section.format.color.a());
+                    found.push((text.galley.rect.translate(text.pos.to_vec2()), alpha));
+                }
+                egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, found)),
+                _ => {}
+            }
+        }
+        let mut found = Vec::new();
+        for clipped in &output.shapes {
+            walk(&clipped.shape, &mut found);
+        }
+        found
+    }
+    for scene in ["weapon-classes-shotgun", "weapon-classes-rifle"] {
+        for (size, scale) in [
+            (egui::vec2(1440.0, 900.0), 1.0),
+            (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+        ] {
+            let mut spots = Vec::new();
+            for reduced in [false, true] {
+                let mut f = staged(scene);
+                assert!(f.screen == Screen::Battle, "{scene}: staged {:?}", f.screen);
+                assert_eq!(f.launch.damage_capture_mode(), LootCaptureMode::Still);
+                // An interactive review of the scene keeps the live clock.
+                let interactive = LaunchConfig {
+                    scenario: Some(scene.into()),
+                    review: Some(ReviewOptions::default()),
+                    ..LaunchConfig::default()
+                };
+                assert_eq!(interactive.damage_capture_mode(), LootCaptureMode::Disabled);
+                f.settings.scale = scale;
+                f.settings.reduced_effects = reduced;
+                let ctx = egui::Context::default();
+                crate::settings::install_font(&ctx);
+                crate::settings::configure(&ctx, scale);
+                let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+                warmup.textures_delta.clear();
+                let mut last = None;
+                for time in [0.0, 0.5, 2.0] {
+                    f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+                    let mut output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                            time: Some(time),
+                            ..egui::RawInput::default()
+                        },
+                        |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+                    );
+                    output.textures_delta.clear();
+                    last = Some(output);
+                }
+                let found = misses(&last.expect("a capture frame"));
+                let label = format!("{scene} scale {scale} reduced {reduced}");
+                // A popup paints its outline as offset copies of its text
+                // (up to 2 pt off), then the text: one label is one cluster.
+                let mut labels: Vec<Vec<(egui::Rect, u8)>> = Vec::new();
+                for run in found {
+                    match labels
+                        .iter_mut()
+                        .find(|label| (label[0].0.center() - run.0.center()).length() < 6.0)
+                    {
+                        Some(label) => label.push(run),
+                        None => labels.push(vec![run]),
+                    }
+                }
+                assert_eq!(labels.len(), 1, "{label}: one MISS, found {labels:?}");
+                let alpha = labels[0].iter().map(|run| run.1).max().unwrap_or(0);
+                assert!(alpha > 200, "{label}: the MISS at full strength ({alpha})");
+                let (rect, _) = *labels[0].last().expect("the text over its outline");
+                spots.push(rect);
+            }
+            // One spot: normal effects draws the fresh label at its punch
+            // scale and reduced at 1.0, both clamped to the same field edge,
+            // so each label's centre lies inside the other.
+            assert!(
+                spots[0].contains(spots[1].center()) && spots[1].contains(spots[0].center()),
+                "{scene} scale {scale}: normal {:?} and reduced {:?} differ",
+                spots[0],
+                spots[1]
+            );
+        }
+    }
+}
