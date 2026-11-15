@@ -31,8 +31,9 @@ const MAX_SURVIVAL_S: f32 = 3_600.0;
 /// defender scaling (a recruit's carries its own appearance), its maximum
 /// health, the progression snapshot, the balance settings, the catalogue
 /// level whose schedule the stage plays and the arena it is fought in. A
-/// deploy at the next threat ([`Game::next_threat`]) copies these into the
-/// attempt; on a country whose modifiers leave the defender alone the
+/// main-run deploy at the next threat ([`Game::next_threat`]) copies these
+/// into the attempt (an expedition's deploy reads them at
+/// `Campaign::expedition_threat_rank`, W4-12); on a country whose modifiers leave the defender alone the
 /// attempt's profile is exactly `profile`. The snapshot is the rank's,
 /// before the stage's front position: a deploy on stage 0 of a multi-stage
 /// front freezes exactly it.
@@ -671,8 +672,9 @@ impl Injury {
 }
 
 impl Game {
-    /// The victory threat the next defense faces: the campaign's
-    /// progression rank, the rank every deploy reads.
+    /// The victory threat the next main-run defense faces: the campaign's
+    /// progression rank, the rank every main-run deploy reads (an
+    /// expedition plays `Campaign::expedition_threat_rank`, W4-12).
     pub fn next_threat(&self) -> u32 {
         self.campaign.progression_rank()
     }
