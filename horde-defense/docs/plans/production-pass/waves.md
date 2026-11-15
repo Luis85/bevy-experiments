@@ -399,7 +399,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 **W2-25 · progression-tree · W2-G `tree_value` and `--values`**
 - Fail-first:
   - `field_fitness_ehp_gain_matches_ratio`
-  - `quick_throw_is_zero_today`
+  - `quick_throw_is_zero_today` (renamed `quick_throw_is_valued_by_its_charges` by W4-03, which gives Quick throw one grenade and one Molotov charge)
   - `dominance_groups_pair_vitality_with_health_add`
 - Deps: W2-24.
 
