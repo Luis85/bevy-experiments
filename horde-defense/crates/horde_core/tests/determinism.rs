@@ -627,8 +627,11 @@ fn progressed_runs_reach_the_pinned_state_digests_and_traces() {
 /// from the campaign it names, a valid save, and its window spawns an elite,
 /// enters a boss phase and kills a new archetype; the four end states differ
 /// and save validly. Perturbation: the same campaigns at rank 2 (below the
-/// elite rank 3, wave tier 5 and the rank-4 boss phases) fail the check, so
-/// it is not vacuous.
+/// elite rank 3 and wave tier 5) fail the check, so it is not vacuous: both
+/// report no elite and no new archetype. Only the takeover (a Sector boss,
+/// below the rank-4 phases) also reports no boss phase, which proves the
+/// phase clause; the Hard Capstone keeps its Capstone transition at any
+/// rank, so it enters a phase at rank 2 too.
 #[test]
 fn progressed_golden_runs_exercise_elites_boss_phases_and_new_archetypes() {
     let mut digests = std::collections::BTreeSet::new();
@@ -681,9 +684,22 @@ fn progressed_golden_runs_exercise_elites_boss_phases_and_new_archetypes() {
                 PROGRESSED_TICKS,
                 |_| {},
             );
-            assert!(
-                progressed_exercise(&early).is_err(),
+            let missing = progressed_exercise(&early).expect_err(&format!(
                 "seed {seed:#x} {run:?} at rank 2 exercises everything: the check is vacuous"
+            ));
+            for clause in ["no elite spawned", "no new archetype killed"] {
+                assert!(
+                    missing.contains(clause),
+                    "seed {seed:#x} {run:?} at rank 2: {clause:?} not reported, got {missing:?}"
+                );
+            }
+            // The Capstone's transition is folded at any rank, so only the
+            // Sector-boss takeover (no phases below rank 4) proves the phase
+            // clause; the Capstone proves it can also pass.
+            assert_eq!(
+                missing.contains("no boss phase entered"),
+                run == ProgressedRun::RecruitTakeover,
+                "seed {seed:#x} {run:?} at rank 2: got {missing:?}"
             );
         }
     }
