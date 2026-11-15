@@ -1,0 +1,2 @@
+# Licence texts are kept byte-for-byte as the creators ship them (living-world-manifest.json pins their sha256).
+licenses/*.txt -text

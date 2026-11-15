@@ -46,7 +46,9 @@ Licence evidence was read on each creator's own page on 2026-11-12.
                   Environment_Dock_Pole f5a511f3f59283153ed470b3edd4a3f91700ee31d6fe89fd941510ac08318ced
                   Prop_Fish_Mackerel 2695abf47ba7f8b15959fee50df63ea6c44ce15347323880a9c66bbd38bff92e
                   Prop_Bucket_Fishes f366412e831a4f14b73cf4a1d15e2acc70c2588c36bdf7db24f18d235e059861
-   Changes: none.
+   Changes: Prop_Bucket_Fishes only (2026-11-15): the unused TEXCOORD_2 attribute was
+           removed with its accessor, bufferView and buffer bytes; indices renumbered.
+           The shipped file's size and hash are in the manifest. The others: none.
 
 5. Quaternius Ultimate Animated Animal Pack (Quaternius, July 2021)
    Files: living/animals/{Deer,Stag}.gltf (self-contained, base64-embedded buffer)

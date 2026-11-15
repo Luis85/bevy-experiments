@@ -24,6 +24,9 @@ N=target/debug/npcctl
   its first stdout line for the URL:
   `$N serve --scenario SCENARIO --port 0 --record target/play/session.json`
   → `{"listening":"http://127.0.0.1:PORT",..}`. Use `--url http://127.0.0.1:PORT` on every call below.
+- The island: the explorer and AI-agent hosts do not host it (ADR 0044); an agent reaches it through the game,
+  `cargo run --locked -p island_game -- --scenario living_world --remote` (developer host, no title screen), at
+  `http://127.0.0.1:15702` like any BRP game below. Its actions are the ones `agent observe` offers.
 - A windowed testbed (`cargo run -p actor_testbed -- --scenario SCENARIO --remote`) or another running server:
   use its URL (default `http://127.0.0.1:15702`); `npcctl session info` fails there (BRP has no session methods),
   `npcctl agent list-units` works.

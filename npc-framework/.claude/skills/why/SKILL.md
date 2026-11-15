@@ -34,7 +34,10 @@ Live game instead (BRP, `docs/debugging.md` §3; the windowed apps keep the jour
 streams it to disk): `npc/journal` with params `{"unit":UNIT,"from":FROM,"to":TO,"kinds":[],"limit":200}` and
 `npc/unit` with `{"id":UNIT}`.
 
-Testbed or another content: add `--scenario testbed[:<name>]` (and the run's `--commands`) to every command, and
+Island: add `--scenario island:living_world` (and the run's `--commands`) to every command; residents run the
+resident tree in `content/island_content/trees/resident.json` (`docs/island-ai-authoring.md`), and a live
+`island_game` answers the same BRP calls. Testbed or another content: add `--scenario testbed[:<name>]` (and the
+run's `--commands`) to every command, and
 the capability kinds to `--kind`: `OrderIssued,OrderStarted,OrderDone,OrderFailed,Interacted,ItemMoved,DoorChanged,
 Roll,Perceived,Lost,PathFound,PathFailed,CraftStarted,CraftDone,CraftFailed,Mounted,Dismounted,VehicleStalled,
 XpGained,LevelUp,SkillImproved,ExternalAction,ActionRejected` (`docs/debugging.md` §5 explains each).

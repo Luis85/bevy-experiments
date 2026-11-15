@@ -8,6 +8,16 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Assets, licences and agent guidance (review pass)
+
+- Removed the retired `assets/audio/` folder, its "Island audio" credits and `licenses/Island-Audio-CC0-sources.txt`.
+- Removed the unused `assets/props/mug_full.gltf` and `.bin` (`scripts/fetch_assets.sh` still names it).
+- Removed `docs/npc-life-and-environment.md`; its two references now say it was removed.
+- `living/ships/Prop_Bucket_Fishes.gltf`: dropped the unused `TEXCOORD_2` attribute, its accessor, bufferView and bytes.
+- Added CC0 licence texts: `KayKit-Furniture-Bits-1.0.txt`, `KayKit-Dungeon-Remastered-1.0.txt`, `Kenney-Survival-Kit.txt`, `ambientCG-CC0.txt`.
+- `living-world-manifest.json` lists every asset the island loads (Knight, Rogue_Hooded, dungeon and survival models, licences), sorted by path; furniture URLs pinned to a commit.
+- `.claude/rules/content.md`, `view.md` and the skills describe the island crates (`island_content`, `island_view`, `island_game`).
+
 ### Island review fix pass (sim)
 
 - Shape placements are built: `PlacePlot`/`PlaceProp` take `mode` (`build` opens a
@@ -1443,7 +1453,7 @@ No backwards compatibility: read the "not kept" bullets before updating.
 - Add perception-scoped resource stock/renewal and workstation input/output information;
   expose public decisions, production recipes and renewal timing in the observer views.
   Island content hashes change; this increment requires a fresh island rather than
-  silently migrating old island saves. See `docs/npc-life-and-environment.md`.
+  silently migrating old island saves. (The guide `docs/npc-life-and-environment.md` was later removed.)
 
 ### Dedicated AI Agent Game Client
 

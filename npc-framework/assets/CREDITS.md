@@ -9,12 +9,12 @@ The bundled Barlow fonts (Regular and SemiBold) use SIL Open Font License 1.1; i
 | `fonts/Barlow-SemiBold.ttf` | [Barlow](https://github.com/jpt/barlow) | The Barlow Project Authors | [SIL OFL 1.1](fonts/OFL.txt) |
 | `characters/Rogue_Hooded.glb`, `props/` | [KayKit Character Pack: Adventurers 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) | Kay Lousberg (kaylousberg.com) | CC0 |
 | `hex/` | [KayKit Medieval Hexagon Pack 1.0](https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0) | Kay Lousberg | CC0 |
-| `furniture/` | [KayKit Furniture Bits 1.0](https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0) | Kay Lousberg | CC0 |
-| `textures/grass_color.jpg` | [ambientCG Grass004](https://ambientcg.com/view?id=Grass004) | Lennart Demes (ambientCG) | CC0 |
+| `furniture/` | [KayKit Furniture Bits 1.0](https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0) | Kay Lousberg | [CC0](licenses/KayKit-Furniture-Bits-1.0.txt) (`LICENSE.txt` at commit `96d5930a`, fetched 2026-11-15) |
+| `textures/grass_color.jpg` | [ambientCG Grass004](https://ambientcg.com/view?id=Grass004) | Lennart Demes (ambientCG) | [CC0](licenses/ambientCG-CC0.txt) (text of https://docs.ambientcg.com/license/, retrieved 2026-11-15) |
 | `testbed/characters/Knight.glb` | [KayKit Character Pack: Adventurers 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0) | Kay Lousberg (kaylousberg.com) | CC0 |
 | `testbed/characters/Skeleton_*.glb`, `testbed/props/` | [KayKit Character Pack: Skeletons 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0) | Kay Lousberg (kaylousberg.com) | CC0 |
-| `testbed/dungeon/` | [KayKit Dungeon Remastered 1.0](https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0) | Kay Lousberg (kaylousberg.com) | CC0 |
-| `testbed/survival/` | [Kenney Survival Kit](https://kenney.nl/assets/survival-kit) | Kenney (kenney.nl) | CC0 |
+| `testbed/dungeon/` | [KayKit Dungeon Remastered 1.0](https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0) | Kay Lousberg (kaylousberg.com) | [CC0](licenses/KayKit-Dungeon-Remastered-1.0.txt) (`LICENSE.txt` at commit `b0ca9bd9`, fetched 2026-11-15) |
+| `testbed/survival/` | [Kenney Survival Kit](https://kenney.nl/assets/survival-kit) (2.0; the same files are in Kenney's own [OpenGameArt upload](https://opengameart.org/content/survival-kit), `kenney_survival-kit.zip`) | Kenney (kenney.nl) | [CC0](licenses/Kenney-Survival-Kit.txt) (the zip's `License.txt`, fetched 2026-11-15) |
 | `testbed/castle/` | [Kenney Castle Kit](https://kenney.nl/assets/castle-kit) | Kenney (kenney.nl) | CC0 |
 | `testbed/town/` | [Kenney Fantasy Town Kit 2.0](https://kenney.nl/assets/fantasy-town-kit) | Kenney (kenney.nl) | CC0 |
 
@@ -55,7 +55,7 @@ SHA-256 hashes are in `living-world-manifest.json`. These files are not fetched 
 | `living/nature/{trees_*_large,trees_*_medium,trees_*_cut,rock_single_A,rock_single_C,waterlily_B,waterplant_C}.gltf`, `living/props/*.gltf` | [KayKit Medieval Hexagon Pack 1.0](https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0), commit `84fa4e91` | Kay Lousberg | [CC0](licenses/KayKit-Medieval-Hexagon-Pack-1.0.txt) | none |
 | `living/ships/*.glb`, `living/ships/Textures/colormap.png` | [Pirate Kit 2.1](https://opengameart.org/content/pirate-kit) (`kenney_pirate-kit_2.1.zip`) | Kenney (kenney.nl) | [CC0](licenses/Kenney-Pirate-Kit-2.1.txt) | none |
 | `living/nature/*.glb`, `living/props/{fence_simple,fence_gate,sign,crops_wheatStageA,crops_wheatStageB}.glb` | [Nature Kit 2.1](https://opengameart.org/content/nature-kit) (`Nature Kit (2.1).zip`) | Kenney (kenney.nl) | [CC0](licenses/Kenney-Nature-Kit-2.1.txt) | none |
-| `living/ships/{Prop_Anchor,Environment_Dock_Pole,Prop_Fish_Mackerel,Prop_Bucket_Fishes}.gltf` | [Pirate Kit](https://quaternius.com/packs/piratekit.html) (creator's linked Google Drive) | Quaternius | CC0 (stated on the pack page) | none |
+| `living/ships/{Prop_Anchor,Environment_Dock_Pole,Prop_Fish_Mackerel,Prop_Bucket_Fishes}.gltf` | [Pirate Kit](https://quaternius.com/packs/piratekit.html) (creator's linked Google Drive) | Quaternius | CC0 (stated on the pack page) | `Prop_Bucket_Fishes`: unused `TEXCOORD_2` removed |
 | `living/animals/{Deer,Stag}.gltf` | [Ultimate Animated Animal Pack](https://quaternius.com/packs/ultimateanimatedanimals.html) (creator's linked Google Drive) | Quaternius | [CC0](licenses/Quaternius-Ultimate-Animated-Animal-Pack.txt) | none |
 
 Kenney's two kits were taken from Kenney's own OpenGameArt account, as for the audio.
@@ -89,27 +89,6 @@ page, whose licence field lists CC0 only. Sources, evidence pages and download h
 | `living/audio/ambience/fire.ogg` | [Fire Crackling](https://opengameart.org/content/fire-crackling) | AntumDeluge | CC0 | none |
 | `living/audio/music/day.ogg` | [Meadow Thoughts](https://opengameart.org/content/meadow-thoughts) | Écrivain | CC0 | none |
 | `living/audio/music/night.ogg` | [Forest Whisper Theme](https://opengameart.org/content/forest-whisper-theme) | Cleyton Kauffman | CC0 | none |
-
-## Island audio
-
-All sound files under `audio/` are **CC0 1.0 (public domain)**. Each was downloaded on
-2026-11-10 from its author's own OpenGameArt page, whose licence field lists CC0 only.
-Per-file sources, changes and SHA-256 hashes are recorded in
-`licenses/Island-Audio-CC0-sources.txt`; the two Kenney pack licence files are retained
-under `licenses/`.
-
-| File | Source | Author | License | Changes |
-|---|---|---|---|---|
-| `audio/kenney-rpg-audio/{chop,creak1,creak2,metalClick,metalPot2,metalPot3}.ogg` | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) (`RPGsounds_Kenney.zip`) | Kenney (kenney.nl) | CC0 | none |
-| `audio/kenney-interface-sounds/click_001.ogg` | [Interface Sounds 1.0](https://opengameart.org/content/interface-sounds) (`kenney_interfaceSounds.zip`) | Kenney (kenney.nl) | CC0 | none |
-| `audio/ambience/birds-isaiah658.ogg` | [Ambient Bird Sounds](https://opengameart.org/content/ambient-bird-sounds) | isaiah658 | CC0 | none |
-| `audio/ambience/forest-tinyworlds.ogg` | [Forest Ambience](https://opengameart.org/content/forest-ambience) (`Forest_Ambience.mp3`) | TinyWorlds | CC0 | MP3 to Ogg Vorbis, +18 dB, 50 ms edge fades |
-| `audio/ambience/crickets-wolfgang.ogg` | [Crickets Ambient Noise - loopable](https://opengameart.org/content/crickets-ambient-noise-loopable) (`crickets-oneloop.mp3`) | Wolfgang | CC0 | MP3 to Ogg Vorbis, 50 ms edge fades |
-| `audio/ambience/waves-jasinski.ogg` | [Beach Ocean Waves](https://opengameart.org/content/beach-ocean-waves) (`jasinski-wave-prev.ogg`), from [Freesound 18363](https://freesound.org/people/jasinski/sounds/18363/) | jasinski (packaged by qubodup) | CC0 | re-encoded with 0.6 s edge fades |
-
-Kenney's own site serves these packs through a signed, browser-only download link, so the
-identical packs were taken from Kenney's OpenGameArt account instead. "Impact Sounds" and
-"UI Audio" were not fetched; nothing of unclear licence is included.
 
 ## Interface icons
 
