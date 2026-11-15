@@ -414,8 +414,22 @@ impl Settings {
         }
     }
     /// Unbinds any extra key that a core action, or an earlier extra action,
-    /// already holds, so one key never drives two actions.
+    /// already holds, so one key never drives two actions. Escape is Pause's
+    /// alone, as in `set_binding`: any other action holding it, in either
+    /// table, is Unbound (a file from before that rule can hold the old
+    /// swap, which the Escape router would leave dead).
     pub fn normalise(&mut self) {
+        let pause = Action::Pause as usize;
+        for (index, slot) in self.bindings.iter_mut().enumerate() {
+            if index != pause && slot == "Escape" {
+                slot.clear();
+            }
+        }
+        for slot in self.extra_bindings.slots_mut() {
+            if slot == "Escape" {
+                slot.clear();
+            }
+        }
         let mut taken: Vec<String> = self.bindings.to_vec();
         for slot in self.extra_bindings.slots_mut() {
             if slot.is_empty() {
@@ -764,6 +778,34 @@ mod tests {
         settings.set_binding(BindingId::Core(Action::Pause), "Escape".into());
         assert_eq!(settings.bindings[Action::Pause as usize], "Escape");
         assert_eq!(settings.bindings[Action::Build as usize], "");
+    }
+
+    /// A file written before set_binding kept Escape for Pause can still hold
+    /// the old swap: rebinding Pause to P handed World clock Escape, and
+    /// rebinding Pause to B handed Build Escape. Loading applies the same
+    /// rule, so the dead binding becomes Unbound instead of naming Escape.
+    #[test]
+    fn old_file_escape_on_a_non_pause_action_loads_unbound() {
+        let decoded = decode(
+            r#"{"version": 1, "extra_bindings": {"world_clock": "Escape", "cycle_attack": "Q"},
+                "bindings": ["Mouse1", "Mouse2", "R", "1", "2", "B", "P", "F"]}"#,
+        );
+        let settings = decoded.settings;
+        assert_eq!(settings.extra_bindings.world_clock, "");
+        assert_eq!(settings.bindings[Action::Pause as usize], "P");
+        assert_eq!(settings.extra_bindings.cycle_attack, "Q");
+        let decoded = decode(
+            r#"{"version": 1,
+                "bindings": ["Mouse1", "Mouse2", "R", "1", "2", "Escape", "B", "F"]}"#,
+        );
+        let settings = decoded.settings;
+        assert_eq!(settings.bindings[Action::Build as usize], "");
+        assert_eq!(settings.bindings[Action::Pause as usize], "B");
+        // Pause itself keeps Escape.
+        assert_eq!(
+            decode(r#"{"version": 1}"#).settings.bindings[Action::Pause as usize],
+            "Escape"
+        );
     }
 
     #[test]
