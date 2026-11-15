@@ -523,6 +523,88 @@ fn observed_expedition_shot_uses_distant_tone() {
     assert_eq!(places.player_shot(), Some(Cue::Rifle));
 }
 
+/// An expedition's alerts heard from camp (design-audio §4) come over the
+/// radio: their own bank and tuning through a 3 kHz low-pass. The root
+/// battle's alerts stay unfiltered.
+#[test]
+fn expedition_alerts_heard_from_camp_take_the_radio_lowpass() {
+    let mut game = deployed(Mode::Personal);
+    for _ in 0..600 {
+        if !game.attempt().unwrap().enemies.is_empty() {
+            break;
+        }
+        game.tick(Input::default());
+    }
+    let attempt = game.staging().attempt().unwrap();
+    let boss = &mut attempt.enemies[0];
+    boss.boss = true;
+    boss.boss_kind = Some(BOSS_KINDS[0]);
+    let boss_id = boss.id;
+    let battle = BattleId::Expedition(4);
+    let mut voices = EnemyVoiceIndex::default();
+    voices.sync(battle, game.attempt().unwrap());
+    voices.sync(BattleId::Root, game.attempt().unwrap());
+    let camp = EventContext {
+        battle,
+        width_yards: None,
+        distant: true,
+        corpses: &[],
+    };
+    let at = [10.0, 0.5];
+    let alerts = [
+        (
+            SimEvent::Boss {
+                enemy_id: boss_id,
+                lane: None,
+                at,
+            },
+            Cue::BossArrival,
+        ),
+        // A boss the index does not know: the legacy arrival.
+        (
+            SimEvent::Boss {
+                enemy_id: 9000,
+                lane: None,
+                at,
+            },
+            Cue::Boss,
+        ),
+        (
+            SimEvent::BossWarning {
+                seconds_left: 10,
+                lane: None,
+                duration_ticks: 60,
+            },
+            Cue::Wave,
+        ),
+        (
+            SimEvent::Reinforcements {
+                lane: None,
+                duration_ticks: 60,
+            },
+            Cue::Wave,
+        ),
+        (SimEvent::StructureLost { at }, Cue::Structure),
+    ];
+    for (event, cue) in alerts {
+        let (cues, root) = requests(&mut voices, &event, &ROOT);
+        assert_eq!(cues, vec![cue], "{event:?}");
+        let (cues, radio) = requests(&mut voices, &event, &camp);
+        assert_eq!(cues, vec![cue], "{event:?}");
+        let plain = root.voicing(cue);
+        assert_eq!(plain.lowpass_hz, None, "{event:?}");
+        assert_eq!(
+            radio.voicing(cue),
+            Voicing {
+                lowpass_hz: Some(3000.0),
+                ..plain
+            },
+            "{event:?}"
+        );
+        assert_eq!(radio.of(cue), None, "{event:?} is centred");
+    }
+}
+
 /// The windup warning sounds for a windup against the defender. A windup
 /// against a structure stays visual (its ring).
 #[test]

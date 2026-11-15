@@ -34,6 +34,10 @@ impl Tone {
     /// A shot heard from camp, on an observed expedition.
     pub const DISTANT: Self = Self::new(0.97, Some(3500.0), -4.0);
 
+    /// The "radio" cutoff of an expedition's alert heard from camp
+    /// (design-audio §4): the alert's own tuning through a 3 kHz low-pass.
+    pub const RADIO_LOWPASS_HZ: f32 = 3000.0;
+
     pub const fn new(speed: f32, lowpass_hz: Option<f32>, gain_db: f32) -> Self {
         Self {
             speed,
@@ -96,6 +100,14 @@ impl Voicing {
             speed: tone.speed,
             gain_db: tone.gain_db,
             lowpass_hz: tone.lowpass_hz,
+        }
+    }
+    /// This voicing over the radio ([`Tone::RADIO_LOWPASS_HZ`]): an
+    /// expedition's alert heard from camp.
+    pub const fn radio(self) -> Self {
+        Self {
+            lowpass_hz: Some(Tone::RADIO_LOWPASS_HZ),
+            ..self
         }
     }
     /// The linear factor of [`Self::gain_db`].

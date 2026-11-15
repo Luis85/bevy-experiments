@@ -74,7 +74,8 @@ pub struct EventContext<'a> {
     /// The width of the battle's field; `None` (no attempt, or an expedition
     /// heard from camp) leaves every cue centred.
     pub width_yards: Option<f32>,
-    /// An expedition watched from camp: its shots are [`Tone::DISTANT`].
+    /// An expedition heard from camp: its shots are [`Tone::DISTANT`] and
+    /// its alerts come over the radio ([`Voicing::radio`]).
     pub distant: bool,
     /// The battle's corpse records: the voice of an enemy that spawned and
     /// died inside one tick, which the index never saw.
@@ -86,6 +87,8 @@ struct Batch<'a> {
     cues: &'a mut Vec<Cue>,
     places: &'a mut Places,
     width_yards: Option<f32>,
+    /// The batch's alerts come over the radio.
+    radio: bool,
 }
 impl Batch<'_> {
     /// The pan place of `cue` for `event`, on a field with a width.
@@ -102,6 +105,17 @@ impl Batch<'_> {
         if let Some(voicing) = voicing {
             self.places.voice(cue, voicing);
         }
+    }
+    /// Queues an alert (a boss, a boss warning, reinforcements, a lost
+    /// structure) in `voicing`, over the radio when heard from camp. A
+    /// mastered voicing in the root battle stays implicit.
+    fn alert(&mut self, cue: Cue, event: &SimEvent, voicing: Voicing) {
+        let voicing = if self.radio {
+            Some(voicing.radio())
+        } else {
+            (voicing != Voicing::of(cue)).then_some(voicing)
+        };
+        self.push(cue, event, voicing);
     }
     /// Queues a warning: of a batch's requests of `cue`, the one nearest
     /// the defender stands.
@@ -139,6 +153,7 @@ pub fn event_requests(
         cues,
         places,
         width_yards: ctx.width_yards,
+        radio: ctx.distant,
     };
     match event {
         SimEvent::Shot { shooter, .. } => match *shooter {
@@ -222,13 +237,15 @@ pub fn event_requests(
             match voices.get(battle, *enemy_id).and_then(|voice| voice.boss) {
                 Some(kind) => {
                     let voicing = boss_voicing(kind, BossStage::Arrival, voices.capstone(battle));
-                    batch.push(Cue::BossArrival, event, Some(voicing));
+                    batch.alert(Cue::BossArrival, event, voicing);
                 }
                 // A boss without a kind: the legacy arrival.
-                None => batch.push(Cue::Boss, event, None),
+                None => batch.alert(Cue::Boss, event, Voicing::of(Cue::Boss)),
             }
         }
-        SimEvent::StructureLost { .. } => batch.push(Cue::Structure, event, None),
+        SimEvent::StructureLost { .. } => {
+            batch.alert(Cue::Structure, event, Voicing::of(Cue::Structure));
+        }
         SimEvent::Ability { .. } => {
             let voicing = Voicing::tuned(Cue::Ability.bank(), ABILITY_SPEED, 0.0);
             batch.push(Cue::Ability, event, Some(voicing));
@@ -256,7 +273,7 @@ pub fn event_requests(
             }
         }
         SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => {
-            batch.push(Cue::Wave, event, None);
+            batch.alert(Cue::Wave, event, Voicing::of(Cue::Wave));
         }
         SimEvent::BossExposure { exposed, .. } => {
             // The weak point opening is the news; its closing is silent.
