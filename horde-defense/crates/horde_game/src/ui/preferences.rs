@@ -222,7 +222,7 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
     chrome::section(ui, "Controls");
     muted(
         ui,
-        "Choose an action, then press a key or mouse button. Duplicate bindings swap.",
+        "Choose an action, then press a key or mouse button. Duplicate bindings swap; an action that would take Escape is left unbound.",
     );
     let mut clicked = false;
     egui::Grid::new("bindings")

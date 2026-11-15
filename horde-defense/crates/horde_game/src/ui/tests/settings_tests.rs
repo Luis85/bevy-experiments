@@ -190,6 +190,35 @@ fn binding_capture_swaps_a_core_key_with_an_extra_key() {
     assert_eq!(f.settings.extra_bindings.world_clock, "R");
 }
 
+/// Escape belongs to Pause alone: rebinding Pause to Reload's key leaves
+/// Reload Unbound instead of handing it Escape, and the Controls hint says so
+/// rather than promising a swap.
+#[test]
+fn rebinding_pause_leaves_the_displaced_action_unbound_and_the_hint_says_so() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    h.frame_size(f, View::Settings, vec![], TALL);
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    assert!(
+        output.shapes.iter().any(|s| shape_has_text(
+            &s.shape,
+            "Duplicate bindings swap; an action that would take Escape is left unbound."
+        )),
+        "the Controls hint names the Escape exception"
+    );
+    assert_eq!(text_count(&output, "Unbound"), 0);
+    h.click_size(f, View::Settings, "Escape", TALL);
+    assert!(f.prefs.rebind == Some(Action::Pause));
+    h.frame_size(f, View::Settings, vec![], TALL);
+    h.key(f, View::Settings, Key::R);
+    assert_eq!(f.settings.bindings[Action::Pause as usize], "R");
+    assert_eq!(f.settings.bindings[Action::Reload as usize], "");
+    let output = h.frame_size(f, View::Settings, vec![], TALL);
+    assert_eq!(text_count(&output, "Unbound"), 1);
+}
+
 /// W3-10: the Controls table lists the extra actions; an extra row captures a
 /// key like a core row, swaps with whichever action holds it, and Escape
 /// cancels its prompt.
