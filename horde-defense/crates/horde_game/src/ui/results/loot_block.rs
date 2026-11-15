@@ -200,6 +200,11 @@ pub(super) fn loot_block(ui: &mut egui::Ui, f: &mut UiCtx) {
     for row in block.upgrades {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
+            // The row is as tall as its framed button, so the labels share
+            // the button's centre line instead of its upper half (CF-3-19).
+            let button = ui.text_style_height(&egui::TextStyle::Button)
+                + 2.0 * ui.spacing().button_padding.y;
+            ui.set_row_height(button.max(ui.spacing().interact_size.y));
             ui.label(&row.lead);
             match row.quality {
                 Some(quality) => {

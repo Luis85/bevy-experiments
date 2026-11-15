@@ -905,3 +905,48 @@ fn results_name_a_secured_regional_checkpoint() {
         );
     }
 }
+
+/// CF-3-19: each "Better than equipped" row shares one centre line: its
+/// lead sits on the framed Equip button's centre, not on its upper half.
+#[test]
+fn results_upgrade_rows_centre_their_labels_on_the_equip_button() {
+    use super::loot_block_tests::{drop_item, settle_run};
+    for target in Target::BOTH {
+        let mut fixture = IsolatedFrontend::new();
+        fixture.deploy();
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        // Epic finds of eight definitions beat the starter gear in two slots.
+        for definition in 4..12 {
+            drop_item(f, definition, horde_core::quality::Quality::Epic);
+        }
+        settle_run(f);
+        let output = super::home_tests::settle(&h, f);
+        let runs = text_runs(&output);
+        let frames = painted_rects(&output);
+        let leads: Vec<Rect> = runs
+            .iter()
+            .filter(|run| run.text == "Better than equipped:")
+            .map(|run| run.rect)
+            .collect();
+        let buttons: Vec<Rect> = runs
+            .iter()
+            .filter(|run| run.text == "Equip")
+            .map(|run| {
+                frames
+                    .iter()
+                    .map(|shape| shape.rect)
+                    .filter(|rect| rect.expand(0.5).contains_rect(run.rect) && *rect != run.rect)
+                    .min_by(|a, b| a.area().total_cmp(&b.area()))
+                    .expect("the Equip button's frame")
+            })
+            .collect();
+        assert_eq!((leads.len(), buttons.len()), (2, 2), "{target:?}");
+        for (lead, button) in leads.iter().zip(&buttons) {
+            assert!(
+                (lead.center().y - button.center().y).abs() <= 2.0,
+                "{target:?}: the lead {lead:?} is off the Equip button's centre line {button:?}"
+            );
+        }
+    }
+}
