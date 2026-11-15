@@ -180,12 +180,18 @@ pub const SKY_QUIET_CUE_MS: u64 = 750;
 const SKY_TAG: u64 = 0x534B_5946_4C41_5348;
 
 /// The lightning clock of one frame: unscaled real time accumulated over
-/// unpaused frames, and the observation speed (it turns event ages in ticks
-/// into wall time for the quiet windows). Presentation state only.
+/// unpaused frames, the observation speed (it turns event ages in ticks
+/// into wall time for the quiet windows), and whether this frame's clock is
+/// frozen. Presentation state only.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SkyClock {
     pub wall_ms: f64,
     pub speed: u32,
+    /// The world clock is paused (or no battle runs), so the clock did not
+    /// advance this frame: no flash in any view, even of an expedition whose
+    /// own attempt is not paused (`Game::set_paused` pauses only the root
+    /// attempt; ruling W-8).
+    pub frozen: bool,
 }
 
 impl SkyClock {
@@ -203,6 +209,7 @@ impl SkyClock {
         Self {
             wall_ms: tick as f64 * 1000.0 / 60.0,
             speed,
+            frozen: false,
         }
     }
 }
@@ -300,16 +307,19 @@ pub fn sky_flash(
     }
 }
 
-/// The pulse one frame of `a` asks [`scene_grade`] for.
+/// The pulse one frame of `a` asks [`scene_grade`] for: dark while `a` is
+/// paused or the frame's clock is frozen (the world clock's pause leaves an
+/// expedition's attempt unpaused).
 pub fn sky_pulse(look: SceneLook, clock: SkyClock, a: &Attempt, reduced: bool) -> f32 {
-    if !look.storm || reduced || a.paused {
+    let paused = a.paused || clock.frozen;
+    if !look.storm || reduced || paused {
         return 0.0;
     }
     sky_flash(
         look.seed,
         clock.wall_ms.max(0.0) as u64,
         sky_quiet(a, clock.speed),
-        a.paused,
+        paused,
         reduced,
         look.storm,
     )
@@ -631,6 +641,7 @@ mod tests {
             let mut clock = SkyClock {
                 wall_ms: 0.0,
                 speed,
+                frozen: false,
             };
             let (mut starts, mut lit, mut ticks, mut frame) = (Vec::new(), false, 0u64, 0u32);
             while clock.wall_ms < 600_000.0 {
@@ -849,6 +860,7 @@ mod tests {
         let clock = |speed| SkyClock {
             wall_ms: peak as f64,
             speed,
+            frozen: false,
         };
         assert_eq!(sky_pulse(look, clock(4), &a, false), 0.0);
         a.tick = 2000;
@@ -867,8 +879,43 @@ mod tests {
             SkyClock::of_tick(600, 2),
             SkyClock {
                 wall_ms: 10_000.0,
-                speed: 2
+                speed: 2,
+                frozen: false,
             }
+        );
+    }
+
+    /// W-8: the world clock's pause darkens every view. `Game::set_paused`
+    /// pauses only the root attempt, so an expedition the Operations observer
+    /// draws stays unpaused; the frozen clock alone must keep its frame dark,
+    /// or a pulse lit when the clock stopped would hold for the whole pause.
+    #[test]
+    fn sky_pulse_is_dark_on_a_frozen_clock_even_for_an_unpaused_attempt() {
+        let peak = first_peak_ms(7);
+        let mut a = calm_attempt();
+        a.tick = 2000;
+        assert!(
+            !a.paused,
+            "a worker attempt is not paused by the world clock"
+        );
+        let live = SkyClock {
+            wall_ms: peak as f64,
+            speed: 1,
+            frozen: false,
+        };
+        assert_eq!(
+            sky_pulse(storm_look(), live, &a, false),
+            1.0,
+            "lit at the peak"
+        );
+        let frozen = SkyClock {
+            frozen: true,
+            ..live
+        };
+        assert_eq!(
+            sky_pulse(storm_look(), frozen, &a, false),
+            0.0,
+            "frozen clock"
         );
     }
 
@@ -913,6 +960,7 @@ mod tests {
         let clock = SkyClock {
             wall_ms: first_peak_ms(7) as f64,
             speed: 1,
+            frozen: false,
         };
         let mut pulses = Vec::new();
         for ticks in [0, 240] {

@@ -33,6 +33,10 @@ fn advance_sky_clock(
     let game = &session.game;
     let fixed_step = config.sequence_path().is_some() || config.capture_path().is_some();
     let frozen = game.global_paused() || !any_attempt_running(game);
+    // The frame's views read the freeze too: the world clock's pause leaves
+    // an expedition's worker attempt unpaused, so `a.paused` alone would keep
+    // a pulse lit when the clock stopped for the whole pause.
+    battle.sky_frozen = frozen;
     battle.sky_wall_ms = sky_wall_ms(
         battle.sky_wall_ms,
         time.delta_secs_f64() * 1000.0,
@@ -57,7 +61,11 @@ pub fn sky_wall_ms(wall_ms: f64, dt_ms: f64, frozen: bool, export_tick: Option<u
     if let Some(tick) = export_tick {
         return crate::art::SkyClock::of_tick(tick, 1).wall_ms;
     }
-    let mut clock = crate::art::SkyClock { wall_ms, speed: 1 };
+    let mut clock = crate::art::SkyClock {
+        wall_ms,
+        speed: 1,
+        frozen,
+    };
     clock.advance(dt_ms, frozen);
     clock.wall_ms
 }

@@ -2680,6 +2680,7 @@ fn sky_flash_paints_under_cue_pass() {
     let sky = SkyClock {
         wall_ms: peak as f64,
         speed: 1,
+        frozen: false,
     };
     let rgba = |rgb: [u8; 3], alpha: f32| {
         egui::Color32::from_rgba_unmultiplied(rgb[0], rgb[1], rgb[2], (alpha * 255.0).round() as u8)

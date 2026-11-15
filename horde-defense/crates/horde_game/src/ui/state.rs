@@ -221,6 +221,10 @@ pub(crate) struct BattleUi {
     /// the attempt's tick in a fixed-step export (presentation only; see
     /// `battle_view::interpolation`).
     pub(crate) sky_wall_ms: f64,
+    /// Whether the lightning clock was frozen this frame (the world clock is
+    /// paused or no battle runs): every view's flash is dark, an unpaused
+    /// expedition's included (presentation only; ruling W-8).
+    pub(crate) sky_frozen: bool,
 }
 impl BattleUi {
     /// This frame's lightning clock at the chosen observation speed.
@@ -228,6 +232,7 @@ impl BattleUi {
         crate::art::SkyClock {
             wall_ms: self.sky_wall_ms,
             speed: self.speed,
+            frozen: self.sky_frozen,
         }
     }
 
@@ -267,6 +272,7 @@ impl BattleUi {
             last_toggle_frame: u64::MAX,
             interpolation: crate::battle_view::ActorInterpolation::default(),
             sky_wall_ms: 0.0,
+            sky_frozen: false,
         }
     }
     /// Whether the retreat button is being held as of egui frame `frame`: a
