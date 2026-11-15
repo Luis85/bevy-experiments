@@ -2071,3 +2071,84 @@ fn music_input_follows_the_screen_and_the_battle() {
     f.nav.tab = Tab::Home;
     assert_eq!(f.ctx().music_input().battle, None);
 }
+
+/// ISO-8 pin (W5-03): the whole App frame of the battle screen, with every
+/// weapon class's volleys (nine-pellet trigger pulls beside turret shots)
+/// live in the event log, normal and reduced, leaves the attempt, its RNG
+/// and the state digest unchanged. A frame reads the game through a shared
+/// borrow and reaches it only through the commands it queues, which the
+/// harness applies after the frame as the App does: that is the path where
+/// presentation could write. The weapon_fx painters themselves only borrow
+/// the attempt shared, so the type system covers them, and the architecture
+/// scan `presentation_never_reads_core_rng` guards the core RNG by name.
+#[test]
+fn shot_fx_never_mutates_attempt() {
+    use horde_core::{sim::Event as SimEvent, sim::EventKind, weapons::WeaponClass};
+    for class in WeaponClass::ALL {
+        for reduced in [false, true] {
+            let mut fixture = IsolatedFrontend::new();
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            // The paused peak scene, staged as the review matrix stages it.
+            f.game = horde_core::sim::peak_render_fixture().expect("peak fixture");
+            f.screen = Screen::Battle;
+            f.campaign.mode = Mode::Npc;
+            f.settings.reduced_effects = reduced;
+            let a = f.game.attempt_mut().unwrap();
+            a.events.clear();
+            a.shots = 0;
+            a.gear_snapshot
+                .iter_mut()
+                .find(|record| record.slot == Slot::Ranged)
+                .expect("the fixture deploys with a ranged weapon")
+                .weapon_class = Some(class);
+            let turret = a
+                .structures
+                .iter()
+                .find(|s| s.kind == StructureKind::Turret)
+                .expect("the fixture has a turret")
+                .id;
+            for ticks_ago in (0..4u64).rev() {
+                a.shots += 1;
+                for (n, actor_id) in (0..9).map(|n| (n, None)).chain([(0, Some(turret))]) {
+                    let seq = a.events.len() as u64 + 1;
+                    a.events.push_back(SimEvent {
+                        kind: EventKind::Shot,
+                        from: a.defender_position(),
+                        to: [30.0, 1.5 + n as f32 * 0.5],
+                        value: 0,
+                        tick: a.tick - ticks_ago,
+                        actor_id,
+                        target_id: None,
+                        lane: None,
+                        duration_ticks: 0,
+                        seq,
+                    });
+                }
+            }
+            let a = f.game.attempt().unwrap();
+            assert!(a.paused, "{class:?}: the peak fixture is paused");
+            // The flash counters are review tooling (W5-10).
+            #[cfg(feature = "review")]
+            {
+                let clock = crate::art::SkyClock::of_tick(a.tick, 1);
+                assert!(
+                    crate::art::flash_facts(a, clock, false).muzzle_flash_count > 0,
+                    "{class:?}: the volleys are inside their flash life"
+                );
+            }
+            let digest = f.game.state_digest();
+            let attempt = serde_json::to_string(a).unwrap();
+            let rng = serde_json::to_string(&a.rng).unwrap();
+            for frame in 0..4 {
+                h.frame_at(f, View::Full, vec![], 100.0 + f64::from(frame) / 60.0);
+                assert_eq!(f.screen, Screen::Battle, "{class:?}: frame {frame}");
+            }
+            let after = f.game.attempt().unwrap();
+            let label = format!("{class:?} reduced {reduced}");
+            assert_eq!(serde_json::to_string(&after.rng).unwrap(), rng, "{label}");
+            assert_eq!(serde_json::to_string(after).unwrap(), attempt, "{label}");
+            assert_eq!(f.game.state_digest(), digest, "{label}");
+        }
+    }
+}

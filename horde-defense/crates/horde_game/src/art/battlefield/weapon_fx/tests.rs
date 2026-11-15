@@ -378,57 +378,6 @@ fn shooter_class_reads_the_gear_snapshot() {
     assert_eq!(shooter_class(a), WeaponClass::Pistol);
 }
 
-/// ISO-8 pin: building the view and painting every weapon_fx profile, normal
-/// and reduced, leaves the attempt (its RNG included) and the state digest
-/// unchanged.
-#[test]
-fn shot_fx_never_mutates_attempt() {
-    for class in WeaponClass::ALL {
-        let mut game = game_with(class);
-        let a = game.attempt_mut().unwrap();
-        let turret = a
-            .structures
-            .iter()
-            .find(|s| s.kind == StructureKind::Turret)
-            .expect("the fixture has a turret")
-            .id;
-        for ticks_ago in (0..4).rev() {
-            volley(a, ticks_ago, 9);
-            shot(a, ticks_ago, 0, Some(turret));
-        }
-        let digest = game.state_digest();
-        let attempt = serde_json::to_string(game.attempt().unwrap()).unwrap();
-        let rng = serde_json::to_string(&game.attempt().unwrap().rng).unwrap();
-        for reduced in [false, true] {
-            let shapes = paint_events(&game, reduced);
-            assert!(!shapes.is_empty(), "{class:?} paints its shots");
-        }
-        for source in FxSource::ALL {
-            painted(|p| {
-                paint_shot(
-                    p,
-                    weapon_fx(source),
-                    Shot {
-                        from: pos2(100.0, 300.0),
-                        to: pos2(900.0, 320.0),
-                        lane: 62.9,
-                        age_ticks: 1,
-                        volley: Volley {
-                            ordinal: 3,
-                            first: true,
-                        },
-                        reduced: false,
-                    },
-                );
-            });
-        }
-        let after = game.attempt().unwrap();
-        assert_eq!(serde_json::to_string(&after.rng).unwrap(), rng, "{class:?}");
-        assert_eq!(serde_json::to_string(after).unwrap(), attempt, "{class:?}");
-        assert_eq!(game.state_digest(), digest, "{class:?}");
-    }
-}
-
 /// Design-vfx-lighting §13 `tracers 96`: one frame draws the Shot events of
 /// its newest volleys up to the cap, whole volleys only, so a crowded frame
 /// keeps its most recent tracers and never splits a shell from its flash.
