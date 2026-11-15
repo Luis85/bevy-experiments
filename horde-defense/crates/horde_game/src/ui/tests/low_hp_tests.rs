@@ -79,7 +79,7 @@ fn set_hp(f: &mut FrontendParts, percent: i32) {
 /// The HP text the HUD reads at `percent`.
 fn hp_text(percent: i32, low: bool) -> String {
     format!(
-        "Rook · HP {percent} / 100{}",
+        "ROOK · HP {percent} / 100{}",
         if low { " · LOW" } else { "" }
     )
 }

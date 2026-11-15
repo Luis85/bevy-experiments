@@ -113,16 +113,19 @@ pub(in crate::ui) fn view_model(game: &Game) -> Option<HudView> {
 
 /// The HUD name and portrait of whoever holds the defense (ruling D16):
 /// both come from the defender's core card, so a recruit taking over the
-/// main run is named and drawn as itself. The player keeps the survivor
-/// name and the appearance stamped on the attempt ("YOU" before a survivor
-/// is chosen); a defender without a card falls back to the attempt.
+/// main run is named and drawn as itself. Every defender is named in the
+/// card's one HUD form, upper case ("ROOK", "MARA", "ALEX"; CF-3-28). The
+/// player keeps the appearance stamped on the attempt, and is "YOU" before
+/// a survivor is chosen; a defender without a card falls back to the
+/// attempt.
 fn identity(game: &Game, a: &Attempt) -> (String, bool) {
     let stamped = a.defender_appearance() == Appearance::Female;
     match a.defender() {
         DefenderId::Player => (
             game.campaign()
                 .selected_survivor
-                .map_or_else(|| "YOU".to_owned(), |survivor| survivor.name().to_owned()),
+                .and_then(|_| game.defender_card(DefenderId::Player))
+                .map_or_else(|| "YOU".to_owned(), |card| card.hud_name),
             stamped,
         ),
         defender => game.defender_card(defender).map_or_else(
@@ -356,6 +359,23 @@ mod tests {
         assert_eq!(view.lanes, a.lane_count);
         assert_eq!(view.threat_rank, a.progression.rank);
         assert_eq!(view.difficulty, a.balance.preset.name());
+    }
+
+    /// CF-3-28 (closing): the chosen survivor is named in the one HUD form
+    /// every defender has, the core card's `hud_name` ("ROOK", as "MARA" and
+    /// a recruit's "ALEX"), not the mixed-case survivor name.
+    #[test]
+    fn player_hud_name_is_the_card_form_every_defender_uses() {
+        use horde_core::survivors::SurvivorId;
+        for survivor in [SurvivorId::Rook, SurvivorId::June] {
+            let mut game = Game::default();
+            game.campaign_mut().choose_survivor(survivor).unwrap();
+            game.deploy(0, Mode::Personal).unwrap();
+            let card = game.defender_card(DefenderId::Player).unwrap();
+            let view = view_model(&game).unwrap();
+            assert_eq!(view.defender, card.hud_name, "{survivor:?}");
+            assert_eq!(view.defender, survivor.name().to_uppercase());
+        }
     }
 
     #[test]

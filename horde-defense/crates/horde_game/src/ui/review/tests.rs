@@ -1971,8 +1971,8 @@ fn callout_stills_leave_one_callout_unread_on_camp_and_upgrades() {
 fn low_hp_stills_draw_the_band_for_the_personal_and_the_observed_defender() {
     use horde_core::content::Mode;
     for (scene, mode, name) in [
-        ("low-hp", Mode::Personal, "Rook"),
-        // The observed defender's HUD names her in capitals.
+        // Every defender's HUD name is its card's capitals (CF-3-28).
+        ("low-hp", Mode::Personal, "ROOK"),
         ("low-hp-observed", Mode::Npc, "MARA"),
     ] {
         assert_eq!(

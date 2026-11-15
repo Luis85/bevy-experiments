@@ -408,7 +408,7 @@ pub const WAVE3_MATRIX: &[MatrixRow] = &[
         "low-hp",
         "W3-15, closing",
         "a paused personal defense at 25% HP: the 8 pt red band inside all four canvas edges, \
-         static at 0.40 in both modes, and \"Rook · HP h / m · LOW\" on the HUD",
+         static at 0.40 in both modes, and \"ROOK · HP h / m · LOW\" on the HUD",
     ),
     row(
         "low-hp-observed",
