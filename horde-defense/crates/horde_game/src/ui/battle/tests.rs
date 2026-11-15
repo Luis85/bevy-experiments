@@ -158,7 +158,9 @@ fn lane_zero_drop_envelope_fits_the_effects_clip_at_progressed_peak() {
 /// zoomed 7x16 and 9x18 fields at both sizes, with and without the hint
 /// band, in normal and reduced effects, no damage number, MISS or loot
 /// fly-up over a top-lane enemy meets the corner panels, the attack selector
-/// or the loot receipt at any age, and the clip keeps its headroom.
+/// or the loot receipt at any age, and the clip keeps its headroom. Where the
+/// field fills the arena, none meets the compact READY / PAUSED tag under the
+/// battle HUD either (CF-3-09; damage-4x showed a MISS through "to resume").
 #[test]
 fn headroom_popups_never_overlap_hud_rects() {
     use crate::{settings::Settings, ui::review::LootCaptureMode};
@@ -168,7 +170,7 @@ fn headroom_popups_never_overlap_hud_rects() {
         quality::{LootEvent, Quality},
         sim::{Event, EventKind},
     };
-    let mut checked = 0;
+    let (mut checked, mut tags, mut in_tag_column) = (0, 0, 0);
     for (lanes, width) in [(7u8, 16u8), (9, 18)] {
         let mut game = Game::default();
         game.campaign_mut()
@@ -232,6 +234,9 @@ fn headroom_popups_never_overlap_hud_rects() {
                 let layout = BattleLayout::new(canvas, a.lane_count, a.width_yards, band);
                 assert_eq!(layout.effects_clip.top(), canvas.top() + 64.0);
                 let keep_clear = layout.effects_keep_clear();
+                // The compact tag between the battle HUD and the arena.
+                let tag = layout.pause_banner_slot.bottom() <= layout.arena.top();
+                tags += usize::from(tag);
                 for reduced in [false, true] {
                     let settings = Settings {
                         reduced_effects: reduced,
@@ -298,6 +303,21 @@ fn headroom_popups_never_overlap_hud_rects() {
                                     f64::from(step) * 0.07
                                 );
                             }
+                            // CF-3-09: the READY / PAUSED tag of a field
+                            // that fills the arena lies in the headroom too.
+                            if tag {
+                                assert!(
+                                    !drawn.intersects(layout.pause_banner_slot),
+                                    "{label} at {:.2} s: popup {drawn:?} meets the pause \
+                                     tag slot {:?}",
+                                    f64::from(step) * 0.07,
+                                    layout.pause_banner_slot
+                                );
+                                let slot = layout.pause_banner_slot;
+                                in_tag_column += usize::from(
+                                    drawn.max.x > slot.min.x && drawn.min.x < slot.max.x,
+                                );
+                            }
                         }
                     }
                 }
@@ -305,6 +325,11 @@ fn headroom_popups_never_overlap_hud_rects() {
         }
     }
     assert!(checked > 1000, "only {checked} shapes drawn");
+    assert!(
+        tags >= 4,
+        "only {tags} geometries put the pause tag over the arena"
+    );
+    assert!(in_tag_column > 0, "no popup was drawn under the pause tag");
 }
 
 /// CF-3-05: a kill's banked-coin pop-up and a drop's quality label anchor

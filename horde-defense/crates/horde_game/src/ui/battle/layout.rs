@@ -255,14 +255,24 @@ impl BattleLayout {
         self.arena.height() / REFERENCE_LANES
     }
     /// The top-band rects the effects headroom shares with the HUD: the two
-    /// corner panels, the attack selector and the loot receipt. Damage, MISS
-    /// and loot popups keep clear of them (CF-1-09).
-    pub(in crate::ui) fn effects_keep_clear(&self) -> [Rect; 4] {
+    /// corner panels, the attack selector, the loot receipt and, where the
+    /// field fills the arena, the READY / PAUSED tag's slot between the
+    /// battle HUD and the arena (CF-3-09; `Rect::NOTHING`, which meets
+    /// nothing, while the banner sits in the bottom letterbox). Damage, MISS
+    /// and loot popups keep clear of them (CF-1-09). The slot is kept clear
+    /// while the battle runs too, so pausing never moves a popup.
+    pub(in crate::ui) fn effects_keep_clear(&self) -> [Rect; 5] {
+        let tag = self.pause_banner_slot;
         [
             self.hud_left,
             self.hud_right,
             self.selector,
             self.receipt_slot,
+            if tag.bottom() <= self.arena.top() {
+                tag
+            } else {
+                Rect::NOTHING
+            },
         ]
     }
 }

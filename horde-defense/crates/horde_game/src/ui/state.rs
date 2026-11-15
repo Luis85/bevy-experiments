@@ -167,7 +167,7 @@ pub(crate) struct BattleUi {
     pub(super) effects_rect: Option<Rect>,
     /// The top-band HUD rects the overlay popups keep clear of, written with
     /// `effects_rect` (presentation only; CF-1-09).
-    pub(super) effects_keep_clear: [Rect; 4],
+    pub(super) effects_keep_clear: [Rect; 5],
     /// The worker observer window's fitted field, written each frame the
     /// window draws a live attempt and cleared when it closes (presentation
     /// only; review captures read it).
@@ -259,7 +259,7 @@ impl BattleUi {
             pending_attack_aims: AttackAims::default(),
             arena_rect: None,
             effects_rect: None,
-            effects_keep_clear: [Rect::NOTHING; 4],
+            effects_keep_clear: [Rect::NOTHING; 5],
             observer_arena_rect: None,
             occluded_lanes: Vec::new(),
             bar_rows: 0,
