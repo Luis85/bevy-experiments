@@ -69,19 +69,20 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                             format!("{} liberated", f.game.campaign().world.cleared.len()),
                         );
                     }
+                    // The alert navigates only where the rest of the header
+                    // does. On Settings and run history it is a red notice:
+                    // a jump to Operations would skip the Settings draft
+                    // warning and save (UX-09) or history's return route.
                     let alerts = f.game.strategy().active_outbreaks();
-                    if alerts > 0
-                        && ui
-                            .add(egui::Button::new(
-                                RichText::new(super::chrome::count_noun(
-                                    alerts,
-                                    "plague alert",
-                                    "plague alerts",
-                                ))
-                                .color(RED),
-                            ))
-                            .clicked()
-                    {
+                    let alert_text = RichText::new(super::chrome::count_noun(
+                        alerts,
+                        "plague alert",
+                        "plague alerts",
+                    ))
+                    .color(RED);
+                    if alerts > 0 && !between_runs {
+                        ui.label(alert_text);
+                    } else if alerts > 0 && ui.add(egui::Button::new(alert_text)).clicked() {
                         f.dispatch(Command::SetPaused(true), "");
                         f.battle.fire_latched = false;
                         f.go(Screen::Camp);

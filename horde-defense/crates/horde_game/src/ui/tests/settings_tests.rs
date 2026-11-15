@@ -1496,3 +1496,74 @@ fn restore_defaults_clears_the_scale_draft_and_the_key_prompt() {
         assert_eq!(f.settings.bindings[Action::Reload as usize], "R");
     }
 }
+
+/// One active outbreak in liberated France, valid enough to save.
+fn push_active_outbreak(f: &mut FrontendParts) {
+    use horde_core::world::world;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().world.cleared.push("FRA".into());
+    f.game
+        .campaign_mut()
+        .world
+        .country_levels
+        .insert("FRA".into(), world().country("FRA").unwrap().level_count());
+    f.game.strategy_mut().peak_freed = 1;
+    f.game.strategy_mut().next_outbreak_id = 2;
+    f.game
+        .strategy_mut()
+        .outbreaks
+        .push(horde_core::strategy::Outbreak {
+            id: 1,
+            country_id: "FRA".into(),
+            started_tick: 0,
+            deadline_tick: 9999,
+            strength: 2,
+            enemy: horde_core::rules::InjuryState::new(9, 10),
+            outcome: horde_core::strategy::OutbreakOutcome::Active,
+            ready_turns: 0,
+        });
+}
+
+/// Closing (UX-09): the header's plague alert is no Settings leave route.
+/// On Settings and run history it reads as a red notice, so a click keeps
+/// the screen, the unapplied draft and the return route; between runs it
+/// still opens Operations.
+#[test]
+fn header_plague_alert_is_no_leave_route_from_settings_or_history() {
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    settings_with_unapplied_hard(&h, f);
+    push_active_outbreak(f);
+    let return_screen = f.nav.return_screen;
+    h.click(f, View::Full, "1 plague alert");
+    assert!(f.screen == Screen::Settings, "the alert left Settings");
+    assert_eq!(f.status.modal, None);
+    assert!(!f.status.save_pending);
+    assert!(f.nav.return_screen == return_screen);
+    assert_eq!(
+        f.prefs.balance_draft,
+        Some(BalanceSettings::for_preset(BalancePreset::Hard))
+    );
+
+    let mut fixture = IsolatedFrontend::new();
+    let f = &mut fixture.frontend;
+    push_active_outbreak(f);
+    f.screen = Screen::Camp;
+    f.act(|c| c.open_history());
+    f.flush_for_test();
+    assert!(f.screen == Screen::History);
+    h.click(f, View::Full, "1 plague alert");
+    assert!(f.screen == Screen::History, "the alert left run history");
+
+    f.act(|c| c.close_history());
+    f.flush_for_test();
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::World);
+    h.click(f, View::Full, "1 plague alert");
+    assert!(
+        f.screen == Screen::Camp && f.nav.tab == Tab::Operations,
+        "{}",
+        f.status.message
+    );
+}
