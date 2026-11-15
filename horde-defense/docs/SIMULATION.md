@@ -44,7 +44,7 @@ Every save format version (the envelope is currently v7; see [SAVE_FORMAT.md](SA
 
 ## Save format 7
 
-`SAVE_VERSION` is 7 (the user's decision before the production pass, W1-14) and `RULESET_VERSION` is 4 (W4-08). The envelope, every v7 key and each migration sub-step are specified in [SAVE_FORMAT.md](SAVE_FORMAT.md); this section is the summary.
+`SAVE_VERSION` is 7 (the user's decision before the production pass, W1-14) and `RULESET_VERSION` is 5 (the closing re-bless; 4 since W4-08). The envelope, every v7 key and each migration sub-step are specified in [SAVE_FORMAT.md](SAVE_FORMAT.md); this section is the summary.
 
 **Migration chain.** An older generation runs the raw-JSON chain in `sim/migrations.rs` before typed decoding; a v7 payload decodes directly, and version 0 or anything above 7 is refused (`decode_rejects_version_8`). Each step freezes its source version's meaning and never reads the current catalogues:
 

@@ -2074,9 +2074,10 @@ fn human_check_names_ignore_a_trailing_parenthetical() {
 }
 
 /// The save and determinism docs at save format 7 (W7-10, save-determinism;
-/// plan SD20). docs/SIMULATION.md states the envelope version, names every
-/// migration step `sim/migrations.rs` defines and every checked-in save
-/// fixture under "## Save format 7", every pin constant of the determinism
+/// plan SD20). docs/SIMULATION.md states the envelope version, states
+/// `RULESET_VERSION` and names every migration step `sim/migrations.rs`
+/// defines and every checked-in save fixture under "## Save format 7",
+/// every pin constant of the determinism
 /// and migration tests under "## Determinism pins", and every keyed-roll
 /// purpose tag of `hash.rs` under "## Keyed rolls and RNG streams";
 /// docs/ARCHITECTURE.md states the envelope, ruleset and settings versions.
@@ -2165,6 +2166,7 @@ fn keyed_tags(source: &str) -> Vec<String> {
 fn save_doc_violations(
     text: &str,
     save_version: u32,
+    ruleset_version: u32,
     steps: &[(u32, u32)],
     fixtures: &[String],
     pins: &[String],
@@ -2180,10 +2182,8 @@ fn save_doc_violations(
             "{SAVE_MIGRATIONS}: the chain {steps:?} does not end at SAVE_VERSION {save_version}"
         ));
     }
-    let mut format_needles: Vec<String> = steps
-        .iter()
-        .map(|(from, to)| format!("v{from}→v{to}"))
-        .collect();
+    let mut format_needles = vec![format!("`RULESET_VERSION` is {ruleset_version}")];
+    format_needles.extend(steps.iter().map(|(from, to)| format!("v{from}→v{to}")));
     format_needles.extend(fixtures.iter().map(|name| format!("`{name}`")));
     let sections = [
         (SAVE_FORMAT_SECTION, format_needles),
@@ -2251,6 +2251,7 @@ fn save_docs_name_the_v7_format_every_migration_step_pin_and_tag() {
     let mut violations = save_doc_violations(
         &read_workspace_file(SAVE_DOC),
         save_version,
+        horde_core::sim::RULESET_VERSION,
         &steps,
         &fixtures,
         &pins,
@@ -2298,11 +2299,12 @@ fn save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap() {
         ),
         vec!["QUALITY", "ELITE"]
     );
-    let doc = "The envelope is\ncurrently v3.\n## Save format 7\nv1→v2, `save_v1.json`\n\
-               ## Determinism pins\n`GOLDEN`\n## Other\n`ELITE`\n";
+    let doc = "The envelope is\ncurrently v3.\n## Save format 7\nv1→v2, `save_v1.json`, \
+               `RULESET_VERSION` is 4\n## Determinism pins\n`GOLDEN`\n## Other\n`ELITE`\n";
     let violations = save_doc_violations(
         doc,
         3,
+        5,
         &[(1, 2), (2, 3)],
         &["save_v1.json".to_owned(), "save_v2.json".to_owned()],
         &["GOLDEN".to_owned(), "V7_CONTINUATION_FNV".to_owned()],
@@ -2311,6 +2313,7 @@ fn save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap() {
     assert_eq!(
         violations,
         vec![
+            format!("{SAVE_DOC}: \"## Save format 7\" does not name `RULESET_VERSION` is 5"),
             format!("{SAVE_DOC}: \"## Save format 7\" does not name v2→v3"),
             format!("{SAVE_DOC}: \"## Save format 7\" does not name `save_v2.json`"),
             format!("{SAVE_DOC}: \"## Determinism pins\" does not name `V7_CONTINUATION_FNV`"),
@@ -2318,7 +2321,7 @@ fn save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap() {
         ]
     );
     assert_eq!(
-        save_doc_violations("", 4, &[(1, 2)], &[], &[], &[])[..2],
+        save_doc_violations("", 4, 5, &[(1, 2)], &[], &[], &[])[..2],
         [
             format!("{SAVE_DOC}: does not say \"the envelope is currently v4\""),
             format!("{SAVE_MIGRATIONS}: the chain [(1, 2)] does not end at SAVE_VERSION 4"),
