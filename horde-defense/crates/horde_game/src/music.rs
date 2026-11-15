@@ -23,7 +23,8 @@ use horde_audio::{
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
 pub struct MusicTarget(pub MusicInput);
 
-/// The director and its track slots. The F3 panel reads [`Self::report`].
+/// The director and its track slots. The F3 panel and the review capture
+/// sidecar read [`Self::report`].
 #[derive(Resource, Clone, Debug)]
 pub struct MusicDirection {
     director: MusicDirector,
@@ -54,8 +55,8 @@ impl MusicDirection {
     fn voices(&self) -> Vec<TrackVoice> {
         self.director.voices(&self.tracks)
     }
-    /// The director's state for the F3 panel.
-    #[cfg_attr(not(any(test, feature = "dev")), allow(dead_code))]
+    /// The director's state for the F3 panel and the review sidecar.
+    #[cfg_attr(not(any(test, feature = "dev", feature = "review")), allow(dead_code))]
     pub fn report(&self) -> String {
         let state = self.director.state();
         let track = match self

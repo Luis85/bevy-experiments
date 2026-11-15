@@ -106,7 +106,8 @@ struct StaticCapture {
     requested: Option<(u32, std::path::PathBuf)>,
 }
 /// Still captures only: refreshes `ReviewFrameFacts` from the pass `ui::draw`
-/// just drew, plus the canvas and the window's scale factor.
+/// just drew, plus the canvas, the window's scale factor and the music
+/// director's state (design-audio §9: the F3 and review reports show it).
 #[allow(clippy::too_many_arguments)]
 fn record_frame_facts(
     mut facts: ResMut<ui::ReviewFrameFacts>,
@@ -117,6 +118,7 @@ fn record_frame_facts(
     screen: Res<State<ui::Screen>>,
     tab: Option<Res<State<ui::Tab>>>,
     battle: Res<ui::BattleUi>,
+    music: Option<Res<crate::music::MusicDirection>>,
     window: Option<Single<&Window, With<PrimaryWindow>>>,
     mut contexts: bevy_egui::EguiContexts,
 ) {
@@ -134,6 +136,7 @@ fn record_frame_facts(
         [r.left(), r.top(), r.right(), r.bottom()]
     });
     next.windows_scale = window.map_or(1.0, |window| window.scale_factor());
+    next.music = music.map(|music| music.report());
     *facts = next;
 }
 
@@ -355,6 +358,7 @@ mod tests {
             lanes: Some(17),
             ui_scale: 1.0,
             windows_scale: 2.0,
+            music: Some(crate::music::MusicDirection::default().report()),
             ..Default::default()
         };
         let bytes = sidecar_json(&facts).unwrap();
@@ -372,6 +376,7 @@ mod tests {
                 "hud_rows",
                 "lanes",
                 "lighting",
+                "music",
                 "observer_arena_rect",
                 "overlays",
                 "reduced_effects",
@@ -394,5 +399,16 @@ mod tests {
         assert!(object["hud_rows"].is_null());
         assert!(object["tab"].is_null());
         assert_eq!(object["overlays"], serde_json::json!([]));
+        assert_eq!(
+            object["music"],
+            serde_json::json!(crate::music::MusicDirection::default().report())
+        );
+        assert!(
+            object["music"]
+                .as_str()
+                .is_some_and(|music| music.ends_with("track deferred")),
+            "{}",
+            object["music"]
+        );
     }
 }

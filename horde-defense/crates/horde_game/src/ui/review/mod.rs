@@ -149,8 +149,8 @@ pub(crate) fn schedule_motion_release(
 /// worker observer's from `observer_arena_rect`; nothing is re-measured here.
 /// `hud_rows` is the control bar's rows as the battle frame counted them
 /// (`BattleUi::bar_rows`, C-10), reported on the battle screen only.
-/// The review tools fill `canvas_rect` and `windows_scale` from the window,
-/// and own all of the IO.
+/// The review tools fill `canvas_rect` and `windows_scale` from the window
+/// and `music` from the music director, and own all of the IO.
 #[cfg(feature = "review")]
 #[derive(bevy::prelude::Resource, Clone, Debug, Default, PartialEq, serde::Serialize)]
 pub(crate) struct ReviewFrameFacts {
@@ -173,6 +173,9 @@ pub(crate) struct ReviewFrameFacts {
     /// storm stage, read by `scripts/measure_field_luminance.py` (W5-09).
     pub(crate) lighting: Option<String>,
     pub(crate) storm: Option<bool>,
+    /// The music director's state (`MusicDirection::report`, design-audio
+    /// §9), as the F3 panel shows it; the review tools fill it.
+    pub(crate) music: Option<String>,
     pub(crate) reduced_effects: bool,
     pub(crate) ui_scale: f32,
     pub(crate) windows_scale: f32,
@@ -226,6 +229,7 @@ impl ReviewFrameFacts {
             lighting: attempt
                 .map(|a| format!("{:?}", crate::art::scene_look(a).lighting).to_lowercase()),
             storm: attempt.map(|a| crate::art::scene_look(a).storm),
+            music: None,
             reduced_effects: settings.reduced_effects,
             ui_scale: crate::settings::applied_scale(settings.scale),
             windows_scale: 1.0,
