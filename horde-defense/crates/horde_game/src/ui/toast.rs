@@ -23,8 +23,11 @@ pub(super) const TOAST_LONG_SECS: f64 = TOAST_ERROR_SECS;
 const TOAST_FADE_SECS: f64 = 0.25;
 /// The most toasts the top-right stack shows at once.
 pub(super) const STACK_VISIBLE: usize = 3;
-/// The stack's offset from the screen's top-right corner.
+/// The stack's offset from the screen's top-right corner: 8 pt under the
+/// 44 pt header.
 const STACK_OFFSET: egui::Vec2 = vec2(-16.0, 52.0);
+/// The stack's gap under the camp navigation on Camp and Upgrades.
+const STACK_FLOOR_GAP: f32 = 8.0;
 /// The stack's width.
 const STACK_WIDTH: f32 = 280.0;
 /// The queue holds at most this many toasts; older ones give way.
@@ -154,8 +157,12 @@ pub(super) fn advance(ctx: &egui::Context, f: &mut UiCtx) {
 }
 
 /// The top-right stack on every screen but the battle, which draws its
-/// toast in the receipt slot. Runs at the end of `draw_screen`.
+/// toast in the receipt slot. Runs at the end of `draw_screen`. Where the
+/// frame drew the camp navigation (Camp and Upgrades) the stack starts under
+/// it, so a toast never covers a tab (CF-3-26); elsewhere it starts under the
+/// header.
 pub(super) fn toast_layer(ctx: &egui::Context, f: &mut UiCtx) {
+    let floor = f.status.toast_floor.take();
     if f.screen == Screen::Battle {
         return;
     }
@@ -168,11 +175,11 @@ pub(super) fn toast_layer(ctx: &egui::Context, f: &mut UiCtx) {
     // A plain layer, not an `Area`: an area's first frame is an invisible
     // sizing pass, which would hide every new toast for a frame.
     let screen = ctx.content_rect();
+    let top = floor.map_or(screen.top() + STACK_OFFSET.y, |floor| {
+        (floor + STACK_FLOOR_GAP).max(screen.top() + STACK_OFFSET.y)
+    });
     let stack = Rect::from_min_max(
-        pos2(
-            screen.right() + STACK_OFFSET.x - STACK_WIDTH,
-            screen.top() + STACK_OFFSET.y,
-        ),
+        pos2(screen.right() + STACK_OFFSET.x - STACK_WIDTH, top),
         pos2(screen.right() + STACK_OFFSET.x, screen.bottom()),
     );
     let id = egui::Id::new("lastlight_toasts");

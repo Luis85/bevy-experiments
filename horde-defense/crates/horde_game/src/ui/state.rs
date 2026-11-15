@@ -76,6 +76,11 @@ pub(crate) struct StatusUi {
     pub(super) save_pending: bool,
     /// Short non-blocking feedback (ui/toast.rs), oldest first.
     pub(super) toasts: super::toast::Toasts,
+    /// The bottom of this frame's camp navigation (the tab row and the
+    /// callout row under it), where the toast stack starts on Camp and
+    /// Upgrades; `None` on a frame that drew no tab row. Taken by the toast
+    /// layer at the end of the frame (CF-3-26).
+    pub(super) toast_floor: Option<f32>,
     /// The status message the battle last turned into a toast, with its
     /// revision and error flag (`toast::status_toast`).
     pub(super) toasted: Option<(String, u64, bool)>,

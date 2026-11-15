@@ -1833,6 +1833,91 @@ fn camp_reports_still_toasts_two_outcomes_and_the_folded_count() {
     assert_eq!(f.status.toasts.len(), 3, "the whole visible stack");
 }
 
+/// CF-3-26 (closing): the top-right toast stack starts under the camp tab
+/// row. At a fixed 52 pt under the screen top the first toast lay on the tab
+/// row at 1050x700@1.35 (777 pt wide), over "Character" and "World map".
+/// Checked on camp-reports' three toasts at both sizes: every toast line
+/// lies below every tab label and meets none.
+#[test]
+fn camp_toast_stack_starts_under_the_tab_row_at_both_sizes() {
+    fn runs(output: &egui::FullOutput) -> Vec<(String, egui::Rect)> {
+        fn walk(shape: &egui::epaint::Shape, found: &mut Vec<(String, egui::Rect)>) {
+            match shape {
+                egui::epaint::Shape::Text(text) => found.push((
+                    text.galley.text().replace('\n', " "),
+                    text.galley.rect.translate(text.pos.to_vec2()),
+                )),
+                egui::epaint::Shape::Vec(shapes) => {
+                    shapes.iter().for_each(|shape| walk(shape, found));
+                }
+                _ => {}
+            }
+        }
+        let mut found = Vec::new();
+        for clipped in &output.shapes {
+            walk(&clipped.shape, &mut found);
+        }
+        found
+    }
+    for (size, scale) in [
+        (egui::vec2(1440.0, 900.0), 1.0),
+        (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+    ] {
+        let mut f = staged("camp-reports");
+        f.settings.scale = scale;
+        let entries: Vec<&str> = crate::ui::navigation::camp_entries(&f.ctx())
+            .into_iter()
+            .map(|entry| entry.label())
+            .collect();
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, scale);
+        let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+        warmup.textures_delta.clear();
+        let mut last = None;
+        for _ in 0..2 {
+            f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                    ..egui::RawInput::default()
+                },
+                |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+            );
+            output.textures_delta.clear();
+            last = Some(output);
+        }
+        let output = last.unwrap();
+        let painted = runs(&output);
+        let tabs: Vec<egui::Rect> = painted
+            .iter()
+            .filter(|(text, _)| entries.contains(&text.as_str()))
+            .map(|(_, rect)| *rect)
+            .collect();
+        assert_eq!(
+            tabs.len(),
+            entries.len(),
+            "{size:?}: {entries:?} in {painted:?}"
+        );
+        let row_bottom = tabs
+            .iter()
+            .map(|rect| rect.bottom())
+            .fold(f32::MIN, f32::max);
+        let toasts: Vec<&(String, egui::Rect)> = painted
+            .iter()
+            .filter(|(text, _)| text.contains("expedition outcome") || text.contains(" · "))
+            .filter(|(_, rect)| rect.left() > size.x * 0.5)
+            .collect();
+        assert!(!toasts.is_empty(), "{size:?}: no toast in {painted:?}");
+        for (text, rect) in toasts {
+            assert!(
+                rect.top() >= row_bottom && tabs.iter().all(|tab| !tab.intersects(*rect)),
+                "{size:?}: the toast {text:?} {rect:?} lies on the tab row {tabs:?}"
+            );
+        }
+    }
+}
+
 /// UX-16's callout row gets a capture on both places it shows: the
 /// callout-camp and callout-upgrades stills leave exactly one unlocked
 /// callout unread (every other scene marks them all seen), one whose place

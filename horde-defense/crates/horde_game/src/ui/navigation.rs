@@ -211,6 +211,9 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
         });
     // The one unlock callout due, under the row (UX-16).
     super::onboarding::callout_row(root, f);
+    // The toast stack starts under the row and its callout, which reach
+    // under the stack's fixed place on a narrow canvas (CF-3-26).
+    f.status.toast_floor = Some(root.available_rect_before_wrap().top());
 }
 
 /// "Active defense · <who>" while a main defense is on the field: "You" for
