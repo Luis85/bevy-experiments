@@ -70,23 +70,19 @@ if (Test-Path -LiteralPath $zip) { throw "Package already exists: $zip" }
 if ($DocsDirectory) { $docsSource = Resolve-WorkspacePath -Path $DocsDirectory -Workspace $workspace }
 else { $docsSource = Join-Path $workspace 'docs' }
 
-$savedCommit = [Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process')
-try {
-    if ($NoBuild) { $built = Resolve-WorkspacePath -Path $Executable -Workspace $workspace }
-    else {
-        # option_env!("LASTLIGHT_BUILD_COMMIT") rebuilds horde-defense when the value changes, so the build and the
-        # copy below belong to one invocation.
-        [Environment]::SetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', (Get-BuildCommitLabel -Commit $commit -Dirty $dirty), 'Process')
-        $buildArguments = @('build', '--locked', '-p', 'horde-defense')
-        if (-not $Review) { $buildArguments += '--no-default-features' }
-        if ($Profile -eq 'release') { $buildArguments += '--release' }
-        elseif ($Profile -ne 'debug') { $buildArguments += @('--profile', $Profile) }
+if ($NoBuild) { $built = Resolve-WorkspacePath -Path $Executable -Workspace $workspace }
+else {
+    $buildArguments = @('build', '--locked', '-p', 'horde-defense')
+    if (-not $Review) { $buildArguments += '--no-default-features' }
+    if ($Profile -eq 'release') { $buildArguments += '--release' }
+    elseif ($Profile -ne 'debug') { $buildArguments += @('--profile', $Profile) }
+    # The stamp is set for this build only (Invoke-WithBuildCommit restores it, scripts/lib/Playtest.ps1).
+    $built = Invoke-WithBuildCommit -Label (Get-BuildCommitLabel -Commit $commit -Dirty $dirty) -Build {
         Invoke-Cargo -Arguments $buildArguments -LogStem (Join-Path $logs 'cargo-build') | Out-Null
-        $built = Get-HordeExecutable -Profile $Profile -Workspace $workspace
+        Get-HordeExecutable -Profile $Profile -Workspace $workspace
     }
-    if (-not (Test-Path -LiteralPath $built -PathType Leaf)) { throw "No executable at $built" }
 }
-finally { [Environment]::SetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', $savedCommit, 'Process') }
+if (-not (Test-Path -LiteralPath $built -PathType Leaf)) { throw "No executable at $built" }
 
 # Both were checked absent above, so a failure removes only what this run made: a folder with a package's name but
 # no manifest would send verify_playtest after "No manifest.json" instead of the real cause.

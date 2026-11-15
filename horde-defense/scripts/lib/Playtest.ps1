@@ -52,6 +52,24 @@ function Get-BuildCommitLabel {
     return $label
 }
 
+function Invoke-WithBuildCommit {
+    # Runs the -Build block (package_playtest.ps1's cargo build) with LASTLIGHT_BUILD_COMMIT set to -Label, returns
+    # the block's output, and restores the variable's earlier value (or its absence) afterwards, also when the block
+    # throws. option_env!("LASTLIGHT_BUILD_COMMIT") rebuilds horde-defense when the value changes, so the build and
+    # the copy of its executable belong to one package run.
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][scriptblock]$Build
+    )
+    $savedCommit = [Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process')
+    try {
+        [Environment]::SetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', $Label, 'Process')
+        return (& $Build)
+    }
+    finally { [Environment]::SetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', $savedCommit, 'Process') }
+}
+
 function Get-BuildStamp {
     # The stamp build_info.rs prints for that build: 'v0.1.0 (abc1234)' or 'v0.1.0 (abc1234+dirty)'.
     [CmdletBinding()]

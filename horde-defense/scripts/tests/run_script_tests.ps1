@@ -1821,6 +1821,24 @@ try {
         Assert-True ($dead[2] -like "docs/PLAYTEST_GUIDE.md:3: '../../outside.md'*") $dead[2]
     }
 
+    Test-Case 'Invoke-WithBuildCommit sets LASTLIGHT_BUILD_COMMIT for the build only and restores it, also after a failure' {
+        $saved = [Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process')
+        try {
+            foreach ($before in @('sentinel-commit', $null)) {
+                [Environment]::SetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', $before, 'Process')
+                $seen = Invoke-WithBuildCommit -Label '0123456+dirty' -Build { [Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process') }
+                Assert-Equal '0123456+dirty' $seen "the build sees the label (before: [$before])"
+                Assert-Equal $before ([Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process')) "restored after the build (before: [$before])"
+                $message = $null
+                try { Invoke-WithBuildCommit -Label '0123456' -Build { throw 'cargo failed' } | Out-Null }
+                catch { $message = $_.Exception.Message }
+                Assert-Equal 'cargo failed' $message 'the build failure propagates'
+                Assert-Equal $before ([Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process')) "restored after a failed build (before: [$before])"
+            }
+        }
+        finally { [Environment]::SetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', $saved, 'Process') }
+    }
+
     Test-Case 'New-PlaytestManifest is version 2 with the stamp, commit and curated docs, in a fixed key order' {
         $root = Join-Path $temporary 'manifest-package'
         $manifest = New-TestPackage $root
@@ -1994,7 +2012,6 @@ try {
             }
             $readMe = [IO.File]::ReadAllText((Join-Path $folder 'READ ME.txt'))
             Assert-True ($readMe -match "(?m)^Build: Lastlight $([regex]::Escape($manifest.stamp)), playtest profile, created \d{4}-\d\d-\d\d \d\d:\d\d:\d\d UTC\r?$") "READ ME build line; $readMe"
-            Assert-True ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('LASTLIGHT_BUILD_COMMIT', 'Process'))) 'LASTLIGHT_BUILD_COMMIT is not left set'
             $v = Invoke-Verify @('-Package', $zip) 'verify-packaged'
             Assert-Equal 0 $v.ExitCode ('verify_playtest on the packed zip; ' + (Read-Log $v.Out) + (Read-Log $v.Err))
         }
