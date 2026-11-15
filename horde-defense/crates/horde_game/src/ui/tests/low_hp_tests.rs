@@ -261,25 +261,54 @@ fn low_hp_edge_static_in_reduced_effects() {
 }
 
 /// Pin (design-ux-flow §8): drawing never changes the game. 100 paused
-/// frames of the whole App frame, with the low-HP warning, a boss warning
-/// and every wall-clock overlay running, leave `state_digest` where it was.
+/// frames of the whole App frame, with the low-HP warning, the boss warning
+/// banner and a battle toast on screen in every frame (the banner and the
+/// toast run on the wall clock), leave `state_digest` where it was.
 #[test]
 fn ui_frames_do_not_change_state_digest() {
+    const APPROACHING: &str = "BOSS APPROACHING";
+    const TOAST: &str = "Saved";
     for (name, mut fixture) in [("personal", personal()), ("observed", observed())] {
         for reduced in [false, true] {
             let h = Harness::new();
             let f = &mut fixture.frontend;
             f.settings.reduced_effects = reduced;
             set_hp(f, 20);
+            // One tick before the boss warning, as boss_banner_tests stage
+            // it: the next tick logs the warning and the next frame starts
+            // the banner. A third of a second of running frames fades it in
+            // (normal effects), and a paused battle then holds it.
+            let a = f.game.attempt_mut().unwrap();
+            let boss = (a.boss_time() * 60.0).ceil() as u64;
+            let warning = (content().levels[a.level].boss_timing.warning * 60.0).ceil() as u64;
+            a.tick = boss - warning - 1;
+            f.game.set_paused(false);
+            f.game.tick(Input::default());
+            f.status
+                .toasts
+                .push(TOAST, crate::ui::toast::ToastKind::Success);
+            const RUNNING: u32 = 20;
+            for frame in 0..RUNNING {
+                h.frame_at(f, View::Full, vec![], T0 + f64::from(frame) / 60.0);
+            }
             f.game.set_paused(true);
             let before = f.game.state_digest();
             let canvas = Rect::from_min_size(Pos2::ZERO, Target::LARGE.pixels);
             for frame in 0..100 {
-                let output = h.frame_at(f, View::Full, vec![], T0 + f64::from(frame) / 60.0);
+                let time = T0 + f64::from(RUNNING + frame) / 60.0;
+                let output = h.frame_at(f, View::Full, vec![], time);
                 assert_eq!(f.screen, Screen::Battle, "{name}: frame {frame}");
                 assert!(
                     edge(&output, canvas).is_some(),
                     "{name} reduced {reduced}: frame {frame} has no low-HP band"
+                );
+                assert!(
+                    painted(&output, APPROACHING),
+                    "{name} reduced {reduced}: frame {frame} has no boss banner"
+                );
+                assert!(
+                    painted(&output, TOAST),
+                    "{name} reduced {reduced}: frame {frame} has no toast"
                 );
                 assert_eq!(
                     f.game.state_digest(),
