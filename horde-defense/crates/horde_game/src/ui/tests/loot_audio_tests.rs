@@ -207,15 +207,15 @@ fn text_centres(shape: &egui::epaint::Shape, out: &mut Vec<Pos2>) {
 
 /// A guard (user decision 17: no hover sound). The pointer visits every
 /// text of the screen (every button, row, tab and node carries one) and a
-/// 64 pt grid over the rest, on Results (the upgrade home), Camp home, the
-/// skill graph, Equipment and Settings at both target sizes; no frame may
-/// write a cue.
+/// 64 pt grid over the rest, on Results, Camp home, the Upgrades screen
+/// (its action strip and skill graph), Equipment and Settings at both target
+/// sizes; no frame may write a cue.
 #[test]
 fn no_widget_hover_writes_a_sound_request() {
     let scenes = [
         ("results", Screen::Results, None),
         ("camp home", Screen::Camp, Some(Tab::Home)),
-        ("skills", Screen::Camp, Some(Tab::Skills)),
+        ("upgrades", Screen::Upgrades, None),
         ("equipment", Screen::Camp, Some(Tab::Armory)),
         ("settings", Screen::Settings, None),
     ];
