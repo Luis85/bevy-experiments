@@ -235,8 +235,12 @@ pub fn progressed_determinism_game(seed: u64, run: ProgressedRun) -> Game {
 }
 
 /// A progressed campaign at threat `rank`, deployed and with its attempt
-/// clock [`PROGRESSED_BOSS_LEAD`] ticks before the boss. Built here, not by
-/// the review render fixtures.
+/// clock [`PROGRESSED_BOSS_LEAD`] ticks before the boss for
+/// [`ProgressedRun::HardCapstone`] and [`PROGRESSED_TAKEOVER_BOSS_LEAD`]
+/// ticks before it for [`ProgressedRun::RecruitTakeover`] (W4-14 halved the
+/// Npc arrivals, so the takeover's window starts earlier to keep an elite,
+/// the new archetypes and the boss phase in it). Built here, not by the
+/// review render fixtures.
 ///
 /// Staged through the test-support seams, because no short legal command
 /// sequence reaches them: the world (the [`PROGRESSED_LIBERATED`] countries
