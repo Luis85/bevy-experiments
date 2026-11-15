@@ -137,8 +137,11 @@ read 1.00 against its 0.67 target. W4-14's Npc pass let them clear stages 1
 and 2, and W4-15 (Survivor network at 1,500 coins and the strategy bot's
 `train_companions` step, which trains each recruit to 12 points and equips
 the best stash items that keep its rank) lets them clear every stage: G3.11
-reads 0.67 and passes. The rule reads item levels, not tiers, so a recruit
-on tier-4 drops of item level 1-4 still plays rank 0.
+reads 0.67 and passes. The rule reads item levels, not tiers, and floors
+the excess levels over the four slots: a recruit wearing tier-4 drops with
+at most three item levels above 1 in all (for example one level-4 item and
+three level-1 items) still plays rank 0, while four level-2 items play
+rank 1 and four level-4 items rank 3.
 
 ## Country difficulty band
 
