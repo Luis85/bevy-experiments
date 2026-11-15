@@ -88,7 +88,7 @@ Blueprint and structure ranks use the same learned prerequisites, victory/libera
 
 Settings → Gameplay offers Easy/Normal/Hard/Custom and a validated draft. Apply to next run commits it; active main/worker fields retain copied balance/dimensions. Normal movement is1.25× its authored base. Character MAX 50 and every-victory threat remain separate.
 
-Live DPS is resolved injury over five simulation seconds (zero-padded initially), with whole-run average/peak and source totals. Pause freezes the clock;4× playback does not multiply it. History is reachable from menu/camp/results, pauses fields and restores prior pause on Back. It filters all recorded outcomes, exposes frozen gear/balance and plots the last 40 matching records without truncating the ledger or inventing past runs. See [BALANCE_AND_RUN_STATS.md](docs/BALANCE_AND_RUN_STATS.md).
+Live DPS is resolved injury over five simulation seconds (zero-padded initially), with whole-run average/peak and source totals. Pause freezes the clock;4× playback does not multiply it. History is reachable from the main menu and from the header on Camp, Results and Journey upgrades, pauses fields and restores prior pause on Back. It filters all recorded outcomes, exposes frozen gear/balance and plots the last 40 matching records without truncating the ledger or inventing past runs. See [BALANCE_AND_RUN_STATS.md](docs/BALANCE_AND_RUN_STATS.md).
 
 ## Equipped component survivors
 

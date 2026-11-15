@@ -129,7 +129,7 @@ Open Settings → Gameplay · difficulty. Select Easy/Normal/Hard or edit Custom
 
 Read DPS as resolved injury over five simulation seconds, with a zero-padded opening; hover for average/peak/source totals. Pause/save/resume and 4× observation must preserve the simulation clock, independently of frame rate.
 
-Open History from the header on any screen. Filter mode, Victory/Defeat/Retreated and country; inspect frozen gear/balance and last 40 matching DPS/coin/threat trends. Older finalized runs are not invented. Reopening results or settling workers cannot append/pay twice. Back restores the prior pause.
+Open History from the header on Camp, Results or Journey upgrades, or from the main menu. Filter mode, Victory/Defeat/Retreated and country; inspect frozen gear/balance and last 40 matching DPS/coin/threat trends. Older finalized runs are not invented. Reopening results or settling workers cannot append/pay twice. Back restores the prior pause.
 
 ## Journey safety and equipped parts
 
