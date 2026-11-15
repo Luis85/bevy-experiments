@@ -370,9 +370,14 @@ Capstone's one extra transition) folds into the snapshot at deploy
   farm.
 - **Armor** and **damage** multiply the rank terms of
   PROGRESSION_SCALING.md (`boss_armor_per_rank`, `boss_damage_per_rank`),
-  clamped to 1-4, so a Capstone at rank 0 already hits ×1.10 and spawns with
-  `round(armor × 1.25)`. **NPC armor** adds to `npc_boss_armor_add` (at most
-  20). **Extra transitions** add to `boss_phases` (at most 2).
+  clamped to 1-4, so against a personal defense a Capstone at rank 0 already
+  hits ×1.10 and spawns with `round(armor × 1.25)`. An Npc boss takes the
+  damage term as an add to its blows, `floor((multiplier - 1) × 6)`
+  (`ProgressionSnapshot::npc_boss_damage_add`), so the Capstone's ×1.10 adds
+  Npc damage only once it moves that floor: from rank 11 (+1) with the
+  authored 0.01 per rank; below it an Npc Capstone hits like a Sector boss.
+  **NPC armor** adds to `npc_boss_armor_add` (at most 20). **Extra
+  transitions** add to `boss_phases` (at most 2).
 - Bounds: health, armor, coins and damage ×1-2; NPC armor +0-10; extra
   transitions 0-2; unknown keys are rejected.
 
@@ -381,8 +386,10 @@ briefing's boss line names the rank once, with its badge ("REGIONAL BOSS" or
 "CAPSTONE BOSS"), and the terms beside it in the order health, armor,
 damage, reward ("+20% health, +20% reward"; the Capstone's "+40% health,
 +25% armor, +10% damage, +40% reward" for a personal defense and "+40%
-health, +2 armor, +10% damage, +40% reward" for Mara or a recruit, whose
-boss armor is the `npc_armor_add` term). The badge's hover counts the
+health, +2 armor, +40% reward" for Mara or a recruit, whose boss armor is the
+`npc_armor_add` term and whose damage term is what the rank adds to the Npc
+boss's blows at the previewed threat, "+1 damage" from rank 11 and left out
+below it). The badge's hover counts the
 phases `extra_transitions` adds ("one more phase" on the Capstone). The
 world panel counts a country's checkpoints ("2 checkpoints"), and a
 Regional victory's Results lead with "Regional checkpoint secured." A

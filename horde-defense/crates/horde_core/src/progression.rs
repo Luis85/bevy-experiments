@@ -631,6 +631,16 @@ impl ProgressionCatalog {
         }
         (1.0 + self.boss_damage_per_rank * steps as f32).clamp(1.0, 4.0)
     }
+    /// The part of an Npc boss's damage add
+    /// ([`ProgressionSnapshot::npc_boss_damage_add`]) that the stage's boss
+    /// rank adds to `snapshot`: its add less the add of the rank term alone
+    /// ([`Self::boss_damage_multiplier`] at `snapshot.rank`). 0 while the
+    /// rank's `damage` factor does not move the floor; with the authored
+    /// 0.01 per rank a Capstone's ×1.10 moves it from rank 11.
+    pub fn npc_boss_rank_damage_add(&self, snapshot: &ProgressionSnapshot) -> i32 {
+        snapshot.npc_boss_damage_add()
+            - npc_boss_damage_add(self.boss_damage_multiplier(snapshot.rank))
+    }
     /// `1 + early × min(rank, knee) + late × (rank - knee)` past the knee:
     /// the enemy health and damage growth (design enemy-balance §2). Up to
     /// the knee, or with no knee (`u32::MAX`), it is the single legacy slope
@@ -783,7 +793,20 @@ impl Default for ProgressionSnapshot {
         }
     }
 }
+/// The damage an Npc boss's blows add from a boss damage `multiplier`
+/// (ruling W-6): `floor((multiplier - 1) × 6)`.
+fn npc_boss_damage_add(multiplier: f32) -> i32 {
+    ((multiplier - 1.0) * 6.0).floor() as i32
+}
+
 impl ProgressionSnapshot {
+    /// What the boss damage term adds to an Npc boss's blows (ruling W-6):
+    /// `floor((boss_damage_multiplier - 1) × 6)`, the rank term and the
+    /// boss rank's factor together. Npc combat and the power model read it;
+    /// a personal boss multiplies its damage by the term instead.
+    pub fn npc_boss_damage_add(&self) -> i32 {
+        npc_boss_damage_add(self.boss_damage_multiplier)
+    }
     /// Folds a preset's catalogue extras into this rank snapshot (ruling
     /// E3), in integer math: the elite rate scales by `elite_rate_pct`
     /// (at most 10000 bp), and past the rank-4 phase gate the boss gains
@@ -1206,5 +1229,47 @@ mod tests {
             1500,
             "a falling curve holds"
         );
+    }
+
+    /// Closing: an Npc boss takes the boss damage term as an add,
+    /// `floor((boss_damage_multiplier - 1) × 6)`, so the boss rank's damage
+    /// factor adds damage only once it moves that floor. With the authored
+    /// `boss_damage_per_rank` 0.01 and the Capstone's ×1.10 that is from
+    /// rank 11; below it the Npc Capstone hits like a Sector boss.
+    #[test]
+    fn npc_boss_rank_damage_add_is_what_the_rank_factor_moves_the_floor_by() {
+        let cfg = catalog();
+        let at = |rank: u32, boss_rank: BossRank| {
+            let mut snapshot = cfg.snapshot(rank);
+            snapshot.fold_boss_rank(boss_rank, cfg.boss_ranks.of(boss_rank));
+            snapshot
+        };
+        for rank in [0, 4, 10] {
+            assert_eq!(
+                cfg.npc_boss_rank_damage_add(&at(rank, BossRank::Capstone)),
+                0,
+                "Capstone at rank {rank}"
+            );
+        }
+        for rank in [11, 14, 50] {
+            assert_eq!(
+                cfg.npc_boss_rank_damage_add(&at(rank, BossRank::Capstone)),
+                1,
+                "Capstone at rank {rank}"
+            );
+        }
+        for rank in [0, 11, 50] {
+            for boss_rank in [BossRank::Sector, BossRank::Regional] {
+                assert_eq!(
+                    cfg.npc_boss_rank_damage_add(&at(rank, boss_rank)),
+                    0,
+                    "{boss_rank:?} at rank {rank}"
+                );
+            }
+        }
+        // The whole add is the rank term's plus the boss rank's.
+        let deep = at(50, BossRank::Capstone);
+        assert_eq!(deep.npc_boss_damage_add(), 3);
+        assert_eq!(cfg.snapshot(50).npc_boss_damage_add(), 2);
     }
 }

@@ -392,7 +392,7 @@ impl Game {
                             + ((a.progression.enemy_damage - 1.0) * 6.0).floor() as i32
                             + if boss {
                                 // The boss rank term (ruling W-6).
-                                ((a.progression.boss_damage_multiplier - 1.0) * 6.0).floor() as i32
+                                a.progression.npc_boss_damage_add()
                             } else {
                                 0
                             },

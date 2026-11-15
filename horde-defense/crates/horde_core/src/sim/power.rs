@@ -409,7 +409,7 @@ impl NpcModel {
                     kind: DamageKind::Crushing,
                 }),
                 level.boss_npc_skill,
-                ((s.boss_damage_multiplier - 1.0) * 6.0).floor() as i32,
+                s.npc_boss_damage_add(),
             ),
         }
     }
