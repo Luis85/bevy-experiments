@@ -45,20 +45,110 @@ use std::time::Instant;
 
 /// Test binaries `--quick` skips: `(package, package dir, test binary)`.
 /// The determinism tests run 20 000 ticks several times; the property and
-/// shuffle tests run many randomized / reshuffled schedules.
+/// shuffle tests run many randomized / reshuffled schedules. The island
+/// entries are the [`ISLAND_SLOW`] binaries: multi-day island runs.
 const SLOW_TESTS: &[(&str, &str, &str)] = &[
     ("village_content", "content/village_content", "determinism"),
     ("village_content", "content/village_content", "properties"),
     ("village_content", "content/village_content", "shuffle"),
+    ("island_content", "content/island_content", "colony_ai"),
+    (
+        "island_content",
+        "content/island_content",
+        "island_behaviour_data",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_data_trade",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_demography",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_economy_edges",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_economy_views",
+    ),
+    ("island_content", "content/island_content", "island_indoors"),
+    (
+        "island_content",
+        "content/island_content",
+        "island_labor_stability",
+    ),
+    ("island_content", "content/island_content", "island_live"),
+    (
+        "island_content",
+        "content/island_content",
+        "island_live_homestead",
+    ),
+    ("island_content", "content/island_content", "island_oversee"),
+    (
+        "island_content",
+        "content/island_content",
+        "island_price_economy",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_renamed_catalog",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_soak_fast",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_stock_targets",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_view_accessors",
+    ),
+    (
+        "island_content",
+        "content/island_content",
+        "island_winter_warmth",
+    ),
 ];
 
 /// The island game's crates: what `--island` lints and tests.
 const ISLAND_PACKAGES: &[&str] = &["island_content", "island_view", "island_game"];
 
 /// Test binaries `--island` skips: `(package, test binary)`. Put a binary
-/// here when it takes more than about 30 s under nextest; `--quick` and the
-/// full gate still run it. `#[ignore]`d tests never run in any tier.
-const ISLAND_SLOW: &[(&str, &str)] = &[];
+/// here when it takes more than about 30 s; list it in [`SLOW_TESTS`] too,
+/// so only the full gate runs it. `#[ignore]`d tests never run in any tier.
+/// Lib unit tests cannot be listed (the `--quick` fallback always runs
+/// `--lib`), so `island_game`'s 45 s lib tests stay in every tier.
+const ISLAND_SLOW: &[(&str, &str)] = &[
+    ("island_content", "colony_ai"),
+    ("island_content", "island_behaviour_data"),
+    ("island_content", "island_data_trade"),
+    ("island_content", "island_demography"),
+    ("island_content", "island_economy_edges"),
+    ("island_content", "island_economy_views"),
+    ("island_content", "island_indoors"),
+    ("island_content", "island_labor_stability"),
+    ("island_content", "island_live"),
+    ("island_content", "island_live_homestead"),
+    ("island_content", "island_oversee"),
+    ("island_content", "island_price_economy"),
+    ("island_content", "island_renamed_catalog"),
+    ("island_content", "island_soak_fast"),
+    ("island_content", "island_stock_targets"),
+    ("island_content", "island_view_accessors"),
+    ("island_content", "island_winter_warmth"),
+];
 
 /// Island replays have this file-name prefix, like `village_` and `testbed_`.
 const ISLAND_REPLAY_PREFIX: &str = "island_";
