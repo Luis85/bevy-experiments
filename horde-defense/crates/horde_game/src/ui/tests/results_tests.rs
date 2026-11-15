@@ -316,11 +316,11 @@ fn results_outcome_is_one_line_with_one_muted_hint_and_no_second_wallet() {
     f.game.set_paused(true);
     let report = f.game.last_result().unwrap().clone();
     let line = format!(
-        "Retreated · {} · Defense {} · banked +{} coins · {} items",
+        "Retreated · {} · Defense {} · banked +{} coins · {}",
         report.country_name,
         report.stage + 1,
         report.coins,
-        report.loot
+        crate::ui::chrome::count_noun(report.loot as usize, "item", "items")
     );
     let wallet = format!("{} coins", f.game.campaign().coins);
     for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
@@ -380,11 +380,11 @@ fn victory_outcome_names_the_win_without_a_retreat_hint() {
     let report = f.game.last_result().unwrap().clone();
     let output = h.frame(f, View::ResultsWithChrome, vec![]);
     let line = format!(
-        "Victory · {} · Defense {} · banked +{} coins · {} items",
+        "Victory · {} · Defense {} · banked +{} coins · {}",
         report.country_name,
         report.stage + 1,
         report.coins,
-        report.loot
+        crate::ui::chrome::count_noun(report.loot as usize, "item", "items")
     );
     assert_eq!(text_count(&output, &line), 1);
     assert!(
@@ -393,6 +393,35 @@ fn victory_outcome_names_the_win_without_a_retreat_hint() {
             .iter()
             .any(|s| shape_has_text(&s.shape, "Rest and train"))
     );
+}
+
+/// CF-3-07 (closing): the outcome strip pluralises its item count: a run
+/// that banked one item reads "1 item", never "1 items".
+#[test]
+fn results_outcome_pluralises_the_item_count() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    f.screen = Screen::Results;
+    for (loot, noun) in [(1, "1 item"), (9, "9 items")] {
+        f.game.last_result_mut().as_mut().unwrap().loot = loot;
+        let report = f.game.last_result().unwrap().clone();
+        let line = format!(
+            "Retreated · {} · Defense {} · banked +{} coins · {noun}",
+            report.country_name,
+            report.stage + 1,
+            report.coins
+        );
+        let output = h.frame(f, View::ResultsWithChrome, vec![]);
+        assert_eq!(
+            text_count(&output, &line),
+            1,
+            "{line} in {:?}",
+            super::loot_block_tests::painted_text(&output)
+        );
+    }
 }
 
 #[test]

@@ -144,6 +144,10 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
             }
         });
 }
+/// "1 kill", "9 kills".
+fn kills(r: &RunRecord) -> String {
+    chrome::count_noun(r.kills as usize, "kill", "kills")
+}
 fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings) {
     chrome::section(ui, &format!("Run #{} · {}", r.id, r.outcome.label()));
     ui.label(format!(
@@ -168,13 +172,13 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings
         muted(ui, format!("Parallel field #{worker}"));
     }
     if r.legacy {
-        ui.label(format!("{} kills · full-run DPS not recorded", r.kills));
+        ui.label(format!("{} · full-run DPS not recorded", kills(r)));
     } else {
         ui.label(format!(
-            "DPS {:.1} average · {:.1} peak (5s) · {} kills",
+            "DPS {:.1} average · {:.1} peak (5s) · {}",
             super::hud::shown_dps(r.average_dps),
             super::hud::shown_dps(r.peak_dps),
-            r.kills
+            kills(r)
         ));
     }
     muted(
@@ -185,11 +189,11 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings
         ),
     );
     ui.label(format!(
-        "{} coins · {} kill XP + {} completion XP · {} items",
+        "{} coins · {} kill XP + {} completion XP · {}",
         grouped(r.coins),
         r.kill_xp,
         r.completion_xp,
-        r.loot
+        chrome::count_noun(r.loot as usize, "item", "items")
     ));
     // What settlement auto-sold from this run's drops; nothing for a run
     // that sold nothing.

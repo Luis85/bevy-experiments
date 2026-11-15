@@ -77,6 +77,56 @@ fn one_run(fixture: &mut IsolatedFrontend) -> &mut FrontendParts {
     f
 }
 
+/// CF-3-07 (closing): the run detail pluralises its counts: a run with one
+/// kill and one item reads "1 kill" and "1 item", never "1 kills" or
+/// "1 items"; the legacy line too.
+#[test]
+fn history_detail_pluralises_kills_and_items() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = one_run(&mut fixture);
+    for legacy in [false, true] {
+        let history = std::sync::Arc::make_mut(&mut f.game.campaign_mut().run_history);
+        let record = history.last_mut().unwrap();
+        record.kills = 1;
+        record.loot = 1;
+        record.legacy = legacy;
+        let record = record.clone();
+        f.history = history::HistoryUi::default();
+        let output = h.frame(f, View::History, vec![]);
+        let texts = super::loot_block_tests::painted_text(&output);
+        let items = format!(
+            "{} coins · {} kill XP + {} completion XP · 1 item",
+            crate::ui::coins::grouped(record.coins),
+            record.kill_xp,
+            record.completion_xp
+        );
+        assert!(
+            texts.contains(&items),
+            "legacy {legacy}: {items} in {texts:?}"
+        );
+        let kills = if legacy {
+            "1 kill · full-run DPS not recorded".to_owned()
+        } else {
+            format!(
+                "DPS {:.1} average · {:.1} peak (5s) · 1 kill",
+                crate::ui::hud::shown_dps(record.average_dps),
+                crate::ui::hud::shown_dps(record.peak_dps)
+            )
+        };
+        assert!(
+            texts.contains(&kills),
+            "legacy {legacy}: {kills} in {texts:?}"
+        );
+        assert!(
+            texts
+                .iter()
+                .all(|text| !text.contains("1 kills") && !text.contains("1 items")),
+            "legacy {legacy}: {texts:?}"
+        );
+    }
+}
+
 #[test]
 fn history_filters_share_one_centre_line_with_the_run_count() {
     let mut fixture = IsolatedFrontend::new();

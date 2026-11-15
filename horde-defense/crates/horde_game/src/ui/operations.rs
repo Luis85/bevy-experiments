@@ -73,10 +73,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                 line.country,
                 line.stage + 1
             ));
-            ui.label(format!(
-                "HP {}/{} · {:.0}s · {} kills",
-                line.hp, line.max_hp, line.elapsed, line.kills
-            ));
+            ui.label(line.stats());
             if ui.button(format!("Observe #{id}")).clicked() {
                 f.campaign.observed = Some(id);
             }
@@ -93,15 +90,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     if view.any_settled {
         egui::CollapsingHeader::new("Completed expedition reports").show(ui, |ui| {
             for report in &view.reports {
-                ui.label(format!(
-                    "Expedition #{} · {} · defense {} · {} · {} kills · {} coins",
-                    report.id,
-                    report.country,
-                    report.stage + 1,
-                    report.outcome.label(),
-                    report.kills,
-                    grouped(report.coins)
-                ));
+                ui.label(report.summary());
             }
         });
     }

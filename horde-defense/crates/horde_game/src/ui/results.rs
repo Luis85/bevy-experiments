@@ -255,9 +255,9 @@ fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     );
     line.append(
         &format!(
-            " · banked +{} coins · {} items",
+            " · banked +{} coins · {}",
             grouped(report.coins),
-            report.loot
+            chrome::count_noun(report.loot as usize, "item", "items")
         ),
         0.0,
         TextFormat {
