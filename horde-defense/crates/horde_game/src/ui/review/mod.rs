@@ -331,14 +331,12 @@ impl crate::launch::LaunchConfig {
     pub(super) fn damage_capture_mode(&self) -> LootCaptureMode {
         let scenario = self.scenario.as_deref();
         let allowed = matches!(scenario, Some("damage" | "damage-4x"));
-        // A weapon-class still pins the popup clock too, so its missed
-        // shot's MISS is drawn whatever the capture waited (CF-3-23); its
-        // motion export keeps the live clock.
-        let still_only = scenario.is_some_and(|scene| {
-            fixtures::production::WEAPON_CLASS_SCENES
-                .iter()
-                .any(|(name, ..)| *name == scene)
-        });
+        // Every other review still pins the popup clock too, so it draws its
+        // pop-ups at full strength whatever the capture waited, the same in
+        // normal and reduced effects: a weapon-class still its missed shot's
+        // MISS (CF-3-23), every Battle still its recent hits (CF-3-06). Their
+        // motion exports keep the live clock.
+        let still_only = scenario.is_some() && !allowed;
         let mode = select_loot_capture_mode(
             if allowed || still_only {
                 Some("quality-loot")

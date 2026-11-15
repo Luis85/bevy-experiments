@@ -3470,3 +3470,157 @@ fn weapon_class_stills_draw_one_miss_at_one_spot_in_both_modes() {
         }
     }
 }
+
+/// Every text run of `output` with its screen rect and alpha, nested shape
+/// lists included.
+fn text_runs(output: &egui::FullOutput) -> Vec<(String, egui::Rect, u8)> {
+    fn walk(shape: &egui::epaint::Shape, found: &mut Vec<(String, egui::Rect, u8)>) {
+        match shape {
+            egui::epaint::Shape::Text(text) => {
+                let alpha = text
+                    .override_text_color
+                    .or_else(|| {
+                        text.galley
+                            .job
+                            .sections
+                            .first()
+                            .map(|section| section.format.color)
+                    })
+                    .map_or(0, |color| color.a());
+                found.push((
+                    text.galley.text().to_owned(),
+                    text.galley.rect.translate(text.pos.to_vec2()),
+                    alpha,
+                ));
+            }
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        walk(&clipped.shape, &mut found);
+    }
+    found
+}
+
+/// The outlined pop-ups among `runs`: a pop-up paints eight outline copies
+/// of its text (each at most 2 pt off) and then its face, so it is a cluster
+/// of nine or more runs of one text. Each is its text, the union of its runs
+/// and its brightest alpha.
+fn outlined_popups(runs: &[(String, egui::Rect, u8)]) -> Vec<(String, egui::Rect, u8)> {
+    let mut clusters: Vec<(String, egui::Rect, u8, usize)> = Vec::new();
+    for (text, rect, alpha) in runs {
+        match clusters.iter_mut().find(|(other, union, ..)| {
+            other == text && (union.center() - rect.center()).length() < 6.0
+        }) {
+            Some(cluster) => {
+                cluster.1 = cluster.1.union(*rect);
+                cluster.2 = cluster.2.max(*alpha);
+                cluster.3 += 1;
+            }
+            None => clusters.push((text.clone(), *rect, *alpha, 1)),
+        }
+    }
+    clusters
+        .into_iter()
+        .filter(|cluster| cluster.3 >= 9)
+        .map(|(text, rect, alpha, _)| (text, rect, alpha))
+        .collect()
+}
+
+/// The frames a still capture of `scene` draws at `size` and `scale`, with
+/// effects `reduced`, on egui input clocks `times`: the last frame's output.
+fn staged_battle_still(
+    scene: &str,
+    size: egui::Vec2,
+    scale: f32,
+    reduced: bool,
+    times: &[f64],
+) -> egui::FullOutput {
+    let mut f = staged(scene);
+    assert!(f.screen == Screen::Battle, "{scene}: staged {:?}", f.screen);
+    f.settings.scale = scale;
+    f.settings.reduced_effects = reduced;
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    crate::settings::configure(&ctx, scale);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    let mut last = None;
+    for &time in times {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                time: Some(time),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        output.textures_delta.clear();
+        last = Some(output);
+    }
+    last.expect("a capture frame")
+}
+
+/// Whether `text` is a damage pop-up's text: a number, a weak-point "N!",
+/// an incoming "-N" or one of the outcome words.
+fn damage_popup_text(text: &str) -> bool {
+    let digits = text.trim_start_matches('-').trim_end_matches('!');
+    (!digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()))
+        || matches!(text, "MISS" | "ARMOR" | "DODGE" | "DEFENDED")
+}
+
+/// CF-3-06: a Battle still draws its damage pop-ups whatever the capture
+/// waited and whatever the effects mode. Outside damage and damage-4x (and,
+/// since CF-3-23, the weapon classes) the popup clock of a still was the
+/// wall clock, so a still caught whatever was mid-fade on its capture frame:
+/// normal battle-female showed a faded "29" that reduced lacked, reduced
+/// progressed-battle a "37" at 30% strength that normal lacked. Staged as
+/// the capture stages them, captured once 0.5 s and once 3.5 s after the
+/// first frame (past a pop-up's 0.9 s life), each scene paints the same
+/// pop-up texts at full strength in normal and reduced effects at both
+/// sizes, and some scene paints any.
+#[test]
+fn battle_stills_draw_the_same_popups_at_full_strength_in_both_modes() {
+    let mut drawn = 0;
+    for scene in [
+        "battle-female",
+        "progressed-battle",
+        "ordnance",
+        "elite-tells",
+    ] {
+        for (size, scale) in [
+            (egui::vec2(1440.0, 900.0), 1.0),
+            (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+        ] {
+            let mut sets = Vec::new();
+            for reduced in [false, true] {
+                for times in [[0.0, 0.2, 0.5], [0.0, 1.2, 3.5]] {
+                    let label = format!("{scene} scale {scale} reduced {reduced} at {times:?}");
+                    let output = staged_battle_still(scene, size, scale, reduced, &times);
+                    let mut texts: Vec<String> = outlined_popups(&text_runs(&output))
+                        .into_iter()
+                        .filter(|(text, ..)| damage_popup_text(text))
+                        .map(|(text, _, alpha)| {
+                            assert!(alpha > 200, "{label}: {text:?} at alpha {alpha}");
+                            text
+                        })
+                        .collect();
+                    texts.sort();
+                    sets.push((label, texts));
+                }
+            }
+            for (label, texts) in &sets[1..] {
+                assert_eq!(
+                    texts, &sets[0].1,
+                    "{label} draws other pop-ups than {}",
+                    sets[0].0
+                );
+            }
+            drawn += sets[0].1.len();
+        }
+    }
+    assert!(drawn > 0, "no Battle still drew a damage pop-up");
+}
