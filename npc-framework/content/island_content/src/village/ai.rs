@@ -8,26 +8,51 @@ use npc_framework::prelude::*;
 use serde_json::json;
 
 pub fn tick(world: &mut World) {
-    super::living::climate_tick(world);
+    use super::probe::probe;
+    {
+        let _probe = probe(world, "eco.climate");
+        super::living::climate_tick(world);
+    }
     let now = world.resource::<SimClock>().tick;
     let (day, _, _) = calendar(world);
-    let mut people: Vec<_> = world
-        .query::<(Entity, &SimId, &Villager)>()
-        .iter(world)
-        .map(|(e, id, v)| (*id, e, v.clone()))
-        .collect();
-    people.sort_by_key(|(id, _, _)| *id);
-    for (id, e, v) in &people {
-        vitals(world, *id, *e, v, now);
+    {
+        let _probe = probe(world, "eco.vitals");
+        let mut people: Vec<_> = world
+            .query::<(Entity, &SimId, &Villager)>()
+            .iter(world)
+            .map(|(e, id, v)| (*id, e, v.clone()))
+            .collect();
+        people.sort_by_key(|(id, _, _)| *id);
+        for (id, e, v) in &people {
+            vitals(world, *id, *e, v, now);
+        }
     }
-    super::frontier::ecology::tick(world);
-    finish_gathers(world, now);
-    super::hunting::tick(world);
-    super::wildlife::tick(world);
-    dividends(world, day);
-    super::production::refresh(world);
-    super::market::tick(world);
-    super::behavior::advance(world);
+    {
+        let _probe = probe(world, "eco.ecology");
+        super::frontier::ecology::tick(world);
+    }
+    {
+        let _probe = probe(world, "eco.gathers_hunting_wildlife");
+        finish_gathers(world, now);
+        super::hunting::tick(world);
+        super::wildlife::tick(world);
+    }
+    {
+        let _probe = probe(world, "eco.dividends");
+        dividends(world, day);
+    }
+    {
+        let _probe = probe(world, "eco.production_refresh");
+        super::production::refresh(world);
+    }
+    {
+        let _probe = probe(world, "eco.market");
+        super::market::tick(world);
+    }
+    {
+        let _probe = probe(world, "eco.behavior_advance");
+        super::behavior::advance(world);
+    }
 }
 
 /// One profession decision. All physical work uses the same action validation,
@@ -43,15 +68,17 @@ pub(super) fn work(world: &mut World, e: Entity) {
 pub const WALKING_SELLER_REACH_MM: i64 = 6_000;
 
 pub(super) fn market_supplier(world: &World, buyer: Entity, kind: &str) -> Option<Entity> {
+    let _probe = super::probe::lookup(
+        world,
+        "sup.market_supplier.start",
+        "sup.market_supplier.other",
+    );
     let coins = world.get::<Wallet>(buyer)?.coins;
     let here = *world.get::<SimPos>(buyer)?;
     // Only the living can sell, so only actors with a vitality are looked at.
     // The ranking key ends in the identity, so the order of the query does
     // not matter.
-    let sellers: Vec<(SimId, Entity)> = world
-        .try_query::<(Entity, &SimId, &Vitality)>()
-        .map(|mut query| query.iter(world).map(|(e, id, _)| (*id, e)).collect())
-        .unwrap_or_default();
+    let sellers = super::lookup::ids_with::<Vitality>(world);
     sellers
         .iter()
         .filter_map(|(id, seller)| {
@@ -118,6 +145,7 @@ fn depot_offers(
     coins: u32,
     here: SimPos,
 ) -> Vec<(bool, u32, i64, SimId, Entity)> {
+    let _probe = super::probe::lookup(world, "sup.depot_offers.start", "sup.depot_offers.other");
     use super::civic;
     if !civic::any_depot(world) {
         return Vec::new();
@@ -202,6 +230,7 @@ fn still_sells(world: &World, buyer: Entity, seller: Entity, kind: &str) -> bool
 
 /// The remembered seller of `kind`, while the errand holds.
 fn recall_seller(world: &World, buyer: Entity, kind: &str) -> Option<Entity> {
+    let _probe = super::probe::lookup(world, "sup.recall_seller.start", "sup.recall_seller.other");
     let errand = world.get::<Errand>(buyer)?;
     let now = world.resource::<SimClock>().tick;
     if errand.good != kind || errand.until <= now {
@@ -272,15 +301,13 @@ pub(super) fn can_forage(world: &World, actor: Entity, kind: &str) -> bool {
 }
 
 pub(crate) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<(SimId, Entity)> {
+    let _probe = super::probe::lookup(world, "sup.gather_source.start", "sup.gather_source.other");
     if econ::fit(world, actor, &[Item::new(kind)]).is_err() {
         return None;
     }
     let here = world.get::<SimPos>(actor).copied().unwrap_or_default();
     // A query over the patches; the ranking key ends in the identity.
-    let patches: Vec<(SimId, Entity)> = world
-        .try_query::<(Entity, &SimId, &ResourcePatch)>()
-        .map(|mut query| query.iter(world).map(|(e, id, _)| (*id, e)).collect())
-        .unwrap_or_default();
+    let patches = super::lookup::ids_with::<ResourcePatch>(world);
     patches
         .iter()
         .filter_map(|(id, e)| {
@@ -303,6 +330,7 @@ pub(crate) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<
 /// Regional residents fetch urgent hearth fuel from a patch that is closer than
 /// the nearest seller instead of freezing on a walk to another settlement.
 pub(super) fn patch_nearer_than_seller(world: &World, actor: Entity, kind: &str) -> bool {
+    let _probe = super::probe::lookup(world, "sup.patch_nearer.start", "sup.patch_nearer.other");
     let Some(here) = world.get::<SimPos>(actor).copied() else {
         return false;
     };
@@ -336,6 +364,7 @@ pub(super) type Procurement = (u8, i64, &'static str, u32);
 /// Goods the funded plan of this actor wants and an affordable seller offers
 /// now, nearest first within each priority.
 pub(super) fn procurement(world: &World, actor: Entity) -> Vec<Procurement> {
+    let _probe = super::probe::lookup(world, "sup.procurement.start", "sup.procurement.other");
     use super::production;
     let mut procure: Vec<_> = catalog::trade_kinds(world)
         .iter()

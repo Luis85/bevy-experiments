@@ -1677,6 +1677,7 @@ fn compute(world: &World) -> ProductionPlan {
 }
 
 fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
+    let phase = super::probe::probe(world, "plan.a_inventory");
     // A query over the people in identity order, not a scan of every identity.
     let mut everybody: Vec<(SimId, Entity, Role)> = world
         .try_query::<(Entity, &SimId, &Villager)>()
@@ -1812,6 +1813,8 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             }
         }
     }
+    drop(phase);
+    let phase = super::probe::probe(world, "plan.b_depths");
     let mut depths = BTreeMap::new();
     for kind in catalog::trade_kinds(world) {
         if depth(
@@ -1831,6 +1834,8 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
     }
     // Executable, urgent bodily needs go first. Future two-day shopping must
     // not consume the same cash and material lots needed to keep makers alive.
+    drop(phase);
+    let phase = super::probe::probe(world, "plan.c_needs");
     let mut critical = Targets::new();
     for (id, e, _) in &people {
         if econ::need(world, *e, "Thirst") < 55_000 {
@@ -1921,6 +1926,8 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             builder.ledger.sellable.insert((store, kind));
         }
     }
+    drop(phase);
+    let phase = super::probe::probe(world, "plan.d_materials");
     let needed = needed_materials(world, &people, &builder.recipes, &civic_orders);
     builder.reserve_working_capital(&needed, &depths);
     for (id, e, role) in &people {
@@ -2011,7 +2018,11 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             }
         }
     };
+    drop(phase);
+    let phase = super::probe::probe(world, "plan.e_run");
     run(&mut builder);
+    drop(phase);
+    let phase = super::probe::probe(world, "plan.f_standing");
     // Standing work (closing design), after every order: the settlement wants
     // its staples' planned stock on hand whether or not a buyer has ordered
     // yet, so makers fill spare capacity and cash with it, never ahead of a
@@ -2046,6 +2057,8 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         run(&mut builder);
         builder.ordered = None;
     }
+    drop(phase);
+    let _phase = super::probe::probe(world, "plan.g_shelves");
     if settlement.is_some() {
         builder.stock_shelves();
         builder.stock_coats();

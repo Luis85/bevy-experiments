@@ -23,10 +23,29 @@ pub fn free_items(world: &World, holder: Entity) -> Vec<(SimId, Item)> {
         .collect()
 }
 pub fn count(world: &World, holder: Entity, kind: &str) -> u32 {
-    free_items(world, holder)
+    // [`free_items`] filtered by kind, without copying every item (S4: the
+    // stock count runs for every seller in a supplier lookup). The filters
+    // are pure, so testing the kind before the reservation gives the same sum.
+    if super::lookup::brute_force(world) {
+        return free_items(world, holder)
+            .iter()
+            .filter(|(_, i)| i.kind == kind)
+            .map(|(_, i)| i.stack)
+            .sum();
+    }
+    let Some(inventory) = world.get::<Inventory>(holder) else {
+        return 0;
+    };
+    let index = world.get_resource::<SimIndex>();
+    let reservations = world.get_resource::<Reservations>();
+    inventory
+        .items
         .iter()
-        .filter(|(_, i)| i.kind == kind)
-        .map(|(_, i)| i.stack)
+        .filter_map(|id| {
+            let item = world.get::<Item>(index?.get(*id)?)?;
+            (item.kind == kind && !reservations.is_some_and(|r| r.count(*id) > 0))
+                .then_some(item.stack)
+        })
         .sum()
 }
 pub fn fit(world: &World, holder: Entity, incoming: &[Item]) -> Result<(), String> {

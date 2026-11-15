@@ -669,15 +669,8 @@ pub fn assigned(world: &World, workplace: SimId) -> u32 {
 
 /// Every living actor, ascending by identity.
 fn living_actors(world: &World) -> Vec<(SimId, Entity)> {
-    let Some(mut query) = world.try_query::<(Entity, &SimId, &village::Vitality)>() else {
-        return Vec::new();
-    };
-    let mut out: Vec<(SimId, Entity)> = query
-        .iter(world)
-        .filter(|(_, _, vitality)| vitality.died_at.is_none())
-        .map(|(entity, id, _)| (*id, entity))
-        .collect();
-    out.sort_unstable_by_key(|(id, _)| *id);
+    let mut out = village::lookup::ids_with::<village::Vitality>(world);
+    out.retain(|(_, entity)| village::living(world, *entity));
     out
 }
 

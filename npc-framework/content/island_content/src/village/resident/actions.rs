@@ -53,11 +53,23 @@ const GATHER_CLASSES: &[&str] = &["water", "food", "fuel", "outputs"];
 const SELL_CLASSES: &[&str] = &["surplus"];
 const HAUL_CLASSES: &[&str] = &["fuel", "materials", "surplus", "restock", "boat"];
 
+/// A leaf start measured under the profiler row `start.<action>` (S4
+/// measurement; hash-neutral, see `village::probe`).
+macro_rules! timed {
+    ($name:literal, $start:path) => {{
+        fn timed_start(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
+            let _probe = super::super::probe::start(world, concat!("start.", $name));
+            $start(world, actor, param)
+        }
+        timed_start
+    }};
+}
+
 /// Every action a resident tree may name, sorted by name.
 pub const ACTIONS: &[ActionInfo] = &[
     ActionInfo {
         name: "life.build",
-        start: build,
+        start: timed!("life.build", build),
         param: Param::None,
         always_starts: false,
         doc: "Work on the cottage commission this resident was given, else on a building site \
@@ -66,7 +78,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.buy",
-        start: buy,
+        start: timed!("life.buy", buy),
         param: Param::NamesOrGood(BUY_CLASSES),
         always_starts: false,
         doc: "Walk to the best affordable seller and buy. `water` and `food` buy one unit to \
@@ -77,7 +89,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.change_job",
-        start: change_job,
+        start: timed!("life.change_job", change_job),
         param: Param::None,
         always_starts: false,
         doc: "Take a requested or better-paid vacant workplace at an idle moment. Fails when \
@@ -85,14 +97,14 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.collect_found",
-        start: collect_found,
+        start: timed!("life.collect_found", collect_found),
         param: Param::None,
         always_starts: false,
         doc: "Pick up a dropped coin purse or diary within reach. Fails when none is near.",
     },
     ActionInfo {
         name: "life.continue",
-        start: carry_on,
+        start: timed!("life.continue", carry_on),
         param: Param::None,
         always_starts: false,
         doc: "Keep doing the physical work already in progress (gathering, crafting, hunting, \
@@ -100,7 +112,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.craft",
-        start: craft,
+        start: timed!("life.craft", craft),
         param: Param::OptionalRecipe,
         always_starts: false,
         doc: "Walk to the workplace and start the best-scoring funded recipe whose inputs are \
@@ -108,14 +120,14 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.drink",
-        start: drink,
+        start: timed!("life.drink", drink),
         param: Param::None,
         always_starts: false,
         doc: "Drink one carried water. Fails when none is carried.",
     },
     ActionInfo {
         name: "life.eat",
-        start: eat,
+        start: timed!("life.eat", eat),
         param: Param::OptionalFood,
         always_starts: false,
         doc: "Eat one carried food: the preferred food, else the alternative, else berries; \
@@ -123,14 +135,14 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.equip",
-        start: equip,
+        start: timed!("life.equip", equip),
         param: Param::None,
         always_starts: false,
         doc: "Put on a carried coat. Fails when one is already worn or none is carried.",
     },
     ActionInfo {
         name: "life.gather",
-        start: gather,
+        start: timed!("life.gather", gather),
         param: Param::NamesOrGood(GATHER_CLASSES),
         always_starts: false,
         doc: "Walk to the nearest patch and gather one unit. `water` and `food` (berries) are \
@@ -140,7 +152,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.go_to",
-        start: go_to,
+        start: timed!("life.go_to", go_to),
         param: Param::Place,
         always_starts: false,
         doc: "Walk to `home`, `work`, `centre` (the settlement centre), a place from \
@@ -149,7 +161,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.harvest",
-        start: harvest,
+        start: timed!("life.harvest", harvest),
         param: Param::None,
         always_starts: false,
         doc: "A farmer walks to a field of the settlement with a ripe plot and harvests it. \
@@ -158,7 +170,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.haul",
-        start: haul,
+        start: timed!("life.haul", haul),
         param: Param::Names(HAUL_CLASSES),
         always_starts: false,
         doc: "`fuel` carries hearth fuel home, where the household lights the hearth. \
@@ -171,7 +183,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.help",
-        start: help,
+        start: timed!("life.help", help),
         param: Param::None,
         always_starts: false,
         doc: "Lend a played friend a hand in free time (living world, at most once a day each, \
@@ -182,7 +194,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.hunt",
-        start: hunt,
+        start: timed!("life.hunt", hunt),
         param: Param::None,
         always_starts: false,
         doc: "A hunter with a spear and funded demand approaches the nearest prey and hunts. \
@@ -190,7 +202,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.sit_down",
-        start: sit_down,
+        start: timed!("life.sit_down", sit_down),
         param: Param::None,
         always_starts: false,
         doc: "Sit down to the meal: eats the first food carried when hunger is below \
@@ -200,14 +212,14 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.idle",
-        start: idle,
+        start: timed!("life.idle", idle),
         param: Param::None,
         always_starts: true,
         doc: "Stand still for one decision. Always starts; put it last.",
     },
     ActionInfo {
         name: "life.pursue_goal",
-        start: pursue_goal,
+        start: timed!("life.pursue_goal", pursue_goal),
         param: Param::None,
         always_starts: false,
         doc: "GOAP: plan a sequence of buy, gather and craft steps towards the funded \
@@ -216,7 +228,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.sell",
-        start: sell,
+        start: timed!("life.sell", sell),
         param: Param::NamesOrGood(SELL_CLASSES),
         always_starts: false,
         doc: "Carry goods offered for sale to the nearest neighbour with funded demand and \
@@ -225,21 +237,21 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.sleep",
-        start: sleep,
+        start: timed!("life.sleep", sleep),
         param: Param::None,
         always_starts: true,
         doc: "Walk home and rest there (300 ticks per rest). Always starts.",
     },
     ActionInfo {
         name: "life.socialise",
-        start: socialise,
+        start: timed!("life.socialise", socialise),
         param: Param::None,
         always_starts: false,
         doc: "Walk to a free neighbour nearby for a meeting. Fails when nobody is free.",
     },
     ActionInfo {
         name: "life.sow",
-        start: sow,
+        start: timed!("life.sow", sow),
         param: Param::None,
         always_starts: false,
         doc: "A farmer walks to a field with a fallow plot and sows it, in a sowing season with \
@@ -248,7 +260,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.tend",
-        start: tend,
+        start: timed!("life.tend", tend),
         param: Param::None,
         always_starts: false,
         doc: "A farmer walks to a field and tends a growing plot that has not been tended for \
@@ -256,7 +268,7 @@ pub const ACTIONS: &[ActionInfo] = &[
     },
     ActionInfo {
         name: "life.warm_up",
-        start: warm_up,
+        start: timed!("life.warm_up", warm_up),
         param: Param::None,
         always_starts: true,
         doc: "Walk home and stay by the hearth until warm (at most 1500 ticks). Always starts.",

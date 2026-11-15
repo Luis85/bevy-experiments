@@ -24,11 +24,14 @@ pub mod island_save;
 pub mod ledger;
 pub mod live;
 pub mod living;
+pub mod lookup;
 pub mod market;
 pub mod merchant;
 mod model;
 pub mod player_journey;
 pub mod policy;
+#[doc(hidden)]
+pub mod probe;
 pub mod production;
 pub mod public_feedback;
 pub mod resident;
@@ -346,15 +349,26 @@ fn hold_arriving_needs(world: &mut World) {
 }
 
 fn tick(world: &mut World) {
+    let _probe = probe::probe(world, "eco.total");
     // The ledger closes a season before anything of the new day happens
     // (closing fix: it ran after the day's levy and grants, so a season's
     // closing fund already held the next day's flows).
     if world.contains_resource::<ledger::SeasonLedger>() {
+        let _probe = probe::probe(world, "eco.ledger");
         ledger::tick(world);
     }
     hold_arriving_needs(world);
     ai::tick(world);
-    homestead::tick(world);
-    colony::tick(world);
-    frontier::tick(world);
+    {
+        let _probe = probe::probe(world, "eco.homestead");
+        homestead::tick(world);
+    }
+    {
+        let _probe = probe::probe(world, "eco.colony");
+        colony::tick(world);
+    }
+    {
+        let _probe = probe::probe(world, "eco.frontier");
+        frontier::tick(world);
+    }
 }

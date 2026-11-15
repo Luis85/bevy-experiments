@@ -51,6 +51,8 @@ pub fn register(app: &mut App) {
     super::civic::register(app);
     // A pure memo of route searches; see `routes::RouteMemo`.
     app.init_resource::<routes::RouteMemo>();
+    // Reused query states of the hot lookups; see `village::lookup`.
+    app.init_resource::<crate::village::lookup::LookupCache>();
     super::weather::register(app);
     super::fields::register(app);
     super::merchant::register(app);
