@@ -178,7 +178,7 @@ Escape does one thing per press, topmost first. Check each row at 1440x900 and a
 | Briefing, Equipment, Character, World map, Mara or Operations | Camp home |
 | Camp home | Results, when the last defense has settled and the journey is running; otherwise asks "Return to the main menu?" |
 | Results | Asks "Return to the main menu?" |
-| Journey upgrades | Results, or Camp home when no defense has settled |
+| Journey upgrades | Results, when the last defense has settled and the journey is running; otherwise Camp home |
 | Battle, holding Retreat & train | Cancels the hold; nothing else happens |
 | Battle, construction open | Closes construction; the battle keeps running |
 | Battle, otherwise | Pauses or resumes while Pause is bound to Escape (the default); with Pause on another key, Escape does nothing in battle |
