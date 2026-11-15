@@ -7,7 +7,9 @@
 # -Viewport normal is 1440x900 at UI scale 1.0, small is 1050x700 at 1.35 (capture_review's two sizes). The
 # version-2 manifest must report the requested reduced_effects, width, height and scale, plus windows_scale.
 # Every frame carries flash_alpha_max, sky_flash and muzzle_flash_count: with -ReducedEffects all three must be 0 in
-# every frame; a normal storm export must show a pulse (sky_flash > 0) that moves by less than 0.2 a frame.
+# every frame; a normal storm export must show a pulse (sky_flash > 0, at most the 0.14 peak alpha) lit in two
+# neighbouring frames. sky_flash is an alpha: the storm's luminance step (delta L < 0.2) is measured on the PNGs by
+# measure_field_luminance.py storm.
 # A relative -OutputDirectory or -Executable resolves against the workspace, never the caller's directory.
 [CmdletBinding()]
 param(

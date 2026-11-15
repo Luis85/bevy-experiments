@@ -255,8 +255,11 @@ function Get-ReviewSceneList {
 function Get-MotionFlashProblem {
     # The flash gate of a motion manifest's frames (design-qa-captures 1.9, W5-10). Every frame must carry the numeric
     # fields flash_alpha_max, sky_flash and muzzle_flash_count. With -ReducedEffects all three are 0 in every frame.
-    # With -Storm (the storm scene, normal effects) at least one frame has sky_flash > 0 and sky_flash moves by less
-    # than 0.2 between neighbouring frames. Returns the first problem as a string, or $null.
+    # With -Storm (the storm scene, normal effects) at least one frame has sky_flash > 0, no frame exceeds the sky-flash
+    # peak alpha (SKY_PEAK_ALPHA 0.14, art/lighting.rs) and the pulse is lit in two neighbouring frames, so it rises
+    # and decays rather than popping. sky_flash is an over-rect alpha, not a luminance: the storm's frame-to-frame
+    # luminance step (G7.3, delta L < 0.2) is gated by measure_field_luminance.py storm on the PNGs.
+    # Returns the first problem as a string, or $null.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Frames,
@@ -274,10 +277,17 @@ function Get-MotionFlashProblem {
     }
     if ($Storm -and -not $ReducedEffects) {
         if (@($Frames | Where-Object { [double]$_.sky_flash -gt 0 }).Count -eq 0) { return 'The storm export captured no lightning pulse (sky_flash is 0 in every frame)' }
-        for ($i = 1; $i -lt $Frames.Count; $i++) {
-            $delta = [Math]::Abs([double]$Frames[$i].sky_flash - [double]$Frames[$i - 1].sky_flash)
-            if ($delta -ge 0.2) { return "sky_flash moves by $delta between frames $($i - 1) and $i (limit 0.2)" }
+        # The manifest writes the f32 alpha; the tolerance absorbs its rounding.
+        $peak = 0.14
+        for ($i = 0; $i -lt $Frames.Count; $i++) {
+            $sky = [double]$Frames[$i].sky_flash
+            if ($sky -gt $peak + 1e-6) { return "Frame $i has sky_flash $sky above the peak alpha $peak" }
         }
+        $held = $false
+        for ($i = 1; $i -lt $Frames.Count; $i++) {
+            if ([double]$Frames[$i].sky_flash -gt 0 -and [double]$Frames[$i - 1].sky_flash -gt 0) { $held = $true; break }
+        }
+        if (-not $held) { return 'The storm pulse pops: no two neighbouring frames have sky_flash > 0' }
     }
     return $null
 }

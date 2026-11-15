@@ -2711,9 +2711,13 @@ fn motion_flash_facts(scene: &str, reduced: bool) -> Vec<crate::art::FlashFacts>
 }
 
 /// Design-qa-captures 1.9 (W5): a normal storm export shows the pulse (at
-/// least one frame with sky_flash > 0, frame-to-frame delta below 0.2), a
+/// least one frame with sky_flash > 0, none above `SKY_PEAK_ALPHA`, lit in
+/// two neighbouring frames so it rises and decays rather than popping), a
 /// normal machine-gun export shows muzzle flashes, and the reduced exports
 /// of storm, fx-stress and weapon-classes-machine-gun are all zeros.
+/// sky_flash is the over-rect alpha, not a luminance: the storm's ΔL < 0.2
+/// (G7.3) is `sky_flash_peak_delta_below_0_2_under_gamma_and_linear_blending` and
+/// measure_field_luminance.py storm on the exported PNGs.
 #[cfg(feature = "review")]
 #[test]
 fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
@@ -2726,9 +2730,15 @@ fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
     );
     assert!(
         storm
+            .iter()
+            .all(|f| f.sky_flash <= crate::art::lighting::SKY_PEAK_ALPHA),
+        "never above the peak alpha: {storm:?}"
+    );
+    assert!(
+        storm
             .windows(2)
-            .all(|pair| (pair[1].sky_flash - pair[0].sky_flash).abs() < 0.2),
-        "{storm:?}"
+            .any(|pair| pair[0].sky_flash > 0.0 && pair[1].sky_flash > 0.0),
+        "the pulse is lit in two neighbouring frames: {storm:?}"
     );
     assert!(storm.iter().all(|f| f.flash_alpha_max >= f.sky_flash));
     // The machine gun fires every eighth tick and its flash polygon lives

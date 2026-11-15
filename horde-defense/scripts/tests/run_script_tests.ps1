@@ -425,7 +425,7 @@ try {
         Assert-True ($null -eq (Get-MotionFlashProblem -Frames $dark -ReducedEffects)) 'a reduced export of zeros passes'
         Assert-True ($null -eq (Get-MotionFlashProblem -Frames $dark -ReducedEffects -Storm)) 'a reduced storm export of zeros passes'
         # The manifest as the game writes it: JSON numbers, parsed by ConvertFrom-Json.
-        $parsed = @(('[{"flash_alpha_max":0.9,"sky_flash":0.0,"muzzle_flash_count":2},{"flash_alpha_max":0.14,"sky_flash":0.14,"muzzle_flash_count":0}]' | ConvertFrom-Json))
+        $parsed = @(('[{"flash_alpha_max":0.9,"sky_flash":0.0,"muzzle_flash_count":2},{"flash_alpha_max":0.14,"sky_flash":0.14,"muzzle_flash_count":0},{"flash_alpha_max":0.09,"sky_flash":0.09,"muzzle_flash_count":0}]' | ConvertFrom-Json))
         Assert-True ($null -eq (Get-MotionFlashProblem -Frames $parsed -Storm)) 'a normal storm export with a pulse passes'
         Assert-True ((Get-MotionFlashProblem -Frames $parsed -ReducedEffects) -like 'Reduced effects must not flash: frame 0 has flash_alpha_max*') 'a reduced export that flashes fails'
         $muzzle = @((& $frame 0.0 0.0 1))
@@ -433,8 +433,12 @@ try {
         $sky = @((& $frame 0.0 0.01 0))
         Assert-True ((Get-MotionFlashProblem -Frames $sky -ReducedEffects) -like '*sky_flash 0.01') 'a reduced sky flash fails'
         Assert-True ((Get-MotionFlashProblem -Frames $dark -Storm) -like 'The storm export captured no lightning pulse*') 'a storm export without a pulse fails'
-        $jump = @((& $frame 0.0 0.0 0), (& $frame 0.25 0.25 0))
-        Assert-True ((Get-MotionFlashProblem -Frames $jump -Storm) -like 'sky_flash moves by 0.25 between frames 0 and 1*') 'a sky flash step of 0.2 or more fails'
+        # sky_flash is the over-rect alpha, at most SKY_PEAK_ALPHA (0.14, art/lighting.rs); the 0.2 luminance-step
+        # gate belongs to measure_field_luminance.py storm on the PNGs.
+        $bright = @((& $frame 0.0 0.0 0), (& $frame 0.15 0.15 0), (& $frame 0.1 0.1 0))
+        Assert-True ((Get-MotionFlashProblem -Frames $bright -Storm) -like 'Frame 1 has sky_flash 0.15 above the peak alpha 0.14*') 'a sky flash above the peak alpha fails'
+        $pop = @((& $frame 0.0 0.0 0), (& $frame 0.14 0.14 0), (& $frame 0.0 0.0 0), (& $frame 0.1 0.1 0))
+        Assert-True ((Get-MotionFlashProblem -Frames $pop -Storm) -like 'The storm pulse pops*') 'a pulse lit in no two neighbouring frames fails'
         $old = @([pscustomobject]@{ file = 'frame.png'; native_frame = 60 })
         Assert-Equal 'Frame 0 has no numeric flash_alpha_max' (Get-MotionFlashProblem -Frames $old) 'a manifest without the fields fails'
         $text = @((& $frame 0.0 '0' 0))
