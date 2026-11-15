@@ -142,6 +142,35 @@ pub(crate) fn schedule_motion_release(
     }
 }
 
+/// The native frame on which a motion export pulls the trigger its fixture
+/// staged latched, or None when the latch runs from startup. The machine gun
+/// fires every eighth tick and its flash polygon lives three, so from a latch
+/// held since startup the frames, four ticks apart, land only on the muzzle
+/// light's tail. The machine-gun export starts with the trigger released and
+/// latches it here instead, so every second frame draws a shot's flash one
+/// tick old and the others its light: the reduced export's zero muzzle-flash
+/// count is then a contrast with frames that do have one.
+#[cfg(feature = "review")]
+pub(crate) fn motion_trigger_frame(launch: &crate::launch::LaunchConfig) -> Option<u32> {
+    (launch.reviewing("weapon-classes-machine-gun")
+        && launch.motion_review()
+        && launch.sequence_path().is_some())
+    .then_some(crate::capture_sequence::FIRST - 2)
+}
+
+/// Capture-service timing bridge: on the trigger frame the export latches
+/// fire, as the Toggle key does.
+#[cfg(feature = "review")]
+pub(crate) fn schedule_motion_trigger(
+    launch: &crate::launch::LaunchConfig,
+    battle: &mut BattleUi,
+    frame: u32,
+) {
+    if motion_trigger_frame(launch) == Some(frame) {
+        battle.fire_latched = true;
+    }
+}
+
 /// What one review still showed, written beside its PNG as the capture
 /// sidecar (`<capture>.json`). Rects are `[left, top, right, bottom]` in egui
 /// points. The battle field and its effects clip come from the rects the
@@ -338,7 +367,9 @@ pub(super) fn apply_reduced_override(
 /// synthetic and copied perf fixtures keep their staged disclaimer (no
 /// gameplay or FPS claim) instead of the generic live-motion note; the peak
 /// fixture, staged paused, says it runs live. A fixture with a
-/// `motion_release_frame` stays paused until the export resumes it.
+/// `motion_release_frame` stays paused until the export resumes it, and one
+/// with a `motion_trigger_frame` starts with its trigger released until the
+/// export latches it.
 pub(super) fn apply_motion_override(f: &mut FrontendParts, config: &crate::launch::LaunchConfig) {
     if config.scenario.is_some() && !config.practice && config.motion_review() {
         #[cfg(feature = "review")]
@@ -347,6 +378,10 @@ pub(super) fn apply_motion_override(f: &mut FrontendParts, config: &crate::launc
         let held = false;
         if !held {
             f.game.set_paused(false);
+        }
+        #[cfg(feature = "review")]
+        if motion_trigger_frame(config).is_some() {
+            f.battle.fire_latched = false;
         }
         f.battle.set_construction(false);
         match config.scenario.as_deref() {

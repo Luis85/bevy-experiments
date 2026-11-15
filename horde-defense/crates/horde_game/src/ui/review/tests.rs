@@ -2755,6 +2755,7 @@ fn motion_flash_frames(scene: &str, reduced: bool) -> Vec<(crate::art::FlashFact
             ));
         }
         schedule_motion_release(&config, &mut f.runtime, frame);
+        crate::ui::schedule_motion_trigger(&config, &mut f.battle, frame);
         // The battle screen's egui pass publishes the controls it holds.
         one_frame(&mut f);
     }
@@ -2766,8 +2767,10 @@ fn motion_flash_frames(scene: &str, reduced: bool) -> Vec<(crate::art::FlashFact
 /// rises and decays rather than popping, and every frame's sky_flash the
 /// schedule's alpha at that frame's own tick, so the facts the manifest
 /// writes follow the stage's seed, the tick clock and the quiet windows), a
-/// normal machine-gun export shows muzzle flashes, and the reduced exports
-/// of storm, fx-stress and weapon-classes-machine-gun are all zeros. No
+/// normal machine-gun export captures muzzle flashes (its trigger is pulled
+/// on `review::motion_trigger_frame`, so frames land on a flash one tick
+/// old) and lights every frame, and the reduced exports of storm, fx-stress
+/// and weapon-classes-machine-gun are all zeros. No
 /// frame can exceed `SKY_PEAK_ALPHA` (sky_flash is `lighting::sky_alpha` of
 /// a clamped pulse), so the peak is not asserted.
 /// sky_flash is the over-rect alpha, not a luminance: the storm's ΔL < 0.2
@@ -2797,10 +2800,11 @@ fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
             .any(|pair| pair[0].sky_flash > 0.0 && pair[1].sky_flash > 0.0),
         "the pulse is lit in two neighbouring frames: {storm:?}"
     );
-    // The machine gun fires every eighth tick and its flash polygon lives
-    // three, so the export's every-fourth-tick frames catch the muzzle
-    // light's tail, not the polygon; the still, paused on the shot, has it.
     let gun = motion_flash_facts("weapon-classes-machine-gun", false);
+    assert!(
+        gun.iter().any(|f| f.muzzle_flash_count > 0),
+        "a captured frame lands on a muzzle flash: {gun:?}"
+    );
     assert!(
         gun.iter().all(|f| f.flash_alpha_max > 0.0),
         "the machine gun lights every frame: {gun:?}"

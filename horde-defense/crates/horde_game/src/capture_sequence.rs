@@ -140,6 +140,7 @@ pub fn capture_frames(
     let frame = state.frame;
     crate::ui::schedule_gesture_review(&config, &session.game, &mut battle, frame);
     crate::ui::schedule_motion_release(&config, &mut runtime, frame);
+    crate::ui::schedule_motion_trigger(&config, &mut battle, frame);
     if let Some(index) = frame_index(frame) {
         let Some(directory) = state.directory.clone() else {
             return;
