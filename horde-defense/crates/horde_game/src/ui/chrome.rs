@@ -117,12 +117,27 @@ pub(super) fn defender_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
     if entries.len() <= 1 {
         return;
     }
+    // In a wrapped row (the Briefing header) a picker that does not fit the
+    // rest of the line takes the next one whole (CF-3, carried item 16).
+    let layout = ui.layout();
+    if layout.main_wrap
+        && layout.is_horizontal()
+        && ui.cursor().left() > ui.max_rect().left() + 0.5
+        && ui.available_size_before_wrap().x < picker_width(ui, &entries)
+    {
+        ui.end_row();
+    }
     let mut chosen = None;
     let mut options = |ui: &mut egui::Ui| {
         for entry in &entries {
             let response = ui
                 .add_enabled_ui(entry.blocked.is_none(), |ui| {
-                    ui.selectable_label(entry.selected, entry.label())
+                    // A chip never wraps its name: one that does not fit
+                    // moves whole to the row's next line.
+                    ui.add(
+                        egui::Button::selectable(entry.selected, entry.label())
+                            .wrap_mode(egui::TextWrapMode::Extend),
+                    )
                 })
                 .inner;
             let response = match &entry.blocked {
@@ -153,6 +168,31 @@ pub(super) fn defender_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
         f.dispatch(Command::SetNextDefender(id), "");
         f.campaign.improvement_focus = None;
     }
+}
+/// The width the defender picker takes on one line: its "Defender" label,
+/// then its unwrapped chips (or its combo box), with the gaps between them.
+fn picker_width(ui: &egui::Ui, entries: &[PickerEntry]) -> f32 {
+    let measure = |text: String, style: egui::TextStyle| {
+        let font = style.resolve(ui.style());
+        ui.painter()
+            .layout_no_wrap(text, font, Color32::PLACEHOLDER)
+            .size()
+            .x
+    };
+    let spacing = ui.spacing();
+    let label = measure("Defender".to_owned(), egui::TextStyle::Body);
+    let options = if entries.len() <= PICKER_CHIPS {
+        entries
+            .iter()
+            .map(|entry| {
+                measure(entry.label(), egui::TextStyle::Button) + 2.0 * spacing.button_padding.x
+            })
+            .sum::<f32>()
+            + spacing.item_spacing.x * (entries.len() - 1) as f32
+    } else {
+        spacing.combo_width
+    };
+    label + spacing.item_spacing.x + options
 }
 /// Height of a padded button or combo box. Wrapped filter rows set their
 /// interact height to this before adding widgets: egui centres each widget in

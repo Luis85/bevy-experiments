@@ -107,6 +107,52 @@ fn briefing_loadout_and_readiness_sit_above_the_footer_at_both_review_sizes() {
     assert!(f.nav.tab == Tab::Armory);
 }
 
+/// CF-3 (closing, carried item 16): the Briefing header's defender chips
+/// keep each name on one line. With three defenders at 1050x700@1.35 the
+/// header row left the last chip a sliver, and egui wrapped "Alex Rowan"
+/// one letter per line down the window edge, pushing Field loadout below
+/// the fold. A picker that does not fit beside the title takes the next
+/// line whole, inside the page.
+#[test]
+fn briefing_defender_chips_keep_one_line_at_both_sizes() {
+    for target in Target::BOTH {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        let recruit = super::defender_tests::camp_with_recruits(f, &["FRA"])[0];
+        let id = horde_core::defenders::DefenderId::Recruit(recruit);
+        f.game.apply(&Command::SetNextDefender(id)).unwrap();
+        let entries = crate::ui::chrome::picker_entries(&f.game);
+        assert_eq!(entries.len(), 3, "the player, Mara and one recruit");
+        f.act(|c| c.open_briefing());
+        f.flush_for_test();
+        let output = h.frame(f, View::WorldWithChrome, vec![]);
+        let page = Rect::from_min_size(Pos2::ZERO, target.points());
+        let line = clipped_bounds(&output, "Defender")
+            .expect("the picker's label")
+            .0
+            .height();
+        for entry in &entries {
+            let label = entry.label();
+            let (chip, clip) = clipped_bounds(&output, &label)
+                .unwrap_or_else(|| panic!("{target:?}: {label} chip not painted"));
+            assert!(
+                chip.height() < line * 1.5,
+                "{target:?}: {label} wraps to {chip:?} (one line is {line})"
+            );
+            assert!(
+                page.contains_rect(chip) && clip.contains_rect(chip),
+                "{target:?}: {label} at {chip:?} leaves the page {page:?}"
+            );
+        }
+        assert!(
+            fully_visible(&output, "Field loadout"),
+            "{target:?}: {:?}",
+            clipped_bounds(&output, "Field loadout")
+        );
+    }
+}
+
 /// W3-23: the briefing reads `Game::stage_preview`. It shows the difficulty
 /// the country plays at (Bangladesh's raw 1.60 clamped to 1.05 as the start
 /// country), the stage's front ramp, and the boss's rank as a text badge on
