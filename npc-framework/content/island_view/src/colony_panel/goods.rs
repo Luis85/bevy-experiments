@@ -397,18 +397,26 @@ fn cause_rank(cause: &WithoutCause) -> u8 {
 }
 
 /// A cause of going without for one resident ("has no coins") or for
-/// several ("have no coins").
-fn cause_words(rank: u8, one: bool) -> &'static str {
+/// several ("have no coins"); `them` for goods counted in units ("logs").
+fn cause_words(rank: u8, one: bool, them: bool) -> String {
+    let it = if them { "them" } else { "it" };
     match (rank, one) {
-        (0, true) => "has no coins",
-        (0, false) => "have no coins",
-        (1, true) => "finds nobody selling it",
-        (1, false) => "find nobody selling it",
-        (2, true) => "finds it too dear",
-        (2, false) => "find it too dear",
-        (_, true) => "lives too far from a seller",
-        (_, false) => "live too far from a seller",
+        (0, true) => "has no coins".to_owned(),
+        (0, false) => "have no coins".to_owned(),
+        (1, true) => format!("finds nobody selling {it}"),
+        (1, false) => format!("find nobody selling {it}"),
+        (2, true) => format!("finds {it} too dear"),
+        (2, false) => format!("find {it} too dear"),
+        (_, true) => "lives too far from a seller".to_owned(),
+        (_, false) => "live too far from a seller".to_owned(),
     }
+}
+
+/// Whether a good's name is a plural of units ("logs", "berries", "warm
+/// clothes"), said with "fewer" and "them"; a mass ("bread", "flour",
+/// "clean water") takes "less" and "it".
+fn counted(good: &str) -> bool {
+    good.ends_with('s')
 }
 
 /// Card line 7: who has less of `good` than they like to keep (most still
@@ -422,11 +430,13 @@ pub(crate) fn without_sentence(
 ) -> Option<(String, Vec<SimId>)> {
     let first = lines.first()?;
     let who: Vec<SimId> = lines.iter().map(|line| line.who).collect();
+    let them = counted(good);
+    let less = if them { "fewer" } else { "less" };
     let short = if lines.len() == 1 {
-        format!("{} has less {good} than they like to keep", first.label)
+        format!("{} has {less} {good} than they like to keep", first.label)
     } else {
         format!(
-            "{} residents have less {good} than they like to keep",
+            "{} residents have {less} {good} than they like to keep",
             lines.len()
         )
     };
@@ -437,7 +447,7 @@ pub(crate) fn without_sentence(
         return Some((
             format!(
                 "{short}, and {}.",
-                cause_words(cause_rank(&first.cause), true)
+                cause_words(cause_rank(&first.cause), true, them)
             ),
             who,
         ));
@@ -451,7 +461,7 @@ pub(crate) fn without_sentence(
     let parts: Vec<String> = causes
         .iter()
         .take(2)
-        .map(|(rank, count)| format!("{count} {}", cause_words(*rank, *count == 1)))
+        .map(|(rank, count)| format!("{count} {}", cause_words(*rank, *count == 1, them)))
         .collect();
     Some((
         format!(
@@ -718,6 +728,23 @@ mod tests {
             "5 residents have less bread than they like to keep; none is on sale."
         );
         assert_eq!(without_sentence(&[], "bread", false), None);
+        // Goods counted in units take "fewer" and "them" (live capture:
+        // "24 residents have less logs ... 12 find nobody selling it").
+        let lines = [
+            without(1, WithoutCause::NoSeller),
+            without(2, WithoutCause::NoSeller),
+            without(3, WithoutCause::NoCoins),
+        ];
+        let (line, _) = without_sentence(&lines, "logs", false).unwrap();
+        assert_eq!(
+            line,
+            "3 residents have fewer logs than they like to keep. 2 find nobody selling them, 1 has no coins."
+        );
+        let (line, _) = without_sentence(&lines[..1], "logs", false).unwrap();
+        assert!(
+            line.ends_with("fewer logs than they like to keep, and finds nobody selling them."),
+            "{line}"
+        );
     }
 
     fn split(on_sale: u32, in_homes: u32, in_stores: u32, at_post: u32) -> StockSplit {

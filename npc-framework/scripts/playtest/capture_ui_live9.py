@@ -670,19 +670,23 @@ def pause_menu(flow, report, checks):
     flow.size_shots("guide-controls")
 
 
-# --- The five states the last pass did not reach -----------------------------
+# --- The states the last passes did not reach ------------------------------
 #
 # Each is made by recorded commands (`npc/command`, the same path the ledger
-# uses) and clock steps on a save of this build, never by writing state:
-# - Nobody makes / Show {job} in Jobs: `SetProfessionTarget` miller 0 in
-#   Harbour, four days (one resident leaves a job per day): the mill has open places and nobody in them; Flour's
-#   card says so and links to Jobs (then the scroll-and-flash).
-# - Held up: the same order; the bakery's bread now waits for flour, so
-#   Flour's card has "Held up: Bread waits for …" (line 8, its tooltip).
-# - Compact fold: the Flour card at 1280x690 (below 700 high is Compact).
-# - Folded alert row: `SetProfessionTarget` water_keeper 0 in Harbour, up to
-#   eight days in quarter days: nobody sells water, so Harbour's residents
-#   go thirsty for one reason and fold into "N residents in Harbour are …".
+# uses) and clock steps on a save of this build, or by a fixture of
+# `island_capture_fixtures`; never by writing state:
+# - Nobody makes / Show {job} in Jobs: the card's maker line counts the
+#   millers of the whole island (`village::view::producers`), so
+#   `SetProfessionTarget` miller 0 goes to every village, and the clock runs
+#   (one resident leaves a job a day) until Flour's card says nobody makes
+#   it. Then Harbour wants one miller again: until the day's work ends the
+#   mill has an open place and nobody in it, so the card offers
+#   "Show miller in Jobs" (then the scroll-and-flash).
+# - Held up: a civic site that waits for a material (an alerts row
+#   "... logs 2/6"): that good's card names the site (line 8, its tooltip).
+# - Compact fold: a good card at 1280x690 (below 700 high is Compact).
+# - Folded alert row: the fixture `village-alerts`, where three residents of
+#   Harbour go hungry and thirsty for one reason (the stack folds them).
 # - The season toast's button: `season_toast` from base0 (two days before
 #   winter) with Economy open; the host no longer toasts autosaves over it.
 
@@ -690,13 +694,21 @@ COMPACT = (1280, 690)
 SETTLEMENT = "living_world_settlement_v1"
 
 
-def settlement_id(flow, key="harbour"):
-    """The village's SimId from the operator read (a capture helper only;
-    nothing the player sees is read this way)."""
+def settlements(flow):
+    """(key, SimId) of every village from the operator read (a capture
+    helper only; nothing the player sees is read this way)."""
+    found = []
     for entity in flow.state()["entities"]:
         settlement = entity.get("components", {}).get(SETTLEMENT)
-        if settlement and settlement.get("key") == key:
-            return entity["sim_id"]
+        if settlement:
+            found.append((settlement.get("key"), entity["sim_id"]))
+    return sorted(found)
+
+
+def settlement_id(flow, key="harbour"):
+    for name, sim_id in settlements(flow):
+        if name == key:
+            return sim_id
     raise RuntimeError(f"no settlement {key!r}")
 
 
@@ -704,51 +716,117 @@ def want(flow, settlement, profession, wanted):
     """A recorded `SetProfessionTarget`, applied by two ticks."""
     receipt = flow.call("npc/command", {"cmd": {"type": "SetProfessionTarget", "settlement": settlement,
                                                 "profession": profession, "wanted": wanted}})
-    flow.report.setdefault("commands", []).append({"profession": profession, "wanted": wanted,
-                                                   "receipt": receipt})
+    flow.report.setdefault("commands", []).append({"settlement": settlement, "profession": profession,
+                                                   "wanted": wanted, "receipt": receipt})
     flow.call("npc/step", {"ticks": 2})
     time.sleep(0.5)
 
 
-def flour_card(flow):
+def goods_page(flow):
     flow.open_page("Economy")
     time.sleep(0.8)
     if flow.has_widget("Goods"):
         flow.click("Goods")
         time.sleep(0.6)
-    return press(flow, "Flour")
 
 
-def nobody_makes_and_held_up(flow, report, checks):
+def card_open(flow, label):
+    """The good card of `label` is open (its maker line shows)."""
+    texts = flow.panel_texts(LEDGER)
+    return label in texts and any(text.startswith(("Made by", "Nobody makes")) for text in texts)
+
+
+def open_card(flow, label):
+    """Open the good card of `label` so that it is scrolled into view: an
+    open card is closed and opened again (a resize keeps the ledger's scroll,
+    and the card scrolls into view only when it opens)."""
+    goods_page(flow)
+    if card_open(flow, label):
+        press(flow, label)
+        time.sleep(0.5)
+    opened = press(flow, label)
+    time.sleep(0.8)
+    return opened and card_open(flow, label)
+
+
+GROUPS = ("Food and water", "Materials", "Tools and clothing")
+
+
+def good_labels(flow):
+    """The goods table's row names (without the group bands)."""
+    goods_page(flow)
+    texts = goods_rows(flow)
+    names = []
+    for text in texts:
+        if text in GROUPS or not text or text[0].isdigit() or text[0] in "+-–" or text in (
+                "steady", "Low"):
+            continue
+        if text.startswith(("up ", "down ")) or " " in text and text.split()[0].isdigit():
+            continue
+        if text not in names and text[0].isupper():
+            names.append(text)
+    return names
+
+
+def nobody_card(flow, goods):
+    """The first good of `goods` whose card says nobody makes it, with that
+    line and the card's link; (None, [], None) when none does."""
+    for good in goods:
+        if not open_card(flow, good):
+            continue
+        card = flow.panel_texts(LEDGER)
+        nobody = [text for text in card if text.startswith("Nobody makes")]
+        if nobody:
+            link = next((text for text in card if text.startswith("Show ") and text.endswith(" in Jobs")),
+                        None)
+            return good, nobody, link
+    return None, [], None
+
+
+def nobody_makes(flow, report, checks):
+    """A good nobody on the island makes. First every good's card as the
+    save stands; then, if none, the recorded way: miller 0 in every village
+    and the clock run (one resident leaves a job a day), then Harbour wants
+    one miller again, so the mill has an open place nobody holds yet."""
     continue_oversee(flow)
-    harbour = settlement_id(flow)
-    want(flow, harbour, "miller", 0)
-    # Residents leave a job one at a time, after the day's work: 4 days.
-    for _ in range(4):
-        step_days(flow, 1)
-        keep_watching(flow)
-    opened = flour_card(flow)
-    time.sleep(1.0)
-    card = flow.dump("flour-card")
-    link = next((text for text in card if text.startswith("Show ") and text.endswith(" in Jobs")), None)
-    held = [text for text in card if text.startswith("Held up")]
-    report["state_nobody_makes"] = {"opened": opened, "nobody": [t for t in card if t.startswith("Nobody")],
-                                    "link": link}
-    report["state_held_up"] = held
-    checks.append({"check": "Flour's card says nobody makes it and links to Jobs",
-                   "ok": link is not None, "card": card[:40]})
-    checks.append({"check": "Flour's card says what is held up for it", "ok": bool(held), "held": held})
-    flow.size_shots("state-flour-card")
-    entity = text_entity(flow, "Held up", LEDGER)
-    if entity:
-        flow.hover(entity)
-        flow.snap("live9-state-held-up-tip-1280x720", SIZES[0])
+    scanned = good_labels(flow)
+    good, nobody, link = nobody_card(flow, scanned)
+    days = 0
+    if good is None:
+        for _, sim_id in settlements(flow):
+            want(flow, sim_id, "miller", 0)
+        # The frozen build of the third round kept its three millers for 12
+        # days with every village wanting none (reported to the sim), so
+        # this route is tried for three days only.
+        for days in range(1, 4):
+            step_days(flow, 1)
+            keep_watching(flow)
+            good, nobody, link = nobody_card(flow, ["Flour"])
+            if good:
+                break
+        if good:
+            flow.dump("flour-card-nobody")
+            flow.size_shots("state-nobody-no-place", prepare=lambda size: open_card(flow, "Flour"))
+            want(flow, settlement_id(flow), "miller", 1)
+            goods_page(flow)
+            press(flow, "Harbour")
+            time.sleep(0.8)
+            good, nobody, link = nobody_card(flow, ["Flour"])
+    report["state_nobody_makes"] = {"scanned": scanned, "good": good, "nobody": nobody, "link": link,
+                                    "days_run": days}
+    checks.append({"check": "a good's card says nobody makes it and links to Jobs",
+                   "ok": link is not None, "good": good, "nobody": nobody})
+    if good:
+        flow.dump("nobody-card")
+        flow.size_shots("state-nobody-card", prepare=lambda size: open_card(flow, good))
     # The narrow ledger: Compact, where the card folds after its first lines.
+    card_good = good or "Flour"
+    open_card(flow, card_good)
     flow.settle(COMPACT)
     time.sleep(1.2)
     texts = flow.panel_texts(LEDGER)
     more = [text for text in texts if text.startswith("More about")]
-    report["state_compact_fold"] = {"more": more, "texts": texts[:40]}
+    report["state_compact_fold"] = {"more": more, "texts": texts[-40:]}
     checks.append({"check": "the good card folds in a Compact window", "ok": bool(more)})
     flow.snap(f"live9-state-compact-fold-{COMPACT[0]}x{COMPACT[1]}", COMPACT)
     if more:
@@ -758,6 +836,7 @@ def nobody_makes_and_held_up(flow, report, checks):
     flow.settle(SIZES[0])
     time.sleep(1.0)
     if link:
+        open_card(flow, good)
         press(flow, link)
         time.sleep(0.25)
         flow.snap("live9-state-show-job-flash-1280x720", SIZES[0])
@@ -766,27 +845,118 @@ def nobody_makes_and_held_up(flow, report, checks):
         flow.snap("live9-state-show-job-after-1280x720", SIZES[0])
 
 
-def folded_alert_row(flow, report, checks):
+def short_goods(flow):
+    """Goods a waiting site lacks, from the alerts' "logs 2/6" parts."""
+    short = []
+    for text in flow.panel_texts("Village alerts"):
+        for part in text.split(" · "):
+            words = part.rsplit(" ", 1)
+            if len(words) == 2 and "/" in words[1]:
+                have, need = words[1].split("/", 1)
+                if have.isdigit() and need.isdigit() and int(have) < int(need):
+                    good = words[0].strip()
+                    label = good[:1].upper() + good[1:]
+                    if label not in short:
+                        short.append(label)
+    return short
+
+
+def wheel_into_view(flow, entity, lowest=560):
+    """Bring `entity` into view inside its scrolling panel, as the panel's
+    own focus scrolling would: the panel's ScrollPosition (view-only, no
+    simulation state) moves until the entity's centre is between the bar
+    and `lowest` (logical px)."""
+    from capture_native_homestead import SCROLL, vector
+    _, parents = flow.shown()
+    scrolls = {int(row["entity"]) for row in query(flow.url, [SCROLL])}
+    ancestor = entity
+    while ancestor in parents and ancestor not in scrolls:
+        ancestor = parents[ancestor]
+    if ancestor not in scrolls:
+        return False
+    for _ in range(4):
+        _, y = flow.centre(entity)
+        if 120 < y < lowest:
+            return True
+        current = vector(next(row["components"][SCROLL] for row in query(flow.url, [SCROLL])
+                              if int(row["entity"]) == ancestor))
+        flow.call("world.mutate_components", {"entity": ancestor, "component": SCROLL, "path": "0",
+                                              "value": [current[0], max(0, current[1] + y - 360)]})
+        time.sleep(0.4)
+    return False
+
+
+def held_up(flow, report, checks):
     continue_oversee(flow)
-    harbour = settlement_id(flow)
-    want(flow, harbour, "water_keeper", 0)
-    found = None
-    # Up to 8 days in quarter days: the wells' keepers leave one a day.
-    for _ in range(32):
-        step_days(flow, 0.25)
-        keep_watching(flow)
-        found = next((text for text in flow.panel_texts("Village alerts") if " residents in " in text), None)
+    found, tried = None, []
+    for _ in range(8):
+        short = short_goods(flow)
+        candidates = short + [good for good in ("Logs", "Planks", "Stone", "Flour") if good not in short]
+        for good in candidates:
+            if not open_card(flow, good):
+                continue
+            tried.append(good)
+            held = [text for text in flow.panel_texts(LEDGER) if text.startswith("Held up")]
+            if held:
+                found = (good, held)
+                break
         if found:
             break
-    report["state_alert_fold"] = {"row": found, "texts": flow.panel_texts("Village alerts")}
+        flow.close_ledger()
+        step_days(flow, 0.5)
+        keep_watching(flow)
+    report["state_held_up"] = {"found": found, "tried": tried}
+    checks.append({"check": "a good's card says what is held up for it", "ok": found is not None,
+                   "held": found})
+    if not found:
+        return
+    good = found[0]
+    flow.dump("held-up-card")
+    flow.size_shots("state-held-up-card", prepare=lambda size: open_card(flow, good))
+    entity = text_entity(flow, "Held up", LEDGER)
+    if entity:
+        # The line sits low in the card: the wheel over the ledger brings it
+        # into view first, as a player would scroll to it.
+        wheel_into_view(flow, entity)
+        flow.hover(entity)
+        flow.dump("held-up-tip")
+        tip = [text for text in flow.texts() if str(text).startswith("Since ")]
+        report["state_held_up"]["tip"] = tip
+        checks.append({"check": "the Held up line's tooltip says since when", "ok": bool(tip), "tip": tip})
+        flow.snap("live9-state-held-up-tip-1280x720", SIZES[0])
+
+
+def folded_alert_row(flow, report, checks):
+    continue_oversee(flow)
+    texts = flow.panel_texts("Village alerts")
+    found = next((text for text in texts if " residents in " in text), None)
+    report.setdefault("state_alert_fold", []).append({"row": found, "texts": texts})
     checks.append({"check": "residents with one reason fold into one alert row", "ok": found is not None,
                    "row": found})
+    flow.dump("state-alerts-folded")
     flow.size_shots("state-alerts-folded")
     if found:
+        entity = text_entity(flow, found, "Village alerts")
+        if entity:
+            flow.hover(entity)
+            flow.dump("state-alerts-folded-tip")
+            flow.snap("live9-state-alerts-folded-tip-1280x720", SIZES[0])
         flow.click(found)
         time.sleep(1.0)
         flow.dump("state-alerts-people")
-        flow.size_shots("state-alerts-fold-people")
+        flow.size_shots("state-alerts-fold-people", prepare=lambda size: None)
+
+
+def outlook_probe(flow, report, checks):
+    """The alerts column of a save as it opens in Oversee: whether the
+    outlook ever says all is well, and which alerts fold."""
+    continue_oversee(flow)
+    texts = flow.panel_texts("Village alerts")
+    label = f"outlook-{flow.run.name}"
+    report.setdefault("outlook_probe", {})[flow.run.name] = texts
+    flow.dump(label)
+    if any(str(text).startswith("All is well") for text in texts):
+        flow.size_shots(f"all-is-well-{flow.run.name}")
 
 
 def clock(flow):
@@ -920,9 +1090,20 @@ SECTIONS = {"probe": probe_parts,
             "why": lambda: [("why", base("base3"), [why])],
             "pause": lambda: [("pause", base("base3"), [pause_menu])],
             # The five states the last pass did not reach (see above).
-            "states": lambda: [("state-goods", base("base3"), [nobody_makes_and_held_up]),
-                               ("state-alerts", base("base3"), [folded_alert_row]),
-                               ("state-season-toast", base("base0"), [season_toast])]}
+            "states": lambda: [("state-nobody", base("base3"), [nobody_makes]),
+                               ("state-held-up", base("base8"), [held_up]),
+                               ("state-alerts", PROBE_FIXTURES / "village-alerts.json",
+                                [folded_alert_row]),
+                               ("state-season-toast", base("base0"), [season_toast])],
+            "nobody": lambda: [("state-nobody", base("base3"), [nobody_makes])],
+            "held-up": lambda: [("state-held-up", base("base8"), [held_up])],
+            "folded": lambda: [("state-alerts", PROBE_FIXTURES / "village-alerts.json",
+                                [folded_alert_row])],
+            # Which fixtures already fold their alerts.
+            "alerts-probe": lambda: [(f"alerts-{path.stem}", path, [outlook_probe])
+                                     for path in sorted(PROBE_FIXTURES.glob("*.json"))
+                                     if path.stem != "older-save"]
+                                    + [("alerts-base0", base("base0"), [outlook_probe])]}
 
 
 if __name__ == "__main__":

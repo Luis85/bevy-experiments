@@ -105,10 +105,10 @@ pub(crate) struct Alerts {
     groups: BTreeMap<u64, (String, Vec<SimId>)>,
     /// The Village outlook's lines (2.5); `None` before the first read.
     outlook: Option<Vec<outlook::OutlookLine>>,
-    /// The session epoch and game hour of that read, and the real seconds
-    /// since: the card is read again when the hour changes, at most twice a
-    /// second.
-    outlook_read: Option<(u64, u64)>,
+    /// The session epoch, game hour and lines shown of that read, and the
+    /// real seconds since: the card is read again when the hour or the
+    /// window's line count changes, at most twice a second.
+    outlook_read: Option<(u64, u64, usize)>,
     outlook_elapsed: f32,
     /// The lines the card shows now; it is rebuilt only when they change.
     outlook_drawn: Option<Vec<outlook::OutlookLine>>,
@@ -1740,14 +1740,20 @@ fn read_outlook(world: &mut World) {
         .get_resource::<SimConfig>()
         .map_or(2400, |config| config.day_length.max(1));
     let hour = tick * 24 / day;
+    // The window's own height, not the design height: at 1024x600 the
+    // interface scales down and the design height reads 720 (final pass, F3).
+    // A resize changes the count without a new hour, so it is part of the key.
+    let layout = scale::layout(world);
+    let shown = outlook::shown(layout.height * layout.scale);
     {
         let mut state = world.resource_mut::<Alerts>();
         state.outlook_elapsed += delta;
-        if state.outlook_read == Some((epoch, hour)) || state.outlook_elapsed < OUTLOOK_SECS {
+        if state.outlook_read == Some((epoch, hour, shown)) || state.outlook_elapsed < OUTLOOK_SECS
+        {
             return;
         }
         state.outlook_elapsed = 0.0;
-        state.outlook_read = Some((epoch, hour));
+        state.outlook_read = Some((epoch, hour, shown));
     }
     let villages: Vec<(SimId, String, village::view::Outlook, Option<String>)> =
         village::frontier::settlements::all(world)
@@ -1793,10 +1799,7 @@ fn read_outlook(world: &mut World) {
     );
     // A low window keeps two lines.
     let mut lines = lines;
-    // The window's own height, not the design height: at 1024x600 the
-    // interface scales down and the design height reads 720 (final pass, F3).
-    let layout = scale::layout(world);
-    lines.truncate(outlook::shown(layout.height * layout.scale));
+    lines.truncate(shown);
     world.resource_mut::<Alerts>().outlook = Some(lines);
 }
 

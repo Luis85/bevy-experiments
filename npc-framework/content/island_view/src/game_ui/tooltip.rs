@@ -168,6 +168,9 @@ pub(super) struct TooltipState {
     shown: Option<(Entity, u8, Tooltip)>,
     /// The interface scale the shown card was built at.
     scale: f32,
+    /// The window (layout size) and the anchor the shown card was placed
+    /// for: a resize or a reflow under a resting pointer places it again.
+    placed: Option<(Vec2, Rect)>,
 }
 
 fn ignore_pointer(world: &mut World, entity: Entity) {
@@ -282,6 +285,21 @@ pub(crate) fn anchor_rect(world: &World, entity: Entity) -> Option<Rect> {
     let half = node.size() * 0.5 * scale;
     let centre = transform.translation * scale;
     (half.x > 0.0 && half.y > 0.0).then(|| Rect::from_center_half_size(centre, half))
+}
+
+/// Whether a shown card still stands where it was placed: the same window
+/// size and its anchor within half a pixel. A card left from a 1280 wide
+/// window ran off a 1024 wide one (live capture, pause menu).
+pub(crate) fn same_place(was: Option<(Vec2, Rect)>, now: Option<(Vec2, Rect)>) -> bool {
+    match (was, now) {
+        (Some((window, anchor)), Some((now_window, now_anchor))) => {
+            window.abs_diff_eq(now_window, 0.5)
+                && anchor.min.abs_diff_eq(now_anchor.min, 0.5)
+                && anchor.max.abs_diff_eq(now_anchor.max, 0.5)
+        }
+        (None, None) => true,
+        _ => false,
+    }
 }
 
 /// Above the host's screens (their root stands at 100).
@@ -399,13 +417,23 @@ pub(super) fn update(world: &mut World) {
     // A card built at another interface size is built again: its wrapped
     // text was laid out for the old one.
     let scale = scale::layout(world).scale;
+    let placed = wanted.as_ref().and_then(|(entity, _, _)| {
+        let layout = scale::layout(world);
+        Some((
+            Vec2::new(layout.width, layout.height),
+            anchor_rect(world, *entity)?,
+        ))
+    });
     {
         let state = world.resource::<TooltipState>();
-        if state.shown == wanted && (state.scale == scale || wanted.is_none()) {
+        if state.shown == wanted
+            && (wanted.is_none() || (state.scale == scale && same_place(state.placed, placed)))
+        {
             return;
         }
     }
     world.resource_mut::<TooltipState>().scale = scale;
+    world.resource_mut::<TooltipState>().placed = placed;
     let roots: Vec<Entity> = world
         .query_filtered::<Entity, With<TooltipRoot>>()
         .iter(world)
@@ -554,6 +582,24 @@ mod tests {
         let bar = world.spawn(GlobalZIndex(t::layer::CHROME)).id();
         let chip = world.spawn(ChildOf(bar)).id();
         assert_eq!(layer_over(&world, chip), t::layer::TOOLTIP);
+    }
+
+    #[test]
+    fn a_card_is_placed_again_when_the_window_or_its_anchor_moves() {
+        let window = Vec2::new(1280.0, 720.0);
+        let button = Rect::new(420.0, 380.0, 840.0, 416.0);
+        assert!(same_place(Some((window, button)), Some((window, button))));
+        // The pause menu at 1024x768: the button moved left with the panel.
+        let narrow = Vec2::new(1024.0, 768.0);
+        let moved = Rect::new(292.0, 404.0, 712.0, 440.0);
+        assert!(!same_place(Some((window, button)), Some((narrow, moved))));
+        assert!(!same_place(Some((window, button)), Some((window, moved))));
+        assert!(!same_place(None, Some((window, button))));
+        // Placed again, the card fits right of the button at 1024.
+        assert!(matches!(
+            place_beside(moved, narrow, t::TOOLTIP_WIDTH),
+            Beside::Right { left, .. } if left + t::TOOLTIP_WIDTH <= narrow.x
+        ));
     }
 
     #[test]

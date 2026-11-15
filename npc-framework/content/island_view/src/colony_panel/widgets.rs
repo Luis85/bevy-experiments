@@ -30,8 +30,12 @@ pub(super) fn column_widths(compact: bool) -> [f32; 4] {
 /// the days its stock lasts, between the price and the change.
 pub(super) fn widths_for(count: usize, compact: bool) -> Vec<f32> {
     match (count, compact) {
-        (5, true) => vec![28.0, 16.0, 16.0, 14.0, 26.0],
-        (5, false) => vec![32.0, 13.0, 13.0, 12.0, 30.0],
+        // The narrow ledger: the name gets the room ("Cooked meals" and
+        // "Clean water" were cut at 28%); "down 23" still fits the last.
+        (5, true) => vec![36.0, 14.0, 14.0, 12.0, 24.0],
+        // The name shares its cell with a Low pill: "Cooked meals" and the
+        // pill's sign fit at 1024 wide; "Since yesterday" still fits.
+        (5, false) => vec![37.0, 12.0, 12.0, 11.0, 28.0],
         _ => column_widths(compact).to_vec(),
     }
 }
@@ -491,11 +495,104 @@ fn table_row(world: &mut World, parent: Entity, entry: &Entry) -> Entity {
         if index == 0
             && let Some((status, word)) = badge_of(entry)
         {
-            w::badge(world, cell, Surface::Paper, status, word);
+            let badge = w::badge(world, cell, Surface::Paper, status, word);
+            // The pill stands before the name, after the good's icon: a long
+            // name is then cut at the cell's end, never the warning
+            // ("Cooked meals" left only a sliver of the pill at 1024 wide).
+            world
+                .entity_mut(cell)
+                .insert_child(usize::from(entry.icon.is_some()), badge);
+            // A long name leaves no room for the word: the pill keeps its
+            // sign and the tooltip says the word (`fit_badges`).
+            let label = world
+                .get::<Children>(badge)
+                .and_then(|children| children.last().copied());
+            if let Some(label) = label {
+                world.entity_mut(badge).insert((
+                    FittedBadge {
+                        cell,
+                        word: label,
+                        word_width: 0.0,
+                    },
+                    Hovered::default(),
+                    Tooltip::new(word, badge_tip(word)),
+                ));
+            }
         }
     }
     world.entity_mut(row).insert((table_kind(entry), parts));
     row
+}
+
+/// What a table row's badge means, for its tooltip.
+pub(super) fn badge_tip(word: &str) -> &'static str {
+    match word {
+        "Low" => "Under two days of it left, or none on sale while residents go without it.",
+        _ => "",
+    }
+}
+
+/// A table row's badge in the first cell, beside the good's name. Its word
+/// is hidden while the name and the whole pill do not fit the cell, and
+/// shown again once they do; `word_width` is the word's last measured width
+/// with its gap, in physical pixels.
+#[derive(Component, Debug)]
+pub(crate) struct FittedBadge {
+    cell: Entity,
+    word: Entity,
+    word_width: f32,
+}
+
+/// Whether a badge's word shows: `used` is the width of the cell's parts as
+/// they stand, `room` the cell's width, `word` the word's width with its
+/// gap (both physical pixels). A shown word hides when the parts overflow;
+/// a hidden one shows when the parts and the word fit.
+pub(crate) fn word_fits(shown: bool, used: f32, room: f32, word: f32) -> bool {
+    if shown {
+        used <= room + 0.5
+    } else {
+        word > 0.0 && used + word <= room - 0.5
+    }
+}
+
+/// After layout: hide or show each table badge's word by `word_fits`.
+pub(crate) fn fit_badges(
+    mut badges: Query<&mut FittedBadge>,
+    cells: Query<(&ComputedNode, &Children)>,
+    mut sized: Query<(&ComputedNode, &mut Node)>,
+) {
+    for mut badge in &mut badges {
+        let Ok((cell, children)) = cells.get(badge.cell) else {
+            continue;
+        };
+        if cell.size.x <= 0.0 {
+            continue;
+        }
+        let scale = 1.0 / cell.inverse_scale_factor.max(f32::EPSILON);
+        let parts: Vec<f32> = children
+            .iter()
+            .filter_map(|child| sized.get(child).ok())
+            .filter(|(_, node)| node.display != Display::None)
+            .map(|(computed, _)| computed.size.x)
+            .collect();
+        // The cell's gap between its parts (`table_cell`).
+        let gaps = 5.0 * scale * parts.len().saturating_sub(1) as f32;
+        let used = parts.iter().sum::<f32>() + gaps;
+        let Ok((word, word_node)) = sized.get(badge.word) else {
+            continue;
+        };
+        let shown = word_node.display != Display::None;
+        if shown && word.size.x > 0.0 {
+            // The badge's own gap between its sign and its word (`w::badge`).
+            badge.word_width = word.size.x + 4.0 * scale;
+        }
+        let fits = word_fits(shown, used, cell.size.x, badge.word_width);
+        if fits != shown
+            && let Ok((_, mut node)) = sized.get_mut(badge.word)
+        {
+            node.display = if fits { Display::Flex } else { Display::None };
+        }
+    }
 }
 
 /// "4 +1" as the price and its change; "4" and "–" alone.
@@ -1327,4 +1424,62 @@ pub(super) fn tab(world: &mut World, strip: Entity, name: &str, picture: Icon, a
         world.entity_mut(picture).insert(TabIcon);
     }
     debug_assert!(world.get::<TabIndex>(entity).is_some());
+}
+
+#[cfg(test)]
+mod badge_tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn sized(world: &mut World, parent: Entity, width: f32) -> Entity {
+        world
+            .spawn((
+                ChildOf(parent),
+                Node::default(),
+                ComputedNode {
+                    size: Vec2::new(width, 20.0),
+                    inverse_scale_factor: 1.0,
+                    ..default()
+                },
+            ))
+            .id()
+    }
+
+    /// "Clean water" and its Low pill overflow the name column at 1280x720
+    /// (the pill was cut to "Lo"): the word hides, the sign stays, and the
+    /// word comes back once the cell is wide enough again.
+    #[test]
+    fn a_long_name_keeps_the_badge_sign_and_drops_its_word() {
+        assert!(word_fits(true, 120.0, 128.0, 26.0));
+        assert!(!word_fits(true, 146.0, 128.0, 26.0));
+        assert!(!word_fits(false, 120.0, 128.0, 26.0));
+        assert!(word_fits(false, 100.0, 128.0, 26.0));
+        // Never measured: stays hidden rather than flicker.
+        assert!(!word_fits(false, 10.0, 128.0, 0.0));
+
+        let mut world = World::new();
+        let row = world.spawn(Node::default()).id();
+        let cell = sized(&mut world, row, 128.0);
+        sized(&mut world, cell, 16.0); // the good's icon
+        sized(&mut world, cell, 70.0); // "Clean water"
+        let badge = sized(&mut world, cell, 50.0);
+        sized(&mut world, badge, 12.0); // the sign
+        let word = sized(&mut world, badge, 22.0); // "Low"
+        world.entity_mut(badge).insert(FittedBadge {
+            cell,
+            word,
+            word_width: 0.0,
+        });
+        world.run_system_once(fit_badges).expect("runs");
+        assert_eq!(world.get::<Node>(word).unwrap().display, Display::None);
+        // Laid out again without the word: the pill is 24 wide.
+        world.get_mut::<ComputedNode>(badge).unwrap().size.x = 24.0;
+        world.get_mut::<ComputedNode>(word).unwrap().size.x = 0.0;
+        world.run_system_once(fit_badges).expect("runs");
+        assert_eq!(world.get::<Node>(word).unwrap().display, Display::None);
+        // A wider ledger: the word comes back.
+        world.get_mut::<ComputedNode>(cell).unwrap().size.x = 200.0;
+        world.run_system_once(fit_badges).expect("runs");
+        assert_eq!(world.get::<Node>(word).unwrap().display, Display::Flex);
+    }
 }

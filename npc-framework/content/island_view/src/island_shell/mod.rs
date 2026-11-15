@@ -840,6 +840,8 @@ fn spawn(world: &mut World) {
         Pickable::IGNORE,
         Node {
             display: Display::None,
+            // The toast inside may wrap to the lane's width.
+            max_width: percent(100),
             ..default()
         },
     ));

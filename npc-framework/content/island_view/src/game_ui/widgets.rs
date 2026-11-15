@@ -1898,8 +1898,12 @@ pub fn toast(
             ChildOf(parent),
             Skin::ChromeSolid,
             Node {
-                height: px(36),
-                padding: UiRect::horizontal(px(14)),
+                // One line, 36 high; in a lane narrower than the sentence
+                // (beside an open column at 1024 wide) the words wrap
+                // inside the lane instead of running under the column.
+                min_height: px(36),
+                max_width: percent(100),
+                padding: UiRect::axes(px(14), px(4)),
                 column_gap: px(8),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(18)),
@@ -1925,7 +1929,13 @@ pub fn toast(
         16.0,
         Tone::status(Surface::Chrome, status),
     );
-    label(world, entity, text, t::BODY, Tone::text(Surface::Chrome));
+    let words = label(world, entity, text, t::BODY, Tone::text(Surface::Chrome));
+    world
+        .entity_mut(words)
+        .insert(TextLayout::default().with_linebreak(bevy::text::LineBreak::WordBoundary));
+    if let Some(mut node) = world.get_mut::<Node>(words) {
+        node.flex_shrink = 1.0;
+    }
     entity
 }
 

@@ -1680,3 +1680,27 @@ fn job_chips_at_one_level_wrap_as_buttons_not_a_selector() {
     ];
     assert!(!widgets::job_chips(&levels));
 }
+
+/// A folded alert's "Show them" opened People under "3 residents in Harbour
+/// are starving: 3 residents" (live capture, state-alerts): the count is
+/// said once.
+#[test]
+fn a_people_filter_heading_counts_its_residents_once() {
+    assert_eq!(
+        model::filter_heading("3 residents in Harbour are starving", 3),
+        "3 residents in Harbour are starving."
+    );
+    assert_eq!(
+        model::filter_heading("Going without bread", 5),
+        "Going without bread: 5 residents"
+    );
+    assert_eq!(
+        model::filter_heading("Going without bread", 1),
+        "Going without bread: 1 resident"
+    );
+    // A heading whose count no longer matches the list keeps the list's.
+    assert_eq!(
+        model::filter_heading("3 residents in Harbour are starving", 2),
+        "3 residents in Harbour are starving: 2 residents"
+    );
+}

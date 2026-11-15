@@ -900,11 +900,7 @@ fn resident_entries(world: &World) -> Vec<Entry> {
         roster.retain(|row| residents.contains(&row.id));
         rows.push(Entry::strong(
             "roster_filter",
-            format!(
-                "{head}: {} resident{}",
-                roster.len(),
-                if roster.len() == 1 { "" } else { "s" }
-            ),
+            filter_heading(head, roster.len()),
         ));
         rows.push(Entry::choices(
             "roster_everyone",
@@ -1081,4 +1077,16 @@ pub(crate) fn manage_entries(world: &World, id: SimId, entity: Entity) -> Vec<En
         }
     }
     rows
+}
+
+/// The heading of a People list a link chose: "Going without bread: 5
+/// residents". A heading that already counts them ("3 residents in Harbour
+/// are starving", a folded alert) is not counted twice.
+pub(crate) fn filter_heading(head: &str, count: usize) -> String {
+    let plural = if count == 1 { "" } else { "s" };
+    if head.starts_with(&format!("{count} resident")) {
+        format!("{head}.")
+    } else {
+        format!("{head}: {count} resident{plural}")
+    }
 }

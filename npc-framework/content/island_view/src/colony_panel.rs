@@ -305,6 +305,10 @@ pub(crate) fn plugin(app: &mut App) {
             (economy::sample, process, refresh, sync)
                 .chain()
                 .in_set(ViewSystems::Present),
+        )
+        .add_systems(
+            PostUpdate,
+            widgets::fit_badges.after(bevy::ui::UiSystems::Layout),
         );
 }
 

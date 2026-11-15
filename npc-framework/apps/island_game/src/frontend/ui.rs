@@ -792,7 +792,7 @@ fn rebuild(world: &mut World) {
             position_type: PositionType::Absolute,
             width: px(width),
             max_width: percent(96),
-            max_height: percent(92),
+            max_height: percent(menu_height_percent(wide)),
             padding: UiRect::all(px(20)),
             row_gap: px(10),
             flex_direction: FlexDirection::Column,
@@ -803,7 +803,7 @@ fn rebuild(world: &mut World) {
             node.left = px(72);
             node.top = px(96);
         } else {
-            node.top = px(if wide { 64 } else { 128 });
+            node.top = px(menu_top(wide));
         }
         let panel = world
             .spawn((ChildOf(root), Name::new("Game menu"), w::panel(node)))
@@ -2184,9 +2184,33 @@ fn hud_notice(host: Option<(&str, NoticeTone)>, saved: Option<Saved>) -> Option<
     }
 }
 
+/// A menu card's top: the wide ones (Settings, the Guide) start higher.
+fn menu_top(wide: bool) -> f32 {
+    if wide { 64.0 } else { 128.0 }
+}
+
+/// A menu card's highest share of the window: with its top it stays inside
+/// the window (the Guide ran off the bottom at 1280x720 and 1024x768 with
+/// 92%).
+fn menu_height_percent(wide: bool) -> f32 {
+    if wide { 86.0 } else { 76.0 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_menu_card_ends_above_the_bottom_of_the_window() {
+        // The design heights a window lays out at (a low window scales
+        // the interface down, so its design height stays near 600).
+        for height in [600.0_f32, 720.0, 768.0, 1080.0] {
+            for wide in [true, false] {
+                let bottom = menu_top(wide) + height * menu_height_percent(wide) / 100.0;
+                assert!(bottom + 16.0 <= height, "{wide} at {height}: {bottom}");
+            }
+        }
+    }
 
     fn summary_with(
         issue: Option<crate::island::Issue>,

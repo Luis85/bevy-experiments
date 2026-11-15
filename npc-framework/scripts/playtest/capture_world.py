@@ -2898,6 +2898,71 @@ def sound_lines(log_path):
     return counts
 
 
+# What makes a work one-shot in the view (`island_poses::island_pose`,
+# `island_audio::mix::{pose_shot, machine_shot}`): a resident standing at a
+# log patch with `island_gathering` (chop); a craft running at a woodcutter's
+# or carpenter's workstation (`crafting`, the saw); a stage of building work
+# (`regional_site_work_v1` at a civic site, `island_cottage_build_v1`,
+# `regional_upgrade_work_v1`), or a craft at a smith's or carpenter's bench
+# (hammer). Work runs under the GOAP leaf `life.pursue_goal` and the build
+# leaves, so the leaf name alone does not say who works: the components do.
+SAW_ROLES = {"woodcutter", "carpenter"}
+BUILD_PARTS = ("regional_site_work_v1", "island_cottage_build_v1", "regional_upgrade_work_v1")
+
+
+def work_spots(state):
+    """Residents at work now, by the sound the view should make for them:
+    {"chop": [...], "saw": [...], "hammer": [...]}, each row
+    {id, name, at (mm), leaf, why}."""
+    tick = state["tick"]
+    entities = {entity["sim_id"]: entity for entity in state.get("entities", [])}
+
+    def parts(sim_id):
+        return entities.get(sim_id, {}).get("components", {})
+
+    found = {"chop": [], "saw": [], "hammer": []}
+    for sim_id, entity in sorted(entities.items()):
+        comps = entity.get("components", {})
+        person = comps.get(VILLAGER)
+        if not person or "pos" not in comps or "move_intent" in comps:
+            continue
+        if person.get("resting_until", 0) > tick:
+            continue
+        leaf = entity.get("active_leaf")
+        row = {"id": sim_id, "name": person.get("name"), "at": xz(comps["pos"]),
+               "leaf": leaf.get("action") if isinstance(leaf, dict) else None}
+        built = next((key for key in BUILD_PARTS if key in comps), None)
+        gathering, crafting = comps.get("island_gathering"), comps.get("crafting")
+        if built:
+            found["hammer"].append(dict(row, why=built))
+        elif gathering:
+            kind = parts(gathering.get("patch")).get("island_resource_patch", {}).get("kind")
+            if kind == "log":
+                found["chop"].append(dict(row, why="gathering log"))
+        elif crafting:
+            station_id = crafting.get("workstation")
+            station = parts(station_id).get("island_place", {})
+            role = station.get("role")
+            if role in SAW_ROLES:
+                place = parts(station_id).get("pos")
+                found["saw"].append(dict(row, why=f"crafting {crafting.get('recipe')} at {station.get('label')}",
+                                         at=xz(place) if place else row["at"]))
+            if role in {"smith", "carpenter", "woodcutter", "miner"}:
+                found["hammer"].append(dict(row, why=f"crafting {crafting.get('recipe')} at {station.get('label')}"))
+    return found
+
+
+def one_shot_lines(log_path, after):
+    """The `island_audio: one-shot` lines of the native log past byte `after`."""
+    try:
+        data = log_path.read_bytes()[after:]
+    except OSError:
+        return []
+    return [line.rsplit("island_audio: ", 1)[1].strip()
+            for line in data.decode("utf-8", errors="replace").splitlines()
+            if "island_audio: one-shot " in line]
+
+
 def sound11_run(binary, base, report):
     run = base / "sound11"
     # The island's sound lines log at debug level.
@@ -2915,47 +2980,48 @@ def sound11_run(binary, base, report):
         post = xz(flow.world().parts(merchant["post"])["pos"]) if merchant.get("post") else None
         px, pz = (post[0] / 1000.0, post[1] / 1000.0) if post else (0.0, 0.0)
         world, row, street_x, street_z = street(flow)
-        work_actions = ("life.gather", "life.craft", "life.build", "life.sow", "life.tend", "life.harvest")
 
-        def worker():
-            """A resident at work (felling, crafting, building, farming):
-            their position, action and the tick, or None."""
-            state = flow.state()
-            for entity in state.get("entities", []):
-                comps = entity.get("components", {})
-                leaf = entity.get("active_leaf")
-                action = leaf.get("action") if isinstance(leaf, dict) else None
-                if VILLAGER in comps and "pos" in comps and action in work_actions:
-                    return xz(comps["pos"]), action, state["tick"]
-            return None
-
-        # By day in the morning, when the village works (most residents
-        # socialise, buy and idle in the afternoon).
+        # By day in the morning, when the village works.
         for phase_name, phase in (("day", 0.12), ("night", 0.85)):
             flow.to_phase(phase)
             flow.call("npc/pause")
-            # The village heard where someone works: by day, step the clock
-            # until a resident fells, crafts, builds or farms (the street of
-            # homes is quiet); else the street.
-            work = None
-            if phase_name == "day":
-                for _ in range(40):
-                    work = worker()
-                    if work:
-                        break
-                    flow.call("npc/step", {"ticks": 120})
-                entry["village_spot"] = ({"at": [work[0][0] / 1000.0, work[0][1] / 1000.0], "action": work[1],
-                                          "tick": work[2]} if work else "street")
-            vx, vz = (work[0][0] / 1000.0, work[0][1] / 1000.0) if work else (street_x, street_z)
             spots = [("coast", px - 6.0, pz, 18), ("woods", px + 6.0, pz + 14.0, 20),
-                     ("village", vx, vz, 22), ("oversee", street_x, street_z, 150)]
+                     ("oversee", street_x, street_z, 150)]
             for label, x, z, distance in spots:
                 flow.look(x, z, distance, f"sound-{phase_name}-{label}", 0.6)
                 flow.call("npc/resume")
-                time.sleep(10.0 if label == "village" else 6.0)
+                time.sleep(6.0)
                 flow.call("npc/pause")
                 flow.snap_now(f"sound-{phase_name}-{label}")
                 entry[f"{phase_name}-{label}"] = sound_lines(flow.log_path)
+            if phase_name != "day":
+                continue
+            # Work heard where it happens: for each of chop, saw and hammer,
+            # step the clock until a resident does that work (by component),
+            # then listen there at 1x with the camera on them.
+            work = entry.setdefault("work", {})
+            for sound in ("chop", "saw", "hammer"):
+                spot = None
+                for _ in range(60):
+                    state = flow.state()
+                    rows = work_spots(state)[sound]
+                    if rows:
+                        spot = dict(rows[0], tick=state["tick"])
+                        break
+                    flow.call("npc/step", {"ticks": 120})
+                if spot is None:
+                    work[sound] = {"found": None}
+                    continue
+                x, z = spot["at"][0] / 1000.0, spot["at"][1] / 1000.0
+                flow.look(x, z, 16, f"sound-work-{sound}", 0.6)
+                mark = flow.log_path.stat().st_size
+                flow.call("npc/resume")
+                time.sleep(8.0)
+                flow.call("npc/pause")
+                flow.snap_now(f"sound-work-{sound}")
+                heard = one_shot_lines(flow.log_path, mark)
+                work[sound] = {"found": spot, "heard": heard,
+                               "ok": any(line.startswith(f"one-shot {sound} ") for line in heard)}
         entry["log"] = sound_lines(flow.log_path)
     finally:
         leave(child, flow, run, report, "sound11")
