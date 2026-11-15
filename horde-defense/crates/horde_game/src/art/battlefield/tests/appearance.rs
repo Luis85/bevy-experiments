@@ -143,24 +143,26 @@ fn thrown_release_origin_reads_profile_appearance_not_forced_female() {
     );
 }
 
-/// Pin (W3-17): main-run Mara is drawn exactly as before the forced-Female
-/// branch was deleted. Her deploy stamps Female on the profile, so reading
-/// the profile picks the model the deleted branch forced: the whole field
-/// paints the same shapes as an attempt whose appearance is set to Female by
-/// hand. Perturbation proof: stamping Male for Npc deploys in
-/// `Campaign::defender_profile` (campaign/loadout.rs) fails the appearance
-/// assertion here.
+/// Pin (W3-17): main-run Mara is drawn with the Female model the deleted
+/// forced-Female branch picked. Her deploy stamps Female on the profile, and
+/// the rig her field draws is not the one the same defense stamped Male
+/// draws, so the stamped Female model is what is painted. Perturbation
+/// proofs: stamping Male for Npc deploys in `Campaign::defender_profile`
+/// (campaign/loadout.rs) fails the appearance assertion; a rig that ignores
+/// the profile and draws one model (`battlefield`'s `defender_appearance`
+/// read) fails the rig comparison.
 #[test]
 fn mara_battlefield_model_unchanged() {
     let mut game = companion_defense();
     let a = game.attempt().unwrap();
     assert_eq!(a.defender(), DefenderId::Mara);
     assert_eq!(a.defender_appearance(), Appearance::Female);
-    let stamped = field(&game);
+    let stamped = rig_meshes(&game);
+    assert!(!stamped.is_empty(), "the rig draws from its source sheets");
+    a_mut(&mut game).profile.appearance = Appearance::Male;
+    // `assert!`, not `assert_ne!`: a failure must not dump the meshes.
     assert!(
-        !rig_meshes(&game).is_empty(),
-        "the rig draws from its source sheets"
+        rig_meshes(&game) != stamped,
+        "Mara's field paints the stamped Female model, not the Male one"
     );
-    a_mut(&mut game).profile.appearance = Appearance::Female;
-    assert!(field(&game) == stamped, "forcing Female changes nothing");
 }
