@@ -30,6 +30,8 @@ struct TreeState {
     pending: Option<Pending>,
     pulse: Option<(usize, f64)>,
     learned: Option<(usize, String)>,
+    /// The branch the compact chip row last scrolled to (CF-3-20).
+    chip_branch: Option<String>,
 }
 /// A purchase sent this session that has not yet shown up as owned.
 #[derive(Clone)]
@@ -507,7 +509,7 @@ struct SearchInput {
 }
 
 /// Recommended jump, zoom, search, goals and branch chips. Compact layouts
-/// keep it to one (horizontally scrolling) row.
+/// keep one row whose branch chips scroll horizontally beside the controls.
 fn toolbar(
     ui: &mut egui::Ui,
     f: &mut UiCtx,
@@ -575,10 +577,20 @@ fn toolbar(
         .on_hover_text("Select a goal; its path lights up on the tree");
     };
     if compact {
-        ui.scope(|ui| {
-            // A solid bar in its own strip under the row (CF-3-16): egui's
-            // floating bar was drawn over the lower half of the controls and
-            // chips. It also shows the row scrolls while chips are off-screen.
+        // One row: the controls stay put and only the branch chips scroll,
+        // in the width the controls leave (CF-3-20). When the controls
+        // scrolled with the chips, only the first chip was in view, rarely
+        // the selected node's branch; a second row would cost the canvas
+        // its half of the compact tree.
+        // Top-aligned, starting one control high like ui.horizontal (whose
+        // centring would drop the controls by half the bar strip).
+        let row = vec2(ui.available_width(), ui.spacing().interact_size.y);
+        ui.allocate_ui_with_layout(row, Layout::left_to_right(Align::Min), |ui| {
+            controls(ui, state);
+            ui.separator();
+            // A solid bar in its own strip under the chips (CF-3-16): egui's
+            // floating bar was drawn over their lower half. It also shows
+            // the row scrolls while chips are off-screen.
             ui.spacing_mut().scroll = egui::style::ScrollStyle {
                 bar_inner_margin: 2.0,
                 ..egui::style::ScrollStyle::solid()
@@ -587,9 +599,27 @@ fn toolbar(
                 .id_salt("skill_tree_toolbar")
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        controls(ui, state);
-                        ui.separator();
-                        branch_chips(ui, state, nodes);
+                        let chip = branch_chips(ui, state, nodes);
+                        // Bring the selected branch's chip into view when the
+                        // selection enters another branch (or the tree
+                        // opens), until it is in view; then the row is the
+                        // player's to scroll.
+                        let branch = &skills().nodes[state.view.selected].branch;
+                        if state.chip_branch.as_ref() != Some(branch)
+                            && let Some(chip) = chip
+                        {
+                            if ui.clip_rect().contains_rect(chip.rect) {
+                                state.chip_branch = Some(branch.clone());
+                            } else {
+                                // A jump, not egui's eased scroll: the row
+                                // moves the same in both effects modes and
+                                // in stills.
+                                chip.scroll_to_me_animation(
+                                    Some(Align::Center),
+                                    egui::style::ScrollAnimation::none(),
+                                );
+                            }
+                        }
                     });
                 });
         });
@@ -604,10 +634,16 @@ fn toolbar(
 }
 
 /// One chip per branch with owned/total; a click frames the branch and
-/// selects its most useful node.
-fn branch_chips(ui: &mut egui::Ui, state: &mut TreeState, nodes: &[Node]) {
+/// selects its most useful node. Returns the chip of the selected node's
+/// branch (as it was when the row was drawn).
+fn branch_chips(
+    ui: &mut egui::Ui,
+    state: &mut TreeState,
+    nodes: &[Node],
+) -> Option<egui::Response> {
     let catalog = skills();
     let current = catalog.nodes[state.view.selected].branch.as_str();
+    let mut selected = None;
     for branch in branches() {
         let members: Vec<usize> = (0..catalog.nodes.len())
             .filter(|&i| catalog.nodes[i].branch == branch)
@@ -628,7 +664,11 @@ fn branch_chips(ui: &mut egui::Ui, state: &mut TreeState, nodes: &[Node]) {
             }
             state.view.frame_world(branch_rect(branch));
         }
+        if current == branch {
+            selected = Some(response);
+        }
     }
+    selected
 }
 
 /// Arrows move to the nearest node in that direction, Home jumps to the

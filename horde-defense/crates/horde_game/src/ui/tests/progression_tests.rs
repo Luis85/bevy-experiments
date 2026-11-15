@@ -366,7 +366,12 @@ fn compact_toolbar_scroll_bar_never_covers_a_toolbar_control() {
     let hover = || vec![Event::PointerMoved(recommended.center())];
     h.frame(f, View::Full, hover());
     let output = h.frame(f, View::Full, hover());
-    let viewport = viewport_of(&output, "Recommended");
+    // Since CF-3-20 only the branch chips scroll; the bar is under them.
+    let first_chip = text_runs(&output)
+        .into_iter()
+        .find(|run| run.text.starts_with("Foundations "))
+        .expect("the first branch chip");
+    let viewport = first_chip.clip;
     // The bar's track and handle: thin rects across the toolbar's x range,
     // at or under its bottom edge.
     let bars: Vec<Rect> = painted_rects(&output)
@@ -391,16 +396,67 @@ fn compact_toolbar_scroll_bar_never_covers_a_toolbar_control() {
             )
         })
         .collect();
-    let chip = text_runs(&output)
-        .into_iter()
-        .find(|run| run.text.starts_with("Foundations "))
-        .expect("the first branch chip");
-    controls.push(("Foundations chip", chip.rect));
+    controls.push(("Foundations chip", first_chip.rect));
     for (label, rect) in controls {
         for bar in &bars {
             assert!(
                 !rect.intersects(*bar),
                 "{label} {rect:?} lies under the scroll bar {bar:?}"
+            );
+        }
+    }
+}
+
+/// CF-3-20: the compact toolbar shows the selected node's branch chip. The
+/// controls and the chips shared one scrolling row, so with a search
+/// ("reload", "27 matches", Clear) only "Foundations 1/1" was in view while
+/// Combat reload, a Firearms node, was selected. At 1050x700@1.35 the chip
+/// of the selected branch lies fully inside its clip and the window, for the
+/// skills-search setup and for a node of the last branch, and the search
+/// field and Recommended stay in view.
+#[test]
+fn compact_toolbar_keeps_the_selected_branch_chip_in_view() {
+    let last = skills().nodes.last().unwrap();
+    for (search, node) in [("reload", "combat_reload"), ("", last.id.as_str())] {
+        let mut fixture = upgrade_home();
+        let h = Harness::small();
+        let f = &mut fixture.frontend;
+        f.game.campaign_mut().coins = 656;
+        if !search.is_empty() {
+            f.campaign.tree_search_seed = Some(search.into());
+        }
+        f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
+            node.into(),
+        ));
+        h.frame(f, View::Full, vec![]);
+        h.frame(f, View::Full, vec![]);
+        let output = h.frame(f, View::Full, vec![]);
+        assert!(progression::layout_for_test(&h.ctx).unwrap().compact);
+        assert_eq!(selected(&h), node);
+        let branch = &skills().node(node).unwrap().branch;
+        let window = h.ctx.content_rect();
+        let chip = text_runs(&output)
+            .into_iter()
+            .find(|run| {
+                run.text
+                    .strip_prefix(&format!("{branch} "))
+                    .is_some_and(|rest| rest.contains('/'))
+            })
+            .unwrap_or_else(|| panic!("{node}: the {branch} chip is painted"));
+        assert!(
+            chip.visible() && window.contains_rect(chip.rect),
+            "{node}: the {branch} chip {:?} lies outside its clip {:?}",
+            chip.rect,
+            chip.clip
+        );
+        let mut kept = vec!["Recommended"];
+        if !search.is_empty() {
+            kept.push(search);
+        }
+        for label in kept {
+            assert!(
+                !visible_runs(&output, label).is_empty(),
+                "{node}: {label} stays in view"
             );
         }
     }
