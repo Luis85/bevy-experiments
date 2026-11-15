@@ -2202,3 +2202,37 @@ fn right_hud_card_is_painted_inside_its_layout_rect() {
         }
     }
 }
+
+/// CF-3-14: with construction open the PAUSED tag gives way to the panel, so
+/// the panel says the field is paused where it can be read. At 1050x700@1.35
+/// "Paused explicitly" lay below the fold of the panel's scroll area (it
+/// ended at "Clear country plan"); it is painted fully inside the panel and
+/// its visible viewport at both sizes.
+#[test]
+fn construction_panel_names_the_pause_above_its_fold() {
+    for target in Target::BOTH {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.game.set_paused(true);
+        f.battle.construction = true;
+        h.frame(f, View::Battle, vec![]);
+        let output = h.frame(f, View::Battle, vec![]);
+        let panel = field_layout(&h, f).construction_panel;
+        // A label below a scroll area's fold is not painted at all.
+        let (rect, clip) = clipped_bounds(&output, "Paused explicitly")
+            .unwrap_or_else(|| panic!("{target:?}: the pause line is not painted"));
+        assert!(
+            panel.contains_rect(rect) && clip.contains_rect(rect),
+            "{target:?}: \"Paused explicitly\" {rect:?} not visible in the panel {panel:?} (viewport {clip:?})"
+        );
+        // The line takes the old cost line's place: the plan buttons keep
+        // their place above the fold.
+        for label in ["Save country plan", "Clear country plan"] {
+            assert!(
+                fully_visible(&output, label),
+                "{target:?}: {label} below the fold"
+            );
+        }
+    }
+}

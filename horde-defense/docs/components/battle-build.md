@@ -13,7 +13,7 @@ Place owned defenses within the left-half construction cells and inspect remaini
 
 - **Entry, exit and actions:** Open Build defenses (or press B), select a structure, place a valid preview or salvage an existing structure; Close construction or Escape closes it without pausing and resumes the aiming presentation. The panel overlays the field's right side and never rescales the field; an INCOMING chevron marks spawns it covers.
 - **State boundary:** Placement legality, supply, salvage and saved plans belong to core rules; selected kind and cell preview are scene state.
-- **Responsiveness and accessibility:** A bounded scrolling panel explains costs and invalid-placement reasons. Preview labels supplement valid/invalid color.
+- **Responsiveness and accessibility:** A bounded scrolling panel explains costs and invalid-placement reasons. Its first line under the supply says "Paused explicitly" or "Combat continues while building", above the fold at 1050x700@1.35: the PAUSED tag gives way to the open panel. Preview labels supplement valid/invalid color.
 
 **Current increment contract:** Opening, placing and salvaging do not pause combat. Explicit pause remains separate. Save this country’s layout records current surviving structures during combat without granting supply; future deployments pay placement costs and apply only the ordered affordable prefix.
 

@@ -12,14 +12,25 @@ use horde_core::{
 
 pub(super) fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
     ui.strong(format!("{} supply remaining", view.supply));
-    muted(ui, "Cost in supply per defense");
+    // First under the supply, above the fold at 1050x700@1.35 (CF-3-14):
+    // the PAUSED tag gives way to this panel, so this line is the field's
+    // paused indicator while it is open. It takes the line that said
+    // "Cost in supply per defense"; each option now names its supply.
+    muted(
+        ui,
+        if view.global_paused {
+            "Paused explicitly"
+        } else {
+            "Combat continues while building"
+        },
+    );
     for kind in StructureKind::ALL {
         let def = content().structure(kind);
         ui.add_enabled_ui(view.blueprint(kind), |ui| {
             ui.selectable_value(
                 &mut f.battle.build_kind,
                 kind,
-                format!("{} · {}", def.name, def.supply),
+                format!("{} · {} supply", def.name, def.supply),
             );
         })
         .response
@@ -52,14 +63,6 @@ pub(super) fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &Bat
     muted(
         ui,
         "Before combat: full refund. During combat: salvage half the remaining-health value, rounded down.",
-    );
-    muted(
-        ui,
-        if view.global_paused {
-            "Paused explicitly"
-        } else {
-            "Combat continues while building"
-        },
     );
     if !view.any_blueprint {
         muted(
