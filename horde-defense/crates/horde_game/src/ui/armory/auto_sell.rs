@@ -234,13 +234,14 @@ fn threshold_chip(ui: &mut egui::Ui, chip: &Chip, selected: bool, settings: &Set
 }
 
 /// The collapsed "Auto-sell" section under "Manage equipment". A pending
-/// reveal (`ArmoryUi::reveal_auto_sell`) opens it and scrolls it into view
-/// on every frame until it has fully opened and lies inside the page's
-/// viewport; after that the header is the player's again. One scroll on the
-/// first frame was not enough (CF-3-25): the section may still be animating
-/// open, and the page's viewport is measured before the camp footer has its
-/// final height, which at 1050x700@1.35 then shrinks it by about 34 pt and
-/// cut "Apply rule to stash now…".
+/// reveal (`ArmoryUi::reveal_auto_sell`) opens it and keeps it in view until
+/// the player first presses, scrolls or types; after that the header and the
+/// page are the player's again. Holding it is what the reveal needs
+/// (CF-3-25): the section may still be animating open on the first frame,
+/// and the page above it settles over the first frames (the camp footer's
+/// height, the item art as it loads), so a panel scrolled into view once was
+/// pushed back under the footer and "Apply rule to stash now…" was cut at
+/// 1050x700@1.35. While the panel lies in view the hold scrolls nothing.
 pub(super) fn panel(ui: &mut egui::Ui, f: &mut UiCtx) {
     let reveal = f.armory.reveal_auto_sell;
     let section = egui::CollapsingHeader::new(HEADER)
@@ -253,13 +254,36 @@ pub(super) fn panel(ui: &mut egui::Ui, f: &mut UiCtx) {
             .map_or(section.header_response.rect, |body| {
                 section.header_response.rect.union(body.rect)
             });
-        // At once, not animated: the next frame already shows the panel.
-        ui.scroll_to_rect_animation(shown, None, egui::style::ScrollAnimation::none());
-        // Done once the open panel lies inside the page's viewport (or is
-        // taller than it, which the scroll leaves showing from the top).
         let clip = ui.clip_rect();
-        let settled = clip.contains_rect(shown) || shown.height() >= clip.height();
-        f.armory.reveal_auto_sell = section.openness < 1.0 || !settled;
+        let fits = shown.height() < clip.height();
+        let gap = ui.spacing().item_spacing.y + 1.0;
+        let in_view = if fits {
+            clip.contains_rect(shown)
+        } else {
+            (clip.top()..=clip.top() + gap).contains(&shown.top())
+        };
+        if !in_view {
+            // A fixed place rather than the least scroll, so every frame
+            // until the page settles aims at the same offset: the panel's
+            // bottom on the viewport's, or its top on the viewport's when it
+            // is taller. At once, not animated.
+            let align = if fits {
+                egui::Align::Max
+            } else {
+                egui::Align::Min
+            };
+            ui.scroll_to_rect_animation(shown, Some(align), egui::style::ScrollAnimation::none());
+        }
+        let player = ui.input(|input| {
+            input.pointer.any_pressed()
+                || input.events.iter().any(|event| {
+                    matches!(
+                        event,
+                        egui::Event::Key { pressed: true, .. } | egui::Event::MouseWheel { .. }
+                    )
+                })
+        });
+        f.armory.reveal_auto_sell = !player;
     }
 }
 

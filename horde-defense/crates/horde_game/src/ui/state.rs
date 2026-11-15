@@ -128,9 +128,9 @@ pub(crate) struct ArmoryUi {
     pub(super) pending_sale: Option<u64>,
     pub(super) preset_name: String,
     pub(super) sell_confirm: bool,
-    /// Open the Auto-sell panel and scroll it into view on the next
-    /// Equipment frame, then clear: set by a route that leads to the panel
-    /// (the equipment-autosell review scene).
+    /// Open the Auto-sell panel and keep it in view on the Equipment page
+    /// until the player first presses, scrolls or types, then clear: set by
+    /// a route that leads to the panel (the equipment-autosell review scene).
     pub(super) reveal_auto_sell: bool,
 }
 impl Default for ArmoryUi {

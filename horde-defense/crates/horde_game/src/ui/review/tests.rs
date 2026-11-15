@@ -2495,8 +2495,8 @@ fn equipment_autosell_preview_counts_only_below_uncommon() {
     let line = format!("Would sell 2 now · +{}", preview.coins);
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1440.0, 900.0));
     // The first frame opens the panel and asks the page to scroll to it;
-    // from the second frame on it is on screen, and the reveal is consumed
-    // once the section has opened (CF-3-25).
+    // from the second frame on it is on screen. The reveal holds it there
+    // until the player's first input (CF-3-25).
     let ctx = egui::Context::default();
     crate::settings::install_font(&ctx);
     let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
@@ -2511,9 +2511,7 @@ fn equipment_autosell_preview_counts_only_below_uncommon() {
             |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
         );
         output.textures_delta.clear();
-        if frame == 29 {
-            assert!(!f.armory.reveal_auto_sell, "the reveal is consumed");
-        }
+        assert!(f.armory.reveal_auto_sell, "no input yet: the reveal holds");
         if frame == 0 {
             continue;
         }
@@ -2531,12 +2529,14 @@ fn equipment_autosell_preview_counts_only_below_uncommon() {
     }
 }
 
-/// CF-3-25 (closing): the reveal scrolls the whole opened panel into view at
-/// the compact size too. A scroll taken on the first frame only was measured
-/// against a viewport that shrank once the camp footer took its height, and
-/// left "Apply rule to stash now…" cut at the viewport's bottom. Checked at
-/// 1050x700@1.35 (and 1440x900) in both modes: once the reveal is consumed,
-/// the Apply button's text lies inside its scroll clip.
+/// CF-3-25 (closing): the reveal keeps the whole opened panel in view at the
+/// compact size too. A scroll taken on the first frame only was measured
+/// against a page that then changed under it (the first frames of a launch
+/// draw before the 1.35 scale applies; the footer and the item art settle),
+/// and left "Apply rule to stash now…" cut at the viewport's bottom. Checked
+/// at 1050x700@1.35 (and 1440x900) in both modes, with the first frames on
+/// the unscaled window: the Apply button's text lies inside its scroll clip,
+/// and the player's first press ends the reveal.
 #[test]
 fn equipment_autosell_reveal_shows_the_apply_button_at_both_sizes() {
     fn texts(output: &egui::FullOutput, label: &str) -> Vec<(egui::Rect, egui::Rect)> {
@@ -2566,8 +2566,8 @@ fn equipment_autosell_reveal_shows_the_apply_button_at_both_sizes() {
     }
     for reduced in [false, true] {
         for (size, scale) in [
-            (egui::vec2(1440.0, 900.0), 1.0),
             (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+            (egui::vec2(1440.0, 900.0), 1.0),
         ] {
             let mut f = staged("equipment-autosell");
             f.settings.scale = scale;
@@ -2578,23 +2578,26 @@ fn equipment_autosell_reveal_shows_the_apply_button_at_both_sizes() {
             let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
             warmup.textures_delta.clear();
             let mut last = None;
-            // Well past the section's open animation at 60 frames a second.
-            for _ in 0..30 {
+            // The first frames draw on the unscaled window, as a launch does
+            // before its scale applies; then well past the section's open
+            // animation at 60 frames a second.
+            let frame = |f: &mut FrontendParts, size: egui::Vec2, events| {
                 f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
                 let mut output = ctx.run_ui(
                     egui::RawInput {
                         screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                        events,
                         ..egui::RawInput::default()
                     },
                     |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
                 );
                 output.textures_delta.clear();
-                last = Some(output);
+                output
+            };
+            for step in 0..30 {
+                let shown = if step < 3 { size * scale } else { size };
+                last = Some(frame(&mut f, shown, Vec::new()));
             }
-            assert!(
-                !f.armory.reveal_auto_sell,
-                "{size:?} reduced {reduced}: the reveal is consumed"
-            );
             let output = last.unwrap();
             let apply = texts(&output, "Apply rule to stash now");
             assert_eq!(
@@ -2607,6 +2610,28 @@ fn equipment_autosell_reveal_shows_the_apply_button_at_both_sizes() {
             assert!(
                 clip.contains_rect(rect),
                 "{size:?} reduced {reduced}: Apply {rect:?} is cut by its clip {clip:?}"
+            );
+            assert!(
+                f.armory.reveal_auto_sell,
+                "{size:?} reduced {reduced}: no input yet, the reveal holds"
+            );
+            // The player's first press (on the empty corner under the
+            // footer's primary) hands the page back.
+            let corner = size.to_pos2() - egui::vec2(4.0, 4.0);
+            let press = |pressed| egui::Event::PointerButton {
+                pos: corner,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            frame(
+                &mut f,
+                size,
+                vec![egui::Event::PointerMoved(corner), press(true), press(false)],
+            );
+            assert!(
+                !f.armory.reveal_auto_sell,
+                "{size:?} reduced {reduced}: a press ends the reveal"
             );
         }
     }
