@@ -24,10 +24,14 @@ use std::path::Path;
 /// The exporter, as the provenance names it.
 pub const GENERATOR: &str = "crates/horde_audio/examples/export_audio.rs";
 /// Every source file that decides a sample or a provenance number, sorted,
-/// relative to the workspace folder. `generator_sha256` covers exactly these;
-/// after editing one, run the exporter with `--write`.
-pub const GENERATOR_SOURCES: [&str; 7] = [
+/// relative to the workspace folder: the list is closed over the crate files
+/// they use (`bank.rs` holds every variant's seed and file name, `cue.rs` the
+/// legacy ordinals). `generator_sha256` covers exactly these; after editing
+/// one, run the exporter with `--write`.
+pub const GENERATOR_SOURCES: [&str; 9] = [
     "crates/horde_audio/examples/export_audio.rs",
+    "crates/horde_audio/src/bank.rs",
+    "crates/horde_audio/src/cue.rs",
     "crates/horde_audio/src/export.rs",
     "crates/horde_audio/src/meter.rs",
     "crates/horde_audio/src/synth/family.rs",

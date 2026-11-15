@@ -365,6 +365,126 @@ fn survival_generator_sha256_matches_lf_normalised_sources() {
     assert!(!String::from_utf8(input).unwrap().contains('\r'));
 }
 
+/// The module paths a `use`/expression tree names after a `crate::`,
+/// `horde_audio::` or `super::` head: `{a, b::{c, d}}` gives `a`, `b::c` and
+/// `b::d`.
+fn use_tree(text: &[u8], at: &mut usize, prefix: &[String], out: &mut Vec<Vec<String>>) {
+    let ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    while *at < text.len() && text[*at].is_ascii_whitespace() {
+        *at += 1;
+    }
+    if text.get(*at) == Some(&b'{') {
+        *at += 1;
+        loop {
+            while *at < text.len() && (text[*at].is_ascii_whitespace() || text[*at] == b',') {
+                *at += 1;
+            }
+            if *at >= text.len() || text[*at] == b'}' {
+                *at += 1;
+                return;
+            }
+            use_tree(text, at, prefix, out);
+        }
+    }
+    let start = *at;
+    while *at < text.len() && ident(text[*at]) {
+        *at += 1;
+    }
+    if start == *at {
+        *at += 1; // `*` or punctuation: the path ends at the prefix
+        out.push(prefix.to_vec());
+        return;
+    }
+    let mut path = prefix.to_vec();
+    path.push(String::from_utf8_lossy(&text[start..*at]).into_owned());
+    if text[*at..].starts_with(b"::") {
+        *at += 2;
+        use_tree(text, at, &path, out);
+    } else {
+        out.push(path);
+    }
+}
+
+/// Every `src/` file of this crate that `source` (a workspace-relative path)
+/// names through `crate::`, `horde_audio::` or `super::`.
+fn crate_files_used(root: &Path, source: &str, text: &str) -> Vec<String> {
+    const SRC: &str = "crates/horde_audio/src/";
+    let module: Vec<String> = source
+        .strip_prefix(SRC)
+        .map(|file| {
+            file.trim_end_matches(".rs")
+                .split('/')
+                .filter(|part| *part != "mod")
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+    let parent = &module[..module.len().saturating_sub(1)];
+    let bytes = text.as_bytes();
+    let mut paths = Vec::new();
+    for (head, prefix) in [
+        ("crate::", &[][..]),
+        ("horde_audio::", &[][..]),
+        ("super::", parent),
+    ] {
+        for (index, _) in text.match_indices(head) {
+            let joined = index > 0 && {
+                let before = bytes[index - 1];
+                before.is_ascii_alphanumeric() || before == b'_' || before == b':'
+            };
+            if !joined {
+                use_tree(bytes, &mut (index + head.len()), prefix, &mut paths);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    for path in paths {
+        let path: Vec<&str> = path
+            .iter()
+            .map(String::as_str)
+            .filter(|part| *part != "self")
+            .collect();
+        for length in (1..=path.len()).rev() {
+            let file = format!("{SRC}{}.rs", path[..length].join("/"));
+            if root.join(&file).is_file() {
+                files.push(file);
+                break;
+            }
+        }
+    }
+    files.sort_unstable();
+    files.dedup();
+    files
+}
+
+/// `generator_sha256` identifies the generator only if the list is closed:
+/// every crate file a generator source uses (the bank seeds and file names in
+/// `bank.rs`, the cue ordinals in `cue.rs`) is itself a generator source.
+#[test]
+fn generator_sources_include_every_crate_file_they_use() {
+    let root = workspace_root();
+    for source in export::GENERATOR_SOURCES {
+        let text = std::fs::read_to_string(root.join(source)).unwrap();
+        for used in crate_files_used(&root, source, &text) {
+            assert!(
+                export::GENERATOR_SOURCES.contains(&used.as_str()),
+                "{source} uses {used}, which GENERATOR_SOURCES leaves out"
+            );
+        }
+    }
+    let family =
+        std::fs::read_to_string(root.join("crates/horde_audio/src/synth/family.rs")).unwrap();
+    let used = crate_files_used(&root, "crates/horde_audio/src/synth/family.rs", &family);
+    assert!(
+        used.contains(&"crates/horde_audio/src/bank.rs".to_owned()),
+        "{used:?}"
+    );
+    assert!(
+        used.contains(&"crates/horde_audio/src/synth/legacy.rs".to_owned()),
+        "{used:?}"
+    );
+}
+
 #[test]
 fn schema2_survival_records_have_seed_and_true_peak() {
     let manifest = shipped_manifest();
