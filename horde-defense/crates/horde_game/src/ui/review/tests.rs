@@ -2409,13 +2409,14 @@ fn equipment_autosell_preview_counts_only_below_uncommon() {
     assert_eq!(preview.count, 2, "Poor and Common");
     let line = format!("Would sell 2 now · +{}", preview.coins);
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1440.0, 900.0));
-    // The reveal is one-shot: the first frame opens the panel and asks the
-    // page to scroll to it; from the second frame on it is on screen.
+    // The first frame opens the panel and asks the page to scroll to it;
+    // from the second frame on it is on screen, and the reveal is consumed
+    // once the section has opened (CF-3-25).
     let ctx = egui::Context::default();
     crate::settings::install_font(&ctx);
     let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
     warmup.textures_delta.clear();
-    for frame in 0..3 {
+    for frame in 0..30 {
         f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
         let mut output = ctx.run_ui(
             egui::RawInput {
@@ -2425,7 +2426,9 @@ fn equipment_autosell_preview_counts_only_below_uncommon() {
             |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
         );
         output.textures_delta.clear();
-        assert!(!f.armory.reveal_auto_sell, "the reveal is consumed");
+        if frame == 29 {
+            assert!(!f.armory.reveal_auto_sell, "the reveal is consumed");
+        }
         if frame == 0 {
             continue;
         }
@@ -2440,6 +2443,87 @@ fn equipment_autosell_preview_counts_only_below_uncommon() {
             bounds.iter().all(|rect| screen.contains_rect(*rect)),
             "frame {frame}: the preview is on screen: {bounds:?}"
         );
+    }
+}
+
+/// CF-3-25 (closing): the reveal scrolls the whole opened panel into view at
+/// the compact size too. A scroll taken on the first frame only was measured
+/// against a viewport that shrank once the camp footer took its height, and
+/// left "Apply rule to stash now…" cut at the viewport's bottom. Checked at
+/// 1050x700@1.35 (and 1440x900) in both modes: once the reveal is consumed,
+/// the Apply button's text lies inside its scroll clip.
+#[test]
+fn equipment_autosell_reveal_shows_the_apply_button_at_both_sizes() {
+    fn texts(output: &egui::FullOutput, label: &str) -> Vec<(egui::Rect, egui::Rect)> {
+        fn walk(
+            shape: &egui::epaint::Shape,
+            clip: egui::Rect,
+            label: &str,
+            found: &mut Vec<(egui::Rect, egui::Rect)>,
+        ) {
+            match shape {
+                egui::epaint::Shape::Text(text) if text.galley.text().contains(label) => {
+                    found.push((text.galley.rect.translate(text.pos.to_vec2()), clip));
+                }
+                egui::epaint::Shape::Vec(shapes) => {
+                    shapes
+                        .iter()
+                        .for_each(|shape| walk(shape, clip, label, found));
+                }
+                _ => {}
+            }
+        }
+        let mut found = Vec::new();
+        for clipped in &output.shapes {
+            walk(&clipped.shape, clipped.clip_rect, label, &mut found);
+        }
+        found
+    }
+    for reduced in [false, true] {
+        for (size, scale) in [
+            (egui::vec2(1440.0, 900.0), 1.0),
+            (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+        ] {
+            let mut f = staged("equipment-autosell");
+            f.settings.scale = scale;
+            f.settings.reduced_effects = reduced;
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, scale);
+            let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+            warmup.textures_delta.clear();
+            let mut last = None;
+            // Well past the section's open animation at 60 frames a second.
+            for _ in 0..30 {
+                f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+                let mut output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                        ..egui::RawInput::default()
+                    },
+                    |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+                );
+                output.textures_delta.clear();
+                last = Some(output);
+            }
+            assert!(
+                !f.armory.reveal_auto_sell,
+                "{size:?} reduced {reduced}: the reveal is consumed"
+            );
+            let output = last.unwrap();
+            let apply = texts(&output, "Apply rule to stash now");
+            assert_eq!(
+                apply.len(),
+                1,
+                "{size:?} reduced {reduced}: {:?}",
+                painted_text(&output)
+            );
+            let (rect, clip) = apply[0];
+            assert!(
+                clip.contains_rect(rect),
+                "{size:?} reduced {reduced}: Apply {rect:?} is cut by its clip {clip:?}"
+            );
+        }
     }
 }
 
