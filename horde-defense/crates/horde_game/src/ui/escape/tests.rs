@@ -103,35 +103,48 @@ const OVERLAYS: [Overlay; 14] = [
     Overlay::None,
 ];
 
-/// The modal family after `kind`, in declaration order (`None` after the
-/// last). The match is exhaustive, so a new `ModalKind` does not compile
-/// until it joins this chain, and through it `OVERLAYS`.
-fn next_modal(kind: ModalKind) -> Option<ModalKind> {
-    match kind {
-        ModalKind::Quit => Some(ModalKind::ReturnToMenu),
-        ModalKind::ReturnToMenu => Some(ModalKind::Storage),
-        ModalKind::Storage => Some(ModalKind::DraftWarning),
-        ModalKind::DraftWarning => Some(ModalKind::Recruit),
-        ModalKind::Recruit => Some(ModalKind::ApplyAutoSell),
-        ModalKind::ApplyAutoSell => None,
-    }
+/// Writes `ALL_MODALS` and `listed` from one list of `ModalKind` variants.
+/// `listed` matches exactly the listed variants, with no wildcard, so a new
+/// `ModalKind` does not compile until it joins the list, and joining the
+/// list puts it in `ALL_MODALS`, which `overlays_hold_every_modal_family`
+/// requires in `OVERLAYS`.
+macro_rules! every_modal {
+    ($($kind:ident),* $(,)?) => {
+        const ALL_MODALS: &[ModalKind] = &[$(ModalKind::$kind),*];
+        /// `kind` itself; it compiles only while the list names every variant.
+        const fn listed(kind: ModalKind) -> ModalKind {
+            match kind {
+                $(ModalKind::$kind)|* => kind,
+            }
+        }
+    };
 }
+every_modal!(
+    Quit,
+    ReturnToMenu,
+    Storage,
+    DraftWarning,
+    Recruit,
+    ApplyAutoSell,
+);
 
 /// design-ux-flow §7: the matrix grows a row family with each overlay, so
-/// every app modal family is one of the overlays the properties sweep.
+/// every app modal family is one of the overlays the properties sweep, and
+/// `OVERLAYS` holds no app modal row outside `ALL_MODALS`.
 #[test]
 fn overlays_hold_every_modal_family() {
-    let mut kind = Some(ModalKind::Quit);
-    let mut families = 0;
-    while let Some(here) = kind {
+    for &kind in ALL_MODALS {
+        assert_eq!(listed(kind), kind);
         assert!(
-            OVERLAYS.contains(&Overlay::AppModal(here)),
-            "{here:?} is missing from OVERLAYS"
+            OVERLAYS.contains(&Overlay::AppModal(kind)),
+            "{kind:?} is missing from OVERLAYS"
         );
-        families += 1;
-        kind = next_modal(here);
     }
-    assert_eq!(families, 6);
+    let modal_rows = OVERLAYS
+        .iter()
+        .filter(|overlay| matches!(overlay, Overlay::AppModal(_)))
+        .count();
+    assert_eq!(modal_rows, ALL_MODALS.len(), "one OVERLAYS row per family");
 }
 
 #[test]
