@@ -456,3 +456,70 @@ fn battle_and_observer_never_render_sale_text() {
         );
     }
 }
+
+/// The receipt's hover lines as `results::loot_block` writes them: one per
+/// listed sale, then "and N more" for the sales the receipt does not list.
+fn receipt_lines(receipt: &horde_core::campaign::AutoSoldReceipt) -> Vec<String> {
+    let mut lines: Vec<String> = receipt
+        .lines
+        .iter()
+        .map(|line| {
+            format!(
+                "{} · {} · Lv{} · +{}",
+                line.definition.definition().unwrap().name,
+                line.quality.name(),
+                line.level,
+                line.coins
+            )
+        })
+        .collect();
+    lines.push(format!(
+        "and {} more",
+        receipt.count as usize - receipt.lines.len()
+    ));
+    lines
+}
+
+/// Hovering "Auto-sold N · +C" shows the receipt: each listed sale's line,
+/// then "and N more" for the sales past the receipt's bound. The lines are
+/// painted only while the pointer is on the line.
+#[test]
+fn results_auto_sold_line_hover_lists_the_receipt_and_the_rest() {
+    use horde_core::campaign::MAX_AUTO_SOLD_LINES;
+    for target in Target::BOTH {
+        let mut fixture = IsolatedFrontend::new();
+        fixture.deploy();
+        let h = Harness::at(target);
+        h.ctx
+            .all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
+        let f = &mut fixture.frontend;
+        let sales = MAX_AUTO_SOLD_LINES + 3;
+        for n in 0..sales {
+            drop_item(f, 4 + n % 4, Quality::Poor);
+        }
+        f.game.apply(&Command::SetAutoSell(sell_cheap())).unwrap();
+        settle_run(f);
+        let receipt = loot_of(f).auto_sold;
+        assert_eq!(receipt.count as usize, sales, "{target:?}");
+        assert_eq!(receipt.lines.len(), MAX_AUTO_SOLD_LINES, "{target:?}");
+        let lines = receipt_lines(&receipt);
+        assert_eq!(lines.last().map(String::as_str), Some("and 3 more"));
+        let sold = format!("Auto-sold {sales} · +{}", receipt.coins);
+        let output = settle(&h, f);
+        assert!(fully_visible(&output, &sold), "{target:?}: {sold}");
+        for line in &lines {
+            assert_eq!(text_count(&output, line), 0, "{target:?}: {line} unhovered");
+        }
+        let (rect, _) = clipped_bounds(&output, &sold).expect("painted");
+        h.frame(f, View::Full, vec![Event::PointerMoved(rect.center())]);
+        let output = settle(&h, f);
+        for line in &lines {
+            let expected = lines.iter().filter(|other| *other == line).count();
+            assert_eq!(
+                text_count(&output, line),
+                expected,
+                "{target:?}: {line} on hover"
+            );
+        }
+    }
+}
