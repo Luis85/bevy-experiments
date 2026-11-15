@@ -135,12 +135,13 @@ pub struct SceneAudioTarget {
     pub ambience: f32,
     pub context: AudioContext,
 }
+/// Before the frontend's first publish: the menu at the sliders' defaults.
 impl Default for SceneAudioTarget {
     fn default() -> Self {
         Self {
             scene: SceneAmbience::default(),
-            master: 0.6,
-            ambience: 0.15,
+            master: crate::settings::defaults::MASTER,
+            ambience: crate::settings::defaults::AMBIENCE,
             context: AudioContext::Menu,
         }
     }
@@ -375,6 +376,18 @@ mod tests {
                 assert!(gains.iter().sum::<f32>() <= 1.00001);
             }
         }
+    }
+    /// Before the frontend first publishes, the beds play at the sliders'
+    /// defaults (the calibrated mix), not the wave-1 values.
+    #[test]
+    fn default_target_plays_at_the_settings_defaults() {
+        let settings = crate::settings::Settings::default();
+        let target = SceneAudioTarget::default();
+        assert_eq!(
+            (target.master, target.ambience),
+            (settings.master, settings.ambience)
+        );
+        assert_eq!(target.context, AudioContext::Menu);
     }
     #[test]
     fn mute_is_immediate_even_during_crossfade() {
