@@ -433,15 +433,17 @@ impl Bot<'_> {
             .take()
             .filter(|c| w.can_enter(c) && !w.cleared.contains(c) && !live.contains(c))
     }
-    /// The offered archetype whose recruit would have the higher power at
-    /// the next threat (the first on a tie), tried on copies of the game.
+    /// The offered archetype whose recruit would have the higher power on
+    /// its expeditions (the first on a tie), tried on copies of the game.
+    /// The bot sends recruits only on expeditions, never on main-run
+    /// takeovers, so each trial recruit is rated at the threat its
+    /// expedition plays at (`Campaign::expedition_threat_rank`, W4-12,
+    /// ruling R57), not the campaign rank.
     fn best_archetype(&self, country: &str) -> Option<String> {
         let offer = self.g.recruit_offer(country).ok()?;
-        let id = DefenderId::Recruit(self.g.strategy.next_recruit_id);
-        let threat = self
-            .g
-            .next_threat()
-            .min(crate::progression::catalog().threat_guard_rank);
+        let next = self.g.strategy.next_recruit_id;
+        let id = DefenderId::Recruit(next);
+        let guard = crate::progression::catalog().threat_guard_rank;
         let mut best: Option<(&'static str, u16)> = None;
         for choice in offer.archetypes {
             let archetype = choice.archetype.id();
@@ -450,9 +452,16 @@ impl Bot<'_> {
                 country: country.to_owned(),
                 archetype: archetype.to_owned(),
             });
+            let threat = trial
+                .strategy
+                .roster
+                .iter()
+                .find(|r| r.id == next)
+                .map(|r| trial.campaign.expedition_threat_rank(&r.npc).min(guard));
             let rating = recruited
                 .ok()
-                .and_then(|_| trial.defender_power(id, threat).ok())
+                .and(threat)
+                .and_then(|threat| trial.defender_power(id, threat).ok())
                 .map(|p| p.rating);
             if let Some(rating) = rating
                 && best.is_none_or(|(_, top)| rating > top)
@@ -1364,5 +1373,67 @@ mod tests {
         bot.idle(3);
         bot.count_settled(&mut book);
         assert_eq!(book.earned, paid);
+    }
+
+    /// Closing (W4-12, R57, R62): the bot's recruits only go on
+    /// expeditions, which play at the recruit's own threat
+    /// (`Campaign::expedition_threat_rank`), so it rates each offered
+    /// archetype there, not at the campaign rank a fresh recruit never
+    /// meets. Deep in a campaign (rank 15) the campaign-rank ratings
+    /// collapse to the clamp 1 and tie, and the first offer won by default
+    /// even where the second is the stronger expedition recruit.
+    #[test]
+    fn best_archetype_rates_each_recruit_at_its_expedition_rank() {
+        let mut bot = bot_after_germany();
+        bot.g
+            .campaign
+            .skill_nodes
+            .insert(crate::sim::defense::feature_node(
+                crate::skill_catalog::CampaignFeature::Recruitment,
+            ));
+        bot.g.campaign.coins = 1_000_000;
+        bot.g.campaign.victories = 15;
+        let campaign_rank = bot.g.campaign.progression_rank();
+        let mut second_wins = 0;
+        for next in 1..=12 {
+            bot.g.strategy.next_recruit_id = next;
+            let rated = |archetype: &str| {
+                let mut trial = bot.g.clone();
+                trial
+                    .apply(&Command::RecruitAs {
+                        country: "DEU".into(),
+                        archetype: archetype.to_owned(),
+                    })
+                    .unwrap();
+                let roster = &trial.strategy.roster;
+                let npc = &roster.iter().find(|r| r.id == next).unwrap().npc;
+                let rank = trial.campaign.expedition_threat_rank(npc);
+                let power = |rank| {
+                    trial
+                        .defender_power(DefenderId::Recruit(next), rank)
+                        .unwrap()
+                        .rating
+                };
+                (rank, power(rank), power(campaign_rank))
+            };
+            let offer = bot.g.recruit_offer("DEU").unwrap();
+            let mut expected: Option<(&str, u16)> = None;
+            for (index, choice) in offer.archetypes.iter().enumerate() {
+                let archetype = choice.archetype.id();
+                let (rank, rating, at_campaign) = rated(archetype);
+                assert!(rank < campaign_rank, "{archetype} plays at rank {rank}");
+                assert_eq!(at_campaign, 1, "{archetype} at rank {campaign_rank}");
+                if expected.is_none_or(|(_, top)| rating > top) {
+                    expected = Some((archetype, rating));
+                    second_wins += index;
+                }
+            }
+            assert_eq!(
+                bot.best_archetype("DEU").as_deref(),
+                expected.map(|(a, _)| a),
+                "recruit {next}"
+            );
+        }
+        assert!(second_wins > 0, "no offer's second archetype is stronger");
     }
 }
