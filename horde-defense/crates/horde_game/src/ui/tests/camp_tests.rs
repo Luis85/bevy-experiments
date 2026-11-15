@@ -253,3 +253,48 @@ fn world_footer_never_creates_attempt() {
         assert!(!f.status.message_error, "{label}");
     }
 }
+
+/// CF-3 (closing): the camp footer is as tall as what it draws. W3-05 moved
+/// Save to the header and the world clock row is Camp home's alone, so a
+/// Prepare page's footer holds one primary row; the old 118 pt floor left
+/// about 50 pt empty under it and took that from the page at 1050x700@1.35.
+#[test]
+fn camp_footer_fits_its_one_row_on_prepare_pages() {
+    for target in Target::BOTH {
+        for (tab, label) in [
+            (Tab::Armory, "Go to briefing"),
+            (Tab::Character, "Go to briefing"),
+            (Tab::Briefing, "Deploy personally"),
+        ] {
+            let mut fixture = IsolatedFrontend::new();
+            let h = Harness::at(target);
+            let f = &mut fixture.frontend;
+            f.game.campaign_mut().choose_start_country("DEU").unwrap();
+            f.game.campaign_mut().journey_active = true;
+            f.act(|c| c.open_preparation(tab));
+            // Two frames: a panel sizes from its previous frame.
+            h.frame(f, View::Camp, vec![]);
+            let output = h.frame(f, View::Camp, vec![]);
+            let screen = Rect::from_min_size(Pos2::ZERO, target.points());
+            let panel = painted_rects(&output)
+                .into_iter()
+                .filter(|shape| shape.fill == art::PANEL)
+                .map(|shape| shape.rect)
+                .find(|rect| {
+                    (rect.bottom() - screen.bottom()).abs() < 1.0
+                        && (rect.width() - screen.width()).abs() < 1.0
+                })
+                .unwrap_or_else(|| panic!("{target:?} {tab:?}: no footer panel"));
+            let button = button_frame(&output, label)
+                .unwrap_or_else(|| panic!("{target:?} {tab:?}: {label} has no frame"));
+            assert!(panel.contains_rect(button), "{target:?} {tab:?}");
+            // The frame's 10 pt margins and the row's 5 pt trailing space,
+            // with a few points of item spacing: nothing like a second row.
+            let below = panel.bottom() - button.bottom();
+            assert!(
+                below <= 24.0,
+                "{target:?} {tab:?}: {below} pt under {label} in the footer {panel:?}"
+            );
+        }
+    }
+}

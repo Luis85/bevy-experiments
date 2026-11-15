@@ -30,12 +30,19 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
         return;
     }
     navigation::camp_navigation(root, f);
+    // The footer is as tall as what it draws (CF-3): its primary row, plus
+    // the "Back to survivor" row before a start or Camp home's world clock
+    // row. Every other page draws the one primary row, and the panel sizes
+    // to it (and to a status line while one shows).
+    let footer_rows = if f.game.campaign().world.start.is_none() {
+        98.0
+    } else if f.tab == Tab::Home && f.operations_available() {
+        118.0
+    } else {
+        0.0
+    };
     egui::Panel::bottom("camp_status")
-        .min_size(if f.game.campaign().world.start.is_none() {
-            98.0
-        } else {
-            118.0
-        })
+        .min_size(footer_rows)
         .frame(
             egui::Frame::new()
                 .fill(PANEL)

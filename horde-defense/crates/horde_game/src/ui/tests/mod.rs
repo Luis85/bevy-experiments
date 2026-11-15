@@ -688,6 +688,31 @@ fn visible_runs(output: &FullOutput, label: &str) -> Vec<Rect> {
         .map(|run| run.rect)
         .collect()
 }
+/// Every painted rectangle of `output` with its fill, in paint order.
+fn painted_rects(output: &FullOutput) -> Vec<egui::epaint::RectShape> {
+    fn collect(shape: &egui::epaint::Shape, found: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::epaint::Shape::Rect(rect) => found.push(rect.clone()),
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| collect(s, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        collect(&clipped.shape, &mut found);
+    }
+    found
+}
+/// The frame of the button reading exactly `label`: the smallest painted
+/// rectangle around its text run.
+fn button_frame(output: &FullOutput, label: &str) -> Option<Rect> {
+    let text = clipped_bounds(output, label)?.0;
+    painted_rects(output)
+        .into_iter()
+        .map(|shape| shape.rect)
+        .filter(|rect| rect.expand(0.5).contains_rect(text) && *rect != text)
+        .min_by(|a, b| a.area().total_cmp(&b.area()))
+}
 /// The clip rect the text run reading exactly `anchor` is painted under: a
 /// scroll area's viewport when the run is in one.
 fn viewport_of(output: &FullOutput, anchor: &str) -> Rect {
