@@ -11,7 +11,7 @@
 //! there are (halo, fill, marker); text is one galley per label.
 use super::super::{AMBER, INK};
 use super::batch::MeshBuilder;
-use bevy_egui::egui::{Align2, Color32 as C, FontId, Painter, Pos2, Rect, Vec2, pos2, vec2};
+use bevy_egui::egui::{self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Vec2, pos2, vec2};
 use std::borrow::Cow;
 
 /// The INK backing under cue geometry.
@@ -323,18 +323,35 @@ fn coin_outline(alpha: f32) -> C {
     )
 }
 
+/// The text of a banked-coin pop-up of `coins`, laid out with `p`'s fonts.
+fn coin_galley(p: &Painter, coins: i32, reduced: bool) -> std::sync::Arc<egui::Galley> {
+    p.layout_no_wrap(
+        format!("+{coins}c"),
+        FontId::proportional(if reduced { 15.0 } else { 16.0 }),
+        AMBER,
+    )
+}
+
+/// How far a coin pop-up's outline copies sit off its text.
+fn coin_border(reduced: bool) -> f32 {
+    if reduced { 1.0 } else { 1.5 }
+}
+
+/// The rect a banked-coin pop-up of `coins` centred at `center` paints, its
+/// outline included.
+pub(super) fn coin_rect(p: &Painter, center: Pos2, coins: i32, reduced: bool) -> Rect {
+    Rect::from_center_size(center, coin_galley(p, coins, reduced).size())
+        .expand(coin_border(reduced))
+}
+
 /// Banked-coin pop-up: amber with the same eight-way dark outline as the
 /// damage numbers, so it reads against any ground. Reduced effects keep it
 /// still (the caller drops the drift) with a thinner outline.
 fn coin_popup(p: &Painter, center: Pos2, coins: i32, alpha: f32, reduced: bool) {
-    let galley = p.layout_no_wrap(
-        format!("+{coins}c"),
-        FontId::proportional(if reduced { 15.0 } else { 16.0 }),
-        AMBER,
-    );
+    let galley = coin_galley(p, coins, reduced);
     let origin = center - galley.size() * 0.5;
     let outline = coin_outline(alpha);
-    let border = if reduced { 1.0 } else { 1.5 };
+    let border = coin_border(reduced);
     for direction in [
         vec2(-1.0, -1.0),
         vec2(0.0, -1.0),

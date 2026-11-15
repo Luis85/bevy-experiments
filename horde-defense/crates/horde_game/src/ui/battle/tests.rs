@@ -277,6 +277,7 @@ fn headroom_popups_never_overlap_hud_rects() {
                                 LootCaptureMode::Disabled,
                                 &keep_clear,
                                 settings.palette,
+                                settings.numbers,
                                 settings.reduced_effects,
                             );
                         });
@@ -304,6 +305,152 @@ fn headroom_popups_never_overlap_hud_rects() {
         }
     }
     assert!(checked > 1000, "only {checked} shapes drawn");
+}
+
+/// CF-3-05: a kill's banked-coin pop-up and a drop's quality label anchor
+/// near the same kill point, and the normal-effects coin rose onto the label
+/// row ("+18cEpic · Marksman rifle" in the quality-loot still at
+/// 1050x700@1.35). For a kill that banks 18 coins and a drop of an Epic
+/// rifle at and around that kill point, at coin ages over the coin's whole
+/// life and drop ages from its first frame, at both sizes, in normal and
+/// reduced effects, the coin the cue pass paints never meets the drop label
+/// the loot pass paints on the same frame.
+#[test]
+fn kill_coin_popups_keep_clear_of_drop_labels() {
+    use crate::{settings::Palette, ui::review::LootCaptureMode};
+    use horde_core::{
+        content::ItemDefId,
+        quality::{LootEvent, Quality},
+        sim::{Event, EventKind},
+    };
+    let mut game = Game::default();
+    game.deploy(0, Mode::Personal).unwrap();
+    let mut a = game.attempt().unwrap().clone();
+    a.enemies.clear();
+    a.events.clear();
+    a.loot_events.clear();
+    a.corpses.clear();
+    a.paused = true;
+    let kill = [a.width_yards * 0.5, f32::from(a.lane_count) * 0.5];
+    let kill_tick = a.tick;
+    a.events.push_back(Event {
+        seq: 1,
+        kind: EventKind::Kill,
+        from: a.defender_position(),
+        to: kill,
+        value: 18,
+        tick: kill_tick,
+        actor_id: None,
+        target_id: None,
+        lane: None,
+        duration_ticks: 0,
+    });
+    let (mut checked, mut both) = (0, 0);
+    for (size, zoom) in [
+        (vec2(1440.0, 900.0), 1.0),
+        (vec2(1050.0, 700.0) / 1.35, 1.35),
+    ] {
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+        let layout = BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+        let keep_clear = layout.effects_keep_clear();
+        for reduced in [false, true] {
+            for dx in [-1.0, 0.0, 1.0_f32] {
+                for step in -5..=10 {
+                    let dy = step as f32 * 0.1;
+                    for coin_ticks in [0, 9, 18, 26] {
+                        let mut a = a.clone();
+                        a.tick = kill_tick + coin_ticks;
+                        a.loot_events.push(LootEvent {
+                            item_id: 77,
+                            definition: ItemDefId::at(4),
+                            level: 3,
+                            quality: Quality::Epic,
+                            name: "Marksman rifle".into(),
+                            tick: kill_tick,
+                            at: [kill[0] + dx, kill[1] + dy],
+                        });
+                        let ctx = egui::Context::default();
+                        crate::settings::install_font(&ctx);
+                        crate::settings::configure(&ctx, zoom);
+                        let mut loot = crate::ui::loot::Feedback::default();
+                        for time in [0.0, 0.05, 0.3] {
+                            let input = egui::RawInput {
+                                time: Some(time),
+                                screen_rect: Some(canvas),
+                                ..Default::default()
+                            };
+                            let mut output = ctx.run_ui(input, |ui| {
+                                art::battlefield_for_attempt(
+                                    &ui.painter_at(layout.arena),
+                                    layout.field.rect,
+                                    &a,
+                                    kill,
+                                    crate::battle_view::SceneBlend::NONE,
+                                    art::RenderOptions {
+                                        construction: false,
+                                        outlines: true,
+                                        numbers: true,
+                                        reduced,
+                                        blood: false,
+                                        scene: art::SceneLook::neutral(0),
+                                        sky: art::SkyClock::default(),
+                                        canvas,
+                                        textures: Default::default(),
+                                        occluder: None,
+                                    },
+                                );
+                                let projection =
+                                    art::ArenaProjection::for_attempt(layout.field.rect, &a)
+                                        .with_effects_clip(layout.effects_clip);
+                                crate::ui::loot::draw_for(
+                                    ui,
+                                    projection,
+                                    &a,
+                                    0,
+                                    Default::default(),
+                                    &mut loot,
+                                    LootCaptureMode::Disabled,
+                                    &keep_clear,
+                                    Palette::default(),
+                                    true,
+                                    reduced,
+                                );
+                            });
+                            output.textures_delta.clear();
+                            let mut coin = Rect::NOTHING;
+                            let mut label = None;
+                            for clipped in &output.shapes {
+                                if let egui::Shape::Text(text) = &clipped.shape {
+                                    let rect = text.galley.rect.translate(text.pos.to_vec2());
+                                    match text.galley.text() {
+                                        "+18c" => coin = coin.union(rect),
+                                        "Epic · Marksman rifle" => label = Some(rect),
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            checked += 1;
+                            let Some(label) = label else { continue };
+                            if !coin.is_positive() {
+                                continue;
+                            }
+                            both += 1;
+                            assert!(
+                                !coin.intersects(label),
+                                "{size:?} reduced {reduced}, drop at ({dx}, {dy:.1}), coin \
+                                 {coin_ticks} ticks old, drop {time} s old: the coin {coin:?} \
+                                 meets the drop label {label:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        both * 2 > checked,
+        "only {both} of {checked} frames drew both"
+    );
 }
 
 /// `BarRows` starts a row when a rect's centre lies below the row so far: a

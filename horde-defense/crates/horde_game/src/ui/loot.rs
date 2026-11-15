@@ -1,6 +1,10 @@
 //! Bounded, real-time feedback for already-banked model receipts. No rewards
 //! or authoritative random state are produced by this presentation cache.
-use super::{UiCtx, armory, battle::keep_clear_shift, chrome, review};
+use super::{
+    UiCtx, armory,
+    battle::{KEEP_CLEAR_GAP, keep_clear_shift},
+    chrome, review,
+};
 use crate::art;
 use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
 use horde_core::quality::{LootEvent, Quality};
@@ -149,6 +153,7 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         capture,
         &f.battle.effects_keep_clear,
         f.settings.palette,
+        f.settings.numbers,
         f.settings.reduced_effects,
     );
 }
@@ -238,7 +243,60 @@ const MARKER_DISC: f32 = 4.5;
 fn marker_center(icon: Rect) -> egui::Pos2 {
     icon.right_top() + vec2(-MARKER_DISC - 1.0, MARKER_DISC + 1.0)
 }
-/// Draws `battle`'s fly-ups; none meets a rect of `keep_clear` (CF-1-09).
+/// How far a drop's quality `label` moves so it meets no banked-coin pop-up
+/// of `coins` (CF-3-05): up over the coins it meets, the way the fly-up
+/// rises, `KEEP_CLEAR_GAP` clear of them; where that leaves `clip`'s top
+/// margin or meets a rect of `keep_clear`, down under them instead. 0 when
+/// it meets none, or when neither move clears it.
+fn coin_clear_shift(label: Rect, coins: &[Rect], clip: Rect, keep_clear: &[Rect]) -> f32 {
+    let met = |rect: Rect| -> Vec<Rect> {
+        let apart = rect.expand(KEEP_CLEAR_GAP * 0.5);
+        coins
+            .iter()
+            .copied()
+            .filter(|coin| coin.intersects(apart))
+            .collect()
+    };
+    if met(label).is_empty() {
+        return 0.0;
+    }
+    let settle = |up: bool| {
+        let mut moved = label;
+        for _ in 0..=coins.len() {
+            let hit = met(moved);
+            if hit.is_empty() {
+                return Some(moved);
+            }
+            let dy = if up {
+                hit.iter()
+                    .map(|coin| coin.top())
+                    .fold(f32::INFINITY, f32::min)
+                    - KEEP_CLEAR_GAP
+                    - moved.bottom()
+            } else {
+                hit.iter()
+                    .map(|coin| coin.bottom())
+                    .fold(f32::NEG_INFINITY, f32::max)
+                    + KEEP_CLEAR_GAP
+                    - moved.top()
+            };
+            moved = moved.translate(vec2(0.0, dy));
+        }
+        met(moved).is_empty().then_some(moved)
+    };
+    [true, false]
+        .into_iter()
+        .filter_map(settle)
+        .find(|moved| {
+            moved.top() >= clip.top() + 4.0
+                && moved.bottom() <= clip.bottom()
+                && !keep_clear.iter().any(|rect| rect.intersects(*moved))
+        })
+        .map_or(0.0, |moved| moved.top() - label.top())
+}
+/// Draws `battle`'s fly-ups; none meets a rect of `keep_clear` (CF-1-09),
+/// and no quality label meets a banked-coin pop-up painted with `numbers`
+/// on (CF-3-05).
 #[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
     ui: &egui::Ui,
@@ -250,6 +308,7 @@ pub(super) fn draw_for(
     capture: review::LootCaptureMode,
     keep_clear: &[Rect],
     palette: crate::settings::Palette,
+    numbers: bool,
     reduced: bool,
 ) -> bool {
     let ready = textures.actors.is_some()
@@ -268,6 +327,12 @@ pub(super) fn draw_for(
         ready,
     );
     let painter = ui.painter_at(projection.effects_clip);
+    // The banked-coin pop-ups the field's cue pass painted this frame.
+    let coins = if numbers {
+        art::coin_rects(&painter, projection, attempt, reduced)
+    } else {
+        Vec::new()
+    };
     for entry in &state.streams[&battle].active {
         let seconds = now - entry.started;
         let age = (seconds / LIFETIME).clamp(0.0, 1.0) as f32;
@@ -307,6 +372,17 @@ pub(super) fn draw_for(
             ),
         );
         let (icon, text_at) = (icon.translate(drop), text_at + drop);
+        // The label keeps clear of every coin pop-up too (CF-3-05).
+        let text_at = text_at
+            + vec2(
+                0.0,
+                coin_clear_shift(
+                    Rect::from_min_size(text_at, galley.size()),
+                    &coins,
+                    projection.effects_clip,
+                    keep_clear,
+                ),
+            );
         painter.rect_filled(icon, 0.0, Color32::from_black_alpha((180.0 * fade) as u8));
         armory::paint_item_icon(
             &painter,
@@ -579,6 +655,7 @@ mod tests {
                     review::LootCaptureMode::Disabled,
                     &[],
                     crate::settings::Palette::Standard,
+                    true,
                     reduced,
                 );
             });

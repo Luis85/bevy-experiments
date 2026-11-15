@@ -19,7 +19,7 @@ pub use battlefield::{FlashFacts, flash_facts};
 pub(crate) use battlefield::{FxCounts, burst_keyframe_parts, fx_counts};
 pub use battlefield::{FxSource, shooter_class};
 pub(crate) use battlefield::{
-    HEALTH_BAR_LIFT, OCCLUDER_GAP, enemy_body_box, fx_lifetime, structure_face,
+    HEALTH_BAR_LIFT, OCCLUDER_GAP, coin_rects, enemy_body_box, fx_lifetime, structure_face,
 };
 #[cfg(test)]
 pub(crate) use battlefield::{

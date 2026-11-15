@@ -10,11 +10,14 @@ use super::cue::{self, CueBatch, Label};
 use super::weapon_fx;
 use crate::{
     animation::{Particle, ParticleKind},
-    battle_view::{BattleViewModel, FxView, Volley},
+    battle_view::{BattleViewModel, FxView, Volley, struck_stagger},
     visual_assets::{self, ArtTextures, PropMotion},
 };
 use bevy_egui::egui::{Align2, Color32 as C, Painter, Pos2, Rect, Vec2, vec2};
-use horde_core::{content::StructureKind, sim::EventKind};
+use horde_core::{
+    content::StructureKind,
+    sim::{Attempt, EventKind},
+};
 
 pub(super) struct FxOptions {
     pub numbers: bool,
@@ -293,6 +296,40 @@ pub(super) fn events(
     // Hit sparks and kill bursts, over the tracers.
     super::hits::paint(p, arena, view, reduced);
 }
+/// The centre of a kill's banked-coin pop-up `age` seconds after the kill at
+/// world point `to` (on the struck body): 12 pt over it, rising 24 pt a
+/// second in normal effects and held in reduced effects.
+fn coin_center(arena: ArenaProjection, to: [f32; 2], age: f32, reduced: bool) -> Pos2 {
+    let rise = if reduced { 0.0 } else { age * 24.0 };
+    arena.world(to[0], to[1]) + vec2(0.0, -12.0 - rise)
+}
+
+/// The rect, outline included, of every banked-coin pop-up the cue pass
+/// paints over `a` this frame with numbers on, laid out with `p`'s fonts:
+/// each Kill that banked coins while it fades ([`fx_lifetime`]), on the
+/// struck body, as [`event_cues`] paints it from the field view. A drop's
+/// quality label keeps clear of them (CF-3-05).
+pub(crate) fn coin_rects(
+    p: &Painter,
+    arena: ArenaProjection,
+    a: &Attempt,
+    reduced: bool,
+) -> Vec<Rect> {
+    a.events
+        .iter()
+        .filter(|e| e.kind == EventKind::Kill && e.value > 0)
+        .filter_map(|e| {
+            let age = a.tick.saturating_sub(e.tick) as f32 / 60.0;
+            // The cue pass paints a coin while its alpha is above 0.
+            (age < fx_lifetime(EventKind::Kill)).then(|| {
+                let [dx, dy] = struck_stagger(a, e);
+                let at = coin_center(arena, [e.to[0] + dx, e.to[1] + dy], age, reduced);
+                super::cue::coin_rect(p, at, e.value, reduced)
+            })
+        })
+        .collect()
+}
+
 /// Cue pass: the event cues of `view`, collected into `batch`.
 pub(super) fn event_cues(
     batch: &mut CueBatch,
@@ -357,9 +394,12 @@ pub(super) fn event_cues(
             // Currency feedback stays separate from the real-time resolved
             // damage-number cache used by battlefield presentation.
             EventKind::Kill if alpha > 0.0 && numbers && e.value > 0 => {
-                let at = arena.world(e.to[0], e.to[1]);
-                let rise = if reduced { 0.0 } else { age * 24.0 };
-                batch.coin(at + vec2(0.0, -12.0 - rise), e.value, alpha, reduced);
+                batch.coin(
+                    coin_center(arena, e.to, age, reduced),
+                    e.value,
+                    alpha,
+                    reduced,
+                );
             }
             _ => {}
         }
