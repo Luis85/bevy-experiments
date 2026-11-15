@@ -25,6 +25,13 @@ context; it is not silently rewritten.
   Skills, and permits live retry. The first battle should teach recovery
   naturally; roughly 3–5 early runs is the pacing target, with country-specific
   balance evidence pending.
+  - **Superseded 4 November 2026 (foundation pass, B2) and in the production
+    pass (decision 1, W3-18):** Start journey (`ChooseStart`) deploys the first
+    Personal defense paused, and Begin defense starts it, with the first-defense
+    hint and the key legend on the field. Every later country is only chosen
+    (`SelectCountry`) and its defense starts from the Briefing. A retreat ends
+    on Results, whose Upgrade opens the tree on its own Upgrades screen; the
+    Skills tab is retired. See JOURNEYS.md, "Choosing a country" and "Loop map".
 - Opening construction, placing and salvaging do not pause combat, including
   observed expeditions. Explicit pause and Settings still freeze simulation
   clocks. Layouts are saved separately per country during live combat.
@@ -111,6 +118,7 @@ These explicit user changes supersede the earlier fresh11/30 opening; legacy act
 These latest user requirements supersede the separate personal body/skill/fortification purchase screens and the early management-first flow. The pixel-survival identity, fixed defender, earned equipment, retained rewards and later country strategy remain.
 
 - The main menu offers New game. A new journey confirms a survivor, selects its infected starting country on the map and starts live defense. An existing campaign must be protected before a confirmed new game replaces the active profile.
+  - **Superseded 4 November 2026 (foundation pass, B2):** Start journey opens the first defense paused; it starts with Begin defense. See JOURNEYS.md, "Choosing a country".
 - Every completed main round returns to one upgrade screen. The player spends retained earnings, equips owned gear and chooses to continue the journey or leave it. A failed round is a retreat, rest and training opportunity; a victory advances to the next local defense. A liberated country opens its eligible neighbors. Leaving is not a prestige reset and does not erase earned progression.
   - **Superseded in the production pass (decision 1):** every main round now ends on Results, whose three actions are Upgrade (the upgrade screen, now its own screen), the continuation and Leave journey; Upgrades returns to battle or to Camp home. See JOURNEYS.md, "Loop map".
 - One connected, data-driven skill tree contains personal development, weapon training, abilities, fortifications and access to later systems. Paths branch from a shared foundation. Path navigation changes the camera rather than splitting the tree into separate tabs. Weapon proficiency and buying/looting a weapon remain separate requirements.
