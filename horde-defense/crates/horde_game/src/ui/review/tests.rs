@@ -396,22 +396,48 @@ fn stills_prepare_headless(screens: &[Screen]) {
     }
     assert!(checked > 0);
 }
-#[test]
-fn stills_menus_and_camp_prepare_headless() {
-    stills_prepare_headless(&[
+/// The screens each `stills_*_prepare_headless` test checks, one group a
+/// test; `every_expected_screen_has_a_stills_test` keeps every screen EXPECTED
+/// names in one of them.
+const STILL_SCREEN_GROUPS: &[&[Screen]] = &[
+    &[
         Screen::Menu,
         Screen::SurvivorSelection,
         Screen::Camp,
         Screen::Settings,
-    ]);
+    ],
+    &[Screen::Battle],
+    &[Screen::Results, Screen::History],
+    &[Screen::Upgrades],
+];
+#[test]
+fn stills_menus_and_camp_prepare_headless() {
+    stills_prepare_headless(STILL_SCREEN_GROUPS[0]);
 }
 #[test]
 fn stills_battles_prepare_headless() {
-    stills_prepare_headless(&[Screen::Battle]);
+    stills_prepare_headless(STILL_SCREEN_GROUPS[1]);
 }
 #[test]
 fn stills_results_and_history_prepare_headless() {
-    stills_prepare_headless(&[Screen::Results, Screen::History]);
+    stills_prepare_headless(STILL_SCREEN_GROUPS[2]);
+}
+#[test]
+fn stills_upgrades_prepare_headless() {
+    stills_prepare_headless(STILL_SCREEN_GROUPS[3]);
+}
+#[test]
+fn every_expected_screen_has_a_stills_test() {
+    for screen in Screen::ALL {
+        let named = EXPECTED.iter().any(|(_, s, _)| *s == screen);
+        let tested = STILL_SCREEN_GROUPS
+            .iter()
+            .any(|group| group.contains(&screen));
+        assert!(
+            !named || tested,
+            "{screen:?} has stills but no stills_*_prepare_headless test checks them"
+        );
+    }
 }
 #[test]
 fn every_still_has_an_expectation_row() {
