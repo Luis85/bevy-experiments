@@ -3,6 +3,7 @@
 # Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_review.ps1 -Scenes menu -Modes normal,reduced -OutputDirectory target/production-after/wave1
 # Layout under -OutputDirectory (which must be missing or empty):
 #   <mode>/<scene>[-small].png, .out.txt, .err.txt and .json (the sidecar, when the build writes one)
+#   <mode>/<scene>[-small].cues.jsonl  the session's LASTLIGHT_REVIEW_CUE_LOG (design-audio 6.18), for replay_cue_log
 #   saves/<mode>-<scene>[-small]/  per-capture LASTLIGHT_SAVE_DIR, so logs never reach the player profile
 #   scenes.tsv                     the binary's --list-scenes output
 #   tools/                         cargo, --list-scenes and --version logs
@@ -12,8 +13,9 @@
 # (window_matches_request; the OS can clamp the window, and launch.rs opens 1440x900 for a malformed size); every
 # capture has a sidecar; every sidecar echoes the requested
 # reduced_effects (mode reduced) and ui_scale (1.0 large, 1.35 small, within 0.001); battle stills at small size report
-# hud_rows <= 2 ('pending' while the build reports null, until ux-flow W3); construction keeps the battle's
-# arena_rect at the same size and mode; max-lanes (17x30) keeps the pre-zoom arena, canvas inset 24/124/24/84.
+# hud_rows <= 2 (the bar rows the battle frame counted, W3-11; 'pending' only for an -Executable built before W3-11,
+# which reports null); construction keeps the battle's arena_rect at the same size and mode; max-lanes (17x30) keeps
+# the pre-zoom arena, canvas inset 24/124/24/84.
 # -Scenes defaults to every Still the binary lists; -SmallScenes defaults to -Scenes. List parameters accept
 # 'a,b' as one argument, because -File passes commas through verbatim.
 # A relative -OutputDirectory or -Executable resolves against the workspace, never the caller's directory.
@@ -141,7 +143,7 @@ function Test-CaptureSidecars($Entries, [string]$Root, $Sizes, $WindowsScale) {
         $detail = "reduced_effects $(Format-Fact $reduced) (requested $(Format-Fact $wantReduced)), ui_scale $(Format-Fact $scale) (requested $(Format-Fact $wantScale))"
         $rows.Add((New-SidecarCheck 'sidecar_echoes_request' $mode $size $scene $(if ($echoes) { 'pass' } else { 'fail' }) $detail))
         if ($fact.screen -eq 'Battle' -and $size -eq 'small') {
-            if ($null -eq $fact.hud_rows) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pending' 'hud_rows is null until ux-flow measures the bar (C-10, wave 3)')) }
+            if ($null -eq $fact.hud_rows) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pending' 'hud_rows is null: this build predates the bar-rows count (W3-11, C-10)')) }
             elseif ([int]$fact.hud_rows -le 2) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pass' "hud_rows $($fact.hud_rows)")) }
             else { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'fail' "hud_rows $($fact.hud_rows)")) }
         }
@@ -245,7 +247,9 @@ try {
                 $stem = $scene + $size.Suffix
                 $png = Join-Path $modeDirectory "$stem.png"
                 $sidecar = Join-Path $modeDirectory "$stem.json"
+                $cueLog = Join-Path $modeDirectory "$stem.cues.jsonl"
                 $env:LASTLIGHT_REVIEW_SCREEN = $scene
+                $env:LASTLIGHT_REVIEW_CUE_LOG = $cueLog
                 $env:LASTLIGHT_REVIEW_CAPTURE = $png
                 $env:LASTLIGHT_REVIEW_EXIT = '1'
                 $env:LASTLIGHT_REVIEW_SIZE = $size.Size
@@ -283,6 +287,7 @@ try {
                     out_log             = "$mode/$stem.out.txt"
                     err_log             = "$mode/$stem.err.txt"
                     sidecar             = $(if (Test-Path -LiteralPath $sidecar -PathType Leaf) { "$mode/$stem.json" } else { $null })
+                    cue_log             = $(if (Test-Path -LiteralPath $cueLog -PathType Leaf) { "$mode/$stem.cues.jsonl" } else { $null })
                     error               = $problem
                     identical_to_normal = $null
                 }

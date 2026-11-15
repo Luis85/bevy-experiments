@@ -2,7 +2,8 @@
 # Deterministic native animation evidence under Windows PowerShell 5.1. This is not a performance benchmark.
 # Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_motion.ps1 -Scene peak -OutputDirectory target/motion/peak
 # The game creates -OutputDirectory itself (frames and manifest.json) and refuses an existing one, so the
-# process logs, cargo log and the isolated LASTLIGHT_SAVE_DIR go to the sibling folder <OutputDirectory>.logs.
+# process logs, cargo log, the isolated LASTLIGHT_SAVE_DIR and the session's LASTLIGHT_REVIEW_CUE_LOG (cues.jsonl,
+# design-audio 6.18, for replay_cue_log) go to the sibling folder <OutputDirectory>.logs.
 # -Viewport normal is 1440x900 at UI scale 1.0, small is 1050x700 at 1.35 (capture_review's two sizes). The
 # version-2 manifest must report the requested reduced_effects, width, height and scale, plus windows_scale.
 # Every frame carries flash_alpha_max, sky_flash and muzzle_flash_count: with -ReducedEffects all three must be 0 in
@@ -49,6 +50,7 @@ try {
     $env:LASTLIGHT_REVIEW_MOTION = '1'
     $env:LASTLIGHT_CAPTURE_SEQUENCE = $directory
     $env:LASTLIGHT_SAVE_DIR = Join-Path $logs 'saves'
+    $env:LASTLIGHT_REVIEW_CUE_LOG = Join-Path $logs 'cues.jsonl'
     if ($ReducedEffects) { $env:LASTLIGHT_REVIEW_REDUCED = '1' }
     $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $logs $Scene) -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile
     if ($result.ExitCode -ne 0) { throw "Native animation export failed with exit code $($result.ExitCode); see $($result.Err)" }

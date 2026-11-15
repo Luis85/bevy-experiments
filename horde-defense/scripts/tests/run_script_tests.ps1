@@ -137,6 +137,12 @@ public static class LastLightNativeHelper {
             Console.WriteLine("clamped\tStill\tfalse\tfalse\tfalse\t\t\t1");
             return 0;
         }
+        // A review session started with LASTLIGHT_REVIEW_CUE_LOG writes the log's header line, as review_tools does.
+        string cueLog = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_CUE_LOG");
+        if (args.Length == 0 && !String.IsNullOrEmpty(cueLog)) {
+            Directory.CreateDirectory(Path.GetDirectoryName(cueLog));
+            File.WriteAllText(cueLog, "{\"cue_log\":1}\n");
+        }
         // A capture_review still: a PNG header at twice the requested size (Windows scale 2) plus a sidecar per scene.
         // battle passes every check, construction moves the arena at small size, max-lanes misses the pre-zoom arena
         // at small size and has 3 HUD rows, menu writes no sidecar, broken writes one that is not JSON, unscaled
@@ -1671,6 +1677,37 @@ try {
         Assert-Equal 1700 $large[0].height_physical 'PNG height recorded'
         $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: window_matches_request *' })
         Assert-Equal 2 $failLines.Count "one FAIL line per wrong-size still; $log"
+    }
+
+    Test-Case 'capture_review and capture_motion give every review session its own cue log (A6-18)' {
+        # design-audio 6.18: a review run writes <run>/cues.jsonl for replay_cue_log. A still's run is its capture, so
+        # its log sits beside its PNG and captures.json names it; a motion run's log goes to <OutputDirectory>.logs,
+        # because the game refuses an -OutputDirectory that exists before it writes the frames.
+        $out = Join-Path $temporary 'captures-cues'
+        $review = Join-Path $scriptsDirectory 'capture_review.ps1'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $review, '-NoBuild', '-Executable', $helper,
+            '-Scenes', 'battle', '-Modes', 'normal,reduced', '-OutputDirectory', $out)
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-review-cues') -TimeoutSeconds 300
+        Assert-Equal 0 $r.ExitCode ('capture_review; out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+        $report = Get-Content -Raw -LiteralPath (Join-Path $out 'captures.json') | ConvertFrom-Json
+        $logs = @($report.captures | ForEach-Object { "$($_.mode) $($_.size) $($_.cue_log)" } | Sort-Object)
+        $expected = @(
+            'normal large normal/battle.cues.jsonl', 'normal small normal/battle-small.cues.jsonl',
+            'reduced large reduced/battle.cues.jsonl', 'reduced small reduced/battle-small.cues.jsonl'
+        ) | Sort-Object
+        Assert-Equal ($expected -join "`n") ($logs -join "`n") 'one cue log per capture'
+        foreach ($capture in @($report.captures)) {
+            Assert-True (Test-Path -LiteralPath (Join-Path $out $capture.cue_log) -PathType Leaf) "$($capture.cue_log) written"
+        }
+        $motion = Join-Path $scriptsDirectory 'capture_motion.ps1'
+        $frames = Join-Path $temporary 'motion-cues'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $motion, '-NoBuild', '-Executable', $helper,
+            '-Scene', 'menu', '-OutputDirectory', $frames)
+        # The fake writes no frames, so the export fails after the session ran.
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-motion-cues') -TimeoutSeconds 300
+        $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+        Assert-True ($log -match 'Native animation export failed') "capture_motion ran the session; $log"
+        Assert-True (Test-Path -LiteralPath (Join-Path "$frames.logs" 'cues.jsonl') -PathType Leaf) "motion cue log in the logs folder; $log"
     }
 
     Test-Case 'capture_review and capture_motion resolve a relative -Executable against the workspace' {
