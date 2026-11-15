@@ -2022,6 +2022,107 @@ try {
     finally {
         foreach ($name in $savedFake.Keys) { [Environment]::SetEnvironmentVariable($name, $savedFake[$name], 'Process') }
     }
+
+    # W7-11: curate_capture_pairs.ps1 on a wave-0 style before set (PNGs only, scale read from their width), its
+    # supplement (captures.json) and an after run (captures.json, scenes.tsv), all at windows_scale 2.
+    Add-Type -AssemblyName System.Drawing
+    $curate = Join-Path $scriptsDirectory 'curate_capture_pairs.ps1'
+    function Invoke-Curate([string[]]$Arguments, [string]$Stem) {
+        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $curate) + $Arguments
+        return Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\$Stem") -TimeoutSeconds 300
+    }
+    function New-SolidPng([string]$Path, [int]$Width, [int]$Height, [int]$Red) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Path) | Out-Null
+        $bitmap = New-Object Drawing.Bitmap($Width, $Height)
+        try {
+            $graphics = [Drawing.Graphics]::FromImage($bitmap)
+            try { $graphics.Clear([Drawing.Color]::FromArgb(255, $Red, 40, 60)) } finally { $graphics.Dispose() }
+            $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally { $bitmap.Dispose() }
+    }
+    function Get-PngFacts([string]$Path) {
+        $bytes = [IO.File]::ReadAllBytes($Path)
+        $stream = New-Object IO.MemoryStream(, $bytes)
+        $image = New-Object Drawing.Bitmap($stream)
+        try { return @{ Width = $image.Width; Height = $image.Height; Red = $image.GetPixel(5, 5).R } }
+        finally { $image.Dispose(); $stream.Dispose() }
+    }
+    $curateRoot = Join-Path $temporary 'curate'
+    $curateBefore = Join-Path $curateRoot 'production-before'
+    $curateAfter = Join-Path $curateRoot 'production-after\final'
+    New-SolidPng (Join-Path $curateBefore 'normal\battle-small.png') 2100 1400 10
+    New-SolidPng (Join-Path $curateBefore 'normal\operations-small.png') 2100 1400 20
+    New-SolidPng (Join-Path $curateBefore 'reduced\max-lanes-small.png') 2100 1400 30
+    New-SolidPng (Join-Path $curateBefore 'normal\journey-victory-small.png') 2100 1400 40
+    New-SolidPng (Join-Path $curateBefore 'supplement\normal\journey-victory-small.png') 2100 1400 50
+    Write-Utf8NoBom -Path (Join-Path $curateBefore 'supplement\captures.json') -Text '{"version":1,"windows_scale":2,"captures":[]}'
+    New-SolidPng (Join-Path $curateAfter 'normal\battle-small.png') 2100 1400 110
+    New-SolidPng (Join-Path $curateAfter 'normal\operations-observer-small.png') 2100 1400 120
+    New-SolidPng (Join-Path $curateAfter 'reduced\fx-stress-small.png') 2100 1400 130
+    New-SolidPng (Join-Path $curateAfter 'normal\journey-victory-small.png') 2100 1400 140
+    New-SolidPng (Join-Path $curateAfter 'normal\storm-small.png') 2100 1400 150
+    New-SolidPng (Join-Path $curateAfter 'normal\battle.png') 2880 1800 160
+    $afterJson = '{"version":1,"windows_scale":2,"captures":[{"scene":"battle","mode":"normal","size":"small","file":"normal/battle-small.png","error":null}]}'
+    Write-Utf8NoBom -Path (Join-Path $curateAfter 'captures.json') -Text $afterJson
+    $scenesTsv = "name`tkind`tmotion`tperf`tpractice`tprimary`tbefore_proxy`tsince_wave`n" +
+        "battle`tStill`ttrue`tfalse`tfalse`t`t`t0`n" +
+        "operations-observer`tStill`tfalse`tfalse`tfalse`t`toperations`t1`n" +
+        "fx-stress`tStill`ttrue`tfalse`tfalse`t`tmax-lanes`t1`n"
+    Write-Utf8NoBom -Path (Join-Path $curateAfter 'scenes.tsv') -Text $scenesTsv
+
+    Test-Case 'curate_capture_pairs writes 2:1 pairs by name, before_proxy and the supplement, with both indexes (W7-11)' {
+        $out = Join-Path $curateRoot 'pairs'
+        $r = Invoke-Curate @('-Before', $curateBefore, '-After', $curateAfter, '-OutputDirectory', $out, '-Pairs', 'battle,operations-observer:small:normal,fx-stress:small:reduced,journey-victory') 'curate-pass'
+        $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+        Assert-Equal 0 $r.ExitCode "exit code; $log"
+        $expected = @{
+            'before-battle-small.png' = 10; 'after-battle-small.png' = 110
+            'before-operations-observer-small.png' = 20; 'after-operations-observer-small.png' = 120
+            'before-fx-stress-small-reduced.png' = 30; 'after-fx-stress-small-reduced.png' = 130
+            'before-journey-victory-small.png' = 50; 'after-journey-victory-small.png' = 140
+        }
+        foreach ($name in $expected.Keys) {
+            $facts = Get-PngFacts (Join-Path $out $name)
+            Assert-Equal '1050x700' "$($facts.Width)x$($facts.Height)" "$name is the 2:1 downsample"
+            Assert-Equal $expected[$name] ([int]$facts.Red) "$name comes from the right still"
+        }
+        Assert-Equal $afterJson ([IO.File]::ReadAllText((Join-Path $out 'captures-after.json'))) 'captures-after.json is the run index byte for byte'
+        $index = [IO.File]::ReadAllText((Join-Path $out 'captures-before.json')) | ConvertFrom-Json
+        Assert-Equal 2 ([int]$index.windows_scale) 'before index scale'
+        Assert-Equal 4 @($index.captures).Count 'the merged before set: 4 stills, the supplement replacing journey-victory'
+        $victory = @($index.captures | Where-Object { $_.scene -eq 'journey-victory' })
+        Assert-True ($victory[0].file -like '*supplement/normal/journey-victory-small.png') "supplement wins; $($victory[0].file)"
+        Assert-Equal (Get-FileSha256 -Path (Join-Path $curateBefore 'normal\battle-small.png')) (@($index.captures | Where-Object { $_.scene -eq 'battle' })[0].sha256) 'before sha256'
+        Assert-Equal 10 @(Get-ChildItem -LiteralPath $out -File).Count 'eight stills and two indexes'
+        Assert-True ($log -match 'Pairs: 4 in .*, \d+ B of 40000000 B') "summary; $log"
+    }
+
+    Test-Case 'curate_capture_pairs exits 1 on a missing still or over budget and 2 on a mismatched scale or bad pair (W7-11)' {
+        $r = Invoke-Curate @('-Before', $curateBefore, '-After', $curateAfter, '-OutputDirectory', (Join-Path $curateRoot 'missing'), '-Pairs', 'camp-home,storm') 'curate-missing'
+        $log = Read-Log $r.Out
+        Assert-Equal 1 $r.ExitCode "missing stills; $log"
+        Assert-True ($log -match 'FAIL no after still .*camp-home-small\.png') "no after still; $log"
+        Assert-True ($log -match 'FAIL no before still for normal/storm-small\.png') "no before still; $log"
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $curateRoot 'missing'))) 'nothing written when a still is missing'
+        $r = Invoke-Curate @('-Before', $curateBefore, '-After', $curateAfter, '-OutputDirectory', (Join-Path $curateRoot 'over'), '-Pairs', 'battle', '-MaxBytes', '100') 'curate-over'
+        $log = Read-Log $r.Out
+        Assert-Equal 1 $r.ExitCode "over budget; $log"
+        Assert-True ($log -match 'over the 100 B budget') "budget line; $log"
+        $r = Invoke-Curate @('-Before', $curateBefore, '-After', $curateAfter, '-OutputDirectory', (Join-Path $curateRoot 'bad'), '-Pairs', 'battle:huge') 'curate-bad-pair'
+        Assert-Equal 2 $r.ExitCode ('bad pair; ' + (Read-Log $r.Out))
+        $r = Invoke-Curate @('-Before', $curateBefore, '-After', $curateAfter, '-OutputDirectory', (Join-Path $curateRoot 'bad'), '-Pairs', 'battle:large') 'curate-large'
+        $log = Read-Log $r.Out
+        Assert-Equal 1 $r.ExitCode "no large before still; $log"
+        $mismatch = Join-Path $curateRoot 'production-after\scale1'
+        New-SolidPng (Join-Path $mismatch 'normal\battle-small.png') 1050 700 170
+        Write-Utf8NoBom -Path (Join-Path $mismatch 'captures.json') -Text '{"version":1,"windows_scale":1,"captures":[]}'
+        $r = Invoke-Curate @('-Before', $curateBefore, '-After', $mismatch, '-OutputDirectory', (Join-Path $curateRoot 'bad'), '-Pairs', 'battle') 'curate-scale'
+        $log = Read-Log $r.Out
+        Assert-Equal 2 $r.ExitCode "mismatched scale; $log"
+        Assert-True ($log -match 'windows_scale differs: before 2 .*after 1') "scale line; $log"
+        Assert-True (-not (Test-Path -LiteralPath (Join-Path $curateRoot 'bad'))) 'nothing written on invalid evidence'
+    }
 }
 finally {
     [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $savedTarget, 'Process')
