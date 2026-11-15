@@ -99,8 +99,9 @@
 //! unchanged by it. V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the
 //! `save_v7.json` pins did not move. `PROVISIONAL` is None again.
 //!
-//! W4-08 is the single re-bless for waves 3 and 4 (rulings P3, R7, R36,
-//! R56, R57). No commit since W2-49 set `PROVISIONAL`: `PROVISIONAL` stayed
+//! W4-08 is the re-bless for waves 3 and 4 up to W4-08 (rulings P3, R7,
+//! R36, R56, R57); W4-14 and W4-15 came after it, and the closing re-bless
+//! folded them. No commit since W2-49 set `PROVISIONAL`: `PROVISIONAL` stayed
 //! None and `PROVISIONAL_CAUSES` empty, and this file's tables are unchanged
 //! from e3f52fa to W4-08, so there is nothing to fold and the log gains no
 //! row. `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6. Why each wave-4 rule leaves the
@@ -204,9 +205,10 @@ const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 /// W1-69 (user decision, enemies no longer queue behind each other) moved
 /// 0x1A57_1167 Personal. W2-49 (the wave-2 re-bless) folded the wave-2
 /// provisional digests into all six (net class F; outcomes and traces
-/// unchanged); see the re-bless log. Waves 3 and 4 (the W4-08 re-bless)
-/// moved none of them. The closing re-bless folded W4-14 (the Npc aim and
-/// arrival pass) into the three Npc runs, class G.
+/// unchanged); see the re-bless log. Waves 3 and 4 up to W4-08 (the W4-08
+/// re-bless) moved none of them. The closing re-bless folded W4-14 (the Npc
+/// aim and arrival pass, a later wave-4 row) into the three Npc runs,
+/// class G.
 const GOLDEN: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xbed5_e271_4b65_90fe),
     (1, Mode::Npc, 0x6134_1ecf_1c42_2fd8),
@@ -223,8 +225,8 @@ const GOLDEN: [(u64, Mode, u64); 6] = [
 /// the gameplay outcomes of the same six runs did not move. W1-69 (user
 /// decision, enemies no longer queue behind each other) re-blessed three of
 /// them; see the re-bless log. Wave 2 (W2-49) moved none of them, nor did
-/// waves 3 and 4 (W4-08). The closing re-bless folded W4-14 into the three
-/// Npc runs, class G.
+/// waves 3 and 4 up to W4-08. The closing re-bless folded W4-14 (a later
+/// wave-4 row) into the three Npc runs, class G.
 const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),
     (1, Mode::Npc, 0x77ce_c201_9601_4f8d),

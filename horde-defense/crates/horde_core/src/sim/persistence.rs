@@ -38,8 +38,9 @@ const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 ///   (W4-p); an expedition's threat rank follows its recruit (W4-12). Wave 3
 ///   changed presentation only. A recording or save made under ruleset 3
 ///   can diverge on replay and now warns. No `GOLDEN` or `GAMEPLAY_TRACE`
-///   digest moved in waves 3 and 4 (the traced runs are rank 0 with no
-///   country, no skill bought and no expedition; tests/determinism.rs).
+///   digest moved in waves 3 and 4 up to W4-08 (the traced runs are rank 0
+///   with no country, no skill bought and no expedition;
+///   tests/determinism.rs). W4-14 and W4-15 came after it; see ruleset 5.
 /// - 5 (the closing re-bless of the production pass): names the rule
 ///   changes since ruleset 4. An Npc aims only when the aim raises its
 ///   expected hits per turn (W4-14 aim; an attempt deployed before save
