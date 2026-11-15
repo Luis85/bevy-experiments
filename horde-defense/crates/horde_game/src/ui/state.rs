@@ -269,8 +269,6 @@ impl BattleUi {
             sky_wall_ms: 0.0,
         }
     }
-    /// Opens or closes the construction overlay. Closing clears
-    /// `occluded_lanes` at once, whether or not a battle frame follows.
     /// Whether the retreat button is being held as of egui frame `frame`: a
     /// hold the bar drew in this frame or the one before.
     pub(super) fn retreat_holding(&self, frame: u64) -> bool {
@@ -289,6 +287,8 @@ impl BattleUi {
         self.boss_banner = None;
         self.observer_boss_banner = None;
     }
+    /// Opens or closes the construction overlay. Closing clears
+    /// `occluded_lanes` at once, whether or not a battle frame follows.
     pub(super) fn set_construction(&mut self, open: bool) {
         self.construction = open;
         if !open {
