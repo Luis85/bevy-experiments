@@ -165,6 +165,48 @@ class MotionGate(Case):
         frames, facts = self.frames([grey(60)])
         self.assertEqual(mfl.main(["motion", "--sidecar", facts, *frames]), 2)
 
+    def manifest(self, **overrides):
+        """A capture_motion manifest.json beside the frames (no arena_rect)."""
+        facts = {"version": 2, "scene": None, "reduced_effects": False, "width": W // 2,
+                 "height": H // 2, "scale": 1.0, "windows_scale": 2.0,
+                 "frames": [{"file": "frame-0000.png"}]}
+        facts.update(overrides)
+        path = self.dir / "manifest.json"
+        path.write_text(json.dumps(facts), encoding="utf-8")
+        return str(path)
+
+    def test_the_exports_own_manifest_names_the_capture_review_sidecar(self):
+        # A capture_motion manifest has no arena_rect: the error must say which
+        # sidecar to pass, not that the export is "not a battle capture".
+        frames, _ = self.frames([grey(60), grey(61)])
+        manifest = self.manifest()
+        for command in ("motion", "storm"):
+            self.assertEqual(mfl.main([command, "--sidecar", manifest, *frames]), 2, command)
+        with self.assertRaises(mfl.Invalid) as raised:
+            mfl.measure_motion(frames, manifest)
+        message = str(raised.exception)
+        self.assertIn("capture_motion manifest", message)
+        self.assertIn("capture_review sidecar", message)
+        self.assertNotIn("not a battle capture", message)
+
+    def test_a_sidecar_of_another_mode_or_viewport_is_invalid(self):
+        frames, facts = self.frames([grey(60), grey(61)])
+        self.manifest()
+        self.assertEqual(mfl.main(["motion", "--sidecar", facts, *frames]), 0)
+        for key, value in (("reduced_effects", True), ("scale", 1.35), ("windows_scale", 1.0)):
+            self.manifest(**{key: value})
+            with self.assertRaises(mfl.Invalid) as raised:
+                mfl.measure_motion(frames, facts)
+            self.assertIn(key, str(raised.exception))
+            self.assertEqual(mfl.main(["storm", "--sidecar", facts, *frames]), 2, key)
+        # The still of another scene: the sidecar names its scene, the manifest another.
+        still = json.loads(Path(facts).read_text(encoding="utf-8"))
+        Path(facts).write_text(json.dumps({**still, "scene": "fx-stress"}), encoding="utf-8")
+        self.manifest(scene="fx-stress")
+        self.assertEqual(mfl.main(["motion", "--sidecar", facts, *frames]), 0)
+        self.manifest(scene="storm")
+        self.assertEqual(mfl.main(["motion", "--sidecar", facts, *frames]), 2)
+
 
 class StormGate(Case):
     def sequence(self, flashes, length=12):

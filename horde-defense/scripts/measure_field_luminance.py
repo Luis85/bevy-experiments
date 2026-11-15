@@ -3,9 +3,18 @@
 Standard library only. Run: python -I -B scripts/measure_field_luminance.py <command> ...
 
 Every PNG is read with its capture sidecar: `<capture>.json` beside a still
-(written by LASTLIGHT_REVIEW_CAPTURE), or the JSON named by --sidecar for a
-motion export. The sidecar gives the field as `arena_rect` in points and the
-scales (`ui_scale`, `windows_scale`); the field in pixels is their product.
+(written by LASTLIGHT_REVIEW_CAPTURE). The sidecar gives the field as
+`arena_rect` in points and the scales (`ui_scale`, `windows_scale`); the field
+in pixels is their product.
+
+A capture_motion export has no sidecar of its own: its manifest.json records
+no arena_rect. For `motion` and `storm`, --sidecar is therefore the
+capture_review sidecar `<mode>/<scene>[-small].json` of the same scene,
+viewport and mode (normal or reduced) as the export; a Battle fixture's camera
+fit does not move between the still and the frames. When the export's
+manifest.json lies beside the first frame, its scene, reduced_effects, scale
+and windows_scale must match the sidecar's scene, reduced_effects, ui_scale
+and windows_scale, or the evidence is invalid.
 Luminance is WCAG 2.x relative luminance (sRGB decode, 0.2126/0.7152/0.0722),
 averaged over the field inset by 4% on every side.
 
@@ -112,8 +121,51 @@ def read_sidecar(path):
         facts = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise Invalid(f"{path}: {error}") from error
+    if isinstance(facts, dict) and "frames" in facts and not facts.get("arena_rect"):
+        raise Invalid(f"{path}: a capture_motion manifest has no arena_rect; pass the "
+                      "capture_review sidecar <mode>/<scene>[-small].json of the same scene, "
+                      "viewport and mode as --sidecar")
     if not isinstance(facts, dict) or not facts.get("arena_rect"):
         raise Invalid(f"{path}: no arena_rect (not a battle capture)")
+    return facts
+
+
+#: (manifest key, sidecar key) pairs a motion export and its still sidecar must agree on.
+_EXPORT_FACTS = (("scene", "scene"), ("reduced_effects", "reduced_effects"),
+                 ("scale", "ui_scale"), ("windows_scale", "windows_scale"))
+
+
+def motion_sidecar(frames, sidecar):
+    """The still sidecar of a motion export, checked against the export's manifest.json.
+
+    The manifest is read from beside the first frame when it is there; a key
+    either file leaves out (or sets to null) is not compared.
+    """
+    facts = read_sidecar(sidecar)
+    if not frames:
+        return facts
+    manifest_path = Path(frames[0]).parent / "manifest.json"
+    if not manifest_path.is_file() or manifest_path.resolve() == Path(sidecar).resolve():
+        return facts
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise Invalid(f"{manifest_path}: {error}") from error
+    if not isinstance(manifest, dict):
+        raise Invalid(f"{manifest_path}: not a capture_motion manifest")
+    for export_key, still_key in _EXPORT_FACTS:
+        export_value, still_value = manifest.get(export_key), facts.get(still_key)
+        if export_value is None or still_value is None:
+            continue
+        if isinstance(export_value, (int, float)) and not isinstance(export_value, bool):
+            agree = (isinstance(still_value, (int, float)) and not isinstance(still_value, bool)
+                     and abs(float(export_value) - float(still_value)) <= 1e-3)
+        else:
+            agree = export_value == still_value
+        if not agree:
+            raise Invalid(f"{sidecar}: {still_key} {still_value!r} does not match the export's "
+                          f"{export_key} {export_value!r} in {manifest_path}; pass the "
+                          "capture_review sidecar of the same scene, viewport and mode")
     return facts
 
 
@@ -178,7 +230,7 @@ def measure_ratio(night, dawn, maximum=0.70, model=None, tolerance=0.03):
 
 
 def measure_motion(frames, sidecar, max_mean_delta=0.01, max_block_delta=0.1, block=32):
-    facts = read_sidecar(sidecar)
+    facts = motion_sidecar(frames, sidecar)
     if len(frames) < 2:
         raise Invalid("a motion gate needs at least two frames")
     means, worst_mean, worst_block, failures = [], 0.0, 0.0, []
@@ -203,7 +255,7 @@ def measure_motion(frames, sidecar, max_mean_delta=0.01, max_block_delta=0.1, bl
 
 
 def measure_storm(frames, sidecar, max_frame_delta=0.2, min_peak_gap=240):
-    facts = read_sidecar(sidecar)
+    facts = motion_sidecar(frames, sidecar)
     if len(frames) < 2:
         raise Invalid("a motion gate needs at least two frames")
     means = [mean(luminance_rows(frame, facts)) for frame in frames]

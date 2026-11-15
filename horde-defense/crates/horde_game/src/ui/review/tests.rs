@@ -2608,7 +2608,10 @@ fn fx_stress_sequence(reduced: bool) -> Vec<usize> {
 /// pool, muzzle flash, burst glow or sky flash. The same 96 frames with
 /// normal effects paint additive vertices in every frame, which proves the
 /// detector sees them. The pixel half (frame-to-frame luminance) is
-/// `scripts/measure_field_luminance.py motion` on a capture_motion export.
+/// `scripts/measure_field_luminance.py motion` on a capture_motion export,
+/// with `--sidecar` the capture_review sidecar `<mode>/<scene>[-small].json`
+/// of the same scene, viewport and mode (the export's manifest.json has no
+/// `arena_rect`; docs/VALIDATION.md, "Full verify").
 #[cfg(feature = "review")]
 #[test]
 fn reduced_96_frame_fx_stress_sequence_has_no_additive_vertex() {
