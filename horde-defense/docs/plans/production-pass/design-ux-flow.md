@@ -498,7 +498,7 @@ None from ux-flow. Labels and feature_unlock are pure. Settings are outside the 
 3. **Escape and egui internals.** This depends on popup.rs:625 and modal.rs:156. Consuming Escape at the top of draw_screen hides it from `Settings::pressed`, so battle pause relies on PassToPause (pinned by a test).
 4. **Wave-2 dependencies.** These arrive from CD, LE and PT in wave 2. The loop test fails at the first missing API until then.
 5. **perf-architecture's single per-pass BattleScreen.** The banner and low-HP code must read it; today it is built 3 times (battle.rs:68, :105, :217). The Interface target is <=1.13 / <=1.03 ms.
-6. **Mouse-only players.** They lose visible Reload, Strike and Toggle buttons. The keys stay in the legend; add a playtest note.
+6. **Mouse-only players.** They lose visible Reload, Strike and Toggle buttons. The keys stay in the legend; add a playtest note. *As built (W3-12):* the three moved to Management › Field actions, each with its key; the note is PLAYTEST_GUIDE "Controls and recovery", "Mouse-only play".
 7. **Seen callouts are per profile.** A New game in the same profile does not re-teach. This is documented.
 8. **OpenSaveFolder** needs a manual check in PLAYTEST_GUIDE.
 9. **The single modal slot** drops a preempted modal when a Storage error arrives. This is documented.
