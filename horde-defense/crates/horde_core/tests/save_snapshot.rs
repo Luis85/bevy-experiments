@@ -166,6 +166,25 @@ fn recording_a_run_without_a_snapshot_appends_in_place() {
     assert_ne!(shared(&g), shared(&snapshot));
 }
 
+/// R58 closing: the 20,000-item stash (default auto-sell after about 150
+/// runs) put `save_snapshot` at 2.7 ms p99, its stash copy 1.8 ms of that,
+/// one definition-ID string allocation per item. A snapshot's items share
+/// their definition IDs with the live stash instead.
+#[test]
+fn snapshot_items_share_their_definition_ids() {
+    let g = Game::decode_save_generation(FIXTURE_V7.as_bytes()).expect("v7 fixture");
+    let snapshot = g.save_snapshot();
+    let ids = |g: &Game| -> Vec<*const u8> {
+        g.campaign()
+            .items
+            .iter()
+            .map(|item| item.definition.as_str().as_ptr())
+            .collect()
+    };
+    assert!(!g.campaign().items.is_empty());
+    assert_eq!(ids(&snapshot), ids(&g), "no item copies its definition ID");
+}
+
 #[test]
 fn save_v6_and_v7_fixtures_round_trip_byte_identical() {
     // v6: the checked-in fixture, migrated, against its pinned FNV-1a. v7:

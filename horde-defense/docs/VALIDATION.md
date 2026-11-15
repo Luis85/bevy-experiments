@@ -772,6 +772,38 @@ Release (`release-2.json`):
 }
 ```
 
+### R58: the 5,000- and 20,000-item stash — 15 November 2026 (closing phase)
+
+R58 keeps the drop and sale rules, so the default auto-sell stash holds about 5,300 items by run 60 and 19,600 by run 150 (plan §9.7). The closing phase measures those sizes against the same G1.8 gate (`save_snapshot` p99 ≤ 1.0 ms, dev and playtest) and fixes the cost only if it fails. `ITEM_COUNTS` is now `[1000, 2500, 5000, 20_000]`, and the report's new `sizes` list reads every fixture against `p99_ms_max` (informational: the exit code and `measure_performance.ps1 -SaveClone` still gate the 1,000-item fixture). The `save_clone_measures_the_r58_stash_sizes` test pins both.
+
+Before the fix, one run per profile, Intel Core Ultra 9 185H. Another workspace's `cargo test` ran beside every run below, before and after (about 35% CPU load), so these are not quiet-machine numbers; `measure_performance.ps1 -SaveClone` now carries the 20,000-item report and its `sizes` verdict into the closing perf run:
+
+| Profile | Items | `save_snapshot` p99 (ms) | mean | stash copy mean | `to_vec` p99 | Bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| dev | 5,000 | 0.865 | 0.602 | 0.338 | 8.72 | 1,784,121 |
+| dev | 20,000 | **2.665** | 1.550 | 1.186 | 14.57 | 3,570,879 |
+| playtest | 5,000 | 0.938 | 0.639 | 0.339 | 6.51 | 1,784,121 |
+| playtest | 20,000 | **2.680** | 1.588 | 1.264 | 11.81 | 3,570,879 |
+
+**The gate fails at 20,000 items in both profiles.** The stash copy is most of it: every item cloned its definition ID, one `String` allocation per item. 5,000 items passed, narrowly.
+
+### Remedy: item definition IDs are shared
+
+`ItemDefId` is now `ItemDefId(Arc<str>)`, the lever the W1-50 remedy named. Cloning an item counts a reference instead of copying its ID, so a snapshot's items share their IDs with the live stash (`snapshot_items_share_their_definition_ids`). It is `serde(transparent)` over the same string, so saves are byte-identical: v1-v6 and `save_v7.json` load and round-trip unchanged (`save_v6_and_v7_fixtures_round_trip_byte_identical`), the byte counts above do not move, and no digest moves.
+
+Re-run, three runs per profile, same machine and load:
+
+| Profile | Items | `save_snapshot` p99 per run (ms) | p99 median | mean | stash copy mean | `to_vec` p99 |
+|---|---:|---|---:|---:|---:|---:|
+| dev | 1,000 | 0.457, 0.443, 0.467 | 0.457 | 0.280 | 0.010 | 6.80 |
+| dev | 5,000 | 0.649, 0.475, 0.521 | 0.521 | 0.291 | 0.062 | 8.44 |
+| dev | 20,000 | 0.879, 0.893, 0.869 | **0.879** | 0.480 | 0.224 | 15.40 |
+| playtest | 1,000 | 0.461, 0.389, 0.429 | 0.429 | 0.256 | 0.010 | 5.28 |
+| playtest | 5,000 | 0.516, 0.407, 0.511 | 0.511 | 0.261 | 0.063 | 6.68 |
+| playtest | 20,000 | 0.911, 0.965, 0.846 | **0.911** | 0.469 | 0.221 | 11.77 |
+
+**The gate passes at 5,000 and 20,000 items in every dev and playtest run** (worst 0.965 ms, playtest, 20,000 items). The margin at 20,000 is thin. If a later run puts it over, the next lever is a shared copy-on-write stash (`Campaign.items` as `Arc<Vec<Item>>`, the run-history pattern above). It moves the copy to the first stash change while a snapshot is in flight, and during a battle a drop is that change, so it needs its own measurement. Reports (git-ignored): `target/perf/closing-r58-save-clone/` (before) and `target/perf/closing-r58-save-clone-remedy/` (after).
+
 ## Save format 7 frozen — 6 November 2026 (W1-63)
 
 **Save format 7 is frozen.** `crates/horde_core/tests/fixtures/save_v7.json` is a real `Game::save` generation: envelope version 7, ruleset 2, 95,266 bytes (budget 96 KB), envelope checksum `8527615155064533385`. It was cut by the `#[ignore]`d writer `write_save_v7_fixture` in `tests/save_fixtures.rs` (`LASTLIGHT_WRITE_SAVE_V7_FIXTURE=<path>`; it refuses to overwrite and asserts `SAVE_VERSION == 7`), re-cut once in the W1-63 review before the freeze closed, and is never re-cut again: its checksum and byte length are pinned. Two cuts from the same tree were byte-identical.

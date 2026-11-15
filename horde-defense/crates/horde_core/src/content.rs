@@ -83,9 +83,11 @@ impl StableKind for StructureKind {
 
 /// Stable authored identity of an item definition. Saves reference items by
 /// this ID, never by catalogue position; [`Content::item_index`] resolves it.
+/// Shared, so cloning an item (a save snapshot of a 20,000-item stash, R58)
+/// counts a reference instead of copying its ID. Serialized as a plain string.
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ItemDefId(pub String);
+pub struct ItemDefId(pub std::sync::Arc<str>);
 impl ItemDefId {
     pub fn as_str(&self) -> &str {
         &self.0
@@ -104,7 +106,7 @@ impl ItemDefId {
 }
 impl From<&str> for ItemDefId {
     fn from(id: &str) -> Self {
-        Self(id.to_owned())
+        Self(id.into())
     }
 }
 impl std::fmt::Display for ItemDefId {
