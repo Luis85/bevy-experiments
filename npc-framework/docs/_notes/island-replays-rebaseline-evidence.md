@@ -1,8 +1,21 @@
 # Island replays re-baseline evidence (staged, awaiting approval)
 
-Tree: `68c2d1fd` (branch `claude/npc-framework-economy-review-7ec4cf`) plus one lint fix in
-`content/island_view/src/keymap.rs`. The fix is view code that `npcctl` does not link, so it cannot reach a hash.
-Recorded on 2026-11-15 with this tree's release `npcctl` (`cargo build --locked --release -p npcctl`).
+Tree: `7f08c855` (branch `claude/npc-framework-economy-review-7ec4cf`). Recorded on 2026-11-15 with this tree's
+release `npcctl` (`cargo build --locked --release -p npcctl`; binary built 2026-11-15 08:49).
+
+**This is the second staging.** The first staging was recorded on `68c2d1fd`. Commit `7f08c855` then changed the
+island's hashed state: `SeasonLedger`'s `Totals` gained `children` and `came_of_age`, and `hash_totals` now hashes
+both (`content/island_content/src/village/ledger.rs`). This is a hash-encoding change. It moves every island state
+hash from the first checkpoint on, but not the content hash, because no registered name changed. On this tree the
+first staging fails at tick 600:
+
+```
+old s7:  {"ok":false,"checked":1,"first_mismatch":[600,13914578685478396185,7969326067423200921]}
+old s11: {"ok":false,"checked":1,"first_mismatch":[600,8516525264000701901,9710609323910368013]}
+old s23: {"ok":false,"checked":1,"first_mismatch":[600,6824013137921424504,9007799059673750488]}
+```
+
+So the three staged files were recorded again and replaced. Neither staging was ever approved or swapped in.
 
 ## What changed and why
 
@@ -12,9 +25,9 @@ construction, `construction::shipped()`, now builds the island everywhere. The r
 island replay: `tests/replays/` has only the 4 `testbed_*` and 4 `village_*` files. So this is a **first
 baseline**, not a replacement. No existing oracle changes, and there is no "before" capture to compare against.
 
-The island's content hash is `17177643955394559808`. It is the same in all three recordings and in both runs of
-each. During this pass the island's registered names and registrations changed several times, so any earlier
-island hash would not match it:
+The island's content hash is `17177643955394559808`. It is the same in all three recordings, in both runs of each,
+and in the first staging. During this pass the island's registered names and registrations changed several
+times, so any island hash from before `68c2d1fd` would not match it:
 
 - `1b589db5` (island split step 5): the island's own names, e.g. `TestbedUnit` -> `IslandUnit`, `TbIdling` ->
   `IslandIdling`, kind name `testbed` -> `island`, one idle tree in place of three. It also dropped `TbWalking` and
@@ -23,20 +36,19 @@ island hash would not match it:
   resources `EditorMode`, `SeasonLedger`, `ActiveWorld`; new commands `SetEditorMode`, `ReplaceBehavior`.
 - `a75c2269` (closing round 3): sim resource `StapleAdvances`.
 - `68c2d1fd` (closing round 4): sim resource `FoodEaten`.
+- `7f08c855` (final patch): no new name. The `SeasonLedger` encoding changed, which alters the state hashes only.
 
-These replays pin the island as it ships at `68c2d1fd`. A later registration or behaviour change to the island
-will need its own re-baseline by the same procedure.
+These replays pin the island as it ships at `7f08c855`. A later registration, encoding or behaviour change to the
+island will need its own re-baseline by the same procedure.
 
 ## Checks that fail until the swap
 
-- `content/village_content/tests/corpus_equivalence.rs` `staged_corpus_is_the_same_runs`: probably red while
-  only island files are staged. The test drops `island_*` files from `tests/replays.next/` and then asserts
-  `!names.is_empty()` ("replays.next exists but is empty"). The full gate's `test` step confirms or rules this
-  out (see the closing report). This is a defect in that test's early return, not in the staged files. The
-  swap removes `tests/replays.next/`, which clears it.
-- Nothing else should change. The testbed `corpus_equivalence` ignores island files and has no empty-check. The
-  village and testbed corpora are unchanged and all 8 verify `"ok":true`. `cargo xtask verify --island` verifies
-  the staged files as "staged, not approved yet".
+- None expected. `7f08c855` changed `content/village_content/tests/corpus_equivalence.rs` to pass when nothing is
+  staged for the village. Before that, it failed with "replays.next exists but is empty" while only island files
+  were staged; the full verify on `68c2d1fd` showed this. The full verify on this tree confirms it now passes (see
+  `target/npc-out/closing/final2/final-verify-report.md`).
+- The testbed `corpus_equivalence` ignores island files. The village and testbed corpora are unchanged and all 8
+  verify `"ok":true`. `cargo xtask verify --island` verifies the staged files as "staged, not approved yet".
 
 ## Commands
 
@@ -45,19 +57,18 @@ cargo build --locked --release -p npcctl
 # recorded into target/ first (the hook blocks `--out tests/replays...`)
 for S in 7 11 23; do
   target/release/npcctl replay record --scenario living_world --seed $S --ticks 24000 --checkpoint-every 600 \
-    --out target/island-split/final/island_living_world_s$S.json
-  target/release/npcctl replay verify target/island-split/final/island_living_world_s$S.json
-  # a second, independent recording, compared byte for byte
+    --out target/island-split/final2/island_living_world_s$S.json
+  target/release/npcctl replay verify target/island-split/final2/island_living_world_s$S.json
+  # a second, independent recording, compared byte for byte (cmp)
   target/release/npcctl replay record --scenario living_world --seed $S --ticks 24000 --checkpoint-every 600 \
-    --out target/island-split/final/second/island_living_world_s$S.json
+    --out target/island-split/final2/second/island_living_world_s$S.json
 done
-mkdir -p tests/replays.next
-cp target/island-split/final/island_living_world_s{7,11,23}.json tests/replays.next/
+cp target/island-split/final2/island_living_world_s{7,11,23}.json tests/replays.next/   # replaces the first staging
 ```
 
 ## Evidence
 
-Verify outputs:
+Verify outputs (this tree):
 
 ```
 island_living_world_s7.json   {"ok":true,"checked":40,"first_mismatch":null}
@@ -66,18 +77,18 @@ island_living_world_s23.json  {"ok":true,"checked":40,"first_mismatch":null}
 ```
 
 Determinism: each seed was recorded twice in separate `npcctl` processes, and the two files are **byte-identical**
-(SHA-256 equal):
+(`cmp` and SHA-256):
 
-| Staged file | Bytes | SHA-256 | 2nd recording |
-|---|---|---|---|
-| `island_living_world_s7.json` | 1272 | `dceb2df20af7b88c5089d53990355c892101eb68eb8adfdd60722a0e612ea5c2` | identical |
-| `island_living_world_s11.json` | 1268 | `a8dcc402bc422bb407ee58f88841c0e6c2d8f4ef3013ad0cab49d9d15d223b3f` | identical |
-| `island_living_world_s23.json` | 1265 | `a53eb6c5daaff443c5f6cb34846de2517e746e2d9dec53f598ad05a55cac3984` | identical |
+| Staged file | Bytes | SHA-256 | 2nd recording | 1st staging (68c2d1fd) |
+|---|---|---|---|---|
+| `island_living_world_s7.json` | 1272 | `088a0bb2bb2b5ee17ed864dbb5e60e2681d6ba0e455f32b55153e0b3ada9d30d` | identical | `dceb2df2…`, stale |
+| `island_living_world_s11.json` | 1270 | `f6e0e6033efaf20c6074b7bec9a2566226361f2d49d48191773edc02551ce70a` | identical | `a8dcc402…`, stale |
+| `island_living_world_s23.json` | 1265 | `a62434d27840dad3f25296ead1815e6944f6b37cccbb732f86267fe4bac1b818` | identical | `a53eb6c5…`, stale |
 
 Each file: `"version":2`, `"scenario":"island:living_world"`, `"content_hash":17177643955394559808`,
 `"ticks":24000`, `"commands":[]`, 40 checkpoints (every 600 ticks, 600..24000), `"villagers":1`, which is
-`npcctl`'s default; the island's population comes from its construction. Recording takes about 40-50 s per seed
-and verifying about the same, in release on this machine.
+`npcctl`'s default; the island's population comes from its construction. Recording, verifying and recording again
+took 103-115 s per seed in release on this machine.
 
 Not done: a Linux/Windows cross-check. The CI determinism job covers that; differing hashes across OSes would be
 a determinism bug, not a re-baseline.
@@ -93,8 +104,8 @@ a determinism bug, not a re-baseline.
 No id remap: there are no commands.
 
 Note for the verify tiers: `xtask` lists `ISLAND_LONG_REPLAYS = ["island_seed7_1day"]`, which names none of these
-files. So `--island` will verify all three, about 2 minutes in total. Adding them there would leave them to the
-full gate only.
+files. So `--island` verifies all three, which took about 6.5 minutes in the `68c2d1fd` run. Adding them there would
+leave them to the full gate only.
 
 ## Applying (owner)
 
