@@ -310,6 +310,62 @@ fn restore_defaults_keeps_seen_callouts_and_writes_current_version() {
     );
 }
 
+/// Closing: a callout whose key a rebind left Unbound (Pause on B, or Cycle
+/// attack cleared) never reads "press Unbound": it names the action as
+/// unbound and where to bind it, as the battle hints do. Bound keys keep the
+/// old wording.
+#[test]
+fn callouts_name_an_unbound_key_and_where_to_bind_it() {
+    use crate::settings::{Action, BindingId, ExtraAction, Settings};
+    let line = |settings: &Settings, id: &str| {
+        let callout = onboarding::CALLOUTS
+            .iter()
+            .find(|callout| callout.id == id)
+            .expect("callout");
+        onboarding::text(callout, settings)
+    };
+    let mut settings = Settings::default();
+    settings.set_binding(BindingId::Core(Action::Pause), "B".into());
+    settings.set_binding(BindingId::Extra(ExtraAction::CycleAttack), String::new());
+    assert_eq!(settings.binding(BindingId::Core(Action::Build)), "");
+    assert_eq!(
+        settings.binding(BindingId::Extra(ExtraAction::CycleAttack)),
+        ""
+    );
+    for callout in onboarding::CALLOUTS {
+        let text = onboarding::text(callout, &settings);
+        assert!(
+            !text.contains(crate::settings::UNBOUND),
+            "{}: {text}",
+            callout.id
+        );
+    }
+    assert_eq!(
+        line(&settings, "feature:construction"),
+        "New: Build defenses - Construction is unbound; bind it in Settings › Controls"
+    );
+    assert_eq!(
+        line(&settings, "blueprint:trap"),
+        "New: Trap blueprint - Construction is unbound; bind it in Settings › Controls to build it"
+    );
+    assert_eq!(
+        line(&settings, "ordnance:grenade"),
+        "New: Grenades - Cycle attack is unbound; bind it in Settings › Controls to switch attacks"
+    );
+    // The bound wording is unchanged.
+    let settings = Settings::default();
+    assert_eq!(line(&settings, "blueprint:trap"), TRAP);
+    assert_eq!(
+        line(&settings, "feature:construction"),
+        "New: Build defenses - press B in battle"
+    );
+    let cycle = settings.binding(BindingId::Extra(ExtraAction::CycleAttack));
+    assert_eq!(
+        line(&settings, "ordnance:grenade"),
+        format!("New: Grenades - switch attacks with {cycle} in battle")
+    );
+}
+
 #[test]
 fn country_dossier_names_defense_count_and_mara_timing() {
     let germany = world().country("DEU").unwrap();

@@ -128,6 +128,13 @@ impl BindingId {
             .map(Self::Core)
             .chain(ExtraAction::ALL.into_iter().map(Self::Extra))
     }
+    /// The row's name in the Controls table.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Core(action) => action.name(),
+            Self::Extra(action) => action.name(),
+        }
+    }
 }
 
 /// What a binding shows in place of its key when it has none.
@@ -136,6 +143,15 @@ pub const UNBOUND: &str = "Unbound";
 /// The text a binding shows: its key, or [`UNBOUND`].
 pub fn binding_text(binding: &str) -> &str {
     if binding.is_empty() { UNBOUND } else { binding }
+}
+
+/// Where the player binds an action a rebind left without a key.
+pub const CONTROLS: &str = "Settings › Controls";
+
+/// "<action> is unbound", naming the action as Settings › Controls does. A
+/// line that would name a key says this instead of "press Unbound".
+pub fn unbound(id: BindingId) -> String {
+    format!("{} is unbound", id.name())
 }
 
 /// Whether the key or mouse button named `binding` is down (`held`) or was

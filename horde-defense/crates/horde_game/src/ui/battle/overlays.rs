@@ -140,8 +140,7 @@ pub(super) fn key_legend(settings: &Settings) -> String {
     .map(|(id, action)| format!("{} {action}", binding_text(settings.binding(id))))
     .join(" · ")
 }
-/// Where the player binds an action a rebind left without a key.
-pub(super) const CONTROLS: &str = "Settings › Controls";
+pub(super) use crate::settings::CONTROLS;
 /// The bound key of the core `action`; None when it is unbound.
 fn core_key(bindings: &[String], action: Action) -> Option<&str> {
     bindings
@@ -151,7 +150,7 @@ fn core_key(bindings: &[String], action: Action) -> Option<&str> {
 }
 /// "<action> is unbound", naming the action as Settings › Controls does.
 pub(super) fn unbound(action: Action) -> String {
-    format!("{} is unbound", action.name())
+    crate::settings::unbound(BindingId::Core(action))
 }
 /// The bound Pause key; None when it is unbound.
 fn pause_key(bindings: &[String]) -> Option<&str> {

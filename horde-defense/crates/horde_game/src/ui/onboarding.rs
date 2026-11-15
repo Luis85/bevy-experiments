@@ -33,11 +33,29 @@ pub(super) struct Callout {
     place: fn(Screen, Tab) -> bool,
 }
 
-fn build_key(settings: &Settings) -> &str {
-    settings::binding_text(settings.binding(BindingId::Core(Action::Build)))
-}
-fn cycle_key(settings: &Settings) -> &str {
-    settings::binding_text(settings.binding(BindingId::Extra(ExtraAction::CycleAttack)))
+const BUILD: BindingId = BindingId::Core(Action::Build);
+const CYCLE: BindingId = BindingId::Extra(ExtraAction::CycleAttack);
+
+/// "New: <what> - " and the `bound` line naming `id`'s key, or, when a
+/// rebind left `id` without a key,
+/// "New: <what> - <action> is unbound; bind it in Settings › Controls" and
+/// `then` (" to build it"), as the battle hints word it. Never "press
+/// Unbound".
+fn key_line(
+    settings: &Settings,
+    what: &str,
+    id: BindingId,
+    bound: impl FnOnce(&str) -> String,
+    then: &str,
+) -> String {
+    match settings.binding(id) {
+        "" => format!(
+            "New: {what} - {}; bind it in {}{then}",
+            settings::unbound(id),
+            settings::CONTROLS
+        ),
+        key => format!("New: {what} - {}", bound(key)),
+    }
 }
 fn in_battle(screen: Screen, _: Tab) -> bool {
     screen == Screen::Battle
@@ -51,17 +69,31 @@ fn open_operations(f: &mut UiCtx) {
 fn has_blueprint(game: &Game, kind: StructureKind) -> bool {
     game.campaign().blueprints[kind]
 }
+fn construction_text(settings: &Settings) -> String {
+    key_line(
+        settings,
+        "Build defenses",
+        BUILD,
+        |key| format!("press {key} in battle"),
+        "",
+    )
+}
 fn blueprint_text(settings: &Settings, kind: StructureKind) -> String {
-    format!(
-        "New: {} blueprint - press {} in battle to build it",
-        kind.label(),
-        build_key(settings)
+    key_line(
+        settings,
+        &format!("{} blueprint", kind.label()),
+        BUILD,
+        |key| format!("press {key} in battle to build it"),
+        " to build it",
     )
 }
 fn ordnance_text(settings: &Settings, name: &str) -> String {
-    format!(
-        "New: {name} - switch attacks with {} in battle",
-        cycle_key(settings)
+    key_line(
+        settings,
+        name,
+        CYCLE,
+        |key| format!("switch attacks with {key} in battle"),
+        " to switch attacks",
     )
 }
 
@@ -69,7 +101,7 @@ fn ordnance_text(settings: &Settings, name: &str) -> String {
 pub(super) const CALLOUTS: &[Callout] = &[
     Callout {
         id: "feature:construction",
-        text: |s| format!("New: Build defenses - press {} in battle", build_key(s)),
+        text: construction_text,
         open: None,
         unlocked: |g| g.campaign().has_feature(CampaignFeature::Construction),
         place: in_battle,
