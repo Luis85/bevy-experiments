@@ -44,7 +44,10 @@ use island_view::{
 use npc_framework::agent_io::scenario::{ScenarioDoc, attach_controllers};
 use npc_framework::kernel::journal::{Journal, JournalSink};
 use npc_framework::kernel::replay::ScenarioInfo;
-use npc_framework::kernel::{NpcDriverPlugin, driver::NpcDriverSet};
+use npc_framework::kernel::{
+    NpcDriverPlugin,
+    driver::{DriverSettings, NpcDriverSet},
+};
 use npc_framework::prelude::{
     JournalPlugin, PlayerId, SimClock, SimCommand, SimControl, SimId, SimIndex, submit,
 };
@@ -385,7 +388,10 @@ fn host(app: &mut App, args: &Args) {
         } else {
             args.island_mode
         })
-        .add_plugins(NpcDriverPlugin::new(TICK_HZ, Update))
+        .add_plugins(NpcDriverPlugin {
+            max_ticks_per_run: catch_up_cap(args.speed),
+            ..NpcDriverPlugin::new(TICK_HZ, Update)
+        })
         .insert_resource(SimControl {
             multiplier: args.speed,
             paused: args.paused,
@@ -403,6 +409,7 @@ fn host(app: &mut App, args: &Args) {
             (speed_input, step_input).chain().in_set(ViewSystems::Input),
         )
         .add_systems(Update, scripted_commands.before(NpcDriverSet))
+        .add_systems(Update, follow_speed_cap.before(NpcDriverSet))
         // The view asks for the idle supervisor to hold while a character is
         // played; the host owns the policy and applies the request.
         .init_resource::<island_view::SchedulerHoldRequest>()
@@ -657,6 +664,29 @@ fn speed_input(keys: Option<Res<ButtonInput<KeyCode>>>, mut control: ResMut<SimC
     }
 }
 
+/// Most ticks one frame may run at `multiplier`: twice one 60 fps frame's
+/// share (`TICK_HZ × multiplier / 60`, rounded up), and never fewer than 4.
+/// After a slow frame the driver then runs at most this many catch-up ticks
+/// and drops the rest of the backlog, so a hitch costs one late frame instead
+/// of growing (the driver's default of 100 turned one 25 ms tick into a
+/// 300 ms frame). At 30x that is 20 ticks a frame, 1200 a second at 60 fps,
+/// above the 600 the speed needs. It changes how many ticks a frame runs,
+/// never what a tick does.
+pub(crate) fn catch_up_cap(multiplier: u32) -> u32 {
+    (2 * TICK_HZ.saturating_mul(multiplier).div_ceil(60)).max(4)
+}
+
+/// Keeps [`DriverSettings::max_ticks_per_run`] at [`catch_up_cap`] of the
+/// current speed, whoever changed it (speed keys, the HUD, the night speed,
+/// pause and resume, `--speed`, remote calls). Runs before the driver.
+fn follow_speed_cap(control: Res<SimControl>, settings: Option<ResMut<DriverSettings>>) {
+    let Some(mut settings) = settings else { return };
+    let cap = catch_up_cap(control.multiplier);
+    if settings.max_ticks_per_run != cap {
+        settings.max_ticks_per_run = cap;
+    }
+}
+
 /// Whether the developer keys act: always on a developer host, and in the
 /// player session only with `--dev-keys`.
 pub(crate) fn developer_keys_on(world: &World) -> bool {
@@ -720,6 +750,34 @@ mod tests {
         assert!(parse_args(&quiet.map(str::to_owned)).mute);
         assert_eq!(window_title(true), "Island Village");
         assert_eq!(window_title(false), "Island Village | NPC Framework");
+    }
+
+    #[test]
+    fn catch_up_cap_is_twice_a_frames_share_and_at_least_four() {
+        let caps: Vec<u32> = [0, 1, 3, 10, 30].map(catch_up_cap).to_vec();
+        assert_eq!(caps, [4, 4, 4, 8, 20]);
+        assert!(catch_up_cap(30) * 60 >= TICK_HZ * 30, "30x stays reachable");
+        assert_eq!(catch_up_cap(u32::MAX), 2 * u32::MAX.div_ceil(60));
+    }
+
+    #[test]
+    fn a_speed_change_moves_the_driver_cap() {
+        let mut app = App::new();
+        app.add_plugins(NpcDriverPlugin {
+            max_ticks_per_run: catch_up_cap(1),
+            ..NpcDriverPlugin::new(TICK_HZ, Update)
+        })
+        .add_systems(Update, follow_speed_cap.before(NpcDriverSet));
+        let cap = |app: &App| app.world().resource::<DriverSettings>().max_ticks_per_run;
+        assert_eq!(cap(&app), 4, "the start speed sets the cap");
+        for (speed, want) in [(10, 8), (3, 4), (30, 20)] {
+            app.world_mut().resource_mut::<SimControl>().multiplier = speed;
+            app.update();
+            assert_eq!(cap(&app), want, "at {speed}x");
+        }
+        app.world_mut().resource_mut::<SimControl>().paused = true;
+        app.update();
+        assert_eq!(cap(&app), 20, "pausing keeps the speed's cap");
     }
 }
 
