@@ -290,3 +290,82 @@ fn ui_frames_do_not_change_state_digest() {
         }
     }
 }
+
+/// Every filled rect painted in the band's colour: RED at one of the
+/// strengths the band takes in these frames (the static 0.40, or the pulse at
+/// a quarter second: its mean, peak and trough).
+fn band_coloured(output: &FullOutput) -> Vec<Rect> {
+    let fills = [0.40, 0.375, 0.50, 0.25].map(|alpha| RED.gamma_multiply(alpha));
+    filled_rects(output)
+        .into_iter()
+        .filter(|(_, fill)| fills.contains(fill))
+        .map(|(rect, _)| rect)
+        .collect()
+}
+
+/// The rule's other half (battle/low_hp.rs): the warning belongs to the main
+/// battle, never to the Operations worker observer window. A worker at 10% HP,
+/// observed from the Operations tab, gets no band inside the canvas or its
+/// observer field, nothing of the band's colour anywhere, no "LOW", and
+/// `BattleUi::low_hp` stays clear, in both effects modes, running or paused.
+#[test]
+fn worker_observer_never_paints_the_low_hp_edge() {
+    for reduced in [true, false] {
+        for paused in [false, true] {
+            let mut fixture = IsolatedFrontend::new();
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            f.game = horde_core::sim::stress_authored_fixture().unwrap();
+            f.game.set_paused(paused);
+            f.settings.reduced_effects = reduced;
+            f.screen = Screen::Camp;
+            f.nav.tab = Tab::Operations;
+            let worker = f
+                .game
+                .battles_mut()
+                .iter_mut()
+                .find(|b| !b.settled && b.game().attempt().is_some())
+                .expect("the fixture keeps a live worker");
+            let id = worker.id;
+            let a = worker.game_mut().attempt_mut().unwrap();
+            (a.max_hp, a.hp) = (100, 10);
+            f.campaign.observed = Some(id);
+            let case = format!("reduced {reduced}, paused {paused}");
+            // Each frame is a quarter second on, through one pulse. The window
+            // lays itself out on its first pass and paints from the second.
+            for frame in 0..5 {
+                let output = h.frame_at(f, View::Full, vec![], T0 + f64::from(frame) * 0.25);
+                assert_eq!(
+                    band_coloured(&output),
+                    Vec::<Rect>::new(),
+                    "{case}: frame {frame}: the band's colour"
+                );
+                assert!(!painted(&output, "LOW"), "{case}: frame {frame}");
+                assert!(!f.battle.low_hp, "{case}: frame {frame}: BattleUi.low_hp");
+                if frame == 0 {
+                    continue;
+                }
+                assert!(
+                    painted(&output, "Save country plan"),
+                    "{case}: frame {frame}: the observer window is open"
+                );
+                assert!(
+                    painted(&output, "HP 10/100"),
+                    "{case}: frame {frame}: the observer reads the worker at 10%"
+                );
+                let canvas = h.ctx.content_rect();
+                let field = f
+                    .battle
+                    .observer_arena_rect
+                    .unwrap_or_else(|| panic!("{case}: frame {frame}: no observer field"));
+                for (name, rect) in [("canvas", canvas), ("observer field", field)] {
+                    assert_eq!(
+                        edge_fills(&output, rect),
+                        [None; 4],
+                        "{case}: frame {frame}: a low-HP band inside the {name}"
+                    );
+                }
+            }
+        }
+    }
+}
