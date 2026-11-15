@@ -392,8 +392,8 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `class_modifier_applies_only_to_matching_class`
   - `armor_penetration_reduces_enemy_armor_for_personal_shots_only`
   - `hazard_scaled_is_identity_at_one_and_scales_at_point_six`
-  - `trap_rank_r_places_three_plus_r_charges` (test-only authored value)
-- Pin: `existing_structures_keep_charges_without_charges_per_rank`.
+  - `trap_rank_r_places_three_plus_r_charges` (test-only authored value; the shipped trap has authored the same 1 since W4-03)
+- Pin: `existing_structures_keep_charges_without_charges_per_rank` (renamed `structures_without_charges_per_rank_keep_their_charges` by W4-03, which gives the shipped shrapnel trap charges_per_rank 1; the pin now covers the structures that author none and a trap with its charges_per_rank cleared).
 - Deps: W2-23.
 
 **W2-25 · progression-tree · W2-G `tree_value` and `--values`**
