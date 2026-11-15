@@ -657,8 +657,9 @@ impl ProgressionCatalog {
     }
     /// The Personal boss armor multiplier at threat `rank`:
     /// `1 + boss_armor_per_rank × (min(rank, 50) - 4)`, clamped to 1..=4
-    /// (design enemy-balance §2, "Boss armor"; the boss-rank factor arrives
-    /// in wave 4). The literal 1.0 through rank 4 and without the key.
+    /// (design enemy-balance §2, "Boss armor"). The literal 1.0 through rank
+    /// 4 and without the key. The boss-rank factor (`boss_ranks.*.armor`) is
+    /// folded at deploy by [`ProgressionSnapshot::fold_boss_rank`].
     pub fn boss_armor_multiplier(&self, rank: u32) -> f32 {
         let steps = rank
             .min(BOSS_SCALING_TO_RANK)
