@@ -128,7 +128,8 @@ fn track_in(tracks: &[(MusicState, Track)], state: MusicState) -> Track {
 
 /// The attempt stingers: the cues of the Music bus. Each plays an existing
 /// survival bank (Victory the wave bank, Defeat the structure bank, Retreat
-/// its own); `events::cues_of` requests them when an attempt finishes.
+/// its own); the `AttemptFinished` arm of `events::event_requests` requests
+/// them when an attempt finishes.
 pub const STINGERS: [Cue; 3] = [Cue::Victory, Cue::Defeat, Cue::Retreat];
 
 /// The low battle state goes high once the intensity held at this or more
