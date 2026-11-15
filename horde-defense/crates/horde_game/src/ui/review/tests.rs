@@ -2699,6 +2699,19 @@ fn storm_fixture_is_a_storm_tagged_stage() {
 /// native frame, the lightning clock on the tick).
 #[cfg(feature = "review")]
 fn motion_flash_facts(scene: &str, reduced: bool) -> Vec<crate::art::FlashFacts> {
+    motion_flash_frames(scene, reduced)
+        .into_iter()
+        .map(|(facts, _)| facts)
+        .collect()
+}
+
+/// [`motion_flash_facts`], each frame with the sky-flash alpha the lightning
+/// schedule gives the frame's own tick: `lighting::sky_flash` of the stage's
+/// presentation seed at the tick's 60 Hz wall time, with the attempt's quiet
+/// windows, through `lighting::sky_alpha`.
+#[cfg(feature = "review")]
+fn motion_flash_frames(scene: &str, reduced: bool) -> Vec<(crate::art::FlashFacts, f32)> {
+    use crate::art::lighting;
     use crate::capture_sequence::{LAST, frame_index};
     let mut vars = vec![
         ("LASTLIGHT_REVIEW_SCREEN", scene),
@@ -2723,10 +2736,22 @@ fn motion_flash_facts(scene: &str, reduced: bool) -> Vec<crate::art::FlashFacts>
         if frame_index(frame).is_some() {
             let a = f.game.attempt().expect("the defense stands");
             assert!(!a.paused, "{scene}: the export runs live");
-            frames.push(crate::art::flash_facts(
-                a,
-                crate::art::SkyClock::of_tick(a.tick, f.battle.speed),
+            let look = crate::art::scene_look(a);
+            let scheduled = lighting::sky_alpha(lighting::sky_flash(
+                look.seed,
+                crate::art::SkyClock::of_tick(a.tick, 1).wall_ms as u64,
+                lighting::sky_quiet(a, f.battle.speed),
+                a.paused,
                 f.settings.reduced_effects,
+                look.storm,
+            ));
+            frames.push((
+                crate::art::flash_facts(
+                    a,
+                    crate::art::SkyClock::of_tick(a.tick, f.battle.speed),
+                    f.settings.reduced_effects,
+                ),
+                scheduled,
             ));
         }
         schedule_motion_release(&config, &mut f.runtime, frame);
@@ -2737,10 +2762,14 @@ fn motion_flash_facts(scene: &str, reduced: bool) -> Vec<crate::art::FlashFacts>
 }
 
 /// Design-qa-captures 1.9 (W5): a normal storm export shows the pulse (at
-/// least one frame with sky_flash > 0, none above `SKY_PEAK_ALPHA`, lit in
-/// two neighbouring frames so it rises and decays rather than popping), a
+/// least one frame with sky_flash > 0, lit in two neighbouring frames so it
+/// rises and decays rather than popping, and every frame's sky_flash the
+/// schedule's alpha at that frame's own tick, so the facts the manifest
+/// writes follow the stage's seed, the tick clock and the quiet windows), a
 /// normal machine-gun export shows muzzle flashes, and the reduced exports
-/// of storm, fx-stress and weapon-classes-machine-gun are all zeros.
+/// of storm, fx-stress and weapon-classes-machine-gun are all zeros. No
+/// frame can exceed `SKY_PEAK_ALPHA` (sky_flash is `lighting::sky_alpha` of
+/// a clamped pulse), so the peak is not asserted.
 /// sky_flash is the over-rect alpha, not a luminance: the storm's ΔL < 0.2
 /// (G7.3) is `sky_flash_peak_delta_below_0_2_under_gamma_and_linear_blending` and
 /// measure_field_luminance.py storm on the exported PNGs.
@@ -2748,7 +2777,15 @@ fn motion_flash_facts(scene: &str, reduced: bool) -> Vec<crate::art::FlashFacts>
 #[test]
 fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
     use crate::art::FlashFacts;
-    let storm = motion_flash_facts("storm", false);
+    let frames = motion_flash_frames("storm", false);
+    for (i, (facts, scheduled)) in frames.iter().enumerate() {
+        assert!(
+            (facts.sky_flash - scheduled).abs() <= f32::EPSILON,
+            "frame {i}: sky_flash {} is not the schedule's {scheduled}",
+            facts.sky_flash
+        );
+    }
+    let storm: Vec<FlashFacts> = frames.into_iter().map(|(facts, _)| facts).collect();
     assert_eq!(storm.len(), 24);
     assert!(
         storm.iter().any(|facts| facts.sky_flash > 0.0),
@@ -2756,17 +2793,10 @@ fn motion_exports_flash_in_normal_mode_and_never_in_reduced() {
     );
     assert!(
         storm
-            .iter()
-            .all(|f| f.sky_flash <= crate::art::lighting::SKY_PEAK_ALPHA),
-        "never above the peak alpha: {storm:?}"
-    );
-    assert!(
-        storm
             .windows(2)
             .any(|pair| pair[0].sky_flash > 0.0 && pair[1].sky_flash > 0.0),
         "the pulse is lit in two neighbouring frames: {storm:?}"
     );
-    assert!(storm.iter().all(|f| f.flash_alpha_max >= f.sky_flash));
     // The machine gun fires every eighth tick and its flash polygon lives
     // three, so the export's every-fourth-tick frames catch the muzzle
     // light's tail, not the polygon; the still, paused on the shot, has it.

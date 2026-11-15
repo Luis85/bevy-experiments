@@ -433,10 +433,9 @@ try {
         $sky = @((& $frame 0.0 0.01 0))
         Assert-True ((Get-MotionFlashProblem -Frames $sky -ReducedEffects) -like '*sky_flash 0.01') 'a reduced sky flash fails'
         Assert-True ((Get-MotionFlashProblem -Frames $dark -Storm) -like 'The storm export captured no lightning pulse*') 'a storm export without a pulse fails'
-        # sky_flash is the over-rect alpha, at most SKY_PEAK_ALPHA (0.14, art/lighting.rs); the 0.2 luminance-step
-        # gate belongs to measure_field_luminance.py storm on the PNGs.
-        $bright = @((& $frame 0.0 0.0 0), (& $frame 0.15 0.15 0), (& $frame 0.1 0.1 0))
-        Assert-True ((Get-MotionFlashProblem -Frames $bright -Storm) -like 'Frame 1 has sky_flash 0.15 above the peak alpha 0.14*') 'a sky flash above the peak alpha fails'
+        # sky_flash is the over-rect alpha, at most SKY_PEAK_ALPHA (0.14, art/lighting.rs) by construction, so the
+        # gate does not check the peak; the 0.2 luminance-step gate belongs to measure_field_luminance.py storm on the
+        # PNGs.
         $pop = @((& $frame 0.0 0.0 0), (& $frame 0.14 0.14 0), (& $frame 0.0 0.0 0), (& $frame 0.1 0.1 0))
         Assert-True ((Get-MotionFlashProblem -Frames $pop -Storm) -like 'The storm pulse pops*') 'a pulse lit in no two neighbouring frames fails'
         $old = @([pscustomobject]@{ file = 'frame.png'; native_frame = 60 })

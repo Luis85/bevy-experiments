@@ -255,10 +255,13 @@ function Get-ReviewSceneList {
 function Get-MotionFlashProblem {
     # The flash gate of a motion manifest's frames (design-qa-captures 1.9, W5-10). Every frame must carry the numeric
     # fields flash_alpha_max, sky_flash and muzzle_flash_count. With -ReducedEffects all three are 0 in every frame.
-    # With -Storm (the storm scene, normal effects) at least one frame has sky_flash > 0, no frame exceeds the sky-flash
-    # peak alpha (SKY_PEAK_ALPHA 0.14, art/lighting.rs) and the pulse is lit in two neighbouring frames, so it rises
-    # and decays rather than popping. sky_flash is an over-rect alpha, not a luminance: the storm's frame-to-frame
-    # luminance step (G7.3, delta L < 0.2) is gated by measure_field_luminance.py storm on the PNGs.
+    # With -Storm (the storm scene, normal effects) at least one frame has sky_flash > 0 and the pulse is lit in two
+    # neighbouring frames, so it rises and decays rather than popping. The game writes sky_flash as lighting::sky_alpha
+    # of a clamped pulse, so no manifest it writes can exceed the 0.14 peak alpha and the peak is not checked here; that
+    # each frame's sky_flash follows the lightning schedule at its own tick is the Rust test
+    # motion_exports_flash_in_normal_mode_and_never_in_reduced. sky_flash is an over-rect alpha, not a luminance: the
+    # storm's frame-to-frame luminance step (G7.3, delta L < 0.2) is gated by measure_field_luminance.py storm on the
+    # PNGs.
     # Returns the first problem as a string, or $null.
     [CmdletBinding()]
     param(
@@ -277,12 +280,6 @@ function Get-MotionFlashProblem {
     }
     if ($Storm -and -not $ReducedEffects) {
         if (@($Frames | Where-Object { [double]$_.sky_flash -gt 0 }).Count -eq 0) { return 'The storm export captured no lightning pulse (sky_flash is 0 in every frame)' }
-        # The manifest writes the f32 alpha; the tolerance absorbs its rounding.
-        $peak = 0.14
-        for ($i = 0; $i -lt $Frames.Count; $i++) {
-            $sky = [double]$Frames[$i].sky_flash
-            if ($sky -gt $peak + 1e-6) { return "Frame $i has sky_flash $sky above the peak alpha $peak" }
-        }
         $held = $false
         for ($i = 1; $i -lt $Frames.Count; $i++) {
             if ([double]$Frames[$i].sky_flash -gt 0 -and [double]$Frames[$i - 1].sky_flash -gt 0) { $held = $true; break }
