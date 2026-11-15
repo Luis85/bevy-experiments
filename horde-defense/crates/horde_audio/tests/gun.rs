@@ -6,7 +6,10 @@ use horde_audio::{
     bank::{BankId, GunStage},
     cue::Cue,
     events::{EventContext, event_requests},
-    gun::{BOLT_DELAY_TICKS, DRY_FIRE_REPEAT_TICKS, GunTracker, MAX_SHELL_INSERTS, stage_speed},
+    gun::{
+        BOLT_DELAY_TICKS, DRY_FIRE_REPEAT_TICKS, GunTracker, MAX_SHELL_INSERTS,
+        dry_fire_repeat_ticks, stage_speed,
+    },
     mix::{Bus, GateGroup, JitterBounds, duck, mix},
     pan::{Places, positional},
     select::CueGate,
@@ -203,71 +206,87 @@ fn dry_trigger_auto_reload_off_plays_dry_fire_once_per_350ms() {
         ..Input::default()
     };
     assert_eq!(mix(Cue::DryFire).cooldown_ms, 350);
-    for speed in SPEEDS {
-        let mut rig = Rig::new(deployed(Mode::Personal, WeaponClass::Pistol), speed);
-        rig.attempt().ammo = 0;
-        rig.frame(&Input {
-            auto_reload: false,
-            ..Input::default()
-        });
-        let from = rig.frames.len();
-        // Two seconds of real time with the trigger held.
-        for _ in 0..120 {
-            rig.frame(&dry);
-        }
-        assert_eq!(rig.count(Cue::DryFire), rig.heard().len(), "speed {speed}");
-        // The click is on the press itself.
-        assert_eq!(rig.frames[from], vec![Cue::DryFire], "speed {speed}");
-        // The tracker asks once per repeat interval of simulated time ...
-        let requests: Vec<usize> = (from..rig.frames.len())
-            .filter(|frame| rig.frames[*frame].contains(&Cue::DryFire))
-            .collect();
-        let ticks = 120 * speed as u64;
-        assert_eq!(
-            requests.len() as u64,
-            ticks.div_ceil(DRY_FIRE_REPEAT_TICKS),
-            "speed {speed}"
-        );
-        // ... and the cue's gate lets one through per 350 ms of real time.
-        let mut gate = CueGate::default();
-        let starts: Vec<u64> = requests
-            .iter()
-            .map(|frame| (frame - from) as u64 * 1000 / 60)
-            .filter(|now_ms| gate.accept(Cue::DryFire, *now_ms, false))
-            .collect();
-        assert!(starts.len() >= 4 && starts.len() <= 6, "{starts:?}");
-        assert!(starts.windows(2).all(|pair| pair[1] - pair[0] >= 350));
-        assert_eq!(starts[0], 0);
-
-        // Releasing and pressing again clicks again at once.
-        rig.frame(&Input {
-            auto_reload: false,
-            ..Input::default()
-        });
-        assert_eq!(rig.frames.last().unwrap(), &vec![]);
-        rig.frame(&dry);
-        assert_eq!(rig.frames.last().unwrap(), &vec![Cue::DryFire]);
-
-        // No dry fire with rounds left, with auto reload on (it reloads
-        // instead), or in a melee commit.
-        let heard = rig.count(Cue::DryFire);
-        rig.attempt().melee_commit = 600;
-        rig.frame(&Input {
-            auto_reload: false,
-            ..Input::default()
-        });
-        rig.run(&dry, 60);
-        assert_eq!(rig.count(Cue::DryFire), heard, "speed {speed}: melee");
-        rig.attempt().melee_commit = 0;
-        rig.run(
-            &Input {
-                fire: true,
+    assert_eq!(dry_fire_repeat_ticks(false), DRY_FIRE_REPEAT_TICKS);
+    // Normal effects click every 400 ms; reduced effects every 3/2 of the
+    // gate (525 ms) or a little more, never a request lost to the gate.
+    for (reduced, gap) in [(false, 350..=400), (true, 525..=600)] {
+        for speed in SPEEDS {
+            let mut rig = Rig::new(deployed(Mode::Personal, WeaponClass::Pistol), speed);
+            rig.tracker.set_reduced_effects(reduced);
+            rig.attempt().ammo = 0;
+            rig.frame(&Input {
+                auto_reload: false,
                 ..Input::default()
-            },
-            8,
-        );
-        assert_eq!(rig.count(Cue::DryFire), heard, "speed {speed}: auto reload");
-        assert_eq!(rig.count(Cue::ReloadOut), 1, "speed {speed}");
+            });
+            let from = rig.frames.len();
+            // Two seconds of real time with the trigger held.
+            for _ in 0..120 {
+                rig.frame(&dry);
+            }
+            let case = format!("speed {speed}, reduced {reduced}");
+            assert_eq!(rig.count(Cue::DryFire), rig.heard().len(), "{case}");
+            // The click is on the press itself.
+            assert_eq!(rig.frames[from], vec![Cue::DryFire], "{case}");
+            // The tracker asks once per repeat interval of simulated time ...
+            let requests: Vec<usize> = (from..rig.frames.len())
+                .filter(|frame| rig.frames[*frame].contains(&Cue::DryFire))
+                .collect();
+            let ticks = 120 * speed as u64;
+            assert_eq!(
+                requests.len() as u64,
+                ticks.div_ceil(dry_fire_repeat_ticks(reduced)),
+                "{case}"
+            );
+            // ... and the cue's gate lets one through per cooldown of real time.
+            let mut gate = CueGate::default();
+            let starts: Vec<u64> = requests
+                .iter()
+                .map(|frame| (frame - from) as u64 * 1000 / 60)
+                .filter(|now_ms| gate.accept(Cue::DryFire, *now_ms, reduced))
+                .collect();
+            assert!(starts.len() >= 3 && starts.len() <= 6, "{case}: {starts:?}");
+            assert!(
+                starts
+                    .windows(2)
+                    .all(|pair| gap.contains(&(pair[1] - pair[0]))),
+                "{case}: {starts:?}"
+            );
+            assert_eq!(starts[0], 0);
+            // At 1x, the real cadence: every request starts.
+            if speed == 1 {
+                assert_eq!(starts.len(), requests.len(), "{case}: {starts:?}");
+            }
+
+            // Releasing and pressing again clicks again at once.
+            rig.frame(&Input {
+                auto_reload: false,
+                ..Input::default()
+            });
+            assert_eq!(rig.frames.last().unwrap(), &vec![]);
+            rig.frame(&dry);
+            assert_eq!(rig.frames.last().unwrap(), &vec![Cue::DryFire]);
+
+            // No dry fire with rounds left, with auto reload on (it reloads
+            // instead), or in a melee commit.
+            let heard = rig.count(Cue::DryFire);
+            rig.attempt().melee_commit = 600;
+            rig.frame(&Input {
+                auto_reload: false,
+                ..Input::default()
+            });
+            rig.run(&dry, 60);
+            assert_eq!(rig.count(Cue::DryFire), heard, "speed {speed}: melee");
+            rig.attempt().melee_commit = 0;
+            rig.run(
+                &Input {
+                    fire: true,
+                    ..Input::default()
+                },
+                8,
+            );
+            assert_eq!(rig.count(Cue::DryFire), heard, "speed {speed}: auto reload");
+            assert_eq!(rig.count(Cue::ReloadOut), 1, "speed {speed}");
+        }
     }
 }
 
@@ -492,8 +511,9 @@ fn stage_speed_follows_weapon_class() {
 
 #[test]
 fn reduced_effects_keeps_dry_fire_and_bolt_at_reduced_gain() {
-    // The tracker does not know the setting: it asks either way (the cases
-    // above), and the rows soften the cues without removing them.
+    // The tracker asks in either setting (the cases above; only the dry
+    // trigger's repeat follows the longer gate), and the rows soften the
+    // cues without removing them.
     for cue in [
         Cue::DryFire,
         Cue::BoltCycle,

@@ -55,7 +55,8 @@ pub struct Runtime {
     /// inserts, the bolt and the dry trigger, heard after every tick with
     /// that tick's input. Presentation only: never saved; it primes on an
     /// attempt it has not seen, so a load plays no stage burst. An
-    /// expedition watched from camp has no gun handling.
+    /// expedition watched from camp has no gun handling. Every fixed step
+    /// hands it the reduced effects setting (the dry trigger's repeat).
     pub(super) guns: GunTracker,
     /// The root battle's drops (`horde_audio::loot`): a Rare or better drop
     /// plays `LootDrop` where it fell. Presentation only: never saved; it

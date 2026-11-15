@@ -240,6 +240,10 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
 /// authoritative ticks; one-shot controls are consumed only by the first tick.
 pub fn step(ctx: &mut RuntimeCtx) {
     let before = ctx.runtime.simulated_ticks;
+    // The dry trigger repeats on the gate of the current effects setting.
+    ctx.runtime
+        .guns
+        .set_reduced_effects(ctx.settings.reduced_effects);
     let finished = ctx.runtime.advance(ctx.game, ctx.cues, ctx.perf);
     ctx.game_changed |= ctx.runtime.simulated_ticks != before;
     report_settlement_issues(ctx);

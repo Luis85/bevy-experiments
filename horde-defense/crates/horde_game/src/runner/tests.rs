@@ -1617,6 +1617,19 @@ fn sell_extras_of_50_plays_one_coin_batch() {
     flush_for_test(&mut host.ctx());
     assert_eq!(host.cues, vec![SoundCue::CoinBatch]);
 }
+/// The dry trigger repeats on the gate of the effects setting the player
+/// has now: every fixed step hands it to the gun tracker.
+#[test]
+fn fixed_step_hands_reduced_effects_to_the_gun_tracker() {
+    let mut host = Host::new();
+    assert!(!host.runtime.guns.reduced_effects());
+    host.settings.reduced_effects = true;
+    step(&mut host.ctx());
+    assert!(host.runtime.guns.reduced_effects());
+    host.settings.reduced_effects = false;
+    step(&mut host.ctx());
+    assert!(!host.runtime.guns.reduced_effects());
+}
 /// A Rare or better drop sounds from the runner's tracker (A6-14), panned
 /// to where it fell, at its tier's speed; the widgets play nothing.
 #[test]

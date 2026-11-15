@@ -15,7 +15,8 @@
 //! - **The bolt.** A marksman rifle cycles its bolt [`BOLT_DELAY_TICKS`]
 //!   after each shot, unless a reload began in between.
 //! - **The dry trigger.** `DryFire` on the press of the trigger, and every
-//!   [`DRY_FIRE_REPEAT_TICKS`] while it is held, when the player's own gun
+//!   [`dry_fire_repeat_ticks`] while it is held (400 ms, 583 ms in reduced
+//!   effects: the gate's own cadence), when the player's own gun
 //!   is empty, not reloading, not in a melee commit and auto reload is off
 //!   (the case in which `manual.rs` does nothing at all).
 //!
@@ -27,7 +28,7 @@
 //! it did not hear begin. Its timing is simulated ticks; the cue gates
 //! (`select::CueGate`) bound the starts in real time at any speed.
 
-use crate::{cue::Cue, events::push_cue, pan::Places, voicing::Voicing};
+use crate::{cue::Cue, events::push_cue, mix::mix, pan::Places, voicing::Voicing};
 use horde_core::{
     content::Mode,
     sim::{Attempt, BattleId, Input},
@@ -37,10 +38,20 @@ use std::collections::BTreeMap;
 
 /// The marksman rifle's bolt follows its shot by 300 ms.
 pub const BOLT_DELAY_TICKS: u32 = 18;
-/// A held dry trigger clicks again after this many ticks: 400 ms, the first
-/// whole frames clear of the cue's 350 ms gate, so that a repeat is never a
-/// frame early for the gate and lost.
+/// A held dry trigger clicks again after this many ticks in normal effects:
+/// 400 ms ([`dry_fire_repeat_ticks`]).
 pub const DRY_FIRE_REPEAT_TICKS: u64 = 24;
+/// The whole frames a dry repeat waits past the cue's gate.
+const DRY_FIRE_MARGIN_TICKS: u64 = 3;
+
+/// The ticks after which a held dry trigger clicks again: the cue's gate in
+/// whole 60 Hz ticks plus [`DRY_FIRE_MARGIN_TICKS`], so that a repeat is
+/// never a frame early for the gate and lost. Normal effects: 350 ms, so 24
+/// ticks (400 ms); reduced effects: 525 ms, so 35 ticks (583 ms).
+pub fn dry_fire_repeat_ticks(reduced: bool) -> u64 {
+    let gate_ms = mix(Cue::DryFire).cooldown(reduced);
+    (gate_ms * 60).div_ceil(1000) + DRY_FIRE_MARGIN_TICKS
+}
 /// The most shells one shotgun reload is heard to push in.
 pub const MAX_SHELL_INSERTS: u32 = 6;
 
@@ -101,8 +112,19 @@ impl Gun {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GunTracker {
     guns: BTreeMap<BattleId, Gun>,
+    /// Reduced effects: the dry trigger repeats on the longer gate.
+    reduced: bool,
 }
 impl GunTracker {
+    /// Follows the reduced effects setting; the runner sets it before every
+    /// fixed step.
+    pub fn set_reduced_effects(&mut self, reduced: bool) {
+        self.reduced = reduced;
+    }
+    /// Whether the tracker follows reduced effects.
+    pub fn reduced_effects(&self) -> bool {
+        self.reduced
+    }
     /// Hears `battle`'s gun after a tick that ran with `input`: queues the
     /// stage cues in `cues`, each voiced in `places` at the speed of the
     /// weapon class. The first observation of an attempt only primes.
@@ -207,11 +229,8 @@ impl GunTracker {
             && before.reload_left == 0
             && attempt.reload_left == 0
             && attempt.melee_commit == 0;
-        if dry
-            && (!before.fire_held
-                || before
-                    .dry_at
-                    .is_none_or(|at| attempt.tick >= at + DRY_FIRE_REPEAT_TICKS))
+        let repeat = dry_fire_repeat_ticks(self.reduced);
+        if dry && (!before.fire_held || before.dry_at.is_none_or(|at| attempt.tick >= at + repeat))
         {
             gun.dry_at = Some(attempt.tick);
             stage(places, Cue::DryFire);
