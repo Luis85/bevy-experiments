@@ -130,8 +130,9 @@ fn main() -> AppExit {
     let config = app.world().resource::<launch::LaunchConfig>().clone();
     // Perf launches only: the probe, its span systems and the GPU span.
     diagnostics::install(&mut app, &config);
-    // After LogPlugin so Game::load startup events reach the console and log file.
-    ui::FrontendParts::load(&config, startup_settings).insert_into(&mut app);
+    // After LogPlugin so the stamp and the Game::load startup events reach the
+    // console and log file.
+    load_frontend(&config, startup_settings).insert_into(&mut app);
     let review = config.review().is_some();
     app.add_systems(Startup, log_launch_warnings).add_plugins((
         runner::SimRuntimePlugin,
@@ -152,14 +153,23 @@ fn main() -> AppExit {
     app.run()
 }
 
-/// Logs the build stamp, then the parse warnings collected before logging
-/// existed.
+/// Logs the parse warnings collected before logging existed.
 fn log_launch_warnings(config: Res<launch::LaunchConfig>) {
-    // Every log names the build it came from.
-    info!("Lastlight {}", build_info::stamp());
     for warning in &config.warnings {
         warn!("{warning}");
     }
+}
+
+/// Logs the build stamp, then loads the frontend. The settings warning and
+/// the save load are logged as the frontend loads, before any `Startup`
+/// system runs, so the stamp is logged here: every log names the build it
+/// came from on its first line.
+fn load_frontend(
+    config: &launch::LaunchConfig,
+    startup_settings: profile::SettingsLoad,
+) -> ui::FrontendParts {
+    info!("Lastlight {}", build_info::stamp());
+    ui::FrontendParts::load(config, startup_settings)
 }
 
 fn asset_directory(config: &launch::LaunchConfig) -> std::path::PathBuf {
@@ -175,4 +185,69 @@ fn asset_directory(config: &launch::LaunchConfig) -> std::path::PathBuf {
         }
     }
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets"))
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::log::{tracing, tracing_subscriber};
+    use std::sync::{Arc, Mutex};
+
+    /// A `MakeWriter` that appends every log line to one shared buffer.
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn the_build_stamp_is_the_first_line_of_a_startup_log() {
+        let directory =
+            std::env::temp_dir().join(format!("lastlight-stamp-first-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        let config = crate::launch::LaunchConfig {
+            save_directory: directory.clone(),
+            ..Default::default()
+        };
+        let paths = crate::profile::ProfilePaths::from_config(&config);
+        std::fs::create_dir_all(paths.directory()).unwrap();
+        // A returning player: an existing campaign and an unreadable settings file.
+        horde_core::sim::Game::default()
+            .save(&paths.campaign())
+            .unwrap();
+        std::fs::write(paths.settings(), b"not json").unwrap();
+        let settings = crate::profile::read_settings(&paths.settings());
+        assert!(settings.warning.is_some(), "the settings read must warn");
+
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            drop(super::load_frontend(&config, settings));
+        });
+        let _ = std::fs::remove_dir_all(&directory);
+
+        let log = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        let lines: Vec<&str> = log.lines().collect();
+        let stamp = format!("Lastlight {}", crate::build_info::stamp());
+        assert!(
+            lines.first().is_some_and(|line| line.ends_with(&stamp)),
+            "the first log line must be {stamp:?}:
+{log}"
+        );
+        assert!(
+            lines.iter().any(|line| line.contains("load started")),
+            "the save load is logged after the stamp:
+{log}"
+        );
+    }
 }
