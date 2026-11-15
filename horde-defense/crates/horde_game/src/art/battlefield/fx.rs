@@ -48,10 +48,13 @@ const DOT_SEGMENTS: u32 = 8;
 
 /// How long after its tick an event can still be painted, in seconds: the
 /// single table the field view's event filter and the painters share. No
-/// painter draws an event older than this. No painter here draws the boss
-/// warning or the boss's arrival any more: their banner runs on the wall
-/// clock (`ui::battle::boss_banner`, W3-14), and the warning's 2.0 s is that
-/// banner's nominal time.
+/// painter draws an `FxView` older than this. The one exception is the
+/// scorch mark (W5-05): `BattleViewModel.scorch` derives it from Explosion
+/// events still in the log, up to `SCORCH_SECONDS` (3 s) old, past this
+/// table's 0.5 s, and `explosion::scorch` paints it. No painter here draws
+/// the boss warning or the boss's arrival any more: their banner runs on the
+/// wall clock (`ui::battle::boss_banner`, W3-14), and the warning's 2.0 s is
+/// that banner's nominal time.
 pub(crate) fn fx_lifetime(kind: EventKind) -> f32 {
     match kind {
         EventKind::BossWarning => 2.0,

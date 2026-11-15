@@ -1006,6 +1006,9 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         occluder: None,
     };
     // Both halves of the event painters: the world pass and the cue pass.
+    // `explosion::scorch` is left out on purpose: the scorch mark is the
+    // documented exception of `fx_lifetime` (W5-05), read from
+    // `view.scorch`, not `view.fx`, for `SCORCH_SECONDS`.
     let both = |view: &BattleViewModel| {
         painted(|p| {
             explosion::paint(p, projection, view, false, options.textures);
