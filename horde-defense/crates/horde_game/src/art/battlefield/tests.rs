@@ -1572,26 +1572,43 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
     // One body is critically wounded, so its CRIT callout is checked too.
     view.enemies[1].health = crate::battle_view::HealthView::Critical;
     let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
-    // Where `Painter::text` anchored each callout, in paint order: a CRIT
-    // above the body, then the name higher up; flagged for the name of the
-    // boss past the right edge in the middle lane.
+    // Where `Painter::text` anchored each callout, in paint order, with the
+    // y its plate stays over: a CRIT above the body, then the name higher up,
+    // over the bar or the CRIT (CF-3-11); flagged for the name of the boss
+    // past the right edge in the middle lane.
     let sy = arena.lane_height();
-    let anchors: Vec<(Pos2, Align2, bool)> =
-        view.enemies
-            .iter()
-            .flat_map(|e| {
-                let [x, y] = e.drawn();
-                let at = arena.world(x, y);
-                let crit = matches!(e.health, crate::battle_view::HealthView::Critical)
-                    .then_some((at + vec2(0.0, -sy * 0.44), Align2::CENTER_BOTTOM, false));
-                let right = e.lane == 8 && x > w;
-                let name = e
-                    .label
-                    .map(|_| (at + vec2(0.0, -sy * 0.7), Align2::CENTER_CENTER, right));
-                crit.into_iter().chain(name)
-            })
-            .collect();
+    let anchors: Vec<(Pos2, Align2, bool, f32)> = view
+        .enemies
+        .iter()
+        .flat_map(|e| {
+            let [x, y] = e.drawn();
+            let at = arena.world(x, y);
+            let crit = matches!(e.health, crate::battle_view::HealthView::Critical).then_some((
+                at + vec2(0.0, -sy * 0.44),
+                Align2::CENTER_BOTTOM,
+                false,
+                f32::INFINITY,
+            ));
+            let right = e.lane == 8 && x > w;
+            let name = e.label.map(|_| {
+                (
+                    at + vec2(0.0, -sy * 0.7),
+                    Align2::CENTER_CENTER,
+                    right,
+                    enemies::name_floor(e, at, sy),
+                )
+            });
+            crit.into_iter().chain(name)
+        })
+        .collect();
     let inner = clip.shrink(enemies::CALLOUT_MARGIN);
+    // A text laid out at `rect` lifted until its plate ends at `floor`.
+    let lifted = |rect: Rect, floor: f32| {
+        rect.translate(vec2(
+            0.0,
+            -(rect.bottom() + enemies::CALLOUT_PAD - floor).max(0.0),
+        ))
+    };
     for rejected in [false, true] {
         let textures = ArtTextures {
             enemy_art_rejected: rejected,
@@ -1632,8 +1649,8 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
         assert_eq!(labels.len(), anchors.len(), "one anchor per callout");
         let close = |a: f32, b: f32| (a - b).abs() < 0.01;
         let mut unmoved = 0;
-        for ((text, rect), &(at, align, _)) in labels.iter().zip(&anchors) {
-            let was = align.anchor_size(at, rect.size());
+        for ((text, rect), &(at, align, _, floor)) in labels.iter().zip(&anchors) {
+            let was = lifted(align.anchor_size(at, rect.size()), floor);
             assert!(
                 clip.contains_rect(*rect),
                 "rejected {rejected}: {text:?} at {rect:?} is cut by the clip {clip:?}"
@@ -1688,14 +1705,15 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
         );
         // The right-edge mid-lane boss: pulled in across only, to the margin.
         let edge = anchors.iter().position(|a| a.2).expect("the right boss");
-        let ((_, right), (at, ..)) = (&labels[edge], anchors[edge]);
+        let ((_, right), (at, align, _, floor)) = (&labels[edge], anchors[edge]);
+        let was = lifted(align.anchor_size(at, right.size()), floor);
         assert!(
             close(right.right(), inner.right()),
             "{right:?} vs {inner:?}"
         );
         assert!(
-            close(right.center().y, at.y),
-            "{right:?} moved down from {at:?}"
+            close(right.center().y, was.center().y),
+            "{right:?} moved down from {was:?}"
         );
     }
 }
@@ -2251,14 +2269,12 @@ fn boss_phase_label_and_name_never_overprint_in_the_top_lane() {
                 "{label}: over the name"
             );
             if lane == 8 {
-                // Mid-field: the name centred `0.7` lanes over the feet and
-                // the label's bottom `PHASE_LABEL_GAP` over that, as before.
+                // Mid-field: the name centred at least `0.7` lanes over the
+                // feet (higher where it would meet the boss bar, CF-3-11)
+                // and the label's bottom `PHASE_LABEL_GAP` over its centre.
+                assert!(name.center().y <= at.y - sy * 0.7 + 0.01, "{label}");
                 assert!(
-                    (name.center().y - (at.y - sy * 0.7)).abs() < 0.01,
-                    "{label}"
-                );
-                assert!(
-                    (phase.bottom() - (at.y - sy * 0.7 - enemies::PHASE_LABEL_GAP)).abs() < 0.01,
+                    (phase.bottom() - (name.center().y - enemies::PHASE_LABEL_GAP)).abs() < 0.01,
                     "{label}"
                 );
             }
@@ -2383,6 +2399,136 @@ fn hostile_callouts_paint_an_ink_backing_under_their_text() {
                 assert_eq!(
                     texts, 4,
                     "lane {lane}, reduced {reduced}, rejected {rejected}"
+                );
+            }
+        }
+    }
+}
+
+/// CF-3-11: at 1050x700@1.35 a 17-lane field has lanes about 18 pt high, so
+/// the boss name, centred 0.7 lanes over the feet at the 10 pt minimum cue
+/// font, put its INK plate over the amber boss bar 0.41 lanes over the feet:
+/// "SIEGE BRUTE" read as underlined or struck, mid-field and where the
+/// CF-1-11 clamp shifts the name left at the right field edge. The name
+/// plate (and a holding boss's phase plate over it) now clear the bar's halo,
+/// or a critically wounded boss's CRIT plate, with or without a phase, on the
+/// batched path and the rejected-art figures.
+#[test]
+fn the_boss_name_plate_clears_the_boss_bar_on_the_compact_17_lane_field() {
+    use crate::battle_view::{BossPhaseView, HealthView};
+    use horde_core::{balance::BalanceSettings, content::EnemyKind};
+    let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1050.0, 700.0) / 1.35);
+    let clip = Rect::from_min_max(
+        canvas.min + vec2(24.0, 124.0),
+        canvas.max - vec2(24.0, 84.0),
+    );
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings {
+            start_lanes: 17,
+            max_lanes: 17,
+            start_width: 30,
+            max_width: 30,
+            ..Default::default()
+        })
+        .unwrap();
+    game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+    for (lane, at_x) in [(8, 0.5), (8, 0.99), (12, 0.99), (3, 0.3)] {
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        a.enemies.clear();
+        game.spawn_enemy(&mut a, EnemyKind::Brute, lane, true);
+        let boss = a.enemies.last_mut().expect("a boss");
+        boss.x = a.width_yards * at_x;
+        let id = boss.id;
+        *game.attempt_slot_mut() = Some(a);
+        let a = game.attempt().unwrap();
+        for (holding, critical, rejected) in (0..8).map(|n| (n & 1 == 1, n & 2 == 2, n & 4 == 4)) {
+            let mut view = BattleViewModel::build(
+                a,
+                SceneAnimation::sample(a, false),
+                SceneBlend::NONE,
+                false,
+            );
+            if holding {
+                view.boss_phase = Some(BossPhaseView {
+                    boss_id: id,
+                    transition: 1,
+                    name: "Breach".into(),
+                    hold_left_ticks: 45,
+                });
+            }
+            if critical {
+                view.enemies[0].health = HealthView::Critical;
+            }
+            let name_text = view.enemies[0].label.expect("a boss name");
+            let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
+            let sy = arena.lane_height();
+            let [x, y] = view.enemies[0].drawn();
+            let at = arena.world(x, y);
+            let textures = ArtTextures {
+                enemy_art_rejected: rejected,
+                ..textures()
+            };
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, 1.35);
+            crate::visual_assets::publish_source_flash_masks(&ctx);
+            let input = egui::RawInput {
+                screen_rect: Some(canvas),
+                ..Default::default()
+            };
+            let mut output = ctx.run_ui(input, |ui| {
+                enemies::paint(
+                    &ui.painter().with_clip_rect(clip),
+                    arena,
+                    &view,
+                    textures,
+                    false,
+                    false,
+                    rig_shadow(),
+                );
+            });
+            output.textures_delta.clear();
+            let plate_of = |wanted: &str| -> Rect {
+                output
+                    .shapes
+                    .iter()
+                    .find_map(|clipped| match &clipped.shape {
+                        egui::Shape::Text(text) if text.galley.text() == wanted => Some(
+                            text.galley
+                                .rect
+                                .translate(text.pos.to_vec2())
+                                .expand(enemies::CALLOUT_PAD),
+                        ),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| panic!("no {wanted:?} drawn"))
+            };
+            // What the name stands over: the boss bar with its halo, or the
+            // CRIT callout's plate that replaces it.
+            let under = if critical {
+                plate_of("CRIT · FIGHTING")
+            } else {
+                Rect::from_center_size(
+                    at - vec2(0.0, sy * HEALTH_BAR_LIFT),
+                    vec2(sy * 1.1, cue::bar_height(sy)),
+                )
+                .expand(cue::HALO_BAR)
+            };
+            let name = plate_of(name_text);
+            let label = format!(
+                "lane {lane}, x {at_x}, holding {holding}, critical {critical}, rejected \
+                 {rejected}, sy {sy:.1}: the {name_text:?} plate {name:?} meets {under:?}"
+            );
+            assert!(clip.contains_rect(name), "{label}: outside the clip");
+            assert!(!name.intersects(under), "{label}");
+            assert!(name.bottom() <= under.top(), "{label}: not over it");
+            if holding {
+                let phase = view.boss_phase.as_ref().unwrap().label();
+                let phase = plate_of(&phase);
+                assert!(
+                    !phase.intersects(under),
+                    "{label}: the phase {phase:?} meets it"
                 );
             }
         }

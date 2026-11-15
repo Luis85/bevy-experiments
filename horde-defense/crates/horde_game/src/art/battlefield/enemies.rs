@@ -252,7 +252,7 @@ pub(super) fn cues(
                 if boss { AMBER } else { RED },
             ),
             HealthView::Critical => batch.label(Label::amber(
-                at + vec2(0.0, -sy * 0.44),
+                at + vec2(0.0, -sy * CRIT_LIFT),
                 Align2::CENTER_BOTTOM,
                 "CRIT · FIGHTING",
                 font * CRIT_FONT,
@@ -265,12 +265,15 @@ pub(super) fn cues(
         if let Some(label) = e.label
             && stacked != Some(e.id)
         {
-            batch.label(Label::amber(
-                name_anchor(at, sy),
-                Align2::CENTER_CENTER,
-                label,
-                font,
-            ));
+            batch.label_block_over(
+                vec![Label::amber(
+                    name_anchor(at, sy),
+                    Align2::CENTER_CENTER,
+                    label,
+                    font,
+                )],
+                name_floor(e, at, sy),
+            );
         }
     }
     if let Some((boss, phase)) = holding {
@@ -292,20 +295,54 @@ pub(super) fn cues(
             phase.label(),
             font,
         ));
-        batch.label_block(block);
+        batch.label_block_over(block, name_floor(boss, at, sy));
     }
 }
 
 /// The CRIT callout's size, as a fraction of the cue font.
-pub(super) const CRIT_FONT: f32 = 0.8;
+const CRIT_FONT: f32 = 0.8;
+
+/// How far over its feet, in lane heights, the bottom of a critically
+/// wounded hostile's CRIT callout sits.
+const CRIT_LIFT: f32 = 0.44;
 
 /// How far over its feet, in lane heights, a hostile's name callout is
 /// centred.
 const NAME_LIFT: f32 = 0.7;
 
-/// Where the name callout of a hostile drawn at `at` is centred.
+/// Where the name callout of a hostile drawn at `at` is centred, unless
+/// [`name_floor`] lifts it.
 fn name_anchor(at: Pos2, sy: f32) -> Pos2 {
     at + vec2(0.0, -sy * NAME_LIFT)
+}
+
+/// How far a hostile's name plate stays over the cue under it.
+const NAME_GAP: f32 = 2.0;
+
+/// How far over its feet, in points, the cue painted over the body of `e`
+/// on a field of lane height `sy` reaches with its backing: the CRIT
+/// callout's plate, or the health bar's halo (where a bar would be when
+/// none is painted).
+pub(super) fn over_body_cue_top(e: &EnemyView, sy: f32) -> f32 {
+    match e.health {
+        HealthView::Critical => {
+            // The callout sits bottom-aligned at 0.44 lanes; its text is at
+            // most 1.3 font sizes tall.
+            sy * CRIT_LIFT + cue::font(sy) * CRIT_FONT * 1.3 + cue::CALLOUT_PAD
+        }
+        HealthView::Bar { .. } | HealthView::Hidden => {
+            sy * HEALTH_BAR_LIFT + cue::bar_height(sy) * 0.5 + cue::HALO_BAR
+        }
+    }
+}
+
+/// The y the name block (a holding boss's name and phase) of `e` drawn at
+/// `at` keeps its plates at or above: [`NAME_GAP`] over the bar or CRIT
+/// callout under it. On a wide lane the name's centre at [`NAME_LIFT`]
+/// clears it already; on the compact 17-lane field (lanes about 18 pt at
+/// the 10 pt minimum font) the plate covered the boss bar (CF-3-11).
+pub(super) fn name_floor(e: &EnemyView, at: Pos2, sy: f32) -> f32 {
+    at.y - over_body_cue_top(e, sy) - NAME_GAP
 }
 
 #[cfg(test)]

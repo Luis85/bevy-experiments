@@ -109,8 +109,9 @@ pub(super) struct CueBatch {
     halo: MeshBuilder,
     fill: MeshBuilder,
     marker: MeshBuilder,
-    /// Labels that move as one block, painted in order.
-    labels: Vec<Vec<Label>>,
+    /// Labels that move as one block, painted in order, each with the y its
+    /// plates stay at or above ([`CueBatch::label_block_over`]).
+    labels: Vec<(Vec<Label>, f32)>,
     coins: Vec<Coin>,
     #[cfg(test)]
     pub(super) records: Vec<CueRecord>,
@@ -217,11 +218,20 @@ impl CueBatch {
     /// Labels that move as one block (a holding boss's name and phase), so
     /// clamped at the clip they keep their order and never overprint.
     pub(super) fn label_block(&mut self, block: Vec<Label>) {
+        self.label_block_over(block, f32::INFINITY);
+    }
+
+    /// [`Self::label_block`] whose plates stay at or above `floor`: a block
+    /// laid out lower moves up until its lowest plate ends there, so a
+    /// boss's name never overprints the bar or CRIT callout under it
+    /// (CF-3-11). The clip still wins: a block with no room above `floor`
+    /// inside the clip (a boss in the top lane) keeps a readable name.
+    pub(super) fn label_block_over(&mut self, block: Vec<Label>, floor: f32) {
         for label in &block {
             let color = label.color;
             self.record(CueKind::Label, color, CALLOUT_BACKING);
         }
-        self.labels.push(block);
+        self.labels.push((block, floor));
     }
 
     /// A banked-coin pop-up: amber on an eight-way INK outline.
@@ -245,8 +255,8 @@ impl CueBatch {
         self.halo.paint(p);
         self.fill.paint(p);
         self.marker.paint(p);
-        for block in self.labels {
-            callouts(p, block);
+        for (block, floor) in self.labels {
+            callouts(p, block, floor);
         }
         for coin in self.coins {
             coin_popup(p, coin.center, coin.coins, coin.alpha, coin.reduced);
@@ -255,13 +265,14 @@ impl CueBatch {
 }
 
 /// Labels that move as one block, painted in order: each laid out at its
-/// anchor, then the block (their union) moved the least that keeps it
-/// `CALLOUT_MARGIN` inside the painter's clip, so a boss at the field's edge
-/// or in its top lane keeps a readable name (CF-1-11). A block already
-/// inside paints exactly where `Painter::text` would. Each text sits on a
+/// anchor, the block (their union) lifted until its plates end at or above
+/// `floor` (CF-3-11), then moved the least that keeps it `CALLOUT_MARGIN`
+/// inside the painter's clip, so a boss at the field's edge or in its top
+/// lane keeps a readable name (CF-1-11). A block already inside and over
+/// `floor` paints exactly where `Painter::text` would. Each text sits on a
 /// `CALLOUT_BACKING` plate padded `CALLOUT_PAD` round it (CF-2-05; the same
 /// in reduced effects).
-fn callouts(p: &Painter, block: Vec<Label>) {
+fn callouts(p: &Painter, block: Vec<Label>, floor: f32) {
     let laid: Vec<(Rect, _, C)> = block
         .into_iter()
         .map(|label| {
@@ -277,9 +288,11 @@ fn callouts(p: &Painter, block: Vec<Label>) {
             )
         })
         .collect();
-    let bounds = laid
+    let laid_out = laid
         .iter()
         .fold(Rect::NOTHING, |bounds, (rect, ..)| bounds.union(*rect));
+    let lift = vec2(0.0, -(laid_out.bottom() + CALLOUT_PAD - floor).max(0.0));
+    let bounds = laid_out.translate(lift);
     let clip = p.clip_rect().shrink(CALLOUT_MARGIN);
     let min = pos2(
         bounds
@@ -295,11 +308,12 @@ fn callouts(p: &Painter, block: Vec<Label>) {
     );
     // Moved only when it would be cut: a block inside keeps its exact
     // position, so labels away from the edges paint where they are anchored.
-    let shift = if p.clip_rect().contains_rect(bounds) {
-        Vec2::ZERO
-    } else {
-        min - bounds.min
-    };
+    let shift = lift
+        + if p.clip_rect().contains_rect(bounds) {
+            Vec2::ZERO
+        } else {
+            min - bounds.min
+        };
     // Every plate first, so none covers a text of the block (CF-2-05).
     for (rect, ..) in &laid {
         p.rect_filled(

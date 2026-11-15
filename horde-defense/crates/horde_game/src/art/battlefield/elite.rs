@@ -8,9 +8,8 @@
 //! colour is secondary. The ring and the marker never move or pulse, so
 //! reduced effects draw the same cues.
 use super::cue::{self, CueBatch};
-use super::enemies::{CRIT_FONT, HEALTH_BAR_LIFT};
 use crate::{
-    battle_view::{BattleViewModel, EliteView, EnemyView, HealthView},
+    battle_view::{BattleViewModel, EliteView, EnemyView},
     visual_assets::enemy_visuals::TellMarker,
 };
 use bevy_egui::egui::{Color32 as C, Pos2, pos2, vec2};
@@ -107,16 +106,7 @@ pub(super) fn marker(batch: &mut CueBatch, e: &EnemyView, at: Pos2, sy: f32) {
 /// halo, or the CRIT callout's plate, by [`MARKER_GAP`].
 pub(super) fn marker_centre(e: &EnemyView, at: Pos2, sy: f32) -> Pos2 {
     let half = marker_half(sy);
-    let top = match e.health {
-        HealthView::Critical => {
-            // The callout sits bottom-aligned at 0.44 lanes; its text is at
-            // most 1.3 font sizes tall.
-            sy * 0.44 + cue::font(sy) * CRIT_FONT * 1.3 + cue::CALLOUT_PAD
-        }
-        HealthView::Bar { .. } | HealthView::Hidden => {
-            sy * HEALTH_BAR_LIFT + cue::bar_height(sy) * 0.5 + cue::HALO_BAR
-        }
-    };
+    let top = super::enemies::over_body_cue_top(e, sy);
     // A marker triangle's backing reaches twice the halo past its corners.
     at - vec2(0.0, top + MARKER_GAP + cue::HALO_MARKER * 2.0 + half)
 }
