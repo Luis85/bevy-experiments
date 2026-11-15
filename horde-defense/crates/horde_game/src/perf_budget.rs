@@ -481,9 +481,12 @@ mod tests {
         const ADAPTER: &str = "Intel(R) Arc(TM) Pro Graphics";
         assert_eq!(gpu["adapter"], ADAPTER);
         let command = format!("measure_performance.ps1 -Adapter \"{ADAPTER}\"");
+        // The human-check rows themselves, by their first cell: the G1.14
+        // row above ACCEPTANCE.md's human checks also names the run.
+        const ROW: &str = "| Integrated-GPU run |";
         let plan_row = PLAN
             .lines()
-            .find(|line| line.starts_with('|') && line.contains("Integrated-GPU run"))
+            .find(|line| line.starts_with(ROW))
             .expect("the plan's human checks have an Integrated-GPU run row");
         assert!(
             plan_row.contains(&command),
@@ -494,7 +497,7 @@ mod tests {
                 assert_eq!(gpu["report"], Value::Null, "a pending run has no report");
                 let row = ACCEPTANCE
                     .lines()
-                    .find(|line| line.starts_with('|') && line.contains("Integrated-GPU run"))
+                    .find(|line| line.starts_with(ROW))
                     .expect("docs/ACCEPTANCE.md has an Integrated-GPU run human-check row");
                 assert!(
                     row.contains("pending human check") && row.contains(&command),
