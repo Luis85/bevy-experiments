@@ -376,6 +376,7 @@ mod tests {
                 "hud_rows",
                 "lanes",
                 "lighting",
+                "low_hp",
                 "music",
                 "observer_arena_rect",
                 "overlays",
@@ -397,6 +398,7 @@ mod tests {
             serde_json::json!([24.0, 124.0, 1416.0, 816.0])
         );
         assert!(object["hud_rows"].is_null());
+        assert!(object["low_hp"].is_null());
         assert!(object["tab"].is_null());
         assert_eq!(object["overlays"], serde_json::json!([]));
         assert_eq!(

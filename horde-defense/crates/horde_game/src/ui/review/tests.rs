@@ -1570,6 +1570,37 @@ fn review_frame_facts_report_the_boss_banner() {
     }
 }
 
+/// The capture sidecar reports whether the battle frame drew the low-HP band
+/// (`BattleUi::low_hp`, UX-12), on the battle screen only, so a capture
+/// review can assert the band on the low-hp stills and its absence elsewhere.
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_report_the_low_hp_band() {
+    let facts = |f: &FrontendParts, screen: Screen| {
+        ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            Some(&f.status),
+            screen,
+            f.nav.tab,
+            &f.battle,
+        )
+    };
+    for (scene, low) in [
+        ("low-hp", true),
+        ("low-hp-observed", true),
+        ("battle", false),
+    ] {
+        let mut f = staged(scene);
+        one_frame(&mut f);
+        assert_eq!(facts(&f, f.screen).low_hp, Some(low), "{scene}");
+        for screen in [Screen::Results, Screen::Camp] {
+            assert_eq!(facts(&f, screen).low_hp, None, "{scene} on {screen:?}");
+        }
+    }
+}
+
 /// The boss-warning motion export holds the tick before the warning through
 /// the warm-up and resumes one native frame before frame-0000 (as the
 /// boss-phase export does), so frame-0000 draws the warning tick, where the

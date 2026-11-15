@@ -148,7 +148,8 @@ pub(crate) fn schedule_motion_release(
 /// battle frame recorded (`BattleUi::arena_rect` / `effects_rect`), the
 /// worker observer's from `observer_arena_rect`; nothing is re-measured here.
 /// `hud_rows` is the control bar's rows as the battle frame counted them
-/// (`BattleUi::bar_rows`, C-10), reported on the battle screen only.
+/// (`BattleUi::bar_rows`, C-10) and `low_hp` whether it drew the low-HP band
+/// (`BattleUi::low_hp`, UX-12), both reported on the battle screen only.
 /// The review tools fill `canvas_rect` and `windows_scale` from the window
 /// and `music` from the music director, and own all of the IO.
 #[cfg(feature = "review")]
@@ -165,6 +166,7 @@ pub(crate) struct ReviewFrameFacts {
     pub(crate) lanes: Option<u8>,
     pub(crate) width_yards: Option<f32>,
     pub(crate) hud_rows: Option<u8>,
+    pub(crate) low_hp: Option<bool>,
     /// The W3-14 boss banner as the battle frame painted it
     /// (`BattleUi::boss_banner_rect`), on the battle screen only; None while
     /// no banner shows.
@@ -225,6 +227,7 @@ impl ReviewFrameFacts {
             lanes: attempt.map(|a| a.lane_count),
             width_yards: attempt.map(|a| a.width_yards),
             hud_rows: in_battle.then_some(battle.bar_rows),
+            low_hp: in_battle.then_some(battle.low_hp),
             boss_banner_rect: battle.boss_banner_rect.filter(|_| in_battle).map(corners),
             lighting: attempt
                 .map(|a| format!("{:?}", crate::art::scene_look(a).lighting).to_lowercase()),
