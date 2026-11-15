@@ -275,12 +275,7 @@ fn light_pools_paint_after_the_grade_and_under_the_vignette() {
     let canvas = arena().expand(24.0);
     let shapes = frame(&game, Lighting::Night, false);
     let night = lighting::grade(Lighting::Night);
-    let fill = C::from_rgba_unmultiplied(
-        night.tint[0],
-        night.tint[1],
-        night.tint[2],
-        (night.alpha * 255.0).round() as u8,
-    );
+    let fill = lighting::over(night.tint, night.alpha);
     let grade = shapes
         .iter()
         .position(|s| matches!(&s.shape, Shape::Rect(r) if r.fill == fill))

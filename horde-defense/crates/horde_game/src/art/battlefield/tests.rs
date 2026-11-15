@@ -2569,12 +2569,7 @@ fn cue_pass_paints_after_the_grade_and_the_vignette() {
     let a = game.attempt().unwrap();
     let canvas = arena().expand(24.0);
     let night = lighting::grade(Lighting::Night);
-    let night_fill = egui::Color32::from_rgba_unmultiplied(
-        night.tint[0],
-        night.tint[1],
-        night.tint[2],
-        (night.alpha * 255.0).round() as u8,
-    );
+    let night_fill = lighting::over(night.tint, night.alpha);
     let pass = |scene: SceneLook, reduced: bool| {
         let ctx = egui::Context::default();
         let mut output = ctx.run_ui(Default::default(), |ui| {
@@ -2682,12 +2677,9 @@ fn sky_flash_paints_under_cue_pass() {
         speed: 1,
         frozen: false,
     };
-    let rgba = |rgb: [u8; 3], alpha: f32| {
-        egui::Color32::from_rgba_unmultiplied(rgb[0], rgb[1], rgb[2], (alpha * 255.0).round() as u8)
-    };
     let storm = lighting::grade(Lighting::Storm);
-    let grade_fill = rgba(storm.tint, storm.alpha);
-    let flash_fill = rgba(lighting::SKY_RGB, lighting::SKY_PEAK_ALPHA);
+    let grade_fill = lighting::over(storm.tint, storm.alpha);
+    let flash_fill = lighting::over(lighting::SKY_RGB, lighting::SKY_PEAK_ALPHA);
     let pass = |a: &horde_core::sim::Attempt, reduced: bool| {
         let ctx = egui::Context::default();
         let mut output = ctx.run_ui(Default::default(), |ui| {

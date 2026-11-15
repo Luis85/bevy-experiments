@@ -325,13 +325,20 @@ pub fn sky_pulse(look: SceneLook, clock: SkyClock, a: &Attempt, reduced: bool) -
     )
 }
 
-fn over(rgb: [u8; 3], alpha: f32) -> C {
-    C::from_rgba_unmultiplied(
-        rgb[0],
-        rgb[1],
-        rgb[2],
-        (alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
-    )
+/// The fill of an over-rect of `rgb` at `alpha` that composites as the
+/// straight linear-space blend `alpha * lin(rgb) + (1 - alpha) * ground`
+/// (design §3, §12; CF-3-21). bevy_egui decodes a vertex colour from sRGB to
+/// linear in its fragment shader and blends it premultiplied on the sRGB
+/// target, so the fill is the sRGB encoding of the linear premultiplied tint.
+/// An unmultiplied sRGB fill was premultiplied in gamma space instead and so
+/// decoded to nearly black: each rect only darkened by its alpha, whatever
+/// its tint.
+pub(crate) fn over(rgb: [u8; 3], alpha: f32) -> C {
+    use bevy_egui::egui::ecolor::{gamma_u8_from_linear_f32, linear_f32_from_gamma_u8};
+    let alpha = (alpha.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let share = f32::from(alpha) / 255.0;
+    let [r, g, b] = rgb.map(|v| gamma_u8_from_linear_f32(share * linear_f32_from_gamma_u8(v)));
+    C::from_rgba_premultiplied(r, g, b, alpha)
 }
 
 /// The alpha of the sky-flash over-rect at pulse intensity `sky` (0..=1).
@@ -393,18 +400,54 @@ mod tests {
     use super::*;
     use bevy_egui::egui::{pos2, vec2};
 
-    /// How an over-rect is composited: on the encoded sRGB values or on the
-    /// decoded linear ones. The blend space of bevy_egui is unverified
-    /// (design §3), so every luminance gate holds under both.
+    /// How an over-rect is composited: on the encoded sRGB values, on the
+    /// decoded linear ones, or as bevy_egui 0.43 really does it (`Egui`).
+    /// Every luminance gate holds under all three.
     #[derive(Clone, Copy, Debug)]
     enum Blend {
         Gamma,
         Linear,
+        /// The real pipeline (CF-3-21): the painted shape's premultiplied
+        /// sRGB vertex colour is decoded to linear in the fragment shader
+        /// (`egui.wesl`, `linear_from_gamma_rgb`) and blended premultiplied
+        /// (`PREMULTIPLIED_ALPHA_BLENDING`) in linear space on the sRGB
+        /// target: `out = lin(colour) + lin(ground) * (1 - alpha)`.
+        Egui,
+    }
+
+    /// The fill the grade pass paints for `g`: its over-rect's colour.
+    fn painted_fill(g: Grade) -> C {
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(16.0, 16.0));
+        match grade_shapes(canvas, g, 0.0).first() {
+            Some(Shape::Rect(rect)) => rect.fill,
+            None => C::TRANSPARENT,
+            Some(other) => panic!("the grade pass paints rects only: {other:?}"),
+        }
+    }
+
+    /// The linear RGB of `ground` under the painted over-rect of `g`, through
+    /// the real egui pipeline ([`Blend::Egui`]).
+    fn egui_composite(ground: [u8; 3], g: Grade) -> [f32; 3] {
+        egui_over(ground.map(srgb_decode), g)
+    }
+
+    /// [`egui_composite`] over a ground given in linear RGB.
+    fn egui_over(ground: [f32; 3], g: Grade) -> [f32; 3] {
+        let fill = painted_fill(g);
+        let alpha = f32::from(fill.a()) / 255.0;
+        let colour = [fill.r(), fill.g(), fill.b()].map(srgb_decode);
+        [0, 1, 2].map(|n| colour[n] + ground[n] * (1.0 - alpha))
+    }
+
+    /// Relative luminance of a linear RGB colour.
+    fn linear_luminance([r, g, b]: [f32; 3]) -> f32 {
+        0.2126 * r + 0.7152 * g + 0.0722 * b
     }
 
     /// Relative luminance of `ground` under grade `g`.
     fn graded_luminance(ground: [u8; 3], g: Grade, blend: Blend) -> f32 {
         match blend {
+            Blend::Egui => linear_luminance(egui_composite(ground, g)),
             Blend::Gamma => {
                 let mixed = [0, 1, 2].map(|n| {
                     (f32::from(g.tint[n]) * g.alpha + f32::from(ground[n]) * (1.0 - g.alpha))
@@ -436,12 +479,50 @@ mod tests {
         grounds
     }
 
+    /// CF-3-21: every over-rect the grade pass paints (each grade, and the
+    /// sky flash at its peak) composites, through the real egui pipeline,
+    /// as the straight linear-space blend of its tint at its alpha (design
+    /// §3, §12: the analytic model the captures are checked against), within
+    /// 0.002 per linear channel on every ground. Before, the unmultiplied
+    /// sRGB fill was premultiplied in gamma space and decoded to linear, so
+    /// each rect darkened by its alpha whatever its tint: the Dawn tint
+    /// vanished and the night/dawn ratio measured 0.686 against 0.45.
+    #[test]
+    fn grade_over_rects_composite_as_their_tint_through_the_egui_pipeline() {
+        let sky = Grade {
+            tint: SKY_RGB,
+            alpha: sky_alpha(1.0),
+            light_gain: 0.0,
+        };
+        let rects = Lighting::ALL.map(grade).into_iter().chain([sky]);
+        for g in rects.filter(|g| g.alpha > 0.0) {
+            let tint = g.tint.map(srgb_decode);
+            // The alpha a vertex colour carries: the table's, to 1/255.
+            let alpha = (g.alpha * 255.0).round() / 255.0;
+            for ground in grounds().into_iter().chain([[0; 3], [255; 3]]) {
+                let painted = egui_composite(ground, g);
+                let intended =
+                    [0, 1, 2].map(|n| tint[n] * alpha + srgb_decode(ground[n]) * (1.0 - alpha));
+                for n in 0..3 {
+                    assert!(
+                        (painted[n] - intended[n]).abs() <= 0.002,
+                        "{g:?} over {ground:?}: channel {n} composites to {:.4}, \
+                         the linear blend of the tint is {:.4}",
+                        painted[n],
+                        intended[n]
+                    );
+                }
+            }
+        }
+    }
+
     /// G7.2: a night stage's ground is at most 0.70 of the same ground at
-    /// dawn, under gamma-space and linear-space blending alike.
+    /// dawn, under gamma-space and linear-space blending and through the
+    /// real egui pipeline.
     #[test]
     fn night_grade_at_most_0_70_of_dawn_under_gamma_and_linear_blending() {
         for ground in grounds() {
-            for blend in [Blend::Gamma, Blend::Linear] {
+            for blend in [Blend::Gamma, Blend::Linear, Blend::Egui] {
                 let night = graded_luminance(ground, grade(Lighting::Night), blend);
                 let dawn = graded_luminance(ground, grade(Lighting::Dawn), blend);
                 assert!(
@@ -460,7 +541,7 @@ mod tests {
         let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1440.0, 900.0));
         assert!(grade_shapes(canvas, grade(Lighting::Neutral), 0.0).is_empty());
         for ground in grounds() {
-            for blend in [Blend::Gamma, Blend::Linear] {
+            for blend in [Blend::Gamma, Blend::Linear, Blend::Egui] {
                 let order = [
                     Lighting::Dawn,
                     Lighting::Sunset,
@@ -611,18 +692,14 @@ mod tests {
             assert_eq!((g, sky), (storm, 0.0), "reduced, pulse {pulse}");
             let shapes = grade_shapes(canvas, g, sky);
             assert_eq!(shapes.len(), 1, "reduced, pulse {pulse}: one static rect");
-            assert_eq!(
-                fill(&shapes[0]),
-                (canvas, C::from_rgba_unmultiplied(22, 30, 44, 66))
-            );
+            assert_eq!(fill(&shapes[0]), (canvas, over([22, 30, 44], 66.0 / 255.0)));
+            assert_eq!(fill(&shapes[0]).1.a(), 66, "the 0.26 Storm alpha");
         }
         let (g, sky) = scene_grade(look, false, 1.0);
         let shapes = grade_shapes(canvas, g, sky);
         assert_eq!(shapes.len(), 2, "normal effects flash over the grade");
-        assert_eq!(
-            fill(&shapes[1]),
-            (canvas, C::from_rgba_unmultiplied(200, 214, 235, 36))
-        );
+        assert_eq!(fill(&shapes[1]), (canvas, over(SKY_RGB, 36.0 / 255.0)));
+        assert_eq!(fill(&shapes[1]).1.a(), 36, "the 0.14 peak alpha");
         let calm = SceneLook::of(1, Some(&theme("suburb", "mist", "dawn")));
         assert_eq!(scene_grade(calm, false, 1.0).1, 0.0);
         assert_eq!(scene_grade(SceneLook::neutral(0), false, 1.0).1, 0.0);
@@ -717,8 +794,9 @@ mod tests {
     }
 
     /// G7.3: the flash at its peak raises the mean luminance of any graded
-    /// ground by less than 0.2, under gamma-space and linear-space blending,
-    /// and the pulse itself rises over 33 ms and decays over 233 ms.
+    /// ground by less than 0.2, under gamma-space and linear-space blending
+    /// and through the real egui pipeline, and the pulse itself rises over
+    /// 33 ms and decays over 233 ms.
     #[test]
     fn sky_flash_peak_delta_below_0_2_under_gamma_and_linear_blending() {
         let flash = |ms| sky_flash(7, ms, SkyQuiet::default(), false, false, true);
@@ -744,9 +822,16 @@ mod tests {
         let mut worst = 0.0_f32;
         for ground in grounds().into_iter().chain([[255; 3], [0; 3]]) {
             for l in Lighting::ALL {
-                for blend in [Blend::Gamma, Blend::Linear] {
+                for blend in [Blend::Gamma, Blend::Linear, Blend::Egui] {
                     let g = grade(l);
                     let (dark, lit) = match blend {
+                        Blend::Egui => {
+                            let graded = egui_composite(ground, g);
+                            (
+                                linear_luminance(graded),
+                                linear_luminance(egui_over(graded, sky)),
+                            )
+                        }
                         Blend::Gamma => {
                             let graded = [0, 1, 2].map(|n| {
                                 (f32::from(g.tint[n]) * g.alpha
