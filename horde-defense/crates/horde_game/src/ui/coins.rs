@@ -1,18 +1,10 @@
 //! Coin amounts as every screen prints them: the digits grouped by
-//! thousands, so a price, a wallet, a reward and a sale read alike.
+//! thousands, so a price, a wallet, a reward and a sale read alike. The one
+//! table is core's (`horde_core::coins::grouped`), so the reasons and
+//! requirement rows core writes group the same way.
 
 /// 1077 as "1,077".
-pub(super) fn grouped(amount: u64) -> String {
-    let digits = amount.to_string();
-    let mut text = String::with_capacity(digits.len() + digits.len() / 3);
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            text.push(',');
-        }
-        text.push(digit);
-    }
-    text
-}
+pub(super) use horde_core::coins::grouped;
 
 #[cfg(test)]
 mod tests {

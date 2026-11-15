@@ -1,6 +1,7 @@
 pub mod balance;
 pub mod campaign;
 pub mod catalog;
+pub mod coins;
 pub mod command;
 pub mod content;
 pub mod defenders;

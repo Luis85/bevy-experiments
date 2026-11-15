@@ -320,7 +320,7 @@ impl StrategyState {
             .ok_or("Unknown recruitment country")?;
         let price = campaign.recruit_price();
         if campaign.coins < price {
-            return Err(format!("Recruitment requires {price} coins"));
+            return Err(crate::defenders::recruitment_requires(price));
         }
         let next_id = self
             .next_recruit_id

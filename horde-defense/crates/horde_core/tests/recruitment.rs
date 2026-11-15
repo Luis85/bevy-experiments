@@ -272,7 +272,14 @@ fn recruit_offer_names_the_missing_recruitment_node() {
     assert_eq!(game.recruit_offer(&country), Err(needs.clone()));
     let label = needs.label();
     assert!(label.contains(&node.name), "{label}");
-    assert!(label.contains(&node.price.to_string()), "{label}");
+    // The price reads grouped by thousands, like every price on screen.
+    assert!(
+        label.contains(&format!(
+            "({} coins)",
+            horde_core::coins::grouped(node.price)
+        )),
+        "{label}"
+    );
     let before = snapshot(&game);
     for command in [
         Command::Recruit(country.clone()),

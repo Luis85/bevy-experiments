@@ -111,6 +111,35 @@ fn a_locked_selection_shows_the_core_reason_under_a_disabled_learn_button() {
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
 
+/// Closing: core's coin text is grouped like the prices beside it. On the
+/// Survivor network detail with 300 coins, the reason under "Learn skill ·
+/// 1,500 coins" and the Requirements row both read "1,500"-style amounts.
+#[test]
+fn core_coin_text_on_a_skill_detail_is_grouped_by_thousands() {
+    let mut fixture = upgrade_home();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    let c = f.game.campaign_mut();
+    c.legacy_features = false;
+    c.skill_nodes.insert("companion_contact".into());
+    c.world.cleared.push("FRA".into());
+    c.coins = 300;
+    assert_eq!(
+        c.node_payment("recruitment_network").unwrap(),
+        NodePayment::Coins(1_500)
+    );
+    f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
+        "recruitment_network".into(),
+    ));
+    h.frame(f, View::Upgrades, vec![]);
+    let output = h.frame(f, View::Upgrades, vec![]);
+    assert_eq!(selected(&h), "recruitment_network");
+    assert_eq!(text_count(&output, "Learn skill · 1,500 coins"), 1);
+    for line in ["Need 1,200 more coins", "1,500 coins (have 300)"] {
+        assert_eq!(text_count(&output, line), 1, "{line}");
+    }
+}
+
 #[test]
 fn search_selects_a_match_and_dims_everything_else() {
     let mut fixture = upgrade_home();

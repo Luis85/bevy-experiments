@@ -6,7 +6,7 @@ use crate::command::CommandError;
 impl Campaign {
     pub(super) fn spend(&mut self, price: u64) -> Result<(), String> {
         if self.coins < price {
-            return Err(format!("Need {} more coins", price - self.coins));
+            return Err(crate::coins::need_more(price - self.coins));
         }
         self.coins -= price;
         Ok(())
@@ -43,7 +43,7 @@ impl Campaign {
         }
         let price = self.buy_price(definition)?;
         if self.coins < price {
-            return Err(format!("Need {} more coins", price - self.coins));
+            return Err(crate::coins::need_more(price - self.coins));
         }
         let id = self.add_item_at_level(definition, self.shop_item_level())?;
         self.coins -= price;

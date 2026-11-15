@@ -298,7 +298,8 @@ impl fmt::Display for CommandError {
                 let unit = if *coins == 1 { "coin" } else { "coins" };
                 write!(
                     f,
-                    "The stash changed: auto-sell would now sell {count} {items} for {coins} {unit}"
+                    "The stash changed: auto-sell would now sell {count} {items} for {} {unit}",
+                    crate::coins::grouped(*coins)
                 )
             }
             Self::StartNotChosen => f.write_str("Choose a starting country first"),
@@ -1079,6 +1080,14 @@ mod tests {
         assert_eq!(
             several.to_string(),
             "The stash changed: auto-sell would now sell 2 items for 5 coins"
+        );
+        let many = CommandError::SaleQuoteChanged {
+            count: 40,
+            coins: 2_035,
+        };
+        assert_eq!(
+            many.to_string(),
+            "The stash changed: auto-sell would now sell 40 items for 2,035 coins"
         );
     }
 }

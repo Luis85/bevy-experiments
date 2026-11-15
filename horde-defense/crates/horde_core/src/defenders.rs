@@ -263,16 +263,27 @@ impl RecruitBlocker {
     pub fn label(&self) -> String {
         match self {
             Self::NeedsNode { name, price, .. } => {
-                format!("Unlock {name} ({price} coins) to recruit survivors")
+                format!(
+                    "Unlock {name} ({} coins) to recruit survivors",
+                    crate::coins::grouped(*price)
+                )
             }
             Self::NotLiberated => "Recruit in a fully liberated country".into(),
             Self::RosterFull => "Survivor roster is full".into(),
             Self::DefenseInProgress => {
                 "Return the active defender to camp before recruiting".into()
             }
-            Self::NeedCoins(price) => format!("Recruitment requires {price} coins"),
+            Self::NeedCoins(price) => recruitment_requires(*price),
         }
     }
+}
+/// "Recruitment requires 1,500 coins": the recruit price the camp cannot
+/// pay, read by [`RecruitBlocker::NeedCoins`] and the recruit preflight.
+pub(crate) fn recruitment_requires(price: u64) -> String {
+    format!(
+        "Recruitment requires {} coins",
+        crate::coins::grouped(price)
+    )
 }
 impl std::fmt::Display for RecruitBlocker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

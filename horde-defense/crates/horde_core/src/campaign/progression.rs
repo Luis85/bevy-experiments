@@ -785,7 +785,7 @@ impl Campaign {
         if let NodePayment::Coins(price) = self.node_payment(id)?
             && self.coins < price
         {
-            return Err(format!("Need {} more coins", price - self.coins));
+            return Err(crate::coins::need_more(price - self.coins));
         }
         Ok(())
     }

@@ -299,7 +299,7 @@ mod tests {
             c.node_status(&open.id),
             NodeStatus::Blocked {
                 payment: Some(NodePayment::Coins(open.price)),
-                reason: format!("Need {} more coins", open.price - c.coins),
+                reason: crate::coins::need_more(open.price - c.coins),
             }
         );
         c.coins = open.price;

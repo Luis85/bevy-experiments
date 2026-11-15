@@ -72,7 +72,7 @@ pub struct Requirement {
     pub kind: RequirementKind,
     /// Sentence case, no trailing period, for example "Learn Steady hands",
     /// "Win 3 defenses (1 / 3)", "Liberate 2 countries (0 / 2)" or
-    /// "40 coins (have 25)".
+    /// "1,500 coins (have 300)" (amounts grouped by `coins::grouped`).
     pub label: String,
     pub met: bool,
 }
@@ -481,7 +481,11 @@ impl Campaign {
             match self.node_payment(id) {
                 Ok(NodePayment::Coins(price)) => rows.push(Requirement {
                     kind: RequirementKind::Coins,
-                    label: format!("{price} coins (have {})", self.coins),
+                    label: format!(
+                        "{} coins (have {})",
+                        crate::coins::grouped(price),
+                        crate::coins::grouped(self.coins)
+                    ),
                     met: self.coins >= price,
                 }),
                 Ok(NodePayment::LegacyBodyPoints(points)) => rows.push(Requirement {
@@ -1134,7 +1138,10 @@ mod tests {
             [
                 ("Learn Steady hands".to_owned(), false),
                 (
-                    format!("{} coins (have 25)", price("shotgun_training")),
+                    format!(
+                        "{} coins (have 25)",
+                        crate::coins::grouped(price("shotgun_training"))
+                    ),
                     false
                 )
             ]
@@ -1145,11 +1152,26 @@ mod tests {
                 ("Learn Field fitness".to_owned(), false),
                 ("Liberate 1 country (0 / 1)".to_owned(), false),
                 (
-                    format!("{} coins (have 25)", price("companion_contact")),
+                    format!(
+                        "{} coins (have 25)",
+                        crate::coins::grouped(price("companion_contact"))
+                    ),
                     false
                 )
             ]
         );
+        // Both amounts group by thousands, like every price on screen.
+        c.coins = 1_234;
+        let network = labels(&c, "recruitment_network");
+        assert_eq!(
+            network.last().unwrap().0,
+            format!(
+                "{} coins (have 1,234)",
+                crate::coins::grouped(price("recruitment_network"))
+            )
+        );
+        assert!(price("recruitment_network") >= 1_000, "a grouped price");
+        c.coins = 25;
         assert_eq!(
             labels(&c, "parallel_command")[1],
             ("Liberate 2 countries (0 / 2)".to_owned(), false)
