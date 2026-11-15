@@ -70,10 +70,11 @@ pub(super) fn results_cues(
         })
         .collect()
 }
-/// Sounds the Results screen. The guard is presentation-local: it is not
-/// saved, and it reads the report without changing anything.
+/// Sounds the Results screen. The guard (`BattleUi::results_audio`) is
+/// presentation-local: it is not saved, and it reads the report without
+/// changing anything.
 pub(super) fn results_audio(
-    mut guard: Local<ResultsAudioGuard>,
+    mut battle: ResMut<BattleUi>,
     screen: Res<State<Screen>>,
     session: Res<GameSession>,
     time: Option<Res<Time<Real>>>,
@@ -84,7 +85,7 @@ pub(super) fn results_audio(
     };
     let now_ms = time.elapsed().as_millis() as u64;
     cues.write_batch(results_cues(
-        &mut guard,
+        &mut battle.results_audio,
         *screen.get(),
         &session.game,
         now_ms,
@@ -365,6 +366,7 @@ impl UiCtx<'_> {
                 self.armory.selected_item = None;
                 self.armory.pending_sale = None;
                 self.battle.clear_boss_banners();
+                self.battle.results_audio = ResultsAudioGuard::default();
                 if let Some(a) = self.game.attempt() {
                     self.battle.aim = [a.width_yards * 0.5, a.defender_position()[1]];
                     self.campaign.mode = a.mode;
@@ -459,6 +461,8 @@ impl UiCtx<'_> {
                 self.battle.loot_feedback = loot::Feedback::default();
                 self.battle.damage_feedback = damage::Feedback::default();
                 self.battle.clear_boss_banners();
+                // Attempt ids start over: the first Results sounds again.
+                self.battle.results_audio = ResultsAudioGuard::default();
                 self.campaign.observed = None;
                 self.status.profile_exists = true;
                 self.battle.fire_latched = false;

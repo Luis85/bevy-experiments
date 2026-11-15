@@ -47,6 +47,69 @@ fn results_screen_reveals_the_loot_once_and_plays_one_coin_batch_for_fifty_sales
     assert!(frames(&mut guard, 5016).is_empty());
 }
 
+/// Attempt ids restart at 1 in a new journey: the new journey's first
+/// Results still reveals its loot and plays its coin batch, as the guard the
+/// Results system keeps is cleared with the other per-journey presentation.
+#[test]
+fn a_new_journey_results_on_the_same_attempt_id_sounds_again() {
+    let mut fixture = after_a_run();
+    let f = &mut fixture.frontend;
+    let give_loot = |game: &mut Game| {
+        let report = game.last_result_mut().as_mut().unwrap();
+        report.loot_by_quality = KindMap::from_fn(|quality| match quality {
+            Quality::Rare => 1,
+            _ => 0,
+        });
+        report.auto_sold.count = 3;
+        report.attempt_id
+    };
+    let heard = |f: &mut FrontendParts, from_ms: u64| -> Vec<Cue> {
+        (0..60)
+            .flat_map(|frame| {
+                notices::results_cues(
+                    &mut f.battle.results_audio,
+                    Screen::Results,
+                    &f.game,
+                    from_ms + frame * 16,
+                )
+            })
+            .map(|request| request.cue)
+            .collect()
+    };
+    // The edited report would not save: the old journey keeps its own when
+    // New game archives it.
+    let saved = f.game.last_result().cloned();
+    let old_attempt = give_loot(&mut f.game);
+    f.screen = Screen::Results;
+    assert_eq!(
+        heard(f, 1000),
+        vec![Cue::LootReveal, Cue::CoinBatch],
+        "the old journey"
+    );
+    *f.game.last_result_mut() = saved;
+    // New game, and the new journey's first defense ends.
+    f.screen = Screen::Menu;
+    f.act(|c| c.dispatch(AppCommand::NewJourney, ""));
+    f.flush_for_test();
+    assert!(!f.status.message_error, "{}", f.status.message);
+    assert!(
+        f.game.last_result().is_none(),
+        "the new journey has no report"
+    );
+    assert!(notices::results_cues(&mut f.battle.results_audio, f.screen, &f.game, 3000).is_empty());
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.deploy_country_stage(0, Mode::Personal).unwrap();
+    f.game.apply(&Command::Withdraw).unwrap();
+    assert_eq!(give_loot(&mut f.game), old_attempt, "the same attempt id");
+    f.screen = Screen::Results;
+    assert_eq!(
+        heard(f, 5000),
+        vec![Cue::LootReveal, Cue::CoinBatch],
+        "the new journey"
+    );
+    f.runtime.finish_storage_for_test();
+}
+
 /// The battle's loot fly-up draws a Legendary drop and plays nothing: the
 /// runner's tracker owns the sound.
 #[test]

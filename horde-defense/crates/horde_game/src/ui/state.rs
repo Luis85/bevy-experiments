@@ -193,6 +193,11 @@ pub(crate) struct BattleUi {
     /// The same for the worker observer window, keyed by the observed
     /// expedition's battle id.
     pub(super) observer_boss_banner: Option<super::battle::BossBanner>,
+    /// Which report the Results screen last sounded, and its loot reveal and
+    /// coin batch still due (presentation only; `notices::results_audio`,
+    /// A6-14). It is keyed by attempt id, and attempt ids start over in a new
+    /// journey, so a new or reloaded journey clears it.
+    pub(super) results_audio: horde_audio::loot::ResultsAudioGuard,
     /// Where the main battle painted its boss banner in the last drawn
     /// battle frame, `None` when it painted none (presentation only).
     pub(super) boss_banner_rect: Option<Rect>,
@@ -252,6 +257,7 @@ impl BattleUi {
             retreat_hold_frame: u64::MAX,
             boss_banner: None,
             observer_boss_banner: None,
+            results_audio: horde_audio::loot::ResultsAudioGuard::default(),
             boss_banner_rect: None,
             pause_banner_rect: None,
             low_hp: false,
