@@ -208,6 +208,7 @@ impl Source for PannedDecoder {
 fn bus_gain(sliders: Sliders, cue: SoundCue) -> f32 {
     sliders.bus_gain(mix(cue).bus)
 }
+#[allow(clippy::too_many_arguments)] // a Bevy system: each parameter is a world access
 fn play_sounds(
     mut commands: Commands,
     assets: Res<AssetServer>,
@@ -807,8 +808,8 @@ mod tests {
             assert_eq!(decoder.sample_rate().get(), rate);
             let out: Vec<Sample> = decoder.collect();
             assert_eq!(out.len(), 2 * plain.len());
-            for (frame, sample) in out.chunks_exact(2).zip(&plain) {
-                assert_eq!(frame, [sample * gains[0], sample * gains[1]]);
+            for (frame, sample) in out.as_chunks::<2>().0.iter().zip(&plain) {
+                assert_eq!(*frame, [sample * gains[0], sample * gains[1]]);
             }
             assert!(out.iter().any(|sample| sample.abs() > 0.2));
         }
@@ -830,7 +831,7 @@ mod tests {
         };
         let handles: Vec<Handle<AudioSource>> = (0..SoundCue::Explosion.bank().variants())
             .map(|variant| {
-                let path = crate::audio::variant_path(SoundCue::Explosion, u64::from(variant));
+                let path = crate::audio::variant_path(SoundCue::Explosion, variant);
                 let handle = app.world().resource::<AssetServer>().load(path);
                 app.world_mut()
                     .resource_mut::<Assets<AudioSource>>()
@@ -1030,7 +1031,7 @@ mod tests {
         };
         (0..cue.bank().variants())
             .map(|variant| {
-                let path = crate::audio::variant_path(cue, u64::from(variant));
+                let path = crate::audio::variant_path(cue, variant);
                 let handle = app.world().resource::<AssetServer>().load(path);
                 app.world_mut()
                     .resource_mut::<Assets<AudioSource>>()
@@ -1135,7 +1136,7 @@ mod tests {
         let tail: Vec<Sample> = decoder.collect();
         assert_eq!(tail.len(), 2 * (rate * FADE_MS / 1000) as usize);
         let mut last = head[0];
-        for frame in tail.chunks_exact(2) {
+        for frame in tail.as_chunks::<2>().0 {
             assert_eq!(frame[0], frame[1]);
             assert!(frame[0] <= last && last - frame[0] <= 0.1 * level);
             last = frame[0];

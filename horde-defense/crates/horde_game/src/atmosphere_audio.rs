@@ -241,6 +241,7 @@ impl Plugin for AtmosphereAudioPlugin {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // a Bevy system: each parameter is a world access
 fn update_ambience(
     mut commands: Commands,
     assets: Res<AssetServer>,

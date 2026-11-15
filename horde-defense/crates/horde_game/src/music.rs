@@ -93,6 +93,7 @@ impl Plugin for MusicPlugin {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // a Bevy system: each parameter is a world access
 fn direct_music(
     mut commands: Commands,
     assets: Res<AssetServer>,
