@@ -1,7 +1,7 @@
 //! Task navigation and active-field wayfinding; authority stays in commands.
 use super::{Screen, Tab, UiCtx, coins::grouped, feedback, muted};
 use crate::{
-    art::{AMBER, PANEL, RED},
+    art::{AMBER, MUTED, PANEL, RED},
     runner::SaveIntent,
 };
 use bevy_egui::egui::{self, Align, Color32, FontId, Layout, RichText, Stroke, pos2};
@@ -63,11 +63,20 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                         f.request_save(SaveIntent::Menu);
                     }
                     ui.colored_label(AMBER, format!("{} coins", grouped(f.game.campaign().coins)));
-                    if ui.available_width() > 230.0 && !f.game.campaign().world.cleared.is_empty() {
-                        muted(
-                            ui,
-                            format!("{} liberated", f.game.campaign().world.cleared.len()),
-                        );
+                    let cleared = f.game.campaign().world.cleared.len();
+                    if cleared > 0 {
+                        // Shown wherever its own width fits beside the logo,
+                        // with a small reserve for the gap (CF-3).
+                        let text = format!("{cleared} liberated");
+                        let font = egui::TextStyle::Body.resolve(ui.style());
+                        let width = ui
+                            .painter()
+                            .layout_no_wrap(text.clone(), font, MUTED)
+                            .size()
+                            .x;
+                        if ui.available_width() > width + ui.spacing().item_spacing.x + 24.0 {
+                            muted(ui, text);
+                        }
                     }
                     // The alert navigates only where the rest of the header
                     // does. On Settings and run history it is a red notice:

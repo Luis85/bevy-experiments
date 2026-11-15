@@ -311,3 +311,33 @@ fn context_operations_available_delegates_to_core() {
     f.game.campaign_mut().legacy_features = false;
     check(f, true, "roster and expedition");
 }
+
+/// CF-3 (closing): the header's liberated count shows wherever its own width
+/// fits beside the logo. W3-05's Save button left less than the old fixed
+/// 230 pt at 1050x700@1.35, so "1 liberated" vanished from Camp, Results and
+/// Upgrades with about 240 pt of the header still empty.
+#[test]
+fn header_names_the_liberated_count_at_both_sizes() {
+    for target in Target::BOTH {
+        for screen in [Screen::Camp, Screen::Results, Screen::Upgrades] {
+            for coins in [399, 12_345] {
+                let mut fixture = IsolatedFrontend::new();
+                let h = Harness::at(target);
+                let f = between_runs(&mut fixture);
+                f.game.campaign_mut().world.cleared.push("DEU".into());
+                f.game.campaign_mut().coins = coins;
+                f.screen = screen;
+                let output = h.frame(f, View::Header, vec![]);
+                assert!(text_count(&output, "Save") == 1, "{target:?} {screen:?}");
+                assert!(
+                    fully_visible(&output, "1 liberated"),
+                    "{target:?} {screen:?} {coins} coins: {:?}",
+                    clipped_bounds(&output, "1 liberated")
+                );
+                let logo = clipped_bounds(&output, "LASTLIGHT").expect("logo").0;
+                let count = clipped_bounds(&output, "1 liberated").unwrap().0;
+                assert!(count.left() > logo.right() + 8.0, "{target:?} {screen:?}");
+            }
+        }
+    }
+}
