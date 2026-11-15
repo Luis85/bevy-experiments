@@ -249,6 +249,44 @@ fn boss_arrived_banner_lasts_1_5s() {
     assert!(!painted(&output, &arrived), "1.6 s of running time");
 }
 
+/// CF-3-10: a warning first seen on a paused frame (a battle paused or
+/// loaded inside the fade-in) is held at full strength in normal effects as
+/// in reduced effects, so the boss cue's visual twin shows in both modes
+/// while the battle waits, and keeps full strength once it resumes.
+#[test]
+fn a_banner_started_on_a_paused_frame_shows_in_both_modes() {
+    for reduced in [false, true] {
+        let mut fixture = personal_before_warning();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.settings.reduced_effects = reduced;
+        // The warning tick runs; the battle pauses before a frame shows it.
+        f.game.tick(Input::default());
+        f.game.set_paused(true);
+        let mut clock = Clock::new();
+        for frames in [1, 120] {
+            let output = clock.run(&h, f, View::Battle, 1, frames);
+            assert_eq!(
+                color_of(&output, APPROACHING),
+                Some(AMBER),
+                "reduced {reduced}: paused, {frames} frames in"
+            );
+            assert!(
+                f.battle.boss_banner_rect.is_some(),
+                "reduced {reduced}: paused, no banner rect"
+            );
+        }
+        // Resumed: full strength until the fade-out.
+        f.game.set_paused(false);
+        let output = clock.run(&h, f, View::Battle, 1, 30);
+        assert_eq!(
+            color_of(&output, APPROACHING),
+            Some(AMBER),
+            "reduced {reduced}: 0.5 s after resuming"
+        );
+    }
+}
+
 /// Ruling C-11: the banner is centred on the arena, `min(380, 0.6 x arena
 /// width)` by 34, 4 pt under the first-defense hint callout while that shows
 /// and 6 pt under the arena top otherwise.

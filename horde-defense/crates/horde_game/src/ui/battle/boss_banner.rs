@@ -7,7 +7,8 @@
 //! The banner's clock is the egui input clock. A new warning or arrival
 //! (`battle_view::BossNotice`, a pure core read) starts it at zero, and it
 //! counts only frames in which the battle runs, so a paused battle holds the
-//! banner where it is and every observation speed shows it equally long.
+//! banner where it is and every observation speed shows it equally long. A
+//! paused frame holds it at full strength: the fade-in is for running frames.
 //! Nothing here touches the simulation.
 use crate::{
     art::{self, AMBER, PANEL, TEXT},
@@ -101,8 +102,9 @@ pub(in crate::ui) fn observer_banner_rect(area: Rect) -> Rect {
 /// number. Pure.
 ///
 /// A warning or an arrival the banner does not announce yet replaces it and
-/// starts at zero, if it is at most `FRESH_TICKS` old. Otherwise the banner
-/// gains `dt` (at most `MAX_FRAME_SECS`) while the battle runs. A banner of
+/// starts at zero (past its fade-in on a paused frame), if it is at most
+/// `FRESH_TICKS` old. Otherwise the banner gains `dt` (at most
+/// `MAX_FRAME_SECS`) while the battle runs. A banner of
 /// another attempt is dropped; a finished banner is kept, so its event never
 /// starts a second one.
 pub(in crate::ui) fn banner_step(
@@ -120,7 +122,7 @@ pub(in crate::ui) fn banner_step(
             return Some(BossBanner {
                 key,
                 arrived: event.arrived,
-                shown: 0.0,
+                shown: held(0.0, running),
                 frame,
             });
         }
@@ -128,10 +130,25 @@ pub(in crate::ui) fn banner_step(
     banner.map(|mut banner| {
         if running && banner.frame != frame && banner.visible() {
             banner.shown += dt.clamp(0.0, MAX_FRAME_SECS);
+        } else if banner.visible() {
+            banner.shown = held(banner.shown, running);
         }
         banner.frame = frame;
         banner
     })
+}
+
+/// `shown` on a frame in which the battle does (`running`) or does not run.
+/// A paused frame ends the fade-in (CF-3-10): a banner first seen, or caught
+/// fading in, on a paused frame is held at full strength in normal effects
+/// as in reduced effects, so the boss cue's visual twin never waits for the
+/// player to resume.
+fn held(shown: f32, running: bool) -> f32 {
+    if running {
+        shown
+    } else {
+        shown.max(FADE_IN_SECS)
+    }
 }
 
 /// The banner's strength after `shown` of `duration` seconds: 0 once it is
@@ -328,6 +345,40 @@ mod tests {
         assert_eq!(swapped.duration(), BOSS_ARRIVED_SECS);
         assert_eq!(start.duration(), BOSS_BANNER_SECS);
         assert_eq!((BOSS_BANNER_SECS, BOSS_ARRIVED_SECS), (2.0, 1.5));
+    }
+
+    #[test]
+    fn a_paused_frame_holds_the_banner_past_its_fade_in() {
+        // CF-3-10: a warning first seen on a paused frame paints at full
+        // strength in normal effects, as in reduced effects.
+        let warned = notice(7, 100, Some((false, 98)));
+        let start = banner_step(None, &warned, false, 0.016, 1).unwrap();
+        for reduced in [false, true] {
+            assert_eq!(
+                banner_alpha(start.shown, start.duration(), reduced),
+                1.0,
+                "reduced {reduced}: {start:?}"
+            );
+        }
+        // A banner paused mid-fade-in is held at full strength too, and a
+        // paused frame past the fade-in adds nothing.
+        let fading = BossBanner {
+            shown: 0.05,
+            ..start
+        };
+        let held = banner_step(Some(fading), &warned, false, 0.016, 2).unwrap();
+        assert_eq!(banner_alpha(held.shown, held.duration(), false), 1.0);
+        let later = BossBanner {
+            shown: 0.5,
+            ..start
+        };
+        let kept = banner_step(Some(later), &warned, false, 0.016, 3).unwrap();
+        assert_eq!(kept.shown, 0.5);
+        // A running start still fades in from zero.
+        assert_eq!(
+            banner_step(None, &warned, true, 0.016, 1).unwrap().shown,
+            0.0
+        );
     }
 
     #[test]
