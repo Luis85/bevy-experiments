@@ -79,6 +79,11 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
   (`civic::home_waits_for`). A supplied site interrupts lower work in the
   resident tree (`Site ready to build`, `life.site_needs_builder`).
   `view::housing_line` says how many households wait for a home.
+- Final capture patch: `view::stock_split` (`StockSplit`: `on_sale`,
+  `in_homes`, `in_stores`, `at_post`, `total`, per settlement or the whole
+  island) says where a good is; the season summary gains `children_start`,
+  `children_end` and `came_of_age` (also in the ledger's `Totals`), so its head
+  counts add up.
 
 ### Island game: review fixes (saving, startup, keys, words)
 

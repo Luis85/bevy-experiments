@@ -782,7 +782,7 @@ pub fn guide_controls() -> Vec<GuideSection> {
     for (mode, key, mods, meaning) in KEYS {
         let shared = *mode != Menus
             && everywhere(*key, *mods, meaning.does)
-            && partner(meaning.does).is_none_or(|other| alike(other));
+            && partner(meaning.does).is_none_or(alike);
         let name = if shared {
             "Every mode"
         } else {

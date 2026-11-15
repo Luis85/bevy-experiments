@@ -245,6 +245,64 @@ fn on_offer(world: &World, settlement: SimId, good: &str) -> u32 {
     units
 }
 
+/// Where the units of a good are (closing fix: a bare stock count beside
+/// "nobody selling it" read as stock held back from the market). The parts
+/// add up to `total`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct StockSplit {
+    pub good: String,
+    /// Residents' units they would sell now, and the market stalls' shelves.
+    pub on_sale: u32,
+    /// What residents carry and keep for themselves: their own food, tools
+    /// and reserve (never more than they plan to keep, or it is on sale).
+    pub in_homes: u32,
+    /// On the settlement's storage shelves (residents buy from them).
+    pub in_stores: u32,
+    /// Laid at the trading post for the boat.
+    pub at_post: u32,
+    pub total: u32,
+}
+
+/// [`StockSplit`] of `good` in `settlement`, or on the whole island with
+/// `None`.
+pub fn stock_split(world: &World, settlement: Option<SimId>, good: &str) -> StockSplit {
+    let mut split = StockSplit {
+        good: good.to_owned(),
+        ..StockSplit::default()
+    };
+    let regions: Vec<SimId> = match settlement {
+        Some(region) => vec![region],
+        None => settlements::all(world)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect(),
+    };
+    let post = crate::village::merchant::post(world).map(|(id, _)| id);
+    for region in regions {
+        for (_, actor) in demography::members(world, region) {
+            let held = econ::count(world, actor, good);
+            let selling = market::available_to_sell(world, actor, good).min(held);
+            split.on_sale = split.on_sale.saturating_add(selling);
+            split.in_homes = split.in_homes.saturating_add(held - selling);
+        }
+        for (id, store) in civic::depots(world, region) {
+            let Some(shelf) = world.get::<civic::Depot>(store) else {
+                continue;
+            };
+            let units = shelf.stock(good);
+            if Some(id) == post {
+                split.at_post = split.at_post.saturating_add(units);
+            } else if shelf.public {
+                split.on_sale = split.on_sale.saturating_add(units);
+            } else {
+                split.in_stores = split.in_stores.saturating_add(units);
+            }
+        }
+    }
+    split.total = split.on_sale + split.in_homes + split.in_stores + split.at_post;
+    split
+}
+
 /// [`GoodFlow`] of `good` in `settlement`.
 pub fn good_flow(world: &World, settlement: SimId, good: &str) -> GoodFlow {
     let mut flow = GoodFlow {
@@ -704,8 +762,17 @@ pub struct SeasonSummary {
     pub season: u32,
     pub year: u32,
     pub name: String,
+    /// Grown residents at the season's first tick and now (or at its end).
     pub population_start: u32,
     pub population_end: u32,
+    /// Children not yet of age, at the start and the end: a birth adds a
+    /// child, and a child who comes of age (`came_of_age`) becomes a resident.
+    /// `population_end = population_start + came_of_age + arrivals - resident
+    /// deaths`; nobody leaves the island but by death. The fund at the
+    /// founding is truly 0 (`fund_start` of the first season).
+    pub children_start: u32,
+    pub children_end: u32,
+    pub came_of_age: u32,
     pub births: u32,
     /// `(cause, residents)`, by cause.
     pub deaths: Vec<(String, u32)>,

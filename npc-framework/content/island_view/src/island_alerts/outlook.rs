@@ -64,11 +64,17 @@ fn rank(status: Status) -> u8 {
     }
 }
 
+/// Days of supply below which a line is trouble. A village holding its
+/// planned stock (four to six days a head) is normal and says nothing: a
+/// line only below two days, a warning at one, critical at none (final
+/// pass: the outlook read as a permanent emergency).
+pub(crate) const TROUBLE_DAYS: u32 = 2;
+
 fn days_status(days: u32) -> Status {
-    match days {
-        0 | 1 => Status::Crit,
-        2 | 3 => Status::Warn,
-        _ => Status::Info,
+    if days == 0 {
+        Status::Crit
+    } else {
+        Status::Warn
     }
 }
 
@@ -134,7 +140,7 @@ fn candidates(
         (Topic::Food, outlook.food_days, "food"),
         (Topic::Water, outlook.water_days, "water"),
     ] {
-        if let Some(days) = days.filter(|days| *days <= 7) {
+        if let Some(days) = days.filter(|days| *days < TROUBLE_DAYS) {
             lines.push((
                 OutlookLine {
                     topic,
@@ -147,11 +153,11 @@ fn candidates(
             ));
         }
     }
-    if let Some(days) = outlook.fuel_days.filter(|days| *days <= 7) {
-        let status = match days {
-            0 | 1 if outlook.cold_now => Status::Crit,
-            0..=3 => Status::Warn,
-            _ => Status::Info,
+    if let Some(days) = outlook.fuel_days.filter(|days| *days < TROUBLE_DAYS) {
+        let status = if days == 0 || outlook.cold_now {
+            Status::Crit
+        } else {
+            Status::Warn
         };
         lines.push((
             OutlookLine {
@@ -251,7 +257,7 @@ fn candidates(
     if let Some(short) = outlook
         .next_shortage
         .as_ref()
-        .filter(|short| short.days_left <= 3)
+        .filter(|short| short.days_left < TROUBLE_DAYS)
         .filter(|short| {
             // A good already on a Food, Water or Fuel line is not said twice.
             topic_of(&short.good)
@@ -383,12 +389,12 @@ mod tests {
     #[test]
     fn the_outlook_shows_the_three_worst_lines_in_order() {
         let mut hilltop = outlook();
-        hilltop.food_days = Some(2);
+        hilltop.food_days = Some(1);
         hilltop.idle_hands = 1;
         let mut harbour = outlook();
         harbour.food_days = Some(5);
         harbour.homeless = 2;
-        harbour.water_days = Some(1);
+        harbour.water_days = Some(0);
         harbour.cold_in_days = Some(9);
         harbour.without_coat = 11;
         let villages = [
@@ -408,11 +414,11 @@ mod tests {
         assert_eq!(
             texts(&words(&villages)),
             vec![
+                (Status::Crit, "Harbour has no water.".to_owned()),
                 (
-                    Status::Crit,
-                    "Harbour runs out of water tomorrow.".to_owned()
+                    Status::Warn,
+                    "Hilltop runs out of food tomorrow.".to_owned()
                 ),
-                (Status::Warn, "Hilltop has food for 2 days.".to_owned()),
                 (
                     Status::Warn,
                     "Harbour: 2 residents have no home.".to_owned()
@@ -430,7 +436,10 @@ mod tests {
         assert_eq!(
             texts(&words(&single)),
             vec![
-                (Status::Warn, "Hilltop has food for 2 days.".to_owned()),
+                (
+                    Status::Warn,
+                    "Hilltop runs out of food tomorrow.".to_owned()
+                ),
                 (Status::Info, "1 resident has no work.".to_owned()),
             ]
         );
@@ -440,7 +449,7 @@ mod tests {
         cold.without_coat = 11;
         cold.next_shortage = Some(Shortage {
             good: "village_plank".into(),
-            days_left: 2,
+            days_left: 1,
             cause_sentence: "nobody saws logs".into(),
         });
         let lines = words(&[VillageOutlook {
@@ -454,7 +463,7 @@ mod tests {
             vec![
                 (
                     Status::Warn,
-                    "Hilltop runs out of plank in 2 days.".to_owned()
+                    "Hilltop runs out of plank tomorrow.".to_owned()
                 ),
                 (
                     Status::Info,
@@ -470,7 +479,7 @@ mod tests {
         assert_eq!(shown(600.0), 2);
         assert_eq!(shown(720.0), 3);
         let mut hilltop = outlook();
-        hilltop.food_days = Some(2);
+        hilltop.food_days = Some(1);
         hilltop.idle_hands = 1;
         hilltop.homeless = 1;
         let lines = words(&[VillageOutlook {
@@ -530,7 +539,7 @@ mod tests {
     #[test]
     fn households_waiting_for_a_home_are_a_warning_below_food_water_and_cold() {
         let mut harbour = outlook();
-        harbour.food_days = Some(2);
+        harbour.food_days = Some(1);
         harbour.cold_now = true;
         harbour.without_coat = 2;
         let calm = outlook();
@@ -556,7 +565,10 @@ mod tests {
                     Status::Crit,
                     "Harbour: it is cold, 2 have no coat.".to_owned()
                 ),
-                (Status::Warn, "Harbour has food for 2 days.".to_owned()),
+                (
+                    Status::Warn,
+                    "Harbour runs out of food tomorrow.".to_owned()
+                ),
                 (
                     Status::Warn,
                     "Mill: 3 households are waiting for a home.".to_owned()
@@ -591,6 +603,61 @@ mod tests {
         assert_eq!(
             texts(&lines),
             vec![(Status::Warn, "2 residents have no home.".to_owned())]
+        );
+    }
+
+    #[test]
+    fn a_village_holding_its_planned_stock_is_not_in_trouble() {
+        // Four days of food, three of water and fuel, a shortage two days
+        // off: the plan's normal; nothing to say.
+        let mut planned = outlook();
+        planned.food_days = Some(4);
+        planned.water_days = Some(3);
+        planned.fuel_days = Some(2);
+        planned.next_shortage = Some(Shortage {
+            good: "village_plank".into(),
+            days_left: 2,
+            cause_sentence: "nobody saws logs".into(),
+        });
+        let lines = words(&[VillageOutlook {
+            id: SimId(1),
+            name: "Hilltop",
+            outlook: &planned,
+            housing: None,
+        }]);
+        assert_eq!(
+            texts(&lines),
+            vec![(
+                Status::Good,
+                "All is well: food for 4 days and a bed for everyone.".to_owned()
+            )]
+        );
+        // One day left is a warning, none critical; in the cold, fuel for
+        // one day is critical already.
+        let mut low = outlook();
+        low.food_days = Some(1);
+        low.water_days = Some(0);
+        low.fuel_days = Some(1);
+        low.cold_now = true;
+        let lines = words(&[VillageOutlook {
+            id: SimId(1),
+            name: "Hilltop",
+            outlook: &low,
+            housing: None,
+        }]);
+        assert_eq!(
+            texts(&lines),
+            vec![
+                (Status::Crit, "Hilltop has no water.".to_owned()),
+                (
+                    Status::Crit,
+                    "Hilltop runs out of firewood tomorrow.".to_owned()
+                ),
+                (
+                    Status::Warn,
+                    "Hilltop runs out of food tomorrow.".to_owned()
+                ),
+            ]
         );
     }
 

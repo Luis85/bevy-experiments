@@ -228,6 +228,18 @@ pub(crate) fn days_low(days: Option<u32>) -> bool {
     days.is_some_and(|days| days < LOW_DAYS)
 }
 
+/// The days all foods together last at a day's use: `None` while nothing
+/// is eaten.
+pub(crate) fn all_food_days(world: &World, usage: &BTreeMap<String, (u32, u32)>) -> Option<u32> {
+    let (per_day, stock) = usage
+        .iter()
+        .filter(|(kind, _)| catalog::food_restore_in(world, kind).is_some())
+        .fold((0u32, 0u32), |(day, held), (_, (per, stock))| {
+            (day.saturating_add(*per), held.saturating_add(*stock))
+        });
+    stock.checked_div(per_day)
+}
+
 /// "3", "99+" or a dash: the days a stock lasts.
 pub(crate) fn days_words(days: Option<u32>) -> String {
     match days {
@@ -876,6 +888,25 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
     let short_food = summary.residents > 0 && summary.food_units < summary.residents;
     let short_water = summary.residents > 0 && summary.water_units < summary.residents;
     let island = scope.is_none();
+    // Food is low by the days all foods together last, never one food's
+    // share: the simulation splits a day's hunger between the foods by
+    // stock, so 87 berries could read "1 day" beside ten days of bread
+    // (final pass: "Berries · Low" with 87 in stock).
+    let cache = world.get_resource::<super::goods::EconomyCache>();
+    let reach = |kind: &str| {
+        cache
+            .and_then(|cache| cache.food_split(scope, kind))
+            .map(|(split, _)| super::goods::reachable(split))
+    };
+    // A food's days count what people hold and can buy together: they eat
+    // from their own packs first.
+    let mut usage = day_use(world, scope);
+    for (kind, (_, stock)) in usage.iter_mut() {
+        if let Some(held) = reach(kind) {
+            *stock = held;
+        }
+    }
+    let food_days = all_food_days(world, &usage);
     let mut stock: Vec<(GoodGroup, StockRow)> = stock_rows(world, scope)
         .into_iter()
         .map(|row| {
@@ -899,7 +930,17 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
         let water = row.kind == catalog::WATER;
         // The island's totals decide the shared rules; the days a stock
         // lasts mark a good low in a village too.
-        let low = days_low(row.days)
+        let edible = *of == GoodGroup::FoodAndWater && !water;
+        let days = match (reach(&row.kind), usage.get(&row.kind)) {
+            (Some(held), Some((per_day, _))) => held.checked_div(*per_day),
+            _ => row.days,
+        };
+        // None to buy while residents go without: the warning mark.
+        let unbuyable = cache
+            .and_then(|cache| cache.food_split(scope, &row.kind))
+            .is_some_and(|(split, without)| *without > 0 && super::goods::none_for_sale(split));
+        let low = unbuyable
+            || days_low(if edible { food_days } else { days })
             || island
                 && good_low(
                     row.stock,
@@ -913,7 +954,7 @@ pub(super) fn entries(world: &World, view: View<'_>) -> Vec<Entry> {
                 row.label.clone(),
                 row.stock.to_string(),
                 super::goods::price_cell(row.price, row.day_ago),
-                days_words(row.days),
+                days_words(days),
                 row.trend.text(),
             ],
             Some(row.trend),
@@ -974,6 +1015,24 @@ fn good_card(
     if places.len() > 1 {
         lines.push((1, places.join(" \u{b7} ")));
     }
+    // Where the stock is: people's own packs, on sale, in the stores, at
+    // the post (final pass: "61 in stock" beside "nobody selling it").
+    let split = cache.and_then(|cache| {
+        cache
+            .split
+            .as_ref()
+            .filter(|split| cache.has_flow(scope, &row.kind) && split.good == row.kind)
+    });
+    if let Some(split) = split {
+        let place = scopes
+            .iter()
+            .find(|(candidate, _)| *candidate == scope && scope.is_some())
+            .map_or_else(
+                || "on the island".to_owned(),
+                |(_, label)| format!("in {label}"),
+            );
+        lines.push((1, goods::split_sentence(&place, split)));
+    }
     if cache.is_some() {
         match (price, row.price) {
             (Some(line), _) => {
@@ -1019,7 +1078,10 @@ fn good_card(
             .map(|line| (goods::user_group(line, &job, &made), line.wanted))
             .collect();
         lines.push((6, goods::used_by_sentence(&groups)));
-        if let Some((line, who)) = goods::without_sentence(&flow.going_without) {
+        let none_on_sale = split.is_some_and(goods::none_for_sale);
+        if let Some((line, who)) =
+            goods::without_sentence(&flow.going_without, &row.label.to_lowercase(), none_on_sale)
+        {
             lines.push((7, line));
             links.push((
                 format!("stock_without_{}", row.kind),
@@ -1383,7 +1445,8 @@ pub(crate) fn priority_entries_with(
         let figure = topic_figure(row.topic, outlook, open_places, boat_days);
         let title = match (&row.profession, figure) {
             (None, Some(figure)) => format!("{} \u{b7} {figure}", row.display),
-            _ => row.display.clone(),
+            // "Workplaces, farmer", the words of "Your orders" (final pass, F2).
+            _ => super::orders::topic_words(&row.display),
         };
         rows.push(Entry::strong(&format!("{key}_title"), title));
         let mut choices = level_choices(settlement, row.topic, row.profession.clone());
@@ -1614,6 +1677,19 @@ mod tests {
         assert!(good_low(500, 0, true));
         // A day's use decides too: under two days left is low.
         assert!(days_low(Some(1)) && days_low(Some(0)));
+        // Food is low by all foods together: 87 berries are a day of
+        // berries, but with bread the village has two days of food.
+        let app = island_content::new_sim_app(7, "living_world");
+        let usage: BTreeMap<String, (u32, u32)> = [
+            ("bread".to_owned(), (10, 100)),
+            ("village_berries".to_owned(), (80, 87)),
+            ("village_water".to_owned(), (5, 1)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(all_food_days(app.world(), &usage), Some(2));
+        assert!(!days_low(all_food_days(app.world(), &usage)));
+        assert_eq!(all_food_days(app.world(), &BTreeMap::new()), None);
         assert!(!days_low(Some(2)) && !days_low(None));
         assert_eq!(days_words(Some(3)), "3");
         assert_eq!(days_words(Some(140)), "99+");

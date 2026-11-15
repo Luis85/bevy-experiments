@@ -10,9 +10,9 @@ use super::{Season, demography, fields, merchant, resident, weather};
 use bevy_ecs::prelude::*;
 pub use economy::{
     ConsignedView, GoodFlow, GoodSeason, HeldUpLine, MarketLine, NeedAlert, NeedCause, Outlook,
-    PriceLine, Purpose, SeasonSummary, Shortage, Trend, UseLine, WithoutCause, WithoutLine,
-    consigned, editor_mode, good_flow, housing_line, need_alert, outlook, price_line, price_lines,
-    season_summaries, season_summary,
+    PriceLine, Purpose, SeasonSummary, Shortage, StockSplit, Trend, UseLine, WithoutCause,
+    WithoutLine, consigned, editor_mode, good_flow, housing_line, need_alert, outlook, price_line,
+    price_lines, season_summaries, season_summary, stock_split,
 };
 use npc_framework::prelude::*;
 use serde::Serialize;

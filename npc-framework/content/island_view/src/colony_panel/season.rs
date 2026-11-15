@@ -52,24 +52,32 @@ pub(crate) fn season_card(
     };
     type Figure = fn(&SeasonSummary) -> String;
     let mut figures: Vec<(&str, Figure)> = vec![
+        // Grown residents, and children apart: a birth adds a child, so the
+        // two together add up (final pass: "42 to 42" beside a birth).
         ("Residents", |season| {
             format!("{} to {}", season.population_start, season.population_end)
+        }),
+        ("Children", |season| {
+            format!("{} to {}", season.children_start, season.children_end)
         }),
         ("Births", |season| season.births.to_string()),
         ("Deaths", |season| sum(&season.deaths).to_string()),
         ("Newcomers", |season| season.arrivals.to_string()),
+    ];
+    if ended.came_of_age > 0 || before.is_some_and(|before| before.came_of_age > 0) {
+        figures.push(("Came of age", |season| season.came_of_age.to_string()));
+    }
+    figures.extend::<[(&str, Figure); 2]>([
         ("Buildings finished", |season| {
             sum(&season.built).to_string()
         }),
         ("Goods made", |season| made(season).to_string()),
-    ];
+    ]);
     if spoiled(ended) > 0 || before.is_some_and(|before| spoiled(before) > 0) {
         figures.push(("Goods spoiled", |season| spoiled(season).to_string()));
     }
     figures.push(("Boat visits", |season| season.boat_visits.to_string()));
-    figures.push(("Fund", |season| {
-        format!("{} to {} coins", season.fund_start, season.fund_end)
-    }));
+    figures.push(("Fund", fund_words));
     let rows = figures
         .into_iter()
         .map(|(label, figure)| (label.to_owned(), figure(ended), before.map(figure)))
@@ -142,6 +150,16 @@ pub(crate) fn season_card(
     }
 }
 
+/// "52 to 39 coins"; the first season of a new island, whose fund truly
+/// starts at none: "64 coins (the island started with none)".
+pub(crate) fn fund_words(season: &SeasonSummary) -> String {
+    if season.season == 0 && season.fund_start == 0 {
+        format!("{} coins (the island started with none)", season.fund_end)
+    } else {
+        format!("{} to {} coins", season.fund_start, season.fund_end)
+    }
+}
+
 /// The card as ledger rows: title, subtitle, the table, the lines and the
 /// two buttons.
 pub(crate) fn season_entries(card: &SeasonCard) -> Vec<Entry> {
@@ -164,7 +182,7 @@ pub(crate) fn season_entries(card: &SeasonCard) -> Vec<Entry> {
     // value columns and stand on their own lines under it.
     let mut spans = Vec::new();
     for (label, ended, before) in &card.rows {
-        if ended.contains(" to ") {
+        if ended.contains(" to ") || label == "Fund" {
             spans.push(span_line(label, ended, before.as_deref(), &card.heads));
             continue;
         }
@@ -284,6 +302,56 @@ mod tests {
             Some(2),
             "one season column"
         );
+    }
+
+    #[test]
+    fn residents_and_children_add_up_and_the_first_fund_reads_as_a_start() {
+        let mut first = autumn();
+        first.season = 0;
+        first.population_start = 42;
+        first.population_end = 42;
+        first.children_start = 3;
+        first.children_end = 4;
+        first.births = 1;
+        first.deaths = Vec::new();
+        first.arrivals = 0;
+        first.fund_start = 0;
+        first.fund_end = 64;
+        let card = season_card(&first, None, 7, &word);
+        let spans: Vec<String> = season_entries(&card)
+            .into_iter()
+            .filter(|entry| entry.key.starts_with("season_span"))
+            .map(|entry| entry.text)
+            .collect();
+        assert_eq!(
+            spans,
+            vec![
+                "Residents: 42 to 42.".to_owned(),
+                "Children: 3 to 4.".to_owned(),
+                "Fund: 64 coins (the island started with none).".to_owned(),
+            ]
+        );
+        assert!(
+            !card.rows.iter().any(|(label, ..)| label == "Came of age"),
+            "no row while nobody came of age"
+        );
+        // A child who came of age is a resident now: the row says so.
+        let mut later = first.clone();
+        later.season = 1;
+        later.came_of_age = 1;
+        later.population_end = 43;
+        later.children_end = 3;
+        later.fund_start = 64;
+        later.fund_end = 80;
+        let card = season_card(&later, Some(&first), 14, &word);
+        assert!(
+            card.rows
+                .iter()
+                .any(|(label, ended, before)| label == "Came of age"
+                    && ended == "1"
+                    && before.as_deref() == Some("0"))
+        );
+        assert_eq!(fund_words(&later), "64 to 80 coins");
     }
 
     #[test]

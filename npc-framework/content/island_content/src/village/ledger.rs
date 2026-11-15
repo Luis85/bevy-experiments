@@ -32,6 +32,13 @@ pub struct Totals {
     pub deaths: BTreeMap<String, u32>,
     pub built: BTreeMap<String, u32>,
     pub boat_visits: u32,
+    /// Children not yet of age, and residents grown from children so far:
+    /// with births, arrivals and deaths they make the season's head counts
+    /// add up (closing fix: a birth adds a child, not a resident).
+    #[serde(default)]
+    pub children: u32,
+    #[serde(default)]
+    pub came_of_age: u32,
 }
 
 /// One season.
@@ -86,6 +93,8 @@ fn hash_totals(h: &mut Fnv64, totals: &Totals) {
     hash_map32(h, &totals.deaths);
     hash_map32(h, &totals.built);
     h.u32(totals.boat_visits);
+    h.u32(totals.children);
+    h.u32(totals.came_of_age);
 }
 
 impl SimHashResource for SeasonLedger {
@@ -177,6 +186,8 @@ pub fn totals(world: &World) -> Totals {
         deaths: census.deaths,
         built,
         boat_visits: merchant.map_or(0, |m| m.visits),
+        children: census.children,
+        came_of_age: census.came_of_age,
     }
 }
 
@@ -329,6 +340,9 @@ pub fn summary(world: &World, tally: &SeasonTally) -> SeasonSummary {
         name: tally.name.clone(),
         population_start: start.population,
         population_end: end.population,
+        children_start: start.children,
+        children_end: end.children,
+        came_of_age: end.came_of_age.saturating_sub(start.came_of_age),
         births: end.births.saturating_sub(start.births),
         deaths: counts(&end.deaths, &start.deaths),
         arrivals: end.arrivals.saturating_sub(start.arrivals),

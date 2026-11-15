@@ -7,7 +7,8 @@ use super::Action;
 use super::economy::Scope;
 use bevy::prelude::*;
 use island_content::village::view::{
-    GoodFlow, HeldUpLine, MarketLine, PriceLine, Purpose, UseLine, WithoutCause, WithoutLine,
+    GoodFlow, HeldUpLine, MarketLine, PriceLine, Purpose, StockSplit, UseLine, WithoutCause,
+    WithoutLine,
 };
 use island_content::village::{self, market};
 use npc_framework::prelude::{SimClock, SimConfig, SimId};
@@ -31,6 +32,11 @@ pub(crate) struct EconomyCache {
     pub(crate) flow: Option<GoodFlow>,
     /// The chosen village's outlook, for the Priorities figures (3.9).
     outlook: Option<(CacheKey, SimId, village::view::Outlook)>,
+    /// The selected good's stock split in the scope (read with its flow).
+    pub(crate) split: Option<StockSplit>,
+    /// Food and water in the scope: each good's split and how many go
+    /// without it, for the table's Days and Low (read once a day).
+    table: Option<(CacheKey, Scope, BTreeMap<String, (StockSplit, usize)>)>,
 }
 
 impl EconomyCache {
@@ -40,6 +46,14 @@ impl EconomyCache {
             .as_ref()
             .filter(|(_, held, _)| *held == village)
             .map(|(_, _, outlook)| outlook)
+    }
+    /// A food's or water's split in `scope` and how many go without it,
+    /// when read.
+    pub(crate) fn food_split(&self, scope: Scope, good: &str) -> Option<&(StockSplit, usize)> {
+        self.table
+            .as_ref()
+            .filter(|(_, held, _)| *held == scope)
+            .and_then(|(_, _, goods)| goods.get(good))
     }
     /// Whether the figures of `good` in `scope` are read.
     pub(crate) fn has_flow(&self, scope: Scope, good: &str) -> bool {
@@ -95,6 +109,42 @@ pub(crate) fn refresh_cache(
         let outlook = village::view::outlook(world, village);
         world.resource_mut::<EconomyCache>().outlook = Some((key, village, outlook));
     }
+    if world
+        .resource::<EconomyCache>()
+        .table
+        .as_ref()
+        .is_none_or(|(held_key, held, _)| (*held_key, *held) != (key, scope))
+    {
+        let settlements: Vec<SimId> = match scope {
+            Some(settlement) => vec![settlement],
+            None => village::frontier::settlements::all(world)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect(),
+        };
+        let table = village::catalog::trade_kinds(world)
+            .iter()
+            .filter(|kind| {
+                village::catalog::food_restore_in(world, kind).is_some()
+                    || **kind == village::catalog::WATER
+            })
+            .map(|kind| {
+                let without = settlements
+                    .iter()
+                    .map(|settlement| {
+                        village::view::good_flow(world, *settlement, kind)
+                            .going_without
+                            .len()
+                    })
+                    .sum();
+                (
+                    (*kind).to_owned(),
+                    (village::view::stock_split(world, scope, kind), without),
+                )
+            })
+            .collect();
+        world.resource_mut::<EconomyCache>().table = Some((key, scope, table));
+    }
     let Some(good) = good else {
         return;
     };
@@ -111,9 +161,54 @@ pub(crate) fn refresh_cache(
                 .collect(),
         ),
     };
+    let split = village::view::stock_split(world, scope, good);
     let mut cache = world.resource_mut::<EconomyCache>();
     cache.flow_key = Some(wanted);
     cache.flow = Some(flow);
+    cache.split = Some(split);
+}
+
+/// What people can actually get of a good: what they hold for themselves,
+/// what is on sale and what stands in the stores (not what lies at the
+/// post for the boat).
+pub(crate) fn reachable(split: &StockSplit) -> u32 {
+    split
+        .in_homes
+        .saturating_add(split.on_sale)
+        .saturating_add(split.in_stores)
+}
+
+/// Whether none of a good can be bought: nothing on sale, nothing in the
+/// stores.
+pub(crate) fn none_for_sale(split: &StockSplit) -> bool {
+    split.on_sale == 0 && split.in_stores == 0
+}
+
+/// The card's stock line: where the stock is, only the parts that hold
+/// some. "61 in Harbour: 58 in people's own packs, 3 on sale." / "... none
+/// on sale." / "..., 4 at the post for the boat." `place` is "in Harbour"
+/// or "on the island".
+pub(crate) fn split_sentence(place: &str, split: &StockSplit) -> String {
+    if split.total == 0 {
+        return format!("None {place}.");
+    }
+    let mut parts = Vec::new();
+    if split.in_homes > 0 {
+        parts.push(format!("{} in people's own packs", split.in_homes));
+    }
+    if split.on_sale > 0 {
+        parts.push(format!("{} on sale", split.on_sale));
+    }
+    if split.in_stores > 0 {
+        parts.push(format!("{} in the stores", split.in_stores));
+    }
+    if none_for_sale(split) {
+        parts.push("none on sale".to_owned());
+    }
+    if split.at_post > 0 {
+        parts.push(format!("{} at the post for the boat", split.at_post));
+    }
+    format!("{} {place}: {}.", split.total, parts.join(", "))
 }
 
 /// The whole island's flow of one good: every village's, each line once.
@@ -316,16 +411,32 @@ fn cause_words(rank: u8, one: bool) -> &'static str {
     }
 }
 
-/// Card line 7: who goes without and the two commonest causes, and the
-/// residents behind "Show them". `None` when nobody does.
-pub(crate) fn without_sentence(lines: &[WithoutLine]) -> Option<(String, Vec<SimId>)> {
+/// Card line 7: who has less of `good` than they like to keep (most still
+/// hold some; it is not starving), with the two commonest causes or that
+/// none is on sale, and the residents behind "Show them". `None` when
+/// nobody does.
+pub(crate) fn without_sentence(
+    lines: &[WithoutLine],
+    good: &str,
+    none_on_sale: bool,
+) -> Option<(String, Vec<SimId>)> {
     let first = lines.first()?;
     let who: Vec<SimId> = lines.iter().map(|line| line.who).collect();
+    let short = if lines.len() == 1 {
+        format!("{} has less {good} than they like to keep", first.label)
+    } else {
+        format!(
+            "{} residents have less {good} than they like to keep",
+            lines.len()
+        )
+    };
+    if none_on_sale {
+        return Some((format!("{short}; none is on sale."), who));
+    }
     if lines.len() == 1 {
         return Some((
             format!(
-                "Going without: {}, who {}.",
-                first.label,
+                "{short}, and {}.",
                 cause_words(cause_rank(&first.cause), true)
             ),
             who,
@@ -344,9 +455,8 @@ pub(crate) fn without_sentence(lines: &[WithoutLine]) -> Option<(String, Vec<Sim
         .collect();
     Some((
         format!(
-            "Going without: {} residents. {}.",
-            lines.len(),
-            parts.join(", ")
+            "{short}. {}.",
+            crate::game_ui::words::capital(&parts.join(", "))
         ),
         who,
     ))
@@ -495,8 +605,12 @@ mod tests {
             Some("6 more were wanted, but only for less than the price.")
         );
         assert_eq!(below_sentence(Some(&round(1, 1, 1, 0))), None);
-        let (line, who) = without_sentence(&[without(4, WithoutCause::NoCoins)]).unwrap();
-        assert_eq!(line, "Going without: Resident 4, who has no coins.");
+        let (line, who) =
+            without_sentence(&[without(4, WithoutCause::NoCoins)], "bread", false).unwrap();
+        assert_eq!(
+            line,
+            "Resident 4 has less bread than they like to keep, and has no coins."
+        );
         assert_eq!(who, vec![SimId(4)]);
     }
 
@@ -590,13 +704,67 @@ mod tests {
             without(4, dear()),
             without(5, WithoutCause::NoCoins),
         ];
-        let (line, who) = without_sentence(&lines).unwrap();
+        let (line, who) = without_sentence(&lines, "bread", false).unwrap();
         assert_eq!(
             line,
-            "Going without: 5 residents. 3 have no coins, 2 find it too dear."
+            "5 residents have less bread than they like to keep. 3 have no coins, 2 find it too dear."
         );
         assert_eq!(who.len(), 5);
-        assert_eq!(without_sentence(&[]), None);
+        // Not starving: most still hold some; and when none is to be bought
+        // the card says so.
+        let (line, _) = without_sentence(&lines, "bread", true).unwrap();
+        assert_eq!(
+            line,
+            "5 residents have less bread than they like to keep; none is on sale."
+        );
+        assert_eq!(without_sentence(&[], "bread", false), None);
+    }
+
+    fn split(on_sale: u32, in_homes: u32, in_stores: u32, at_post: u32) -> StockSplit {
+        StockSplit {
+            good: "bread".into(),
+            on_sale,
+            in_homes,
+            in_stores,
+            at_post,
+            total: on_sale + in_homes + in_stores + at_post,
+        }
+    }
+
+    #[test]
+    fn the_stock_line_says_where_the_stock_is_in_plain_words() {
+        // Every part.
+        assert_eq!(
+            split_sentence("in Harbour", &split(3, 50, 8, 4)),
+            "65 in Harbour: 50 in people's own packs, 3 on sale, 8 in the stores, 4 at the post for the boat."
+        );
+        // Only some parts.
+        assert_eq!(
+            split_sentence("in Harbour", &split(3, 58, 0, 0)),
+            "61 in Harbour: 58 in people's own packs, 3 on sale."
+        );
+        assert_eq!(
+            split_sentence("on the island", &split(0, 0, 12, 0)),
+            "12 on the island: 12 in the stores."
+        );
+        // None on sale.
+        assert_eq!(
+            split_sentence("in Harbour", &split(0, 61, 0, 0)),
+            "61 in Harbour: 61 in people's own packs, none on sale."
+        );
+        // At the post only.
+        assert_eq!(
+            split_sentence("in Harbour", &split(0, 0, 0, 6)),
+            "6 in Harbour: none on sale, 6 at the post for the boat."
+        );
+        assert_eq!(
+            split_sentence("in Harbour", &split(0, 0, 0, 0)),
+            "None in Harbour."
+        );
+        // What people can get, and whether any can be bought.
+        assert_eq!(reachable(&split(3, 50, 8, 4)), 61);
+        assert!(none_for_sale(&split(0, 61, 0, 2)));
+        assert!(!none_for_sale(&split(0, 0, 1, 0)));
     }
 
     #[test]

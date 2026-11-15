@@ -1793,7 +1793,10 @@ fn read_outlook(world: &mut World) {
     );
     // A low window keeps two lines.
     let mut lines = lines;
-    lines.truncate(outlook::shown(scale::layout(world).height));
+    // The window's own height, not the design height: at 1024x600 the
+    // interface scales down and the design height reads 720 (final pass, F3).
+    let layout = scale::layout(world);
+    lines.truncate(outlook::shown(layout.height * layout.scale));
     world.resource_mut::<Alerts>().outlook = Some(lines);
 }
 
@@ -1829,9 +1832,12 @@ fn draw_outlook(world: &mut World) {
     }
     world.entity_mut(body).despawn_children();
     for (index, line) in lines.iter().enumerate() {
+        // A long line wraps and the row grows; it is never cut (final
+        // pass, F1: "… waiting for a home." keeps its end).
         let node = Node {
             width: percent(100),
-            height: px(t::ROW_ONE_LINE),
+            min_height: px(t::ROW_ONE_LINE),
+            padding: UiRect::vertical(px(3)),
             column_gap: px(8),
             align_items: AlignItems::Center,
             overflow: Overflow::clip(),
@@ -1858,7 +1864,7 @@ fn draw_outlook(world: &mut World) {
             14.0,
             Tone::status(Surface::Chrome, line.status),
         );
-        let text = w::label(
+        let text = w::paragraph(
             world,
             entity,
             &line.text,
