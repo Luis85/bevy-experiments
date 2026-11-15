@@ -194,42 +194,17 @@ fn buy_in_tree(h: &Harness, f: &mut FrontendParts, id: &str, searched: Option<&s
     );
 }
 
-/// Clicks the `label` on the row of `row`: of every text run reading
-/// `label`, the one nearest in height to the run reading `row`.
+/// Clicks the `label` on the row of `row` (see `row_action`).
 fn click_in_row(h: &Harness, f: &mut FrontendParts, row: &str, label: &str) {
-    fn collect(shape: &egui::epaint::Shape, label: &str, found: &mut Vec<Pos2>) {
-        match shape {
-            egui::epaint::Shape::Text(text) if text.galley.text() == label => {
-                found.push(text.pos + text.galley.rect.center().to_vec2());
-            }
-            egui::epaint::Shape::Vec(shapes) => {
-                for shape in shapes {
-                    collect(shape, label, found);
-                }
-            }
-            _ => {}
-        }
-    }
     let output = h.frame(f, View::Full, vec![]);
-    let all = |label: &str| {
-        let mut found = Vec::new();
-        for clipped in &output.shapes {
-            collect(&clipped.shape, label, &mut found);
-        }
-        found
-    };
-    let rows = all(row);
-    assert_eq!(rows.len(), 1, "{:?}: one row reads {row}", h.target);
-    let position = all(label)
-        .into_iter()
-        .min_by(|a, b| (a.y - rows[0].y).abs().total_cmp(&(b.y - rows[0].y).abs()))
-        .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+    let (name, action) = row_action(&output, row, label)
+        .unwrap_or_else(|| panic!("{:?}: {label} on the row of {row}", h.target));
     assert!(
-        (position.y - rows[0].y).abs() < 12.0,
-        "{:?}: {label} sits on the row of {row}",
+        name.visible() && action.visible(),
+        "{:?}: the row of {row} and its {label} are on screen",
         h.target
     );
-    h.press_at(f, View::Full, position, h.target.pixels);
+    h.press_at(f, View::Full, action.rect.center(), h.target.points());
 }
 
 fn full_loop(target: Target) {
@@ -482,6 +457,14 @@ fn full_loop(target: Target) {
 
     // 10. The recruit defends: chosen on the roster, the next front planned
     // on the map, deployed from its briefing onto the field, live at once.
+    // At the small target the roster row sits below Camp home's fold: the
+    // player scrolls the page to it first.
+    let output = h.frame(f, View::Full, vec![]);
+    let viewport = viewport_of(&output, "Camp home");
+    h.scroll_until(f, View::Full, viewport.center(), |output| {
+        row_action(output, &recruit_name, "Defend next")
+            .is_some_and(|(name, action)| name.visible() && action.visible())
+    });
     click_in_row(&h, f, &recruit_name, "Defend next");
     assert_eq!(
         f.game.next_defender(),

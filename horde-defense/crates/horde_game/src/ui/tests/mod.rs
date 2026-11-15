@@ -171,8 +171,9 @@ enum View {
 
 /// A target window, the one harness size convention: `pixels` is the window
 /// in physical pixels and `scale` the UI scale, so a frame is `pixels /
-/// scale` points (`RawInput::screen_rect` is `pixels`, the context's zoom is
-/// `scale`).
+/// scale` points. `RawInput::screen_rect` is in points and egui's zoom does
+/// not divide it, so the harness frames pass `points()` as the screen rect
+/// (as the App's window backend does) and the context's zoom is `scale`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Target {
     pixels: Vec2,
@@ -191,6 +192,10 @@ impl Target {
     };
     /// Both target sizes, large first.
     const BOTH: [Self; 2] = [Self::LARGE, Self::SMALL];
+    /// The target's canvas in points: `pixels / scale`.
+    fn points(self) -> Vec2 {
+        self.pixels / self.scale
+    }
 }
 
 struct Harness {
@@ -234,7 +239,7 @@ impl Harness {
             .collect()
     }
     fn frame(&self, f: &mut FrontendParts, view: View, events: Vec<Event>) -> FullOutput {
-        self.frame_size(f, view, events, self.target.pixels)
+        self.frame_size(f, view, events, self.target.points())
     }
     fn frame_size(
         &self,
@@ -254,7 +259,7 @@ impl Harness {
         events: Vec<Event>,
         time: f64,
     ) -> FullOutput {
-        self.frame_timed(f, view, events, self.target.pixels, Some(time))
+        self.frame_timed(f, view, events, self.target.points(), Some(time))
     }
     fn frame_timed(
         &self,
@@ -295,7 +300,7 @@ impl Harness {
         output
     }
     fn click(&self, f: &mut FrontendParts, view: View, label: &str) {
-        self.click_size(f, view, label, self.target.pixels);
+        self.click_size(f, view, label, self.target.points());
     }
     fn click_size(&self, f: &mut FrontendParts, view: View, label: &str, size: Vec2) {
         let output = self.frame_size(f, view, vec![], size);
@@ -309,7 +314,7 @@ impl Harness {
     /// Clicks the topmost text run reading `label`: the last one painted, so
     /// a modal's button wins over the same label on the screen under it.
     fn click_topmost(&self, f: &mut FrontendParts, view: View, label: &str) {
-        let size = self.target.pixels;
+        let size = self.target.points();
         let output = self.frame_size(f, view, vec![], size);
         let position = output
             .shapes
@@ -371,6 +376,40 @@ impl Harness {
                 start + 0.05 * f64::from(frame),
             );
         }
+    }
+    /// Wheels the scroll area under `at` down, 40 pt a frame, until `done`
+    /// holds for a frame, and returns that frame: how a player at the small
+    /// target reaches content below the fold (Camp home's roster at
+    /// 1050x700). `at` is a point in the scroll viewport, which does not move
+    /// as its content scrolls (see `viewport_of`). Panics when `done` never
+    /// holds within 60 frames.
+    fn scroll_until(
+        &self,
+        f: &mut FrontendParts,
+        view: View,
+        at: Pos2,
+        done: impl Fn(&FullOutput) -> bool,
+    ) -> FullOutput {
+        let mut output = self.frame(f, view, vec![]);
+        for _ in 0..60 {
+            if done(&output) {
+                return output;
+            }
+            output = self.frame(
+                f,
+                view,
+                vec![
+                    Event::PointerMoved(at),
+                    Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Point,
+                        delta: vec2(0.0, -40.0),
+                        phase: egui::TouchPhase::Move,
+                        modifiers: Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        panic!("{:?}: scrolling under {at:?} never got there", self.target);
     }
     fn key(&self, f: &mut FrontendParts, view: View, key: Key) {
         self.frame(f, view, vec![key_event(key, true)]);
@@ -607,6 +646,66 @@ fn clipped_bounds(output: &FullOutput, label: &str) -> Option<(Rect, Rect)> {
 /// Whether the text run reading exactly `label` is painted and fully visible.
 fn fully_visible(output: &FullOutput, label: &str) -> bool {
     clipped_bounds(output, label).is_some_and(|(rect, clip)| clip.contains_rect(rect))
+}
+/// A painted text run: its text, its painted bounds and the clip rect it was
+/// painted under.
+struct TextRun {
+    text: String,
+    rect: Rect,
+    clip: Rect,
+}
+impl TextRun {
+    /// Whether the run lies fully inside its clip rect.
+    fn visible(&self) -> bool {
+        self.clip.contains_rect(self.rect)
+    }
+}
+/// Every text run of `output`, in paint order.
+fn text_runs(output: &FullOutput) -> Vec<TextRun> {
+    fn collect(shape: &egui::epaint::Shape, clip: Rect, found: &mut Vec<TextRun>) {
+        match shape {
+            egui::epaint::Shape::Text(t) => found.push(TextRun {
+                text: t.galley.text().to_owned(),
+                rect: t.galley.rect.translate(t.pos.to_vec2()),
+                clip,
+            }),
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| collect(s, clip, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        collect(&clipped.shape, clipped.clip_rect, &mut found);
+    }
+    found
+}
+/// The painted bounds of every text run reading exactly `label` that lies
+/// fully inside its clip rect, in paint order.
+fn visible_runs(output: &FullOutput, label: &str) -> Vec<Rect> {
+    text_runs(output)
+        .into_iter()
+        .filter(|run| run.text == label && run.visible())
+        .map(|run| run.rect)
+        .collect()
+}
+/// The clip rect the text run reading exactly `anchor` is painted under: a
+/// scroll area's viewport when the run is in one.
+fn viewport_of(output: &FullOutput, anchor: &str) -> Rect {
+    clipped_bounds(output, anchor)
+        .unwrap_or_else(|| panic!("{anchor} painted"))
+        .1
+}
+/// The action reading `label` on the row of `row`: the first run reading
+/// `label` painted after the last run reading `row`. A row paints its runs
+/// in order, so this holds however its runs wrap (Camp home's roster rows
+/// take two lines at the small target), and the last `row` run is the row
+/// even when the name also reads earlier (Camp home's picker chip).
+fn row_action(output: &FullOutput, row: &str, label: &str) -> Option<(TextRun, TextRun)> {
+    let mut runs = text_runs(output);
+    let at = runs.iter().rposition(|run| run.text == row)?;
+    let action = at + 1 + runs[at + 1..].iter().position(|run| run.text == label)?;
+    let action = runs.swap_remove(action);
+    Some((runs.swap_remove(at), action))
 }
 
 mod armory_tests;

@@ -306,28 +306,38 @@ fn roster_shows_core_power_and_status_labels() {
         let h = Harness::at(target);
         let output = settle(&h, f);
         assert!(f.nav.tab == Tab::Home);
+        let viewport = viewport_of(&output, "Camp home").center();
         for option in &options {
-            let name = &option.card.name;
-            assert!(text_count(&output, name) >= 1, "{target:?}: {name}");
+            let name = option.card.name.clone();
             let power = option.power;
             let line = power_text(option);
-            // Equal powers (the player and Mara can match) share a line.
-            let rows = options.iter().filter(|o| power_text(o) == line).count();
-            assert_eq!(
-                text_count(&output, &line),
-                rows,
-                "{target:?}: {name} {line}"
-            );
             let max_hp = f
                 .game
                 .deployment_inputs(option.card.id, power.threat)
                 .unwrap()
                 .max_hp;
             let readiness = format!("HP {max_hp} · Lv {}", option.card.level);
-            assert!(
-                text_count(&output, &readiness) >= 1,
-                "{target:?}: {name} {readiness}"
-            );
+            let status = super::home::status_label(&f.game, option);
+            // At the small target the roster runs below Camp home's fold:
+            // each row is read once the page is scrolled to it.
+            let row = [name.as_str(), &status, &readiness, &line];
+            h.scroll_until(f, View::Full, viewport, |output| {
+                row.iter()
+                    .all(|text| !visible_runs(output, text).is_empty())
+            });
+            if target == Target::LARGE {
+                // The whole roster fits: equal powers (the player and Mara
+                // can match) share a line.
+                let rows = options.iter().filter(|o| power_text(o) == line).count();
+                assert_eq!(
+                    text_count(&output, &line),
+                    rows,
+                    "{target:?}: {name} {line}"
+                );
+            }
+        }
+        if target != Target::LARGE {
+            continue;
         }
         // Status reads the core labels, never a Debug name.
         assert_eq!(text_count(&output, "Ready"), expected_ready, "{target:?}");

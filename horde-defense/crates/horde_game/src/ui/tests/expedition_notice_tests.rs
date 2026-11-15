@@ -38,7 +38,7 @@ fn draw_only(h: &Harness, f: &mut FrontendParts, time: Option<f64>) -> FullOutpu
     f.settings.scale = h.target.scale;
     let mut output = h.ctx.run_ui(
         RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.pixels)),
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.points())),
             time,
             ..RawInput::default()
         },

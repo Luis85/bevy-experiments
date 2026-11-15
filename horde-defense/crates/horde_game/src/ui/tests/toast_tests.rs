@@ -27,7 +27,7 @@ fn full_at(h: &Harness, f: &mut FrontendParts, time: f64) -> FullOutput {
     f.settings.scale = h.target.scale;
     let mut output = h.ctx.run_ui(
         RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.pixels)),
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.points())),
             time: Some(time),
             ..RawInput::default()
         },

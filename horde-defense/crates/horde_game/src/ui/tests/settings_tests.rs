@@ -1007,7 +1007,7 @@ fn scale_applies_only_on_release() {
     assert_eq!(f.settings.scale, dragged);
 
     // A click without a drag commits on its release too.
-    h.press_at(f, View::Settings, low, h.target.pixels);
+    h.press_at(f, View::Settings, low, h.target.points());
     assert!(f.settings.scale < dragged, "{}", f.settings.scale);
     assert_eq!(f.prefs.scale_draft, None);
 

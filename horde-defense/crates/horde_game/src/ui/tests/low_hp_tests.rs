@@ -111,11 +111,15 @@ fn low_hp_edge_below_30_percent() {
         let mut fixture = personal();
         let h = Harness::at(target);
         let f = &mut fixture.frontend;
-        // A partial view draws in the window's pixels as points.
-        let canvas = Rect::from_min_size(Pos2::ZERO, target.pixels);
         set_hp(f, 31);
         let output = h.frame(f, View::Battle, vec![]);
-        assert_eq!(h.ctx.content_rect(), canvas, "{target:?}");
+        // The canvas is the target in points (pixels / scale), as the
+        // context rounds it.
+        let canvas = h.ctx.content_rect();
+        assert!(
+            canvas.min == Pos2::ZERO && (canvas.size() - target.points()).length() < 0.5,
+            "{target:?}: {canvas:?}"
+        );
         assert_eq!(edge(&output, canvas), None, "{target:?}: 31% is not low");
         assert!(painted(&output, &hp_text(31, false)), "{target:?}: 31%");
         assert!(!painted(&output, "LOW"), "{target:?}: 31%");

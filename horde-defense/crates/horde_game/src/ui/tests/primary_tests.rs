@@ -46,7 +46,7 @@ fn painted_color(output: &FullOutput, label: &str) -> Option<Color32> {
 fn bare_primaries(h: &Harness, events: Vec<Event>) -> FullOutput {
     let mut output = h.ctx.run_ui(
         RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.pixels)),
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.points())),
             events,
             ..RawInput::default()
         },

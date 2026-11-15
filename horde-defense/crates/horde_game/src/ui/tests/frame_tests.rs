@@ -128,3 +128,36 @@ fn observer_builds_one_field_view_per_visible_worker() {
         );
     }
 }
+
+/// The harness size convention (closing): a frame at a target lays out
+/// `pixels / scale` points, as the App's window does. `RawInput::screen_rect`
+/// is in points and egui's zoom does not divide it, so the small target
+/// (1050x700 at 1.35) is a 777.8x518.5 pt canvas, for a partial view and for
+/// the whole App frame, through `frame`, `frame_at` and `click`'s frames.
+#[test]
+fn harness_frames_lay_out_the_target_in_points() {
+    for target in Target::BOTH {
+        let points = target.points();
+        assert!(
+            (points - target.pixels / target.scale).length() < 1e-3,
+            "{target:?}"
+        );
+        for view in [View::Camp, View::Full] {
+            let mut fixture = IsolatedFrontend::new();
+            let h = Harness::at(target);
+            let f = &mut fixture.frontend;
+            h.frame(f, view, vec![]);
+            let canvas = h.ctx.content_rect();
+            assert!(
+                (canvas.size() - points).length() < 0.5,
+                "{target:?}: frame lays out {canvas:?}, not {points:?}"
+            );
+            h.frame_at(f, view, vec![], 10.0);
+            let canvas = h.ctx.content_rect();
+            assert!(
+                (canvas.size() - points).length() < 0.5,
+                "{target:?}: frame_at lays out {canvas:?}, not {points:?}"
+            );
+        }
+    }
+}
