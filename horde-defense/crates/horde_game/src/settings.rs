@@ -443,15 +443,20 @@ impl Settings {
     }
     /// Binds `id` to `key`. A key another action holds, in either table,
     /// swaps over: that action takes `id`'s previous key (Unbound when `id`
-    /// had none), so one key never drives two actions.
+    /// had none), so one key never drives two actions. Escape is Pause's
+    /// alone: the Escape router consumes it on every screen, so an action
+    /// that would take it over is left Unbound instead.
     pub fn set_binding(&mut self, id: BindingId, key: String) {
         let holder = if key.is_empty() {
             None
         } else {
             BindingId::all().find(|&other| other != id && self.binding(other) == key)
         };
-        let previous = std::mem::replace(self.binding_mut(id), key);
+        let mut previous = std::mem::replace(self.binding_mut(id), key);
         if let Some(holder) = holder {
+            if previous == "Escape" && holder != BindingId::Core(Action::Pause) {
+                previous.clear();
+            }
             *self.binding_mut(holder) = previous;
         }
     }
@@ -740,6 +745,25 @@ mod tests {
         settings.normalise();
         assert_eq!(settings.extra_bindings.world_clock, "K");
         assert_eq!(settings.extra_bindings.cycle_attack, "");
+    }
+
+    /// Escape belongs to Pause alone: the Escape router consumes it on every
+    /// screen, so a swap never hands it to another action, which would go
+    /// dead with a Controls row and a hover that name Escape.
+    #[test]
+    fn rebinding_pause_never_hands_escape_to_another_action() {
+        let mut settings = Settings::default();
+        settings.set_binding(BindingId::Core(Action::Pause), "P".into());
+        assert_eq!(settings.bindings[Action::Pause as usize], "P");
+        assert_eq!(settings.extra_bindings.world_clock, "");
+        let mut settings = Settings::default();
+        settings.set_binding(BindingId::Core(Action::Pause), "B".into());
+        assert_eq!(settings.bindings[Action::Pause as usize], "B");
+        assert_eq!(settings.bindings[Action::Build as usize], "");
+        // Pause taking Escape back still swaps as before.
+        settings.set_binding(BindingId::Core(Action::Pause), "Escape".into());
+        assert_eq!(settings.bindings[Action::Pause as usize], "Escape");
+        assert_eq!(settings.bindings[Action::Build as usize], "");
     }
 
     #[test]
