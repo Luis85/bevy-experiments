@@ -1443,3 +1443,46 @@ fn settings_show_the_music_and_stingers_slider_with_its_caption() {
         "Music tracks are not in this build; this sets victory, defeat and retreat stingers."
     );
 }
+
+/// The Profile section's restore button, at the end of the Settings page.
+const RESTORE_DEFAULTS: &str = "Restore display, audio & control defaults";
+
+/// "Restore display, audio & control defaults", reached by scrolling the
+/// page at the window size: the preferences take their defaults, a pending
+/// key prompt closes and no interface-scale draft is left behind
+/// (`ui/preferences.rs`, the Profile section). Earlier in the same pass the
+/// scale slider drops a draft nothing holds, and the prompt takes the press
+/// as "Mouse1", so the button's own two clears are a second guard: the test
+/// pins the outcome, which fails when the button stops restoring.
+#[test]
+fn restore_defaults_clears_the_scale_draft_and_the_key_prompt() {
+    for target in Target::BOTH {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.screen = Screen::Settings;
+        f.settings.master = 0.1;
+        f.settings.bindings[Action::Build as usize] = "G".into();
+        // A key prompt waits (the Reload button, at the top of the page).
+        h.click_size(f, View::Settings, "R", TALL);
+        assert!(f.prefs.rebind == Some(Action::Reload), "{target:?}");
+        let expected = {
+            let mut restored = f.settings.clone();
+            restored.restore_defaults();
+            restored
+        };
+        let output = h.scroll_until(f, View::Settings, pos2(40.0, 300.0), |output| {
+            fully_visible(output, RESTORE_DEFAULTS)
+        });
+        let (button, _) = clipped_bounds(&output, RESTORE_DEFAULTS).expect("painted");
+        f.prefs.scale_draft = Some(1.3);
+        h.press_at(f, View::Settings, button.center(), target.points());
+        assert_eq!(f.settings, expected, "{target:?}");
+        assert_eq!(f.prefs.scale_draft, None, "{target:?}");
+        assert!(
+            f.prefs.rebind.is_none(),
+            "{target:?}: the key prompt closed"
+        );
+        assert_eq!(f.settings.bindings[Action::Reload as usize], "R");
+    }
+}
