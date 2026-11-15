@@ -73,6 +73,7 @@ fn home_after_report() -> EscapeContext {
 const QUIT: ModalKind = ModalKind::Quit;
 const RETURN: ModalKind = ModalKind::ReturnToMenu;
 const DRAFT: ModalKind = ModalKind::DraftWarning;
+const APPLY: ModalKind = ModalKind::ApplyAutoSell;
 
 const TABS: [Tab; 9] = [
     Tab::Home,
@@ -85,7 +86,7 @@ const TABS: [Tab; 9] = [
     Tab::Engineering,
     Tab::Operations,
 ];
-const OVERLAYS: [Overlay; 13] = [
+const OVERLAYS: [Overlay; 14] = [
     Overlay::Rebind,
     Overlay::TextFocus,
     Overlay::AppModal(ModalKind::Quit),
@@ -93,6 +94,7 @@ const OVERLAYS: [Overlay; 13] = [
     Overlay::AppModal(ModalKind::Storage),
     Overlay::AppModal(ModalKind::DraftWarning),
     Overlay::AppModal(ModalKind::Recruit),
+    Overlay::AppModal(ModalKind::ApplyAutoSell),
     Overlay::NewJourneyModal,
     Overlay::Details,
     Overlay::Popup,
@@ -100,6 +102,37 @@ const OVERLAYS: [Overlay; 13] = [
     Overlay::ArmoryConfirm,
     Overlay::None,
 ];
+
+/// The modal family after `kind`, in declaration order (`None` after the
+/// last). The match is exhaustive, so a new `ModalKind` does not compile
+/// until it joins this chain, and through it `OVERLAYS`.
+fn next_modal(kind: ModalKind) -> Option<ModalKind> {
+    match kind {
+        ModalKind::Quit => Some(ModalKind::ReturnToMenu),
+        ModalKind::ReturnToMenu => Some(ModalKind::Storage),
+        ModalKind::Storage => Some(ModalKind::DraftWarning),
+        ModalKind::DraftWarning => Some(ModalKind::Recruit),
+        ModalKind::Recruit => Some(ModalKind::ApplyAutoSell),
+        ModalKind::ApplyAutoSell => None,
+    }
+}
+
+/// design-ux-flow §7: the matrix grows a row family with each overlay, so
+/// every app modal family is one of the overlays the properties sweep.
+#[test]
+fn overlays_hold_every_modal_family() {
+    let mut kind = Some(ModalKind::Quit);
+    let mut families = 0;
+    while let Some(here) = kind {
+        assert!(
+            OVERLAYS.contains(&Overlay::AppModal(here)),
+            "{here:?} is missing from OVERLAYS"
+        );
+        families += 1;
+        kind = next_modal(here);
+    }
+    assert_eq!(families, 6);
+}
 
 #[test]
 fn matrix_table() {
@@ -350,6 +383,17 @@ fn matrix_table() {
             with(Overlay::AppModal(ModalKind::Recruit), camp(Tab::Operations)),
             A::CloseModal,
         ),
+        // The stash auto-sell confirmation (W3-21): Cancel's route.
+        (
+            "the auto-sell confirmation closes before the armory goes back",
+            with(Overlay::AppModal(APPLY), camp(Tab::Armory)),
+            A::CloseModal,
+        ),
+        (
+            "the auto-sell confirmation closes while a save is pending",
+            pending(with(Overlay::AppModal(APPLY), camp(Tab::Armory))),
+            A::CloseModal,
+        ),
         (
             "the results defender picker popup is egui's",
             with(Overlay::Popup, on(Screen::Results)),
@@ -526,7 +570,7 @@ fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
 #[test]
 fn properties() {
     let all = every_context();
-    assert_eq!(all.len(), 8 * 9 * 13 * 512);
+    assert_eq!(all.len(), 8 * 9 * 14 * 512);
     for cx in all {
         let action = escape_action(&cx);
         // A focused text field and an open popup keep Escape for egui, and
