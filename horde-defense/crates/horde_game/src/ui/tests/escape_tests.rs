@@ -130,6 +130,86 @@ fn escape_walks_a_camp_tab_back_to_camp_home_then_the_return_modal() {
     assert!(Game::load(&f.paths.campaign()).unwrap().global_paused());
 }
 
+/// Every camp tab. Adding a `Tab` breaks the match, so the list is revisited
+/// with it.
+fn camp_tabs() -> [Tab; 9] {
+    let _exhaustive = |tab: Tab| match tab {
+        Tab::Home
+        | Tab::World
+        | Tab::Briefing
+        | Tab::Character
+        | Tab::Survivor
+        | Tab::Armory
+        | Tab::Skills
+        | Tab::Engineering
+        | Tab::Operations => (),
+    };
+    [
+        Tab::Home,
+        Tab::World,
+        Tab::Briefing,
+        Tab::Character,
+        Tab::Survivor,
+        Tab::Armory,
+        Tab::Skills,
+        Tab::Engineering,
+        Tab::Operations,
+    ]
+}
+
+/// design-ux-flow §10: "Escape presses from any camp tab to the Quit modal:
+/// <=5". Escape alone walks a camp tab back to Camp home, then (after a
+/// defense) to Results, then to the ReturnToMenu modal; its one confirm is a
+/// click, not a press. On the menu the next press asks to quit.
+#[test]
+fn escape_reaches_the_quit_modal_from_every_camp_tab_within_five_presses() {
+    const BUDGET: usize = 5;
+    let h = Harness::new();
+    for after_a_defense in [false, true] {
+        for tab in camp_tabs() {
+            let mut fixture = IsolatedFrontend::new();
+            if after_a_defense {
+                fixture.deploy();
+                fixture.frontend.game.withdraw();
+            } else {
+                fixture
+                    .frontend
+                    .game
+                    .campaign_mut()
+                    .choose_start_country("DEU")
+                    .unwrap();
+            }
+            let f = &mut fixture.frontend;
+            f.game.set_paused(true);
+            f.screen = Screen::Camp;
+            f.nav.tab = tab;
+            let case = format!("{tab:?}, after a defense {after_a_defense}");
+            let mut presses = 0;
+            let mut confirmed = false;
+            while f.status.modal != Some(AppModal::Quit) && presses <= BUDGET {
+                if f.status.modal == Some(AppModal::ReturnToMenu) && !confirmed {
+                    h.frame(f, View::Full, vec![]);
+                    assert_eq!(
+                        modal_primaries(&h),
+                        ["Save and return to main menu"],
+                        "{case}"
+                    );
+                    h.click_topmost(f, View::Full, "Save and return to main menu");
+                    assert!(f.screen == Screen::Menu, "{case}: {}", f.status.message);
+                    confirmed = true;
+                } else {
+                    h.key(f, View::Full, Key::Escape);
+                    presses += 1;
+                }
+            }
+            assert_eq!(f.status.modal, Some(AppModal::Quit), "{case}");
+            assert!(f.screen == Screen::Menu, "{case}");
+            assert!(confirmed, "{case}: the way out is the ReturnToMenu modal");
+            assert!(presses <= BUDGET, "{case}: {presses} presses");
+        }
+    }
+}
+
 #[test]
 fn escape_on_camp_home_after_a_defense_opens_results_then_the_return_modal() {
     let mut fixture = IsolatedFrontend::new();
