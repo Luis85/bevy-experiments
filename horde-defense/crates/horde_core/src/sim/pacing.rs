@@ -699,9 +699,10 @@ pub fn tree_exhausted<'a>(
     nodes_left(nodes, owned, retired) == 0
 }
 /// The smallest victory gate that keeps a node out of its tier: the first
-/// rank milestone. A node gated at 5 victories or more cannot be bought
-/// inside the tier windows (runs 3-13), so it is not part of a tier's cost
-/// (design progression-tree section 4).
+/// rank milestone. A node gated at 5 victories or more opens only with a
+/// rank milestone, so it is not part of what a tier window measures and not
+/// part of a tier's cost (design progression-tree section 4), even though a
+/// campaign that reaches 5 victories early can buy it inside a window.
 pub const TIER_GATE_VICTORIES: u64 = 5;
 /// Coins needed to learn every node up to and including `depth` that is
 /// not milestone gated ([`TIER_GATE_VICTORIES`]).

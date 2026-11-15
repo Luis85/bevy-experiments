@@ -648,8 +648,9 @@ fn body_rank_one_is_cheaper_than_its_dedicated_peer() {
 }
 
 /// Rule 6 and the design §4 tier definition: a tier is every node up to its
-/// prerequisite depth that a fresh campaign can buy inside the tier window,
-/// so the milestone-gated nodes (a victory gate of 5 or more) stay out.
+/// prerequisite depth that is not milestone gated. A node with a victory
+/// gate of 5 or more opens only with a rank milestone, so it is not part of
+/// what a tier window measures and stays out.
 #[test]
 fn tier_costs_sit_in_design_bands() {
     let depths = node_depths();
