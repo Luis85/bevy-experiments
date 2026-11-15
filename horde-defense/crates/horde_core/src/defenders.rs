@@ -420,12 +420,19 @@ impl PowerBand {
 }
 
 /// A comparable strength for any defender against a given victory threat
-/// (`Game::defender_power`, CD11). Analytic, from the inputs a deploy uses:
-/// the expected kill rate against the reference enemy and the expected time
-/// the defender survives its arrivals, in the defender's own combat model.
-/// `rating` is the geometric mean of both against a fresh starter's at
-/// threat 0 (exactly 100 in either model), clamped to 1..=999. Derived on
-/// every read; never saved.
+/// (`Game::defender_power`, CD11). Analytic, from the inputs a deploy uses,
+/// in the defender's own combat model:
+/// - Personal: `kills_per_min` and `survival_s` against the reference enemy
+///   (a Shambler) and its arrivals; `rating` is the geometric mean of both
+///   against a fresh starter's at threat 0.
+/// - Npc (W4-16, R62): `rating` is the heaviest arrival load at which the
+///   defender still wins the stage, against a fresh Mara's at threat 0;
+///   `kills_per_min` is the turn-limited kill rate at mid-field against the
+///   stage's hostile mix and `survival_s` the seconds held against the
+///   stage's own arrivals.
+///
+/// A fresh starter reads exactly 100 in either model; `rating` is clamped
+/// to 1..=999. Derived on every read; never saved.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DefenderPower {
     pub defender: DefenderId,
