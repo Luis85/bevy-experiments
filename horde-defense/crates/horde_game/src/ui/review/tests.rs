@@ -527,6 +527,115 @@ fn launched(vars: &[(&str, &str)]) -> FrontendParts {
     prepare(&mut f);
     f
 }
+/// CF-3-13: a still's footer status line never depends on how long the
+/// launch took. The status line's 5 s wall-clock fade decided whether the
+/// "Campaign restored…" line of a reused review folder (CF-3-24) and its
+/// Dismiss showed, so the normal and reduced briefing-npc stills differed.
+/// Startup reads that journey, the scene replaces it, and in both modes,
+/// with the capture frame 0.5 s or 8 s after the first, the stills carry one
+/// status state: no restored line, and a line staged after the load (here
+/// a plan save) shown at full strength.
+#[test]
+fn briefing_npc_stills_carry_one_status_state_in_both_modes() {
+    use crate::ui::tests::text_count;
+    const STAGED: &str = "Country plan saved. Next deployment pays its supply costs.";
+    let mut states = Vec::new();
+    for staged_note in [false, true] {
+        for reduced in [false, true] {
+            for capture_at in [0.5, 8.0] {
+                let config = LaunchConfig {
+                    scenario: Some("briefing-npc".into()),
+                    review: Some(ReviewOptions {
+                        capture: Some("headless-review-capture.png".into()),
+                        exit: true,
+                        reduced,
+                        ..ReviewOptions::default()
+                    }),
+                    ..LaunchConfig::default()
+                };
+                let paths = crate::profile::ProfilePaths::in_directory(
+                    std::env::temp_dir().join(format!("lastlight-cf313-{}", std::process::id())),
+                );
+                let profile = crate::profile::LoadedProfile {
+                    game: Game::default(),
+                    settings: crate::settings::Settings::default(),
+                    warning: crate::profile::CAMPAIGN_RESTORED.into(),
+                    load_error: None,
+                    settings_warning: None,
+                    settings_at_risk: false,
+                };
+                let mut f = FrontendParts::new(profile, &config, &paths);
+                prepare(&mut f);
+                apply_reduced_override(&mut f, true, false, reduced);
+                if staged_note {
+                    f.status.message = STAGED.into();
+                }
+                let ctx = egui::Context::default();
+                crate::settings::install_font(&ctx);
+                let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+                warmup.textures_delta.clear();
+                let mut last = None;
+                for time in [0.0, capture_at] {
+                    f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+                    let mut output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(1440.0, 900.0),
+                            )),
+                            time: Some(time),
+                            ..egui::RawInput::default()
+                        },
+                        |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+                    );
+                    output.textures_delta.clear();
+                    last = Some(output);
+                }
+                let output = last.expect("a capture frame");
+                // The painted strength of the run: its colour's alpha times
+                // the opacity of the scope it was painted in.
+                fn strength(shape: &egui::epaint::Shape, label: &str) -> Option<f32> {
+                    match shape {
+                        egui::epaint::Shape::Text(t) if t.galley.text() == label => {
+                            let color = t.galley.job.sections.first()?.format.color;
+                            Some(f32::from(color.a()) / 255.0 * t.opacity_factor)
+                        }
+                        egui::epaint::Shape::Vec(v) => v.iter().find_map(|s| strength(s, label)),
+                        _ => None,
+                    }
+                }
+                let alpha = |label: &str| {
+                    output
+                        .shapes
+                        .iter()
+                        .find_map(|clipped| strength(&clipped.shape, label))
+                };
+                states.push((
+                    staged_note,
+                    reduced,
+                    capture_at,
+                    text_count(&output, crate::profile::CAMPAIGN_RESTORED),
+                    text_count(&output, STAGED),
+                    alpha(STAGED),
+                    text_count(&output, "Dismiss"),
+                ));
+            }
+        }
+    }
+    for state in &states {
+        let (staged_note, _, _, restored, note, alpha, dismiss) = *state;
+        assert_eq!(restored, 0, "the replaced journey's line shows: {state:?}");
+        assert_eq!(
+            (note, alpha.is_some_and(|a| a > 0.999), dismiss),
+            if staged_note {
+                (1, true, 1)
+            } else {
+                (0, false, 0)
+            },
+            "{state:?} of {states:?}"
+        );
+    }
+}
 #[test]
 fn isolated_reviews_are_not_practice_profiles() {
     if cfg!(feature = "review") {

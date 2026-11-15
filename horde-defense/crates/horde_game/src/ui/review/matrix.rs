@@ -27,6 +27,13 @@ fn stage(f: &mut FrontendParts) {
     let Some(screen) = launch.scenario.clone() else {
         return;
     };
+    // The scene replaces the journey startup read (a reused review folder
+    // can hold one, CF-3-24), so that read's "Campaign restored…" line no
+    // longer describes it and never reaches a still (CF-3-13). A load
+    // failure keeps its line: it is a real fault of the review folder.
+    if !launch.practice && f.status.message == crate::profile::CAMPAIGN_RESTORED {
+        f.status.message.clear();
+    }
     if screen == "npc-stutter" {
         prepare_copied_npc(f);
         return;

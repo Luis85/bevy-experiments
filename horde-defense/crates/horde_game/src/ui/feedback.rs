@@ -40,11 +40,15 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
         || f.status.message.starts_with("Original unreadable");
     let applying = f.runtime.pending_commands() > 0;
     let working = f.status.save_pending || applying;
+    // A review capture pins the line (CF-3-13): its message stays at full
+    // strength for the whole launch, so a still never depends on how long
+    // the launch took to reach its capture frame.
+    let pinned = f.launch.review_capture();
     let visible = working
         || !f.status.message.is_empty()
             && f.status
                 .feedback
-                .visible(now, critical || f.status.save_pending);
+                .visible(now, critical || f.status.save_pending || pinned);
     let text = if applying && !f.status.save_pending {
         "Applying changes…".into()
     } else if visible {
@@ -54,7 +58,7 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
     } else {
         "Coins and equipment bank as they are earned.".into()
     };
-    let alpha = if !visible || critical || working || f.settings.reduced_effects {
+    let alpha = if !visible || critical || working || pinned || f.settings.reduced_effects {
         1.0
     } else {
         ((5.0 - (now - f.status.feedback.started)) / 0.25).clamp(0.0, 1.0) as f32
