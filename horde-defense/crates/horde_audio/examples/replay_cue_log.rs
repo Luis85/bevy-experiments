@@ -12,6 +12,7 @@
 //! against `reference_mixed_60s` (-23 +/-2 LUFS integrated, true peak <= 0.95).
 //! `--wav` also writes the left and right signals as `<out>.L.wav` and
 //! `<out>.R.wav` for listening.
+#![allow(clippy::print_stdout, clippy::print_stderr)] // a CLI: its report is its output
 
 use horde_audio::{cue_log, render, wav};
 use std::path::{Path, PathBuf};

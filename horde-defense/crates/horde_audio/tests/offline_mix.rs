@@ -7,6 +7,7 @@
 //! calibrated (A6-17); run
 //! `cargo test -p horde_audio --test offline_mix -- --include-ignored --nocapture`
 //! to print the numbers, the logged max-slider render included.
+#![allow(clippy::print_stdout)] // the gates print the loudness they assert on
 
 use horde_audio::{
     cue::Cue,

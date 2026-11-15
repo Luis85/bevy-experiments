@@ -5,6 +5,7 @@
 //! (`LASTLIGHT_REVIEW_CUE_LOG`), so a log of a real session can be metered
 //! with `cargo run -p horde_audio --example replay_cue_log -- <cues.jsonl>`
 //! and compared with the loudness gate's reference scene.
+#![allow(clippy::print_stdout)] // prints the loudness the replay is held to
 
 use horde_audio::{
     cue::Cue,

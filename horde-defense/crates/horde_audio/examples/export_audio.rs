@@ -14,6 +14,7 @@
 //! also writes the audition reel to `target/audio-audition/`, which is never
 //! committed. `--root <folder>` names the workspace folder (default: the one
 //! this crate lives in).
+#![allow(clippy::print_stdout, clippy::print_stderr)] // a CLI: its report is its output
 
 use horde_audio::{export, synth::legacy::RATE, wav};
 use std::{path::PathBuf, process::ExitCode};

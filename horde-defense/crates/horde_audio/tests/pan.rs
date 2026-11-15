@@ -292,7 +292,7 @@ fn single_voice_peak_at_max_sliders_le_0_75() {
                     .into_iter()
                     .fold(0.0_f32, f32::max);
                 assert_eq!(near, 1.0, "{cue:?}");
-                let level = peak(library.clip(cue, u64::from(variant)))
+                let level = peak(library.clip(cue, variant))
                     * mix(cue).level(false)
                     * db_to_linear(mix(cue).jitter.gain_db)
                     * bus

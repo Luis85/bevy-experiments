@@ -88,9 +88,10 @@ pub fn read_pcm16(bytes: &[u8]) -> Result<Pcm16, String> {
             format = Some((u32_at(bytes, body + 4), channels));
         } else if id == b"data" {
             let (rate, channels) = format.ok_or("the data chunk comes before fmt")?;
-            let samples = bytes[body..end]
-                .chunks_exact(2)
-                .map(|pair| f32::from(i16::from_le_bytes([pair[0], pair[1]])) / 32_767.0)
+            let (pairs, _odd_byte) = bytes[body..end].as_chunks::<2>();
+            let samples = pairs
+                .iter()
+                .map(|pair| f32::from(i16::from_le_bytes(*pair)) / 32_767.0)
                 .collect();
             return Ok(Pcm16 {
                 rate,

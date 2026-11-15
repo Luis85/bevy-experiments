@@ -326,12 +326,15 @@ fn battle(seed: u64) -> Game {
     game
 }
 
+/// Each bank's starts, by bank ordinal: the variant and jitter of each.
+type BankStarts = BTreeMap<u64, Vec<(u64, Jitter)>>;
+
 /// The starts of a battle's first 40 s through the policy, per bank.
-fn plans(seed: u64) -> (Vec<Vec<Cue>>, BTreeMap<u64, Vec<(u64, Jitter)>>) {
+fn plans(seed: u64) -> (Vec<Vec<Cue>>, BankStarts) {
     let frames = render::battle_frames(&mut battle(seed), 2_400);
     let audible = Sliders::MAX.bus_gains();
     let mut policy = VoicePolicy::default();
-    let mut plans: BTreeMap<u64, Vec<(u64, Jitter)>> = BTreeMap::new();
+    let mut plans = BankStarts::new();
     for (index, frame) in frames.iter().enumerate() {
         let now_ms = index as u64 * 1000 / 60;
         let actions = policy.frame_requests(
