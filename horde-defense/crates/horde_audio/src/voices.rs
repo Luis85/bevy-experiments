@@ -8,7 +8,9 @@
 //! - A bus holds [`BUS_CAP`] voices. Each bus counts and steals among its own
 //!   voices, so a combat cue never takes an interface sound or a stinger.
 //! - A [`Family`] of cues holds [`Family::cap`] voices. A start into a full
-//!   family steals that family's oldest voice.
+//!   family steals that family's oldest voice that is no more important than
+//!   the start (the highest priority number is the least important), and is
+//!   refused when every member is more important.
 //! - A start into a full bus steals the bus's least important voice (the
 //!   highest priority number), the oldest of them first. The victim must be
 //!   less important than the start; an equally important one is taken only
@@ -185,7 +187,12 @@ pub fn admit(start: Start, live: &[LiveVoice]) -> Admission {
                 .filter(|voice| self::family(voice.cue) == Some(family))
         };
         if members().count() >= family.cap() {
-            return match members().min_by_key(age) {
+            // Only a member no more important than the start is taken: the
+            // spawn squelch must not cut a sounding boss warning.
+            return match members()
+                .filter(|voice| mix(voice.cue).priority >= row.priority)
+                .min_by_key(age)
+            {
                 Some(oldest) => Admission::Steal(oldest.id),
                 None => Admission::Refuse,
             };

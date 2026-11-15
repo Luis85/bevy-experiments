@@ -117,6 +117,25 @@ fn family_cap_steals_own_oldest() {
     assert_eq!(admit(Start::bus(Cue::Kill), &same), Admission::Steal(4));
 }
 
+/// A family steal never takes a member more important than the start: the
+/// spawn squelch (Incoming, priority 12) cannot cut a boss warning or a
+/// reinforcement call (Wave, priority 1) that still sounds, while the warning
+/// still replaces a sounding squelch.
+#[test]
+fn incoming_never_steals_a_sounding_wave() {
+    assert!(mix(Cue::Wave).priority < mix(Cue::Incoming).priority);
+    let wave = [voice(1, Cue::Wave, 0)];
+    assert_eq!(admit(Start::bus(Cue::Incoming), &wave), Admission::Refuse);
+    let incoming = [voice(2, Cue::Incoming, 0)];
+    assert_eq!(admit(Start::bus(Cue::Wave), &incoming), Admission::Steal(2));
+    // A second warning replaces the first: an equal is taken.
+    assert_eq!(admit(Start::bus(Cue::Wave), &wave), Admission::Steal(1));
+    assert_eq!(
+        admit(Start::bus(Cue::Incoming), &incoming),
+        Admission::Steal(2)
+    );
+}
+
 /// At a full bus the least important voice goes, the oldest of the equally
 /// unimportant ones first; an equal is taken only by gunfire and impacts;
 /// and the victim fades for 40 ms, sample-exact at any frame rate.

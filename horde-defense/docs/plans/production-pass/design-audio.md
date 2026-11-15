@@ -256,7 +256,7 @@ If calibration needs more than -1.4 dB, compress the loud rare rows first; never
 - Family (`max_concurrent`): player guns 2, turret 1, EnemyWindup 2, EnemyContact 2, death group 2, Impact 2, Armor/Block 1, Explosion 2, Molotov 1, Fire 1, reload-stage group 1, radio (Wave, Incoming) 1, each boss cue 1, LootDrop 1.
 
 **Stealing:**
-- At a family cap, steal that family's oldest voice.
+- At a family cap, steal that family's oldest voice that is no more important than the start (priority value >= the start's), and refuse the start when every member is more important. Only the radio family mixes priorities: an Incoming squelch (12) never cuts a sounding Wave warning (1), while a Wave still replaces an Incoming (closing phase).
 - At a bus cap, steal the highest priority value (least important), ties broken by oldest `started_ms`. Equal-priority steals are allowed only for fire and impact families.
 - The victim gets a 40 ms fade through VoiceControl and then stops. Fading voices do not count toward caps.
 - UI and Music voices are never stolen by Effects.
@@ -512,6 +512,7 @@ If calibration needs more than -1.4 dB, compress the loud rare rows first; never
 - **6.8 Selection and budgets.** `player_shot_starts_even_with_two_critical_cues_in_frame`. The old sfx.rs:228-288 cases are re-expressed.
 - **6.9 Caps and stealing.**
   - `family_cap_steals_own_oldest`;
+  - `incoming_never_steals_a_sounding_wave`;
   - `steal_prefers_oldest_among_equal_priority_and_fades_40ms` (dt-independent at 30 and 144 FPS);
   - `ui_and_music_never_stolen_by_effects`;
   - `voice_control_fade_has_no_step_over_0_1`.
