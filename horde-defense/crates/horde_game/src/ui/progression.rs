@@ -496,15 +496,24 @@ fn toolbar(
         .on_hover_text("Select a goal; its path lights up on the tree");
     };
     if compact {
-        egui::ScrollArea::horizontal()
-            .id_salt("skill_tree_toolbar")
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    controls(ui, state);
-                    ui.separator();
-                    branch_chips(ui, state, nodes);
+        ui.scope(|ui| {
+            // A solid bar in its own strip under the row (CF-3-16): egui's
+            // floating bar was drawn over the lower half of the controls and
+            // chips. It also shows the row scrolls while chips are off-screen.
+            ui.spacing_mut().scroll = egui::style::ScrollStyle {
+                bar_inner_margin: 2.0,
+                ..egui::style::ScrollStyle::solid()
+            };
+            egui::ScrollArea::horizontal()
+                .id_salt("skill_tree_toolbar")
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        controls(ui, state);
+                        ui.separator();
+                        branch_chips(ui, state, nodes);
+                    });
                 });
-            });
+        });
     } else {
         ui.horizontal_wrapped(|ui| {
             controls(ui, state);

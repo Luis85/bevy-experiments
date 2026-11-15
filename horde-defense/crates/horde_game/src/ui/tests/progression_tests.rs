@@ -346,3 +346,62 @@ fn counter_node_tooltip_names_its_archetypes() {
         assert_ne!(delta.before, delta.after, "{label}: the perk changes it");
     }
 }
+
+/// CF-3-16: the compact toolbar's scroll bar has its own strip. egui's
+/// default floating bar was drawn over the lower half of Recommended, -, +,
+/// the search field, Path to… and the branch chips whenever it showed, at
+/// full opacity at once with reduced effects. With the pointer on the
+/// toolbar at 1050x700@1.35 no control meets the bar.
+#[test]
+fn compact_toolbar_scroll_bar_never_covers_a_toolbar_control() {
+    let mut fixture = upgrade_home();
+    let h = Harness::small();
+    let f = &mut fixture.frontend;
+    f.settings.reduced_effects = true;
+    f.game.campaign_mut().coins = 200;
+    h.frame(f, View::Full, vec![]);
+    let output = h.frame(f, View::Full, vec![]);
+    assert!(progression::layout_for_test(&h.ctx).unwrap().compact);
+    let recommended = button_frame(&output, "Recommended").expect("Recommended painted");
+    let hover = || vec![Event::PointerMoved(recommended.center())];
+    h.frame(f, View::Full, hover());
+    let output = h.frame(f, View::Full, hover());
+    let viewport = viewport_of(&output, "Recommended");
+    // The bar's track and handle: thin rects across the toolbar's x range,
+    // at or under its bottom edge.
+    let bars: Vec<Rect> = painted_rects(&output)
+        .into_iter()
+        .map(|shape| shape.rect)
+        .filter(|rect| {
+            rect.height() <= 12.0
+                && rect.width() >= viewport.width() * 0.25
+                && rect.left() >= viewport.left() - 1.0
+                && rect.right() <= viewport.right() + 1.0
+                && rect.top() >= viewport.top() - 1.0
+                && rect.bottom() <= viewport.bottom() + 16.0
+        })
+        .collect();
+    assert!(!bars.is_empty(), "the toolbar scroll bar is painted");
+    let mut controls: Vec<(&str, Rect)> = ["Recommended", "-", "+", "Search upgrades", "Path to…"]
+        .into_iter()
+        .map(|label| {
+            (
+                label,
+                button_frame(&output, label).unwrap_or_else(|| panic!("{label} painted")),
+            )
+        })
+        .collect();
+    let chip = text_runs(&output)
+        .into_iter()
+        .find(|run| run.text.starts_with("Foundations "))
+        .expect("the first branch chip");
+    controls.push(("Foundations chip", chip.rect));
+    for (label, rect) in controls {
+        for bar in &bars {
+            assert!(
+                !rect.intersects(*bar),
+                "{label} {rect:?} lies under the scroll bar {bar:?}"
+            );
+        }
+    }
+}
