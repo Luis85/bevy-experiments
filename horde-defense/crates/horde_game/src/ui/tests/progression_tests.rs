@@ -405,3 +405,73 @@ fn compact_toolbar_scroll_bar_never_covers_a_toolbar_control() {
         }
     }
 }
+
+/// CF-3-17: every "What changes" row fits the detail panel. Pump drill's
+/// long stat labels grew the 4-column grid past the 310 pt wide detail
+/// column, so the after-value was cut at the window edge. At 1440x900 and
+/// 1050x700@1.35 (its detail scrolled to the rows) every stat, before and
+/// after run lies inside the panel and the window.
+#[test]
+fn what_changes_rows_stay_inside_the_detail_panel() {
+    for target in Target::BOTH {
+        let mut fixture = upgrade_home();
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
+            "shotgun_pump_drill".into(),
+        ));
+        h.frame(f, View::Full, vec![]);
+        h.frame(f, View::Full, vec![]);
+        assert_eq!(selected(&h), "shotgun_pump_drill");
+        let layout = progression::layout_for_test(&h.ctx).unwrap();
+        // Each row's stat, before and after.
+        let preview = f.game.campaign().node_stat_preview("shotgun_pump_drill");
+        let texts: Vec<String> = preview
+            .iter()
+            .flat_map(|delta| [delta.stat.label(), delta.stat.format(delta.after)])
+            .collect();
+        // The compact detail is short (CF-3-30): wheel its body down until
+        // every row is painted.
+        let body = pos2(
+            layout.region.right() - 40.0,
+            (layout.canvas.bottom() + layout.region.bottom()) * 0.5,
+        );
+        let output = h.scroll_until(f, View::Full, body, |output| {
+            texts.iter().all(|text| text_count(output, text) > 0)
+        });
+        let panel = if layout.compact {
+            Rect::from_min_max(
+                pos2(layout.region.left(), layout.canvas.bottom()),
+                layout.region.max,
+            )
+        } else {
+            Rect::from_min_max(
+                pos2(layout.canvas.right(), layout.region.top()),
+                layout.region.max,
+            )
+        };
+        let window = h.ctx.content_rect();
+        let before: Vec<String> = preview
+            .iter()
+            .map(|delta| delta.stat.format(delta.before))
+            .collect();
+        let rows: Vec<TextRun> = text_runs(&output)
+            .into_iter()
+            .filter(|run| texts.contains(&run.text) || before.contains(&run.text))
+            .filter(|run| run.rect.top() >= panel.top() - 0.5)
+            .collect();
+        assert!(
+            rows.len() >= 3 * preview.len(),
+            "{target:?}: every row is painted"
+        );
+        for run in rows {
+            assert!(
+                run.rect.left() >= panel.left() - 0.5
+                    && run.rect.right() <= panel.right().min(window.right()) + 0.5,
+                "{target:?}: {:?} {:?} leaves the detail panel {panel:?}",
+                run.text,
+                run.rect
+            );
+        }
+    }
+}

@@ -253,8 +253,87 @@ pub(super) fn learned_line(campaign: &Campaign, node: &SkillNode) -> String {
     }
 }
 /// A small painted arrow for before/after rows.
+/// The "What changes" rows, laid out to the detail column's width (CF-3-17).
+/// While every row fits, one aligned grid (stat, before, arrow, after). A
+/// stat label too long for that (Pump drill's "Shotgun time between shots")
+/// grew the grid past the column and cut the after-value off at the window
+/// edge, so the rows then stack: the stat on its own wrapping line, and
+/// "before → after" indented under it.
+fn what_changes(ui: &mut egui::Ui, id: &str, preview: &[StatDelta]) {
+    const SPACING: egui::Vec2 = vec2(8.0, 3.0);
+    let font = egui::TextStyle::Body.resolve(ui.style());
+    let width = |text: &str| {
+        ui.painter()
+            .layout_no_wrap(text.to_owned(), font.clone(), egui::Color32::PLACEHOLDER)
+            .size()
+            .x
+    };
+    // The grid's column widths: stat, before (or the unlocked name), after.
+    let mut columns = [0.0f32; 3];
+    for delta in preview {
+        let cells = match &delta.stat {
+            PreviewStat::Unlock(name) => [width("Unlocks"), width(name), 0.0],
+            stat => [
+                width(&stat.label()),
+                width(&stat.format(delta.before)),
+                width(&stat.format(delta.after)),
+            ],
+        };
+        for (column, cell) in columns.iter_mut().zip(cells) {
+            *column = column.max(cell);
+        }
+    }
+    let row = columns.iter().sum::<f32>() + ARROW_WIDTH + 3.0 * SPACING.x;
+    if row <= ui.available_width() {
+        egui::Grid::new(("skill-changes", id))
+            .num_columns(4)
+            .min_col_width(0.0)
+            .spacing(SPACING)
+            .show(ui, |ui| {
+                for delta in preview {
+                    match &delta.stat {
+                        PreviewStat::Unlock(name) => {
+                            ui.label("Unlocks");
+                            ui.colored_label(AMBER, name);
+                        }
+                        stat => {
+                            ui.label(stat.label());
+                            ui.colored_label(MUTED, stat.format(delta.before));
+                            arrow(ui);
+                            ui.colored_label(AMBER, stat.format(delta.after));
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+        return;
+    }
+    for delta in preview {
+        match &delta.stat {
+            PreviewStat::Unlock(name) => {
+                ui.label("Unlocks");
+                ui.horizontal(|ui| {
+                    ui.add_space(12.0);
+                    ui.add(egui::Label::new(RichText::new(name).color(AMBER)).wrap());
+                });
+            }
+            stat => {
+                ui.add(egui::Label::new(stat.label()).wrap());
+                ui.horizontal(|ui| {
+                    ui.add_space(12.0);
+                    ui.colored_label(MUTED, stat.format(delta.before));
+                    arrow(ui);
+                    ui.colored_label(AMBER, stat.format(delta.after));
+                });
+            }
+        }
+        ui.add_space(SPACING.y);
+    }
+}
+/// The drawn width of [`arrow`].
+const ARROW_WIDTH: f32 = 16.0;
 fn arrow(ui: &mut egui::Ui) {
-    let (rect, _) = ui.allocate_exact_size(vec2(16.0, 12.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(vec2(ARROW_WIDTH, 12.0), Sense::hover());
     let stroke = Stroke::new(1.5, MUTED);
     let (a, b) = (
         rect.left_center() + vec2(2.0, 0.0),
@@ -704,27 +783,7 @@ fn skill_detail(
         if !preview.is_empty() {
             ui.add_space(6.0);
             ui.strong("What changes");
-            egui::Grid::new(("skill-changes", &node.id))
-                .num_columns(4)
-                .min_col_width(0.0)
-                .spacing(vec2(8.0, 3.0))
-                .show(ui, |ui| {
-                    for delta in &preview {
-                        match &delta.stat {
-                            PreviewStat::Unlock(name) => {
-                                ui.label("Unlocks");
-                                ui.colored_label(AMBER, name);
-                            }
-                            stat => {
-                                ui.label(stat.label());
-                                ui.colored_label(MUTED, stat.format(delta.before));
-                                arrow(ui);
-                                ui.colored_label(AMBER, stat.format(delta.after));
-                            }
-                        }
-                        ui.end_row();
-                    }
-                });
+            what_changes(ui, &node.id, &preview);
         }
         let requirements = campaign.node_requirements(&node.id);
         ui.add_space(6.0);
