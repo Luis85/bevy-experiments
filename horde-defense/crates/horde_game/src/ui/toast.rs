@@ -15,8 +15,9 @@ use std::collections::VecDeque;
 pub(super) const TOAST_SECS: f64 = 3.0;
 /// How long an Error toast stays, in seconds.
 pub(super) const TOAST_ERROR_SECS: f64 = 6.0;
-/// The longer life an Info toast that must be read gets ("Saved · recovery
-/// copies kept"): as long as an error.
+/// The longer life an Info or Success toast that must be read gets ("Saved ·
+/// recovery copies kept", every expedition outcome and the folded-outcomes
+/// toast): as long as an error.
 pub(super) const TOAST_LONG_SECS: f64 = TOAST_ERROR_SECS;
 /// The fade-out at the end of a toast's life; reduced effects has none.
 const TOAST_FADE_SECS: f64 = 0.25;
