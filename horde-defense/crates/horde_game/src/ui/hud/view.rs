@@ -250,18 +250,21 @@ pub(in crate::ui) fn danger(attempt: &Attempt) -> DangerReadout {
             ),
         }
     } else {
+        let attacks = if winding == 1 { "attack" } else { "attacks" };
+        // Every windup ranged reads "N ranged attack(s)"; a mix names the
+        // ranged share.
+        let windup = match ranged {
+            0 => format!("{winding} {attacks} winding up"),
+            r if r == winding => format!("{winding} ranged {attacks} winding up"),
+            r => format!("{winding} {attacks} winding up, {r} of them ranged"),
+        };
         format!(
-            "Contact lanes: {}. {winding} attacks winding up{}. Any contact lane can hurt the same defender; target that lane for melee.",
+            "Contact lanes: {}. {windup}. Any contact lane can hurt the same defender; target that lane for melee.",
             lanes
                 .iter()
                 .map(u8::to_string)
                 .collect::<Vec<_>>()
                 .join(", "),
-            if ranged > 0 {
-                format!(", {ranged} of them ranged")
-            } else {
-                String::new()
-            }
         )
     };
     DangerReadout {
@@ -444,7 +447,15 @@ mod tests {
         a.enemies[0].attack_phase = EnemyPhase::Advance;
         assert_eq!(
             danger(&a).detail,
-            "Contact lanes: 2. 1 attacks winding up. Any contact lane can hurt the same defender; target that lane for melee."
+            "Contact lanes: 2. 1 attack winding up. Any contact lane can hurt the same defender; target that lane for melee."
+        );
+        // A lone ranged windup beside a contact lane reads as one ranged
+        // attack, not "1 of them ranged".
+        a.enemies[0].attack_phase = EnemyPhase::Windup;
+        a.enemies.last_mut().unwrap().attack_phase = EnemyPhase::Advance;
+        assert_eq!(
+            danger(&a).detail,
+            "Contact lanes: 2. 1 ranged attack winding up. Any contact lane can hurt the same defender; target that lane for melee."
         );
     }
 }
