@@ -27,24 +27,69 @@ fn results_screen_reveals_the_loot_once_and_plays_one_coin_batch_for_fifty_sales
     report.auto_sold.count = 50;
     let mut guard = ResultsAudioGuard::default();
     // Not on the Results screen: nothing.
-    assert!(notices::results_cues(&mut guard, Screen::Camp, &f.game, 0).is_empty());
-    let frames = |guard: &mut ResultsAudioGuard, from_ms: u64| -> Vec<CueRequest> {
+    assert!(notices::results_cues(&mut guard, Screen::Camp, &f.game, &mut f.runtime, 0).is_empty());
+    let frames = |guard: &mut ResultsAudioGuard, f: &mut FrontendParts, from_ms: u64| {
         (0..60)
             .flat_map(|frame| {
-                notices::results_cues(guard, Screen::Results, &f.game, from_ms + frame * 16)
+                notices::results_cues(
+                    guard,
+                    Screen::Results,
+                    &f.game,
+                    &mut f.runtime,
+                    from_ms + frame * 16,
+                )
             })
-            .collect()
+            .collect::<Vec<CueRequest>>()
     };
-    let heard = frames(&mut guard, 1000);
+    let heard = frames(&mut guard, f, 1000);
     let cues: Vec<Cue> = heard.iter().map(|request| request.cue).collect();
     assert_eq!(cues, vec![Cue::LootReveal, Cue::CoinBatch]);
     // The best drop tunes the reveal; both are centred interface sounds.
     assert_eq!(heard[0].voicing.unwrap().speed, 1.03);
     assert!(heard.iter().all(|r| r.place.is_none() && !r.player_weapon));
     // A re-render, and History and back: nothing more.
-    assert!(frames(&mut guard, 3000).is_empty());
-    assert!(notices::results_cues(&mut guard, Screen::History, &f.game, 5000).is_empty());
-    assert!(frames(&mut guard, 5016).is_empty());
+    assert!(frames(&mut guard, f, 3000).is_empty());
+    assert!(
+        notices::results_cues(&mut guard, Screen::History, &f.game, &mut f.runtime, 5000)
+            .is_empty()
+    );
+    assert!(frames(&mut guard, f, 5016).is_empty());
+}
+
+/// An expedition batch the battle left owed sounds with its Results
+/// screen's coins: one `CoinBatch` on the coins' timing, whether or not the
+/// run auto-sold anything, and none on a later Results frame.
+#[test]
+fn results_screen_plays_the_owed_expedition_batch_once() {
+    use horde_audio::loot::COIN_BATCH_DELAY_MS;
+    for auto_sold in [0, 4] {
+        let mut fixture = after_a_run();
+        let f = &mut fixture.frontend;
+        f.game.last_result_mut().as_mut().unwrap().auto_sold.count = auto_sold;
+        f.runtime.owe_results_coins_for_test(2);
+        let mut guard = ResultsAudioGuard::default();
+        // The battle screen's last frame takes nothing.
+        assert!(
+            notices::results_cues(&mut guard, Screen::Battle, &f.game, &mut f.runtime, 0)
+                .is_empty()
+        );
+        let mut heard = Vec::new();
+        for frame in 0..60u64 {
+            let now_ms = 1000 + frame * 16;
+            for request in
+                notices::results_cues(&mut guard, Screen::Results, &f.game, &mut f.runtime, now_ms)
+            {
+                heard.push((request.cue, now_ms));
+            }
+        }
+        assert_eq!(
+            heard.iter().map(|(cue, _)| *cue).collect::<Vec<_>>(),
+            vec![Cue::CoinBatch],
+            "auto-sold {auto_sold}"
+        );
+        assert!(heard[0].1 >= 1000 + COIN_BATCH_DELAY_MS);
+        assert_eq!(f.runtime.take_results_coins(), 0, "taken once");
+    }
 }
 
 /// Attempt ids restart at 1 in a new journey: the new journey's first
@@ -70,6 +115,7 @@ fn a_new_journey_results_on_the_same_attempt_id_sounds_again() {
                     &mut f.battle.results_audio,
                     Screen::Results,
                     &f.game,
+                    &mut f.runtime,
                     from_ms + frame * 16,
                 )
             })
@@ -96,7 +142,16 @@ fn a_new_journey_results_on_the_same_attempt_id_sounds_again() {
         f.game.last_result().is_none(),
         "the new journey has no report"
     );
-    assert!(notices::results_cues(&mut f.battle.results_audio, f.screen, &f.game, 3000).is_empty());
+    assert!(
+        notices::results_cues(
+            &mut f.battle.results_audio,
+            f.screen,
+            &f.game,
+            &mut f.runtime,
+            3000
+        )
+        .is_empty()
+    );
     f.game.campaign_mut().choose_start_country("DEU").unwrap();
     f.game.deploy_country_stage(0, Mode::Personal).unwrap();
     f.game.apply(&Command::Withdraw).unwrap();

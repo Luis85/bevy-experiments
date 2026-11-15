@@ -64,7 +64,8 @@ pub struct Runtime {
     /// widget plays a loot sound.
     pub(super) loot: LootTracker,
     /// The settled expeditions whose auto-sold batch has been heard: one
-    /// `CoinBatch` each, never during a battle. Presentation only.
+    /// `CoinBatch` each, never during a battle; what a battle leaves owed
+    /// sounds with its Results screen's coins. Presentation only.
     pub(super) expedition_coins: ExpeditionCoins,
     pub(super) dirty: bool,
     pub(super) save_ticks: u64,
@@ -353,6 +354,21 @@ impl Runtime {
         if self.expedition_coins.observe_game(game) > 0 {
             push_cue(cues, SoundCue::CoinBatch);
         }
+    }
+    /// The expedition batches the battle that just ended left owed, for its
+    /// Results screen's one `CoinBatch` (`ExpeditionCoins::take_for_results`).
+    pub(crate) fn take_results_coins(&mut self) -> usize {
+        self.expedition_coins.take_for_results()
+    }
+    /// Test hook: a battle in which `batches` expeditions settled with
+    /// sales has just ended.
+    #[cfg(test)]
+    pub(crate) fn owe_results_coins_for_test(&mut self, batches: u64) {
+        let coins = &mut self.expedition_coins;
+        coins.observe(&[], true);
+        let settled: Vec<(u64, u32)> = (0..batches).map(|n| (u64::MAX - n, 1)).collect();
+        coins.observe(&settled, true);
+        assert_eq!(coins.observe(&[], false), 0);
     }
     /// Turns the game's undrained events into cues now. Ticks call it, and so
     /// does a command that finishes the attempt outside a tick (`Withdraw`

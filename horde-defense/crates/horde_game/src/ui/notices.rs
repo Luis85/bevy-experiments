@@ -50,17 +50,23 @@ pub(super) fn handle_notices(
 
 /// The cues the Results screen is due at real time `now_ms`: a report's
 /// loot reveal and its one coin batch, once per report
-/// (`horde_audio::loot::ResultsAudioGuard`). Any other screen is silent.
+/// (`horde_audio::loot::ResultsAudioGuard`). The coin batch also carries
+/// the expedition batches the battle left owed, which the Results screen
+/// takes from the runner. Any other screen is silent.
 pub(super) fn results_cues(
     guard: &mut ResultsAudioGuard,
     screen: Screen,
     game: &Game,
+    runtime: &mut Runtime,
     now_ms: u64,
 ) -> Vec<CueRequest> {
     let results = (screen == Screen::Results)
         .then(|| game.last_result())
         .flatten()
-        .map(ResultsLoot::of);
+        .map(|report| ResultsLoot {
+            expedition_batches: runtime.take_results_coins(),
+            ..ResultsLoot::of(report)
+        });
     guard
         .observe(results, now_ms)
         .into_iter()
@@ -77,6 +83,7 @@ pub(super) fn results_audio(
     mut battle: ResMut<BattleUi>,
     screen: Res<State<Screen>>,
     session: Res<GameSession>,
+    mut runtime: ResMut<Runtime>,
     time: Option<Res<Time<Real>>>,
     mut cues: MessageWriter<CueRequest>,
 ) {
@@ -88,6 +95,7 @@ pub(super) fn results_audio(
         &mut battle.results_audio,
         *screen.get(),
         &session.game,
+        &mut runtime,
         now_ms,
     ));
 }

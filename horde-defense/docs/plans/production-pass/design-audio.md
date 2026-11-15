@@ -360,9 +360,9 @@ If calibration needs more than -1.4 dB, compress the loud rare rows first; never
 **Results and commands.**
 - A presentation-local `ResultsAudioGuard { last_attempt: Option<u64> }`, keyed by `report.attempt_id`, fires once on the first Results frame:
   - LootReveal (UI, delay 150 ms, speed from `quality_speed(best)`, +1 dB per tier above Rare) when the report has loot;
-  - then exactly one CoinBatch (delay 450 ms) when `report.auto_sold` is non-empty.
+  - then exactly one CoinBatch (delay 450 ms) when `report.auto_sold` is non-empty or the battle left an expedition batch owed.
 - `SellItem`, `sell_extras` and apply-rule-to-stash each play exactly one CoinBatch per successful command with sold >= 1, in the runner apply step beside `confirms_purchase` (`runner/apply.rs:84-117`).
-- Each expedition notice whose receipt sold >= 1 item plays one CoinBatch.
+- Each expedition notice whose receipt sold >= 1 item plays one CoinBatch. One that settles during a battle is owed until the battle ends and then sounds with that battle's Results CoinBatch (450 ms), never on the tick that plays the stinger (closing phase).
 - No CoinBatch is produced while on `Screen::Battle`, and loot cues take no auto-sell input.
 - No hover cue, enforced by a guard test.
 

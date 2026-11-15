@@ -765,6 +765,7 @@ pub fn reference_mixed_60s(battle: &mut Game) -> Vec<Frame> {
             .and_then(|report| report.best)
             .or(Some(Quality::Rare)),
         auto_sold: report.map_or(0, |report| report.auto_sold).max(1),
+        expedition_batches: 0,
     };
     let mut guard = ResultsAudioGuard::default();
     for (index, frame) in frames[results..].iter_mut().enumerate() {

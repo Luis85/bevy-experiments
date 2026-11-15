@@ -25,6 +25,7 @@ fn results(attempt_id: u64, best: Option<Quality>, auto_sold: u32) -> ResultsLoo
         attempt_id,
         best,
         auto_sold,
+        expedition_batches: 0,
     }
 }
 /// Every cue the guard emits over `frames` frames, 16 ms apart, on the
@@ -176,17 +177,21 @@ fn no_sale_cue_in_battle() {
         sale_cue(&Command::SellItem(3), &CommandOutcome::Amount(25), true),
         None
     );
-    // An expedition's batch waits for the battle to end.
+    // An expedition's batch waits for the battle to end, then for its
+    // Results screen.
     let mut coins = ExpeditionCoins::default();
     assert_eq!(coins.observe(&[], false), 0);
     assert_eq!(coins.observe(&[(4, 12)], true), 0);
-    assert_eq!(coins.observe(&[(4, 12)], false), 1);
+    assert_eq!(coins.observe(&[(4, 12)], false), 0);
+    assert_eq!(coins.take_for_results(), 1);
     assert_eq!(coins.observe(&[(4, 12)], false), 0);
 }
 
 /// An expedition that settles during a battle is toasted and acknowledged
 /// while the battle is paused (W3-25): its batch still plays once the
-/// battle ends, and only once.
+/// battle ends, and only once. The look that ends the battle keeps it for
+/// the Results screen; one that no Results screen took is due on the next
+/// look.
 #[test]
 fn expedition_batch_acknowledged_in_battle_plays_after_it() {
     let mut coins = ExpeditionCoins::default();
@@ -194,13 +199,117 @@ fn expedition_batch_acknowledged_in_battle_plays_after_it() {
     // Settles in the battle, then its notice is acknowledged in the pause.
     assert_eq!(coins.observe(&[(4, 12), (5, 0)], true), 0);
     assert_eq!(coins.observe(&[], true), 0);
-    assert_eq!(coins.observe(&[], false), 1);
+    assert_eq!(coins.observe(&[], false), 0, "not under the stinger");
+    assert_eq!(coins.take_for_results(), 1);
+    assert_eq!(coins.take_for_results(), 0);
     assert_eq!(coins.observe(&[], false), 0);
-    // Two owed batches still request one each.
+    // Two owed batches are two; untaken, the next look requests them.
     assert_eq!(coins.observe(&[(6, 3)], true), 0);
     assert_eq!(coins.observe(&[(6, 3), (7, 9)], true), 0);
+    assert_eq!(coins.observe(&[(6, 3)], false), 0);
     assert_eq!(coins.observe(&[(6, 3)], false), 2);
     assert_eq!(coins.observe(&[(6, 3)], false), 0);
+    assert_eq!(coins.take_for_results(), 0);
+    // A batch settling on the battle's last look waits with them.
+    assert_eq!(coins.observe(&[], true), 0);
+    assert_eq!(coins.observe(&[(8, 1)], false), 0);
+    assert_eq!(coins.take_for_results(), 1);
+}
+
+/// An expedition settles with sales during the main battle, which then
+/// ends with or without an auto-sold batch of its own. The tick that ends
+/// it plays the stinger and no coins; the Results screen plays exactly one
+/// `CoinBatch`, on its coin timing after the stinger, as the runner's
+/// cues and the Results screen's go through the same gate.
+#[test]
+fn owed_expedition_batch_plays_once_on_results_after_the_stinger() {
+    for reduced in [false, true] {
+        for auto_sold in [0, 4] {
+            let case = format!("reduced {reduced}, auto-sold {auto_sold}");
+            let mut coins = ExpeditionCoins::default();
+            let mut guard = ResultsAudioGuard::default();
+            let mut gate = CueGate::default();
+            let mut starts: Vec<(Cue, u64)> = Vec::new();
+            let mut sound = |cue: Cue, now_ms: u64| {
+                if gate.accept(cue, now_ms, reduced) {
+                    starts.push((cue, now_ms));
+                }
+            };
+            // Camp, the deploy, and the expedition settling in the battle.
+            assert_eq!(coins.observe(&[], false), 0, "{case}");
+            assert_eq!(coins.observe(&[], true), 0, "{case}");
+            assert_eq!(coins.observe(&[(4, 12)], true), 0, "{case}");
+            // The tick that finishes the attempt: the stinger, and what the
+            // runner asks after it.
+            let end = 10_000;
+            sound(Cue::Victory, end);
+            for _ in 0..coins.observe(&[(4, 12)], false) {
+                sound(Cue::CoinBatch, end);
+            }
+            // The Results screen from the next frame on, with the batches
+            // the battle left owed.
+            for frame in 1..120 {
+                let now_ms = end + frame * 16;
+                let loot = ResultsLoot {
+                    expedition_batches: coins.take_for_results(),
+                    ..results(3, None, auto_sold)
+                };
+                for due in guard.observe(Some(loot), now_ms) {
+                    sound(due.cue, now_ms);
+                }
+            }
+            let batches: Vec<u64> = starts
+                .iter()
+                .filter(|(cue, _)| *cue == Cue::CoinBatch)
+                .map(|(_, at)| *at)
+                .collect();
+            assert_eq!(batches.len(), 1, "{case}: {starts:?}");
+            assert!(
+                batches[0] >= end + 16 + COIN_BATCH_DELAY_MS,
+                "{case}: {starts:?}"
+            );
+            // Nothing is left owed for a later look.
+            assert_eq!(coins.observe(&[(4, 12)], false), 0, "{case}");
+            assert_eq!(coins.take_for_results(), 0, "{case}");
+        }
+    }
+}
+
+/// Owed batches are never lost: on a report already sounded they still play
+/// one `CoinBatch` on the coins' timing, and one already due absorbs them.
+#[test]
+fn owed_batches_reaching_a_sounded_report_still_play() {
+    let mut guard = ResultsAudioGuard::default();
+    let plain = results(5, None, 0);
+    assert_eq!(shown(&mut guard, plain, 0, 60), vec![]);
+    let owed = ResultsLoot {
+        expedition_batches: 2,
+        ..plain
+    };
+    assert_eq!(guard.observe(Some(owed), 2000), vec![]);
+    let cues = shown(&mut guard, plain, 2016, 60);
+    assert_eq!(
+        cues,
+        vec![UiCue {
+            cue: Cue::CoinBatch,
+            voicing: None
+        }]
+    );
+    // The run's own batch still due takes them in.
+    let mut guard = ResultsAudioGuard::default();
+    let sold = results(6, None, 3);
+    assert_eq!(guard.observe(Some(sold), 0), vec![]);
+    assert_eq!(
+        guard.observe(
+            Some(ResultsLoot {
+                expedition_batches: 1,
+                ..sold
+            }),
+            16
+        ),
+        vec![]
+    );
+    assert_eq!(count(&shown(&mut guard, sold, 32, 60), Cue::CoinBatch), 1);
 }
 
 /// A session that opens in a battle: what is pending then is old news, and
@@ -210,7 +319,8 @@ fn notices_pending_when_a_battle_session_opens_stay_old() {
     let mut coins = ExpeditionCoins::default();
     assert_eq!(coins.observe(&[(1, 30)], true), 0);
     assert_eq!(coins.observe(&[(1, 30), (2, 4)], true), 0);
-    assert_eq!(coins.observe(&[(1, 30), (2, 4)], false), 1);
+    assert_eq!(coins.observe(&[(1, 30), (2, 4)], false), 0);
+    assert_eq!(coins.take_for_results(), 1);
 }
 
 #[test]
