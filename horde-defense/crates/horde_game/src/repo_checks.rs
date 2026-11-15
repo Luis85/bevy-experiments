@@ -35,7 +35,9 @@
 //! Click-to-photon) and what they must say. `acceptance_ledger_lists_every_production_pass_row`
 //! keeps docs/ACCEPTANCE.md listing every criterion of the production-pass
 //! acceptance matrix, with each function its Proof names defined in a file
-//! its Defined in column lists, and `acceptance_lists_every_pending_human_check`
+//! its Defined in column lists and its Criterion, Proof and Wave cells the
+//! matrix's (a name the matrix elides with `...` may be spelled out), and
+//! `acceptance_lists_every_pending_human_check`
 //! keeps its pending human checks equal to the plan's (W7-08).
 //!
 //! `save_docs_name_the_v7_format_every_migration_step_pin_and_tag` keeps
@@ -1940,6 +1942,78 @@ fn ledger_violations(
     violations
 }
 
+/// Whether a ledger cell says what a matrix cell says. Each `...` in the
+/// matrix cell stands for the rest of a name it elides: one or more name
+/// characters (lower-case letters, digits, `_`) in the ledger, or a `...`
+/// the ledger keeps. Everything else must match exactly.
+fn cell_matches_elided(matrix: &str, ledger: &str) -> bool {
+    fn rest_matches(parts: &[&str], text: &str) -> bool {
+        let Some((first, rest)) = parts.split_first() else {
+            return text.is_empty();
+        };
+        let Some(after) = text.strip_prefix(first) else {
+            return false;
+        };
+        if rest.is_empty() {
+            return after.is_empty();
+        }
+        if after
+            .strip_prefix("...")
+            .is_some_and(|kept| rest_matches(rest, kept))
+        {
+            return true;
+        }
+        let run = after
+            .bytes()
+            .take_while(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'_')
+            .count();
+        (1..=run).any(|length| rest_matches(rest, &after[length..]))
+    }
+    let parts: Vec<&str> = matrix.split("...").collect();
+    rest_matches(&parts, ledger)
+}
+
+/// Where the ledger's production section says something other than the
+/// matrix for a criterion both list: its Criterion, Proof or Wave cell. A
+/// Proof may spell out a name the matrix elides (`cell_matches_elided`).
+/// Rows of the wrong shape and ids only one side lists are
+/// `ledger_violations`' to report.
+fn ledger_cell_violations(matrix: &str, section: &str) -> Vec<String> {
+    let rows = table_rows(section, "AC");
+    let mut violations = Vec::new();
+    for criterion in table_rows(matrix, "AC") {
+        let [id, criterion, proof, wave] = criterion.as_slice() else {
+            violations.push(format!(
+                "{}: {} cells in {PRODUCTION_ACCEPTANCE}, not AC, Criterion, Proof, Wave",
+                criterion[0],
+                criterion.len()
+            ));
+            continue;
+        };
+        let Some([_, ledger_criterion, ledger_proof, _, ledger_wave]) =
+            rows.iter().find(|row| &row[0] == id).map(Vec::as_slice)
+        else {
+            continue;
+        };
+        if criterion != ledger_criterion {
+            violations.push(format!(
+                "{id}: Criterion differs from the matrix:\n  matrix: {criterion}\n  ledger: {ledger_criterion}"
+            ));
+        }
+        if !cell_matches_elided(proof, ledger_proof) {
+            violations.push(format!(
+                "{id}: Proof differs from the matrix:\n  matrix: {proof}\n  ledger: {ledger_proof}"
+            ));
+        }
+        if wave != ledger_wave {
+            violations.push(format!(
+                "{id}: Wave differs from the matrix: {wave} against {ledger_wave}"
+            ));
+        }
+    }
+    violations
+}
+
 /// A workspace file's text, by `/`-separated workspace path.
 fn read_workspace_file(name: &str) -> String {
     let path = workspace_directory().join(name);
@@ -1953,12 +2027,12 @@ fn acceptance_ledger_lists_every_production_pass_row() {
     let ledger = read_workspace_file(ACCEPTANCE_LEDGER);
     let section = section_body(&ledger, LEDGER_PRODUCTION_SECTION)
         .unwrap_or_else(|| panic!("{ACCEPTANCE_LEDGER} has no \"{LEDGER_PRODUCTION_SECTION}\""));
-    let violations = ledger_violations(
-        &read_workspace_file(PRODUCTION_ACCEPTANCE),
-        &section,
-        &function_index(&workspace),
-        &|file| workspace.join(file).is_file(),
-    );
+    let matrix = read_workspace_file(PRODUCTION_ACCEPTANCE);
+    let mut violations =
+        ledger_violations(&matrix, &section, &function_index(&workspace), &|file| {
+            workspace.join(file).is_file()
+        });
+    violations.extend(ledger_cell_violations(&matrix, &section));
     assert!(
         violations.is_empty(),
         "{ACCEPTANCE_LEDGER} does not list the production-pass criteria ({}):\n{}",
@@ -2004,6 +2078,38 @@ fn acceptance_ledger_check_reports_missing_rows_unknown_names_and_unlisted_files
              function Get-X {\n// fn not_this\n"
         ),
         vec!["a_b", "c", "d_e", "Get-X"]
+    );
+}
+
+#[test]
+fn acceptance_ledger_cells_say_what_the_matrix_says_modulo_elided_names() {
+    assert!(cell_matches_elided(
+        "`steady_hands_..._at_most_40...`; human",
+        "`steady_hands_keeps_rank_zero_and_adds_at_most_40_percent`; human"
+    ));
+    assert!(cell_matches_elided(
+        "`every_rust_family_masters...tp...`",
+        "`every_rust_family_masters_to_minus21_tp_le_0_80`"
+    ));
+    assert!(cell_matches_elided("`kept_...` (W1)", "`kept_...` (W1)"));
+    assert!(!cell_matches_elided("`a_...` (W1)", "`a_` (W1)"));
+    assert!(!cell_matches_elided("`a_...` (W1)", "`a_b` (W2)"));
+    assert!(!cell_matches_elided("`a_...` (W1)", "`a_b`, `c_d` (W1)"));
+    assert!(!cell_matches_elided("`a_b` (W5-03)", "`a_b` (W5-03: more)"));
+    let matrix = "| AC | Criterion | Proof | Wave |\n|---|---|---|---|\n\
+                  | G1.1 | a | `x_...` | 1 |\n| G1.2 | b | `y_test` | 1, 2 |\n\
+                  | G1.3 | c | d | 7 |\n| G1.4 | e | f |\n";
+    let section = "| AC | Criterion | Proof | Defined in | Wave |\n|---|---|---|---|---|\n\
+                   | G1.1 | a | `x_test` | `a.rs` | 1 |\n\
+                   | G1.2 | b2 | prose | — | 1, 2, closing |\n| G1.4 | e | f | — | 1 |\n";
+    assert_eq!(
+        ledger_cell_violations(matrix, section),
+        vec![
+            "G1.2: Criterion differs from the matrix:\n  matrix: b\n  ledger: b2".to_owned(),
+            "G1.2: Proof differs from the matrix:\n  matrix: `y_test`\n  ledger: prose".to_owned(),
+            "G1.2: Wave differs from the matrix: 1, 2 against 1, 2, closing".to_owned(),
+            format!("G1.4: 3 cells in {PRODUCTION_ACCEPTANCE}, not AC, Criterion, Proof, Wave"),
+        ]
     );
 }
 
