@@ -225,7 +225,7 @@ If calibration needs more than -1.4 dB, compress the loud rare rows first; never
 - At p = 1: ILD 3.1 dB, mono fold-down -1.38 dB, power -1.28 dB.
 - Centre equals today's dual-mono level, so calibration does not depend on pan, and pan never raises TP.
 
-**Worker observer window** (`ui/operations.rs:277`): centred. Observed shots use `Tone::DISTANT` (speed 0.97, low-pass 3500 Hz, -4 dB). There are no reload or dry-fire diffs for expeditions, and `runtime.rs:441-453` audibility is unchanged (with a 3 kHz "radio" low-pass on alerts).
+**Worker observer window** (`ui/operations.rs:277`): centred. Observed shots use `Tone::DISTANT` (speed 0.97, low-pass 3500 Hz, -4 dB). There are no reload or dry-fire diffs for expeditions, and `runtime.rs:441-453` audibility is unchanged (with a 3 kHz "radio" low-pass on alerts). An expedition counts as observed only while its window draws the field (`UiCtx::observed_battle` requires `observer_arena_rect`): a collapsed observer shows no windup or phase ring, so it hears that expedition as any unobserved one, its boss, wave and structure alerts only (closing phase, `a_collapsed_observer_window_hears_no_expedition`).
 
 ## 5. Voice implementation
 

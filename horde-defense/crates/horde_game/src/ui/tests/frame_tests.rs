@@ -129,6 +129,74 @@ fn observer_builds_one_field_view_per_visible_worker() {
     }
 }
 
+/// Every audio warning has a visual twin (closing): an expedition is heard in
+/// full (its windups and boss phases included) only while the observer draws
+/// its field. Collapsed, the window draws no field, so the runtime is told
+/// to observe nothing; expanded again, it hears the worker once more.
+#[test]
+fn a_collapsed_observer_window_hears_no_expedition() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game = horde_core::sim::stress_authored_fixture().unwrap();
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Operations;
+    let id = f
+        .game
+        .battles()
+        .iter()
+        .find(|b| !b.settled && b.game().attempt().is_some())
+        .map(|b| b.id)
+        .expect("the fixture keeps a live worker");
+    f.campaign.observed = Some(id);
+    let collapsing = super::super::operations::observer_window_id(id).with("collapsing");
+    let set_open = |open: bool| {
+        let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(
+            &h.ctx, collapsing, true,
+        );
+        state.set_open(open);
+        state.store(&h.ctx);
+    };
+    // A quarter second per frame: past the collapse animation (0.12 s), in
+    // which the shrinking body still draws its field.
+    let mut now = 100.0;
+    let mut frame = |f: &mut FrontendParts| {
+        now += 0.25;
+        h.frame_at(f, View::Full, vec![], now);
+    };
+    for _ in 0..2 {
+        frame(f);
+    }
+    assert!(f.battle.observer_arena_rect.is_some(), "the field is drawn");
+    assert_eq!(
+        f.ctx().observed_battle(),
+        Some(id),
+        "an open observer hears"
+    );
+    set_open(false);
+    frame(f);
+    for n in 0..3 {
+        frame(f);
+        assert_eq!(f.campaign.observed, Some(id), "frame {n}: still observed");
+        assert_eq!(f.battle.observer_arena_rect, None, "frame {n}: no field");
+        assert_eq!(
+            f.ctx().observed_battle(),
+            None,
+            "frame {n}: a collapsed observer plays no warning without its twin"
+        );
+    }
+    set_open(true);
+    for _ in 0..2 {
+        frame(f);
+    }
+    assert!(f.battle.observer_arena_rect.is_some(), "drawn again");
+    assert_eq!(
+        f.ctx().observed_battle(),
+        Some(id),
+        "expanded, it hears again"
+    );
+}
+
 /// The harness size convention (closing): a frame at a target lays out
 /// `pixels / scale` points, as the App's window does. `RawInput::screen_rect`
 /// is in points and egui's zoom does not divide it, so the small target

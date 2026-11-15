@@ -276,9 +276,15 @@ impl UiCtx<'_> {
             self.settings,
         )
     }
-    /// The expedition the operations tab is showing, if it is open.
+    /// The expedition the operations tab is showing, if its observer drew the
+    /// field this frame. It is heard in full, windups and boss phases
+    /// included, so a collapsed observer (no field, no windup ring or phase
+    /// ring) observes nothing: every audio warning has its visual twin.
     pub(super) fn observed_battle(&self) -> Option<u64> {
-        if self.screen == Screen::Camp && self.tab == Tab::Operations {
+        if self.screen == Screen::Camp
+            && self.tab == Tab::Operations
+            && self.battle.observer_arena_rect.is_some()
+        {
             self.campaign.observed
         } else {
             None
