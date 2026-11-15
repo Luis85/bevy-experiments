@@ -12,6 +12,10 @@ use horde_core::{
 };
 
 const FOOTER_LINE: &str = "A BEVY EXPERIMENT  /  LOCAL CAMPAIGN  /  NO OFFLINE EARNINGS";
+/// A secondary menu button: the primary's 190 pt column, 36 pt tall. Every
+/// button under the primary fills the column (Settings and History split
+/// it), so the stack reads as one edge.
+const MENU_BUTTON: egui::Vec2 = vec2(super::primary_action::PRIMARY_MIN_SIZE.x, 36.0);
 
 /// The menu's Controls list: every binding, core rows first, with the
 /// Settings rebind table's label and its key (`settings::binding_text`, so
@@ -142,7 +146,11 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                                 f.request_new_game();
                             }
                         }
-                        if has_journey && ui.button("New game").clicked() {
+                        if has_journey
+                            && ui
+                                .add_sized(MENU_BUTTON, egui::Button::new("New game"))
+                                .clicked()
+                        {
                             f.request_new_game();
                         }
                         if let Some(identity) = f.game.campaign().selected_survivor {
@@ -151,7 +159,9 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                                 format!("{} · checkpoint · {} lanes", identity.name(), lanes),
                             );
                             if f.game.campaign().world.start.is_none()
-                                && ui.small_button("Change survivor").clicked()
+                                && ui
+                                    .add_sized(MENU_BUTTON, egui::Button::new("Change survivor"))
+                                    .clicked()
                             {
                                 f.open_survivor_selection();
                             }
@@ -178,21 +188,20 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                         }
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
-                            if ui
-                                .add_sized([92.0, 36.0], egui::Button::new("Settings"))
-                                .clicked()
-                            {
+                            // The pair splits the column, gap included.
+                            let half = vec2(
+                                (MENU_BUTTON.x - ui.spacing().item_spacing.x) * 0.5,
+                                MENU_BUTTON.y,
+                            );
+                            if ui.add_sized(half, egui::Button::new("Settings")).clicked() {
                                 f.open_settings();
                             }
-                            if ui
-                                .add_sized([92.0, 36.0], egui::Button::new("History"))
-                                .clicked()
-                            {
+                            if ui.add_sized(half, egui::Button::new("History")).clicked() {
                                 f.open_history();
                             }
                         });
                         if ui
-                            .add_sized([190.0, 36.0], egui::Button::new("Save and quit"))
+                            .add_sized(MENU_BUTTON, egui::Button::new("Save and quit"))
                             .clicked()
                         {
                             f.request_save(SaveIntent::Quit);
