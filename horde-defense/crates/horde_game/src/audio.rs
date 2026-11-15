@@ -1,4 +1,5 @@
-//! The Bevy side of the survival SFX: the cue message.
+//! The Bevy side of the survival SFX: the cue message and the preload of
+//! every runtime WAV ([`AudioBanks`]).
 //! The cue list, banks, the mix table and the offline synthesis live in
 //! `horde_audio`. Only presentation time selects/coalesces variants.
 //! No combat RNG is read.
@@ -50,8 +51,7 @@ impl CueRequest {
 /// exactly this set. The wave-6 gun, enemy, boss and UI banks ship from A6-05
 /// on; the enemy and boss cues play theirs from A6-12, the gun-handling cues
 /// from A6-13 (`horde_audio::gun`), and the loot and coin cues theirs from
-/// A6-14 (`horde_audio::loot`).
-#[cfg(test)]
+/// A6-14 (`horde_audio::loot`). [`AudioBanks`] preloads it.
 pub(crate) fn runtime_wav_paths() -> Vec<String> {
     let mut paths: Vec<String> = horde_audio::bank::BankId::shipped()
         .into_iter()
@@ -63,6 +63,30 @@ pub(crate) fn runtime_wav_paths() -> Vec<String> {
             .map(|channel| channel.path().to_owned()),
     );
     paths
+}
+
+/// Every runtime WAV ([`runtime_wav_paths`]), loading from startup and
+/// held for the whole session (design-audio §1 `AudioBanks`; the WAV bytes,
+/// about 21 MB). A variant's first play then finds its source loaded and
+/// plays as a `PannedClip` (panned, low-passed, fadeable when stolen); the
+/// plain fallback player is left for a voice that starts before the load
+/// finished.
+#[derive(bevy::prelude::Resource)]
+pub struct AudioBanks {
+    _handles: Vec<bevy::prelude::Handle<bevy::prelude::AudioSource>>,
+}
+impl AudioBanks {
+    /// Starts loading every runtime WAV; `SfxPlugin` runs it at startup.
+    pub fn preload(
+        mut commands: bevy::prelude::Commands,
+        assets: bevy::prelude::Res<bevy::prelude::AssetServer>,
+    ) {
+        let _handles = runtime_wav_paths()
+            .into_iter()
+            .map(|path| assets.load(path))
+            .collect();
+        commands.insert_resource(Self { _handles });
+    }
 }
 
 #[cfg(test)]

@@ -15,7 +15,8 @@
 //! density gain. Effects and UI voices never duck.
 //!
 //! A voice plays as a [`PannedClip`]: the cue's WAV into two channels at the
-//! gains of its lane pan (`horde_audio::pan`; centred with "Mono audio"). A
+//! gains of its lane pan (`horde_audio::pan`; centred with "Mono audio").
+//! Every WAV starts loading at startup ([`crate::audio::AudioBanks`]); a
 //! variant whose WAV has not loaded yet plays as a plain centred
 //! `AudioSource`, so no cue is lost.
 //!
@@ -51,6 +52,7 @@ impl Plugin for SfxPlugin {
             .add_audio_source::<PannedClip>()
             .init_resource::<SfxState>()
             .init_resource::<Ducking>()
+            .add_systems(Startup, crate::audio::AudioBanks::preload)
             .add_systems(
                 Update,
                 (
@@ -1040,6 +1042,30 @@ mod tests {
                 handle
             })
             .collect()
+    }
+
+    /// The plugin starts loading every runtime WAV at startup and keeps the
+    /// handles, so a variant's first play is a `PannedClip` (panned,
+    /// filtered, fadeable) and not the plain fallback player.
+    #[test]
+    fn startup_preloads_every_runtime_wav() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
+            // `AudioPlugin` registers it in the game.
+            .init_asset::<AudioSource>()
+            .insert_resource(Settings::default())
+            // The schedule exists whatever the plugin adds to it.
+            .add_systems(Startup, || {})
+            .add_plugins(SfxPlugin);
+        app.world_mut().run_schedule(Startup);
+        let paths = crate::audio::runtime_wav_paths();
+        assert!(paths.len() > 200, "{}", paths.len());
+        let server = app.world().resource::<AssetServer>();
+        let missing: Vec<String> = paths
+            .into_iter()
+            .filter(|path| server.get_handle::<AudioSource>(path.clone()).is_none())
+            .collect();
+        assert!(missing.is_empty(), "not preloaded: {missing:?}");
     }
 
     /// A third gun at the gun family's cap of two steals the oldest gun. A
