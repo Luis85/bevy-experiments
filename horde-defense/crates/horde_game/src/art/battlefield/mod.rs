@@ -1,10 +1,10 @@
 //! Egui renderer of a `BattleViewModel`, painted in passes (W5-01,
 //! design-vfx-lighting §2):
 //!
-//! 1. World: ground and weather, burning ground, blood decals (`decals`,
-//!    with the blood setting on), structures, bodies,
-//!    hostiles, the survivor rig, thrown ordnance, event effects and impact
-//!    particles.
+//! 1. World: ground and weather, scorch marks (`explosion::scorch`),
+//!    burning ground, blood decals (`decals`, with the blood setting on),
+//!    structures, bodies, hostiles, the survivor rig, thrown ordnance, event
+//!    effects with their hit sparks (`hits`) and impact particles.
 //! 2. Grade: the stage's lighting over-rect across the whole canvas
 //!    (`super::lighting`), the forest backdrop included.
 //! 3. Lights: the additive light pools of explosions, burning ground and
@@ -16,10 +16,12 @@
 //!
 //! Anything drawn per hostile, per body or per particle is batched into
 //! layer meshes (`batch`), so the primitive count does not grow with the
-//! crowd: settled bodies (one cached mesh, see `corpses`), collapsing
-//! bodies, the hostiles' underlay, one shadow mesh (the rig's included), one
-//! sprite mesh on the packed battle atlas, the overlay, callout text and one
-//! impact-particle mesh.
+//! crowd. The world pass has one weather-mote mesh, the blood-decal mesh,
+//! settled bodies (one cached mesh, see `corpses`), collapsing bodies, one
+//! shadow mesh (the rig's included), one sprite mesh on the packed battle
+//! atlas, the hit-spark mesh and one impact-particle mesh; then the one
+//! light-pool mesh; then the cue pass's halo, fill and marker meshes
+//! (`cue::CueBatch`) and its labels.
 mod batch;
 mod corpses;
 mod cue;
