@@ -205,7 +205,9 @@ fn glint_phase(quality: Quality, seconds: f64, reduced: bool) -> Option<f32> {
 }
 /// The glint: one additive diagonal band, a third of the icon wide and
 /// leaning 45 degrees, `phase` of the way from clear of the icon's left edge
-/// to clear of its right. The caller clips it to the icon.
+/// to clear of its right. `color` is the unfaded quality colour: the band
+/// lifts it halfway to white at 0.6 and fades that once by `fade`. The
+/// caller clips it to the icon.
 fn glint_band(icon: Rect, phase: f32, color: Color32, fade: f32) -> egui::Mesh {
     let half = icon.width() / 6.0;
     let lean = icon.height() * 0.5;
@@ -275,7 +277,9 @@ pub(super) fn draw_for(
         // appears, 12 pt over the kill, and only fades.
         let rise = if reduced { 0.0 } else { age };
         let at = drop_icon_center(projection, origin, entry.receipt.item_id, rise);
-        let color = chrome::quality_colour(entry.receipt.quality, palette).gamma_multiply(fade);
+        // The glint fades the quality colour itself, so it gets it unfaded.
+        let quality = chrome::quality_colour(entry.receipt.quality, palette);
+        let color = quality.gamma_multiply(fade);
         let text = if entry.receipt.quality >= Quality::Rare {
             format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
         } else {
@@ -331,7 +335,7 @@ pub(super) fn draw_for(
         if let Some(phase) = glint_phase(entry.receipt.quality, seconds, reduced) {
             painter
                 .with_clip_rect(icon.intersect(projection.effects_clip))
-                .add(glint_band(icon, phase, color, fade));
+                .add(glint_band(icon, phase, quality, fade));
         }
         // The tier marker and its disc: static, the same in reduced effects.
         let marker = marker_center(icon);
@@ -658,6 +662,24 @@ mod tests {
         };
         assert!(band(0.2) < band(0.35) && band(0.35) < band(0.5));
         assert!(band(0.2) < 0.0 && band(0.5) > 0.0);
+        // Its colour is the quality colour lifted halfway to white at 0.6,
+        // times the fade, faded once (design-vfx-lighting §8).
+        let (shapes, _) = drawn(Quality::Epic, false, 0.5);
+        let mesh = shapes
+            .iter()
+            .find_map(|shape| match shape {
+                egui::Shape::Mesh(mesh) if glints(std::slice::from_ref(shape)) == 1 => Some(mesh),
+                _ => None,
+            })
+            .expect("a glint");
+        let fade = (1.0 - (0.5 / LIFETIME) as f32).powf(0.65);
+        let quality = chrome::quality_colour(Quality::Epic, crate::settings::Palette::Standard);
+        let lit = |c: u8| ((f32::from(c) * 0.5 + 127.5) * 0.6 * fade).round() as u8;
+        let expected =
+            Color32::from_rgb_additive(lit(quality.r()), lit(quality.g()), lit(quality.b()));
+        for vertex in &mesh.vertices {
+            assert_eq!(vertex.color, expected, "the band is faded once");
+        }
     }
     /// G7 (FX-7, the reduced half): in reduced effects a fly-up holds 12 pt
     /// above the kill, neither rising nor drifting, never glints and only
