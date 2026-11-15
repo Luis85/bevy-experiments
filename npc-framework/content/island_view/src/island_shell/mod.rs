@@ -1559,7 +1559,15 @@ fn refresh_totals(world: &mut World, shown: bool, class: LayoutClass) {
     );
     // The open right column (a ledger page, a card, the build menu) is
     // never covered: the lane is centred in what is left beside it.
-    let right = model::beside_column(right, right_column(world, class));
+    let column = right_column(world, class);
+    let right = model::beside_column(right, column);
+    // With a column open the lane is narrow: it starts right of the alerts
+    // stack, so the pill never covers the stack's "Show" (at 1024 wide).
+    let left = if column > 0.0 {
+        left.max(t::SCREEN_MARGIN + t::ATTENTION_COLUMN + 8.0)
+    } else {
+        left
+    };
     // Shape's resources panel stands right of the rail: the lane (the
     // Paused pill and the toasts) is centred in what is left beside it, so
     // an export's toast never covers the panel's goods.

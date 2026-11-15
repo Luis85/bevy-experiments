@@ -47,6 +47,8 @@ pub(crate) fn plugin(app: &mut App) {
         .add_observer(legend::activate)
         .add_systems(Startup, (markers::setup, legend::spawn))
         .add_systems(Update, markers::sync.in_set(ViewSystems::Sync))
+        // The sun follows the season the land is drawn in.
+        .add_systems(Update, daylight::follow_season.in_set(ViewSystems::Sync))
         .add_systems(
             Update,
             (markers::present, legend::refresh)

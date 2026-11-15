@@ -249,7 +249,13 @@ pub(crate) fn priority_text(topic: &str, level: PriorityLevel, effect: &str) -> 
         .get(..word.len() + 1)
         .filter(|head| head.eq_ignore_ascii_case(&format!("{word}:")))
         .map_or(trimmed, |_| trimmed[word.len() + 1..].trim_start());
-    format!("{topic}: {word}. {}", words::sentence(rest))
+    format!("{}: {word}. {}", topic_words(topic), words::sentence(rest))
+}
+
+/// A topic as a row title with one colon: the simulation's "Workplaces:
+/// farmer" reads "Workplaces, farmer" (closing re-capture, N6).
+pub(crate) fn topic_words(topic: &str) -> String {
+    topic.replace(": ", ", ")
 }
 
 /// Whether the simulation's reason reads as player words. Its old Jobs
@@ -434,6 +440,15 @@ mod tests {
                 "Harbour sees to it first"
             ),
             "Food reserve: high. Harbour sees to it first."
+        );
+        // The simulation's "Workplaces: farmer" title: one colon only.
+        assert_eq!(
+            priority_text(
+                "Workplaces: farmer",
+                PriorityLevel::High,
+                "High: the planner builds farmer workplaces sooner"
+            ),
+            "Workplaces, farmer: high. The planner builds farmer workplaces sooner."
         );
         assert!(!plain_reason(
             "1 more farmer(s) wanted: residents move at their next review, once their              switching rest is over"

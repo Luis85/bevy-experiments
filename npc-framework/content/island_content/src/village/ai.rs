@@ -1460,6 +1460,10 @@ fn civic_levy(world: &mut World, day: u64, people: &[(SimId, Entity)]) {
             "dividend":dividend,"balance":fund,"held_for_building":hold,
             "reserve":reserve,"relief_levy":relief}),
     );
+    // After the levy has written the fund back (closing fix: advanced in the
+    // middle, the levy's own copy of the fund overwrote the advance and
+    // created coins).
+    super::production::advance_staple_makers(world, people);
 }
 pub(super) fn recover_found(world: &mut World, e: Entity) -> bool {
     // Only purses and diaries on the ground are lost property: two small

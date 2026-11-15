@@ -887,7 +887,12 @@ fn rebuild(world: &mut World) {
                     t::BODY,
                     Tone::text(Surface::Paper),
                 );
-                let pair = row(world, card, 8.0);
+                // One above the other: the first has focus, and its tooltip
+                // (to its right) would hide a second beside it.
+                let pair = column(world, card, 8.0);
+                if let Some(mut node) = world.get_mut::<Node>(pair) {
+                    node.width = px(280);
+                }
                 for (text, action) in [
                     ("Continue from the autosave", Action::ContinueAutosave),
                     ("Continue from my save", Action::Continue),

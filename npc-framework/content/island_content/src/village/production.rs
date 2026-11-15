@@ -89,7 +89,157 @@ impl SimHash for JobIntent {
     }
 }
 
+/// What staple makers owe the civic fund for advances on their standing work
+/// (closing design). The fund advances at most `staple_advance_per_day` a day
+/// and `staple_advance_per_maker` to one maker; a maker repays half of every
+/// sale's proceeds until it owes nothing. Coins only move between the fund
+/// and the maker, so the island's coins stay exactly the same.
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StapleAdvances {
+    pub owed: BTreeMap<SimId, u32>,
+    /// Coins advanced and repaid since the founding.
+    pub advanced: u64,
+    pub repaid: u64,
+}
+impl SimHashResource for StapleAdvances {
+    const NAME: &'static str = "island_staple_advances_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.u32(self.owed.len() as u32);
+        for (id, coins) in &self.owed {
+            h.u32(id.0);
+            h.u32(*coins);
+        }
+        h.u64(self.advanced);
+        h.u64(self.repaid);
+    }
+    fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
+        Some(npc_framework::snapshot::serde_resource_fns::<Self>())
+    }
+}
+
+/// Whether `kind` is a staple or goes into one (up to two recipes deep):
+/// grain and flour for bread, thread and leather for the coat.
+pub fn feeds_staple(world: &World, kind: &str) -> bool {
+    fn feeds(world: &World, kind: &str, depth: u32) -> bool {
+        if super::stock::planned_staple(world, kind) {
+            return true;
+        }
+        if depth == 0 {
+            return false;
+        }
+        super::frontier::economy_spec::registry(world).is_some_and(|registry| {
+            registry
+                .spec
+                .recipes
+                .iter()
+                .filter(|recipe| recipe.inputs.iter().any(|input| input.good == kind))
+                .flat_map(|recipe| recipe.outputs.iter())
+                .any(|output| feeds(world, &output.good, depth - 1))
+        })
+    }
+    feeds(world, kind, 2)
+}
+
+/// Daily, after the floor grants: the fund advances staple makers with
+/// standing work and an empty purse what they need for inputs, within the
+/// caps (closing design).
+pub(super) fn advance_staple_makers(world: &mut World, people: &[(SimId, Entity)]) {
+    let Some((per_day, per_maker)) = super::frontier::economy_spec::tuning(world).map(|tuning| {
+        (
+            tuning.staple_advance_per_day,
+            tuning.staple_advance_per_maker,
+        )
+    }) else {
+        return;
+    };
+    if per_day == 0 || per_maker == 0 {
+        return;
+    }
+    let Some(plan) = world.get_resource::<ProductionPlan>() else {
+        return;
+    };
+    let makers: Vec<(SimId, Entity)> = people
+        .iter()
+        .copied()
+        .filter(|(id, _)| {
+            plan.production.get(id).is_some_and(|goods| {
+                goods
+                    .iter()
+                    .any(|(kind, units)| *units > 0 && feeds_staple(world, kind))
+            })
+        })
+        .collect();
+    // The fund keeps half of what it holds for its other duties.
+    let mut left = per_day.min(world.resource::<super::VillageState>().fund / 2);
+    for (id, actor) in makers {
+        if left == 0 {
+            break;
+        }
+        let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
+        if coins >= per_maker {
+            continue;
+        }
+        let owed = world
+            .get_resource::<StapleAdvances>()
+            .and_then(|advances| advances.owed.get(&id).copied())
+            .unwrap_or(0);
+        let give = (per_maker - coins)
+            .min(per_maker.saturating_sub(owed))
+            .min(left);
+        if give == 0 {
+            continue;
+        }
+        left -= give;
+        world.resource_mut::<super::VillageState>().fund -= give;
+        world.get_mut::<Wallet>(actor).expect("maker wallet").coins += give;
+        let mut advances = world.resource_mut::<StapleAdvances>();
+        *advances.owed.entry(id).or_default() += give;
+        advances.advanced += u64::from(give);
+        record_effect(
+            world,
+            Some(id),
+            "VillageStapleAdvance",
+            &serde_json::json!({"coins":give,"owed":owed + give}),
+        );
+    }
+}
+
+/// A maker who owes the fund repays half of `proceeds` (at least one coin,
+/// at most what it owes) from the coins it was just paid.
+pub(crate) fn repay_advance(world: &mut World, seller: Entity, proceeds: u32) {
+    let Some(id) = world.get::<SimId>(seller).copied() else {
+        return;
+    };
+    let owed = world
+        .get_resource::<StapleAdvances>()
+        .and_then(|advances| advances.owed.get(&id).copied())
+        .unwrap_or(0);
+    if owed == 0 || proceeds == 0 {
+        return;
+    }
+    let coins = world.get::<Wallet>(seller).map_or(0, |wallet| wallet.coins);
+    let repay = proceeds.div_ceil(2).min(owed).min(coins);
+    if repay == 0 {
+        return;
+    }
+    world
+        .get_mut::<Wallet>(seller)
+        .expect("seller wallet")
+        .coins -= repay;
+    world.resource_mut::<super::VillageState>().fund += repay;
+    let mut advances = world.resource_mut::<StapleAdvances>();
+    let left = owed - repay;
+    if left == 0 {
+        advances.owed.remove(&id);
+    } else {
+        advances.owed.insert(id, left);
+    }
+    advances.repaid += u64::from(repay);
+}
+
 pub fn register(app: &mut App) {
+    app.init_resource::<StapleAdvances>()
+        .register_sim_resource::<StapleAdvances>();
     app.init_resource::<ProductionPlan>()
         .register_sim_resource::<ProductionPlan>()
         .register_sim_component::<JobIntent>();
@@ -523,6 +673,9 @@ struct Builder<'a> {
     industrial: bool,
     /// The settlement of this regional round.
     settlement: Option<SimId>,
+    /// Makers with ordered work this round: standing work goes to the others
+    /// only, so a planned stock never displaces an order (closing design).
+    ordered: Option<BTreeSet<SimId>>,
 }
 #[derive(Default)]
 struct MaterialBundle {
@@ -1119,6 +1272,7 @@ impl Builder<'_> {
                 catalog::outputs_for(self.world, *role).contains(&kind)
                     && super::frontier::labor::work_feasible(self.world, *entity)
             })
+            .filter(|(id, _, _)| self.ordered.as_ref().is_none_or(|busy| !busy.contains(id)))
             .collect();
         producers.sort_by_key(|(id, _, _)| {
             (
@@ -1557,6 +1711,7 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         work_budget: BTreeMap::new(),
         industrial: false,
         settlement,
+        ordered: None,
     };
     for (id, e, role) in &people {
         for kind in catalog::outputs_for(world, *role) {
@@ -1845,14 +2000,51 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
     }
     let mut order: Vec<_> = depths.into_iter().collect();
     order.sort_by(|(a, da), (b, db)| db.cmp(da).then_with(|| a.cmp(b)));
-    for (kind, _) in order {
-        let requested = builder.requests.remove(&kind).unwrap_or(0);
-        builder.ledger.release_unused_work(&kind);
-        let supplied = builder.ledger.take_any(&kind, requested);
-        let missing = requested - supplied;
-        if missing > 0 {
-            builder.manufacture(&kind, missing);
+    let run = |builder: &mut Builder<'_>| {
+        for (kind, _) in &order {
+            let requested = builder.requests.remove(kind).unwrap_or(0);
+            builder.ledger.release_unused_work(kind);
+            let supplied = builder.ledger.take_any(kind, requested);
+            let missing = requested - supplied;
+            if missing > 0 {
+                builder.manufacture(kind, missing);
+            }
         }
+    };
+    run(&mut builder);
+    // Standing work (closing design), after every order: the settlement wants
+    // its staples' planned stock on hand whether or not a buyer has ordered
+    // yet, so makers fill spare capacity and cash with it, never ahead of a
+    // funded order. What is left for sale supplies it first (`take_any`);
+    // makers get the shortfall, inputs through the recipes. `manufacture`
+    // stops at the target (`stocked`), and the target never exceeds what keeps.
+    if let Some(region) = settlement {
+        for kind in catalog::trade_kinds(world) {
+            if !super::stock::planned_staple(world, kind) {
+                continue;
+            }
+            let target = super::stock::target(world, region, kind);
+            if target == 0 {
+                continue;
+            }
+            let held = super::stock::on_offer(world, region, kind);
+            let wanted = target.saturating_sub(held);
+            if wanted > 0 {
+                let requested = builder.requests.entry((*kind).into()).or_default();
+                *requested = requested.saturating_add(wanted);
+            }
+        }
+        builder.ordered = Some(
+            builder
+                .plan
+                .production
+                .iter()
+                .filter(|(_, goods)| goods.values().any(|count| *count > 0))
+                .map(|(id, _)| *id)
+                .collect(),
+        );
+        run(&mut builder);
+        builder.ordered = None;
     }
     if settlement.is_some() {
         builder.stock_shelves();

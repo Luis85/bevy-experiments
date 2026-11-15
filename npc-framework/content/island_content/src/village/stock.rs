@@ -156,12 +156,44 @@ fn crop_target(world: &World, settlement: SimId, kind: &str) -> u32 {
         .unwrap_or(0)
 }
 
+/// A staple its makers keep a planned stock of (closing design): the foods,
+/// gathered or made, and the coat with their inputs. Not hearth fuel, which
+/// has its planned stock at the homes (`winter_fuel_reserve`, ordered by each
+/// steward ahead of winter): a stall target for it is sized from every log
+/// traded, planks and building included, and sent the woodcutters to hoard
+/// hundreds of logs while a site's four logs waited. Not drink, which every
+/// resident draws at a well when thirsty: a stall target planned 300 to 800
+/// units of water in the first hours and tied the carriers up (closing
+/// probes on `island_buildings`).
+pub fn planned_staple(world: &World, kind: &str) -> bool {
+    let roles = super::roles::roles(world);
+    market::is_staple(world, kind) && kind != roles.drink && !roles.fuels.contains(&kind)
+}
+
 /// Units of `kind` a settlement aims to hold for sale; 0 when the rule is off.
 pub fn target(world: &World, settlement: SimId, kind: &str) -> u32 {
     let days = tuning(world).map_or(0, |tuning| tuning.stock_target_days);
     if days == 0 {
         return 0;
     }
+    // Made staples keep a planned stock of their own (closing design), more
+    // for the winter: autumn and winter.
+    let days = if planned_staple(world, kind) {
+        tuning(world).map_or(days, |tuning| {
+            let winter = matches!(
+                super::calendar(world).1,
+                super::Season::Autumn | super::Season::Winter
+            );
+            if winter {
+                tuning.staple_winter_stock_days
+            } else {
+                tuning.staple_stock_days
+            }
+            .max(days)
+        })
+    } else {
+        days
+    };
     // The overseer's food and fuel priorities scale the days kept.
     let days = {
         use super::frontier::oversee::{self, PriorityTopic};

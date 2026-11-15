@@ -108,6 +108,19 @@ pub(crate) fn fog_visibility(camera_distance: f32) -> f32 {
     (camera_distance * 14.0).max(900.0)
 }
 
+/// The haze under a weather that brings it nearer (`factor` below 1: rain
+/// 0.42, a storm 0.28, snow 0.32). The far distance still goes grey, but the
+/// ground under the camera keeps at least about seven tenths of its colour
+/// at any zoom: snow scaled the haze alone, and from the whole-island view
+/// half of the island's colour went into a grey veil.
+pub(crate) fn weather_fog_visibility(camera_distance: f32, factor: f32) -> f32 {
+    (fog_visibility(camera_distance) * factor).max(camera_distance * WEATHER_FOCUS_REACH)
+}
+
+/// Haze visibility, in camera distances, below which weather never brings
+/// it (about 0.7 of the focus's own colour kept).
+const WEATHER_FOCUS_REACH: f32 = 8.5;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +193,24 @@ mod tests {
             assert!(transmittance > 0.8, "{distance} m keeps {transmittance}");
         }
         assert!(fog_visibility(62.0) >= 868.0);
+    }
+
+    #[test]
+    fn snow_and_rain_haze_the_distance_but_never_veil_the_focus() {
+        for distance in [8.0_f32, 30.0, 62.0, 150.0, 360.0, 600.0] {
+            for factor in [0.28_f32, 0.32, 0.42] {
+                let visibility = weather_fog_visibility(distance, factor);
+                let at_focus = (-2.996 * distance / visibility).exp();
+                assert!(at_focus > 0.69, "{distance} m x{factor}: {at_focus}");
+                // Still nearer than a clear day's haze: weather shows.
+                assert!(visibility <= fog_visibility(distance));
+            }
+        }
+        // Up close the weather's own haze is kept as authored.
+        assert_eq!(
+            weather_fog_visibility(30.0, 0.32),
+            fog_visibility(30.0) * 0.32
+        );
     }
 
     #[test]

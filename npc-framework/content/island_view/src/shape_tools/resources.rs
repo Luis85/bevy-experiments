@@ -1105,7 +1105,7 @@ fn refresh(world: &mut World) {
         }),
         (Some(Mode::Remove), Some(_)) => Some(hovered.as_ref().map_or_else(
             || "Remove".to_owned(),
-            |(_, words)| format!("Remove the {}", words.to_lowercase()),
+            |(_, words)| format!("Remove the {}", lower_first(words)),
         )),
         _ => None,
     };

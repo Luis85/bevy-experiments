@@ -5,7 +5,8 @@ island crate is built while the simulation is being edited.
 Run from npc-framework:
   python scripts/playtest/capture_ui_live9.py
       [--binary target/npc-out/closing-ui/frozen/island_game.exe]
-      [--only probe,title-cards,new,outlook,goods,orders,alerts,season,shape,why,pause,states]
+      [--only probe,title-cards,new,oversee-start,outlook,goods,orders,alerts,season,shape,why,pause,states]
+      [--fixtures DIR] [--made DIR] [--out DIR]
 
 The binary may also come from ISLAND_GAME_EXE. PNGs, texts and summary.json
 go to target/npc-out/ui-live9/<section>/.
@@ -36,6 +37,8 @@ SAVE = "living-world.world.json"
 AUTOSAVE = "living-world.world.autosave.json"
 MADE = ROOT / "target/npc-out/closing-ui/fixtures9"
 AUTOSAVE_FOR = {"title-autosave": MADE / "base8.json"}
+# The probe's fixtures: `--fixtures` points it at a frozen set.
+PROBE_FIXTURES = FIXTURES
 
 
 class Live9Flow(Live8Flow):
@@ -214,15 +217,24 @@ def autosave_title(flow, report, checks):
     texts = flow.dump("title-autosave")
     checks.append({"check": "a newer autosave is offered on the title",
                    "ok": "Continue from the autosave" in texts, "texts": texts[:16]})
+    # Defect 16: the card's two choices only, both in sight (the first has
+    # focus; its tooltip stands to its right, the second is below it).
+    choices = [text for text in texts if text.startswith("Continue")]
+    report["autosave_choices"] = choices
+    checks.append({"check": "the autosave title offers the card's two choices and no third Continue",
+                   "ok": sorted(set(choices)) == ["Continue from my save", "Continue from the autosave"],
+                   "choices": choices})
     flow.size_shots("title-autosave")
 
 
 # --- Oversee from a save of this build ---------------------------------------
 
 def continue_oversee(flow):
-    """Continue the save (it was saved in Oversee) and pause."""
+    """Continue the save in Oversee and pause. "Continue" would enter Live,
+    where the Traveller arrives and, left alone in Oversee afterwards, dies:
+    a death of the script's own making."""
     time.sleep(1.0)
-    flow.click("Continue")
+    flow.click("Oversee the village")
     wait_for(lambda: flow.has_widget("Oversee") or None, 120)
     time.sleep(2.0)
     flow.call("npc/pause")
@@ -269,6 +281,16 @@ def outlook(flow, report, checks):
     flow.park(low)
     report["outlook_low"] = flow.panel_texts("Village alerts")
     flow.snap(f"live9-outlook-low-{low[0]}x{low[1]}", low)
+    # Defect 8: Compact folds the stack; Show opens it there.
+    if flow.has_widget("Show"):
+        flow.click("Show")
+        time.sleep(1.0)
+        flow.park(low)
+        opened = flow.panel_texts("Village alerts")
+        report["outlook_low_shown"] = opened
+        checks.append({"check": "Show opens the alerts in a Compact window",
+                       "ok": "Village outlook" in opened, "texts": opened})
+        flow.snap(f"live9-outlook-low-shown-{low[0]}x{low[1]}", low)
     flow.settle(SIZES[0])
 
 
@@ -653,13 +675,13 @@ def pause_menu(flow, report, checks):
 # Each is made by recorded commands (`npc/command`, the same path the ledger
 # uses) and clock steps on a save of this build, never by writing state:
 # - Nobody makes / Show {job} in Jobs: `SetProfessionTarget` miller 0 in
-#   Harbour, one day: the mill has open places and nobody in them; Flour's
+#   Harbour, four days (one resident leaves a job per day): the mill has open places and nobody in them; Flour's
 #   card says so and links to Jobs (then the scroll-and-flash).
 # - Held up: the same order; the bakery's bread now waits for flour, so
 #   Flour's card has "Held up: Bread waits for …" (line 8, its tooltip).
 # - Compact fold: the Flour card at 1280x690 (below 700 high is Compact).
 # - Folded alert row: `SetProfessionTarget` water_keeper 0 in Harbour, up to
-#   four days in quarter days: nobody sells water, so Harbour's residents
+#   eight days in quarter days: nobody sells water, so Harbour's residents
 #   go thirsty for one reason and fold into "N residents in Harbour are …".
 # - The season toast's button: `season_toast` from base0 (two days before
 #   winter) with Economy open; the host no longer toasts autosaves over it.
@@ -701,8 +723,10 @@ def nobody_makes_and_held_up(flow, report, checks):
     continue_oversee(flow)
     harbour = settlement_id(flow)
     want(flow, harbour, "miller", 0)
-    step_days(flow, 1)
-    keep_watching(flow)
+    # Residents leave a job one at a time, after the day's work: 4 days.
+    for _ in range(4):
+        step_days(flow, 1)
+        keep_watching(flow)
     opened = flour_card(flow)
     time.sleep(1.0)
     card = flow.dump("flour-card")
@@ -747,7 +771,8 @@ def folded_alert_row(flow, report, checks):
     harbour = settlement_id(flow)
     want(flow, harbour, "water_keeper", 0)
     found = None
-    for _ in range(16):
+    # Up to 8 days in quarter days: the wells' keepers leave one a day.
+    for _ in range(32):
         step_days(flow, 0.25)
         keep_watching(flow)
         found = next((text for text in flow.panel_texts("Village alerts") if " residents in " in text), None)
@@ -764,6 +789,52 @@ def folded_alert_row(flow, report, checks):
         flow.size_shots("state-alerts-fold-people")
 
 
+def clock(flow):
+    """The HUD's "hh:mm" as minutes past midnight, or None."""
+    for text in flow.texts():
+        text = str(text)
+        if len(text) >= 5 and text[2] == ":" and text[:2].isdigit() and text[3:5].isdigit():
+            return int(text[:2]) * 60 + int(text[3:5])
+    return None
+
+
+def oversee_start(flow, report, checks):
+    """A new game begun in Oversee, a day and a half run: the character who
+    never arrived must not die nor be named in the alerts (defect 1); then
+    the sea at dawn (the lattice, defect 22)."""
+    time.sleep(1.5)
+    flow.click("New game")
+    time.sleep(1.2)
+    flow.click("Oversee the village")
+    wait_for(lambda: flow.has_widget("Oversee") or None, 120)
+    time.sleep(2.0)
+    flow.call("npc/pause")
+    modal = 0
+    for _ in range(6):
+        step_days(flow, 0.25)
+        if keep_watching(flow):
+            modal += 1
+    alerts = flow.panel_texts("Village alerts")
+    traveller = [text for text in flow.texts() if "Traveller" in str(text)]
+    report["oversee_start"] = {"life_ended_modals": modal, "alerts": alerts, "traveller": traveller}
+    checks.append({"check": "an Oversee start runs a day and a half with no life-ended modal",
+                   "ok": modal == 0, "modals": modal})
+    checks.append({"check": "the alerts never name the character who never arrived",
+                   "ok": not any("Traveller" in str(text) for text in alerts), "alerts": alerts})
+    flow.size_shots("oversee-start-day-and-a-half")
+    # Dawn: step in tenths of an hour until the HUD clock reads 05:00-06:30.
+    seen = []
+    for _ in range(240):
+        minutes = clock(flow)
+        seen.append(minutes)
+        if minutes is not None and 300 <= minutes <= 390:
+            break
+        step_days(flow, 1 / 96)
+    report["dawn_clock"] = seen[-1]
+    flow.dump("dawn")
+    flow.size_shots("sea-at-dawn")
+
+
 def base(name):
     return MADE / f"{name}.json"
 
@@ -774,7 +845,17 @@ def main():
                         default=Path(os.environ.get("ISLAND_GAME_EXE", FROZEN)))
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-live9")
     parser.add_argument("--only", default="probe")
+    parser.add_argument("--fixtures", type=Path, default=None,
+                        help="the folder of fixtures the probe opens (default: target/npc-out/fixtures)")
+    parser.add_argument("--made", type=Path, default=None,
+                        help="where the New section keeps the base saves it makes (default: fixtures9)")
     args = parser.parse_args()
+    global MADE, PROBE_FIXTURES
+    if args.fixtures is not None:
+        PROBE_FIXTURES = args.fixtures.resolve()
+    if args.made is not None:
+        MADE = args.made.resolve()
+        AUTOSAVE_FOR["title-autosave"] = MADE / "base8.json"
     binary = args.binary.resolve()
     if not binary.is_file():
         parser.error(f"no game at {binary}")
@@ -814,7 +895,7 @@ def main():
 
 def probe_parts():
     parts = []
-    for path in sorted(FIXTURES.glob("*.json")):
+    for path in sorted(PROBE_FIXTURES.glob("*.json")):
         if path.stem == "older-save":
             continue
         fixture = path.stem
@@ -827,6 +908,7 @@ def probe_parts():
 
 SECTIONS = {"probe": probe_parts,
             "new": lambda: [("new", None, [new_screen, make_bases])],
+            "oversee-start": lambda: [("oversee-start", None, [oversee_start])],
             "title-cards": title_parts,
             "outlook": lambda: [("outlook", base("base8"), [outlook])],
             "goods": lambda: [("goods", base("base8"), [goods])],

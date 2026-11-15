@@ -1475,7 +1475,7 @@ fn one_job_can_have_its_own_workplace_level() {
     // "Your orders" names the level in force.
     assert!(
         rows.iter()
-            .any(|entry| entry.text.starts_with("Workplaces: ") && entry.text.contains(": high.")),
+            .any(|entry| entry.text.starts_with("Workplaces, ") && entry.text.contains(": high.")),
         "{:?}",
         rows.iter()
             .map(|entry| entry.text.clone())

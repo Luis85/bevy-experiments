@@ -812,6 +812,14 @@ fn bring_card_into_view(world: &mut World) {
     }
     let card = world.resource::<Ledger>().rows.get("stock_detail").copied();
     if let (Some(_), Some(card)) = (&good, card) {
+        // A card just built has no layout yet, and scrolling to it then
+        // does nothing: wait for the frame that has measured it.
+        let measured = world
+            .get::<ComputedNode>(card)
+            .is_some_and(|node| node.size().y > 0.0);
+        if !measured {
+            return;
+        }
         world.trigger(bevy::ui_widgets::ScrollIntoView { entity: card });
     }
     world.resource_mut::<Ledger>().scrolled_good = good;
@@ -1004,7 +1012,7 @@ fn process(world: &mut World) {
                         let success = economy::priority_success(world, &command);
                         let display = match &profession {
                             Some(_) => format!(
-                                "Workplaces: {}",
+                                "Workplaces, {}",
                                 words::noun(
                                     &economy::trade_display(
                                         world,

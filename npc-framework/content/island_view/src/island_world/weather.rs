@@ -128,7 +128,10 @@ pub(crate) fn haze_tone(kind: Weather) -> Option<([f32; 3], f32)> {
         Weather::Clear => None,
         Weather::Rain => Some(([0.42, 0.45, 0.5], 0.34)),
         Weather::Storm => Some(([0.2, 0.22, 0.27], 0.46)),
-        Weather::Snow => Some(([0.93, 0.95, 0.98], 0.4)),
+        // Light: from a high camera the snow island is white itself, and a
+        // thick pale layer over it read as a grey veil (the overcast light
+        // greys it). Drifting patches are enough to show it snowing.
+        Weather::Snow => Some(([0.93, 0.95, 0.98], 0.22)),
     }
 }
 
@@ -1171,6 +1174,10 @@ mod tests {
             let (_, opacity) = haze_tone(kind).expect("a haze");
             assert!(opacity > 0.2 && opacity < 0.7);
         }
+        // Snow's haze is the lightest: over a white island a thick one is a
+        // grey veil.
+        let snow = haze_tone(Weather::Snow).expect("snow").1;
+        assert!(snow < 0.25 && snow < haze_tone(Weather::Rain).expect("rain").1);
         // The haze texture repeats without a seam and has both patches and
         // gaps.
         for step in 0..32 {

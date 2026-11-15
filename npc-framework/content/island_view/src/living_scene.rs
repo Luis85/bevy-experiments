@@ -1204,19 +1204,32 @@ fn shore_mesh(terrain: &TerrainState, x: i32, z: i32) -> Option<Mesh> {
             {
                 continue;
             }
+            let (a, b) = (cx as f32, cz as f32);
+            let quad = [
+                [a, SHALLOWS_Y, b],
+                [a, SHALLOWS_Y, b + 1.0],
+                [a + 1.0, SHALLOWS_Y, b + 1.0],
+                [a + 1.0, SHALLOWS_Y, b],
+            ];
+            // An inland pond (wetland water) is still water, not the sea's
+            // shallows: one dark, even tint over the whole pond. Drawn as
+            // shallows, every pond cell was near land, so the whole pond
+            // turned the pale turquoise of a beach and breathed white with
+            // the swell: pale rectangles on the island.
+            if terrain
+                .cell(cx, cz)
+                .is_some_and(|cell| cell.biome == Biome::Wetland)
+            {
+                geometry.blended_quad(quad, [0.0, 1.0, 0.0], [POND_TINT; 4]);
+                continue;
+            }
             let alpha = [(0, 0), (0, 1), (1, 1), (1, 0)]
                 .map(|(dx, dz)| ground::shallows(terrain, cx + dx, cz + dz));
             if alpha.iter().all(|alpha| *alpha <= 0.0) {
                 continue;
             }
-            let (a, b) = (cx as f32, cz as f32);
             geometry.blended_quad(
-                [
-                    [a, SHALLOWS_Y, b],
-                    [a, SHALLOWS_Y, b + 1.0],
-                    [a + 1.0, SHALLOWS_Y, b + 1.0],
-                    [a + 1.0, SHALLOWS_Y, b],
-                ],
+                quad,
                 [0.0, 1.0, 0.0],
                 alpha.map(|alpha| [1.0, 1.0, 1.0, alpha]),
             );
@@ -1224,6 +1237,11 @@ fn shore_mesh(terrain: &TerrainState, x: i32, z: i32) -> Option<Mesh> {
     }
     (!geometry.vertices.is_empty()).then(|| geometry.mesh())
 }
+
+/// A pond's vertex colour over the shallows material: its light turquoise
+/// and foam taken down to a still, dark green-teal, laid fully over the
+/// water beneath.
+const POND_TINT: [f32; 4] = [0.36, 0.40, 0.40, 1.0];
 
 pub(crate) fn scene(server: &AssetServer, path: &'static str) -> Handle<WorldAsset> {
     server.load(GltfAssetLabel::Scene(0).from_asset(path))
@@ -2696,6 +2714,46 @@ mod tests {
         assert_eq!(
             vertices,
             [(-16, -16, 6), (-16, 0, 12), (0, -16, 12), (0, 0, 20 + 18)]
+        );
+    }
+
+    /// An inland wetland pond is drawn as still, dark water over all its
+    /// cells; the sea's shallows by the same land keep their pale, fading
+    /// shore tint.
+    #[test]
+    fn a_wetland_pond_is_dark_still_water_not_the_seas_shallows() {
+        let mut terrain = plateau(150);
+        // A 6 x 6 pond in the land, and the sea west of x = -20.
+        for index in 0..4096_i32 {
+            let (x, z) = (index % 64 - 32, index / 64 - 32);
+            let cell = &mut terrain.cells[index as usize];
+            if (0..6).contains(&x) && (0..6).contains(&z) {
+                cell.surface = TerrainSurface::Water;
+                cell.biome = Biome::Wetland;
+                cell.height_mm = -200;
+            } else if x < -20 {
+                cell.surface = TerrainSurface::Water;
+                cell.biome = Biome::Coast;
+                cell.height_mm = -700;
+            }
+        }
+        let colours = |x: i32, z: i32| -> Vec<[f32; 4]> {
+            let mesh = shore_mesh(&terrain, x, z).expect("water here");
+            let Some(bevy::mesh::VertexAttributeValues::Float32x4(colours)) =
+                mesh.attribute(Mesh::ATTRIBUTE_COLOR)
+            else {
+                panic!("shore colours")
+            };
+            colours.clone()
+        };
+        let pond = colours(0, 0);
+        assert_eq!(pond.len(), 36 * 4, "every pond cell is drawn");
+        assert!(pond.iter().all(|colour| *colour == POND_TINT));
+        let shore = colours(-32, 0);
+        assert!(shore.iter().all(|colour| colour[0] == 1.0));
+        assert!(
+            shore.iter().any(|colour| colour[3] < 1.0),
+            "the shore fades out"
         );
     }
 

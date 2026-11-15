@@ -248,6 +248,7 @@ pub fn trade(
         .get_mut::<Wallet>(seller)
         .expect("checked wallet")
         .coins += cost;
+    super::production::repay_advance(world, seller, cost);
     world.resource_mut::<VillageState>().transactions += 1;
     market::record_trade(world, buyer, seller, kind, n, cost);
     let bid = *world.get::<SimId>(buyer).expect("sim buyer");

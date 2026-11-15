@@ -440,6 +440,19 @@ pub struct EconomyTuning {
     /// stock and open offers exceed this many days of its use. 0 switches it
     /// off.
     pub stock_target_days: u32,
+    /// Staples (foods, water, fuel, the winter coat) are made to a planned
+    /// stock of this many days of the settlement's use, whether or not a
+    /// buyer has ordered them yet (closing design: the makers work toward a
+    /// stock, not only to order). Never more days than the good keeps.
+    pub staple_stock_days: u32,
+    /// The staple stock in the cold season and the season before it.
+    pub staple_winter_stock_days: u32,
+    /// Coins the civic fund may advance in one day to staple makers whose
+    /// purse cannot pay for the inputs of their standing work, repaid from
+    /// their sales.
+    pub staple_advance_per_day: u32,
+    /// The most a single maker may owe the fund for advances.
+    pub staple_advance_per_maker: u32,
     /// Stock up to the island's stock target is working stock: the market
     /// lowers a price only for what is offered beyond it.
     pub stock_cover_pricing: bool,
@@ -556,6 +569,10 @@ impl Default for EconomyTuning {
             maker_margin_percent: 10,
             raw_floor_percent: 25,
             stock_target_days: 2,
+            staple_stock_days: 4,
+            staple_winter_stock_days: 6,
+            staple_advance_per_day: 120,
+            staple_advance_per_maker: 30,
             stock_cover_pricing: true,
             trade_window_rounds: 24,
             boat_duty_percent: 5,
@@ -1859,9 +1876,13 @@ impl EconomySpec {
                 t.maker_margin_percent <= 1000
                     && t.raw_floor_percent <= 100
                     && t.stock_target_days <= 28
+                    && t.staple_stock_days <= 28
+                    && t.staple_winter_stock_days <= 28
+                    && t.staple_advance_per_maker <= 10_000
+                    && t.staple_advance_per_day <= 100_000
                     && (1..=256).contains(&t.trade_window_rounds)
                     && t.boat_duty_percent <= 100,
-                "maker_margin_percent must be at most 1000, raw_floor_percent and boat_duty_percent at most 100, stock_target_days at most 28 and trade_window_rounds 1..=256",
+                "maker_margin_percent must be at most 1000, raw_floor_percent and boat_duty_percent at most 100, stock_target_days, staple_stock_days and staple_winter_stock_days at most 28, staple_advance_per_maker at most 10000, staple_advance_per_day at most 100000 and trade_window_rounds 1..=256",
             ),
             (
                 (0..=100_000).contains(&t.freezing_warmth)
@@ -2063,6 +2084,10 @@ impl EconomySpec {
         h.u32(t.maker_margin_percent);
         h.u32(t.raw_floor_percent);
         h.u32(t.stock_target_days);
+        h.u32(t.staple_stock_days);
+        h.u32(t.staple_winter_stock_days);
+        h.u32(t.staple_advance_per_day);
+        h.u32(t.staple_advance_per_maker);
         h.u8(u8::from(t.stock_cover_pricing));
         h.u32(t.trade_window_rounds);
         h.u32(t.boat_duty_percent);

@@ -61,6 +61,16 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
   character's needs stay full; Jobs reasons are plain sentences; the ledger
   turns on the calendar's season; a save layout this build cannot read is
   another build's; a blocked hunter re-paths.
+- Planned staple stock: the foods (gathered or made) and the coat, with their
+  inputs, are made toward a stock of `staple_stock_days` (4) days per head,
+  `staple_winter_stock_days` (6) in autumn and winter, as standing work after
+  every order and only for makers with no ordered work (`stock::planned_staple`;
+  hearth fuel keeps its home reserve and drink its wells). The fund advances
+  staple makers input money (`staple_advance_per_day` 120,
+  `staple_advance_per_maker` 30), repaid from half of each sale
+  (`StapleAdvances`, hashed). Restockers no longer carry the boat's order off
+  the trading post to the village stall. `view::economy::stock_plan` gives
+  target, held and in work per good. `catalog::food_restore` is removed.
 
 ### Island game: review fixes (saving, startup, keys, words)
 

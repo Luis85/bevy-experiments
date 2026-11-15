@@ -77,11 +77,34 @@ fn unfunded_wants_do_not_become_orders_or_unsellable_production() {
             .values()
             .all(|goods| goods.values().all(|count| *count == 0))
     );
-    assert!(
-        plan.production
-            .values()
-            .all(|goods| goods.values().all(|count| *count == 0))
-    );
+    // Staples keep a planned stock whether or not anybody can pay yet
+    // (closing design: standing work, paid on sale). Every other want stays
+    // unfunded: nothing outside a staple's chain is made, and the staples'
+    // standing work never exceeds the islands' planned stock.
+    let mut made: std::collections::BTreeMap<String, u32> = Default::default();
+    for goods in plan.production.values() {
+        for (kind, count) in goods {
+            if *count > 0 {
+                *made.entry(kind.clone()).or_default() += count;
+            }
+        }
+    }
+    for (kind, count) in &made {
+        assert!(
+            production::feeds_staple(app.world(), kind),
+            "{count} {kind} planned without a buyer, and it is no staple's"
+        );
+        let planned: u32 = village::frontier::settlements::all(app.world())
+            .into_iter()
+            .map(|(region, _)| village::stock::target(app.world(), region, kind))
+            .sum();
+        if village::stock::planned_staple(app.world(), kind) {
+            assert!(
+                *count <= planned,
+                "{count} {kind} planned, above the planned stock of {planned}"
+            );
+        }
+    }
 }
 
 #[test]

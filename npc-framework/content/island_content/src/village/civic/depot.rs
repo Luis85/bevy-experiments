@@ -158,6 +158,7 @@ pub fn buy(
                     .get_mut::<Wallet>(entity)
                     .expect("checked payee")
                     .coins += coins;
+                crate::village::production::repay_advance(world, entity, coins);
                 record_effect(
                     world,
                     Some(*owner),

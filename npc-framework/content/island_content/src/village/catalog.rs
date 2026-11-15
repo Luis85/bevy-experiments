@@ -243,16 +243,6 @@ pub fn register(app: &mut App) {
     }
 }
 
-/// Hunger restored by a finished edible good. Raw meat is deliberately not food.
-pub fn food_restore(kind: &str) -> Option<i32> {
-    match kind {
-        "bread" => Some(80_000),
-        COOKED_MEAL => Some(90_000),
-        BERRIES => Some(20_000),
-        _ => None,
-    }
-}
-
 pub fn trade_kinds(world: &World) -> &'static [&'static str] {
     if let Some(registry) = super::frontier::economy_spec::registry(world) {
         registry.trade_kinds()

@@ -115,9 +115,18 @@ fn paid_carried_spare_is_reserved_once_without_replacing_a_still_usable_coat() {
         production::purchase_target(app.world(), ada, catalog::WARM_CLOTHES),
         1
     );
-    assert_eq!(
-        production::production_demand(app.world(), lina, catalog::WARM_CLOTHES),
-        0
+    // The coat is a staple with a planned stock (closing design): the sale
+    // took Lina's spare off the shelf, so she gets standing work to restock
+    // it, never more than the settlement's shortfall. Ada's carried spare is
+    // not bought again (above), and no order is made for it.
+    let region = village::frontier::settlements::member(app.world(), lina).expect("settlement");
+    let restock =
+        village::stock::target(app.world(), region, catalog::WARM_CLOTHES).saturating_sub(
+            village::stock::on_offer(app.world(), region, catalog::WARM_CLOTHES),
+        );
+    assert!(
+        production::production_demand(app.world(), lina, catalog::WARM_CLOTHES) <= restock,
+        "Lina's coat work exceeds the planned stock's shortfall of {restock}"
     );
     assert!(app.world().get::<Wallet>(ada).unwrap().coins < buyer_cash);
     assert_eq!(coins(&app), cash);

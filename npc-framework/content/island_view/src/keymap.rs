@@ -740,6 +740,9 @@ fn mode_name(mode: Mode) -> &'static str {
     }
 }
 
+/// Meanings the Guide keeps together, as left and right.
+const PAIRS: [(&str, &str); 1] = [("turn the camera left", "turn the camera right")];
+
 /// The Guide's Controls page: every player key per mode, the keys of one
 /// meaning on one line. Developer keys are not in the table, so not here.
 pub fn guide_controls() -> Vec<GuideSection> {
@@ -752,12 +755,34 @@ pub fn guide_controls() -> Vec<GuideSection> {
             })
         })
     };
+    // Meanings said as a pair ("turn the camera left" and "right"): the pair
+    // stays together, under "Every mode" only when both halves are bound
+    // alike everywhere (Q is left everywhere, but right is R in Live and E
+    // elsewhere, so both stay with their modes; closing re-capture, N7).
+    let alike = |does: &str| {
+        KEYS.iter().any(|(at, key, mods, meaning)| {
+            plays.contains(at) && meaning.does == does && everywhere(*key, *mods, does)
+        })
+    };
+    let partner = |does: &str| {
+        PAIRS.iter().find_map(|(one, other)| {
+            if *one == does {
+                Some(*other)
+            } else if *other == does {
+                Some(*one)
+            } else {
+                None
+            }
+        })
+    };
     let mut sections: Vec<GuideSection> = vec![GuideSection {
         mode: "Every mode",
         keys: Vec::new(),
     }];
     for (mode, key, mods, meaning) in KEYS {
-        let shared = *mode != Menus && everywhere(*key, *mods, meaning.does);
+        let shared = *mode != Menus
+            && everywhere(*key, *mods, meaning.does)
+            && partner(meaning.does).is_none_or(|other| alike(other));
         let name = if shared {
             "Every mode"
         } else {
@@ -867,6 +892,16 @@ mod tests {
         assert!(has(1, "I", "Pouch"));
         assert!(has(4, "Ctrl+Z", "Undo"));
         assert!(has(4, "[", "Brush smaller"));
+        // The camera's turn keys stay together with their mode: Q and R in
+        // Live, Q and E elsewhere; neither half is under "Every mode".
+        assert!(has(1, "Q", "Turn the camera left") && has(1, "R", "Turn the camera right"));
+        assert!(has(2, "Q", "Turn the camera left") && has(2, "E", "Turn the camera right"));
+        assert!(
+            guide[0]
+                .keys
+                .iter()
+                .all(|(_, does)| !does.starts_with("Turn the camera"))
+        );
         // No section has two lines of one meaning.
         for section in &guide {
             for (index, (_, does)) in section.keys.iter().enumerate() {

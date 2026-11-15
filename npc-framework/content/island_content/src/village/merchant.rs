@@ -545,6 +545,15 @@ pub fn wanted_surplus(world: &World, kind: &str) -> u32 {
         .max(order_left(merchant, kind))
 }
 
+/// Units of `kind` lying at the trading post that the boat's open order
+/// still wants: held for the boat, so no hauler takes them to a site or a
+/// stall before the call (closing fix).
+pub(crate) fn held_for_order(world: &World, kind: &str) -> u32 {
+    world
+        .get_resource::<Merchant>()
+        .map_or(0, |merchant| order_left(merchant, kind))
+}
+
 /// Units of `kind` the announced order still wants.
 fn order_left(merchant: &Merchant, kind: &str) -> u32 {
     merchant

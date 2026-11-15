@@ -3199,6 +3199,66 @@ def sea13_run(binary, base, report):
     return run
 
 
+# Fourteenth pass (`--only look14`): the north ponds, snow's haze from the
+# whole-island view, and the sun's hours by season. Three games: clear in the
+# calendar's autumn, clear drawn as winter (`ISLAND_VIEW_SEASON=winter`), and
+# snowing drawn as winter. Each at the camera a new game starts with and
+# close views, at fixed clock hours.
+
+LOOK14_HOURS = (("0630", 6.5), ("0800", 8.0), ("1424", 14.4), ("2000", 20.0), ("2150", 21.83))
+PONDS = (0.0, 95.0)
+
+
+def hour_phase(hour):
+    return ((hour - 6.0) / 24.0) % 1.0
+
+
+def look14_one(binary, base, report, label, weather, season):
+    run = base / f"look14-{label}"
+    env = {"ISLAND_VIEW_SEASON": season} if season else {}
+    child, flow = enter(binary, run, rules_with_weather(base, weather), report, env, 3)
+    entry = report.setdefault("look14", {}).setdefault(label, {})
+    try:
+        for attempt in range(4):
+            try:
+                flow.resize((1280, 720))
+                break
+            except RuntimeError:
+                time.sleep(2.0)
+        _, start = flow.camera_entity()
+        start = {key: start[key] for key in ("focus", "distance", "pitch", "yaw")}
+        world, row, street_x, street_z = street(flow)
+        hours = LOOK14_HOURS if weather == "clear" else (("0830", 8.5), ("1424", 14.4))
+        for name, hour in hours:
+            flow.to_phase(hour_phase(hour))
+            flow.call("npc/pause")
+            entry[name] = {"tick": flow.state()["tick"], "clock": flow.hud_clock()}
+            set_camera(flow, start)
+            time.sleep(1.2)
+            flow.snap_now(f"look14-{label}-{name}-island")
+            if name == "1424":
+                shot(flow, PONDS[0], PONDS[1], 40, f"look14-{label}-{name}-ponds-40m", 0.5)
+                shot(flow, street_x, street_z, 60, f"look14-{label}-{name}-village-60m", 0.8)
+                if weather != "clear":
+                    # The whole island with the ledger open beside it.
+                    set_camera(flow, start)
+                    try:
+                        flow.open_page("Village")
+                        time.sleep(1.0)
+                        flow.snap_now(f"look14-{label}-{name}-island-ledger")
+                    except RuntimeError as error:
+                        entry["ledger"] = str(error)[:200]
+    finally:
+        leave(child, flow, run, report, f"look14-{label}")
+    return run
+
+
+def look14_run(binary, base, report):
+    look14_one(binary, base, report, "autumn", "clear", None)
+    look14_one(binary, base, report, "winter", "clear", "winter")
+    return look14_one(binary, base, report, "snow", "snow", "winter")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
@@ -3207,7 +3267,7 @@ def main():
                                            "scale", "live", "harbour", "harsh", "third", "bodies",
                                            "cast", "precip", "flash", "shocks", "poses", "cottage",
                                            "knight", "stormnight", "block", "upgrade5x6",
-                                           "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12", "sea13"))
+                                           "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12", "sea13", "look14"))
     parser.add_argument("--prefix", default="after", help="--only block: before or after")
     parser.add_argument("--group-only", action="store_true",
                         help="--only cast: the group at the start only")
@@ -3228,7 +3288,7 @@ def main():
         "physical_input_tested": False, "screenshots": {}, "checks": []}
     runs = []
     third = {"bodies", "cast", "precip", "flash", "shocks", "poses", "cottage", "knight", "stormnight",
-             "block", "upgrade5x6", "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12", "sea13"}
+             "block", "upgrade5x6", "harbour5", "homework", "fisher", "larger", "motion", "budget", "look6", "village7", "look8", "look10", "deer11", "sound11", "shape12", "sea13", "look14"}
     try:
         if args.only == "knight":
             runs.append(knight_run(binary, base, report))
@@ -3242,7 +3302,7 @@ def main():
                  "larger": larger_run, "motion": motion_run, "look6": look6_run, "village7": village7_run,
                  "look8": look8_run, "look10": look10_run,
                  "deer11": deer11_run, "sound11": sound11_run, "shape12": shape12_run,
-                 "sea13": sea13_run}
+                 "sea13": sea13_run, "look14": look14_run}
         if args.only in fifth:
             runs.append(fifth[args.only](binary, base, report))
         if args.only == "budget":

@@ -509,6 +509,38 @@ fn days_of(stock: u32, per_day: u32) -> Option<u32> {
     (per_day > 0).then(|| stock / per_day)
 }
 
+/// What the village plan wants of one staple (closing design): its planned
+/// stock, what the settlement holds for sale, and what its makers have in
+/// work.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct StockPlanRow {
+    pub good: String,
+    pub display: String,
+    pub target: u32,
+    pub held: u32,
+    pub in_work: u32,
+}
+
+/// The staple stock plan of `settlement`, in key order.
+pub fn stock_plan(world: &World, settlement: SimId) -> Vec<StockPlanRow> {
+    let members = demography::members(world, settlement);
+    let plan = world.get_resource::<crate::village::production::ProductionPlan>();
+    catalog::trade_kinds(world)
+        .iter()
+        .filter(|kind| crate::village::stock::planned_staple(world, kind))
+        .map(|kind| StockPlanRow {
+            good: (*kind).to_owned(),
+            display: catalog::display_in(world, kind).unwrap_or(kind).to_owned(),
+            target: crate::village::stock::target(world, settlement, kind),
+            held: crate::village::stock::on_offer(world, settlement, kind),
+            in_work: members
+                .iter()
+                .filter_map(|(id, _)| plan?.production.get(id)?.get(*kind).copied())
+                .fold(0, u32::saturating_add),
+        })
+        .collect()
+}
+
 /// [`Outlook`] of `settlement`.
 pub fn outlook(world: &World, settlement: SimId) -> Outlook {
     let (day, season, _) = crate::village::calendar(world);

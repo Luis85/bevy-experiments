@@ -2135,7 +2135,12 @@ fn weather(
     if regional.is_some() {
         let phase =
             crate::island_atmosphere::daylight::view_phase(clock.tick, &config, pinned.as_deref());
-        let daylight = crate::island_atmosphere::daylight::daylight(phase, config.night_permille);
+        // The season's own sunrise, sunset and noon height (view only).
+        let daylight = crate::island_atmosphere::daylight::view_daylight(
+            clock.tick,
+            &config,
+            pinned.as_deref(),
+        );
         let light = crate::island_atmosphere::sky::sky_light(daylight);
         let srgb = |[r, g, b]: [f32; 3]| Color::srgb(r, g, b);
         // Today's weather and a shock dim the sun, bring the haze nearer
@@ -2172,7 +2177,10 @@ fn weather(
         for (camera, mut fog) in &mut atmospheres {
             fog.color = srgb(under(light.fog));
             fog.falloff = FogFalloff::from_visibility_colors(
-                crate::island_atmosphere::sky::fog_visibility(camera.distance) * change.visibility,
+                crate::island_atmosphere::sky::weather_fog_visibility(
+                    camera.distance,
+                    change.visibility,
+                ),
                 srgb(under(light.fog_extinction)),
                 srgb(under(light.fog_inscatter)),
             );

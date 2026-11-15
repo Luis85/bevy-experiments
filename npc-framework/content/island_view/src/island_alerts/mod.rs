@@ -1497,8 +1497,10 @@ fn stack(world: &World) -> Stack {
     }
 }
 
-/// One row of the stack: a chrome card, 44 high, with a severity edge, the
-/// shape, a title, one line of detail and a locate marker.
+/// One row of the stack: a chrome card, at least 44 high, with a severity
+/// edge, the shape, a title, one line of detail and a locate marker. A long
+/// title wraps and the card grows; it is never cut (its tooltip says it
+/// whole as well).
 fn row(
     world: &mut World,
     body: Entity,
@@ -1512,7 +1514,7 @@ fn row(
             ChildOf(body),
             w::chrome(
                 Node {
-                    height: px(t::ROW_TWO_LINES),
+                    min_height: px(t::ROW_TWO_LINES),
                     overflow: Overflow::clip(),
                     flex_shrink: 0.0,
                     ..default()
@@ -1530,7 +1532,8 @@ fn row(
         Reach::Ring,
         Node {
             width: percent(100),
-            padding: UiRect::new(px(12), px(8), px(0), px(0)),
+            min_height: px(t::ROW_TWO_LINES),
+            padding: UiRect::new(px(12), px(8), px(5), px(5)),
             column_gap: px(8),
             align_items: AlignItems::Center,
             ..default()
@@ -1575,7 +1578,9 @@ fn row(
             },
         ))
         .id();
-    w::label(world, column, title, t::BODY, Tone::text(Surface::Chrome));
+    // Wraps: "The village is short of food: 37 portions for 44 residents"
+    // is read whole, on two lines when it must (closing re-capture, N5).
+    w::paragraph(world, column, title, t::BODY, Tone::text(Surface::Chrome));
     if !detail.is_empty() {
         w::label(
             world,

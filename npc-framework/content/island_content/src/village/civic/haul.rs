@@ -167,12 +167,13 @@ pub fn material_trip(world: &World, actor: Entity) -> Option<MaterialTrip> {
                 {
                     continue;
                 }
-                let count = fitting(
+                let available = post_available(
                     world,
-                    actor,
+                    store_id,
                     kind,
-                    wanted.min(depot::available(world, store, kind, Some(me))),
+                    depot::available(world, store, kind, Some(me)),
                 );
+                let count = fitting(world, actor, kind, wanted.min(available));
                 if count > 0 {
                     return Some(MaterialTrip::Fetch {
                         store: store_id,
@@ -185,6 +186,17 @@ pub fn material_trip(world: &World, actor: Entity) -> Option<MaterialTrip> {
         }
     }
     None
+}
+
+/// What a hauler may take of `available` units of `kind` in `store`: at the
+/// trading post, less what the boat's open order still wants, which is laid
+/// there for the boat (closing fix: restockers and site carriers took it).
+fn post_available(world: &World, store: SimId, kind: &str, available: u32) -> u32 {
+    if crate::village::merchant::post(world).is_some_and(|(post, _)| post == store) {
+        available.saturating_sub(crate::village::merchant::held_for_order(world, kind))
+    } else {
+        available
+    }
 }
 
 fn entity(world: &World, id: SimId) -> Result<Entity, &'static str> {
@@ -470,7 +482,12 @@ pub fn restock_trip(world: &World, actor: Entity) -> Option<RestockTrip> {
                     .min(room)
                     .min(trip)
                     .min(coins / price)
-                    .min(store.available(kind, Some(me), now));
+                    .min(post_available(
+                        world,
+                        *store_id,
+                        kind,
+                        store.available(kind, Some(me), now),
+                    ));
                 let count = fitting(world, actor, kind, wanted);
                 if count > 0 {
                     return Some(RestockTrip::Fetch {

@@ -222,26 +222,35 @@ fn a_sociable_resident_takes_leisure_and_meets_more_people_than_an_unsociable_on
     }));
     let mut loner = app_with(behavior.clone(), 7);
     let mut mixer = app_with(behavior, 7);
-    let (subject, _) = residents(loner.world())[3];
-    set_trait(&mut loner, subject, |t| t.sociability = 0);
-    let alone = run_sampled(&mut loner, &[subject], 3_600)[0];
-    let social = run_sampled(&mut mixer, &[subject], 3_600)[0];
-    let (met_alone, met_social) = (meetings(&loner, subject), meetings(&mixer, subject));
+    // Six subjects, not one: since the planned staple stock (closing design)
+    // the makers' day shifts with their standing work, and whether one
+    // resident's few leisure minutes overlap with a free neighbour is down to
+    // a handful of samples. Over six residents the trait shows.
+    let subjects: Vec<SimId> = residents(loner.world())[3..9]
+        .iter()
+        .map(|(id, _)| *id)
+        .collect();
+    for subject in &subjects {
+        set_trait(&mut loner, *subject, |t| t.sociability = 0);
+    }
+    let alone = run_sampled(&mut loner, &subjects, 3_600);
+    let social = run_sampled(&mut mixer, &subjects, 3_600);
+    let met_alone: i32 = subjects.iter().map(|id| meetings(&loner, *id)).sum();
+    let met_social: i32 = subjects.iter().map(|id| meetings(&mixer, *id)).sum();
+    let leisure: u32 = social.iter().map(|samples| samples.leisure).sum();
     println!(
-        "SOCIABILITY unsociable={alone:?} meetings={met_alone} sociable={social:?} \
-         meetings={met_social}"
+        "SOCIABILITY unsociable={alone:?} meetings={met_alone} sociable={social:?}          meetings={met_social}"
     );
     // Since the review fix pass (npc-ai#3) everybody has an evening; an
     // unsociable resident spends it without company (checked below by the
     // meetings), so its leisure samples are no longer zero.
     assert!(
-        social.leisure >= 40,
-        "the sociable resident spent only {} samples at leisure",
-        social.leisure
+        leisure >= 40 * subjects.len() as u32,
+        "the sociable residents spent only {leisure} samples at leisure"
     );
     assert!(
         met_social > met_alone,
-        "sociable met {met_social} people, unsociable {met_alone}"
+        "sociable residents met {met_social} people, unsociable ones {met_alone}"
     );
 }
 
