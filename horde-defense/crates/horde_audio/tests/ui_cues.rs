@@ -184,6 +184,35 @@ fn no_sale_cue_in_battle() {
     assert_eq!(coins.observe(&[(4, 12)], false), 0);
 }
 
+/// An expedition that settles during a battle is toasted and acknowledged
+/// while the battle is paused (W3-25): its batch still plays once the
+/// battle ends, and only once.
+#[test]
+fn expedition_batch_acknowledged_in_battle_plays_after_it() {
+    let mut coins = ExpeditionCoins::default();
+    assert_eq!(coins.observe(&[], false), 0);
+    // Settles in the battle, then its notice is acknowledged in the pause.
+    assert_eq!(coins.observe(&[(4, 12), (5, 0)], true), 0);
+    assert_eq!(coins.observe(&[], true), 0);
+    assert_eq!(coins.observe(&[], false), 1);
+    assert_eq!(coins.observe(&[], false), 0);
+    // Two owed batches still request one each.
+    assert_eq!(coins.observe(&[(6, 3)], true), 0);
+    assert_eq!(coins.observe(&[(6, 3), (7, 9)], true), 0);
+    assert_eq!(coins.observe(&[(6, 3)], false), 2);
+    assert_eq!(coins.observe(&[(6, 3)], false), 0);
+}
+
+/// A session that opens in a battle: what is pending then is old news, and
+/// stays old once the battle ends.
+#[test]
+fn notices_pending_when_a_battle_session_opens_stay_old() {
+    let mut coins = ExpeditionCoins::default();
+    assert_eq!(coins.observe(&[(1, 30)], true), 0);
+    assert_eq!(coins.observe(&[(1, 30), (2, 4)], true), 0);
+    assert_eq!(coins.observe(&[(1, 30), (2, 4)], false), 1);
+}
+
 #[test]
 fn two_worker_batches_at_most_one_each() {
     let mut coins = ExpeditionCoins::default();

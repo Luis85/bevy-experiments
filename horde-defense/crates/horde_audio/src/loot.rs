@@ -235,28 +235,33 @@ pub fn sale_cue(command: &Command, outcome: &CommandOutcome, in_battle: bool) ->
 pub struct ExpeditionCoins {
     /// `None` until the first look: what is pending then (a load) is old.
     heard: Option<BTreeSet<u64>>,
+    /// Batches that arrived during a battle and wait for it to end. Their
+    /// notice may be acknowledged meanwhile (toasted in the pause, W3-25).
+    owed: usize,
 }
 impl ExpeditionCoins {
     /// `pending` is every unacknowledged expedition notice as `(battle id,
     /// items its receipt sold)`. Returns how many `CoinBatch` requests are
     /// due: one per notice not heard before that sold at least one item.
-    /// During a battle nothing is due and nothing is marked heard.
+    /// During a battle nothing is due: a new batch is owed, and is due on
+    /// the first look after the battle, even if its notice is gone by then.
     pub fn observe(&mut self, pending: &[(u64, u32)], in_battle: bool) -> usize {
-        if in_battle {
-            return 0;
-        }
         let ids = || pending.iter().map(|(battle, _)| *battle);
         let Some(heard) = &mut self.heard else {
             self.heard = Some(ids().collect());
             return 0;
         };
-        let due = pending
+        let new = pending
             .iter()
             .filter(|(battle, sold)| !heard.contains(battle) && *sold > 0)
             .count();
         // An acknowledged notice is forgotten; its id is never reused.
         *heard = ids().collect();
-        due
+        if in_battle {
+            self.owed += new;
+            return 0;
+        }
+        std::mem::take(&mut self.owed) + new
     }
     /// [`Self::observe`] of `game`'s unacknowledged expedition notices.
     pub fn observe_game(&mut self, game: &Game) -> usize {
