@@ -8,9 +8,10 @@
 //!
 //! The topmost overlay answers first, in [`Overlay`]'s order. With no overlay
 //! the screen answers: the menu asks to quit, a camp tab goes back to Camp
-//! home, Upgrades goes back to Results (or to Camp home with no settled
-//! report), Camp home goes back to a settled Results while the journey runs
-//! and no defense is live, else asks to return to the main menu; Results asks
+//! home, Upgrades goes back to Results while the journey runs (or to Camp
+//! home with no settled report or a closed journey), Camp home goes back to
+//! a settled Results while the journey runs and no defense is live, else
+//! asks to return to the main menu; Results asks
 //! to return to the main menu; and the battle cancels a retreat hold, else
 //! closes construction or, only when Pause is bound to Escape (decision 18),
 //! passes the press on to the Pause binding. Settings saves and returns,
@@ -166,9 +167,11 @@ fn screen_action(cx: &EscapeContext) -> EscapeAction {
         Screen::Battle if cx.pause_is_escape => A::PassToPause,
         Screen::Battle => A::Ignore,
         Screen::Results => A::OpenModal(ModalKind::ReturnToMenu),
-        // Upgrades goes back to the debrief it was opened from, or to Camp
-        // home when no round has settled.
-        Screen::Upgrades if cx.settled_report => A::Go(Screen::Results),
+        // Upgrades goes back to the debrief it was opened from while the
+        // journey runs, or to Camp home when no round has settled or a
+        // liberation (or leaving) closed the journey: the last report is kept
+        // but is no longer a debrief to return to, as on Camp home.
+        Screen::Upgrades if cx.settled_report && cx.journey_active => A::Go(Screen::Results),
         Screen::Upgrades => A::GoTab(Tab::Home),
         Screen::History => A::CloseHistory,
         // An unapplied difficulty draft is never dropped silently (UX-09).

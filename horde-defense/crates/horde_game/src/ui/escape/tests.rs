@@ -414,6 +414,15 @@ fn matrix_table() {
             A::GoTab(Tab::Home),
         ),
         (
+            "upgrades after a liberation closed the journey goes back to Camp home",
+            EscapeContext {
+                settled_report: true,
+                journey_active: false,
+                ..on(Screen::Upgrades)
+            },
+            A::GoTab(Tab::Home),
+        ),
+        (
             "upgrades over a live defense with an older report goes back to Results",
             EscapeContext {
                 settled_report: true,
