@@ -211,29 +211,34 @@ pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, expanded: bool) {
     if attempt.mode != Mode::Npc {
         return;
     }
-    ui.strong("Current survivor decision");
-    ui.label(&attempt.decision);
-    ui.colored_label(
-        MUTED,
-        format!(
-            "Next legal decision in {:.1}s",
-            attempt.next_decision_seconds()
-        ),
-    );
-    if let Some(id) = attempt.decision_target {
-        ui.label(format!("Committed target #{id}"));
-    }
-    if let Some(line) = attempt.latest_resolution.as_deref() {
-        egui::CollapsingHeader::new("Latest resolution")
-            .default_open(expanded)
-            .show(ui, |ui| {
-                ui.label(RichText::new(line).size(12.0));
-                ui.colored_label(
-                    MUTED,
-                    "This is a resolved action, not a prediction of the next roll.",
-                );
-            });
-    }
+    // A left-aligned, unjustified block (CF-3-15): the Tactics popup is a
+    // menu, whose justified layout would stretch each wrapped line of the
+    // decision to the popup width with wide, uneven word gaps.
+    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+        ui.strong("Current survivor decision");
+        ui.label(&attempt.decision);
+        ui.colored_label(
+            MUTED,
+            format!(
+                "Next legal decision in {:.1}s",
+                attempt.next_decision_seconds()
+            ),
+        );
+        if let Some(id) = attempt.decision_target {
+            ui.label(format!("Committed target #{id}"));
+        }
+        if let Some(line) = attempt.latest_resolution.as_deref() {
+            egui::CollapsingHeader::new("Latest resolution")
+                .default_open(expanded)
+                .show(ui, |ui| {
+                    ui.label(RichText::new(line).size(12.0));
+                    ui.colored_label(
+                        MUTED,
+                        "This is a resolved action, not a prediction of the next roll.",
+                    );
+                });
+        }
+    });
 }
 
 #[cfg(test)]

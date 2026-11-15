@@ -2236,3 +2236,68 @@ fn construction_panel_names_the_pause_above_its_fold() {
         }
     }
 }
+
+/// The galleys of every text run reading exactly `label`, in paint order.
+fn galleys_of(output: &FullOutput, label: &str) -> Vec<std::sync::Arc<egui::Galley>> {
+    fn find(
+        shape: &egui::epaint::Shape,
+        label: &str,
+        found: &mut Vec<std::sync::Arc<egui::Galley>>,
+    ) {
+        match shape {
+            egui::epaint::Shape::Text(t) if t.galley.text() == label => {
+                found.push(t.galley.clone());
+            }
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| find(s, label, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        find(&clipped.shape, label, &mut found);
+    }
+    found
+}
+
+/// CF-3-15: the Tactics popup is a menu, whose layout is justified, and egui
+/// justifies a wrapped label in it, so the decision's first line was
+/// stretched to the popup width with wide, uneven word gaps. The decision
+/// and the latest resolution wrap left-aligned at their normal spacing.
+#[test]
+fn tactics_popup_wraps_the_decision_without_justifying_it() {
+    const DECISION: &str = "Attack: shoot Breacher packling in lane 1 · nearest visible threat, then reload behind the wall";
+    const RESOLUTION: &str = "Shot Breacher packling in lane 1 for 14 damage · 3d6 roll 11 against cover 9 · the packling staggers";
+    for target in Target::BOTH {
+        let mut fixture = fresh_battle(Mode::Npc, true);
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.game.set_paused(true);
+        {
+            let a = f.game.attempt_slot_mut().as_mut().unwrap();
+            a.decision = DECISION.into();
+            a.latest_resolution = Some(RESOLUTION.into());
+        }
+        h.frame(f, View::Battle, vec![]);
+        h.click(f, View::Battle, "Tactics");
+        h.click(f, View::Battle, "Latest resolution");
+        let output = h.frame(f, View::Battle, vec![]);
+        for text in [DECISION, RESOLUTION] {
+            // The popup's run is the one that wraps (the HUD may show the
+            // decision on one truncated line).
+            let wrapped: Vec<_> = galleys_of(&output, text)
+                .into_iter()
+                .filter(|galley| galley.rows.len() > 1)
+                .collect();
+            assert!(
+                !wrapped.is_empty(),
+                "{target:?}: {text:?} wraps in the popup"
+            );
+            for galley in wrapped {
+                assert!(
+                    !galley.job.justify,
+                    "{target:?}: {text:?} is justified across the popup"
+                );
+            }
+        }
+    }
+}
