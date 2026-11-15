@@ -1839,10 +1839,13 @@ fn midpoint_label_clears_the_construction_panel() {
 /// live OS pointer. With the pointer over the field the aim stays where the
 /// scene pinned it, the field does not hover, and the frame paints exactly
 /// what it paints with no pointer: no hover reticle, no inspector, no
-/// crosshair cursor. An interactive launch still aims with the pointer.
+/// crosshair cursor. With the pointer parked on an enemy the aim already
+/// rests on, the inspector tooltip still never draws in a capture. An
+/// interactive launch still aims with the pointer and inspects the enemy.
 #[test]
 fn review_capture_aim_ignores_the_os_pointer() {
     use crate::launch::{LaunchConfig, ReviewOptions};
+    use horde_core::content::EnemyKind;
     let still = ReviewOptions {
         capture: Some("headless-review-capture.png".into()),
         exit: true,
@@ -1903,6 +1906,73 @@ fn review_capture_aim_ignores_the_os_pointer() {
                 assert!(f.battle.arena_hover, "{name} {size:?}: the field hovers");
                 assert!(crosshair, "{name} {size:?}: the field owns the cursor");
                 assert!(!same_paint, "{name} {size:?}: the reticle readout paints");
+            }
+
+            // The inspector half: the pointer parks on an enemy, and the aim
+            // already rests on its body (the scene pinned it there), so only
+            // the capture's missing pointer keeps the inspector away.
+            h.ctx
+                .all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
+            let mut a = f.game.attempt_slot_mut().take().unwrap();
+            a.enemies.clear();
+            a.events.clear();
+            f.game.spawn_enemy(&mut a, EnemyKind::Runner, 1, false);
+            let enemy = a.enemies.last_mut().unwrap();
+            enemy.x = a.width_yards * 0.6;
+            let [sx, sy] = crate::battle_view::crowd_stagger(enemy.id);
+            let body = [enemy.x + sx, enemy.y() + sy];
+            *f.game.attempt_slot_mut() = Some(a);
+            let a = f.game.attempt().unwrap();
+            assert!(
+                matches!(
+                    crate::inspector::target_at(a, body),
+                    Some(crate::inspector::Target::Enemy(_))
+                ),
+                "{name} {size:?}: the body is inspectable"
+            );
+            let on_enemy = art::ArenaProjection::for_attempt(field, a).world(body[0], body[1]);
+            f.battle.aim = body;
+            // The inspector's heading: "<enemy> · lane 2".
+            let dossier = " · lane 2";
+            h.frame_size(f, View::Battle, vec![Event::PointerGone], size);
+            let baseline = h.frame_size(f, View::Battle, vec![], size);
+            assert!(
+                !baseline
+                    .shapes
+                    .iter()
+                    .any(|c| shape_has_text(&c.shape, dossier)),
+                "{name} {size:?}: the inspector draws with no pointer"
+            );
+            let mut inspected = false;
+            let mut last = None;
+            for frame in 0..4 {
+                let events = if frame == 0 {
+                    vec![Event::PointerMoved(on_enemy)]
+                } else {
+                    vec![]
+                };
+                let output = h.frame_size(f, View::Battle, events, size);
+                inspected |= output
+                    .shapes
+                    .iter()
+                    .any(|c| shape_has_text(&c.shape, dossier));
+                last = Some(output);
+            }
+            if pinned {
+                assert!(
+                    !inspected,
+                    "{name} {size:?}: the inspector drew under the OS pointer"
+                );
+                assert_eq!(
+                    f.battle.aim, body,
+                    "{name} {size:?}: the pointer moved the aim"
+                );
+                assert!(
+                    last.unwrap().shapes == baseline.shapes,
+                    "{name} {size:?}: the pointer on the enemy changed the painted frame"
+                );
+            } else {
+                assert!(inspected, "{name} {size:?}: the pointer inspects the enemy");
             }
         }
     }
