@@ -1646,20 +1646,25 @@ fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
     }
 }
 
-/// CF-2-03: the boss-phase motion export plays the whole hold. Its warm-up
-/// frames hold the staged entry tick, and the export resumes the defense one
-/// native frame before frame-0000, so frames 0-22 draw the phase on ticks
-/// 1-89 of the 90-tick hold (normal and reduced) and frame 23 its end. The
-/// loop stands in for the App: per native frame `RuntimeSet::Apply`, one fixed
-/// step (the export's `FixedTimesteps(1)`), then Update (`capture_frames` and
-/// the battle screen's control publish).
+/// The motion export of `scene` in `reduced` effects, run headless as the App
+/// runs it. Per native frame: `RuntimeSet::Apply`, one fixed step (the
+/// export's `FixedTimesteps(1)`), Update (`capture_frames`, which records the
+/// frame and schedules the release), then the egui pass, which draws the
+/// screen on one persistent context and publishes the controls it holds:
+/// enabled only while the attempt runs, so a release's first tick waits for
+/// the pass after the release applies (CF-3-29). `on_capture` sees every
+/// captured frame, by index, after its egui pass. `staged` sees the loaded
+/// fixture before the first native frame.
 #[cfg(feature = "review")]
-#[test]
-fn boss_phase_motion_export_plays_the_whole_hold() {
-    use crate::capture_sequence::{COUNT, LAST, frame_index};
-    use crate::runner::ControlFrame;
+fn run_motion_export(
+    scene: &str,
+    reduced: bool,
+    staged: impl FnOnce(&FrontendParts),
+    mut on_capture: impl FnMut(u32, &mut FrontendParts),
+) {
+    use crate::capture_sequence::{LAST, frame_index};
     let vars = [
-        ("LASTLIGHT_REVIEW_SCREEN", "boss-phase"),
+        ("LASTLIGHT_REVIEW_SCREEN", scene),
         ("LASTLIGHT_REVIEW_MOTION", "1"),
         ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
     ];
@@ -1670,21 +1675,60 @@ fn boss_phase_motion_export_plays_the_whole_hold() {
     })
     .expect("valid export launch");
     let mut f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
-    assert!(
-        f.game.global_paused(),
-        "the export's warm-up holds the staged entry tick"
-    );
-    let boss = f
-        .game
-        .attempt()
-        .and_then(|a| a.enemies.iter().find(|e| e.boss))
-        .map(|e| e.id)
-        .expect("a boss");
-    let mut frames = Vec::new();
+    f.settings.reduced_effects = reduced;
+    staged(&f);
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
     for frame in 1..=LAST {
         f.flush();
         f.step();
-        if frame_index(frame).is_some() {
+        schedule_motion_release(&config, &mut f.runtime, frame);
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1440.0, 900.0),
+                )),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        output.textures_delta.clear();
+        if let Some(index) = frame_index(frame) {
+            on_capture(index, &mut f);
+        }
+    }
+}
+
+/// CF-2-03: the boss-phase motion export plays the whole hold. Its warm-up
+/// frames hold the staged entry tick, and the export resumes the defense so
+/// that frame-0000 draws its first tick (`review::motion_release_frame`), so
+/// frames 0-22 draw the phase on ticks 1-89 of the 90-tick hold (normal and
+/// reduced) and frame 23 its end ([`run_motion_export`] stands in for the App).
+#[cfg(feature = "review")]
+#[test]
+fn boss_phase_motion_export_plays_the_whole_hold() {
+    use crate::capture_sequence::COUNT;
+    let mut boss = None;
+    let mut frames = Vec::new();
+    run_motion_export(
+        "boss-phase",
+        false,
+        |f| {
+            assert!(
+                f.game.global_paused(),
+                "the export's warm-up holds the staged entry tick"
+            );
+            boss = f
+                .game
+                .attempt()
+                .and_then(|a| a.enemies.iter().find(|e| e.boss))
+                .map(|e| e.id);
+        },
+        |index, f| {
             let a = f.game.attempt().expect("the defense stands");
             let phase = [false, true].map(|reduced| {
                 crate::battle_view::BattleViewModel::build(
@@ -1696,17 +1740,11 @@ fn boss_phase_motion_export_plays_the_whole_hold() {
                 .boss_phase
                 .map(|p| (p.boss_id, p.transition, p.hold_left_ticks))
             });
-            assert_eq!(phase[0], phase[1], "native frame {frame}: both modes agree");
+            assert_eq!(phase[0], phase[1], "frame {index}: both modes agree");
             frames.push(phase[0]);
-        }
-        schedule_motion_release(&config, &mut f.runtime, frame);
-        // The battle screen's egui pass publishes enabled 1x controls.
-        f.runtime.publish(ControlFrame {
-            enabled: true,
-            speed: 1,
-            ..ControlFrame::default()
-        });
-    }
+        },
+    );
+    let boss = boss.expect("a boss");
     let expected: Vec<_> = (0..u64::from(COUNT))
         .map(|k| (k < 23).then(|| (boss, 1, 89 - 4 * k)))
         .collect();
@@ -1817,51 +1855,54 @@ fn review_frame_facts_report_the_low_hp_band() {
 }
 
 /// The boss-warning motion export holds the tick before the warning through
-/// the warm-up and resumes one native frame before frame-0000 (as the
-/// boss-phase export does), so frame-0000 draws the warning tick, where the
-/// banner starts, and every later frame is four ticks on, all inside the
-/// banner's 2.0 s.
+/// the warm-up and resumes it so that frame-0000 draws the warning tick (as
+/// the boss-phase export does), and every later frame is four ticks on, all
+/// inside the banner's 2.0 s. CF-3-29: frame-0000 carries the banner, at
+/// full strength in reduced effects and on its first fade step (started,
+/// nothing shown yet) in normal effects, whose frame 1 draws it fading in.
 #[cfg(feature = "review")]
 #[test]
 fn boss_warning_motion_export_starts_on_the_warning_tick() {
-    use crate::capture_sequence::{COUNT, LAST, frame_index};
-    use crate::runner::ControlFrame;
-    let vars = [
-        ("LASTLIGHT_REVIEW_SCREEN", "boss-warning"),
-        ("LASTLIGHT_REVIEW_MOTION", "1"),
-        ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
-    ];
-    let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
-        vars.iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| (*value).into())
-    })
-    .expect("valid export launch");
-    let mut f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
-    assert!(f.game.global_paused(), "the warm-up holds the staged tick");
-    let a = f.game.attempt().expect("a live battle");
-    assert_eq!(a.boss_warning_tick(), None, "staged before the warning");
-    let staged = a.tick;
-    let mut frames = Vec::new();
-    for frame in 1..=LAST {
-        f.flush();
-        f.step();
-        if frame_index(frame).is_some() {
-            let a = f.game.attempt().expect("the defense stands");
-            frames.push((a.tick, a.boss_warning_tick()));
+    use crate::capture_sequence::COUNT;
+    for reduced in [false, true] {
+        let mut staged = None;
+        let mut frames = Vec::new();
+        let mut banners = Vec::new();
+        run_motion_export(
+            "boss-warning",
+            reduced,
+            |f| {
+                assert!(f.game.global_paused(), "the warm-up holds the staged tick");
+                let a = f.game.attempt().expect("a live battle");
+                assert_eq!(a.boss_warning_tick(), None, "staged before the warning");
+                staged = Some(a.tick);
+            },
+            |_, f| {
+                let a = f.game.attempt().expect("the defense stands");
+                frames.push((a.tick, a.boss_warning_tick()));
+                banners.push((
+                    f.battle.boss_banner.map(|b| (b.key.1, b.shown)),
+                    f.battle.boss_banner_rect.is_some(),
+                ));
+            },
+        );
+        let due = staged.expect("staged") + 1;
+        let expected: Vec<_> = (0..u64::from(COUNT))
+            .map(|k| (due + 4 * k, Some(due)))
+            .collect();
+        assert_eq!(frames, expected, "reduced {reduced}");
+        assert_eq!(
+            banners[0],
+            (Some((due, 0.0)), reduced),
+            "reduced {reduced}: frame-0000 starts the banner"
+        );
+        for (index, (banner, drawn)) in banners.iter().enumerate().skip(1) {
+            assert!(
+                *drawn && banner.is_some_and(|(tick, _)| tick == due),
+                "reduced {reduced}: frame {index} draws the banner ({banner:?})"
+            );
         }
-        schedule_motion_release(&config, &mut f.runtime, frame);
-        f.runtime.publish(ControlFrame {
-            enabled: true,
-            speed: 1,
-            ..ControlFrame::default()
-        });
     }
-    let due = staged + 1;
-    let expected: Vec<_> = (0..u64::from(COUNT))
-        .map(|k| (due + 4 * k, Some(due)))
-        .collect();
-    assert_eq!(frames, expected);
 }
 
 /// W3-25's expedition notices get a deterministic capture: the camp-reports

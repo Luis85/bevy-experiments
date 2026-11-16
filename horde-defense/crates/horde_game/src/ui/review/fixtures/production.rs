@@ -591,9 +591,9 @@ fn prepare_boss_phase(f: &mut FrontendParts) {
 /// The W3-14 boss banner (closing phase): a stage-0 defense after one
 /// victory (no first-defense lesson over the field), played with the smoke
 /// input for `BOSS_PHASE_PLAY_TICKS`. Then the clock advances to one tick
-/// before the boss warning. A motion export pauses there and resumes one
-/// frame before frame-0000 (`review::motion_release_frame`), so its frames
-/// start on the warning tick, where the banner starts. A still plays the one
+/// before the boss warning. A motion export pauses there and resumes so that
+/// its first tick lands on frame-0000 (`review::motion_release_frame`), so
+/// its frames start on the warning tick, where the banner starts. A still plays the one
 /// tick, so the director warns by its own rule, and pauses with the banner
 /// `BOSS_WARNING_SHOWN_SECS` into its life.
 fn prepare_boss_warning(f: &mut FrontendParts) {

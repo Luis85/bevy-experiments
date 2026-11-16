@@ -117,16 +117,22 @@ pub(crate) fn schedule_gesture_review(
 /// The native frame on which a motion export releases a fixture staged
 /// paused, or None when the fixture runs live from startup. The boss-phase
 /// export (CF-2-03) holds the staged entry tick of its 90-tick phase hold
-/// through the capture warm-up and resumes one frame before frame-0000, so
-/// frames 0-22 draw ticks 1-89 of the hold and frame 23 its end. The
-/// boss-warning export holds the tick before the boss warning the same way,
-/// so frame-0000 draws the warning tick and the banner's first frames.
+/// through the capture warm-up and resumes so that frame-0000 draws its
+/// first tick: frames 0-22 draw ticks 1-89 of the hold and frame 23 its end.
+/// The boss-warning export holds the tick before the boss warning the same
+/// way, so frame-0000 draws the warning tick and the banner's first frame.
+///
+/// The release is two native frames before frame-0000 (CF-3-29): the resume
+/// command queued on that frame applies on the next frame's
+/// `RuntimeSet::Apply`, but that frame's fixed step still reads the controls
+/// the previous, paused battle pass published (disabled), so the first tick
+/// runs one frame later, on frame-0000.
 #[cfg(feature = "review")]
 pub(crate) fn motion_release_frame(launch: &crate::launch::LaunchConfig) -> Option<u32> {
     ((launch.reviewing("boss-phase") || launch.reviewing("boss-warning"))
         && launch.motion_review()
         && launch.sequence_path().is_some())
-    .then_some(crate::capture_sequence::FIRST - 1)
+    .then_some(crate::capture_sequence::FIRST - 2)
 }
 
 /// Capture-service timing bridge: on the release frame the export resumes
