@@ -88,6 +88,15 @@ const ESCAPE_RULES: &[Rule] = &[
     },
 ];
 
+/// `Command::EnterCountry` is frozen in core for recorded journeys, which
+/// the dev-only replay applies to `Game` directly. The frontend chooses a
+/// country with `ChooseStart` or `SelectCountry` and never names it.
+const LEGACY_COMMAND_RULES: &[Rule] = &[Rule {
+    needle: "EnterCountry",
+    allowed: &[],
+    reason: "EnterCountry stays in core for recordings; the frontend selects a country with SelectCountry",
+}];
+
 const TEST_ATTRIBUTE: &str = "#[cfg(test)]";
 const TEST_FILE_ATTRIBUTE: &str = "#![cfg(test)]";
 
@@ -678,6 +687,29 @@ fn escape_is_read_only_by_the_router() {
     assert!(
         hits.is_empty(),
         "Escape is read outside the router:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
+fn frontend_never_names_the_legacy_enter_country() {
+    let planted = "AppCommand::Game(Command::EnterCountry(id)) => {}\n";
+    let hits = scan_source_with("ui/notices.rs", planted, LEGACY_COMMAND_RULES).hits;
+    assert!(
+        hits.iter()
+            .any(|hit| hit.starts_with("ui/notices.rs:1:") && hit.contains("EnterCountry")),
+        "the scanner missed a planted EnterCountry: {hits:?}"
+    );
+    let (hits, read) = scan_tree_with(&source_directory(), LEGACY_COMMAND_RULES);
+    for expected in ["ui/notices.rs", "ui/camp.rs", "ui/context.rs"] {
+        assert!(
+            read.iter().any(|path| path == expected),
+            "the scan never read {expected}: {read:?}"
+        );
+    }
+    assert!(
+        hits.is_empty(),
+        "the frontend names the legacy EnterCountry:\n{}",
         hits.join("\n")
     );
 }

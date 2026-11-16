@@ -540,16 +540,6 @@ impl UiCtx<'_> {
                 self.status.profile_exists = true;
                 self.start_battle();
             }
-            AppCommand::Game(Command::EnterCountry(id)) => {
-                self.campaign.selected_country = id;
-                self.campaign.stage = self.game.campaign().world.next_stage();
-                self.status.profile_exists = true;
-                if self.game.attempt().is_some() {
-                    self.start_battle();
-                } else {
-                    self.open_preparation(Tab::Briefing);
-                }
-            }
             AppCommand::Game(Command::SelectCountry(id)) => {
                 // The country is chosen, nothing is deployed (CD6): open its
                 // Briefing on the stage to plan. An outbreak's response
