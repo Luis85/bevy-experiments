@@ -6,7 +6,11 @@ use crate::{
 };
 use bevy_egui::egui::{self, Color32, FontId, Pos2, RichText, Sense, Stroke, vec2};
 use horde_core::{
-    command::Command, content::Mode, defenders::DefenderId, quality::Quality, sim::Game,
+    command::Command,
+    content::Mode,
+    defenders::{DefenderId, DefenderOption},
+    quality::Quality,
+    sim::Game,
 };
 
 pub(super) fn page_title(ui: &mut egui::Ui, title: &str, description: &str) {
@@ -87,20 +91,30 @@ impl PickerEntry {
         }
     }
 }
-/// The picker's options in core order. Mara is listed once she can be
-/// chosen or trained, as on Camp home.
+/// The picker's options from a fresh `Game::available_defenders` read.
+#[cfg(test)]
 pub(super) fn picker_entries(game: &Game) -> Vec<PickerEntry> {
+    picker_entries_of(game, &game.available_defenders())
+}
+/// The picker's options in core order from `options`, a page's read of
+/// `Game::available_defenders`. Mara is listed once she can be chosen or
+/// trained, as on Camp home.
+fn picker_entries_of(game: &Game, options: &[DefenderOption]) -> Vec<PickerEntry> {
     let companion = game
         .campaign()
         .has_feature(horde_core::skill_catalog::CampaignFeature::Companion);
-    game.available_defenders()
-        .into_iter()
+    options
+        .iter()
         .filter(|option| option.card.id != DefenderId::Mara || companion)
         .map(|option| PickerEntry {
             id: option.card.id,
-            name: option.card.name,
+            name: option.card.name.clone(),
             selected: option.selected,
-            blocked: option.selectable.err().map(|blocker| blocker.label()),
+            blocked: option
+                .selectable
+                .as_ref()
+                .err()
+                .map(|blocker| blocker.label()),
         })
         .collect()
 }
@@ -113,7 +127,17 @@ pub(super) fn defender_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
     if f.game.attempt().is_some() {
         return;
     }
-    let entries = picker_entries(f.game);
+    let options = f.game.available_defenders();
+    defender_picker_of(ui, f, &options);
+}
+/// [`defender_picker`] over `options`, so a page that already read
+/// `Game::available_defenders` this frame (Camp home's roster) pays for
+/// that read once.
+pub(super) fn defender_picker_of(ui: &mut egui::Ui, f: &mut UiCtx, options: &[DefenderOption]) {
+    if f.game.attempt().is_some() {
+        return;
+    }
+    let entries = picker_entries_of(f.game, options);
     if entries.len() <= 1 {
         return;
     }

@@ -151,7 +151,7 @@ In strategic practice, resume the world clock and inspect the active outbreak. R
 
 A recruit can defend the main run in your place. Use Strategy practice.cmd, or a journey with Survivor network bought and a recruit in camp.
 
-1. Finish a run. Results shows a "Defender" row: you, Mara (once Meet Mara is bought) and each recruit; more than three appear in a drop-down. The Briefing has the same picker, and Camp home's Defenders list has "Defend next" on each row with its HP, level and power line. A recruit on guard duty or an expedition is disabled, and its hover names why ("Guarding <country>", "Away on an expedition").
+1. Finish a run. Results shows a "Defender" row: you, Mara (once Meet Mara is bought) and each recruit; more than three appear in a drop-down. The Briefing and Camp home's Next defense card have the same picker, and Camp home's Defenders list has "Defend next" on each row with its HP, level and power line. A recruit on guard duty or an expedition is disabled, and its hover names why ("Guarding <country>", "Away on an expedition").
 2. Choose a recruit. The Briefing's main button reads "Deploy <name>"; press it. Nothing about the choice deploys on its own, and during a live defense the picker is hidden.
 3. In battle, the HUD names the recruit (its first name in capitals) with its own portrait, and the field draws its figure, not Mara's. Open Tactics and change the policy or the recall threshold: the change acts at the recruit's next action and is kept on the recruit, not on Mara.
 4. While it defends, Camp home shows "Active defense · <country> · Defense N · <name>" and the recruit as Defending. In Operations, sending, guarding, training or equipping it is refused with "Already defending the front", and nothing changes.

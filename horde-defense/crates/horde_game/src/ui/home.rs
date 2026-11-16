@@ -188,13 +188,17 @@ pub(super) fn home(ui: &mut egui::Ui, f: &mut UiCtx) {
 }
 
 fn left_column(ui: &mut egui::Ui, f: &mut UiCtx) {
+    // One core read feeds the card's picker and the roster.
+    let options = f.game.available_defenders();
     chrome::section(ui, "Next defense");
-    next_defense(ui, f);
+    next_defense(ui, f, &options);
     chrome::section(ui, "Defenders");
-    roster(ui, f);
+    roster(ui, f, &options);
 }
 
-fn next_defense(ui: &mut egui::Ui, f: &mut UiCtx) {
+/// "<Country> · Defense N · <defender>" with the defender picker, or the
+/// live defense.
+fn next_defense(ui: &mut egui::Ui, f: &mut UiCtx, options: &[DefenderOption]) {
     let game = f.game;
     if let Some(attempt) = game.attempt() {
         let name = game.active_defender().map_or_else(String::new, |c| c.name);
@@ -229,16 +233,16 @@ fn next_defense(ui: &mut egui::Ui, f: &mut UiCtx) {
             stage + 1
         ));
     }
+    chrome::defender_picker_of(ui, f, options);
 }
 
-fn roster(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let options = f.game.available_defenders();
+fn roster(ui: &mut egui::Ui, f: &mut UiCtx, options: &[DefenderOption]) {
     let live = f.game.attempt().is_some();
     let companion = f
         .game
         .campaign()
         .has_feature(horde_core::skill_catalog::CampaignFeature::Companion);
-    for option in &options {
+    for option in options {
         let id = option.card.id;
         // Mara is listed even while locked; Home shows her once she can be
         // trained or chosen.

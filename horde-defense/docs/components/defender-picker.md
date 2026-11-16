@@ -4,7 +4,7 @@ id: defender-picker
 title: "Defender picker"
 parent: results
 status: Implemented
-source: "crates/horde_game/src/ui/chrome.rs::defender_picker, picker_entries, PICKER_CHIPS"
+source: "crates/horde_game/src/ui/chrome.rs::defender_picker, defender_picker_of, picker_entries_of, PICKER_CHIPS; crates/horde_game/src/ui/home.rs::next_defense"
 ---
 
 # Defender picker

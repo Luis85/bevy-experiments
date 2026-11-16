@@ -365,13 +365,73 @@ fn roster_shows_core_power_and_status_labels() {
         .defender_card(DefenderId::Recruit(ready))
         .unwrap()
         .name;
-    let color = |o: &FullOutput| o.shapes.iter().find_map(|s| text_color(&s.shape, &name));
+    // The roster row, painted after the Next defense card's picker.
+    let color = |o: &FullOutput| {
+        o.shapes
+            .iter()
+            .rev()
+            .find_map(|s| text_color(&s.shape, &name))
+    };
     assert_eq!(color(&output), Some(crate::art::AMBER));
     f.act(|c| c.open_preparation(Tab::Armory));
     assert_eq!(f.nav.home_focus, None);
     f.act(|c| c.open_camp_home(None));
     let output = settle(&h, f);
     assert_ne!(color(&output), Some(crate::art::AMBER));
+}
+
+/// The Next defense card carries the defender picker (design-ux-flow §4
+/// "Camp/Home", docs/components/camp-home.md): one chip per defender above
+/// the roster, and a chip is `SetNextDefender`. A live defense hides it.
+#[test]
+fn home_next_defense_card_draws_the_defender_picker() {
+    let mut fixture = IsolatedFrontend::new();
+    let f = &mut fixture.frontend;
+    let recruit = super::defender_tests::camp_with_recruits(f, &["FRA"])[0];
+    f.nav.tab = Tab::Home;
+    f.screen = Screen::Camp;
+    let name = f
+        .game
+        .defender_card(DefenderId::Recruit(recruit))
+        .unwrap()
+        .name;
+    for target in Target::BOTH {
+        let h = Harness::at(target);
+        let output = settle(&h, f);
+        assert!(f.nav.tab == Tab::Home, "{target:?}");
+        assert_eq!(text_count(&output, "Defender"), 1, "{target:?}: the picker");
+        // The recruit's chip in the card; at 1050x700 the single-column
+        // page scrolls, so its roster row may sit below the fold.
+        assert!(text_count(&output, &name) >= 1, "{target:?}: {name}");
+    }
+    // At 1440x900 both show: the chip in the card, then the roster row.
+    let h = Harness::large();
+    let output = settle(&h, f);
+    assert_eq!(text_count(&output, &name), 2, "{name}");
+    let chip = output
+        .shapes
+        .iter()
+        .find_map(|s| text_position(&s.shape, &name))
+        .unwrap();
+    let row = output
+        .shapes
+        .iter()
+        .rev()
+        .find_map(|s| text_position(&s.shape, &name))
+        .unwrap();
+    assert!(chip.y < row.y, "the picker sits above the roster");
+    assert_eq!(f.game.next_defender(), DefenderId::Player);
+    h.click(f, View::Full, &name);
+    assert_eq!(f.game.next_defender(), DefenderId::Recruit(recruit));
+    assert!(f.game.attempt().is_none(), "choosing never deploys");
+
+    // While a defense is live the card names it and offers no picker.
+    f.game.apply(&Command::BeginDefense { stage: 0 }).unwrap();
+    f.game.set_paused(true);
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Home;
+    let output = settle(&h, f);
+    assert_eq!(text_count(&output, "Defender"), 0);
 }
 
 #[test]
