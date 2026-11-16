@@ -159,6 +159,77 @@ fn joined_recruit_modal_stays_on_results() {
     }
 }
 
+/// One whole App frame whose queued commands stay with the runner: the
+/// notice of a click's command has not come back yet.
+fn unflushed_frame(h: &Harness, f: &mut FrontendParts, events: Vec<Event>) -> FullOutput {
+    f.runtime.begin_frame(h.ctx.cumulative_frame_nr() as u32);
+    f.settings.scale = h.target.scale;
+    let mut c = f.ctx();
+    h.ctx.run_ui(
+        RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, h.target.pixels)),
+            events,
+            ..RawInput::default()
+        },
+        |ui| draw_screen(ui.ctx(), &mut c, 0.0),
+    )
+}
+
+/// A second "Recruit as" click before `RecruitAs` answers sends nothing:
+/// the modal waits for the runner, as the stash apply does. A refusal
+/// gives the choice back.
+#[test]
+fn recruit_as_waits_for_its_answer_before_another_click() {
+    for refused in [false, true] {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        liberation_results(f, 1_000);
+        let offer = f.game.recruit_offer("DEU").unwrap();
+        h.click(f, View::Full, &recruit_from(offer.price));
+        assert_eq!(f.status.modal, choose_modal());
+        let label = recruit_as_label(&offer, 0);
+        let output = unflushed_frame(&h, f, vec![]);
+        let position = output
+            .shapes
+            .iter()
+            .find_map(|s| text_position(&s.shape, &label))
+            .unwrap_or_else(|| panic!("{label} is drawn"));
+        for _ in 0..2 {
+            unflushed_frame(&h, f, pointer_at(position, true));
+            unflushed_frame(&h, f, pointer_at(position, false));
+        }
+        assert_eq!(f.runtime.pending_commands(), 1, "one RecruitAs is queued");
+        if refused {
+            // The wallet empties before the runner applies it.
+            f.game.campaign_mut().coins = 0;
+        }
+        f.flush_for_test();
+        let roster = f.game.strategy().roster.len();
+        if refused {
+            assert_eq!(roster, 0, "core refused the recruit");
+            assert_eq!(f.status.modal, choose_modal(), "the choice is back");
+        } else {
+            assert_eq!(roster, 1, "one recruit, once: {}", f.status.message);
+            assert!(matches!(
+                f.status.modal,
+                Some(AppModal::Recruit {
+                    phase: RecruitPhase::Joined { .. },
+                    ..
+                })
+            ));
+        }
+    }
+}
+
+fn recruit_as_label(offer: &horde_core::defenders::RecruitOffer, index: usize) -> String {
+    format!(
+        "Recruit as {} · {} coins",
+        offer.archetypes[index].archetype.label(),
+        offer.price
+    )
+}
+
 #[test]
 fn liberation_results_names_missing_survivor_network() {
     let mut fixture = IsolatedFrontend::new();

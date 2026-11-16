@@ -194,6 +194,10 @@ impl UiCtx<'_> {
                         );
                         self.status.auto_sell_refused(fresh);
                     }
+                    // A refused recruit gives the Recruit modal its choice back.
+                    if let AppCommand::Game(Command::RecruitAs { country, .. }) = &command {
+                        self.status.recruit_refused(country);
+                    }
                     self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
                     self.status.message = error;
                     self.status.message_error = true;

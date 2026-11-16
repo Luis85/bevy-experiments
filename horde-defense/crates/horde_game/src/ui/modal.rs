@@ -66,6 +66,9 @@ pub(crate) enum AppModal {
 pub(crate) enum RecruitPhase {
     /// The offer's two archetypes wait for a choice.
     Choose,
+    /// The chosen `Command::RecruitAs` is with the runner; the archetype
+    /// buttons wait for its answer, so a second click recruits nobody.
+    Recruiting,
     /// `Command::RecruitAs` answered with this recruit's id.
     Joined { recruit_id: u64 },
 }
@@ -256,9 +259,22 @@ impl StatusUi {
             phase,
         }) = &mut self.modal
             && open == country
-            && *phase == RecruitPhase::Choose
+            && matches!(*phase, RecruitPhase::Choose | RecruitPhase::Recruiting)
         {
             *phase = RecruitPhase::Joined { recruit_id };
+        }
+    }
+    /// Core refused `Command::RecruitAs` for `country`: the modal waiting
+    /// for it offers the choice again (the status line carries the reason).
+    pub(super) fn recruit_refused(&mut self, country: &str) {
+        if let Some(AppModal::Recruit {
+            country: open,
+            phase,
+        }) = &mut self.modal
+            && open == country
+            && *phase == RecruitPhase::Recruiting
+        {
+            *phase = RecruitPhase::Choose;
         }
     }
     /// `Command::ApplyAutoSellToStash` sold its batch: the stash apply is
@@ -395,8 +411,9 @@ enum RecruitChoice {
 /// offer core withdraws meanwhile reads its blocker instead.
 fn show_recruit(ctx: &egui::Context, f: &mut UiCtx, country: &str, phase: RecruitPhase) {
     let offer = f.game.recruit_offer(country);
+    let waiting = phase == RecruitPhase::Recruiting;
     let joined = match phase {
-        RecruitPhase::Choose => None,
+        RecruitPhase::Choose | RecruitPhase::Recruiting => None,
         RecruitPhase::Joined { recruit_id } => Some((
             recruit_id,
             f.game
@@ -449,11 +466,16 @@ fn show_recruit(ctx: &egui::Context, f: &mut UiCtx, country: &str, phase: Recrui
                         );
                         let label = recruit_as_label(offer, index);
                         // One amber primary: the offer's first archetype.
-                        let clicked = if index == 0 {
-                            primary_in_modal(ui, &label).clicked()
-                        } else {
-                            ui.button(label).clicked()
-                        };
+                        // Both wait while a chosen RecruitAs is answered.
+                        let clicked = ui
+                            .add_enabled_ui(!waiting, |ui| {
+                                if index == 0 {
+                                    primary_in_modal(ui, &label).clicked()
+                                } else {
+                                    ui.button(label).clicked()
+                                }
+                            })
+                            .inner;
                         if clicked {
                             choice = Some(RecruitChoice::As(index));
                         }
@@ -478,7 +500,10 @@ fn show_recruit(ctx: &egui::Context, f: &mut UiCtx, country: &str, phase: Recrui
     match shown.inner {
         Some(RecruitChoice::As(index)) => {
             if let Ok(offer) = &offer {
-                // The notice system moves the modal to Joined on the id.
+                // The notice system moves the modal to Joined on the id, or
+                // back to Choose when core refuses. A command the runner
+                // did not queue leaves the choice open.
+                let queued = f.runtime.pending_commands();
                 f.dispatch(
                     Command::RecruitAs {
                         country: country.to_owned(),
@@ -486,6 +511,11 @@ fn show_recruit(ctx: &egui::Context, f: &mut UiCtx, country: &str, phase: Recrui
                     },
                     "",
                 );
+                if f.runtime.pending_commands() > queued
+                    && let Some(AppModal::Recruit { phase, .. }) = &mut f.status.modal
+                {
+                    *phase = RecruitPhase::Recruiting;
+                }
             }
         }
         Some(RecruitChoice::BackToCamp(recruit_id)) => {
