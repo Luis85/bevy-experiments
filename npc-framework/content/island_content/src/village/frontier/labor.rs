@@ -1062,6 +1062,17 @@ fn idle_trade(world: &World, actor: Entity, role: Role) -> bool {
             .iter()
             .any(|kind| production::production_demand(world, actor, kind) > 0)
         || shortage(world, settlement, role) > 0
+        || [
+            Some(settlement),
+            production::economic_settlement(world, actor),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|region| {
+            outputs
+                .iter()
+                .any(|kind| village::civic::site_hold(world, region, kind) > 0)
+        })
     {
         return false;
     }
@@ -1275,6 +1286,34 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
         .is_some_and(|since| now >= since.saturating_add(BLOCKED_TICKS));
     let duplicate = assigned(world, person.workplace) > 1;
     let settlement = settlements::member(world, actor);
+    // Site floor (S4 housing fix): the last worker of a trade in its
+    // settlement stays while an open site there, or one elsewhere whose
+    // shortfall is assigned to it, still lacks a good of the trade and the
+    // work can be done (on seed 7 Stone Ridge's last woodcutter became a
+    // fisher while two of its houses waited for logs, and one was cancelled).
+    // Not against the overseer's target: a trade over it moves as before.
+    // The settlement is the one whose plan the worker is in (its workplace's):
+    // that plan gives it the sites' work.
+    let planned = production::economic_settlement(world, actor);
+    if planned.is_some_and(|region| {
+        living_actors(world)
+            .into_iter()
+            .filter(|(_, other)| {
+                world
+                    .get::<Villager>(*other)
+                    .is_some_and(|other| other.role == person.role)
+                    && production::economic_settlement(world, *other) == Some(region)
+            })
+            .count()
+            == 1
+            && !super::oversee::over_target(world, region, person.role)
+            && catalog::outputs_for(world, person.role)
+                .iter()
+                .any(|kind| village::civic::site_hold(world, region, kind) > 0)
+    }) && viable(world, actor, person.role, person.workplace)
+    {
+        return false;
+    }
     // The overseer's targets (`oversee`): a worker of a trade over its target
     // is surplus; one of a trade at or under its target stays unless its work
     // is blocked; a specialist may answer a target elsewhere at home while

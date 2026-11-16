@@ -538,9 +538,11 @@ pub fn wanted_surplus(world: &World, kind: &str) -> u32 {
     };
     let bought = merchant.visit.bought.get(kind).copied().unwrap_or(0);
     let (offer, target) = island_stock(world, kind);
-    // The announced order is bought whatever the stock targets say.
+    // The announced order is bought whatever the stock targets say. What open
+    // building sites still lack is not surplus (S4 housing fix).
     offer
         .saturating_sub(target.max(buy.keep_units))
+        .saturating_sub(civic::island_shortfall(world, kind))
         .min(buy.max_units.saturating_sub(bought))
         .max(order_left(merchant, kind))
 }
@@ -710,9 +712,15 @@ fn buy_exports(world: &mut World, spec: &MerchantSpec, settlement: SimId) {
             )
         };
         let (offer, target) = island_stock(world, &buy.good);
-        let surplus = offer.saturating_sub(target);
+        let surplus = offer
+            .saturating_sub(target)
+            .saturating_sub(civic::island_shortfall(world, &buy.good));
+        // Units an open site still lacks that the port is to supply (its own
+        // sites, and those assigned to it by `civic::unmet_elsewhere`) are
+        // held back for the site, never sold to the boat (S4 housing fix).
         let mut left = total
             .saturating_sub(buy.keep_units)
+            .saturating_sub(civic::site_hold(world, settlement, &buy.good))
             .min(surplus)
             .min(buy.max_units.saturating_sub(already))
             .min(coins / unit);

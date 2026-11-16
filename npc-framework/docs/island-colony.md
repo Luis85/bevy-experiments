@@ -419,7 +419,16 @@ character's homestead upgrade is paid from that character's escrow: the price of
 an order and its carrying fee, and the builder's wage for each stage. Both kinds
 are supplied and built the same physical way, by residents who walk to the door,
 and the village's own sites come first in a resident's work hours. The planner
-never counts, funds, prioritises or cancels a homestead upgrade. See
+never counts, funds, prioritises or cancels a homestead upgrade.
+
+A village site whose own settlement has none of a material in store and nobody
+in a trade that makes it is supplied by the nearest other settlement that makes
+or stores it (`civic::unmet_elsewhere`): that settlement's plan funds the work,
+and its residents carry the units over when no site of their own needs a trip.
+The boat does not buy what open sites still lack, and the last woodcutter (or
+carpenter) of a settlement stays while a site it is to supply waits for logs
+(or planks). See `docs/island-economy-authoring.md`, "Materials from another
+settlement". See
 [ADR 0040](adr/0040-homestead-work-and-the-payer.md).
 
 ### Cold, coats and the inn
@@ -449,7 +458,9 @@ it buys to the trading post in their work hours (`life.haul boat`); the boat buy
 what the port's stores and stalls hold above the island's stock target (the
 settlements' targets, every traded good covered by `tuning.raw_stock_cover`) and
 a store's kept level, up to its limit of a good per visit and what its purse can
-pay, paying each owner at once. It does not buy fiber or thread: fiber is a
+pay, paying each owner at once. What open building sites still lack is not
+surplus: the island's offer leaves it out, and the port's stores and a resident's
+trip to the post keep back what its settlement is to supply (`civic::site_hold`). It does not buy fiber or thread: fiber is a
 harvest the tailors spin through winter and spring. It sells the civic fund what
 the port lacks of its kept level, or what the island lacks of its stock target
 while the good is dear (above its base price), laid in the harbour's market

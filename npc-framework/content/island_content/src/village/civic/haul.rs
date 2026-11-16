@@ -97,11 +97,96 @@ pub enum MaterialTrip {
     },
 }
 
-/// The materials trip this resident would start now, if any.
+/// The materials trip this resident would start now, if any: to an open site
+/// of its own settlement first; else to a site of another settlement whose
+/// shortfall is assigned to this one (`supply::unmet_elsewhere`: the site's
+/// own settlement can neither take it from its stores nor make it), at most
+/// the assigned units, bought at this settlement's stores or carried spare.
+/// Goods already bought for a site of any settlement are delivered there.
 pub fn material_trip(world: &World, actor: Entity) -> Option<MaterialTrip> {
+    if world
+        .get_resource::<super::model::CivicState>()
+        .is_none_or(|state| state.sites.values().all(Vec::is_empty))
+    {
+        return None;
+    }
     let settlement = depot::home_settlement(world, actor)?;
-    let open = sites::open_sites(world, settlement);
-    if open.is_empty() {
+    let me = *world.get::<SimId>(actor)?;
+    let now = world.resource::<SimClock>().tick;
+    // The home settlement's sites, then those of the settlement whose plan
+    // the resident works to (its workplace's), when that is another: the
+    // plan gave it the work for them (S4: on seed 11 Stone Ridge's carpenter
+    // lived in Alderwood, sawed the planks Stone Ridge's house was waiting
+    // for and carried them to the boat; the house was cancelled).
+    let served = served(world, actor, settlement);
+    for region in &served {
+        for (site_id, site_entity) in sites::open_sites(world, *region) {
+            if let Some(trip) = site_trip(world, actor, settlement, site_id, site_entity, None) {
+                return Some(trip);
+            }
+        }
+    }
+    // Goods bought for a site elsewhere are delivered whatever the assignment
+    // says now.
+    let elsewhere: Vec<(SimId, Entity)> = world
+        .resource::<super::model::CivicState>()
+        .sites
+        .iter()
+        .filter(|(region, _)| !served.contains(region))
+        .flat_map(|(_, ids)| ids.iter().copied())
+        .filter_map(|id| Some((id, world.resource::<SimIndex>().get(id)?)))
+        .collect();
+    for (site_id, site_entity) in &elsewhere {
+        if world
+            .get::<ConstructionSite>(*site_entity)
+            .is_some_and(|site| {
+                site.incoming
+                    .get(&me)
+                    .is_some_and(|hold| hold.loaded && hold.until > now)
+            })
+            && let Some(trip) = site_trip(world, actor, settlement, *site_id, *site_entity, None)
+        {
+            return Some(trip);
+        }
+    }
+    for (site_id, goods) in super::supply::assigned_sites(world, settlement) {
+        let Some(site_entity) = world.resource::<SimIndex>().get(site_id) else {
+            continue;
+        };
+        if let Some(trip) = site_trip(world, actor, settlement, site_id, site_entity, Some(&goods))
+        {
+            return Some(trip);
+        }
+    }
+    None
+}
+
+/// The settlements whose sites a resident supplies as its own: its home
+/// settlement, and the one whose production plan it is in (its workplace's)
+/// when that is another.
+fn served(world: &World, actor: Entity, home: SimId) -> Vec<SimId> {
+    let mut list = vec![home];
+    if let Some(plan) = production::economic_settlement(world, actor)
+        && plan != home
+    {
+        list.push(plan);
+    }
+    list
+}
+
+/// The trip to one site: goods bought for it, spare goods carried, or goods
+/// bought at a store of `settlement` (the hauler's own). `limit` caps the
+/// goods and units (a foreign site's assigned shortfall).
+fn site_trip(
+    world: &World,
+    actor: Entity,
+    settlement: SimId,
+    site_id: SimId,
+    site_entity: Entity,
+    limit: Option<&super::model::Goods>,
+) -> Option<MaterialTrip> {
+    let site = world.get::<ConstructionSite>(site_entity)?;
+    if !reachable(world, actor, site_id, site_entity) {
         return None;
     }
     let me = *world.get::<SimId>(actor)?;
@@ -110,78 +195,78 @@ pub fn material_trip(world: &World, actor: Entity) -> Option<MaterialTrip> {
     let budget = sites::site_budget(world);
     let payable =
         |kind: &str| market::unit_price(world, kind).map_or(0, |price| budget / price.max(1));
-    for (site_id, site_entity) in &open {
-        let Some(site) = world.get::<ConstructionSite>(*site_entity) else {
-            continue;
-        };
-        if !reachable(world, actor, *site_id, *site_entity) {
+    let cap = |kind: &str| limit.map_or(u32::MAX, |goods| goods.get(kind).copied().unwrap_or(0));
+    // Goods bought for this site are delivered whatever the carrier's own
+    // wishes for them are.
+    if let Some(hold) = site
+        .incoming
+        .get(&me)
+        .filter(|hold| hold.loaded && hold.until > now)
+    {
+        let count = hold
+            .count
+            .min(econ::count(world, actor, &hold.kind))
+            .min(site.open(&hold.kind, Some(me), now))
+            .min(payable(&hold.kind));
+        if count > 0 {
+            return Some(MaterialTrip::Deliver {
+                site: site_id,
+                kind: hold.kind.clone(),
+                count,
+            });
+        }
+    }
+    for kind in site.cost.keys() {
+        let wanted = site
+            .open(kind, Some(me), now)
+            .min(payable(kind))
+            .min(trip)
+            .min(cap(kind));
+        if wanted == 0 {
             continue;
         }
-        // Goods bought for this site are delivered whatever the carrier's own
-        // wishes for them are.
-        if let Some(hold) = site
-            .incoming
-            .get(&me)
-            .filter(|hold| hold.loaded && hold.until > now)
-        {
-            let count = hold
-                .count
-                .min(econ::count(world, actor, &hold.kind))
-                .min(site.open(&hold.kind, Some(me), now))
-                .min(payable(&hold.kind));
+        let spare = econ::count(world, actor, kind).saturating_sub(kept(world, actor, kind));
+        if spare > 0 {
+            return Some(MaterialTrip::Deliver {
+                site: site_id,
+                kind: kind.clone(),
+                count: spare.min(wanted),
+            });
+        }
+    }
+    if !depot::any(world) {
+        return None;
+    }
+    let coins = spendable(world, actor);
+    for kind in site.cost.keys() {
+        let wanted = site
+            .open(kind, Some(me), now)
+            .min(payable(kind))
+            .min(trip)
+            .min(cap(kind));
+        let price = market::unit_price(world, kind).unwrap_or(u32::MAX).max(1);
+        let wanted = wanted.min(coins / price);
+        if wanted == 0 {
+            continue;
+        }
+        for (store_id, store) in nearest_first(world, actor, depot::depots(world, settlement)) {
+            if !depot::serves(world, store, actor) || !reachable(world, actor, store_id, store) {
+                continue;
+            }
+            let available = post_available(
+                world,
+                store_id,
+                kind,
+                depot::available(world, store, kind, Some(me)),
+            );
+            let count = fitting(world, actor, kind, wanted.min(available));
             if count > 0 {
-                return Some(MaterialTrip::Deliver {
-                    site: *site_id,
-                    kind: hold.kind.clone(),
+                return Some(MaterialTrip::Fetch {
+                    store: store_id,
+                    site: site_id,
+                    kind: kind.clone(),
                     count,
                 });
-            }
-        }
-        for kind in site.cost.keys() {
-            let wanted = site.open(kind, Some(me), now).min(payable(kind)).min(trip);
-            if wanted == 0 {
-                continue;
-            }
-            let spare = econ::count(world, actor, kind).saturating_sub(kept(world, actor, kind));
-            if spare > 0 {
-                return Some(MaterialTrip::Deliver {
-                    site: *site_id,
-                    kind: kind.clone(),
-                    count: spare.min(wanted),
-                });
-            }
-        }
-        if !depot::any(world) {
-            continue;
-        }
-        let coins = spendable(world, actor);
-        for kind in site.cost.keys() {
-            let wanted = site.open(kind, Some(me), now).min(payable(kind)).min(trip);
-            let price = market::unit_price(world, kind).unwrap_or(u32::MAX).max(1);
-            let wanted = wanted.min(coins / price);
-            if wanted == 0 {
-                continue;
-            }
-            for (store_id, store) in nearest_first(world, actor, depot::depots(world, settlement)) {
-                if !depot::serves(world, store, actor) || !reachable(world, actor, store_id, store)
-                {
-                    continue;
-                }
-                let available = post_available(
-                    world,
-                    store_id,
-                    kind,
-                    depot::available(world, store, kind, Some(me)),
-                );
-                let count = fitting(world, actor, kind, wanted.min(available));
-                if count > 0 {
-                    return Some(MaterialTrip::Fetch {
-                        store: store_id,
-                        site: *site_id,
-                        kind: kind.clone(),
-                        count,
-                    });
-                }
             }
         }
     }
@@ -191,7 +276,7 @@ pub fn material_trip(world: &World, actor: Entity) -> Option<MaterialTrip> {
 /// What a hauler may take of `available` units of `kind` in `store`: at the
 /// trading post, less what the boat's open order still wants, which is laid
 /// there for the boat (closing fix: restockers and site carriers took it).
-fn post_available(world: &World, store: SimId, kind: &str, available: u32) -> u32 {
+pub(super) fn post_available(world: &World, store: SimId, kind: &str, available: u32) -> u32 {
     if crate::village::merchant::post(world).is_some_and(|(post, _)| post == store) {
         available.saturating_sub(crate::village::merchant::held_for_order(world, kind))
     } else {
@@ -353,6 +438,18 @@ pub fn boat_trip(world: &World, actor: Entity) -> Option<(SimId, String, u32)> {
         if surplus == 0 {
             continue;
         }
+        // Units an open site still lacks that this settlement is to supply
+        // stay for the site (`supply::site_hold`), not the boat (S4).
+        let surplus =
+            surplus.saturating_sub(depot::home_settlement(world, actor).map_or(0, |home| {
+                served(world, actor, home)
+                    .into_iter()
+                    .map(|region| super::supply::site_hold(world, region, kind))
+                    .fold(0, u32::saturating_add)
+            }));
+        if surplus == 0 {
+            continue;
+        }
         let room = world
             .get::<Depot>(post)
             .filter(|state| state.accepts(kind))
@@ -441,6 +538,35 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<&'static str> {
         for kind in site.cost.keys() {
             let payable = market::unit_price(world, kind).is_some_and(|price| budget >= price);
             if site.open(kind, Some(me), now) == 0
+                || !payable
+                || econ::count(world, actor, kind) > kept(world, actor, kind)
+                || !gatherable(kind)
+                || stored(kind)
+            {
+                continue;
+            }
+            if let Some(kind) = catalog::trade_kinds(world)
+                .iter()
+                .find(|known| **known == kind.as_str())
+            {
+                return Some(*kind);
+            }
+        }
+    }
+    // A site elsewhere whose shortfall this settlement is to supply, at most
+    // the assigned units.
+    for (site_id, goods) in super::supply::assigned_sites(world, settlement) {
+        let Some(site) = world
+            .resource::<SimIndex>()
+            .get(site_id)
+            .and_then(|entity| world.get::<ConstructionSite>(entity))
+        else {
+            continue;
+        };
+        for (kind, units) in &goods {
+            let payable = market::unit_price(world, kind).is_some_and(|price| budget >= price);
+            if *units == 0
+                || site.open(kind, Some(me), now) == 0
                 || !payable
                 || econ::count(world, actor, kind) > kept(world, actor, kind)
                 || !gatherable(kind)

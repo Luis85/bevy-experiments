@@ -14,6 +14,7 @@ mod model;
 mod placement;
 mod planner;
 mod sites;
+mod supply;
 
 pub(crate) use depot::reserve as depot_reserve;
 pub use depot::{
@@ -47,6 +48,9 @@ pub use sites::{
 };
 pub(crate) use sites::{builder_tool, removable, remove_finished};
 pub(crate) use sites::{note_grants, raise_building_levy, raise_relief_levy, settle_earmark};
+pub use supply::{
+    Assignment, assigned_orders, assigned_sites, island_shortfall, site_hold, unmet_elsewhere,
+};
 
 use crate::village::frontier::building_spec::BuildingDef;
 use crate::village::frontier::economy_spec;

@@ -478,6 +478,27 @@ are done. The finished building keeps the site's identity. Coins the fund paid
 stay paid if the site is cancelled: the returned goods belong to the settlement,
 and selling them pays the fund back.
 
+**Materials from another settlement.** A site's orders go to its own
+settlement's production plan. What it still lacks of a good that its settlement
+can neither take from its stores nor make (no living resident of a trade whose
+`outputs` include the good is planned with that settlement) is assigned to the
+nearest other settlement, by the distance from the site's door to its centre,
+that has such a maker or the units in its stores: `civic::unmet_elsewhere(world)`,
+a pure query over open sites, stores and trades (nothing is saved; a
+settlement's stores serve its own sites first). The assigned settlement's plan
+takes the shortfall as civic demand like its own sites' orders
+(`civic::assigned_orders`), so its woodcutter or carpenter gets funded work, and
+when no own site needs a trip its residents carry the assigned units there
+(`life.haul materials`, spare goods or bought at their own stores; the same
+promise, delivery and payment by the civic fund). `life.haul help` gathers for
+such a site too. Units open sites still lack are not surplus for the boat: the
+island's offer to it leaves out every open site's shortfall, and a settlement's
+residents and the port's stores keep back what that settlement is to supply
+(`civic::site_hold`: its own sites' shortfall and what is assigned to it). The
+last worker of a trade in a settlement stays while `site_hold` of one of the
+trade's goods is above zero and the work can be done (a patch with units left,
+the workplace in reach), unless the trade is over the overseer's target.
+
 **Stores and stalls.** Goods in a store still belong to whoever laid them there.
 The store sells them at the quoted price while the owner is elsewhere and credits
 the owner at once; goods of the settlement, or of an owner who has died, credit

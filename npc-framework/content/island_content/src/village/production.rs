@@ -2005,6 +2005,13 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         for (kind, units) in super::live::order_demand(world, region) {
             *civic_orders.entry(kind).or_default() += units;
         }
+        // Other settlements' sites whose shortfall is assigned to this one:
+        // their own settlement can neither take it from its stores nor make
+        // it (`civic::unmet_elsewhere`). Its makers get the work; its haulers
+        // carry it there (S4 housing fix).
+        for (kind, units) in super::civic::assigned_orders(world, region) {
+            *civic_orders.entry(kind).or_default() += units;
+        }
         // The boat's announced order, at the port.
         // The overseer's boat priority: none at low, twice at high.
         let boat = super::frontier::oversee::level(

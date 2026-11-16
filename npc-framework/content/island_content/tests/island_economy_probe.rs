@@ -277,18 +277,20 @@ fn watch_good(world: &World, seed: u64, kind: &str) {
         let coatless = kind == catalog::WARM_CLOTHES && !village::living::has_coat(world, actor);
         if wanted > count || coatless {
             wanters.push(format!(
-                "{}:{}@s{settlement} coins {} wants {wanted} has {count}{}",
+                "{}:{}@s{settlement}/plan s{} coins {} wants {wanted} has {count}{}",
                 id.0,
                 person.role.key(),
+                production::economic_settlement(world, actor).map_or(0, |s| s.0),
                 world.get::<village::Wallet>(actor).map_or(0, |w| w.coins),
                 if coatless { " coatless" } else { "" }
             ));
         }
         if catalog::outputs_for(world, person.role).contains(&kind) {
             makers.push(format!(
-                "{}:{}@s{settlement} demand {} sells {} coins {} doing {}",
+                "{}:{}@s{settlement}/plan s{} demand {} sells {} coins {} doing {}",
                 id.0,
                 person.role.key(),
+                production::economic_settlement(world, actor).map_or(0, |s| s.0),
                 production::production_demand(world, actor, kind),
                 village::market::available_to_sell(world, actor, kind),
                 world.get::<village::Wallet>(actor).map_or(0, |w| w.coins),
@@ -304,6 +306,100 @@ fn watch_good(world: &World, seed: u64, kind: &str) {
         wanters.join("; "),
         makers.join("; ")
     );
+}
+
+/// Building sites and births held for a bed, from the journal and a sample
+/// of the open sites (S4 housing round).
+#[derive(Default)]
+struct Housing {
+    /// Completed and cancelled sites, by building kind.
+    completed: BTreeMap<String, u64>,
+    cancelled: BTreeMap<String, u64>,
+    /// `VillageBirthDeferred` by reason `no_bed` / `no_home_affordable`.
+    no_bed: u64,
+    no_home: u64,
+    /// Ticks each site stood open short of materials.
+    waiting: BTreeMap<u32, u64>,
+    /// Units delivered to sites, and those carried by a resident of another settlement.
+    delivered: BTreeMap<String, u64>,
+    across: BTreeMap<String, u64>,
+    read_to: u64,
+}
+
+fn site_settlement(world: &World, site: u32) -> Option<SimId> {
+    let entity = world.resource::<SimIndex>().get(SimId(site))?;
+    world
+        .get::<village::civic::ConstructionSite>(entity)
+        .map(|site| site.settlement)
+        .or_else(|| {
+            world
+                .get::<village::civic::Building>(entity)
+                .map(|building| building.settlement)
+        })
+}
+
+fn housing_flows(world: &mut World, housing: &mut Housing) {
+    let now = world.resource::<SimClock>().tick;
+    let from = housing.read_to;
+    housing.read_to = now;
+    let world: &World = world;
+    for site in village::civic::sites(world) {
+        if site
+            .cost
+            .iter()
+            .any(|(kind, units)| site.delivered.get(kind).copied().unwrap_or(0) < *units)
+        {
+            *housing.waiting.entry(site.id.0).or_default() += SAMPLE;
+        }
+    }
+    let journal = world.resource::<Journal>();
+    for entry in journal
+        .entries
+        .iter()
+        .filter(|entry| entry.tick >= from && entry.tick < now)
+    {
+        let JournalKind::Effect {
+            effect,
+            applied: true,
+        } = &entry.kind
+        else {
+            continue;
+        };
+        let value = serde_json::to_value(effect).unwrap_or_default();
+        match value["type"].as_str() {
+            Some("VillageBuildingCompleted") => {
+                *housing
+                    .completed
+                    .entry(value["kind"].as_str().unwrap_or("?").to_owned())
+                    .or_default() += 1;
+            }
+            Some("VillageSiteCancelled") => {
+                let kind =
+                    village::civic::definition(world, value["building"].as_str().unwrap_or(""))
+                        .map_or("prop", |def| def.kind.name());
+                *housing.cancelled.entry(kind.to_owned()).or_default() += 1;
+            }
+            Some("VillageBirthDeferred") => match value["reason"].as_str() {
+                Some("no_bed") => housing.no_bed += 1,
+                Some("no_home_affordable") => housing.no_home += 1,
+                _ => {}
+            },
+            Some("VillageSiteDelivery") => {
+                let kind = value["kind"].as_str().unwrap_or("?").to_owned();
+                let units = value["quantity"].as_u64().unwrap_or(0);
+                *housing.delivered.entry(kind.clone()).or_default() += units;
+                let site = value["site"].as_u64().unwrap_or(0) as u32;
+                let hauler = entry
+                    .unit
+                    .and_then(|id| world.resource::<SimIndex>().get(id))
+                    .and_then(|actor| village::civic::home_settlement(world, actor));
+                if hauler.is_some() && hauler != site_settlement(world, site) {
+                    *housing.across.entry(kind).or_default() += units;
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 fn get(map: &BTreeMap<String, u64>, key: &str) -> u64 {
@@ -326,9 +422,18 @@ fn probe(seed: u64, days: u64) -> (String, u64, u64) {
         world.resource_mut::<Journal>().capacity = 400_000;
     }
     let mut read_to = 0_u64;
+    // The housing counters read the journal (it never feeds the sim).
+    let mut housing = Housing::default();
+    {
+        let world = app.world_mut();
+        npc_framework::kernel::journal::set_journal(world, true, false);
+        let mut journal = world.resource_mut::<Journal>();
+        journal.capacity = journal.capacity.max(400_000);
+    }
     while app.world().resource::<SimClock>().tick < end {
         run_ticks(app.world_mut(), SAMPLE);
         sample(app.world_mut(), &mut work);
+        housing_flows(app.world_mut(), &mut housing);
         if villages_on {
             read_to = village_flows(app.world_mut(), read_to, &mut villages);
         }
@@ -408,6 +513,46 @@ fn probe(seed: u64, days: u64) -> (String, u64, u64) {
         world
             .get_resource::<production::StapleAdvances>()
             .map_or(0, |a| a.repaid),
+    ));
+    let civic = world.resource::<village::civic::CivicState>();
+    let longest = housing
+        .waiting
+        .iter()
+        .max_by_key(|(id, ticks)| (**ticks, std::cmp::Reverse(**id)));
+    let open: Vec<String> = village::civic::sites(world)
+        .into_iter()
+        .map(|site| {
+            let short: Vec<String> = site
+                .cost
+                .iter()
+                .filter_map(|(kind, units)| {
+                    let have = site.delivered.get(kind).copied().unwrap_or(0);
+                    (have < *units).then(|| format!("{kind} {have}/{units}"))
+                })
+                .collect();
+            format!(
+                "{}@s{} [{}]",
+                site.building,
+                site.settlement.0,
+                short.join(" ")
+            )
+        })
+        .collect();
+    out.push_str(&format!(
+        "PROBE seed={seed} housing: completed {} cancelled {} (by kind: completed {:?} cancelled {:?}); \
+         births held no_bed {} no_home_affordable {}; site wait days total {} longest {}; \
+         delivered {:?} across villages {:?}; open {}\n",
+        civic.completed,
+        civic.cancelled,
+        housing.completed,
+        housing.cancelled,
+        housing.no_bed,
+        housing.no_home,
+        housing.waiting.values().sum::<u64>() / day,
+        longest.map_or("-".to_owned(), |(id, ticks)| format!("{} (site {id})", ticks / day)),
+        housing.delivered,
+        housing.across,
+        open.join("; "),
     ));
     let pct = |a: u64, b: u64| (a * 100).checked_div(b).unwrap_or(0);
     let raw: Vec<String> = work
