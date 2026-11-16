@@ -1654,7 +1654,10 @@ fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
 /// enabled only while the attempt runs, so a release's first tick waits for
 /// the pass after the release applies (CF-3-29). `on_capture` sees every
 /// captured frame, by index, after its egui pass. `staged` sees the loaded
-/// fixture before the first native frame.
+/// fixture before the first native frame. Each export saves to a folder of
+/// its own: the App's per-process review folder is shared by every test in
+/// the process, so a parallel test's fresh profile would fail this one's
+/// autosave, and the save-error modal would pause the battle.
 #[cfg(feature = "review")]
 fn run_motion_export(
     scene: &str,
@@ -1674,7 +1677,15 @@ fn run_motion_export(
             .map(|(_, value)| (*value).into())
     })
     .expect("valid export launch");
-    let mut f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
+    let folder = std::env::temp_dir().join(format!(
+        "lastlight-motion-test-{}-{scene}-{reduced}",
+        std::process::id()
+    ));
+    let mut f = FrontendParts::load_from(
+        &config,
+        &crate::profile::ProfilePaths::in_directory(folder.clone()),
+        crate::profile::SettingsLoad::default(),
+    );
     f.settings.reduced_effects = reduced;
     staged(&f);
     let ctx = egui::Context::default();
@@ -1701,6 +1712,8 @@ fn run_motion_export(
             on_capture(index, &mut f);
         }
     }
+    drop(f);
+    let _ = std::fs::remove_dir_all(folder);
 }
 
 /// CF-2-03: the boss-phase motion export plays the whole hold. Its warm-up
