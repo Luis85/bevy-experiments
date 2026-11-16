@@ -391,6 +391,59 @@ fn results_loot_block_fits_1050x700_at_1_35() {
 #[test]
 fn battle_and_observer_never_render_sale_text() {
     for target in Target::BOTH {
+        // A stash apply's "Sold N · +C" toast still alive when the Briefing
+        // primary begins a defense: the camp shows it, the battle never does.
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.apply(&Command::SetAutoSell(sell_cheap())).unwrap();
+        for definition in 4..7 {
+            f.game
+                .campaign_mut()
+                .add_item_with_quality(definition, 1, Some(Quality::Poor))
+                .unwrap();
+        }
+        let quote = f.game.auto_sell_preview(
+            &f.game.campaign().auto_sell,
+            horde_core::sim::AutoSellScope::Stash,
+        );
+        assert!(quote.count > 0, "{target:?}: the stash has a batch to sell");
+        f.act(|c| c.open_preparation(Tab::Armory));
+        f.act(|c| {
+            c.dispatch(
+                Command::ApplyAutoSellToStash {
+                    expect_count: quote.count,
+                    expect_coins: quote.coins,
+                },
+                "",
+            );
+        });
+        f.flush_for_test();
+        let output = h.frame(f, View::Full, vec![]);
+        assert!(
+            sale_text(&output).iter().any(|t| t.starts_with("Sold ")),
+            "{target:?}: the camp shows the sale toast: {:?}",
+            sale_text(&output)
+        );
+        f.act(|c| c.open_preparation(Tab::Briefing));
+        f.act(|c| c.begin());
+        f.flush_for_test();
+        assert!(f.game.attempt().is_some(), "{target:?}: the defense began");
+        assert!(f.screen == Screen::Battle, "{target:?}");
+        f.game.set_paused(true);
+        for view in [View::Full, View::Battle] {
+            for _ in 0..3 {
+                let output = h.frame(f, view, vec![]);
+                assert!(paints(&output, "HP "), "{target:?}: the battle is drawn");
+                assert_eq!(
+                    sale_text(&output),
+                    Vec::<String>::new(),
+                    "{target:?}: a sale toast on the battle screen"
+                );
+            }
+        }
+
         // The main battle: an enabled rule, drops that settlement will sell.
         let mut fixture = IsolatedFrontend::new();
         fixture.deploy();
