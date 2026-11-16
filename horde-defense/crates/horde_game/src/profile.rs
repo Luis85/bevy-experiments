@@ -1,7 +1,9 @@
 //! The active profile: where its campaign and settings live, and the startup
 //! reads that load them. `settings.json` is read once, in `main` before the
 //! App exists (`read_settings`); the campaign is read by `load_profile`, which
-//! takes that settings read. Construction of the frontend itself stays pure.
+//! takes that settings read. An isolated review reads neither and starts
+//! from a fresh profile (`reads_saved_profile`). Construction of the frontend
+//! itself stays pure.
 use crate::{launch::LaunchConfig, settings::Settings};
 use bevy::prelude::Resource;
 use horde_core::sim::Game;
@@ -56,6 +58,26 @@ impl LoadedProfile {
     pub fn load(paths: &ProfilePaths, settings: SettingsLoad) -> Self {
         load_profile(paths.directory(), settings)
     }
+    /// This launch's startup profile: `load`, or for an isolated review
+    /// (`reads_saved_profile`) a fresh game with no status line, reading no
+    /// file.
+    pub fn for_launch(config: &LaunchConfig, paths: &ProfilePaths, settings: SettingsLoad) -> Self {
+        if reads_saved_profile(config) {
+            return Self::load(paths, settings);
+        }
+        bevy::log::info!(
+            "persistence: isolated review starts from a fresh profile; {} is not read",
+            paths.directory().display()
+        );
+        LoadedProfile {
+            game: Game::default(),
+            load_error: None,
+            settings_warning: settings.warning.clone(),
+            settings_at_risk: settings.original_at_risk(),
+            settings: settings.settings,
+            warning: String::new(),
+        }
+    }
 }
 
 pub struct LoadedProfile {
@@ -87,6 +109,23 @@ pub fn profile_directory(base: PathBuf, scenario: Option<&str>, practice: bool) 
         std::env::temp_dir().join(format!("lastlight-review-{}", std::process::id()))
     } else {
         base
+    }
+}
+/// Whether this launch reads the profile it saves to. An isolated review (a
+/// staged scenario outside practice) does not: its folder,
+/// `<temp>/lastlight-review-<pid>`, may be one an earlier process with the
+/// same PID left behind, and its campaign or settings would then change what
+/// the review shows (CF-3-24). It starts from a fresh profile instead.
+pub fn reads_saved_profile(config: &LaunchConfig) -> bool {
+    config.practice || config.scenario.is_none()
+}
+/// `main`'s one startup read of `settings.json` for this launch; an isolated
+/// review reads nothing and uses the defaults.
+pub fn startup_settings(config: &LaunchConfig, paths: &ProfilePaths) -> SettingsLoad {
+    if reads_saved_profile(config) {
+        read_settings(&paths.settings())
+    } else {
+        SettingsLoad::default()
     }
 }
 /// The status text of a journey read from its save.

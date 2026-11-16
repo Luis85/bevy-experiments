@@ -389,19 +389,27 @@ pub(crate) struct FrontendParts {
 impl FrontendParts {
     /// Production startup: reads the save beside the one startup settings
     /// read `main` made before the App (never `settings.json` again), then
-    /// applies review or practice scenarios.
+    /// applies review or practice scenarios. An isolated review reads no save
+    /// (`LoadedProfile::for_launch`).
     pub fn load(config: &LaunchConfig, startup_settings: SettingsLoad) -> Self {
-        let paths = ProfilePaths::from_config(config);
+        Self::load_from(config, &ProfilePaths::from_config(config), startup_settings)
+    }
+    /// `load` over explicit profile paths, so a test can stage the folder.
+    pub(crate) fn load_from(
+        config: &LaunchConfig,
+        paths: &ProfilePaths,
+        startup_settings: SettingsLoad,
+    ) -> Self {
         // The read ran before logging existed; report its warning now.
         if let Some(warning) = &startup_settings.warning {
             warn!("{warning}");
         }
-        let profile = LoadedProfile::load(&paths, startup_settings);
+        let profile = LoadedProfile::for_launch(config, paths, startup_settings);
         let resumed_practice = config.practice
             && (profile.game.campaign().selected_survivor.is_some()
                 || profile.game.campaign().attempts > 0
                 || profile.game.campaign().world.start.is_some());
-        let mut f = Self::new(profile, config, &paths);
+        let mut f = Self::new(profile, config, paths);
         if !resumed_practice {
             super::review::prepare(&mut f);
         } else {

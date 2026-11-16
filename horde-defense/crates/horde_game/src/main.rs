@@ -111,7 +111,7 @@ fn main() -> AppExit {
     // present mode and pipelined rendering are fixed from it (or a perf
     // override), and the frontend reuses it instead of reading again.
     let startup_settings =
-        profile::read_settings(&profile::ProfilePaths::from_config(&config).settings());
+        profile::startup_settings(&config, &profile::ProfilePaths::from_config(&config));
     let plan = render_plan::render_plan(&startup_settings.settings, config.perf());
     let mut app = App::new();
     if config.sequence_path().is_some() {

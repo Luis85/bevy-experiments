@@ -636,6 +636,80 @@ fn briefing_npc_stills_carry_one_status_state_in_both_modes() {
         );
     }
 }
+/// CF-3-24: an isolated review (a staged scenario outside practice) starts
+/// from a fresh profile. Its folder, `<temp>/lastlight-review-<pid>`, can be
+/// left by an earlier process that had the same PID; the campaign and
+/// settings there are never read, so the still shows no "Campaign restored"
+/// line and the default settings. A practice scenario still resumes its own
+/// saved profile.
+#[cfg(feature = "review")]
+#[test]
+fn an_isolated_review_over_a_reused_folder_starts_from_a_fresh_profile() {
+    use crate::profile::{ProfilePaths, startup_settings};
+    use crate::settings::Settings;
+    let parse = |vars: &[(&str, &str)]| {
+        LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+            vars.iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| (*value).into())
+        })
+        .expect("valid launch")
+    };
+    let directory = std::env::temp_dir().join(format!("lastlight-cf324-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let paths = ProfilePaths::in_directory(directory.clone());
+    let review = parse(&[("LASTLIGHT_REVIEW_SCREEN", "history-empty")]);
+    // What the earlier process with this PID left: its settings, and first
+    // an unreadable campaign, then a readable journey.
+    let stale_settings = Settings {
+        master: 0.25,
+        reduced_effects: true,
+        ..Settings::default()
+    };
+    stale_settings.save(&paths.settings()).unwrap();
+    std::fs::write(paths.campaign(), b"{\"truncated").unwrap();
+    let mut stale = Game::default();
+    stale
+        .campaign_mut()
+        .choose_survivor(SurvivorId::Rook)
+        .unwrap();
+    for readable in [false, true] {
+        if readable {
+            stale.save(&paths.campaign()).unwrap();
+        }
+        let settings = startup_settings(&review, &paths);
+        assert_eq!(
+            settings.settings,
+            Settings::default(),
+            "stale settings read"
+        );
+        assert!(settings.warning.is_none());
+        let f = FrontendParts::load_from(&review, &paths, settings);
+        assert_eq!(
+            f.status.message, "",
+            "readable {readable}: the stale folder's status shows"
+        );
+        assert!(!f.status.message_error, "readable {readable}");
+    }
+
+    let practice = parse(&[
+        ("LASTLIGHT_PRACTICE", "1"),
+        ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+    ]);
+    let settings = startup_settings(&practice, &paths);
+    assert_eq!(
+        settings.settings.master, 0.25,
+        "practice reads its settings"
+    );
+    let f = FrontendParts::load_from(&practice, &paths, settings);
+    assert_eq!(
+        f.game.campaign().selected_survivor,
+        Some(SurvivorId::Rook),
+        "practice resumes its saved journey"
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
 #[test]
 fn isolated_reviews_are_not_practice_profiles() {
     if cfg!(feature = "review") {
