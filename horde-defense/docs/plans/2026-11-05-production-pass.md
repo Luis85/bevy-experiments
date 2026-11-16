@@ -1688,6 +1688,20 @@ Quiet closing perf run (2026-11-16, HEAD c34c39cd, `horde_core` unchanged since 
 
 Digests: none moved. This block runs measurements only, so no `PROVISIONAL` pin is set.
 
+Closing playtest package (W7-02, 2026-11-16, HEAD `61bced1a`, clean tree, Windows PowerShell 5.1). The full record is in VALIDATION.md, "Closing playtest package".
+
+| Check | Result |
+|---|---|
+| `package_playtest.ps1` | `target/playtest/Lastlight-playtest-v0.1.0-61bced1-20261116-175626.zip`, 52,427,602 B, SHA-256 `ef09c5e3...dc9eb9b33`; folder 330 files, 116,258,368 B; forward-slash entries; docs = PLAYTEST_GUIDE.md 37,376 B; no `archive/` or `docs/audio/` entry; WAVs 20,424,084 B (9.47 MB before wave 6) |
+| `verify_playtest.ps1 -Package <zip>` | PASS in 9.1 s; `--version` `Lastlight: Horde Defense v0.1.0 (61bced1)`; packed `--smoke` first line `^PASS: ` |
+| Packaged `--smoke` time (W7-09) | 1.50 / 1.51 / 1.47 s wall, exit 0, run from the package folder |
+| Non-review `-NativeCapture` | refused in 1.07 s (exit 1, "no review feature"), nothing unpacked |
+| `package_playtest.ps1 -Review` then `verify_playtest.ps1 -NativeCapture` | 52,709,990 B, SHA-256 `6682b3fd...c2a5bf8`; PASS in 15.2 s, `native capture=True`, `portable-peak.png` 2,880x1,800; first log line `Lastlight v0.1.0 (61bced1)` under the default filter |
+| Dirty tree | refused without `-AllowDirty`; with it the stamp is `v0.1.0 (61bced1+dirty)` and `dirty` is true |
+| Dev build `--version` | `Lastlight: Horde Defense v0.1.0 (dev build)`, exit 0 |
+
+The W7-02 done conditions (design-qa-captures) hold at this HEAD. Findings fixed before the build, each in its own `[closing]` commit: `verify_playtest` refuses `-NativeCapture` from the manifest before it unpacks the package (61bced1a; the refusal took about 7 s before); the Recruit modal waits for `RecruitAs`, so a second click recruits nobody (62a406d4); the frontend's dead `EnterCountry` notice arm is gone and an architecture rule keeps it out (ac71fcf7); Camp home's Next defense card carries the defender picker (fe14fe4f); the NPC decision names its defender (d789418a); and a coverage test checks that a sale toast never follows the Briefing into battle (e73ae33c). Digests: none moved, and no core code changed.
+
 ### 9.3 Audio
 
 | Measure | Before (A6-04) | After (A6-17) | Closing (2026-11-15, b0256a17) | Gate |
