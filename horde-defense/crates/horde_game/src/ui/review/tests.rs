@@ -3053,6 +3053,44 @@ fn elite_tells_fixture_fields_every_shipped_affix() {
     );
 }
 
+/// CF-3-27: every elite of the elite-tells still stands apart from every
+/// other, so each ring and marker reads as its own hostile's: two lanes
+/// apart, or `ELITE_TELLS_SPREAD_YARDS` apart along the field. Under that
+/// spread on its 7-lane, 16-yard field two rings (0.88 lane heights, about a
+/// yard wide) overlapped, and a marker one lane above its ring sat in the
+/// ring of a hostile in the lane above.
+#[test]
+fn elite_tells_fixture_spreads_its_elites() {
+    let f = staged("elite-tells");
+    let a = f.game.attempt().expect("a live defense");
+    let elites: Vec<_> = a
+        .enemies
+        .iter()
+        .filter(|e| {
+            e.resolved
+                .as_ref()
+                .is_some_and(|profile| profile.elite.is_some())
+        })
+        .collect();
+    assert!(elites.len() >= 2, "{} elites", elites.len());
+    for (i, one) in elites.iter().enumerate() {
+        for other in &elites[i + 1..] {
+            assert!(
+                fixtures::production::elite_tells_apart(one, other),
+                "elites {} (lane {}, x {:.2}) and {} (lane {}, x {:.2}) stand together",
+                one.id,
+                one.lane,
+                one.x,
+                other.id,
+                other.lane,
+                other.x
+            );
+        }
+    }
+    let spread = fixtures::production::ELITE_TELLS_SPREAD_YARDS;
+    assert!((1.5..=2.0).contains(&spread), "{spread}");
+}
+
 fn fx_view(f: &FrontendParts, reduced: bool) -> crate::battle_view::BattleViewModel {
     let a = f.game.attempt().expect("a live field");
     crate::battle_view::BattleViewModel::build(

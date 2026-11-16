@@ -27,7 +27,7 @@ use horde_core::{
     defenders::DefenderId,
     enemy_catalog::{ResolvedEnemy, enemy_catalog},
     quality::Quality,
-    sim::{Actor, Attempt, DEFENSE_LINE, EnemyPhase, Input, Outcome, SimEvent},
+    sim::{Actor, Attempt, DEFENSE_LINE, Enemy, EnemyPhase, Input, Outcome, SimEvent},
     skill_catalog::{CampaignFeature, SkillEffect, skills},
     weapons::{WeaponClass, WeaponSpec},
     world::{Country, StageTheme, world},
@@ -1022,6 +1022,20 @@ fn prepare_takeover_battle(f: &mut FrontendParts) {
 pub(in crate::ui::review) const ELITE_TELLS_RANK: u64 = SPITTER_WINDUP_RANK;
 /// Hostiles for every affix plus a plain one walk in well inside two minutes.
 const ELITE_TELLS_TICK_CAP: u32 = 60 * 120;
+/// CF-3-27: how far apart along the field two elites of the elite-tells
+/// still stand when fewer than two lanes part them, in yards. An elite's
+/// ring is 0.88 lane heights wide, about a yard on the scene's 7-lane,
+/// 16-yard field, and its marker floats about a lane above the ring, where
+/// the ring of a hostile in the lane above lies: 1.5 yards leaves half a
+/// yard between two rings and keeps a marker out of the neighbour's ring.
+pub(in crate::ui::review) const ELITE_TELLS_SPREAD_YARDS: f32 = 1.5;
+
+/// Whether two elites stand far enough apart for each ring and marker to
+/// read as its own hostile's: two lanes apart, or `ELITE_TELLS_SPREAD_YARDS`
+/// along the field.
+pub(in crate::ui::review) fn elite_tells_apart(one: &Enemy, other: &Enemy) -> bool {
+    one.lane.abs_diff(other.lane) >= 2 || (one.x - other.x).abs() >= ELITE_TELLS_SPREAD_YARDS
+}
 /// The share of fx-stress hostiles that are elite, in percent.
 #[cfg(feature = "review")]
 pub(in crate::ui::review) const FX_STRESS_ELITE_PCT: usize = 30;
@@ -1089,17 +1103,30 @@ fn prepare_storm(f: &mut FrontendParts) {
 
 /// For every shipped affix, in catalogue order, a hostile inside the field
 /// and the elite profile `elite_profile` gives it for that affix. A hostile
-/// that already rolled an affix covers it. None until the field holds a
-/// hostile for every affix and one more that stays plain.
+/// that already rolled an affix covers it. Every elite, rolled or cast,
+/// stands apart from every other (`elite_tells_apart`, CF-3-27), so each
+/// ring and marker reads as its own hostile's. None until the field holds
+/// such a hostile for every affix and one more that stays plain.
 fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
     let catalog = enemy_catalog();
+    let elite = |e: &Enemy| {
+        e.resolved
+            .as_ref()
+            .and_then(|profile| profile.elite.as_ref())
+            .map(|mark| mark.affix_id.clone())
+    };
+    let mut placed: Vec<&Enemy> = a.enemies.iter().filter(|e| elite(e).is_some()).collect();
+    if placed.iter().enumerate().any(|(i, one)| {
+        placed[i + 1..]
+            .iter()
+            .any(|other| !elite_tells_apart(one, other))
+    }) {
+        return None;
+    }
     let rolled = |affix: &str| {
-        a.enemies.iter().any(|e| {
-            e.resolved
-                .as_ref()
-                .and_then(|profile| profile.elite.as_ref())
-                .is_some_and(|mark| mark.affix_id == affix)
-        })
+        a.enemies
+            .iter()
+            .any(|e| elite(e).is_some_and(|rolled| rolled == affix))
     };
     let mut cast: Vec<(u64, ResolvedEnemy)> = Vec::new();
     for affix in catalog.elite_affix_ids().filter(|affix| !rolled(affix)) {
@@ -1107,7 +1134,7 @@ fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
             .enemies
             .iter()
             .filter(|e| !e.boss && !e.split_child && e.x < a.width_yards - 1.0)
-            .filter(|e| cast.iter().all(|(id, _)| *id != e.id))
+            .filter(|e| placed.iter().all(|other| elite_tells_apart(e, other)))
             .find_map(|e| {
                 let base = e.resolved.as_ref().filter(|base| base.elite.is_none())?;
                 (0..1024)
@@ -1118,9 +1145,10 @@ fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
                             .as_ref()
                             .is_some_and(|mark| mark.affix_id == affix)
                     })
-                    .map(|profile| (e.id, profile))
+                    .map(|profile| (e, profile))
             })?;
-        cast.push(pick);
+        placed.push(pick.0);
+        cast.push((pick.0.id, pick.1));
     }
     let plain = a.enemies.iter().any(|e| {
         !e.boss
