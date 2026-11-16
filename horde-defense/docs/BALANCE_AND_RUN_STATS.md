@@ -128,14 +128,14 @@ Acceptance G4.13 is one release-only row in `crates/horde_core/tests/pacing_targ
 cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture --test-threads 1 auto_sell_profile_within stash_growth_reported
 ```
 
-| Row | Test | Target | Wave-4 close | Verdict |
+| Row | Test | Target | Closing HEAD (2026-11-16) | Verdict |
 | --- | --- | --- | --- | --- |
 | G4.13 | `auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3` | Tiers 1 / 2 / 3 affordable with `auto-sell` within one run of the same build's `expert-deu` (no sales), lower medians over 20 seeds | 4 [4, 4] / 8 [7, 8] / 11 [10, 12] against 4 [4, 4] / 8 [8, 8] / 12 [11, 12] | PASS |
-| R39 report | `stash_growth_reported_for_150_runs` | None; it fails only when a seed misses a requested run or nothing was auto-sold | After run 60: 5,317 [5,270, 5,452] items owned, 112 [104, 127] auto-sold so far. After run 150: 19,615 [19,068, 19,801] owned, 298 [286, 312] auto-sold. Auto-sold coins per run, runs 1-6: 31 / 56 / 68 / 50 / 36 / 25 | Reported |
+| R39 report | `stash_growth_reported_for_150_runs` | None; it fails only when a seed misses a requested run or nothing was auto-sold | After run 60: 5,324 [5,219, 5,492] items owned, 109 [104, 122] auto-sold so far. After run 150: 19,597 [19,056, 19,783] owned, 297 [281, 312] auto-sold. Auto-sold coins per run, runs 1-6: 31 / 56 / 68 / 50 / 36 / 25 | Reported |
 
 The evaluators are pure functions in `sim/pacing/loot.rs` (`auto_sell_within_default`, `stash_growth`), pinned on synthetic reports in `tests/pacing_harness.rs`. The gate refuses a baseline that sells, a second sweep that does not auto-sell and unequal seed counts. The stash size is `PacingRun::items_owned`, every item the campaign holds after the run, worn ones included: what a save stores.
 
-Reading. The rule earns little: runs 1-6 bring 266 coins in all against a tier-1 cost of 2,030, so it moves a tier by at most one run (tier 3 arrives one run early). It also removes little: 2.1% of the items after 60 runs and 1.5% after 150, because past the first drop tiers few drops are Poor or Common (ITEM_QUALITY.md, "Auto-sell threshold") and `keep_upgrades` keeps some that are. The stash grows by about 89 items a run over runs 1-60 and 159 a run over runs 61-150. The user kept the drop and sale rules as shipped (R58, 2026-11-14): the closing phase measures the save-clone cost at 5,000 and 20,000 items against the G1.8 gate (p99 at most 1 ms) and changes something only if that gate fails. The numbers are plan §9.7 ("W4-l: stash growth and early auto-sold coins"); the closing phase re-runs both rows at HEAD.
+Reading. The rule earns little: runs 1-6 bring 266 coins in all against a tier-1 cost of 2,030, so it moves a tier by at most one run (tier 3 arrives one run early). It also removes little: 2.0% of the items after 60 runs and 1.5% after 150, because past the first drop tiers few drops are Poor or Common (ITEM_QUALITY.md, "Auto-sell threshold") and `keep_upgrades` keeps some that are. The stash grows by about 89 items a run over runs 1-60 and 159 a run over runs 61-150. The user kept the drop and sale rules as shipped (R58, 2026-11-14): the closing phase measures the save-clone cost at 5,000 and 20,000 items against the G1.8 gate (p99 at most 1 ms) and changes something only if that gate fails. At HEAD (VALIDATION.md "R58", plan §9.6 "Closing pacing") both sizes pass in dev and playtest on low-load runs (worst 0.875 ms at 20,000 items), and three playtest runs measured beside a foreign build went over (up to 1.225 ms). The wave-4 numbers are plan §9.7 ("W4-l: stash growth and early auto-sold coins"). The table above is the closing re-run at HEAD (2026-11-16): G4.13 did not move, and W4-15's Survivor network price (63283a9) moved the stash by under 1%.
 
 ## Goal 5: progression pacing acceptance
 
@@ -164,7 +164,7 @@ A milestone counts the runs completed when it first holds. Camp milestones (Fort
 
 Cells are the lower median over the 20 seeds, with [p25, p75].
 
-| Row | Test | Target | Wave-4 close | Verdict |
+| Row | Test | Target | Closing HEAD (2026-11-16) | Verdict |
 | --- | --- | --- | --- | --- |
 | G5.7 | `goal5_first_victory_run_2_to_4` | Median first victory on runs 2-4 | 3 [3, 4] | PASS |
 | G5.8 | `goal5_tiers_affordable_3_5_7_9_11_13` | Tiers 1 / 2 / 3 affordable at about runs 4 / 8 / 12, one run either side | 4 [4, 4] / 8 [8, 8] / 12 [11, 12] | PASS |
@@ -174,7 +174,7 @@ Cells are the lower median over the 20 seeds, with [p25, p75].
 - **Nodes bought after a liberation (G5.9).** The nodes learned in the camps before runs l + 1 onwards, where l is the run that reached `Liberation(2)`. A seed that never reaches it fails the row and is named.
 - **Unlock order (G5.10).** Per seed the order only has to hold with ties, so a camp that buys Meet Mara and Survivor network together passes its seed; the medians must still differ. That tie is why the row was red before W4-p (Mara and Operations both 15 [14, 17]).
 
-The numbers are those of plan §9.6 ("W4-p repricing and goal-5 calibration"), measured on the repriced tree, with G5.9 and G5.10 as W4-15 measured them after it lowered Survivor network from 1,700 to 1,500 coins (plan §9.6, "W4-15"; before: 74 [68, 81] nodes and Operations 19 [18, 19]). No other later wave-4 row moves them: the W4-04..n loop kept no lever (one rejected variant broke the unlock order), W4-12's expedition rule does not reach a solo profile, W4-13 changes only the goal-6 bot, and W4-08 changed no balance data. The closing phase re-runs every `pacing_targets` row at HEAD.
+The numbers are those of plan §9.6 ("W4-p repricing and goal-5 calibration"), measured on the repriced tree, with G5.9 and G5.10 as W4-15 measured them after it lowered Survivor network from 1,700 to 1,500 coins (plan §9.6, "W4-15"; before: 74 [68, 81] nodes and Operations 19 [18, 19]). No other later wave-4 row moves them: the W4-04..n loop kept no lever (one rejected variant broke the unlock order), W4-12's expedition rule does not reach a solo profile, W4-13 changes only the goal-6 bot, and W4-08 changed no balance data. The closing phase re-ran every `pacing_targets` row in release at HEAD (2026-11-16, plan §9.6 "Closing pacing"): all four goal-5 rows read the numbers above and pass.
 
 ### What the repricing did
 
@@ -208,13 +208,13 @@ G6.11 and G6.12 moved to `goal6-novice` because the expert bot aims almost perfe
 
 Cells are the lower median over the 20 seeds, with [p25, p75] unless named.
 
-| Row | Test | Target | Wave-4 close | Verdict |
+| Row | Test | Target | Closing HEAD (2026-11-16) | Verdict |
 | --- | --- | --- | --- | --- |
-| G6.11 | `goal6_defeat_rate_windows` | Defeat share 10-25% in every 20-run window after the first victory | `goal6-novice`: 32 of 37 windows outside (30.5% at offset 0, 0.0% from offset 18); `expert-deu`: 32 of 38 | FAIL |
-| G6.12 | `goal6_no_15_streak_after_run_10` | No seed wins 15 in a row from run 11 | `goal6-novice`: longest streak median 44 [max 50], every seed; `expert-deu`: 49 [max 50] | FAIL |
+| G6.11 | `goal6_defeat_rate_windows` | Defeat share 10-25% in every 20-run window after the first victory | `goal6-novice`: 32 of 37 windows outside (highest 30.0% at offset 0, 0.0% first at offset 16); `expert-deu`: 33 of 38 (highest 25.5% at offset 0) | FAIL |
+| G6.12 | `goal6_no_15_streak_after_run_10` | No seed wins 15 in a row from run 11 | `goal6-novice`: longest streak median 44 [max 50], every seed (40-50); `expert-deu`: 48 [max 50] (39-50) | FAIL |
 | G6.15 | `goal6_lux_easy_at_most_6_runs`, `goal6_lux_hard_at_most_1_5x_normal` | Luxembourg liberated in at most 6 runs on Easy; Hard at most 1.5× Normal | Easy 5 [5, 6], Normal 9 [7, 10], Hard 13 [12, 15] (limit 13.5) | PASS |
 | G6.16 | `goal6_archetype_coverage` | Every catalogue archetype spawned and killed | 18 of 18 | PASS |
-| G6.17 | `goal6_boss_ttk_median_20_60_s` | Boss time-to-kill median 20-60 s | 31.4 s [p25 25.6, p90 47.5] | PASS |
+| G6.17 | `goal6_boss_ttk_median_20_60_s` | Boss time-to-kill median 20-60 s | 31.4 s [p25 25.5, p90 47.5] over 1,047 kills | PASS |
 | G6.18 | `goal6_clamped_starts_first_victory_runs_2_to_4` | A clamped start's median first victory on runs 2-4 | Austria 3 [3, 5], Bangladesh 3 [3, 4] | PASS |
 
 - **Windows (G6.11).** Each seed's runs are aligned on its own first victory. Window `offset` covers the 20 runs from that offset and pools the defeats of every seed that played all 20; a seed that never wins adds nothing and is named as a failure. No minimum seed count applies, so the summary reports how many seeds each window pooled (ruling R37): on `goal6-novice` offsets 0-35 pool 20 seeds and offset 36 pools 19.
@@ -222,10 +222,10 @@ Cells are the lower median over the 20 seeds, with [p25, p75] unless named.
 - **Runs to liberate (G6.15).** The median `Liberation(1)` run, a seed that never liberates counting 21. A Hard median that lands on such a seed fails as unmeasured, because 21 only bounds it from below (design-enemy-balance W-4 as-built note).
 - **Boss time-to-kill (G6.17).** `RunRecord.boss_ttk_ticks`, the defeat tick less the boss's arrival, pooled over every seed and run.
 
-The numbers are those of plan §9.6 ("W4-p repricing and goal-5 calibration", "W4-04..n tuning loop, resumed on the repriced tree" and "W4-13 goal-6 measurement profile"), measured after the wave-4 rules (Regional and Capstone multipliers, the repriced tree) were in. The expedition rule of W4-12 does not reach them: every goal-6 profile plays the solo plan.
+The numbers are those of plan §9.6 ("W4-p repricing and goal-5 calibration", "W4-04..n tuning loop, resumed on the repriced tree" and "W4-13 goal-6 measurement profile"), measured after the wave-4 rules (Regional and Capstone multipliers, the repriced tree) were in. The expedition rule of W4-12 does not reach them: every goal-6 profile plays the solo plan. The closing re-run at HEAD (2026-11-16, plan §9.6 "Closing pacing") reads the cells above: W4-15's Survivor network price (1,700 to 1,500 coins, 63283a9) moved the solo sweeps' camp order slightly after W4-13 measured them (G6.11 `goal6-novice` highest window 30.5% to 30.0% and the first 0.0% window from offset 18 to 16, `expert-deu` 32 to 33 of 38 windows; the `expert-deu` streak median 49 to 48; boss TTK p25 25.6 to 25.5 s over 1,049 to 1,047 kills); the G6.15, G6.16 and G6.18 cells did not move.
 
 ### What the tuning showed
 
 The W4-04..n loop measured every listed enemy lever on the repriced tree: `health_per_rank_late`, the `boss_health` slope past rank 4, `front_ramp_max` in 0.17-0.25, elite `end_bp` and the affix multipliers, and the Capstone health, alone and combined. Inside the G6.17 band (boss TTK p90 at most 60 s) every variant left 32-33 of 38 windows outside 10-25% and a 46-50 win streak, the shipped values' own numbers, so none was kept and `progression.json` and `enemy_catalog.json` ship the wave-2 values plus the W4-01 boss ranks. The cause is the survivor's late power, not the enemy curve: the expert survivor takes no archetype damage in the median run from run 11 and loses no run after run 20, while its power stops growing at about run 30 (level 50, tree exhausted at run 28-30). The rank rises by one per victory and never falls, so a steeper slope builds a wall at one rank (no defeats, then nearly all) instead of a steady share. `goal6-novice` loses more early (the first windows rise past 25%) and still loses no run from about run 25. No other profile the bot's knobs allow (aim, spending, start country, farming, takeover; preset Normal) passes either.
 
-G6.11 and G6.12 are red at the wave-4 close and are accepted red for this pass (plan §2.4 R60, the user's 2026-11-14 answer "Accept red, playtest decides" to the §2.5 row "G6.11 and G6.12 stay red on the goal-6 measurement profile"). `goal6-novice` stays the gate profile of `goal6_defeat_rate_windows` and `goal6_no_15_streak_after_run_10`, the expert-deu numbers stay printed as information, and no balance data, bot or acceptance row changes. The closing report lists both rows as open, and the human difficulty playtest (plan §11) judges the late-game challenge. The closing phase re-runs every `pacing_targets` row at HEAD.
+G6.11 and G6.12 are red at the wave-4 close and are accepted red for this pass (plan §2.4 R60, the user's 2026-11-14 answer "Accept red, playtest decides" to the §2.5 row "G6.11 and G6.12 stay red on the goal-6 measurement profile"). `goal6-novice` stays the gate profile of `goal6_defeat_rate_windows` and `goal6_no_15_streak_after_run_10`, the expert-deu numbers stay printed as information, and no balance data, bot or acceptance row changes. The closing report lists both rows as open, and the human difficulty playtest (plan §11) judges the late-game challenge. At the closing re-run (release, HEAD, 2026-11-16) they are the only red rows of `pacing_targets`: 14 of 16 tests pass.

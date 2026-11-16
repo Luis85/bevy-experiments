@@ -973,18 +973,18 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 
 ### 9.2 Pacing and smoke
 
-| Measure | Wave 0 | After W2 (W2-49) | After W4 (W4-08) |
+| Measure | Wave 0 | After W2 (W2-49) | After W4 (W4-08; measured at the closing HEAD, §9.6 "Closing pacing") |
 |---|---|---|---|
-| expert-deu first victory (1 seed / 20-seed median) | run 4 / (W2-01, post-W1-69: run 3 / 3 [2, 5]) | run 2 / 3 [2, 4] | |
-| Tier 1 / 2 / 3 affordable | runs 3 / 5 / 7 | 20-seed 3 [2, 3] / 5 [5, 6] / 8 [8, 9] at 930 / 5,190 / 11,675 coins (W2-41 nodes counted) | |
-| Tree exhausted vs Liberation(2) | run 24 vs (W2-01, post-W1-69 20-seed median: 25 [24, 26] vs 17 [16, 18]) | 26 [25, 27] vs 17 [16, 18] (177 nodes) | |
-| Unlock order Fortifications / Mara / Operations (median) | 4 / 14 / 14 (Recruitment) | 3 [2, 4] / 14 [13, 15] / 14 [13, 15] | |
-| Defeat rate per 20-run window after first victory | 0% after run 10 / (W2-04, 20 seeds: 0.0-13.2%, 36 of 39 windows under 10%) | 0.0-16.2%, 35 of 39 windows outside 10-25% | |
-| Longest win streak after run 10 | 50 / (W2-04, 20 seeds: median 50, every seed 46-50) | median 50, every seed 45-50 | |
-| LUX runs to liberate Easy / Normal / Hard | (W2-04, 20-seed median: 4 [4, 4] / 6 [5, 7] / 8 [8, 8]) | 4 [4, 5] / 5 [5, 6] / 9 [8, 11] | |
-| Boss TTK median (s) | (W2-04, 20 seeds: 6.4 [p25 5.9, p90 32.1] over 1,091 kills) | 25.5 [p25 21.5, p90 36.4] over 1,090 kills | |
-| Smoke Personal stages 1-5 / Npc stages 1-5 | see 1.3 | PASS; every stage won, failed attempts Personal 2 (stage 1 x2) / Npc 3 (stage 1 x2, stage 2 x1) (§9.6) | |
-| Strategy profile: liberations 2/4/10, coins per minute | (W2-43, before tuning, 20 seeds: S1 runs 8 / 18 / 42, 3,154 coins/min; S2b/S2a runs to free 3 neighbours 9 / 9) | S1 runs 8 / 18 / 41, 3,183.5 coins/min; S2b/S2a 9 / 9 | (W4-c, at ad80ed5, 20 seeds) S1 runs 9 / 19 / 42, 3,290.5 coins/min; S2b/S2a 9 / 9, so G3.11 is still red (§9.6, "W4-c goal-3 strategy acceptance") |
+| expert-deu first victory (1 seed / 20-seed median) | run 4 / (W2-01, post-W1-69: run 3 / 3 [2, 5]) | run 2 / 3 [2, 4] | run 3 / 3 [3, 4] |
+| Tier 1 / 2 / 3 affordable | runs 3 / 5 / 7 | 20-seed 3 [2, 3] / 5 [5, 6] / 8 [8, 9] at 930 / 5,190 / 11,675 coins (W2-41 nodes counted) | runs 4 / 8 / 11; 20-seed 4 [4, 4] / 8 [8, 8] / 12 [11, 12] at 2,030 / 8,700 / 19,630 coins (W4-p tier definition) |
+| Tree exhausted vs Liberation(2) | run 24 vs (W2-01, post-W1-69 20-seed median: 25 [24, 26] vs 17 [16, 18]) | 26 [25, 27] vs 17 [16, 18] (177 nodes) | 28 [27, 29] vs 19 [18, 20] (176 buyable nodes) |
+| Unlock order Fortifications / Mara / Operations (median) | 4 / 14 / 14 (Recruitment) | 3 [2, 4] / 14 [13, 15] / 14 [13, 15] | 3 [3, 4] / 16 [15, 17] / 18 [17, 18] |
+| Defeat rate per 20-run window after first victory | 0% after run 10 / (W2-04, 20 seeds: 0.0-13.2%, 36 of 39 windows under 10%) | 0.0-16.2%, 35 of 39 windows outside 10-25% | `goal6-novice` (the gate, R56): 0.0-30.0%, 32 of 37 windows outside; `expert-deu`: 0.0-25.5%, 33 of 38 (red, accepted R60) |
+| Longest win streak after run 10 | 50 / (W2-04, 20 seeds: median 50, every seed 46-50) | median 50, every seed 45-50 | `goal6-novice`: median 44, every seed 40-50; `expert-deu`: median 48, every seed 39-50 (red, accepted R60) |
+| LUX runs to liberate Easy / Normal / Hard | (W2-04, 20-seed median: 4 [4, 4] / 6 [5, 7] / 8 [8, 8]) | 4 [4, 5] / 5 [5, 6] / 9 [8, 11] | 5 [5, 6] / 9 [7, 10] / 13 [12, 15] |
+| Boss TTK median (s) | (W2-04, 20 seeds: 6.4 [p25 5.9, p90 32.1] over 1,091 kills) | 25.5 [p25 21.5, p90 36.4] over 1,090 kills | 31.4 [p25 25.5, p90 47.5] over 1,047 kills; Sector 26.9, Regional 46.9, Capstone 39.8 |
+| Smoke Personal stages 1-5 / Npc stages 1-5 | see 1.3 | PASS; every stage won, failed attempts Personal 2 (stage 1 x2) / Npc 3 (stage 1 x2, stage 2 x1) (§9.6) | PASS; every stage won, failed attempts Personal 2 (stage 1 x2) / Npc 0; legacy autonomous Victory |
+| Strategy profile: liberations 2/4/10, coins per minute | (W2-43, before tuning, 20 seeds: S1 runs 8 / 18 / 42, 3,154 coins/min; S2b/S2a runs to free 3 neighbours 9 / 9) | S1 runs 8 / 18 / 41, 3,183.5 coins/min; S2b/S2a 9 / 9 | (W4-c, at ad80ed5, 20 seeds) S1 runs 9 / 19 / 42, 3,290.5 coins/min; S2b/S2a 9 / 9, so G3.11 is still red (§9.6, "W4-c goal-3 strategy acceptance"); closing HEAD: S1 runs 9 / 19 / 39, 3,579.4 coins/min; S2b/S2a 6 / 9 = 0.67, G3.11 passes |
 
 W2-01 20-seed baseline (2026-11-07, pacing harness v2 on the post-W1-69 rules): `cargo run --locked --release -p horde_core --example pacing -- 60 --profile expert-deu --profile novice-deu --profile novice-gear-lux --seeds 20`, once with `--csv --out target/production-before/pacing_20seed_before.csv` (3,600 runs, sha256 af9763f3...54b1b) and once with `--fit-tiers 3,5,7,9,11,13 --out target/production-before/pacing_20seed_before.txt` (sha256 321a9af1...98b3), both not committed. Cells are the lower median [p25, p75] of runs completed; a missed milestone counts as 61. expert-deu: first victory 3 [2, 5]; tiers 1 / 2 / 3 affordable 3 / 5 / 7; Fortifications / Mara / Recruitment / Operations unlocked 3 / 14 / 14 / 23; Liberation(1) 14 [13, 15], Liberation(2) 17 [16, 18]; tree exhausted 25 [24, 26]; rank 5 / 10 / 15 / 20 at 10 / 15 / 20 / 25. Median earned at runs 3 / 5 / 7 / 9 / 11 / 13 over tier 1-6 cost: 1.37 / 0.87 / 1.07 / 1.56 / 1.88 / 2.23. Seed index 0 is the profile's own seed, so the default `pacing 60 --runs` still equals `target/production-after/w1-69/pacing.txt` byte for byte (§9.6).
 
@@ -1616,6 +1616,74 @@ Goal-3 rows in release over 20 seeds (`pacing --strategy --seeds 20`, `target/w4
 | G3.12 reopens over 10 liberations | 0 [0], PASS | 0 [0], PASS |
 
 The solo sweeps (goal 5 and goal 6) play no recruit, so the readout cannot move them; they were not re-run. Digests: none move (the readout is never saved and no pinned run reads it; the full horde_core suite passes at 9f18943 with the two test expectations above updated). Cost (release, 2,000 rounds, with a foreign cargo build on the machine): about 50-66 µs per Npc call (the stage plays of the load bisection), 0.8 ms for 13 defenders and for `available_defenders`, against W2-21's 6.9 µs and 105-110 µs; recorded, not cached (R41). The battle hides the picker, so no gated perf scene draws it.
+
+**Closing pacing (closing phase, 2026-11-16, R36).** One sequential release re-run at the closing HEAD (270b5247; the `horde_core` tree is unchanged since 33b76774), after the RULESET 5 re-bless (8787675). It closes the carried pacing, smoke and save-clone items of waves 3-7: every `pacing_targets` row, the default `pacing 60 --runs` output, smoke, and the R58 save-clone sizes. Outputs (UTF-8, LF; not committed) are in `target/production-after/closing/`: `pacing_targets.txt` (sha256 1d541cc8...8fc8ea8a), `pacing.txt` (e24389ae...ccb2543b), `smoke.txt` (dc1f383a...8747f829), and under `pacing/` and `save-clone/` the isolation run, the CSV sweeps and the logs.
+
+The full suite: `cargo test --locked --release -p horde_core --test pacing_targets -- --include-ignored --nocapture --test-threads 1` (16 tests, 583 s, the 150-run stash sweep included). 14 pass; the 2 red rows are `goal6_defeat_rate_windows` and `goal6_no_15_streak_after_run_10`, accepted red (R60). No other row is red. Cells are the lower median [p25, p75] over 20 seeds (goal 3: median [p90]):
+
+| Row | Before (latest record) | Closing HEAD | Verdict |
+|---|---|---|---|
+| G5.7 first victory | 3 [3, 4] (W4-15) | 3 [3, 4] | PASS |
+| G5.8 tiers 1 / 2 / 3 affordable | 4 [4, 4] / 8 [8, 8] / 12 [11, 12] (W4-15) | unchanged | PASS (tier 3 at the top of 11-13) |
+| G5.9 Liberation(2) / tree exhausted / nodes after it | 19 [18, 20] / 28 [27, 29] / 77 [70, 81] (W4-15) | unchanged | PASS |
+| G5.10 Fortifications / Mara / Operations | 3 [3, 4] / 16 [15, 17] / 18 [17, 18] (W4-15) | unchanged | PASS (waves.md W4-15 "16 / 18" holds) |
+| G6.11 windows outside 10-25%, `goal6-novice` | 32 of 37, 0.0-30.0% (W4-15) | unchanged; first 0.0% window at offset 16 | FAIL, accepted (R60) |
+| G6.11 information, `expert-deu` | 33 of 38, 0.0-25.5% (W4-15) | unchanged | information |
+| G6.12 longest streak from run 11, median [max] | `goal6-novice` 44 [50], every seed 40-50; `expert-deu` 48 [50], 39-50 (W4-15) | unchanged | FAIL, accepted (R60) |
+| G6.15 LUX Easy / Normal / Hard | 5 [5, 6] / 9 [7, 10] / 13 [12, 15] (W4-04..n) | unchanged; Hard 13 against the 13.5 limit | PASS |
+| G6.16 archetype coverage | 18 of 18 | 18 of 18 | PASS |
+| G6.17 boss TTK | 31.4 s [p25 25.5, p90 47.5], 1,047 kills (W4-15) | unchanged | PASS |
+| G6.18 AUT / BGD clamped starts | 3 [3, 5] / 3 [3, 4], no run-1 victory | unchanged | PASS (AUT p75 5) |
+| G4.13 auto-sell tiers 1 / 2 / 3 | 4 [4, 4] / 8 [7, 8] / 11 [10, 12] against 4 [4, 4] / 8 [8, 8] / 12 [11, 12] | unchanged | PASS |
+| R39 stash after run 60 / 150 | 5,324 [5,219, 5,492] (109 auto-sold) / 19,597 [19,056, 19,783] (297) (W4-15) | unchanged | reported |
+| G3.10 S1 liberations 2 / 4 / 10, coins per minute | 9 [10] / 19 [20] / 39 [42], 3,579.4 [3,624.7] (8d569d2) | unchanged | PASS |
+| G3.11 S2b / S2a runs to free 3 neighbours | 6 [6] / 9 [9] = 0.67 (W4-16, 8d569d2) | unchanged | PASS |
+| G3.12 reopens over 10 liberations | 0 [0] | 0 [0] | PASS |
+
+The suite output equals W4-15's `target/w4-15/pacing-targets-b.txt` (62f90d3) line for line apart from the timing line and the G3.10 line, which W4-16 (9f18943) and the closing bot fix 8d569d2 moved from 3,563.8 to 3,579.4 coins per minute and liberation 10 from 39 [43] to 39 [42]. Against the wave-4 tables written before W4-15 (BALANCE_AND_RUN_STATS.md, W4-13 and W4-l above), W4-15's price commit 63283a9 (Survivor network 1,700 → 1,500 coins) is the only cause of every moved solo cell: `target/w4-14/pacing-targets-after.txt` (93321b8) → `target/w4-15/pacing-targets-a.txt` (63283a9) moves G5.9 nodes 74 [68, 81] → 77 [70, 81], Operations 19 [18, 19] → 18 [17, 18], the `goal6-novice` highest window 30.5% → 30.0% (first 0.0% window offset 18 → 16), the `expert-deu` information line 32 → 33 of 38 windows and its streak median 49 → 48, boss TTK p25 25.6 → 25.5 s (1,049 → 1,047 kills), and the stash 5,317 → 5,324 and 19,615 → 19,597 items (112 → 109 and 298 → 297 auto-sold; 2.1% → 2.0% of the items after 60 runs). The tree-first bot buys Survivor network a camp earlier, which reorders the following purchases. BALANCE_AND_RUN_STATS.md and ITEM_QUALITY.md now quote the closing numbers. G3.11 still reads 6 / 9 = 0.67, so PROGRESSION_SCALING.md ("Measured at the wave-4 close") and STRATEGY.md need no change.
+
+Default `pacing 60 --runs` (`cargo run --locked --release -p horde_core --example pacing -- 60 --runs --out target/production-after/closing/pacing.txt`). It is the W4-p and W4-15 "after" file that neither row recorded. The latest recorded output is W4-03's `target/production-after-wave4/commits/1b6fc341/pacing.txt` (sha256 28116036...221ff47d). The only later commits that reach the three solo legacy profiles are W4-p (a9a842a2: repriced `skills.json`, the tier definition and the recommendation order) and W4-15's price (63283a9b). W4-14, W4-12 and W4-16 change Npc, expedition and readout rules, W4-13 adds a registry row, W4-l changes no rule, and the closing fixes are text, saves (byte-identical) or the strategy bot. To split the two, the HEAD release binary was also run with `LASTLIGHT_SKILLS` set to the `skills.json` of 63283a9b^ (Survivor network 1,700, the only difference; `pacing/pacing-pre-w4-15.txt`, sha256 a7ec7955...598e9966). Runs / battle minutes, 1b6fc341 → W4-p (HEAD with the 1,700 price) → HEAD:
+
+| Milestone | expert, tree first, DEU | novice, tree first, DEU | novice, gear first, LUX |
+|---|---|---|---|
+| First victory | 3 / 10 → unchanged → unchanged | 6 / 20 → 4 / 13 → unchanged | 2 / 7 (unchanged) |
+| First liberation | 16 / 67 → 16 / 68 → unchanged | 19 / 79 → 18 / 75 → unchanged | 5 / 18 → 6 / 23 → unchanged |
+| Tier 1 / 2 / 3 / 4 affordable (runs) | 3 / 6 / 9 / 10 → 4 / 8 / 11 / 13 → unchanged | 3 / 8 / 11 / 13 → 4 / 8 / 13 / 14 → unchanged | 2 / 5 / 8 / 9 → 3 / 7 / 10 / 11 → unchanged |
+| Tier costs (coins) | 930 / 5,190 / 11,675 / 15,655 → 2,030 / 8,700 / 19,830 / 24,760 → 2,030 / 8,700 / 19,630 / 24,560 | the same | the same |
+| Fortifications / Mara / Recruitment unlocked | 3 / 16 / 16 → 3 / 16 / 19 → 3 / 16 / 18 | 6 / 19 / 19 → 4 / 18 / 20 → 4 / 18 / 19 | 2 / 5 / 5 → 2 / 8 / 18 → unchanged |
+| Parallel defenses / Country operations unlocked | 19 / 25 → unchanged → unchanged | 22 / 28 → 21 / 27 → unchanged (Parallel 89 → 90 battle min) | 8 / 20 → 18 / 21 → unchanged |
+| Defeats in 60 runs (runs) | 7 (1, 2, 4, 7, 8, 11, 12) → 7 (1, 2, 4, 7, 8, 9, 11) → unchanged | 10 (1, 2, 3, 4, 5, 7, 10, 11, 14, 15) → 9 (1, 2, 3, 5, 8, 9, 10, 11, 12) → unchanged | 2 (1, 3) → 3 (1, 3, 5) → unchanged |
+| Coins over 60 runs | 481,918 → 481,675 → unchanged | 457,633 → 480,698 → 481,473 | 589,581 → 579,711 → 579,581 |
+
+W4-p is balance on purpose (R55): the repriced tree buys fewer, dearer nodes early, so the tiers arrive at runs 4 / 8 / 11-13 as G5.8 asks, and Meet Mara (expert run 16) and Survivor network (run 19) no longer share a camp. The novice profile wins first at run 4 instead of 6 and loses 9 runs instead of 10. In the gear-first LUX profile, Mara moves from run 5 to 8 and Recruitment from 5 to 18 behind the dearer nodes. W4-15 moves only the camp order: Survivor network a camp earlier (expert run 19 → 18, novice 20 → 19), tier 3 and 4 200 coins cheaper (no tier run moves), and the camps after it buy in another order (expert runs 19-20, novice runs 20-29, LUX runs 19-20). The LUX profile still buys it in the same camp (Recruitment unlocked at 18). Every one of the 180 outcomes is unchanged. The novice's runs 20-27 move by up to 24 s (run 21 277 → 301 s), the novice gains 775 coins and LUX loses 130.
+
+Smoke. `cargo run --locked -p horde-defense -- --smoke` (`smoke.txt`), PASS, exit 0. The `horde_core` smoke test (`cargo test --locked -p horde_core --test simulation campaign_gates_are_achievable_in_both_modes_without_rare_loot -- --nocapture`, seeds 1, 2026, 0x1A571167) passes, and the `campaign_smoke` example prints the same 12 attempt lines as `--smoke`. Against W4-03's `commits/1b6fc341/smoke.txt`:
+- Personal (moved by W4-p, a9a842a2: the smoke camp buys the repriced recommended nodes; `target/w4-14/smoke-before.txt`, on the post-W4-p b771d2d, already has these lines): stage 1 attempt 2 209.5 s, 150 kills, 500 coins → 210.2 s, 149 kills, 498 coins; attempt 3 199.4 s, 151 kills, 622 coins → 211.2 s, 150 kills, 621 coins; stage 2 191.1 s, 168 kills, 979 coins → 207.6 s, 174 kills, 986 coins; stages 3-5 and attempt 1 unchanged. Failed attempts stay 2 (stage 1 x2).
+- Npc (moved by W4-14: fbedee29 and 93321b8a, as `target/w4-14/smoke-aim.txt` and `smoke-arrival.txt` record): 8 attempts with 3 defeats → every stage won at the first attempt (stage 1 197.0 s, 51 kills, 289 coins; stage 5 253.0 s, 98 kills, 1,199 coins).
+- The legacy autonomous Npc run: Defeat, 70 kills, 240 coins in 174.0 s → Victory, 50 kills, 290 coins in 189.0 s ("The sector boss was defeated"). It is an Npc run. The W4-14 files record only the campaign lines, so the commit that moved it (W4-p's Npc trap-blueprint price read in `smoke_prepare`, or W4-14's Npc rules) was not isolated.
+- W4-04..n changed no data, so one run at HEAD is its before and after (the W4-04..n block above). W4-03's own before and after are in the "W4-01 and W4-03 before/after" block.
+- Audio: `--smoke` returns before an `App` exists (`main.rs`, the `LaunchAction::Smoke` branch), so it plays no sound. The carried audio checks (SFX through `CueRequest`, stolen `PannedClip` voices ending through `PlaybackSettings::DESPAWN` with no `Fading` pile-up) need a windowed run with audio and cannot be confirmed by `--smoke`. They stay with the listening pass (§11).
+- Build note: the first `--smoke` attempt ran a stale `target/debug/horde-defense.exe` linked from the git-archive tree `target/closing-tests2/src` (9101dbe3). That tree shares the workspace-relative unit hash, so cargo took it as fresh against this tree. The binary was rebuilt after removing its fingerprint, and the result is the same, because `horde_core` is identical at 9101dbe3 and HEAD. The game binary was built with another agent's uncommitted `horde_game` edits in the tree. `--smoke` reads only `horde_core`, whose tree is clean.
+
+Measurements the wave-4 rows left to this phase, from `pacing --profile expert-deu --seeds 20 --csv` and `--profile farm --seeds 20 --csv` (`pacing/*.csv`, `pacing/extras.txt`). Boss rank is computed from each run's stage and the country's stage count (`FrontPosition::boss_rank`):
+- Boss TTK by boss rank (`expert-deu`, the G6.17 sweep): Sector 26.9 s [p25 23.3, p90 45.6] over 669 kills, Regional 46.9 s [46.1, 71.8] over 20 (DEU stage 6, once per seed), Capstone 39.8 s [36.4, 54.6] over 358; pooled 31.4 s, as G6.17. Both new ranks' medians sit inside 20-60 s, and the Regional p90 is above 60 s. On `farm` (novice aim): Regional 68.3 s, Capstone 55.0 s, pooled 38.4 s, reported only.
+- Capstone replay against the frontier (design-enemy-balance "Numbers to record", at most 1.1×): `farm` replays the stage before the frontier, which is never a Capstone. Both sweeps also replay liberated countries' Capstones once the map offers no new stage, so each such replay's coins per minute is read against the median of the same seed's frontier victories within two runs. `expert-deu`: median 1.031× [p25 0.986, p75 1.077, max 1.273] over 85 replays (2,839 against 2,733 coins per minute), 16 above 1.1×. `farm`: 1.041× [0.980, 1.099, max 1.251] over 80, 19 above 1.1×. The median passes. No acceptance row gates this check, so it is reported.
+- Results leads with Upgrade after a first defeat (W3-28): run 1 is a defeat in all 20 `expert-deu` seeds, with 332 [min 283, max 357] coins earned (battle, level grant and milestones). The node learned first in the next camp is the recommended node, `steady_hands` (120 coins) in 13 seeds and `smg_training` (100) in 7. Every seed affords it with at least 176 coins to spare, and none learns nothing (`farm`: 297 [268, 346], at least 148 to spare).
+
+R58 save clone (`save_clone` example, `ITEM_COUNTS` 1,000 / 2,500 / 5,000 / 20,000; dev and playtest builds of HEAD; reports in `target/production-after/closing/save-clone/`). Another workspace's release `cargo test` ran on the machine throughout. The first set (`save-clone/*.json`) sampled the load only before and after each run (2-76%). The second set (`save-clone/low-load/`) started each run after a 60 s window with a mean load under 35% and sampled the load every 2 s during the run (run means 7-60%, max 87%; no sample at 90%, R30). `save_snapshot` p99 in ms, three runs each, median in bold:
+
+| Profile | Items | First set | Low-load set | Gate (1 ms) |
+|---|---:|---|---|---|
+| dev | 1,000 | 0.465, 0.456, 0.492 | 0.455, 0.619, 0.552 (**0.552**) | pass |
+| dev | 5,000 | 0.400, 0.484, 0.449 | 0.508, 0.498, 0.450 (**0.498**) | pass |
+| dev | 20,000 | 0.718, 0.714, 0.727 | 0.813, 0.729, 0.825 (**0.813**) | pass |
+| playtest | 1,000 | 0.610, 0.468, 0.549 | 0.430, 0.581, 0.419 (**0.430**) | pass |
+| playtest | 5,000 | 0.794, **1.124**, 0.422 | 0.435, 0.747, 0.420 (**0.435**) | pass in the low-load set |
+| playtest | 20,000 | **1.078**, **1.225**, 0.629 | 0.690, 0.875, 0.720 (**0.720**) | pass in the low-load set |
+
+The gated fixture (1,000 items, dev and playtest) passes in every run. In the low-load set, 5,000 and 20,000 items pass in every run (worst 0.875 ms, playtest, 20,000). In the first set, three playtest runs went over 1 ms. Run 2 (5,000 at 1.124, 20,000 at 1.225) read 11% load before and 75% after. Run 1 (20,000 at 1.078) read 44% before, while the foreign build was compiling. Those runs are recorded, not discarded. The cost under load sits at the 1 ms line, as VALIDATION.md "R58" found after the `Arc<str>` remedy (11778f2). R58 changes something only if the gate fails: the quiet closing perf run (`measure_performance.ps1 -SaveClone`, which carries the 20,000-item report) decides, and its lever is VALIDATION.md's shared copy-on-write stash, which needs its own measurement.
+
+Digests: none moved. This block runs measurements only, so no `PROVISIONAL` pin is set.
 
 ### 9.3 Audio
 
