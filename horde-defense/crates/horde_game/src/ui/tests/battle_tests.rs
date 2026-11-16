@@ -2333,3 +2333,85 @@ fn tactics_popup_wraps_the_decision_without_justifying_it() {
         }
     }
 }
+
+/// CF-7-02: with construction open, the battle screen paints the overlay's
+/// INCOMING cues left of the panel and the field's "NO BUILDING BEYOND
+/// MIDPOINT" label, and a damage number kept clear only of the cue pass
+/// (CF-7-01) still sat on them ("25" on the bottom of "MIDPOINT" and the top
+/// of the INCOMING plate in construction-small). For a hit at points over
+/// and under the label and beside the cue, on the 7x16 field at both target
+/// sizes, in normal and reduced effects, the number meets neither.
+#[test]
+fn construction_damage_numbers_keep_clear_of_the_midpoint_label_and_incoming_cues() {
+    use horde_core::{content::EnemyKind, sim::Event as SimEvent, sim::EventKind};
+    let (mut checked, mut drawn) = (0, 0);
+    for size in target_sizes() {
+        for reduced in [false, true] {
+            for dx in [-0.5_f32, 0.0, 0.5, 1.0] {
+                for step in 0..8 {
+                    let mut fixture = sized_battle(7, 16, true);
+                    let h = Harness::new();
+                    let f = &mut fixture.frontend;
+                    f.battle.construction = true;
+                    f.settings.reduced_effects = reduced;
+                    let mut a = f.game.attempt_slot_mut().take().unwrap();
+                    a.enemies.clear();
+                    let width = a.width_yards;
+                    // A hostile under the panel in lane 0 gets the cue.
+                    f.game.spawn_enemy(&mut a, EnemyKind::Runner, 0, false);
+                    a.enemies.last_mut().unwrap().x = width - 0.5;
+                    a.events.clear();
+                    let build_right = a.construction_bounds()[1];
+                    let at = [build_right + 0.2 + dx, 0.3 + step as f32 * 0.2];
+                    a.events.push_back(SimEvent {
+                        seq: 1,
+                        kind: EventKind::Hit,
+                        from: a.defender_position(),
+                        to: at,
+                        value: 25,
+                        tick: a.tick,
+                        actor_id: None,
+                        target_id: None,
+                        lane: Some(0),
+                        duration_ticks: 0,
+                    });
+                    *f.game.attempt_slot_mut() = Some(a);
+                    let output = h.frame_size(f, View::Battle, vec![], size);
+                    let runs = text_runs(&output);
+                    let number = runs
+                        .iter()
+                        .filter(|run| run.text == "25")
+                        .fold(Rect::NOTHING, |all, run| all.union(run.rect));
+                    let label = runs
+                        .iter()
+                        .find(|run| run.text == art::MIDPOINT_LABEL)
+                        .map(|run| run.rect)
+                        .expect("the midpoint label drew");
+                    let cue = runs
+                        .iter()
+                        .find(|run| run.text == "INCOMING")
+                        .map(|run| run.rect)
+                        .expect("the INCOMING cue drew");
+                    checked += 1;
+                    if !number.is_positive() {
+                        continue;
+                    }
+                    drawn += 1;
+                    let case = format!("{size:?} reduced {reduced}, hit at {at:?}");
+                    assert!(
+                        !number.intersects(label),
+                        "{case}: the number {number:?} meets the midpoint label {label:?}"
+                    );
+                    assert!(
+                        !number.intersects(cue),
+                        "{case}: the number {number:?} meets the INCOMING cue {cue:?}"
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        drawn * 2 > checked,
+        "only {drawn} of {checked} frames drew the number"
+    );
+}

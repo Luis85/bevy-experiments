@@ -2,7 +2,7 @@
 use super::super::{ArenaProjection, GREEN, MUTED, line, paint_ground};
 use super::fx::OCCLUDER_GAP;
 use crate::{battle_view::BattleViewModel, visual_assets::ArtTextures};
-use bevy_egui::egui::{Align2, Color32 as C, FontId, Painter, Pos2, Rect};
+use bevy_egui::egui::{Align2, Color32 as C, FontId, Galley, Painter, Pos2, Rect};
 
 /// The construction grid's label right of the last build column.
 pub(crate) const MIDPOINT_LABEL: &str = "NO BUILDING BEYOND MIDPOINT";
@@ -34,6 +34,35 @@ pub(crate) fn midpoint_label_place(
     }
     at.x = limit - MIDPOINT_LABEL_MIN_WRAP;
     (at, MIDPOINT_LABEL_MIN_WRAP)
+}
+
+/// The midpoint label laid out with `p`'s fonts at [`midpoint_label_place`].
+fn midpoint_label_galley(
+    p: &Painter,
+    arena: ArenaProjection,
+    build_right: f32,
+    occluder: Option<Rect>,
+) -> (Pos2, std::sync::Arc<Galley>) {
+    let (at, wrap) = midpoint_label_place(arena, build_right, occluder);
+    let galley = p.layout(
+        MIDPOINT_LABEL.to_owned(),
+        FontId::proportional(MIDPOINT_LABEL_SIZE),
+        MUTED,
+        wrap,
+    );
+    (at, galley)
+}
+
+/// The rect the construction grid paints its midpoint label in, laid out
+/// with `p`'s fonts: damage numbers keep clear of it (CF-7-02).
+pub(crate) fn midpoint_label_rect(
+    p: &Painter,
+    arena: ArenaProjection,
+    build_right: f32,
+    occluder: Option<Rect>,
+) -> Rect {
+    let (at, galley) = midpoint_label_galley(p, arena, build_right, occluder);
+    galley.rect.translate(at.to_vec2())
 }
 
 pub fn paint(p: &Painter, arena: ArenaProjection, theme: usize, textures: ArtTextures) {
@@ -94,12 +123,6 @@ pub(super) fn construction_grid(
             MUTED,
         );
     }
-    let (at, wrap) = midpoint_label_place(arena, build_right, occluder);
-    let galley = p.layout(
-        MIDPOINT_LABEL.to_owned(),
-        FontId::proportional(MIDPOINT_LABEL_SIZE),
-        MUTED,
-        wrap,
-    );
+    let (at, galley) = midpoint_label_galley(p, arena, build_right, occluder);
     p.galley(at, galley, MUTED);
 }

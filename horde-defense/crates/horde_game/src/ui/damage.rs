@@ -532,9 +532,13 @@ fn off_face_spot(
         .or_else(|| clear_from(Side::Right, right).map(|edge| (Side::Right, edge)))
         .unwrap_or((Side::Left, left))
 }
-pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
+/// Draws the live battle's popups over `arena`, each kept clear of
+/// `overlay` too: what the battle screen paints on the field outside the cue
+/// pass (the open construction overlay's INCOMING cues and midpoint label,
+/// CF-7-02).
+pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx, overlay: &[Rect]) {
     if let Some(a) = f.game.attempt() {
-        draw_for(
+        draw_for_over(
             ui,
             a,
             art::ArenaProjection::for_attempt(arena, a)
@@ -545,6 +549,7 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
             f.settings,
             f.launch.damage_capture_mode(),
             &f.battle.effects_keep_clear,
+            overlay,
         );
     }
 }
@@ -651,6 +656,34 @@ pub(super) fn draw_for(
     settings: &Settings,
     mode: review::LootCaptureMode,
     keep_clear: &[Rect],
+) {
+    draw_for_over(
+        ui,
+        a,
+        arena,
+        blend,
+        battle,
+        state,
+        settings,
+        mode,
+        keep_clear,
+        &[],
+    );
+}
+/// [`draw_for`] with every popup also kept clear of the `overlay` rects, as
+/// of older popups (CF-7-02).
+#[allow(clippy::too_many_arguments)]
+fn draw_for_over(
+    ui: &egui::Ui,
+    a: &Attempt,
+    arena: art::ArenaProjection,
+    blend: SceneBlend,
+    battle: u64,
+    state: &mut Feedback,
+    settings: &Settings,
+    mode: review::LootCaptureMode,
+    keep_clear: &[Rect],
+    overlay: &[Rect],
 ) {
     let (enabled, reduced) = (settings.numbers, settings.reduced_effects);
     let frame = ui.ctx().cumulative_frame_nr();
@@ -870,6 +903,7 @@ pub(super) fn draw_for(
     // (CF-7-01).
     let mut placed: Vec<Rect> = art::coin_rects(&p, arena, a, reduced);
     placed.extend(art::incoming_rects(&p, arena, a));
+    placed.extend_from_slice(overlay);
     placed.reserve(drafts.len());
     let mut moves = vec![None; drafts.len()];
     for i in order {

@@ -20,7 +20,7 @@ pub(crate) use battlefield::{FxCounts, burst_keyframe_parts, fx_counts};
 pub use battlefield::{FxSource, shooter_class};
 pub(crate) use battlefield::{
     HEALTH_BAR_LIFT, OCCLUDER_GAP, coin_rects, crit_plate, enemy_body_box, fx_lifetime,
-    incoming_rects, structure_face,
+    incoming_rects, midpoint_label_rect, structure_face,
 };
 #[cfg(test)]
 pub(crate) use battlefield::{

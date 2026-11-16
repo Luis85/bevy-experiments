@@ -308,17 +308,51 @@ pub(super) fn incoming_cues(painter: &egui::Painter, cues: &[(u8, Pos2)], lane_h
             Stroke::new(2.5, AMBER),
         ));
         if n == 0 {
-            let galley =
-                painter.layout_no_wrap("INCOMING".into(), FontId::proportional(10.0), AMBER);
-            let label = Rect::from_min_size(
-                pos2(
-                    backing.left() - 4.0 - galley.size().x,
-                    at.y - galley.size().y * 0.5,
-                ),
-                galley.size(),
-            );
-            painter.rect_filled(label.expand2(vec2(3.0, 1.0)), 2.0, INK);
+            let (label, galley) = incoming_word(painter, backing, at);
+            painter.rect_filled(label.expand2(INCOMING_WORD_PLATE), 2.0, INK);
             painter.galley(label.min, galley, AMBER);
         }
     }
+}
+
+/// How far the INK plate under the INCOMING word reaches past it.
+const INCOMING_WORD_PLATE: egui::Vec2 = vec2(3.0, 1.0);
+
+/// The INCOMING word left of the chevron `backing` of the cue at `at`: its
+/// rect and galley.
+fn incoming_word(
+    painter: &egui::Painter,
+    backing: Rect,
+    at: Pos2,
+) -> (Rect, std::sync::Arc<egui::Galley>) {
+    let galley = painter.layout_no_wrap("INCOMING".into(), FontId::proportional(10.0), AMBER);
+    let label = Rect::from_min_size(
+        pos2(
+            backing.left() - 4.0 - galley.size().x,
+            at.y - galley.size().y * 0.5,
+        ),
+        galley.size(),
+    );
+    (label, galley)
+}
+
+/// The rects [`incoming_cues`] paints for `cues`, backings and plate
+/// included: damage numbers keep clear of them (CF-7-02).
+pub(super) fn incoming_cue_rects(
+    painter: &egui::Painter,
+    cues: &[(u8, Pos2)],
+    lane_height: f32,
+) -> Vec<Rect> {
+    cues.iter()
+        .enumerate()
+        .flat_map(|(n, &(_, at))| {
+            let backing = cue_chevron(at, lane_height).expand(CHEVRON_BACKING);
+            let word = (n == 0).then(|| {
+                incoming_word(painter, backing, at)
+                    .0
+                    .expand2(INCOMING_WORD_PLATE)
+            });
+            std::iter::once(backing).chain(word)
+        })
+        .collect()
 }

@@ -7,7 +7,9 @@ use super::{
     input::{preview_aim, reticle_ownership},
     layout::{BAR_BUTTON_PADDING_Y, BAR_ROW_GAP, PANEL_FILL_ALPHA, occluded_spawn_cues},
     low_hp::{low_hp, low_hp_edge},
-    overlays::{corner_hud, field_hint_callout, incoming_cues, key_legend, pause_banner},
+    overlays::{
+        corner_hud, field_hint_callout, incoming_cue_rects, incoming_cues, key_legend, pause_banner,
+    },
     projection,
     retreat::retreat_button,
 };
@@ -159,7 +161,24 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     },
                 );
             }
-            damage::draw(ui, r, f);
+            // The open construction overlay's INCOMING cues and the field's
+            // midpoint label are painted around the popups, which keep clear
+            // of them (CF-7-02).
+            let overlay = if f.battle.construction {
+                let panel = layout.construction_panel;
+                let cues = occluded_spawn_cues(arena, panel, &views.field.enemies);
+                let mut rects = incoming_cue_rects(ui.painter(), &cues, arena.lane_height());
+                rects.push(art::midpoint_label_rect(
+                    ui.painter(),
+                    arena,
+                    a.construction_bounds()[1],
+                    Some(panel),
+                ));
+                rects
+            } else {
+                Vec::new()
+            };
+            damage::draw(ui, r, f, &overlay);
             loot::draw(ui, r, f);
             f.battle.pause_banner_rect = (view.paused && !f.battle.construction)
                 .then(|| pause_banner(ui, &layout, view, &f.settings.bindings));

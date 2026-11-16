@@ -42,6 +42,7 @@ pub(crate) use enemies::{HEALTH_BAR_LIFT, crit_plate};
 #[cfg(test)]
 pub(crate) use fx::reinforcements_anchor;
 pub(crate) use fx::{OCCLUDER_GAP, coin_rects, fx_lifetime, incoming_rects};
+pub(crate) use terrain::midpoint_label_rect;
 #[cfg(test)]
 pub(crate) use terrain::{
     MIDPOINT_LABEL, MIDPOINT_LABEL_MIN_WRAP, MIDPOINT_LABEL_SIZE, midpoint_label_place,
