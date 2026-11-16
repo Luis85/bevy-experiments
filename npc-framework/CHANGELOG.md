@@ -8,6 +8,21 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Island economy, housing and tick cost (S4)
+
+- Food and trade windows close every day/8 ticks and keep 3 days (they kept 0.3 day); food use is what is eaten;
+  boat purchases count as exports; farmers rank goals by food value. Berries spoiled fall below berries eaten.
+- Staple advances reach broke makers; standing work toward the stock target for staples and the made goods their
+  recipe uses (flour, thread, leather). Flour imports over 14 days: 29/33/31 -> 0/0/0 (seeds 7/11/23).
+- New resident leaf `life.haul help` (gather for a site or a short staple); makers holding unstorable goods keep
+  their stand; unsociable residents spend leisure alone; a job target of 0 empties the trade.
+- Building materials move between villages (`civic::supply::unmet_elsewhere`); the boat leaves site shortfalls;
+  the last worker of a trade stays while a site it supplies lacks its goods. Sites cancelled in 14 days 1/1/0 -> 0/0/0.
+- Tick cost: dense A* scratch, reused query states, copy-free stock counts, plan refresh spread over ticks;
+  seed 11 day 7 222 -> 541 ticks/s. `island_game` caps catch-up ticks per frame by speed.
+- First island replay baseline: `tests/replays/island_living_world_s{7,11,23}.json` (24,000 ticks, 40 checkpoints,
+  content hash `5549939943327183273`); evidence in `docs/_notes/island-replays-rebaseline-evidence.md`.
+
 ### Assets, licences and agent guidance (review pass)
 
 - Removed the retired `assets/audio/` folder, its "Island audio" credits and `licenses/Island-Audio-CC0-sources.txt`.

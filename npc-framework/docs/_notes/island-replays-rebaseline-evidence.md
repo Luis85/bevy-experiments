@@ -1,21 +1,27 @@
-# Island replays re-baseline evidence (staged, awaiting approval)
+# Island replays re-baseline evidence (third staging, approved for swap 2026-11-16)
 
-Tree: `7f08c855` (branch `claude/npc-framework-economy-review-7ec4cf`). Recorded on 2026-11-15 with this tree's
-release `npcctl` (`cargo build --locked --release -p npcctl`; binary built 2026-11-15 08:49).
+Tree: `a9e5afa8` (branch `claude/npc-framework-economy-review-7ec4cf`). Recorded on 2026-11-16 with this tree's
+release `npcctl` (`cargo build --locked --release -p npcctl`).
 
-**This is the second staging.** The first staging was recorded on `68c2d1fd`. Commit `7f08c855` then changed the
-island's hashed state: `SeasonLedger`'s `Totals` gained `children` and `came_of_age`, and `hash_totals` now hashes
-both (`content/island_content/src/village/ledger.rs`). This is a hash-encoding change. It moves every island state
-hash from the first checkpoint on, but not the content hash, because no registered name changed. On this tree the
-first staging fails at tick 600:
+**This is the third staging.** The second staging (`7f08c855`, content hash `17177643955394559808`) went stale with
+the S4 sim pass of this session:
+
+- `98bab437` (tick cost): hash-neutral; the second staging still verified on it.
+- `8a55a11c` (economy: 3-day food window, food use is what is eaten, standing staple work, help-haul leaf, the
+  sociable trait): new tree leaf `life.haul help`, so the **content hash** changes, and every state hash.
+- `a9e5afa8` (building materials between villages): state hashes only.
+
+On this tree the second staging is refused before the first checkpoint:
 
 ```
-old s7:  {"ok":false,"checked":1,"first_mismatch":[600,13914578685478396185,7969326067423200921]}
-old s11: {"ok":false,"checked":1,"first_mismatch":[600,8516525264000701901,9710609323910368013]}
-old s23: {"ok":false,"checked":1,"first_mismatch":[600,6824013137921424504,9007799059673750488]}
+old s7:  {"ok":false,"checked":0,"first_mismatch":null,"error":"content hash mismatch: replay ee63402a976dbf40, this build 4d0558f93ec4b1a9 (registered actions, conditions, trees, needs, components or commands differ)"}
+old s11: (same error)
+old s23: (same error)
 ```
 
-So the three staged files were recorded again and replaced. Neither staging was ever approved or swapped in.
+So the three staged files were recorded again and replaced. The new content hash is `5549939943327183273`
+(`4d0558f93ec4b1a9`). The user approved the swap of these files in this session (handover task 1: "they must
+verify and re-record byte-identically on the tree you swap on").
 
 ## What changed and why
 
@@ -25,7 +31,7 @@ construction, `construction::shipped()`, now builds the island everywhere. The r
 island replay: `tests/replays/` has only the 4 `testbed_*` and 4 `village_*` files. So this is a **first
 baseline**, not a replacement. No existing oracle changes, and there is no "before" capture to compare against.
 
-The island's content hash is `17177643955394559808`. It is the same in all three recordings, in both runs of each,
+The island's content hash at the second staging was `17177643955394559808` (now `5549939943327183273`, same in all three recordings and both runs of each). It was the same in all three recordings, in both runs of each,
 and in the first staging. During this pass the island's registered names and registrations changed several
 times, so any island hash from before `68c2d1fd` would not match it:
 
@@ -38,7 +44,7 @@ times, so any island hash from before `68c2d1fd` would not match it:
 - `68c2d1fd` (closing round 4): sim resource `FoodEaten`.
 - `7f08c855` (final patch): no new name. The `SeasonLedger` encoding changed, which alters the state hashes only.
 
-These replays pin the island as it ships at `7f08c855`. A later registration, encoding or behaviour change to the
+These replays pin the island as it ships at `a9e5afa8`. A later registration, encoding or behaviour change to the
 island will need its own re-baseline by the same procedure.
 
 ## Checks that fail until the swap
@@ -57,13 +63,13 @@ cargo build --locked --release -p npcctl
 # recorded into target/ first (the hook blocks `--out tests/replays...`)
 for S in 7 11 23; do
   target/release/npcctl replay record --scenario living_world --seed $S --ticks 24000 --checkpoint-every 600 \
-    --out target/island-split/final2/island_living_world_s$S.json
-  target/release/npcctl replay verify target/island-split/final2/island_living_world_s$S.json
+    --out target/island-split/final3/island_living_world_s$S.json
+  target/release/npcctl replay verify target/island-split/final3/island_living_world_s$S.json
   # a second, independent recording, compared byte for byte (cmp)
   target/release/npcctl replay record --scenario living_world --seed $S --ticks 24000 --checkpoint-every 600 \
-    --out target/island-split/final2/second/island_living_world_s$S.json
+    --out target/island-split/final3/second/island_living_world_s$S.json
 done
-cp target/island-split/final2/island_living_world_s{7,11,23}.json tests/replays.next/   # replaces the first staging
+cp target/island-split/final3/island_living_world_s{7,11,23}.json tests/replays.next/   # replaces the second staging
 ```
 
 ## Evidence
@@ -79,13 +85,13 @@ island_living_world_s23.json  {"ok":true,"checked":40,"first_mismatch":null}
 Determinism: each seed was recorded twice in separate `npcctl` processes, and the two files are **byte-identical**
 (`cmp` and SHA-256):
 
-| Staged file | Bytes | SHA-256 | 2nd recording | 1st staging (68c2d1fd) |
+| Staged file | Bytes | SHA-256 | 2nd recording | 2nd staging (7f08c855) |
 |---|---|---|---|---|
-| `island_living_world_s7.json` | 1272 | `088a0bb2bb2b5ee17ed864dbb5e60e2681d6ba0e455f32b55153e0b3ada9d30d` | identical | `dceb2df2…`, stale |
-| `island_living_world_s11.json` | 1270 | `f6e0e6033efaf20c6074b7bec9a2566226361f2d49d48191773edc02551ce70a` | identical | `a8dcc402…`, stale |
-| `island_living_world_s23.json` | 1265 | `a62434d27840dad3f25296ead1815e6944f6b37cccbb732f86267fe4bac1b818` | identical | `a53eb6c5…`, stale |
+| `island_living_world_s7.json` | 1269 | `dea11e348f20e3fc7013e974ead79762e7f6313e137c9dd755e8af7a3c531391` | identical | `088a0bb2…`, stale |
+| `island_living_world_s11.json` | 1266 | `94e59ac361a809c8fa8167415572c22da8a1159d4287355e9b74453f1a7efff4` | identical | `f6e0e603…`, stale |
+| `island_living_world_s23.json` | 1260 | `f501f29ddd56ee49eed9facfddabdebf1133b878f848959d7338bafc74970af6` | identical | `a62434d2…`, stale |
 
-Each file: `"version":2`, `"scenario":"island:living_world"`, `"content_hash":17177643955394559808`,
+Each file: `"version":2`, `"scenario":"island:living_world"`, `"content_hash":5549939943327183273`,
 `"ticks":24000`, `"commands":[]`, 40 checkpoints (every 600 ticks, 600..24000), `"villagers":1`, which is
 `npcctl`'s default; the island's population comes from its construction. Recording, verifying and recording again
 took 103-115 s per seed in release on this machine.
@@ -93,7 +99,7 @@ took 103-115 s per seed in release on this machine.
 Not done: a Linux/Windows cross-check. The CI determinism job covers that; differing hashes across OSes would be
 a determinism bug, not a re-baseline.
 
-## Staged files (not applied)
+## Staged files (swapped in on 2026-11-16)
 
 | Oracle | Staged as | Change |
 |---|---|---|
