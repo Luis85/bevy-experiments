@@ -319,6 +319,11 @@
         "stress": { "primitives": 0, "vertices": 1440 },
         "stress-5000-corpses": { "primitives": 0, "vertices": 1534 }
       },
+      "w7_09_remeasure": {
+        "note": "W7-09 (closing phase): measure_battlefield_egui_load -- --ignored re-run once on the integrated tree at HEAD 30847f90 (2026-11-16 18:23-18:26 UTC, 190.95 s, exit 0). Every count and maximum tick above is reproduced exactly at both arenas (normal: peak 32968 at tick 180, progressed-peak 38839 at 246, stress 57330 at 1440, stress-5000-corpses 60811 at 1534; small: 28008, 33863, 52905 at tick 1814, 56411; 18 primitives each), and live_battlefield_runs_stay_within_the_egui_gates passes, so the W4-14 record above stands for HEAD and no gate moves: progressed-peak has 1161 vertices of headroom under 40000 and stress-5000-corpses 287 under 61098. fx-stress is not part of this headless measurement; its live maxima are in acceptance.closing.battlefield_live_worst.",
+        "commit": "30847f90",
+        "evidence": "target/perf/w7-09/egui-load.out.txt"
+      },
       "w2_review": {
         "note": "The W2-review measurement at 776075c, which egui_measured held until W5-01, and its gate (24 primitives). Its note, verbatim: W1-51, with ruling R22 (wave-1 close, gates only tighten): each egui gate is min(W1-32 ceiling, ceil(measured max x factor), the gate it replaces in previous.gates); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn; that case starts from tick 1,000,000, the tick stage_bodies sets, not from the fixture schedule). W2 review (perf-diagnostics): re-measured at 776075c, on the W2-47 stress fixture (787929f: every catalogue archetype, elites, the last wave tier); the 4d599a5 post-W1-69 maxima are kept verbatim under w1_69. These are the maxima at the normal arena; the small arena is lower in every case (peak 27784, progressed-peak 33596, stress 46494, stress-5000-corpses 47725 vertices; 19 primitives each). W2 review (ui, CF-2-05): re-measured with the INK backing under every hostile callout, one rect per boss name, EXPOSED, CRIT or phase label, which adds 80-160 vertices per scene (normal arena, was peak 32624, progressed-peak 38524, stress 51014, stress-5000-corpses 52325) and moves no primitive count and no maximum tick. Every run simulated all its ticks (780, 780, 1980, 1980) and every maximum was first painted on an even tick (max_tick_by_scene). On the new fixture the stress vertex maxima fall late (tick 1980, and 1700 with full corpse caps), no longer by tick 420. live_battlefield_runs_stay_within_the_egui_gates gates progressed-peak, stress and stress-5000-corpses at the normal arena, painted every 2nd tick of the first 420 and at each scene's recorded max_tick_by_scene ticks (R22: or the exact maxima ticks), running to the latest of them, and asserts that its maxima and their first ticks equal battlefield_primitives_by_scene, battlefield_vertices_by_scene and max_tick_by_scene exactly (W2 review, tests), so a fixture change that moves a recorded maximum fails it until this evidence is re-measured; live_battlefield_gate_paints_every_recorded_maximum_tick pins only the plan builder, and the re-measure asserts full length and the gates. Re-derived, no gate moves: primitives 19 x 1.25 -> 24; progressed-peak vertices 38604 x 1.25 stays at the 40000 ceiling; stress vertices 52405 x 1.25 = 65507 is above the 61098 it would replace, so the gate stays 61098. Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
         "commit": "776075c",
@@ -378,6 +383,107 @@
     "driver_stalls": { "acc-dev-vsync-progressed-peak": 15, "acc-dev-novsync": 48, "acc-playtest-novsync": 48 },
     "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "commit": "199d823", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
     "shipped_smoke_seconds": { "median": 1.257, "runs": [2.719, 1.245, 1.257], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-review2/acc-playtest-novsync/shipped" },
+    "closing": {
+      "note": "W7-09 final acceptance at the release candidate, attempt 1 (closing phase, R36), at HEAD 30847f90 on a clean tree, window_utc 2026-11-16 18:58 to 23:10 UTC; informational, the script never reads it and no test pins it yet (RECORDED_CPU_GATED_SCENES still lists progressed-peak and stress only, so these fx-stress cells are not pinned). Every pass held the display on (R27, no Kernel-Power 506/507 event in a kept run) and waited for an R30 quiet window; another session's cargo builds and release soak tests ran on the machine (quiet windows up to 2195 s), and a group with an invalid run (a CPU load sample of 90% or more, or unfocused sample frames) after the one rerun was re-measured as a whole group (W1-37). No valid group was re-measured (R34). gate_clean is false wherever an invocation printed a VALID OVER: those stand. The acceptance is NOT met: dev -VsyncOff exits 1 (fx-stress/normal cpu_frame p99 10.2157 > 10.0 and peak/normal egui texture uploads 1 > 0), playtest -VsyncOff has the same peak/normal upload over, and dev VSync on has progressed-peak interface_draw 1.1395 / 1.1421 over 1.129 / 1.030 (G1.10). The R31 A/B passes, playtest VSync on (the shipped default, pipelined on) passes every cell, and frames over 50 ms outside driver stalls are 0 in every kept repeat with 0 driver stalls. Production-pass plan 9.1, VALIDATION.md 'W7-09 final perf acceptance at the release candidate'.",
+      "commit": "30847f90",
+      "window_utc": ["2026-11-16T18:58:17Z", "2026-11-16T23:10:32Z"],
+      "executables_sha256": { "dev": "89d61656", "playtest": "47efa4a9", "shipped": "5a597fd2", "ab_a": "0df08943", "ab_b": "c976e731" },
+      "passes": {
+        "dev-novsync": {
+          "command": "-Scene all -Profile dev -VsyncOff -Repeat 3", "exit": 1, "evidence": ["target/perf/w7-09/acc-dev-novsync"],
+          "gate_clean": false,
+          "invocations": {
+            "acc-dev-novsync": {
+              "started_utc": "2026-11-16T18:58:17Z", "exit": 1,
+              "over": [
+                { "scene": "fx-stress", "size": "normal", "metric": "cpu_frame_p99_ms", "median": 10.2157, "limit": 10.0, "repeats": [10.1457, 10.2157, 10.3331], "load_max_percent": [72, 42, 9] },
+                { "scene": "peak", "size": "normal", "metric": "egui_texture_uploads", "worst": 1, "limit": 0, "repeats": [1, 1, 1], "bytes": 6420 }
+              ]
+            }
+          }
+        },
+        "playtest-novsync": {
+          "command": "-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke", "exit": 0, "evidence": ["target/perf/w7-09/acc-playtest-novsync", "target/perf/w7-09/acc-playtest-novsync-b-progressed-peak", "target/perf/w7-09/acc-playtest-novsync-b-stress"],
+          "gate_clean": false,
+          "invocations": {
+            "acc-playtest-novsync": {
+              "started_utc": "2026-11-16T19:39:53Z", "exit": 2,
+              "invalid_groups": ["progressed-peak/small", "stress/small"],
+              "over": [{ "scene": "peak", "size": "normal", "metric": "egui_texture_uploads", "worst": 1, "limit": 0, "repeats": [1, 1, 1], "bytes": 6420 }]
+            },
+            "acc-playtest-novsync-b-progressed-peak": { "started_utc": "2026-11-16T19:59:58Z", "exit": 0, "remeasures": ["progressed-peak/normal", "progressed-peak/small"] },
+            "acc-playtest-novsync-b-stress": { "started_utc": "2026-11-16T20:06:50Z", "exit": 0, "remeasures": ["stress/normal", "stress/small"] }
+          }
+        },
+        "dev-vsync": {
+          "command": "-Scene all -Profile dev -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09/acc-dev-vsync", "target/perf/w7-09/acc-dev-vsync-b-stress", "target/perf/w7-09/acc-dev-vsync-b-fx-stress", "target/perf/w7-09/acc-dev-vsync-c-stress"],
+          "gate_clean": false,
+          "invocations": {
+            "acc-dev-vsync": {
+              "started_utc": "2026-11-16T20:09:39Z", "exit": 2,
+              "invalid_groups": ["fx-stress/small", "stress/small"],
+              "over": [
+                { "scene": "progressed-peak", "size": "normal", "metric": "interface_draw_mean_ms", "median": 1.1395, "limit": 1.129, "repeats": [1.1199, 1.1592, 1.1395], "load_max_percent": [46, 55, 66] },
+                { "scene": "progressed-peak", "size": "small", "metric": "interface_draw_mean_ms", "median": 1.1421, "limit": 1.03, "repeats": [1.4464, 1.1421, 1.138], "load_max_percent": [88, 4, 49] }
+              ]
+            },
+            "acc-dev-vsync-b-stress": { "started_utc": "2026-11-16T20:24:50Z", "exit": 2, "invalid_groups": ["stress/normal", "stress/small"], "remeasures": ["stress/normal", "stress/small"] },
+            "acc-dev-vsync-b-fx-stress": { "started_utc": "2026-11-16T20:48:43Z", "exit": 0, "remeasures": ["fx-stress/normal", "fx-stress/small"] },
+            "acc-dev-vsync-c-stress": { "started_utc": "2026-11-16T21:36:49Z", "exit": 0, "remeasures": ["stress/normal", "stress/small"] }
+          }
+        },
+        "playtest-vsync": {
+          "command": "-Scene all -Profile playtest -Pipelined on -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09/acc-playtest-vsync", "target/perf/w7-09/acc-playtest-vsync-b-fx-stress"],
+          "gate_clean": true,
+          "invocations": {
+            "acc-playtest-vsync": { "started_utc": "2026-11-16T21:57:57Z", "exit": 2, "invalid_groups": ["fx-stress/small"] },
+            "acc-playtest-vsync-b-fx-stress": { "started_utc": "2026-11-16T22:11:51Z", "exit": 0, "remeasures": ["fx-stress/normal", "fx-stress/small"] }
+          }
+        }
+      },
+      "load_percent_max_during_runs": { "dev-novsync": 75, "playtest-novsync": 84, "dev-vsync": 88, "playtest-vsync": 85 },
+      "cpu_frame_p99_ms": {
+        "dev": {
+          "progressed-peak": { "normal": 9.2249, "small": 8.5572 },
+          "stress": { "normal": 9.8009, "small": 9.438 },
+          "fx-stress": { "normal": 10.2157, "small": 9.101 }
+        },
+        "playtest": {
+          "progressed-peak": { "normal": 6.733, "small": 8.1823 },
+          "stress": { "normal": 8.7803, "small": 8.2486 },
+          "fx-stress": { "normal": 8.9746, "small": 8.9505 }
+        }
+      },
+      "interface_draw_mean_ms": {
+        "peak": { "normal": 0.8755, "small": 0.8762 },
+        "progressed-peak": { "normal": 1.1395, "small": 1.1421 },
+        "stress": { "normal": 1.471, "small": 1.469 },
+        "fx-stress": { "normal": 1.5921, "small": 1.6287 }
+      },
+      "interface_total_mean_ms": {
+        "peak": { "normal": 1.6838, "small": 1.6206 },
+        "progressed-peak": { "normal": 2.1127, "small": 2.0252 },
+        "stress": { "normal": 2.4693, "small": 2.3927 },
+        "fx-stress": { "normal": 2.6421, "small": 2.6378 }
+      },
+      "interface_total_ab": {
+        "evidence": "target/perf/w7-09/ab-interface-total-b", "started_utc": "2026-11-16T23:02:30Z", "exit": 0, "pairs": 5, "tolerance": 1.05,
+        "a_commit": "ab03da9", "b_commit": "30847f90",
+        "normal": { "a_median": 2.0248, "b_median": 2.101, "ratio": 1.0376 },
+        "small": { "a_median": 1.9396, "b_median": 1.9907, "ratio": 1.0263 },
+        "first_sitting": "target/perf/w7-09/ab-interface-total (exit 2: A pair 2 small and pair 3 normal at 97-100% CPU load)"
+      },
+      "frames_over_50ms_worst": 0,
+      "driver_stalls": 0,
+      "gate3_shipped_default": { "evidence": "target/perf/w7-09/acc-playtest-vsync", "scene": "stress", "profile": "playtest", "pipelined": true, "mean_fps": { "normal": 60.0, "small": 60.0 }, "p99_interval_ms": { "normal": 17.63, "small": 19.95 }, "frames_over_33ms_worst": 0, "frames_over_50ms_worst": 0 },
+      "battlefield_live_worst": {
+        "primitives": { "peak": 18, "progressed-peak": 19, "stress": 22, "fx-stress": 22, "gate": 23 },
+        "vertices": { "progressed-peak": 38707, "stress": 55055, "fx-stress": 60311, "gates": { "progressed-peak": 40000, "stress": 61098 } }
+      },
+      "shipped_smoke_seconds": { "median": 1.056, "runs": [2.296, 1.056, 0.968], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w7-09/acc-playtest-novsync/shipped" },
+      "packaged_smoke_seconds": { "runs": [1.5, 1.51, 1.47], "commit": "61bced1a", "evidence": "VALIDATION.md 'Closing playtest package' (Lastlight.exe --smoke from the unpacked package)" },
+      "integrated_gpu": "pending (not measured; informational only)"
+    },
     "w2_47": {
       "note": "W2-47 re-gate on the wave-2 stress fixture (all 18 catalogue archetypes, elites, the last wave tier, the boss's phase state), window_utc 2026-11-09 22:15 to 2026-11-10 02:27 UTC; informational, the script never reads it, and perf_budget_records_the_w2_47_regate pins it. Every pass ran with the R27 display hold and the R30 quiet window and load check, on a machine shared with another session's cargo builds and tests. Each invocation records its start, the commit it ran at, its executable (sha256 prefix), its exit, its invalid groups (scene/size with an invalid run after the one rerun: a CPU load sample of 90% or more, or an unreadable one), any valid gated cell over its limit (over) and the groups it re-measures. exit is the last invocation's exit, so for dev-vsync and playtest-vsync it is the exit over the kept groups. Invalid groups were re-measured as whole scene groups, as W1-37 did. dev-novsync is the exception: its first invocation also had a valid over (progressed-peak/small cpu_frame p99, exit 2 only because invalid runs rank above an over), and the whole pass was re-measured, which neither R30 nor the W1-37 method allows for a valid group, so gate_clean is false: R34 (plan 2.4) answered the plan 2.5 row (W2-47 review), the valid over stands, may not be re-measured away, and W5-11 re-gates it. The executables are the bd12d1c-era sources (the bin is unchanged from 0213760 to bd12d1c); later wave-2 commits change the binary, among them presentation (3d4e881, 1cb775a), core simulation and campaign rules (759cf49, aa21781, 95c239f, 83d533e, a86c5a4, 4b4dc4a, bf7cfd3, ec09c1d) and the ruleset constant (e3f52fa), so these are not HEAD's executables and the wave-2 close perf acceptance at HEAD (R34) is a new measurement. The first four invocations ran at 43184d1, the reruns and the A/B at bd12d1c after the A/B fix's cargo clean, so two hashes per profile. VALIDATION.md 'W2-47 re-gate on the wave-2 stress fixture'.",
       "commits": ["43184d1", "bd12d1c"],
