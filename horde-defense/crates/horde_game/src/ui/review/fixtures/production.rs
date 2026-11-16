@@ -1036,6 +1036,15 @@ pub(in crate::ui::review) const ELITE_TELLS_SPREAD_YARDS: f32 = 1.5;
 pub(in crate::ui::review) fn elite_tells_apart(one: &Enemy, other: &Enemy) -> bool {
     one.lane.abs_diff(other.lane) >= 2 || (one.x - other.x).abs() >= ELITE_TELLS_SPREAD_YARDS
 }
+
+/// Whether an elite's marker lies inside the field: its marker floats about
+/// a lane above its ring, so a top-lane elite draws it above the field's
+/// top edge, where the frame clips it (and at 1050x700 the PAUSED tag
+/// covers it).
+pub(in crate::ui::review) fn elite_tells_marker_in_field(elite: &Enemy) -> bool {
+    elite.lane >= 1
+}
+
 /// The share of fx-stress hostiles that are elite, in percent.
 #[cfg(feature = "review")]
 pub(in crate::ui::review) const FX_STRESS_ELITE_PCT: usize = 30;
@@ -1104,9 +1113,10 @@ fn prepare_storm(f: &mut FrontendParts) {
 /// For every shipped affix, in catalogue order, a hostile inside the field
 /// and the elite profile `elite_profile` gives it for that affix. A hostile
 /// that already rolled an affix covers it. Every elite, rolled or cast,
-/// stands apart from every other (`elite_tells_apart`, CF-3-27), so each
-/// ring and marker reads as its own hostile's. None until the field holds
-/// such a hostile for every affix and one more that stays plain.
+/// stands apart from every other (`elite_tells_apart`, CF-3-27) and below
+/// the top lane (`elite_tells_marker_in_field`), so each ring and marker
+/// shows and reads as its own hostile's. None until the field holds such a
+/// hostile for every affix and one more that stays plain.
 fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
     let catalog = enemy_catalog();
     let elite = |e: &Enemy| {
@@ -1116,11 +1126,13 @@ fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
             .map(|mark| mark.affix_id.clone())
     };
     let mut placed: Vec<&Enemy> = a.enemies.iter().filter(|e| elite(e).is_some()).collect();
-    if placed.iter().enumerate().any(|(i, one)| {
-        placed[i + 1..]
-            .iter()
-            .any(|other| !elite_tells_apart(one, other))
-    }) {
+    if placed.iter().any(|e| !elite_tells_marker_in_field(e))
+        || placed.iter().enumerate().any(|(i, one)| {
+            placed[i + 1..]
+                .iter()
+                .any(|other| !elite_tells_apart(one, other))
+        })
+    {
         return None;
     }
     let rolled = |affix: &str| {
@@ -1134,6 +1146,7 @@ fn elite_tell_casting(a: &Attempt) -> Option<Vec<(u64, ResolvedEnemy)>> {
             .enemies
             .iter()
             .filter(|e| !e.boss && !e.split_child && e.x < a.width_yards - 1.0)
+            .filter(|e| elite_tells_marker_in_field(e))
             .filter(|e| placed.iter().all(|other| elite_tells_apart(e, other)))
             .find_map(|e| {
                 let base = e.resolved.as_ref().filter(|base| base.elite.is_none())?;

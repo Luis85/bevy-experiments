@@ -3071,7 +3071,8 @@ fn elite_tells_fixture_fields_every_shipped_affix() {
 /// apart, or `ELITE_TELLS_SPREAD_YARDS` apart along the field. Under that
 /// spread on its 7-lane, 16-yard field two rings (0.88 lane heights, about a
 /// yard wide) overlapped, and a marker one lane above its ring sat in the
-/// ring of a hostile in the lane above.
+/// ring of a hostile in the lane above. No elite stands in the top lane,
+/// whose marker floats above the field (under the PAUSED tag at 1050x700).
 #[test]
 fn elite_tells_fixture_spreads_its_elites() {
     let f = staged("elite-tells");
@@ -3086,6 +3087,14 @@ fn elite_tells_fixture_spreads_its_elites() {
         })
         .collect();
     assert!(elites.len() >= 2, "{} elites", elites.len());
+    for elite in &elites {
+        assert!(
+            fixtures::production::elite_tells_marker_in_field(elite),
+            "elite {} in lane {} draws its marker above the field",
+            elite.id,
+            elite.lane
+        );
+    }
     for (i, one) in elites.iter().enumerate() {
         for other in &elites[i + 1..] {
             assert!(
