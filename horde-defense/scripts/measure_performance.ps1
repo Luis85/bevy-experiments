@@ -769,7 +769,7 @@ try {
     $displayHold = Enter-DisplayHold
     if ($ShippedSmoke) {
         # One CARGO_TARGET_DIR: the shipped and review playtest builds share an exe path, so copy the shipped one out first.
-        Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense', '--profile', 'playtest', '--no-default-features') -LogStem (Join-Path $tools 'cargo-shipped') | Out-Null
+        Invoke-HordeBuild -Arguments @('build', '--locked', '-p', 'horde-defense', '--profile', 'playtest', '--no-default-features') -LogStem (Join-Path $tools 'cargo-shipped') -DepInfo (Join-Path $target 'playtest\horde-defense.d') -Workspace $workspace | Out-Null
         $shippedDirectory = Join-Path $destination 'shipped'
         New-Item -ItemType Directory -Force -Path $shippedDirectory | Out-Null
         $shippedExe = Join-Path $shippedDirectory 'horde-defense.exe'
@@ -791,7 +791,9 @@ try {
     if (-not $NoBuild -or $ShippedSmoke) {
         $buildArguments = @('build', '--locked', '-p', 'horde-defense')
         if ($Profile -eq 'playtest') { $buildArguments += @('--profile', 'playtest') }
-        Invoke-Cargo -Arguments $buildArguments -LogStem (Join-Path $tools "cargo-$Profile") | Out-Null
+        $profileDirectory = 'debug'
+        if ($Profile -eq 'playtest') { $profileDirectory = 'playtest' }
+        Invoke-HordeBuild -Arguments $buildArguments -LogStem (Join-Path $tools "cargo-$Profile") -DepInfo (Join-Path $target "$profileDirectory\horde-defense.d") -Workspace $workspace | Out-Null
     }
     $exe = Get-HordeExecutable -Profile $Profile -Workspace $workspace
 
@@ -886,6 +888,8 @@ try {
         $example = Join-Path $workspace 'crates\horde_core\examples\save_clone.rs'
         if (-not (Test-Path -LiteralPath $example)) { throw "-SaveClone needs crates/horde_core/examples/save_clone.rs (W1-50)" }
         # Built, then run directly: the example exits 1 over its gate, which is a budget verdict, not a run failure.
+        # An example's dep-info names only its own file, so a horde_core shadowed by a tree extracted under the target
+        # dir is caught by the review build above (Invoke-HordeBuild cleans it), not here.
         $cloneArguments = @('build', '--locked', '-p', 'horde_core', '--example', 'save_clone')
         $cloneDirectory = 'debug'
         if ($Profile -eq 'playtest') { $cloneArguments += @('--profile', 'playtest'); $cloneDirectory = 'playtest' }

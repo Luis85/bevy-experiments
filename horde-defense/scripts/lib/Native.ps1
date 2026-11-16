@@ -203,6 +203,84 @@ function Invoke-Cargo {
     return $result
 }
 
+function Test-PathUnder([string]$Path, [string]$Root) {
+    $prefix = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/') + '\'
+    return $Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ForeignBuildSource {
+    # The sources a build's uplifted dep-info (<exe>.d beside the exe cargo copies out) names outside -Workspace or
+    # under -Target. Cargo keeps a source under the target dir relative to the target dir, so a tree extracted under a
+    # shared CARGO_TARGET_DIR (git archive into <target>\<name>\src) and built there writes its own sources into this
+    # workspace's fingerprint (one unit hash for both): the workspace build then stays fresh and `cargo run` starts that
+    # tree's code (closing, plan 9: 9101dbe3 ran for three hours; the fix-ui*-stale-exe folders). OUT_DIR files
+    # (<target>\...\build\<unit>\out\) belong to the build. When -Workspace is itself under -Target (the A/B script's
+    # A arm), only its own folder counts. Returns the foreign paths in dep-info order (wrap the call in @()); throws on a missing dep-info.
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$DepInfo,
+        [string]$Workspace = $script:NativeHordeWorkspace,
+        [string]$Target
+    )
+    if (-not $Target) { $Target = Resolve-HordeTarget -Workspace $Workspace }
+    $DepInfo = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DepInfo)
+    if (-not (Test-Path -LiteralPath $DepInfo -PathType Leaf)) { throw "No dep-info at $DepInfo; the build wrote none" }
+    $Workspace = [IO.Path]::GetFullPath($Workspace)
+    $Target = [IO.Path]::GetFullPath($Target)
+    $targetShadows = -not (Test-PathUnder $Workspace $Target)
+    $foreign = New-Object System.Collections.Generic.List[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in [IO.File]::ReadAllLines($DepInfo)) {
+        # Make syntax: "<output>: <dep> <dep> ...", a space inside a path escaped as "\ ". A drive colon is never
+        # followed by a space; later "<dep>:" lines list no dependencies.
+        $colon = $line.IndexOf(': ')
+        if ($line.StartsWith('#') -or $colon -lt 0) { continue }
+        foreach ($token in [regex]::Split($line.Substring($colon + 2).Trim(), '(?<!\\) +')) {
+            if (-not $token) { continue }
+            # rustc writes an example's dep-info relative to the workspace it ran in; cargo's bin dep-info is absolute.
+            $path = Resolve-WorkspacePath -Path ($token -replace '\\ ', ' ') -Workspace $Workspace
+            if (-not $seen.Add($path)) { continue }
+            $isForeign = -not (Test-PathUnder $path $Workspace)
+            if (-not $isForeign -and $targetShadows -and (Test-PathUnder $path $Target)) {
+                $isForeign = $path.Substring($Target.Length) -notmatch '\\build\\[^\\]+\\out\\'
+            }
+            if ($isForeign) { $foreign.Add($path) }
+        }
+    }
+    return $foreign.ToArray()
+}
+
+function Invoke-HordeBuild {
+    # Invoke-Cargo build, then Get-ForeignBuildSource on the built exe's dep-info. A build that took a foreign tree's
+    # sources cleans the workspace packages in that profile and builds once more; one still foreign throws. Returns
+    # Cleaned (whether it cleaned) and Foreign (the first build's foreign sources). -Cargo takes (Arguments, LogStem,
+    # WorkingDirectory) for the self-tests; the default runs Invoke-Cargo.
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$LogStem,
+        [Parameter(Mandatory = $true)][string]$DepInfo,
+        [string]$Workspace = $script:NativeHordeWorkspace,
+        [string]$Target,
+        [scriptblock]$Cargo = { param($CargoArguments, $CargoLog, $CargoDirectory) Invoke-Cargo -Arguments $CargoArguments -LogStem $CargoLog -WorkingDirectory $CargoDirectory | Out-Null }
+    )
+    if (-not $Target) { $Target = Resolve-HordeTarget -Workspace $Workspace }
+    $profileName = 'dev'
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        if ($Arguments[$i] -eq '--release') { $profileName = 'release' }
+        elseif ($Arguments[$i] -eq '--profile' -and $i + 1 -lt $Arguments.Count) { $profileName = $Arguments[$i + 1] }
+    }
+    & $Cargo $Arguments $LogStem $Workspace | Out-Null
+    $foreign = @(Get-ForeignBuildSource -DepInfo $DepInfo -Workspace $Workspace -Target $Target)
+    if ($foreign.Count -eq 0) { return [pscustomobject]@{ Cleaned = $false; Foreign = @() } }
+    Write-Host "The $profileName build of this workspace took $($foreign.Count) source(s) from another tree (first: $($foreign[0])); cleaning the workspace packages and building again"
+    & $Cargo @('clean', '--locked', '-p', 'horde-defense', '-p', 'horde_core', '-p', 'horde_audio', '--profile', $profileName) "$LogStem-clean" $Workspace | Out-Null
+    & $Cargo $Arguments "$LogStem-rebuild" $Workspace | Out-Null
+    $still = @(Get-ForeignBuildSource -DepInfo $DepInfo -Workspace $Workspace -Target $Target)
+    if ($still.Count -gt 0) { throw "The $profileName build still takes sources from another tree after cargo clean: $($still -join ', ')" }
+    return [pscustomobject]@{ Cleaned = $true; Foreign = $foreign }
+}
+
 function Get-ReviewSceneList {
     # Runs <Executable> --list-scenes through Invoke-Native and parses its TSV (name kind motion perf practice primary
     # before_proxy since_wave; the header and '#' lines are skipped). Returns the Invoke-Native result plus Scenes: one

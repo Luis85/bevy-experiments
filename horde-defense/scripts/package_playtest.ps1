@@ -78,7 +78,7 @@ else {
     elseif ($Profile -ne 'debug') { $buildArguments += @('--profile', $Profile) }
     # The stamp is set for this build only (Invoke-WithBuildCommit restores it, scripts/lib/Playtest.ps1).
     $built = Invoke-WithBuildCommit -Label (Get-BuildCommitLabel -Commit $commit -Dirty $dirty) -Build {
-        Invoke-Cargo -Arguments $buildArguments -LogStem (Join-Path $logs 'cargo-build') | Out-Null
+        Invoke-HordeBuild -Arguments $buildArguments -LogStem (Join-Path $logs 'cargo-build') -DepInfo (Join-Path (Resolve-HordeTarget -Workspace $workspace) "$Profile\horde-defense.d") -Workspace $workspace | Out-Null
         Get-HordeExecutable -Profile $Profile -Workspace $workspace
     }
 }

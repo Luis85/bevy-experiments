@@ -35,7 +35,7 @@ else { $view = @{ Width = 1440; Height = 900; Scale = 1.0 } }
 $saved = Reset-LastlightEnv
 try {
     if (-not $NoBuild) {
-        Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $logs 'cargo-build') | Out-Null
+        Invoke-HordeBuild -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $logs 'cargo-build') -DepInfo (Join-Path (Resolve-HordeTarget -Workspace $workspace) 'debug\horde-defense.d') -Workspace $workspace | Out-Null
     }
     if ($Executable) {
         $exe = Resolve-WorkspacePath $Executable -Workspace $workspace

@@ -9,6 +9,12 @@ Use cargo fmt --all, cargo clippy --locked --workspace --all-targets -- -D warni
 the same clippy with -p horde-defense --no-default-features and with --features dev,
 and cargo test --locked --workspace (plus -p horde-defense --no-default-features and --features dev) inside this directory. Each workspace owns target/ unless CARGO_TARGET_DIR is set; every script under scripts/ honours it.
 Only the PowerShell 7 trace_npc.ps1 still uses ./target.
+Build an older tree (git archive) with its own CARGO_TARGET_DIR, never in the shared one: cargo keeps a source under
+the target dir relative to it, so the extracted tree takes over this workspace's units (same hashes), edits here no
+longer rebuild and `cargo run` starts its code until `cargo clean -p horde-defense -p horde_core -p horde_audio
+--profile <p>`. Removing only the bin fingerprint leaves the libraries on the other tree. measure_performance,
+capture_review, capture_motion and package_playtest build through Invoke-HordeBuild (scripts/lib/Native.ps1), which
+reads the exe's dep-info and cleans and rebuilds once when a source is foreign; ab_interface_total cleans its arms.
 Performance evidence: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure_performance.ps1
 -Scene all|peak|progressed-peak|stress|fx-stress -Profile dev|playtest [-VsyncOff] [-Pipelined default|on|off] [-Repeat 3]
 [-ShippedSmoke] [-SaveClone] [-NoBuild] [-NoWaitQuiet] [-QuietTimeoutMinutes 240] builds the review exe, runs every scene at both sizes (all runs every PERF_BUDGET.json run.frames scene, fx-stress

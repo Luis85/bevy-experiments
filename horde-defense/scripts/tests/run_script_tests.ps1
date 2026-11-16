@@ -495,6 +495,87 @@ try {
         Assert-True $threw 'missing playtest build did not throw'
     }
 
+    # A build's uplifted dep-info (closing, release-packaging 1): a tree extracted under the shared target dir and
+    # built there leaves its own sources in this workspace's fingerprint, so the workspace build stays fresh and runs
+    # that tree's code.
+    $depWorkspace = Join-Path $temporary 'dep-ws'
+    $depTarget = Join-Path $depWorkspace 'target'
+    function Write-DepInfo([string]$Path, [string[]]$Sources) {
+        $escaped = @($Sources | ForEach-Object { $_ -replace ' ', '\ ' })
+        Write-Utf8NoBom -Path $Path -Text ("$([IO.Path]::ChangeExtension($Path, '.exe')): $($escaped -join ' ')`n`n")
+    }
+
+    Test-Case 'Get-ForeignBuildSource names sources from outside the workspace or under its target dir' {
+        $depInfo = Join-Path $depTarget 'debug\horde-defense.d'
+        $own = Join-Path $depWorkspace 'crates\horde_game\src\main.rs'
+        $font = Join-Path $depWorkspace 'crates\horde_game\src\../../../assets/fonts/a.ttf'
+        $spaced = Join-Path $depWorkspace 'crates\horde_core\src\with space.rs'
+        $generated = Join-Path $depTarget 'debug\build\horde_core-0123\out\table.rs'
+        $extracted = Join-Path $depTarget 'closing-tests2\src\horde-defense\crates\horde_game\src\main.rs'
+        $outside = Join-Path $temporary 'elsewhere\crates\horde_core\src\lib.rs'
+        Write-DepInfo $depInfo @($own, $font, $spaced, $generated, $extracted, $outside)
+        $foreign = @(Get-ForeignBuildSource -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget)
+        Assert-Equal "$extracted|$outside" ($foreign -join '|') 'the extracted tree and the outside path, in dep-info order'
+        Write-DepInfo $depInfo @($own, $font, $spaced, $generated)
+        Assert-Equal 0 @(Get-ForeignBuildSource -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget).Count 'own sources, a spaced path and OUT_DIR files are not foreign'
+        # rustc writes an example's dep-info relative to the workspace, with one line per output.
+        $relative = 'crates\horde_core\examples\save_clone.rs'
+        Write-Utf8NoBom -Path $depInfo -Text ("${depInfo}: $relative`n`nx.exe: $relative $extracted`n`n${relative}:`n")
+        Assert-Equal $extracted (@(Get-ForeignBuildSource -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget) -join '|') 'a relative source is the workspace''s; each foreign source is named once'
+        # A tree that is itself under the target dir (the A/B script's A arm) owns its sources there.
+        $tree = Join-Path $depTarget 'ab-w1\src'
+        Write-DepInfo $depInfo @((Join-Path $tree 'crates\horde_game\src\main.rs'))
+        Assert-Equal 0 @(Get-ForeignBuildSource -DepInfo $depInfo -Workspace $tree -Target $depTarget).Count 'a tree under the target dir builds its own sources'
+        $threw = $false
+        try { Get-ForeignBuildSource -DepInfo (Join-Path $depTarget 'debug\missing.d') -Workspace $depWorkspace -Target $depTarget | Out-Null } catch { $threw = $_.Exception.Message -match 'missing\.d' }
+        Assert-True $threw 'a missing dep-info throws and names it'
+    }
+
+    Test-Case 'Invoke-HordeBuild cleans the workspace packages and builds again when the build took a foreign tree' {
+        $depInfo = Join-Path $depTarget 'playtest\horde-defense.d'
+        $own = Join-Path $depWorkspace 'crates\horde_game\src\main.rs'
+        $extracted = Join-Path $depTarget 'closing-tests2\src\horde-defense\crates\horde_game\src\main.rs'
+        $script:depCalls = New-Object System.Collections.Generic.List[string]
+        $script:depBuilds = @(@($extracted), @($own))
+        $cargo = {
+            param([string[]]$Arguments, [string]$LogStem, [string]$WorkingDirectory)
+            $script:depCalls.Add(($Arguments -join ' ') + " @ $WorkingDirectory")
+            if ($Arguments[0] -eq 'build') {
+                $next = $script:depBuilds[0]
+                if ($script:depBuilds.Count -gt 1) { $script:depBuilds = @($script:depBuilds[1..($script:depBuilds.Count - 1)]) }
+                Write-DepInfo $depInfo $next
+            }
+        }
+        $build = @('build', '--locked', '-p', 'horde-defense', '--profile', 'playtest')
+        $result = Invoke-HordeBuild -Arguments $build -LogStem (Join-Path $temporary 'logs\dep-build') -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget -Cargo $cargo
+        Assert-Equal ((@(
+                    "build --locked -p horde-defense --profile playtest @ $depWorkspace",
+                    "clean --locked -p horde-defense -p horde_core -p horde_audio --profile playtest @ $depWorkspace",
+                    "build --locked -p horde-defense --profile playtest @ $depWorkspace"
+                )) -join '|') (@($script:depCalls) -join '|') 'build, clean the profile, build again'
+        Assert-True $result.Cleaned 'reports the clean'
+        Assert-Equal $extracted (@($result.Foreign) -join '|') 'reports the first build''s foreign source'
+
+        $script:depCalls.Clear()
+        $script:depBuilds = @(, @($own))
+        $fresh = Invoke-HordeBuild -Arguments @('build', '--locked', '-p', 'horde-defense', '--release') -LogStem (Join-Path $temporary 'logs\dep-fresh') -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget -Cargo $cargo
+        Assert-Equal 1 $script:depCalls.Count 'a build from this tree builds once'
+        Assert-True (-not $fresh.Cleaned) 'and does not clean'
+
+        $script:depCalls.Clear()
+        $script:depBuilds = @(, @($extracted))
+        $message = ''
+        try { Invoke-HordeBuild -Arguments @('build', '--locked', '-p', 'horde-defense', '--release') -LogStem (Join-Path $temporary 'logs\dep-stuck') -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget -Cargo $cargo | Out-Null }
+        catch { $message = $_.Exception.Message }
+        Assert-Equal 'clean --locked -p horde-defense -p horde_core -p horde_audio --profile release' (($script:depCalls[1] -split ' @ ')[0]) '--release cleans the release profile'
+        Assert-True ($message.Contains($extracted)) "a build still foreign after the clean throws and names the source, got [$message]"
+
+        $script:depCalls.Clear()
+        $script:depBuilds = @(@($extracted), @($own))
+        Invoke-HordeBuild -Arguments @('build', '--locked', '-p', 'horde_core', '--example', 'save_clone') -LogStem (Join-Path $temporary 'logs\dep-dev') -DepInfo $depInfo -Workspace $depWorkspace -Target $depTarget -Cargo $cargo | Out-Null
+        Assert-Equal 'clean --locked -p horde-defense -p horde_core -p horde_audio --profile dev' (($script:depCalls[1] -split ' @ ')[0]) 'no profile flag cleans dev'
+    }
+
     Test-Case 'Reset/Restore-LastlightEnv round-trips LASTLIGHT_CONTENT' {
         $env:LASTLIGHT_CONTENT = 'bogus-content-dir'
         [Environment]::SetEnvironmentVariable('LASTLIGHT_SCRIPT_TEST_LEAK', $null, 'Process')

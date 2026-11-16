@@ -196,7 +196,7 @@ $sceneListFile = $null
 $saved = Reset-LastlightEnv
 try {
     if (-not $NoBuild) {
-        Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $tools 'cargo-build') | Out-Null
+        Invoke-HordeBuild -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $tools 'cargo-build') -DepInfo (Join-Path (Resolve-HordeTarget -Workspace $workspace) 'debug\horde-defense.d') -Workspace $workspace | Out-Null
     }
     if ($Executable) {
         $exe = Resolve-WorkspacePath $Executable -Workspace $workspace
