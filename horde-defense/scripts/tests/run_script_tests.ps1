@@ -2010,6 +2010,22 @@ try {
             Assert-True (-not (Test-Path -LiteralPath (Join-Path $folders[-1].FullName 'logs'))) 'no process was started'
         }
 
+        Test-Case 'verify_playtest refuses -NativeCapture on a non-review zip from its manifest, before unpacking or hashing it' {
+            # The real package is about 50 MB: unpacking and hashing it before the refusal took 7 s (closing, W7-02).
+            $root = Join-Path $temporary 'verify-no-review-zip'
+            New-TestPackage $root | Out-Null
+            $zip = New-PlaytestZip -SourceDirectory $root -Destination (Join-Path $temporary 'verify-no-review.zip')
+            $before = @(Get-VerificationFolders).Count
+            $r = Invoke-Verify @('-Package', $zip, '-NativeCapture') 'verify-no-review-zip'
+            $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+            Assert-True ($r.ExitCode -ne 0) "must fail; $log"
+            Assert-True ($log -match 'no review feature') "names the cause; $log"
+            $folders = @(Get-VerificationFolders)
+            Assert-Equal ($before + 1) $folders.Count 'one verification folder'
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $folders[-1].FullName 'unpacked'))) 'nothing was unpacked'
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $folders[-1].FullName 'logs'))) 'no process was started'
+        }
+
         Test-Case 'verify_playtest fails a version 1 manifest, a changed file, a stale stamp and a failed smoke' {
             $root = Join-Path $temporary 'verify-v1'
             New-TestPackage $root | Out-Null

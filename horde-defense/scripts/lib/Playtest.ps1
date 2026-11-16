@@ -261,6 +261,33 @@ function Expand-PlaytestZip {
     [IO.Compression.ZipFile]::ExtractToDirectory([IO.Path]::GetFullPath($Path), [IO.Path]::GetFullPath($Destination))
 }
 
+function Get-PlaytestPackageFeature {
+    # The manifest's features of a package zip (its manifest.json entry) or folder, read without unpacking or hashing
+    # anything, so verify_playtest can refuse -NativeCapture early. $null when there is no readable manifest; the full
+    # checks then report it.
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][string]$Package)
+    $text = $null
+    if ([IO.Path]::GetExtension($Package) -eq '.zip') {
+        $archive = [IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($Package))
+        try {
+            $entry = $archive.GetEntry('manifest.json')
+            if ($null -ne $entry) {
+                $reader = New-Object IO.StreamReader($entry.Open(), (New-Object Text.UTF8Encoding($false)))
+                try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            }
+        }
+        finally { $archive.Dispose() }
+    }
+    else {
+        $path = Join-Path $Package 'manifest.json'
+        if (Test-Path -LiteralPath $path -PathType Leaf) { $text = [IO.File]::ReadAllText($path) }
+    }
+    if ($null -eq $text) { return $null }
+    try { $manifest = $text | ConvertFrom-Json } catch { return $null }
+    return , @($manifest.features | ForEach-Object { [string]$_ })
+}
+
 function Test-PackageIntegrity {
     # The manifest's file list against the unpacked package: every listed file is inside the package with the listed
     # size and SHA-256, and nothing but manifest.json is unlisted. Returns one line per problem.

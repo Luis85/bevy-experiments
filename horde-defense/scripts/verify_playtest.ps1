@@ -3,7 +3,8 @@
 # PowerShell 5.1. Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_playtest.ps1 -Package <zip>
 # In order: zip entry safety, unpack, manifest file integrity, the manifest v2 rules (commit, game version, curated
 # docs), the packed executable's --version against the manifest stamp, then its --smoke. -NativeCapture also takes
-# one review still; it needs a package built with -Review and is refused, before anything is launched, otherwise.
+# one review still; it needs a package built with -Review and is refused otherwise, from the manifest before the
+# package is unpacked or anything is launched.
 # Prints 'PASS: ...' and the verification folder; any failure throws (exit code 1).
 [CmdletBinding()]
 param(
@@ -22,6 +23,13 @@ $packagePath = (Resolve-Path -LiteralPath $Package).ProviderPath
 $verificationRoot = Join-Path (Resolve-HordeTarget -Workspace $workspace) ('playtest-verification\' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $verificationRoot | Out-Null
 $logs = Join-Path $verificationRoot 'logs'
+# A build without the review feature ignores the capture variables and opens the ordinary game, which never exits.
+$noReview = 'This package has no review feature, so -NativeCapture cannot run (build it with package_playtest.ps1 -Review)'
+# Refused from the manifest alone, before a 50 MB zip is unpacked and hashed; the check after the integrity pass stays.
+if ($NativeCapture) {
+    $declared = Get-PlaytestPackageFeature -Package $packagePath
+    if ($null -ne $declared -and @($declared) -notcontains 'review') { throw $noReview }
+}
 
 if ([IO.Path]::GetExtension($packagePath) -eq '.zip') {
     $bundle = Join-Path $verificationRoot 'unpacked'
@@ -38,10 +46,7 @@ if ($integrity.Count -gt 0) { throw "Package integrity failed:`n$($integrity -jo
 $rules = @(Test-PlaytestManifest -Manifest $manifest -PackageRoot $bundle -GameVersion (Get-WorkspaceVersion -Workspace $workspace))
 if ($rules.Count -gt 0) { throw "Package manifest failed:`n$($rules -join "`n")" }
 $features = @($manifest.features | ForEach-Object { [string]$_ })
-# A build without the review feature ignores the capture variables and opens the ordinary game, which never exits.
-if ($NativeCapture -and $features -notcontains 'review') {
-    throw 'This package has no review feature, so -NativeCapture cannot run (build it with package_playtest.ps1 -Review)'
-}
+if ($NativeCapture -and $features -notcontains 'review') { throw $noReview }
 
 $game = Join-Path $bundle 'Lastlight.exe'
 $saved = Reset-LastlightEnv
