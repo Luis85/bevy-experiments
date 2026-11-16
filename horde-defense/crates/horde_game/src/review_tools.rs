@@ -11,12 +11,19 @@ use bevy::{
     render::view::screenshot::{Screenshot, save_to_disk},
     window::PrimaryWindow,
 };
-use bevy_egui::EguiPrimaryContextPass;
+use bevy_egui::{EguiInput, EguiPreUpdateSet, EguiPrimaryContextPass};
 
 pub struct ReviewToolsPlugin;
 impl Plugin for ReviewToolsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ui::ReviewFrameFacts>()
+            .add_systems(
+                PreUpdate,
+                drop_capture_pointer
+                    .after(EguiPreUpdateSet::ProcessInput)
+                    .before(EguiPreUpdateSet::BeginPass)
+                    .run_if(|config: Res<LaunchConfig>| config.review_capture()),
+            )
             .add_systems(
                 Update,
                 (automated_capture, capture_sequence::capture_frames),
@@ -46,6 +53,15 @@ impl Plugin for ReviewToolsPlugin {
                 diagnostics::capture_performance.after(diagnostics::PerfSet::CloseFrame),
             );
         }
+    }
+}
+
+/// CF-3-18: a review capture's egui contexts lose the OS pointer each frame,
+/// after bevy_egui has written the frame's input and before the pass begins,
+/// so where the mouse sat never reaches a still or a frame sequence.
+fn drop_capture_pointer(mut inputs: Query<&mut EguiInput>) {
+    for mut input in &mut inputs {
+        ui::drop_os_pointer(&mut input.0);
     }
 }
 
@@ -306,6 +322,89 @@ mod tests {
             !unordered,
             "capture_performance and close_frame are unordered"
         );
+    }
+
+    /// CF-3-18: `ReviewToolsPlugin` drops the pointer bevy_egui wrote into a
+    /// context's input before that context's pass begins, on a still and on a
+    /// frame-sequence capture; an interactive review keeps it. The stand-ins
+    /// write a pointer move and a key in `ProcessInput` and record what
+    /// `BeginPass` would hand egui, in the set order `EguiPlugin` configures.
+    #[test]
+    fn review_captures_drop_the_os_pointer_before_the_egui_pass() {
+        use crate::launch::ReviewOptions;
+        use bevy_egui::egui;
+        #[derive(Resource, Default)]
+        struct Seen(Vec<egui::Event>);
+        let key = egui::Event::Key {
+            key: egui::Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let moved = egui::Event::PointerMoved(egui::pos2(200.0, 300.0));
+        for (name, review, dropped) in [
+            (
+                "still capture",
+                ReviewOptions {
+                    capture: Some("headless-review-capture.png".into()),
+                    exit: true,
+                    ..ReviewOptions::default()
+                },
+                true,
+            ),
+            (
+                "sequence capture",
+                ReviewOptions {
+                    motion: true,
+                    sequence: Some("headless-review-sequence".into()),
+                    ..ReviewOptions::default()
+                },
+                true,
+            ),
+            ("interactive review", ReviewOptions::default(), false),
+        ] {
+            let mut app = App::new();
+            app.insert_resource(LaunchConfig {
+                scenario: Some("skills-firearms-column".into()),
+                review: Some(review),
+                ..LaunchConfig::default()
+            })
+            .init_resource::<Seen>()
+            .configure_sets(
+                PreUpdate,
+                (EguiPreUpdateSet::ProcessInput, EguiPreUpdateSet::BeginPass).chain(),
+            )
+            .add_plugins(ReviewToolsPlugin);
+            let (k, m) = (key.clone(), moved.clone());
+            app.add_systems(
+                PreUpdate,
+                (move |mut inputs: Query<&mut EguiInput>| {
+                    for mut input in &mut inputs {
+                        input.events.extend([m.clone(), k.clone()]);
+                    }
+                })
+                .in_set(EguiPreUpdateSet::ProcessInput),
+            )
+            .add_systems(
+                PreUpdate,
+                (|inputs: Query<&EguiInput>, mut seen: ResMut<Seen>| {
+                    for input in &inputs {
+                        seen.0.extend(input.events.iter().cloned());
+                    }
+                })
+                .in_set(EguiPreUpdateSet::BeginPass),
+            );
+            app.world_mut().spawn(EguiInput::default());
+            app.world_mut().run_schedule(PreUpdate);
+            let seen = &app.world().resource::<Seen>().0;
+            let expected = if dropped {
+                vec![key.clone(), egui::Event::PointerGone]
+            } else {
+                vec![moved.clone(), key.clone()]
+            };
+            assert_eq!(seen, &expected, "{name}");
+        }
     }
 
     /// A6-18: the cue log on disk is the header plus one line per recorded

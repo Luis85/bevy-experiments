@@ -3698,3 +3698,145 @@ fn battle_stills_draw_the_same_popups_at_full_strength_in_both_modes() {
     }
     assert!(drawn > 0, "no Battle still drew a damage pop-up");
 }
+
+/// Three headless frames of the staged `scene` at `size` points and `scale` on
+/// a fresh context, every frame given `events`, run through the review
+/// capture's pointer filter when `drop` is set; returns the last frame.
+fn pointer_frames(
+    scene: &str,
+    size: egui::Vec2,
+    scale: f32,
+    events: &[egui::Event],
+    drop: bool,
+) -> egui::FullOutput {
+    let mut f = staged(scene);
+    assert!(f.launch.review_capture(), "{scene}: staged as a capture");
+    f.settings.scale = scale;
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    crate::settings::configure(&ctx, scale);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    let mut output = None;
+    for _ in 0..3 {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+            events: events.to_vec(),
+            ..egui::RawInput::default()
+        };
+        if drop {
+            drop_os_pointer(&mut input);
+        }
+        let mut frame = ctx.run_ui(input, |ui| {
+            crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0)
+        });
+        frame.textures_delta.clear();
+        output = Some(frame);
+    }
+    output.expect("three frames")
+}
+
+/// CF-3-18: a review capture's frames never see the OS pointer, so a still
+/// paints the same wherever the mouse sat during the run. The closing
+/// reduced skills-firearms-column-small still drew the toolbar's floating
+/// scroll bar expanded in amber (pixels 38-978 x 440-466 at 1050x700@1.35)
+/// because the mouse rested over it; the normal still did not. With the
+/// capture's filter, a pointer resting or wheeling anywhere over the scene
+/// (that toolbar spot included) paints exactly the frame with no pointer, at
+/// both sizes. The perturbation half: unfiltered, the same pointer does
+/// change the paint, so the comparison has teeth.
+#[test]
+fn review_capture_paints_the_same_whatever_the_os_pointer() {
+    const SCENE: &str = "skills-firearms-column";
+    let wheel = egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(-40.0, -40.0),
+        phase: egui::TouchPhase::Move,
+        modifiers: egui::Modifiers::NONE,
+    };
+    for (size, scale) in [
+        (egui::vec2(1440.0, 900.0), 1.0),
+        (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+    ] {
+        let still = pointer_frames(SCENE, size, scale, &[], false).shapes;
+        // The toolbar scroll bar of the closing still, in points.
+        let mut points = vec![egui::pos2(500.0, 453.0) / scale];
+        for column in 0..6 {
+            for row in 0..4 {
+                points.push(egui::pos2(
+                    size.x * (column as f32 + 0.5) / 6.0,
+                    size.y * (row as f32 + 0.5) / 4.0,
+                ));
+            }
+        }
+        let mut perturbed = 0;
+        for point in points {
+            for events in [
+                vec![egui::Event::PointerMoved(point)],
+                vec![egui::Event::PointerMoved(point), wheel.clone()],
+            ] {
+                let filtered = pointer_frames(SCENE, size, scale, &events, true).shapes;
+                assert!(
+                    filtered == still,
+                    "scale {scale}: a capture with the pointer at {point:?} ({} events) \
+                     painted another frame than with no pointer",
+                    events.len()
+                );
+                if pointer_frames(SCENE, size, scale, &events, false).shapes != still {
+                    perturbed += 1;
+                }
+            }
+        }
+        assert!(
+            perturbed > 0,
+            "scale {scale}: the unfiltered pointer never changed the paint"
+        );
+    }
+}
+
+/// CF-3-18: the filter drops every pointer event, reports the pointer gone
+/// and keeps the keyboard and text input.
+#[test]
+fn drop_os_pointer_keeps_only_non_pointer_events() {
+    let key = egui::Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    let text = egui::Event::Text("a".into());
+    let mut input = egui::RawInput {
+        events: vec![
+            egui::Event::PointerMoved(egui::pos2(10.0, 10.0)),
+            key.clone(),
+            egui::Event::MouseMoved(egui::vec2(1.0, 1.0)),
+            egui::Event::PointerButton {
+                pos: egui::pos2(10.0, 10.0),
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: egui::Modifiers::NONE,
+            },
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, 1.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::NONE,
+            },
+            egui::Event::Zoom(1.1),
+            egui::Event::Rotate(0.1),
+            egui::Event::Touch {
+                device_id: egui::TouchDeviceId(0),
+                id: egui::TouchId(0),
+                phase: egui::TouchPhase::Start,
+                pos: egui::pos2(10.0, 10.0),
+                force: None,
+            },
+            text.clone(),
+        ],
+        ..egui::RawInput::default()
+    };
+    drop_os_pointer(&mut input);
+    assert_eq!(input.events, vec![key, text, egui::Event::PointerGone]);
+}

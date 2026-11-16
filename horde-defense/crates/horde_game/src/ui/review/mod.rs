@@ -315,7 +315,8 @@ impl crate::launch::LaunchConfig {
     /// the field keeps the scene's pinned aim and draws no hover reticle or
     /// inspector, so two captures of one scene differ only by the change
     /// under review. An interactive review and practice keep the pointer.
-    pub(super) fn review_capture(&self) -> bool {
+    /// egui never sees it either (CF-3-18, [`drop_os_pointer`]).
+    pub(crate) fn review_capture(&self) -> bool {
         self.review.is_some()
             && !self.practice
             && (self.capture_path().is_some() || self.sequence_path().is_some())
@@ -363,6 +364,31 @@ impl crate::launch::LaunchConfig {
             self.practice,
         )
     }
+}
+
+/// CF-3-18: a review capture's egui input without the OS pointer. The pointer
+/// events (moves, buttons, wheel, touch, pinch) are dropped and the pointer is
+/// reported gone, so no widget hovers, no floating scroll bar expands and no
+/// area scrolls: a capture paints what it paints with no pointer, wherever
+/// the mouse sat during the run. Keys and text still pass. The review tools
+/// apply it to every frame of a `review_capture` launch.
+#[cfg(any(test, feature = "review"))]
+pub(crate) fn drop_os_pointer(input: &mut bevy_egui::egui::RawInput) {
+    use bevy_egui::egui::Event;
+    input.events.retain(|event| {
+        !matches!(
+            event,
+            Event::PointerMoved(_)
+                | Event::MouseMoved(_)
+                | Event::PointerButton { .. }
+                | Event::PointerGone
+                | Event::MouseWheel { .. }
+                | Event::Zoom(_)
+                | Event::Rotate(_)
+                | Event::Touch { .. }
+        )
+    });
+    input.events.push(Event::PointerGone);
 }
 
 /// Review-only presentation override. Persistent and ordinary profiles keep
