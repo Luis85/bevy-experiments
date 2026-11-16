@@ -1090,3 +1090,17 @@ pub(crate) fn filter_heading(head: &str, count: usize) -> String {
         format!("{head}: {count} resident{plural}")
     }
 }
+
+/// How far to scroll the ledger (logical px, down positive) so an open
+/// card, `card` = (top, bottom), shows in the visible `area` = (top,
+/// bottom): the whole card when it fits, its bottom just in view; a card
+/// taller than the area starts at the area's top, so its head is read
+/// first; a card already in view stays.
+pub(crate) fn card_scroll(area: (f32, f32), card: (f32, f32)) -> f32 {
+    let (area_top, area_bottom) = area;
+    let (top, bottom) = card;
+    if bottom - top > area_bottom - area_top || top < area_top {
+        return top - area_top;
+    }
+    (bottom - area_bottom).max(0.0)
+}

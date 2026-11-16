@@ -843,5 +843,49 @@ mod debug_tools {
         if let Some(path) = &args.record {
             record_from_startup(app, "island_game", path.clone());
         }
+        if let Some(path) = std::env::var_os("ISLAND_FRAME_LOG") {
+            install_frame_log(app, path.into());
+        }
+    }
+
+    /// Review aid (`ISLAND_FRAME_LOG=FILE`): one CSV line per frame, the
+    /// frame's real time in ms, the sim tick after it, the speed and whether
+    /// the clock is stopped. Reads only; for measuring smoothness at speed.
+    fn install_frame_log(app: &mut App, path: std::path::PathBuf) {
+        use std::io::Write;
+        let Ok(file) = std::fs::File::create(&path) else {
+            warn!("island frame log: cannot write {}", path.display());
+            return;
+        };
+        let mut out = std::io::BufWriter::new(file);
+        let _ = writeln!(out, "frame_ms,tick,speed,stopped");
+        app.insert_resource(FrameLog(out))
+            .add_systems(Last, write_frame_log);
+    }
+
+    #[derive(Resource)]
+    struct FrameLog(std::io::BufWriter<std::fs::File>);
+
+    fn write_frame_log(
+        time: Res<Time<Real>>,
+        clock: Option<Res<npc_framework::prelude::SimClock>>,
+        control: Res<npc_framework::prelude::SimControl>,
+        mut log: ResMut<FrameLog>,
+        mut frames: Local<u32>,
+    ) {
+        use std::io::Write;
+        let tick = clock.map_or(0, |clock| clock.tick);
+        let _ = writeln!(
+            log.0,
+            "{:.3},{tick},{},{}",
+            time.delta_secs_f64() * 1000.0,
+            control.multiplier,
+            u8::from(control.is_stopped())
+        );
+        // Written out about once a second, so a killed run keeps its lines.
+        *frames += 1;
+        if frames.is_multiple_of(60) {
+            let _ = log.0.flush();
+        }
     }
 }

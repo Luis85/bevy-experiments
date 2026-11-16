@@ -824,9 +824,74 @@ fn bring_card_into_view(world: &mut World) {
         if !measured {
             return;
         }
-        world.trigger(bevy::ui_widgets::ScrollIntoView { entity: card });
+        // The whole card when it fits (its later lines, who makes the good
+        // and what is held up for it, were left below the fold), else its
+        // head at the top; the head alone when the parts are not measured.
+        if !scroll_card_into_view(world, card) {
+            world.trigger(bevy::ui_widgets::ScrollIntoView { entity: card });
+        }
     }
     world.resource_mut::<Ledger>().scrolled_good = good;
+}
+
+/// The parts of an open good card after its head: the rest of its lines,
+/// its bars, its links and the Compact fold.
+fn card_part(key: &str) -> bool {
+    key.starts_with("stock_detail")
+        || key.starts_with("stock_spark_")
+        || key.starts_with("stock_maker_")
+        || key.starts_with("stock_without_")
+        || key.starts_with("stock_more_")
+}
+
+/// The top and bottom of a laid-out node, in logical px.
+fn span(world: &World, entity: Entity) -> Option<(f32, f32)> {
+    let node = world.get::<ComputedNode>(entity)?;
+    let at = world.get::<bevy::ui::UiGlobalTransform>(entity)?;
+    let height = node.size().y * node.inverse_scale_factor();
+    if height <= 0.0 {
+        return None;
+    }
+    let centre = at.translation.y * node.inverse_scale_factor();
+    Some((centre - height / 2.0, centre + height / 2.0))
+}
+
+/// Scroll the ledger so the open card, from `head` to its last part, is in
+/// view (`model::card_scroll`). False when the parts are not laid out yet.
+fn scroll_card_into_view(world: &mut World, head: Entity) -> bool {
+    let parts: Vec<Entity> = world
+        .resource::<Ledger>()
+        .rows
+        .iter()
+        .filter(|(key, _)| card_part(key))
+        .map(|(_, entity)| *entity)
+        .collect();
+    let Some((top, _)) = span(world, head) else {
+        return false;
+    };
+    let mut bottom = f32::MIN;
+    for part in parts {
+        match span(world, part) {
+            Some((_, low)) => bottom = bottom.max(low),
+            None => return false,
+        }
+    }
+    let Some((body, area)) = world
+        .query_filtered::<Entity, With<LedgerBody>>()
+        .iter(world)
+        .next()
+        .and_then(|body| Some((body, span(world, body)?)))
+    else {
+        return false;
+    };
+    let Some(node) = world.get::<ComputedNode>(body) else {
+        return false;
+    };
+    let most = (node.content_size().y - node.size().y).max(0.0) * node.inverse_scale_factor();
+    if let Some(mut scroll) = world.get_mut::<ScrollPosition>(body) {
+        scroll.y = (scroll.y + model::card_scroll(area, (top, bottom))).clamp(0.0, most);
+    }
+    true
 }
 
 /// [`queue`] for an order of "Your orders": it is remembered until the

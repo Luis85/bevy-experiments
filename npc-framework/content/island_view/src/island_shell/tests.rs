@@ -934,3 +934,32 @@ fn a_toast_with_a_button_is_not_replaced_until_it_expires() {
         ))
     );
 }
+
+#[test]
+fn a_toast_in_a_narrow_lane_caps_its_words_to_the_lane() {
+    // No layout yet: nothing is capped.
+    assert_eq!(toast_words_room(0.0, None), None);
+    // 1024 wide beside an open column (a lane of 362): the words get what
+    // the padding, border, icon and gap leave; a button takes its share.
+    assert_eq!(toast_words_room(362.0, None), Some(308.0));
+    assert_eq!(toast_words_room(362.0, Some(100.0)), Some(200.0));
+    // Never squeezed to nothing.
+    assert_eq!(toast_words_room(90.0, Some(100.0)), Some(80.0));
+
+    // The host toast's words carry the cap once the lane is known.
+    let mut app = fixture(true);
+    app.world_mut().resource_mut::<ShellState>().lane_width = 362.0;
+    let slot = app.world_mut().spawn((HostToastSlot, Node::default())).id();
+    host_toast(
+        app.world_mut(),
+        ToastTone::Failed,
+        "Behaviour not changed: the file is not a behaviour document.\nDetails: key must be a string",
+        true,
+        false,
+    );
+    refresh_host_toast(app.world_mut(), false, 0.0);
+    let toast = app.world().get::<Children>(slot).unwrap()[0];
+    let words = *app.world().get::<Children>(toast).unwrap().last().unwrap();
+    assert!(app.world().get::<ToastWords>(words).is_some());
+    assert_eq!(app.world().get::<Node>(words).unwrap().max_width, px(308.0));
+}

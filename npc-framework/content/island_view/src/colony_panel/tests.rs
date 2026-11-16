@@ -1704,3 +1704,18 @@ fn a_people_filter_heading_counts_its_residents_once() {
         "3 residents in Harbour are starving: 2 residents"
     );
 }
+
+#[test]
+fn an_open_card_is_scrolled_into_view_whole_when_it_fits() {
+    // The visible ledger runs from 150 to 630.
+    let area = (150.0, 630.0);
+    // Its head showed at 500 and its "Nobody makes" line at 760: the card
+    // moves up until its last part is in view, its head still in sight.
+    assert_eq!(model::card_scroll(area, (500.0, 760.0)), 130.0);
+    // Already in view: no scroll.
+    assert_eq!(model::card_scroll(area, (200.0, 600.0)), 0.0);
+    // Taller than the area: its head at the top.
+    assert_eq!(model::card_scroll(area, (500.0, 1200.0)), 350.0);
+    // Above the area (scrolled past): back down to its head.
+    assert_eq!(model::card_scroll(area, (100.0, 300.0)), -50.0);
+}

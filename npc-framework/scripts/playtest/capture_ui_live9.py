@@ -806,7 +806,8 @@ def nobody_makes(flow, report, checks):
                 break
         if good:
             flow.dump("flour-card-nobody")
-            flow.size_shots("state-nobody-no-place", prepare=lambda size: open_card(flow, "Flour"))
+            flow.size_shots("state-nobody-no-place", prepare=lambda size: (
+                open_card(flow, "Flour"), card_line_in_view(flow, "Nobody makes", size)))
             want(flow, settlement_id(flow), "miller", 1)
             goods_page(flow)
             press(flow, "Harbour")
@@ -818,7 +819,9 @@ def nobody_makes(flow, report, checks):
                    "ok": link is not None, "good": good, "nobody": nobody})
     if good:
         flow.dump("nobody-card")
-        flow.size_shots("state-nobody-card", prepare=lambda size: open_card(flow, good))
+        # Line 9 sits low in the card: the wheel brings it into view.
+        flow.size_shots("state-nobody-card", prepare=lambda size: (
+            open_card(flow, good), card_line_in_view(flow, "Nobody makes", size)))
     # The narrow ledger: Compact, where the card folds after its first lines.
     card_good = good or "Flour"
     open_card(flow, card_good)
@@ -886,6 +889,43 @@ def wheel_into_view(flow, entity, lowest=560):
     return False
 
 
+def wheel_to(flow, entity, lowest=560, size=SIZES[0]):
+    """Scroll the panel under `entity` with the mouse wheel, as a player
+    would, until the entity's centre is between the bar and `lowest`
+    (logical px): the pointer rests over the panel, then wheel lines are
+    sent one at a time. True when it is in view."""
+    for _ in range(30):
+        try:
+            x, y = flow.centre(entity)
+        except RuntimeError:
+            return False
+        if 150 < y < lowest:
+            return True
+        flow.cursor(x, min(max(y, 200), size[1] - 140))
+        time.sleep(0.2)
+        # The picking pointer reads the wheel from the window's own events
+        # (`WindowEvent::MouseWheel`); a bare `MouseWheel` message reaches
+        # only systems that read it directly, never a scroll area.
+        flow.call("world.write_message", {"message": "bevy_window::event::WindowEvent",
+                  "value": {"MouseWheel": {"unit": "Line", "x": 0.0,
+                                           "y": -1.0 if y >= lowest else 1.0,
+                                           "window": flow.window, "phase": "Moved"}}})
+        time.sleep(0.3)
+    return False
+
+
+def card_line_in_view(flow, start, size=SIZES[0]):
+    """The ledger's text that starts with `start` scrolled into view by the
+    wheel; its entity, or None."""
+    entity = text_entity(flow, start, LEDGER)
+    if entity is None:
+        return None
+    if not wheel_to(flow, entity, lowest=size[1] - 180, size=size):
+        wheel_into_view(flow, entity, lowest=size[1] - 180)
+    time.sleep(0.5)
+    return entity
+
+
 def held_up(flow, report, checks):
     continue_oversee(flow)
     found, tried = None, []
@@ -912,12 +952,13 @@ def held_up(flow, report, checks):
         return
     good = found[0]
     flow.dump("held-up-card")
-    flow.size_shots("state-held-up-card", prepare=lambda size: open_card(flow, good))
-    entity = text_entity(flow, "Held up", LEDGER)
+    # The line sits low in the card: the wheel over the ledger brings it
+    # into view, as a player would scroll to it.
+    flow.size_shots("state-held-up-card", prepare=lambda size: (
+        open_card(flow, good), card_line_in_view(flow, "Held up", size)))
+    open_card(flow, good)
+    entity = card_line_in_view(flow, "Held up")
     if entity:
-        # The line sits low in the card: the wheel over the ledger brings it
-        # into view first, as a player would scroll to it.
-        wheel_into_view(flow, entity)
         flow.hover(entity)
         flow.dump("held-up-tip")
         tip = [text for text in flow.texts() if str(text).startswith("Since ")]

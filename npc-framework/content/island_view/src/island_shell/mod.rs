@@ -202,6 +202,61 @@ pub(crate) struct ShellState {
     second_row: bool,
     /// Totals on the bar at the last refresh: more than five crowd it.
     totals_shown: usize,
+    /// The toast lane's width in logical px (0 before the first layout).
+    lane_width: f32,
+}
+
+/// The words of a toast in the lane (the host's or a notice), whose width
+/// is capped to what the lane leaves them ([`fit_toast_words`]).
+#[derive(Component)]
+struct ToastWords;
+
+/// The room a toast leaves its words beside them, in logical px: the
+/// padding and border (2 × 14 + 2), the icon (16) and its gap (8), and a
+/// button with its gap when there is one.
+fn toast_words_room(lane: f32, button: Option<f32>) -> Option<f32> {
+    if lane <= 0.0 {
+        return None;
+    }
+    let room = lane - 30.0 - 16.0 - 8.0 - button.map_or(0.0, |width| width + 8.0);
+    Some(room.max(80.0))
+}
+
+/// A wrapped toast's words are measured at their full width unless their
+/// own width is capped: the box then keeps one line's height while two or
+/// three show (seen at 1024 wide beside an open column). The words get a
+/// `max_width` of what the lane leaves them, so they are measured wrapped.
+fn fit_toast_words(world: &mut World) {
+    let lane = world.resource::<ShellState>().lane_width;
+    let words: Vec<(Entity, Option<f32>)> = world
+        .query_filtered::<(Entity, &ChildOf), With<ToastWords>>()
+        .iter(world)
+        .map(|(entity, parent)| (entity, parent.parent()))
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|(entity, toast)| {
+            // A button in the toast (after the words): its laid-out width.
+            let button = world
+                .get::<Children>(toast)
+                .and_then(|children| {
+                    let at = children.iter().position(|child| child == entity)?;
+                    children.get(at + 1).copied()
+                })
+                .and_then(|button| world.get::<ComputedNode>(button))
+                .map(|node| node.size.x * node.inverse_scale_factor);
+            (entity, button)
+        })
+        .collect();
+    for (entity, button) in words {
+        let Some(room) = toast_words_room(lane, button) else {
+            continue;
+        };
+        if let Some(mut node) = world.get_mut::<Node>(entity)
+            && node.max_width != px(room)
+        {
+            node.max_width = px(room);
+        }
+    }
 }
 
 pub(crate) fn plugin(app: &mut App) {
@@ -830,7 +885,7 @@ fn spawn(world: &mut World) {
         .get::<Children>(notice)
         .and_then(|children| children.last().copied())
         .expect("toast text");
-    world.entity_mut(text).insert(NoticeText);
+    world.entity_mut(text).insert((NoticeText, ToastWords));
     w::show(world, notice, false);
     world.spawn((
         ChildOf(lane),
@@ -1358,6 +1413,12 @@ fn refresh_host_toast(world: &mut World, gated: bool, delta: f32) {
             if let Some((tone, button, text)) = &wanted {
                 let (status, picture) = toast_look(*tone);
                 let toast = w::toast(world, *slot, status, text, Some(picture));
+                if let Some(words) = world
+                    .get::<Children>(toast)
+                    .and_then(|children| children.last().copied())
+                {
+                    world.entity_mut(words).insert(ToastWords);
+                }
                 if let Some(label) = button {
                     w::button(
                         world,
@@ -1375,6 +1436,7 @@ fn refresh_host_toast(world: &mut World, gated: bool, delta: f32) {
     for slot in slots {
         w::show(world, slot, wanted.is_some() && !gated);
     }
+    fit_toast_words(world);
 }
 
 /// Show a sentence as a toast under the bar for a few seconds.
@@ -1593,6 +1655,7 @@ fn refresh_totals(world: &mut World, shown: bool, class: LayoutClass) {
             node.right = px(right);
         }
     }
+    world.resource_mut::<ShellState>().lane_width = (width - left - right).max(0.0);
     if !shown {
         return;
     }
