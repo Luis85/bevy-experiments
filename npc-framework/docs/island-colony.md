@@ -110,12 +110,14 @@ opens the last page; the ledger's own tabs and **F1** to **F5** reach the rest.
 The profession table lists every trade of a settlement with how many work it
 now, the overseer's wanted number, and, when they differ, why in one
 sentence: a seat is missing ("build another pottery"), nobody here has the
-aptitude, the last worker of an essential trade stays, or residents will move
-at their next review. **+** and **-** set the wanted number
+aptitude, or residents will move at their next review. **+** and **-** set the wanted number
 (`SetProfessionTarget`); clearing it lets the village decide again. A target
 is a wish, not an order: residents move toward it through the usual trade
 changes, one review at a time, never in the middle of a task, and a trade at
-its target takes nobody new. The inn is kept one keeper per inn and has no
+its target takes nobody new, not even an empty essential seat. A worker over
+the target takes any open seat of a trade below its own target at the next
+review, the last worker of an essential trade too (a target of 0 empties the
+trade). The inn is kept one keeper per inn and has no
 target.
 
 Priorities set **low**, **normal** or **high** on housing, storage,

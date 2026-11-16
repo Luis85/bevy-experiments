@@ -70,7 +70,7 @@ fn unfunded_wants_do_not_become_orders_or_unsellable_production() {
         clear(&mut app, e);
         app.world_mut().get_mut::<Wallet>(e).unwrap().coins = 0;
     }
-    production::refresh(app.world_mut());
+    production::refresh_all(app.world_mut());
     let plan = app.world().resource::<production::ProductionPlan>();
     assert!(
         plan.procurement
@@ -117,7 +117,7 @@ fn finite_working_cash_funds_complete_joined_inputs_instead_of_one_stranded_stoc
     // After reserving her own garment, this purse supports one complete
     // leather+thread bundle, not the whole village's wardrobe at once.
     app.world_mut().get_mut::<Wallet>(tailor).unwrap().coins = 80;
-    production::refresh(app.world_mut());
+    production::refresh_all(app.world_mut());
     let leather = production::desired_stock(app.world(), tailor, catalog::LEATHER);
     let thread = production::desired_stock(app.world(), tailor, catalog::THREAD);
     assert!(
@@ -183,7 +183,7 @@ fn partial_bread_reserves_keep_a_funded_preferred_meal_request() {
     clear(&mut app, buyer);
     economy::grant(app.world_mut(), buyer, Item::new("bread"));
     economy::grant(app.world_mut(), buyer, Item::new(catalog::WATER).stack(16));
-    production::refresh(app.world_mut());
+    production::refresh_all(app.world_mut());
     assert!(
         production::desired_stock(app.world(), buyer, catalog::COOKED_MEAL) > 0,
         "one bread must not cover a two-day forecast of {} ticks: {:?}",

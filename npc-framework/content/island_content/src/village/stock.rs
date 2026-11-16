@@ -3,10 +3,12 @@
 //! start another batch.
 //!
 //! - **Daily use.** Water and food from the residents' need decay (as
-//!   [`super::view::daily_use`] reports it); every other good from the
-//!   recent trade volume: an integer moving sum of the units sold in the
-//!   settlement over the last `trade_window_rounds` market rounds, kept in
-//!   the hashed [`TradeVolume`].
+//!   [`super::view::daily_use`] reports it, each food's share following what
+//!   was eaten); every other good from the recent trade volume: an integer
+//!   moving sum of the units sold in the settlement over the last
+//!   `trade_window_rounds` buckets of an eighth of a day each (3 days), kept
+//!   in the hashed [`TradeVolume`]. The buckets close on the clock
+//!   ([`tick`]), not with the market round, which is capped at 300 ticks.
 //! - **Stock target.** `stock_target_days` of that use. A crop's harvest good
 //!   also keeps the field's own target (`stock_per_resident`), since it is
 //!   grown once a season and must last until the next harvest.
@@ -23,16 +25,17 @@ use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Units sold per settlement and good, one entry per market round.
+/// Units sold per settlement and good, one entry per bucket (an eighth of a
+/// day).
 type Round = BTreeMap<SimId, BTreeMap<String, u32>>;
 
 /// Recent trade volume by settlement, the moving sum behind the daily use of
 /// goods that are not eaten or drunk.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub struct TradeVolume {
-    /// Units sold since the last market round.
+    /// Units sold since the last bucket closed.
     pub pending: Round,
-    /// The last rounds, oldest first; at most `trade_window_rounds`.
+    /// The last buckets, oldest first; at most `trade_window_rounds`.
     pub rounds: Vec<Round>,
 }
 fn hash_round(h: &mut Fnv64, round: &Round) {
@@ -60,13 +63,13 @@ impl SimHashResource for TradeVolume {
     }
 }
 
-/// Food eaten per settlement and good, one entry per market round, over the
-/// same window as [`TradeVolume`]: the share of each food in a settlement's
+/// Food eaten per settlement and good, one entry per bucket, over the same
+/// window as [`TradeVolume`]: the share of each food in a settlement's
 /// daily use (`view::daily_use`) follows what its people actually ate, so a
 /// food held in plenty does not grow its own target (closing fix).
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub struct FoodEaten {
-    /// Units eaten since the last market round.
+    /// Units eaten since the last bucket closed.
     pub pending: Round,
     /// The last rounds, oldest first; at most `trade_window_rounds`.
     pub rounds: Vec<Round>,
@@ -154,7 +157,28 @@ pub(super) fn record(world: &mut World, seller: Entity, kind: &str, units: u32) 
     *entry = entry.saturating_add(units);
 }
 
-/// Closes a market round: the pending sales join the window.
+/// Ticks of one bucket of the trade and food windows: an eighth of a day,
+/// whatever the market round is (S4 fix: the windows closed with the market
+/// round, which is capped at 300 ticks, so at the shipped 24,000-tick day the
+/// 24-bucket window covered 0.3 day instead of 3, and the sleep block left
+/// most of it without a meal).
+pub fn bucket_ticks(world: &World) -> u64 {
+    (world.resource::<SimConfig>().day_length / BUCKETS_PER_DAY).max(1)
+}
+
+/// Buckets in a day.
+pub const BUCKETS_PER_DAY: u64 = 8;
+
+/// Closes a bucket of the trade and food windows every [`bucket_ticks`].
+/// Called every tick in the island's Effects pass.
+pub(super) fn tick(world: &mut World) {
+    let now = world.resource::<SimClock>().tick;
+    if now > 0 && now.is_multiple_of(bucket_ticks(world)) {
+        close_round(world);
+    }
+}
+
+/// Closes a bucket: the pending sales and meals join the window.
 pub(super) fn close_round(world: &mut World) {
     if !world.contains_resource::<TradeVolume>() {
         return;
@@ -173,7 +197,8 @@ pub(super) fn close_round(world: &mut World) {
     }
 }
 
-/// Units of `kind` sold in a settlement per day, from the moving sum.
+/// Units of `kind` sold in a settlement per day, from the moving sum of the
+/// closed buckets (eight a day).
 pub fn volume_per_day(world: &World, settlement: SimId, kind: &str) -> u32 {
     let Some(volume) = world.get_resource::<TradeVolume>() else {
         return 0;
@@ -187,20 +212,29 @@ pub fn volume_per_day(world: &World, settlement: SimId, kind: &str) -> u32 {
         .filter_map(|round| round.get(&settlement)?.get(kind))
         .map(|units| u64::from(*units))
         .sum();
-    let rounds_per_day =
-        (world.resource::<SimConfig>().day_length / market::round_ticks(world)).max(1);
-    (sold * rounds_per_day).div_ceil(volume.rounds.len() as u64) as u32
+    (sold * BUCKETS_PER_DAY).div_ceil(volume.rounds.len() as u64) as u32
 }
 
-/// Units of `kind` a settlement uses in a day: need decay for water and food,
-/// the moving sum of trade for everything else.
+/// Units of `kind` a settlement uses in a day: for a food, its share of the
+/// residents' hunger by what they ate (`view::daily_use`); for water, the
+/// thirst of its people or what was sold, the larger; the moving sum of trade
+/// for everything else.
+///
+/// A food's use is what is eaten, not also what is sold (S4 fix): sales
+/// swung from 0 to 143 bread a day between buckets, and a resident buying a
+/// food to keep in the pack is no more use than the meal it is eaten at.
 pub fn daily_use(world: &World, settlement: SimId, kind: &str) -> u32 {
-    if kind == super::roles::roles(world).drink || catalog::food_restore_in(world, kind).is_some() {
-        return super::view::daily_use(world, settlement)
+    let need = || {
+        super::view::daily_use(world, settlement)
             .into_iter()
             .find(|row| row.good == kind)
             .map_or(0, |row| row.per_day)
-            .max(volume_per_day(world, settlement, kind));
+    };
+    if catalog::food_restore_in(world, kind).is_some() {
+        return need();
+    }
+    if kind == super::roles::roles(world).drink {
+        return need().max(volume_per_day(world, settlement, kind));
     }
     volume_per_day(world, settlement, kind)
 }
@@ -433,4 +467,72 @@ pub fn reservation(world: &World, kind: &str) -> Option<u32> {
             * 10
     });
     Some((milli.div_ceil(1000) as u32).clamp(1, market::MAX_UNIT_PRICE))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shipped day: 24,000 ticks, eight buckets of 3,000.
+    fn world() -> World {
+        let mut world = World::new();
+        world.insert_resource(SimConfig {
+            day_length: 24_000,
+            ..Default::default()
+        });
+        world.insert_resource(SimClock::default());
+        world.init_resource::<TradeVolume>();
+        world.init_resource::<FoodEaten>();
+        world
+    }
+
+    /// Runs the clock to `until`, selling and eating in daylight only
+    /// (the first 70% of the day, as the shipped schedule sleeps after it).
+    fn run(world: &mut World, until: u64) {
+        let settlement = SimId(1);
+        while world.resource::<SimClock>().tick < until {
+            let now = {
+                let mut clock = world.resource_mut::<SimClock>();
+                clock.tick += 1;
+                clock.tick
+            };
+            if now % 24_000 < 16_800 && now.is_multiple_of(400) {
+                let sell = |round: &mut Round| {
+                    *round
+                        .entry(settlement)
+                        .or_default()
+                        .entry("bread".into())
+                        .or_default() += 1;
+                };
+                sell(&mut world.resource_mut::<TradeVolume>().pending);
+                sell(&mut world.resource_mut::<FoodEaten>().pending);
+            }
+            tick(world);
+        }
+    }
+
+    /// S4 fix: the windows closed with the 300-tick market round, so at the
+    /// 24,000-tick day the 24-round window was 0.3 day; at dawn it held only
+    /// the night and the daily use of bread fell to nothing. With buckets of
+    /// an eighth of a day the window is three days, and the daily use read at
+    /// dawn and at midday is the same.
+    #[test]
+    fn volume_per_day_and_meals_are_stable_between_dawn_and_midday() {
+        let mut world = world();
+        run(&mut world, 3 * 24_000);
+        let dawn = volume_per_day(&world, SimId(1), "bread");
+        let eaten_dawn = eaten_recently(&world, SimId(1), "bread");
+        assert_eq!(world.resource::<TradeVolume>().rounds.len(), 24);
+        run(&mut world, 3 * 24_000 + 12_000);
+        let midday = volume_per_day(&world, SimId(1), "bread");
+        let eaten_midday = eaten_recently(&world, SimId(1), "bread");
+        // 42 sales a day (every 400 ticks over 16,800 ticks).
+        assert_eq!(dawn, 42, "a day's sales read at dawn");
+        assert!(midday.abs_diff(dawn) <= 1, "dawn {dawn}, midday {midday}");
+        // The meals of three days (pending included) at both times.
+        assert!(
+            eaten_dawn.abs_diff(eaten_midday) <= 42 / 8 + 1,
+            "dawn {eaten_dawn}, midday {eaten_midday}"
+        );
+    }
 }

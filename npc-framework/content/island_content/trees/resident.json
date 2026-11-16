@@ -119,7 +119,8 @@
         {"name": "Craft", "kind": {"Leaf": {"action": "life.craft", "param": "None"}}},
         {"name": "Hunt", "kind": {"Leaf": {"action": "life.hunt", "param": "None"}}},
         {"name": "Buy materials", "kind": {"Leaf": {"action": "life.buy", "param": {"Name": "inputs"}}}},
-        {"name": "Gather", "kind": {"Leaf": {"action": "life.gather", "param": {"Name": "outputs"}}}}
+        {"name": "Gather", "kind": {"Leaf": {"action": "life.gather", "param": {"Name": "outputs"}}}},
+        {"name": "Help with the hauling", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "help"}}}}
       ]}
     ]},
     {"name": "Night", "kind": {"Guard": {"cond": "life.in_sleep_window", "abort": "None"}}, "children": [

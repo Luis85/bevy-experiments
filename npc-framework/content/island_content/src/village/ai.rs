@@ -48,6 +48,7 @@ pub fn tick(world: &mut World) {
     {
         let _probe = probe(world, "eco.market");
         super::market::tick(world);
+        super::stock::tick(world);
     }
     {
         let _probe = probe(world, "eco.behavior_advance");
@@ -642,10 +643,12 @@ pub(super) fn gather_outputs(world: &mut World, actor: Entity) -> bool {
                 (1000 + super::frontier::labor::good_margin_permille(world, role, kind)).max(100)
                     as u64
             };
-            // Regional: ingredients of food come before other raw goods.
+            // Regional: ingredients of food come before other raw goods, and
+            // rank by the food value their demand stands for (S4).
             let staple = super::frontier::economy_spec::registry(world)
                 .is_some_and(|registry| registry.feeds_food(kind));
-            (demand > 0).then_some((staple, u64::from(demand) * weight, *kind))
+            let food = catalog::food_value_per_unit(world, kind).max(1);
+            (demand > 0).then_some((staple, u64::from(demand) * weight * food, *kind))
         })
         .collect();
     raw.sort_by(|(af, a, ak), (bf, b, bk)| {

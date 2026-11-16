@@ -456,8 +456,9 @@ pub struct EconomyTuning {
     /// Stock up to the island's stock target is working stock: the market
     /// lowers a price only for what is offered beyond it.
     pub stock_cover_pricing: bool,
-    /// Market rounds of trade the daily use of goods that are not eaten is
-    /// estimated from (eight rounds make a day).
+    /// Buckets of an eighth of a day (eight make a day, whatever the market
+    /// round) of trade the daily use of goods that are not eaten is estimated
+    /// from, and of meals the foods' shares of hunger follow: 24 is 3 days.
     pub trade_window_rounds: u32,
     /// Share of each merchant-boat trade the boat pays into the civic fund.
     pub boat_duty_percent: u32,

@@ -187,6 +187,43 @@ pub fn food_restore_in(world: &World, kind: &str) -> Option<i32> {
         .good(kind)
         .and_then(|good| good.food_value)
 }
+/// The hunger one unit of `kind` stills, as food or through the recipes it
+/// goes into (up to three deep, the best recipe): a loaf's food value, a
+/// grain's share of the loaves its flour bakes. 0 for a good that feeds no
+/// food. Work on a food chain is ranked by the food value its demand stands
+/// for (S4: by units, a farmer's order for twenty berries outranked one for
+/// five grain that bake ten loaves, eight times the food).
+pub fn food_value_per_unit(world: &World, kind: &str) -> u64 {
+    fn value(world: &World, kind: &str, depth: u32) -> u64 {
+        if let Some(food) = food_restore_in(world, kind) {
+            return food.max(0) as u64;
+        }
+        if depth == 0 {
+            return 0;
+        }
+        super::frontier::economy_spec::registry(world).map_or(0, |registry| {
+            registry
+                .spec
+                .recipes
+                .iter()
+                .filter_map(|recipe| {
+                    let input = recipe.inputs.iter().find(|input| input.good == kind)?;
+                    let made: u64 = recipe
+                        .outputs
+                        .iter()
+                        .map(|output| {
+                            value(world, &output.good, depth - 1)
+                                .saturating_mul(u64::from(output.count))
+                        })
+                        .sum();
+                    Some(made / u64::from(input.count.max(1)))
+                })
+                .max()
+                .unwrap_or(0)
+        })
+    }
+    value(world, kind, 3)
+}
 /// The work tool that speeds gathering `kind`, from this world's data.
 pub fn gather_tool_in(world: &World, kind: &str) -> Option<&'static str> {
     super::frontier::economy_spec::registry(world)?

@@ -24,7 +24,13 @@ const MAX_DEPTH: u32 = 24;
 
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub struct ProductionPlan {
+    /// The tick the current refresh cycle started.
     pub refreshed_at: Option<u64>,
+    /// Settlements of the current cycle still to plan, one a tick in
+    /// identity order (S4: planning all of them in one tick cost up to 26 ms
+    /// every 300 ticks).
+    #[serde(default)]
+    pub pending: Vec<SimId>,
     pub procurement: Targets,
     /// Utility/material targets before the purse cap. These are desires, not
     /// funded bids; market recovery may quote a real affordable counter-bid.
@@ -58,6 +64,10 @@ impl SimHashResource for ProductionPlan {
     const NAME: &'static str = "island_production_plan";
     fn sim_hash(&self, h: &mut Fnv64) {
         h.opt(self.refreshed_at.as_ref(), |h, tick| h.u64(*tick));
+        h.u32(self.pending.len() as u32);
+        for id in &self.pending {
+            h.u32(id.0);
+        }
         hash_targets(h, &self.procurement);
         hash_targets(h, &self.wanted);
         hash_targets(h, &self.self_commissions);
@@ -117,33 +127,85 @@ impl SimHashResource for StapleAdvances {
     }
 }
 
-/// Whether `kind` is a staple or goes into one (up to two recipes deep):
-/// grain and flour for bread, thread and leather for the coat.
+/// Whether `kind` is a planned staple or goes into one (up to two recipes
+/// deep): grain and flour for bread, thread and leather for the coat.
 pub fn feeds_staple(world: &World, kind: &str) -> bool {
-    fn feeds(world: &World, kind: &str, depth: u32) -> bool {
-        if super::stock::planned_staple(world, kind) {
-            return true;
-        }
-        if depth == 0 {
-            return false;
-        }
-        super::frontier::economy_spec::registry(world).is_some_and(|registry| {
-            registry
-                .spec
-                .recipes
-                .iter()
-                .filter(|recipe| recipe.inputs.iter().any(|input| input.good == kind))
-                .flat_map(|recipe| recipe.outputs.iter())
-                .any(|output| feeds(world, &output.good, depth - 1))
-        })
-    }
-    feeds(world, kind, 2)
+    catalog::trade_kinds(world).iter().any(|staple| {
+        super::stock::planned_staple(world, staple) && feeds_good(world, kind, staple, 2)
+    })
 }
 
-/// Daily, after the floor grants: the fund advances staple makers with
-/// standing work and an empty purse what they need for inputs, within the
-/// caps (closing design).
-pub(super) fn advance_staple_makers(world: &mut World, people: &[(SimId, Entity)]) {
+/// Whether `kind` is `staple` or goes into it, up to two recipes deep.
+pub(crate) fn feeds_good(world: &World, kind: &str, staple: &str, depth: u32) -> bool {
+    if kind == staple {
+        return true;
+    }
+    if depth == 0 {
+        return false;
+    }
+    super::frontier::economy_spec::registry(world).is_some_and(|registry| {
+        registry
+            .spec
+            .recipes
+            .iter()
+            .filter(|recipe| recipe.inputs.iter().any(|input| input.good == kind))
+            .flat_map(|recipe| recipe.outputs.iter())
+            .any(|output| feeds_good(world, &output.good, staple, depth - 1))
+    })
+}
+
+/// The planned staples short in `settlement`: less on offer than the
+/// planned stock.
+pub(crate) fn short_staples(world: &World, settlement: SimId) -> Vec<&'static str> {
+    catalog::trade_kinds(world)
+        .iter()
+        .copied()
+        .filter(|staple| {
+            super::stock::planned_staple(world, staple)
+                && super::stock::on_offer(world, settlement, staple)
+                    < super::stock::target(world, settlement, staple)
+        })
+        .collect()
+}
+
+/// Coins `actor` lacks to buy the inputs of one batch of `kind` at today's
+/// quotes, beyond what it holds of them (the cheapest recipe of `kind` its
+/// trade makes); 0 when it can pay or `kind` is not made from inputs.
+fn batch_shortfall(world: &World, actor: Entity, kind: &str) -> u32 {
+    let Some(registry) = super::frontier::economy_spec::registry(world) else {
+        return 0;
+    };
+    let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
+    registry
+        .spec
+        .recipes
+        .iter()
+        .filter(|recipe| recipe.outputs.iter().any(|output| output.good == kind))
+        .map(|recipe| {
+            recipe
+                .inputs
+                .iter()
+                .map(|input| {
+                    let missing =
+                        input
+                            .count
+                            .saturating_sub(econ::count(world, actor, &input.good));
+                    missing.saturating_mul(market::unit_price(world, &input.good).unwrap_or(1))
+                })
+                .fold(0_u32, u32::saturating_add)
+        })
+        .min()
+        .map_or(0, |cost| cost.saturating_sub(coins))
+}
+
+/// Daily, after the floor grants: the fund advances staple makers whose
+/// purse cannot pay for the inputs of a batch of their standing work, within
+/// the caps (closing design). A maker qualifies when its trade makes from
+/// inputs a good that is, or goes into, a planned staple short in its
+/// settlement (S4 fix: the gate looked for a staple entry in the production
+/// plan, which only a maker who could already pay for its inputs ever got,
+/// so no advance was ever made).
+pub fn advance_staple_makers(world: &mut World, people: &[(SimId, Entity)]) {
     let Some((per_day, per_maker)) = super::frontier::economy_spec::tuning(world).map(|tuning| {
         (
             tuning.staple_advance_per_day,
@@ -155,37 +217,46 @@ pub(super) fn advance_staple_makers(world: &mut World, people: &[(SimId, Entity)
     if per_day == 0 || per_maker == 0 {
         return;
     }
-    let Some(plan) = world.get_resource::<ProductionPlan>() else {
-        return;
-    };
-    let makers: Vec<(SimId, Entity)> = people
-        .iter()
-        .copied()
-        .filter(|(id, _)| {
-            plan.production.get(id).is_some_and(|goods| {
-                goods
+    let mut short: BTreeMap<SimId, Vec<&'static str>> = BTreeMap::new();
+    let mut makers: Vec<(SimId, Entity, u32)> = Vec::new();
+    for (id, actor) in people.iter().copied() {
+        if !super::living(world, actor) || !super::frontier::labor::work_feasible(world, actor) {
+            continue;
+        }
+        let (Some(role), Some(settlement)) = (
+            world.get::<Villager>(actor).map(|person| person.role),
+            economic_settlement(world, actor),
+        ) else {
+            continue;
+        };
+        let staples = short
+            .entry(settlement)
+            .or_insert_with(|| short_staples(world, settlement));
+        let lacking = catalog::outputs_for(world, role)
+            .iter()
+            .filter(|kind| {
+                staples
                     .iter()
-                    .any(|(kind, units)| *units > 0 && feeds_staple(world, kind))
+                    .any(|staple| feeds_good(world, kind, staple, 2))
             })
-        })
-        .collect();
+            .map(|kind| batch_shortfall(world, actor, kind))
+            .max()
+            .unwrap_or(0);
+        if lacking > 0 {
+            makers.push((id, actor, lacking));
+        }
+    }
     // The fund keeps half of what it holds for its other duties.
     let mut left = per_day.min(world.resource::<super::VillageState>().fund / 2);
-    for (id, actor) in makers {
+    for (id, actor, lacking) in makers {
         if left == 0 {
             break;
-        }
-        let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
-        if coins >= per_maker {
-            continue;
         }
         let owed = world
             .get_resource::<StapleAdvances>()
             .and_then(|advances| advances.owed.get(&id).copied())
             .unwrap_or(0);
-        let give = (per_maker - coins)
-            .min(per_maker.saturating_sub(owed))
-            .min(left);
+        let give = lacking.min(per_maker.saturating_sub(owed)).min(left);
         if give == 0 {
             continue;
         }
@@ -1665,15 +1736,48 @@ fn compute(world: &World) -> ProductionPlan {
         ..Default::default()
     };
     for (settlement, _) in super::frontier::settlements::all(world) {
-        let plan = compute_region(world, Some(settlement));
-        combined.procurement.extend(plan.procurement);
-        combined.wanted.extend(plan.wanted);
-        combined.self_commissions.extend(plan.self_commissions);
-        combined.bid_limits.extend(plan.bid_limits);
-        combined.production.extend(plan.production);
-        combined.committed.extend(plan.committed);
+        merge(&mut combined, compute_region(world, Some(settlement)));
     }
     combined
+}
+
+fn merge(plan: &mut ProductionPlan, region: ProductionPlan) {
+    plan.procurement.extend(region.procurement);
+    plan.wanted.extend(region.wanted);
+    plan.self_commissions.extend(region.self_commissions);
+    plan.bid_limits.extend(region.bid_limits);
+    plan.production.extend(region.production);
+    plan.committed.extend(region.committed);
+}
+
+/// Replans one settlement in place: the entries of its people (and of
+/// anybody no longer living or of no settlement) are replaced by a fresh
+/// plan of the settlement; the other settlements' entries stay.
+fn refresh_region(world: &mut World, settlement: SimId) {
+    let region = compute_region(world, Some(settlement));
+    let stale = |world: &World, id: &SimId| {
+        world
+            .resource::<SimIndex>()
+            .get(*id)
+            .filter(|actor| super::living(world, *actor))
+            .and_then(|actor| economic_settlement(world, actor))
+            .is_none_or(|home| home == settlement)
+    };
+    let mut plan = world
+        .remove_resource::<ProductionPlan>()
+        .unwrap_or_default();
+    for targets in [
+        &mut plan.procurement,
+        &mut plan.wanted,
+        &mut plan.self_commissions,
+        &mut plan.bid_limits,
+        &mut plan.production,
+        &mut plan.committed,
+    ] {
+        targets.retain(|id, _| !stale(world, id));
+    }
+    merge(&mut plan, region);
+    world.insert_resource(plan);
 }
 
 fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
@@ -2029,9 +2133,33 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
     // funded order. What is left for sale supplies it first (`take_any`);
     // makers get the shortfall, inputs through the recipes. `manufacture`
     // stops at the target (`stocked`), and the target never exceeds what keeps.
+    // The made inputs of a staple's recipe (flour for bread; thread and
+    // leather for the coat) keep their own stock target the same way (S4 fix: flour was made
+    // only to the bakers' orders of the moment, so in winter the harbour's
+    // flour sat at 1 of a target of 18 while its miller stood idle with no
+    // funded goal, and bread fell short).
     if let Some(region) = settlement {
         for kind in catalog::trade_kinds(world) {
-            if !super::stock::planned_staple(world, kind) {
+            // Made goods a staple's own recipe consumes, one step up only:
+            // further up (the bowls a tanner uses, the planks for those) the
+            // batches leave remainders that stand unsold (S4: with bowls
+            // stocked, planks sat at their floor price on seed 11).
+            let made_input = || {
+                super::frontier::economy_spec::registry(world).is_some_and(|registry| {
+                    let recipes = &registry.spec.recipes;
+                    recipes
+                        .iter()
+                        .any(|recipe| recipe.outputs.iter().any(|output| output.good == *kind))
+                        && recipes.iter().any(|recipe| {
+                            recipe.inputs.iter().any(|input| input.good == *kind)
+                                && recipe
+                                    .outputs
+                                    .iter()
+                                    .any(|output| super::stock::planned_staple(world, &output.good))
+                        })
+                })
+            };
+            if !super::stock::planned_staple(world, kind) && !made_input() {
                 continue;
             }
             let target = super::stock::target(world, region, kind);
@@ -2073,16 +2201,44 @@ pub(super) fn invalidate(world: &mut World) {
     }
 }
 
+/// Every `day_length / 8` ticks (at most 300) a refresh cycle starts and
+/// plans the first settlement; the others follow one a tick, in identity
+/// order. An invalidation starts a new cycle at the next tick.
 pub fn refresh(world: &mut World) {
     let now = world.resource::<SimClock>().tick;
     let interval = (world.resource::<SimConfig>().day_length / 8).clamp(40, 300);
-    if world
+    let due = world
         .get_resource::<ProductionPlan>()
         .and_then(|plan| plan.refreshed_at)
-        .is_some_and(|last| now < last.saturating_add(interval))
-    {
-        return;
+        .is_none_or(|last| now >= last.saturating_add(interval));
+    if due {
+        let settlements: Vec<SimId> = super::frontier::settlements::all(world)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        if settlements.is_empty() {
+            let plan = compute(world);
+            world.insert_resource(plan);
+            return;
+        }
+        let mut plan = world
+            .remove_resource::<ProductionPlan>()
+            .unwrap_or_default();
+        plan.refreshed_at = Some(now);
+        plan.pending = settlements;
+        world.insert_resource(plan);
     }
+    let next = world
+        .get_resource_mut::<ProductionPlan>()
+        .and_then(|mut plan| (!plan.pending.is_empty()).then(|| plan.pending.remove(0)));
+    if let Some(settlement) = next {
+        refresh_region(world, settlement);
+    }
+}
+
+/// Plans every settlement now, at once (tests and tools; the simulation
+/// plans one settlement a tick through [`refresh`]).
+pub fn refresh_all(world: &mut World) {
     let plan = compute(world);
     world.insert_resource(plan);
 }

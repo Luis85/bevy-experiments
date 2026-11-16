@@ -51,7 +51,7 @@ const BUY_CLASSES: &[&str] = &[
 ];
 const GATHER_CLASSES: &[&str] = &["water", "food", "fuel", "outputs"];
 const SELL_CLASSES: &[&str] = &["surplus"];
-const HAUL_CLASSES: &[&str] = &["fuel", "materials", "surplus", "restock", "boat"];
+const HAUL_CLASSES: &[&str] = &["fuel", "materials", "surplus", "restock", "boat", "help"];
 
 /// A leaf start measured under the profiler row `start.<action>` (S4
 /// measurement; hash-neutral, see `village::probe`).
@@ -179,7 +179,7 @@ pub const ACTIONS: &[ActionInfo] = &[
               `surplus` lays the resident's own surplus in a store or stall of the settlement. \
               `restock` buys from storage what the stall is short of and lays it on the stall. \
               `boat` (living world) carries unsold stock the merchant boat buys to the trading \
-              post while the boat is in or due that day. Fails when there is nothing to carry.",
+              post while the boat is in or due that day. `help` (living world), the fallback of a               resident with no funded work: gathers a raw good an open site of the settlement               lacks and no store holds, else one the resident has no use for that is or goes               into a staple short in the settlement; the materials and surplus leaves then               carry it to the site or a store. Fails when there is nothing to carry.",
     },
     ActionInfo {
         name: "life.help",
@@ -406,6 +406,7 @@ pub(super) fn label(action: &str, param: &ParamValue) -> Option<&'static str> {
         ("life.haul", "surplus") => "storing surplus goods",
         ("life.haul", "restock") => "restocking the stall",
         ("life.haul", "boat") => "carrying goods to the boat",
+        ("life.haul", "help") => "helping with the hauling",
         ("life.haul", _) => "carrying fuel home",
         ("life.help", _) => "helping a friend",
         ("life.hunt", _) => "hunting",
@@ -1179,6 +1180,7 @@ fn haul(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
                 "surplus" => return super::super::civic::haul_surplus(world, actor),
                 "restock" => return super::super::civic::haul_restock(world, actor),
                 "boat" => return super::super::civic::haul_boat(world, actor),
+                "help" => return super::super::civic::haul_help(world, actor),
                 _ => {}
             }
             let hearth = colony::home_heating(world, actor).ok_or("no home hearth")?;

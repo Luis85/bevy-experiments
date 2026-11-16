@@ -268,8 +268,6 @@ pub enum GapCause {
     TooMany {
         n: u32,
     },
-    /// The last worker of an essential trade stays.
-    LastKept,
     /// No workplace of the trade stands here: build this one.
     NoWorkplace {
         building: String,
@@ -328,12 +326,6 @@ fn gap_reason(
 ) -> (GapCause, String) {
     let trade = economy_spec::trade_label(world, role);
     if current > wanted {
-        if super::labor::essential_kept(world, settlement, role) && wanted == 0 {
-            return (
-                GapCause::LastKept,
-                format!("The last {trade} stays while the village still wants its goods."),
-            );
-        }
         let n = current - wanted;
         return (
             GapCause::TooMany { n },

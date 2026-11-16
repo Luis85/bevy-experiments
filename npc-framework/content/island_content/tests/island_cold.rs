@@ -161,13 +161,17 @@ fn no_outdoor_errand_starts_in_the_cold_without_a_coat() {
     strip_coat(&mut app, actor);
     set_need(&mut app, actor, "Warmth", 45_000);
     assert!(living::exposed(app.world(), actor));
+    // Only starts from now on count: at tick 0, warm and in a coat, the
+    // resident may start an errand (S4: the new help leaf gives an idle
+    // resident one; the test read the whole journal, the founding included).
+    let exposed_from = app.world().resource::<SimClock>().tick;
     run_ticks(app.world_mut(), 400);
     let errand = app
         .world()
         .resource::<Journal>()
         .entries
         .iter()
-        .filter(|entry| entry.unit == Some(id))
+        .filter(|entry| entry.unit == Some(id) && entry.tick >= exposed_from)
         .any(|entry| {
             matches!(&entry.kind, JournalKind::LeafStart { action, status, .. }
                 if format!("{status:?}") == "Running"

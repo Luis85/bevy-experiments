@@ -111,10 +111,8 @@ fn makers_start_no_batch_beyond_the_stock_target_and_the_rule_switches_off() {
         let over = stock::over_target(app.world(), harbour, "plank");
         // A big order for planks: the plan makes none while stock is over.
         if over {
-            app.world_mut()
-                .resource_mut::<production::ProductionPlan>()
-                .refreshed_at = None;
-            production::refresh(app.world_mut());
+            // Every settlement at once: the simulation plans one a tick.
+            production::refresh_all(app.world_mut());
             for (_, carpenter) in makers(&app, harbour, Role::Carpenter) {
                 assert_eq!(
                     production::production_demand(app.world(), carpenter, "plank"),

@@ -549,7 +549,11 @@ fn assess(world: &World, actor: Entity) -> PlanAssessment {
                 || *kind == super::roles::roles(world).drink
                 || super::frontier::economy_spec::registry(world)
                     .is_some_and(|registry| registry.feeds_food(kind));
-            (demand > 0).then_some((essential, demand, *kind))
+            // Food-chain goals rank by the food value their demand stands
+            // for, not by raw units (S4: twenty berries outranked five grain
+            // for ten loaves); other goals by units.
+            let weight = catalog::food_value_per_unit(world, kind).max(1);
+            (demand > 0).then_some((essential, u64::from(demand) * weight, *kind))
         })
         .collect();
     goals.sort_by(|(ae, ad, ak), (be, bd, bk)| {

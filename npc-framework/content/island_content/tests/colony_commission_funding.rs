@@ -73,7 +73,7 @@ fn a_forecast_clothing_bid_cannot_strand_a_financeable_cottage_or_double_count_i
     let (mut app, _, actor) = fixture();
     let items = economy::free_items(app.world(), actor);
     let coins = app.world().get::<village::Wallet>(actor).unwrap().coins;
-    production::refresh(app.world_mut());
+    production::refresh_all(app.world_mut());
     // Six planks need one saw batch. Its input log and the four retained house
     // logs are separate requirements, even though the actor owns only one log.
     assert!(production::desired_stock(app.world(), actor, "plank") >= 8);

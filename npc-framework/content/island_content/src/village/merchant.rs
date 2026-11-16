@@ -769,7 +769,7 @@ fn buy_exports(world: &mut World, spec: &MerchantSpec, settlement: SimId) {
                     }
                 }
             }
-            market::record_trade(world, store, store, &buy.good, take, take * unit);
+            market::record_export(world, store, &buy.good, take, take * unit);
         }
         if bought > 0 {
             let coins = bought * unit;

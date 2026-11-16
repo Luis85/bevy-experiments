@@ -605,8 +605,7 @@ fn has_spare_coins(world: &World, actor: Entity) -> bool {
 }
 
 fn sociable(world: &World, actor: Entity) -> bool {
-    super::spec(world)
-        .is_some_and(|spec| super::traits(world, actor).sociability >= spec.traits.sociable_min)
+    super::sociable(world, actor)
 }
 
 fn wants_leisure(world: &World, actor: Entity) -> bool {

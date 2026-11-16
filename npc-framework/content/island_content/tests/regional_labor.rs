@@ -277,7 +277,7 @@ fn duplicate_producers_receive_separate_funded_work() {
             economy::consume(app.world_mut(), actor, "log", logs).unwrap();
         }
     }
-    village::production::refresh(app.world_mut());
+    village::production::refresh_all(app.world_mut());
     for name in ["Oak", "Piper"] {
         assert!(
             village::production::production_demand(app.world(), person(&app, name), "log") > 0,

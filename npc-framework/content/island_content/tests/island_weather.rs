@@ -360,11 +360,10 @@ fn a_gatherer_of_a_dear_good_is_asked_for_a_shelf_beyond_its_orders() {
             .world()
             .resource::<production::ProductionPlan>()
             .refreshed_at;
+        // A refresh cycle plans one settlement a tick: wait for all of them.
         let fresh = until(&mut app, 400, 1, |app| {
-            app.world()
-                .resource::<production::ProductionPlan>()
-                .refreshed_at
-                != made
+            let plan = app.world().resource::<production::ProductionPlan>();
+            plan.refreshed_at != made && plan.pending.is_empty()
         });
         assert!(fresh, "no new plan");
         (

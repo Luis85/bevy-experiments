@@ -151,6 +151,19 @@ pub fn work_pace_percent(world: &World, actor: Entity) -> u32 {
         / 100
 }
 
+/// An unsociable resident spends its free time alone: in its leisure it is
+/// nobody's company, neither for a chat in passing nor for a neighbour who
+/// seeks company (`life.sociable` decides whether the evening is spent in
+/// company). S4: without this a loner strolling to the square was met as
+/// often as a sociable resident seeking company, and the trait had no effect.
+fn spends_free_time_alone(world: &World, actor: Entity) -> bool {
+    super::super::resident::spec(world).is_some()
+        && world
+            .get::<super::super::behavior::LifeDecision>(actor)
+            .is_some_and(|decision| decision.goal == super::super::behavior::LifeGoal::Leisure)
+        && !super::super::resident::sociable(world, actor)
+}
+
 /// Leisure remains a low-priority action beneath survival and funded work.
 pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
     let policy = world.get_resource::<ColonyState>()?;
@@ -175,7 +188,11 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
         .filter_map(|(id, entity)| {
             let target = world.get::<SimPos>(*entity).copied()?;
             let direct = pos.dist2(target);
-            if id == me || direct > 15_000_i64.pow(2) || !social_available(world, *entity) {
+            if id == me
+                || direct > 15_000_i64.pow(2)
+                || !social_available(world, *entity)
+                || spends_free_time_alone(world, *entity)
+            {
                 return None;
             }
             // Somebody inside a building is company only for those inside it.
@@ -280,6 +297,7 @@ pub(super) fn tick(world: &mut World, now: u64) {
                         }))
         };
         if on_the_way(*a)
+            || spends_free_time_alone(world, *a)
             || !social_available(world, *a)
             || world
                 .get::<SocialLife>(*a)
@@ -296,6 +314,7 @@ pub(super) fn tick(world: &mut World, now: u64) {
                 || super::super::indoors::inside_entity(world, *a)
                     != super::super::indoors::inside_entity(world, *b)
                 || on_the_way(*b)
+                || spends_free_time_alone(world, *b)
                 || !social_available(world, *b)
                 || world
                     .get::<SocialLife>(*b)

@@ -854,6 +854,12 @@ pub fn in_block(world: &World, actor: Entity, kind: BlockKind) -> bool {
         })
 }
 
+/// Whether `actor` spends its free time in company: sociability at least
+/// `traits.sociable_min` (`life.sociable`).
+pub fn sociable(world: &World, actor: Entity) -> bool {
+    spec(world).is_some_and(|spec| traits(world, actor).sociability >= spec.traits.sociable_min)
+}
+
 /// Coins `actor` keeps back from stocking provisions ahead of need.
 pub fn thrift_reserve(world: &World, actor: Entity) -> u32 {
     let Some(spec) = spec(world) else {

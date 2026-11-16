@@ -22,11 +22,11 @@ pub use depot::{
     depots, home_settlement, is_depot, serves, storable,
 };
 pub use haul::{
-    MaterialTrip, RestockTrip, boat_trip, material_trip, restock_trip, site_needs_builder,
-    surplus_trip,
+    MaterialTrip, RestockTrip, boat_trip, help_trip, material_trip, restock_trip,
+    site_needs_builder, surplus_trip,
 };
 pub(crate) use haul::{
-    build as build_step, fitting, haul_boat, haul_materials, haul_restock, haul_surplus,
+    build as build_step, fitting, haul_boat, haul_help, haul_materials, haul_restock, haul_surplus,
     hearth_reserve, kept, nearest_first, reachable, spendable,
 };
 pub use model::{

@@ -427,7 +427,7 @@ pub fn settle_newcomer(world: &mut World, settlement: SimId, name: &str) -> Resu
 }
 
 /// Workplaces of a settlement with a free seat, in identity order. The inn is
-/// never offered to a newcomer.
+/// never offered to a newcomer, nor a trade at or over the overseer's target.
 pub fn free_seats(world: &World, settlement: SimId) -> Vec<(SimId, Role)> {
     let taken = seats_taken(world);
     workplaces(world)
@@ -435,8 +435,10 @@ pub fn free_seats(world: &World, settlement: SimId) -> Vec<(SimId, Role)> {
         .filter(|(_, entity)| settlements::member(world, *entity) == Some(settlement))
         .filter_map(|(id, _)| {
             let (_, role, capacity) = site(world, id)?;
-            (service(world, role).is_none() && taken.get(&id).copied().unwrap_or(0) < capacity)
-                .then_some((id, role))
+            (service(world, role).is_none()
+                && taken.get(&id).copied().unwrap_or(0) < capacity
+                && !super::oversee::at_or_over_target(world, settlement, role))
+            .then_some((id, role))
         })
         .collect()
 }
@@ -454,12 +456,6 @@ pub fn seats_in(world: &World, settlement: SimId, role: Role) -> (u32, u32) {
         .fold((0, 0), |(seats, held), (capacity, workers)| {
             (seats + capacity, held + workers)
         })
-}
-
-/// Whether the essential-coverage floor keeps the last worker of `role` in
-/// `settlement`: an essential trade whose goods are still wanted there.
-pub fn essential_kept(world: &World, settlement: SimId, role: Role) -> bool {
-    essential(world, role) && shortage(world, settlement, role) > 0
 }
 
 /// The resident of `settlement` (working another trade) closest to the
@@ -1278,19 +1274,6 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
         .blocked_since
         .is_some_and(|since| now >= since.saturating_add(BLOCKED_TICKS));
     let duplicate = assigned(world, person.workplace) > 1;
-    // Essential-coverage floor: the last worker of an essential profession stays
-    // while the settlement it serves still wants the goods, even when the work
-    // is blocked for now (an exhausted patch regrows; an abandoned yard does not).
-    let served =
-        site(world, person.workplace).and_then(|(place, _, _)| settlements::member(world, place));
-    if essential(world, person.role)
-        && !duplicate
-        && (!blocked || served.is_some_and(|region| shortage(world, region, person.role) > 0))
-    {
-        return false;
-    }
-    // Otherwise only a blocked, surplus or flexible worker may move freely. A
-    // settled specialist may still cover a vacant essential trade at home.
     let settlement = settlements::member(world, actor);
     // The overseer's targets (`oversee`): a worker of a trade over its target
     // is surplus; one of a trade at or under its target stays unless its work
@@ -1298,6 +1281,25 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
     // another worker of its own trade remains.
     let own_over =
         settlement.is_some_and(|region| super::oversee::over_target(world, region, person.role));
+    // Essential-coverage floor: the last worker of an essential profession stays
+    // while the settlement it serves still wants the goods, even when the work
+    // is blocked for now (an exhausted patch regrows; an abandoned yard does not).
+    // Not against the overseer's target (S4 fix: a target of 0 millers left
+    // the last miller of every village in place for good).
+    let served =
+        site(world, person.workplace).and_then(|(place, _, _)| settlements::member(world, place));
+    if essential(world, person.role)
+        && !duplicate
+        && !own_over
+        && (!blocked || served.is_some_and(|region| shortage(world, region, person.role) > 0))
+    {
+        return false;
+    }
+    // Otherwise only a blocked, surplus or flexible worker may move freely. A
+    // settled specialist may still cover a vacant essential trade at home.
+    // A worker over the overseer's target moves as freely as a blocked one:
+    // any open seat of a trade not at its own target will do.
+    let free = blocked || own_over;
     let own_held = settlement.is_some_and(|region| {
         super::oversee::target(world, region, person.role)
             .is_some_and(|wanted| super::oversee::headcount(world, region, person.role) <= wanted)
@@ -1347,9 +1349,10 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
         let wished =
             local && own_spare && super::oversee::below_target(world, vacancy.settlement, role) > 0;
         let essential_gap = vacancy.occupied == 0 && essential(world, role);
-        if !essential_gap
-            && (super::oversee::at_or_over_target(world, vacancy.settlement, role)
-                || (own_held && !blocked))
+        // A trade at or over the overseer's target takes nobody new, an empty
+        // essential seat included: the target is the overseer's word on it.
+        if super::oversee::at_or_over_target(world, vacancy.settlement, role)
+            || (!essential_gap && own_held && !free)
         {
             continue;
         }
@@ -1371,16 +1374,16 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
         }
         // Adjustment, not musical chairs: a worker whose own goods are short
         // moves only towards a larger unmet demand.
-        if !floor && !blocked && !pulled && own_shortage > 0 && vacancy.shortage <= own_shortage {
+        if !floor && !free && !pulled && own_shortage > 0 && vacancy.shortage <= own_shortage {
             continue;
         }
         // A vacancy can be valuable before the missing profession has produced
         // any profit. Otherwise require a genuine shortage or a persistent
         // realised-margin gap, not empty capacity.
-        if vacancy.occupied > 0 && vacancy.shortage == 0 && !blocked && !pulled {
+        if vacancy.occupied > 0 && vacancy.shortage == 0 && !free && !pulled {
             continue;
         }
-        if !blocked
+        if !free
             && !duplicate
             && !pulled
             && service(world, person.role).is_none()
@@ -1415,7 +1418,7 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
         // Realised margin ranks otherwise comparable work: ten points per permille.
         let score = (score as i64).saturating_add(gap * 10).max(0) as u64;
         // Hysteresis also protects useful nonessential specialist work.
-        if score > 15_000 || blocked || pulled {
+        if score > 15_000 || free || pulled {
             candidates.push((score, vacancy.workplace, role, pulled));
         }
     }
@@ -1432,6 +1435,8 @@ pub fn consider_assignment(world: &mut World, actor: Entity) -> bool {
         workplace,
         if blocked {
             "Resources or access unavailable; taking useful work"
+        } else if own_over {
+            "Leaving a trade over the overseer's wanted headcount"
         } else if wanted_move {
             "Answering the overseer's wanted headcount"
         } else if covering {

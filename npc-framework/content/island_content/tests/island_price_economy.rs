@@ -219,7 +219,7 @@ fn a_missing_tool_becomes_funded_smith_work() {
     let mut app = scene();
     let oak = person(&app, "Oak");
     economy::consume(app.world_mut(), oak, "axe", 1).unwrap();
-    village::production::refresh(app.world_mut());
+    village::production::refresh_all(app.world_mut());
     assert_eq!(
         village::production::desired_stock(app.world(), oak, "axe"),
         1

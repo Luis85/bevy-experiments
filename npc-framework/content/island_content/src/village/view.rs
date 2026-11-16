@@ -374,9 +374,10 @@ pub struct UseView {
     pub days_left: Option<u32>,
 }
 
-/// One day's use of water and of every food in a settlement. Food is shared
-/// between the foods in proportion to what is in stock; with no food in
-/// stock it is counted as bread. The estimate follows the decay of Thirst and
+/// One day's use of water and of every food in a settlement. The hunger is
+/// shared between the foods in proportion to the food value eaten of each
+/// over the recent window; before any meal, by the residents' preferred
+/// foods; with nobody to feed it is counted as bread. The estimate follows the decay of Thirst and
 /// Hunger; production inputs and hearth fuel are not part of it.
 pub fn daily_use(world: &World, settlement: SimId) -> Vec<UseView> {
     use npc_framework::needs::NeedRegistry;
@@ -428,39 +429,51 @@ pub fn daily_use(world: &World, settlement: SimId) -> Vec<UseView> {
         (people * decay("Thirst") * day).div_ceil(90_000),
     );
     let hunger = (people * 100 + children * ration) * decay("Hunger") * day / 100;
-    let foods: Vec<(&'static str, u64, u64)> = super::catalog::trade_kinds(world)
+    let foods: Vec<(&'static str, u64)> = super::catalog::trade_kinds(world)
         .iter()
         .filter_map(|kind| {
             let restore = super::catalog::food_restore_in(world, kind)?.max(1) as u64;
-            Some((*kind, restore, u64::from(stock(kind))))
+            Some((*kind, restore))
         })
         .collect();
-    let held: u64 = foods.iter().map(|(_, _, units)| units).sum();
     // Each food's share of the hunger is its share of the hunger restored by
     // what the settlement ate in the recent window (closing fix: a share by
     // the stock held let a food in plenty grow its own target, and berries
-    // spoiled as fast as they were eaten). Every food keeps a floor of a
-    // twentieth of the total, so a new food can still enter. Before anything
-    // has been eaten, the stock held decides, as before.
+    // spoiled as fast as they were eaten). A food some resident prefers keeps
+    // a floor of a twentieth of the total, so it can come back after a
+    // shortage; a food nobody prefers gets only what was eaten of it (S4 fix:
+    // the floor kept a stock of berries, eaten last, that mostly spoiled).
+    // Before anything has been eaten, the residents' preferred foods share
+    // it: one share for every resident who prefers the food (S4 fix: the
+    // stock held decided, and a berry weighed as much as a loaf).
+    let preferred: Vec<u64> = foods
+        .iter()
+        .map(|(kind, _)| {
+            members
+                .iter()
+                .filter(|(_, actor)| super::production::food_preference(world, *actor) == *kind)
+                .count() as u64
+        })
+        .collect();
     let eaten: Vec<u64> = foods
         .iter()
-        .map(|(kind, restore, _)| {
+        .map(|(kind, restore)| {
             super::stock::eaten_recently(world, settlement, kind).saturating_mul(*restore)
         })
         .collect();
     let restored: u64 = eaten.iter().sum();
     let floor = (restored / 20).max(1);
     let weights: Vec<u64> = if restored > 0 {
-        eaten.iter().map(|units| units + floor).collect()
+        eaten
+            .iter()
+            .zip(&preferred)
+            .map(|(units, fans)| units + if *fans > 0 { floor } else { 0 })
+            .collect()
     } else {
-        foods.iter().map(|(_, _, units)| *units).collect()
+        preferred
     };
-    let total: u64 = if restored > 0 {
-        weights.iter().sum()
-    } else {
-        held
-    };
-    for ((kind, restore, _), weight) in foods.iter().zip(&weights) {
+    let total: u64 = weights.iter().sum();
+    for ((kind, restore), weight) in foods.iter().zip(&weights) {
         let share = (hunger * weight).checked_div(total).unwrap_or(
             if *kind == super::roles::roles(world).baked {
                 hunger
@@ -473,9 +486,7 @@ pub fn daily_use(world: &World, settlement: SimId) -> Vec<UseView> {
     // Every other good: the units sold in the settlement per day, from the
     // moving sum of recent trade (regional; nothing before the first sale).
     for kind in super::catalog::trade_kinds(world) {
-        if *kind == super::roles::roles(world).drink
-            || foods.iter().any(|(food, _, _)| food == kind)
-        {
+        if *kind == super::roles::roles(world).drink || foods.iter().any(|(food, _)| food == kind) {
             continue;
         }
         let per_day = super::stock::volume_per_day(world, settlement, kind);

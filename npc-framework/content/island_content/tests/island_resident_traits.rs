@@ -64,6 +64,8 @@ struct Samples {
     work: u32,
     /// Samples spent in the authored `Leisure` branch of the tree.
     leisure: u32,
+    /// Samples spent seeking a neighbour's company in it (`Sociable`).
+    seeking: u32,
     home: u32,
     first_home: Option<u64>,
 }
@@ -85,6 +87,13 @@ fn sample(app: &App, id: SimId, into: &mut Samples) {
             .is_some_and(|branch| branch.contains(" > Leisure > "))
     }) {
         into.leisure += 1;
+    }
+    if resident::explain(app.world(), actor).is_some_and(|record| {
+        record["branch"]
+            .as_str()
+            .is_some_and(|branch| branch.contains(" > Leisure > ") && branch.contains("Sociable"))
+    }) {
+        into.seeking += 1;
     }
 }
 
@@ -247,6 +256,17 @@ fn a_sociable_resident_takes_leisure_and_meets_more_people_than_an_unsociable_on
     assert!(
         leisure >= 40 * subjects.len() as u32,
         "the sociable residents spent only {leisure} samples at leisure"
+    );
+    // The trait decides who seeks company (only sociable residents take the
+    // `Sociable` leaf) and whether a resident is company in its free time at
+    // all: an unsociable one spends its leisure alone (S4: with neighbours
+    // busier since the help leaf, chats in passing had made both groups meet
+    // exactly as many people, 210 and 210).
+    let seeking_alone: u32 = alone.iter().map(|samples| samples.seeking).sum();
+    let seeking_social: u32 = social.iter().map(|samples| samples.seeking).sum();
+    assert!(
+        seeking_alone == 0 && seeking_social > 0,
+        "sociable residents sought company in {seeking_social} samples, unsociable ones in {seeking_alone}"
     );
     assert!(
         met_social > met_alone,

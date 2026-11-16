@@ -392,6 +392,102 @@ pub(crate) fn haul_surplus(world: &mut World, actor: Entity) -> Step {
     depot::deposit(world, actor, shelf, &kind, count).map_err(|_| "the store refused the goods")
 }
 
+/// The raw good this resident would gather to help the settlement
+/// (`life.haul help`), the honest fallback of a resident with no funded work
+/// in its work block (S4): a good an open building site of its settlement
+/// still lacks and no store of it holds (the materials leaf then delivers
+/// it, paid by the site), else a good this resident has no use for that is,
+/// or goes into, a staple short in its settlement (the surplus leaf then lays
+/// it in a store, the resident its seller). Only goods gathered at a patch
+/// with units left.
+pub fn help_trip(world: &World, actor: Entity) -> Option<&'static str> {
+    // A maker with its own goods for sale that no store takes (a tailor's
+    // coats) keeps its stand: buyers find it standing at work, not on an
+    // errand across the village (S4: on seed 11 a coatless miner went the
+    // last week without a coat while the tailors who held them were out
+    // helping, and the 14-day audit failed).
+    let role = world.get::<crate::village::Villager>(actor)?.role;
+    if catalog::outputs_for(world, role).iter().any(|kind| {
+        !depot::storable(world, kind) && market::available_to_sell(world, actor, kind) > 0
+    }) {
+        return None;
+    }
+    let settlement = depot::home_settlement(world, actor)?;
+    let me = *world.get::<SimId>(actor)?;
+    let now = world.resource::<SimClock>().tick;
+    // A patch of the good with units left (the gathering itself picks the
+    // nearest reachable one).
+    let patches = crate::village::lookup::ids_with::<crate::village::ResourcePatch>(world);
+    let gatherable = |kind: &str| {
+        patches.iter().any(|(_, entity)| {
+            world
+                .get::<crate::village::ResourcePatch>(*entity)
+                .is_some_and(|patch| patch.kind == kind && patch.remaining > 0)
+        })
+    };
+    let stores = depot::depots(world, settlement);
+    let stored = |kind: &str| {
+        stores.iter().any(|(id, entity)| {
+            world.get::<Depot>(*entity).is_some_and(|depot| {
+                post_available(world, *id, kind, depot.available(kind, Some(me), now)) > 0
+            })
+        })
+    };
+    let budget = sites::site_budget(world);
+    for (_, site_entity) in sites::open_sites(world, settlement) {
+        let Some(site) = world.get::<ConstructionSite>(site_entity) else {
+            continue;
+        };
+        for kind in site.cost.keys() {
+            let payable = market::unit_price(world, kind).is_some_and(|price| budget >= price);
+            if site.open(kind, Some(me), now) == 0
+                || !payable
+                || econ::count(world, actor, kind) > kept(world, actor, kind)
+                || !gatherable(kind)
+                || stored(kind)
+            {
+                continue;
+            }
+            if let Some(kind) = catalog::trade_kinds(world)
+                .iter()
+                .find(|known| **known == kind.as_str())
+            {
+                return Some(*kind);
+            }
+        }
+    }
+    let candidates: Vec<&'static str> = catalog::trade_kinds(world)
+        .iter()
+        .copied()
+        .filter(|kind| {
+            depot::storable(world, kind)
+                && market::no_use(world, actor, kind)
+                && econ::count(world, actor, kind) == 0
+                && gatherable(kind)
+        })
+        .collect();
+    if candidates.is_empty() {
+        return None;
+    }
+    let short = production::short_staples(world, settlement);
+    candidates.into_iter().find(|kind| {
+        short
+            .iter()
+            .any(|staple| production::feeds_good(world, kind, staple, 2))
+    })
+}
+
+/// `life.haul help`: gather what [`help_trip`] names.
+pub(crate) fn haul_help(world: &mut World, actor: Entity) -> Step {
+    let kind =
+        help_trip(world, actor).ok_or("no site or short staple of this settlement needs a hand")?;
+    if ai::gather_job(world, actor, kind) {
+        Ok(())
+    } else {
+        Err("no reachable patch has any left, or the pack is full")
+    }
+}
+
 /// One trip that restocks a stall from the settlement's storage.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RestockTrip {

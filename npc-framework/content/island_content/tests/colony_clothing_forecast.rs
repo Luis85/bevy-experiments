@@ -58,10 +58,8 @@ fn wear(app: &mut App, person: Entity, remaining: u32) {
         .current = remaining;
 }
 fn refresh(app: &mut App) {
-    app.world_mut()
-        .resource_mut::<production::ProductionPlan>()
-        .refreshed_at = None;
-    production::refresh(app.world_mut());
+    // Every settlement at once: the simulation plans one a tick.
+    production::refresh_all(app.world_mut());
 }
 fn coins(app: &App) -> u64 {
     app.world()

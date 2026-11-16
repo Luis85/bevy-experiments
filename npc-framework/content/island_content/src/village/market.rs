@@ -471,11 +471,33 @@ pub fn record_trade(
     quantity: u32,
     total: u32,
 ) {
+    record_sale(world, buyer, seller, kind, quantity, total, true);
+}
+
+/// A sale to the merchant boat from a store (an export): a price sample like
+/// any trade, but no use of the good on the island, so it stays out of the
+/// trade window the stock targets read (S4 fix: the boat's purchases counted
+/// as the settlement's daily use and raised the targets of what it bought).
+pub fn record_export(world: &mut World, store: Entity, kind: &str, quantity: u32, total: u32) {
+    record_sale(world, store, store, kind, quantity, total, false);
+}
+
+fn record_sale(
+    world: &mut World,
+    buyer: Entity,
+    seller: Entity,
+    kind: &str,
+    quantity: u32,
+    total: u32,
+    island_use: bool,
+) {
     let Some(seed) = catalog::price_in(world, kind) else {
         return;
     };
     let seller_id = world.get::<SimId>(seller).copied();
-    super::stock::record(world, seller, kind, quantity);
+    if island_use {
+        super::stock::record(world, seller, kind, quantity);
+    }
     super::live::trade_booked(world, buyer, seller, kind, quantity, total);
     let mut state = world.resource_mut::<MarketState>();
     let row = state
@@ -560,7 +582,6 @@ pub fn tick(world: &mut World) {
     // Prices rest until the weather clears; goods in hand still change hands.
     if super::weather::storm(world) {
         world.resource_mut::<MarketState>().last_round = Some(now);
-        super::stock::close_round(world);
         return;
     }
     let kinds = catalog::trade_kinds(world);
@@ -728,13 +749,22 @@ pub fn tick(world: &mut World) {
         .filter(|percent| *percent > 0);
     // Regional: stock up to the island's target is working stock. Only what is
     // offered beyond it is a glut, and an order the stock on offer can fill is
-    // no scarcity.
+    // no scarcity. What the merchant boat's announced order still wants is
+    // sold already, so it is cover too (S4: with the trade window three days
+    // long, planks sawn for the boat's order and waiting for its call read
+    // as a glut and held the quote at its floor for days).
     let covers: Option<BTreeMap<&str, u32>> = super::frontier::economy_spec::tuning(world)
         .filter(|tuning| tuning.stock_cover_pricing && tuning.stock_target_days > 0)
         .map(|_| {
             kinds
                 .iter()
-                .map(|kind| (*kind, super::stock::island_target(world, kind)))
+                .map(|kind| {
+                    (
+                        *kind,
+                        super::stock::island_target(world, kind)
+                            .saturating_add(super::merchant::held_for_order(world, kind)),
+                    )
+                })
                 .collect()
         });
     // Regional: the lowest price any resident or store sells each good at.
@@ -852,7 +882,6 @@ pub fn tick(world: &mut World) {
         row.pending_units = 0;
         row.pending_turnover = 0;
     }
-    super::stock::close_round(world);
 }
 
 /// Published market news contains no individual wallet, inventory or position.

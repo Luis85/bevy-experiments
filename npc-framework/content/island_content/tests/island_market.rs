@@ -119,7 +119,7 @@ fn genuine_need_bids_recover_when_scarcity_pushes_reference_above_all_buyers_cas
         clothed_customer,
         bread_entity,
     );
-    village::production::refresh(app.world_mut());
+    village::production::refresh_all(app.world_mut());
     for kind in ["bread", village::catalog::WATER] {
         assert!(
             village::production::purchase_wanted(app.world(), clothed_customer, kind)
@@ -156,7 +156,7 @@ fn genuine_need_bids_recover_when_scarcity_pushes_reference_above_all_buyers_cas
     let start = app.world().resource::<SimClock>().tick;
     for round in 0..100 {
         app.world_mut().resource_mut::<SimClock>().tick = start + round * interval;
-        village::production::refresh(app.world_mut());
+        village::production::refresh_all(app.world_mut());
         market::tick(app.world_mut());
     }
     let price = market::unit_price(app.world(), village::catalog::WARM_CLOTHES).unwrap();
