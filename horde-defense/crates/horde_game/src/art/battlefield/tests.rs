@@ -3007,3 +3007,53 @@ fn fx_budget_matches_presentation_caps() {
     ];
     assert_eq!(crate::perf_budget::FX_BUDGET, caps);
 }
+
+/// CF-3 (closing): a banked-coin pop-up over a kill at either edge of the
+/// arena (a runner at the spawn edge) is moved inside the clip like the
+/// damage numbers, 4 pt in, so its "+Nc" is never cut; one in the middle
+/// stays centred on its kill. `coin_rect`, what a drop's quality label keeps
+/// clear of (CF-3-05), is the rect painted.
+#[test]
+fn a_coin_popup_at_the_arena_edge_paints_inside_the_clip() {
+    let clip = arena();
+    for reduced in [false, true] {
+        for (x, edge) in [
+            (clip.right(), "right"),
+            (clip.right() - 3.0, "right"),
+            (clip.left(), "left"),
+            (clip.center().x, "middle"),
+        ] {
+            let center = pos2(x, clip.center().y);
+            let mut kept = Rect::NOTHING;
+            let shapes = painted(|p| {
+                kept = cue::coin_rect(p, center, 4, reduced);
+                let mut batch = cue::CueBatch::new(0);
+                batch.coin(center, 4, 1.0, reduced);
+                batch.paint(p);
+            });
+            let drawn = shapes
+                .iter()
+                .filter_map(|shape| match shape {
+                    egui::Shape::Text(text) => Some(text.galley.rect.translate(text.pos.to_vec2())),
+                    _ => None,
+                })
+                .reduce(|a, b| a.union(b))
+                .expect("the pop-up paints text");
+            assert!(
+                clip.shrink(4.0 - 1e-3).contains_rect(drawn),
+                "{edge} edge, reduced {reduced}: {drawn:?} leaves {clip:?}"
+            );
+            assert!(
+                (kept.center() - drawn.center()).length() < 1e-3
+                    && (kept.size() - drawn.size()).length() < 1e-3,
+                "{edge} edge, reduced {reduced}: coin_rect {kept:?} is not the painted {drawn:?}"
+            );
+            if edge == "middle" {
+                assert!(
+                    (drawn.center().x - x).abs() < 1e-3,
+                    "a mid-field pop-up stays put"
+                );
+            }
+        }
+    }
+}

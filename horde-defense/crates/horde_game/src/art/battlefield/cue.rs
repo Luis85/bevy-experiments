@@ -365,21 +365,43 @@ fn coin_border(reduced: bool) -> f32 {
     if reduced { 1.0 } else { 1.5 }
 }
 
-/// The rect a banked-coin pop-up of `coins` centred at `center` paints, its
-/// outline included.
+/// How far inside the battlefield clip a coin pop-up's outline stays, as the
+/// damage numbers keep inside the effects clip.
+const COIN_MARGIN: f32 = 4.0;
+
+/// The centre a pop-up of `size` (outline included) over `center` paints
+/// at: `center`, moved sideways only as far as keeps it `COIN_MARGIN` inside
+/// `p`'s clip, so a kill at the spawn edge never cuts its "+Nc" (CF-3). A
+/// clip narrower than the pop-up keeps its left edge.
+fn coin_center(p: &Painter, center: Pos2, size: Vec2) -> Pos2 {
+    let half = size.x * 0.5;
+    let clip = p.clip_rect();
+    pos2(
+        center
+            .x
+            .min(clip.right() - half - COIN_MARGIN)
+            .max(clip.left() + half + COIN_MARGIN),
+        center.y,
+    )
+}
+
+/// The rect a banked-coin pop-up of `coins` over `center` paints, its
+/// outline included, kept inside `p`'s clip as [`coin_popup`] keeps it.
 pub(super) fn coin_rect(p: &Painter, center: Pos2, coins: i32, reduced: bool) -> Rect {
-    Rect::from_center_size(center, coin_galley(p, coins, reduced).size())
-        .expand(coin_border(reduced))
+    let size = coin_galley(p, coins, reduced).size() + Vec2::splat(coin_border(reduced) * 2.0);
+    Rect::from_center_size(coin_center(p, center, size), size)
 }
 
 /// Banked-coin pop-up: amber with the same eight-way dark outline as the
 /// damage numbers, so it reads against any ground. Reduced effects keep it
-/// still (the caller drops the drift) with a thinner outline.
+/// still (the caller drops the drift) with a thinner outline. Either way it
+/// stays inside the clip ([`coin_center`]).
 fn coin_popup(p: &Painter, center: Pos2, coins: i32, alpha: f32, reduced: bool) {
     let galley = coin_galley(p, coins, reduced);
-    let origin = center - galley.size() * 0.5;
     let outline = coin_outline(alpha);
     let border = coin_border(reduced);
+    let center = coin_center(p, center, galley.size() + Vec2::splat(border * 2.0));
+    let origin = center - galley.size() * 0.5;
     for direction in [
         vec2(-1.0, -1.0),
         vec2(0.0, -1.0),
