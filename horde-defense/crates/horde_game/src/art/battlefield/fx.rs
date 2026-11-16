@@ -330,6 +330,44 @@ pub(crate) fn coin_rects(
         .collect()
 }
 
+/// The chevron points of the INCOMING tag of a spawn at world `at`.
+fn incoming_chevron(at: Pos2) -> [Pos2; 3] {
+    [
+        at + vec2(0.0, -6.0),
+        at + vec2(-8.0, 0.0),
+        at + vec2(0.0, 6.0),
+    ]
+}
+
+/// The INCOMING word of the tag of a spawn at world `at`, in `font` pt.
+fn incoming_label(at: Pos2, font: f32) -> Label {
+    Label::amber(
+        at + vec2(-12.0, 0.0),
+        Align2::RIGHT_CENTER,
+        "INCOMING",
+        font,
+    )
+}
+
+/// The rects, backings included, of every INCOMING tag the cue pass paints
+/// over `a` this frame, laid out with `p`'s fonts: each Spawn while it shows
+/// ([`fx_lifetime`]), as [`event_cues`] paints it from the field view. With
+/// [`coin_rects`] they are the cues a damage number keeps clear of (CF-7-01).
+pub(crate) fn incoming_rects(p: &Painter, arena: ArenaProjection, a: &Attempt) -> Vec<Rect> {
+    let font = cue::font(arena.lane_height());
+    a.events
+        .iter()
+        .filter(|e| e.kind == EventKind::Spawn)
+        .filter(|e| (a.tick.saturating_sub(e.tick) as f32 / 60.0) < fx_lifetime(e.kind))
+        .map(|e| {
+            let [_, dy] = struck_stagger(a, e);
+            let at = arena.world(a.width_yards - 0.5, e.to[1] + dy);
+            let chevron = Rect::from_points(&incoming_chevron(at)).expand(cue::HALO_MARKER * 2.0);
+            chevron.union(cue::plate(p, &incoming_label(at, font)))
+        })
+        .collect()
+}
+
 /// Cue pass: the event cues of `view`, collected into `batch`.
 pub(super) fn event_cues(
     batch: &mut CueBatch,
@@ -362,20 +400,8 @@ pub(super) fn event_cues(
             // The boss's arrival is the wall-clock banner's, not a spawn tag.
             EventKind::Spawn if age < fx_lifetime(e.kind) => {
                 let at = arena.world(view.width - 0.5, e.to[1]);
-                batch.marker(
-                    [
-                        at + vec2(0.0, -6.0),
-                        at + vec2(-8.0, 0.0),
-                        at + vec2(0.0, 6.0),
-                    ],
-                    AMBER,
-                );
-                batch.label(Label::amber(
-                    at + vec2(-12.0, 0.0),
-                    Align2::RIGHT_CENTER,
-                    "INCOMING",
-                    font,
-                ));
+                batch.marker(incoming_chevron(at), AMBER);
+                batch.label(incoming_label(at, font));
             }
             EventKind::Damage if age < 0.3 && e.target_id.is_none() => {
                 batch.line(

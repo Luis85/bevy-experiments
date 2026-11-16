@@ -636,8 +636,9 @@ fn clear_spot(
     corners.sort_by(shortest_first);
     corners.into_iter().find(|offset| clear(offset))
 }
-/// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09), and
-/// none meets another (CF-2-06).
+/// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09),
+/// another (CF-2-06), or a banked-coin pop-up or INCOMING tag of the cue
+/// pass (CF-7-01).
 /// `blend` is the one the field painted `a`'s hostiles with this frame.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
@@ -864,7 +865,12 @@ pub(super) fn draw_for(
             .total_cmp(&drafts[j].started)
             .then(i.cmp(&j))
     });
-    let mut placed: Vec<Rect> = Vec::with_capacity(drafts.len());
+    // The cue pass's banked-coin pop-ups and INCOMING tags are on the field
+    // already: every popup keeps clear of them as of an older popup
+    // (CF-7-01).
+    let mut placed: Vec<Rect> = art::coin_rects(&p, arena, a, reduced);
+    placed.extend(art::incoming_rects(&p, arena, a));
+    placed.reserve(drafts.len());
     let mut moves = vec![None; drafts.len()];
     for i in order {
         let draft = &drafts[i];
@@ -1371,6 +1377,8 @@ mod tests {
                         a.enemies.clear();
                         a.tick = 100;
                         game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 0, false);
+                        // Struck long after it spawned: its INCOMING tag is gone.
+                        a.events.retain(|e| e.kind != EventKind::Spawn);
                         *game.attempt_slot_mut() = Some(a);
                         let a = game.attempt_mut().unwrap();
                         let enemy = a.enemies.last_mut().unwrap();
@@ -1525,6 +1533,8 @@ mod tests {
         a.enemies.clear();
         a.tick = 100;
         game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 0, false);
+        // Struck long after it spawned: its INCOMING tag is gone.
+        a.events.retain(|e| e.kind != EventKind::Spawn);
         a.enemies[0].x = x;
         let id = a.enemies[0].id;
         *game.attempt_slot_mut() = Some(a);
@@ -2028,5 +2038,160 @@ mod tests {
             let (scale, rise, _) = motion(age, true);
             assert_eq!((scale, rise), (1.0, 0.0));
         }
+    }
+
+    /// CF-7-01: the cue pass paints a kill's banked-coin pop-up over the
+    /// struck body and an INCOMING tag at the field's right edge, and a
+    /// damage number rising from the same spot overprinted them ("19" over
+    /// "+4c" in low-hp-observed-small, "22" over the INCOMING chevron in
+    /// weapon-classes-turret-small). For a hit and a coin-banking kill at one
+    /// point, and for a hit just under a lane whose spawn tag shows, across
+    /// the field's right half, at both sizes, in normal and reduced effects,
+    /// fresh and late, the number never meets the coin or the INCOMING tag.
+    #[test]
+    fn damage_numbers_keep_clear_of_coin_popups_and_incoming_tags() {
+        let (mut checked, mut drawn_count) = (0, 0);
+        for (size, zoom) in [
+            (vec2(1440.0, 900.0), 1.0),
+            (vec2(1050.0, 700.0) / 1.35, 1.35),
+        ] {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+            for reduced in [false, true] {
+                for cue in ["coin", "incoming"] {
+                    for x_back in [0.3_f32, 0.6, 1.0, 2.0, 4.0] {
+                        for step in 0..=6 {
+                            let mut game = fixture();
+                            let a = game.attempt_mut().unwrap();
+                            a.lane_count = 5;
+                            a.width_yards = 14.0;
+                            a.events.clear();
+                            a.enemies.clear();
+                            a.corpses.clear();
+                            a.loot_events.clear();
+                            a.paused = true;
+                            a.tick = 600;
+                            let lane = 1_u8;
+                            let at = [
+                                a.width_yards - x_back,
+                                f32::from(lane) + 0.5 + step as f32 * 0.15,
+                            ];
+                            a.events.push_back(Event {
+                                to: at,
+                                target_id: None,
+                                lane: Some(lane),
+                                ..hit(a, 19, EventKind::Hit, 1)
+                            });
+                            let extra = if cue == "coin" {
+                                Event {
+                                    kind: EventKind::Kill,
+                                    value: 4,
+                                    to: at,
+                                    target_id: None,
+                                    lane: Some(lane),
+                                    ..hit(a, 4, EventKind::Kill, 2)
+                                }
+                            } else {
+                                Event {
+                                    kind: EventKind::Spawn,
+                                    value: 0,
+                                    to: [a.width_yards - 0.5, f32::from(lane) + 0.5],
+                                    target_id: None,
+                                    actor_id: Some(77),
+                                    lane: Some(lane),
+                                    ..hit(a, 0, EventKind::Spawn, 2)
+                                }
+                            };
+                            a.events.push_back(extra);
+                            let layout = crate::ui::battle::BattleLayout::new(
+                                canvas,
+                                a.lane_count,
+                                a.width_yards,
+                                false,
+                            );
+                            let keep_clear = layout.effects_keep_clear();
+                            let arena = art::ArenaProjection::for_attempt(layout.field.rect, a)
+                                .with_effects_clip(layout.effects_clip);
+                            let settings = Settings {
+                                reduced_effects: reduced,
+                                ..Settings::default()
+                            };
+                            let ctx = egui::Context::default();
+                            crate::settings::install_font(&ctx);
+                            crate::settings::configure(&ctx, zoom);
+                            let mut state = Feedback::default();
+                            let hit_tick = a.tick;
+                            for age in [0.0, 0.06, 0.2] {
+                                let a = game.attempt_mut().unwrap();
+                                a.tick = hit_tick + (age * 60.0_f64).round() as u64;
+                                let a = game.attempt().unwrap();
+                                let input = egui::RawInput {
+                                    time: Some(age),
+                                    screen_rect: Some(canvas),
+                                    ..Default::default()
+                                };
+                                let mut output = ctx.run_ui(input, |ui| {
+                                    art::battlefield_for_attempt(
+                                        &ui.painter_at(layout.arena),
+                                        layout.field.rect,
+                                        a,
+                                        at,
+                                        SceneBlend::NONE,
+                                        art::RenderOptions {
+                                            construction: false,
+                                            outlines: true,
+                                            numbers: true,
+                                            reduced,
+                                            blood: false,
+                                            scene: art::SceneLook::neutral(0),
+                                            sky: art::SkyClock::default(),
+                                            canvas,
+                                            textures: Default::default(),
+                                            occluder: None,
+                                        },
+                                    );
+                                    draw_for(
+                                        ui,
+                                        a,
+                                        arena,
+                                        SceneBlend::NONE,
+                                        0,
+                                        &mut state,
+                                        &settings,
+                                        review::LootCaptureMode::Disabled,
+                                        &keep_clear,
+                                    );
+                                });
+                                output.textures_delta.clear();
+                                let (mut number, mut other) = (Rect::NOTHING, Rect::NOTHING);
+                                for clipped in &output.shapes {
+                                    if let egui::Shape::Text(text) = &clipped.shape {
+                                        let rect = text.galley.rect.translate(text.pos.to_vec2());
+                                        match text.galley.text() {
+                                            "19" => number = number.union(rect),
+                                            "+4c" | "INCOMING" => other = other.union(rect),
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                                checked += 1;
+                                if !number.is_positive() || !other.is_positive() {
+                                    continue;
+                                }
+                                drawn_count += 1;
+                                assert!(
+                                    !number.intersects(other),
+                                    "{size:?} reduced {reduced}, {cue} cue, hit at {at:?}, age \
+                                     {age}: the number {number:?} meets the {cue} cue {other:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            drawn_count * 2 > checked,
+            "only {drawn_count} of {checked} frames drew both the number and the cue"
+        );
     }
 }
