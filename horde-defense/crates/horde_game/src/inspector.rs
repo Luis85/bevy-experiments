@@ -206,8 +206,9 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
         }
     }
 }
+/// `name` is the defender's card name (Mara, or a recruit taking over);
 /// `expanded` opens the latest resolution (the `npc-expanded` review fixture).
-pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, expanded: bool) {
+pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, name: &str, expanded: bool) {
     if attempt.mode != Mode::Npc {
         return;
     }
@@ -215,7 +216,7 @@ pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, expanded: bool) {
     // menu, whose justified layout would stretch each wrapped line of the
     // decision to the popup width with wide, uneven word gaps.
     ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-        ui.strong("Current survivor decision");
+        ui.strong(format!("{name} · current decision"));
         ui.label(&attempt.decision);
         ui.colored_label(
             MUTED,

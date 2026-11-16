@@ -75,7 +75,11 @@ fn npc_resolution_popup_and_observation_controls_fit_at_both_sizes() {
             }
             let output = h.frame_size(f, View::Battle, vec![], size);
             let area = h.ctx.content_rect();
-            for label in ["Current survivor decision", "Latest resolution"] {
+            let decision = format!(
+                "{} · current decision",
+                f.game.active_defender().unwrap().name
+            );
+            for label in [decision.as_str(), "Latest resolution"] {
                 let r = output
                     .shapes
                     .iter()

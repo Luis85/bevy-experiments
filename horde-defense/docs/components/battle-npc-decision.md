@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/battle/field.rs::battle; crates/horde_game/src
 
 Explain the active NPC's current action and permit policy edits.
 
-- **Entry, exit and actions:** In NPC mode open Tactics; the popup is titled "<name> · tactics" for whoever holds the defense (Mara, or a recruit taking over, whose tactics it edits through `SetRecruitTactics`); inspect its decision and adjust its tactics; dismiss outside the popup.
+- **Entry, exit and actions:** In NPC mode open Tactics; the popup is titled "<name> · tactics" for whoever holds the defense (Mara, or a recruit taking over, whose tactics it edits through `SetRecruitTactics`); inspect its decision (headed "<name> · current decision") and adjust its tactics; dismiss outside the popup.
 - **State boundary:** Decision context is read-only; policy changes use the existing validated command at the next legal decision.
 - **Responsiveness and accessibility:** The popup wraps and scrolls within field height; NPC inspection never masquerades as personal firing input.
 

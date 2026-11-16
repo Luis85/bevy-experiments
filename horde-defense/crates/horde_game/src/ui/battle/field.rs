@@ -323,10 +323,11 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                         // Tactics edits whoever holds the defense: Mara,
                         // or the recruit taking over (ruling D16).
                         let defender = a.defender();
-                        let title = game.defender_card(defender).map_or_else(
-                            || "Tactics".to_owned(),
-                            |c| format!("{} · tactics", c.name),
-                        );
+                        let name = game.defender_card(defender).map(|c| c.name);
+                        let title = name
+                            .as_ref()
+                            .map_or_else(|| "Tactics".to_owned(), |n| format!("{n} · tactics"));
+                        let name = name.unwrap_or_else(|| "Defender".to_owned());
                         let response = rows.widget(ui.button("Tactics"));
                         let mut popup = egui::Popup::menu(&response)
                             .width(300.0)
@@ -345,6 +346,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                                     crate::inspector::npc_decision(
                                         ui,
                                         a,
+                                        &name,
                                         f.launch.reviewing("npc-expanded"),
                                     );
                                     character::tactics(ui, f, defender);

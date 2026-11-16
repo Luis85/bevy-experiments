@@ -300,6 +300,12 @@ fn hud_tactics_dispatch_set_recruit_tactics_during_takeover() {
     // The popup's title names the defender whose tactics it edits.
     let output = h.frame(f, View::Battle, vec![]);
     assert_eq!(text_count(&output, &format!("{name} · tactics")), 1);
+    // So does its decision: the recruit's, never "survivor".
+    assert_eq!(
+        text_count(&output, &format!("{name} · current decision")),
+        1
+    );
+    assert_eq!(text_count(&output, "Current survivor decision"), 0);
     h.click(f, View::Battle, "Reload early when safe");
 
     assert_eq!(
