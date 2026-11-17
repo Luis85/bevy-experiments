@@ -3941,3 +3941,27 @@ fn drop_os_pointer_keeps_only_non_pointer_events() {
     drop_os_pointer(&mut input);
     assert_eq!(input.events, vec![key, text, egui::Event::PointerGone]);
 }
+
+/// A6-18 (closing): an isolated review scene is muted, except a perf run that
+/// asks for its audio (`LASTLIGHT_PERF_AUDIO` with `LASTLIGHT_PERF_REPORT`),
+/// so a 60 s live battle can write a cue log with real starts for
+/// `replay_cue_log`. The flag alone, without a report, still mutes.
+#[cfg(feature = "review")]
+#[test]
+fn a_perf_audio_review_keeps_the_battle_audible() {
+    let default = crate::settings::Settings::default().master;
+    assert!(default > 0.0);
+    for scene in ["npc", "battle", "peak"] {
+        let screen = ("LASTLIGHT_REVIEW_SCREEN", scene);
+        let report = ("LASTLIGHT_PERF_REPORT", "perf.json");
+        let audio = ("LASTLIGHT_PERF_AUDIO", "1");
+        for (vars, master) in [
+            (&[screen][..], 0.0),
+            (&[screen, report][..], 0.0),
+            (&[screen, audio][..], 0.0),
+            (&[screen, report, audio][..], default),
+        ] {
+            assert_eq!(launched(vars).settings.master, master, "{scene} {vars:?}");
+        }
+    }
+}

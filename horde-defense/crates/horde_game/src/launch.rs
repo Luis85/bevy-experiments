@@ -225,7 +225,7 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_PERF_ACTIVE_ONLY    Flag: sample only unpaused battle frames
     LASTLIGHT_PERF_CPU            CPU label recorded in the report
     LASTLIGHT_PERF_PROFILE        Build profile label recorded in the report
-    LASTLIGHT_PERF_AUDIO          Flag: keep audio in the perf-audio fixture
+    LASTLIGHT_PERF_AUDIO          Flag: keep audio in a perf run of any review scene
     LASTLIGHT_PERF_NPC_SPEED      Observation speed 1, 2 or 4 for perf fixtures
     LASTLIGHT_PERF_PRESENT_MODE   fifo, mailbox, immediate or autonovsync; with
                                   LASTLIGHT_PERF_REPORT, wins over the VSync and Low

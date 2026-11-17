@@ -39,7 +39,7 @@ fn stage(f: &mut FrontendParts) {
         return;
     }
     f.game = Game::default();
-    if !launch.practice {
+    if !launch.practice && !keeps_audio(&launch) {
         f.settings.master = 0.0;
     }
     if let Some(scale) = launch.review().and_then(|r| r.scale) {
