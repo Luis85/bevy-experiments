@@ -2524,10 +2524,8 @@ This W7-12 commit changes the plan only. After writing it, `check_views.py`, `ch
 
 ### 12.7 Playtest package
 
-- **Verified package:** `target/playtest/Lastlight-playtest-v0.1.0-61bced1-20261116-175626.zip`, 52,427,602 B, SHA-256 `ef09c5e3bd121bee4217cb46566cb02eadd2293beb7818627c8747fdc9eb9b33`, built at 61bced1a on a clean tree under Windows PowerShell 5.1. `verify_playtest.ps1` printed PASS (329 manifest hashes, stamp `v0.1.0 (61bced1)`, copied-executable smoke). The review package `...-61bced1-20261116-180346.zip` passed `-NativeCapture` (VALIDATION.md "Closing playtest package").
-- **The package is not at HEAD's code.** HEAD differs from 61bced1a by four `horde_game` commits: 400c8efb, b33f03fe, 27d763cb and a0278a08. A hand-off package should be built and verified again at the final HEAD:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1`
-  - then `scripts/verify_playtest.ps1 -Package <zip>`
+- **Verified package (current):** `target/playtest/Lastlight-playtest-v0.1.0-99d013a-20261117-082902.zip`, 52,442,433 B, SHA-256 `94be8f76fde28db8f4813f7a75747ec58b9f8a6a6922433ac3680c50bedce997`, built at 99d013af on a clean tree under Windows PowerShell 5.1 (`package_playtest.ps1` without `-AllowDirty`). `verify_playtest.ps1 -Package <zip>` printed PASS (329 manifest hashes, stamp `v0.1.0 (99d013a)`, copied-executable smoke). The packed `--version` prints `v0.1.0 (99d013a)`, and the packed `--smoke` passed three times in 1.50 / 1.50 / 1.72 s. The zip carries only `docs/PLAYTEST_GUIDE.md` and no `archive/` or `docs/audio/` entry (VALIDATION.md "Closing playtest package at the final HEAD").
+- **The rebuild at the final HEAD is done.** The earlier package, `...-61bced1-20261116-175626.zip` (52,427,602 B, SHA-256 `ef09c5e3...dc9eb9b33`), predated the `horde_game` commits 400c8efb, b33f03fe, 27d763cb and a0278a08 and the A6-18 commit ef778e28, and is superseded. Its review package `...-61bced1-20261116-180346.zip` passed `-NativeCapture`; that run was not repeated at 99d013af (VALIDATION.md "Closing playtest package").
 - `target/playtest/` also holds two `...-30847f9-...` zips, from 2026-11-16 18:15 and 18:20 UTC, that no record describes. 30847f90 has the same code as 61bced1a.
 
 ### 12.8 Pending human checks

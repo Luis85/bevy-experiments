@@ -1463,9 +1463,21 @@ Final digest table at HEAD (`SAVE_VERSION` 7, `RULESET_VERSION` and `TRACE_RULES
 
 Across the whole pass after the wave-2 close, the closing re-bless (8787675c) is the only re-bless that moved a pin. It folded W4-14 and W4-15, and no other move happened in waves 5, 6 or 7.
 
+## Closing playtest package at the final HEAD — 17 November 2026 (closing)
+
+This is the current hand-off package. It replaces the 61bced1a package below, which predates the closing commits 400c8efb, b33f03fe, 27d763cb, a0278a08 and ef778e28 (A6-18). Built and verified at HEAD `99d013af` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1` (no `-AllowDirty`; about 145 s with the build) wrote `target/playtest/Lastlight-playtest-v0.1.0-99d013a-20261117-082902.zip`, **52,442,433 bytes**, SHA-256 `94be8f76fde28db8f4813f7a75747ec58b9f8a6a6922433ac3680c50bedce997`, and its unpacked folder: 330 files, 116,311,616 bytes (`Lastlight.exe` 83,170,816 bytes). The manifest is version 2: stamp `v0.1.0 (99d013a)`, commit `99d013afa406c66e9e90fb8b4674bf4853d88606`, `dirty` false, branch `claude/horde-production-pass`, profile `playtest`, no features, curated docs `PLAYTEST_GUIDE.md`, 329 file records.
+
+- **Zip contents.** 330 entries, all with forward slashes. `docs/` holds only `PLAYTEST_GUIDE.md` (37,376 B). No entry is under `archive/` or `docs/audio/`. Top level as before: `Lastlight.exe`, `LICENSE`, `READ ME.txt`, `manifest.json`, the four launchers, `assets/` (313 files; `assets/audio/` 283 files, 20,572,357 B, of which 20,424,084 B are WAVs), `content/` (8 catalogues) and `docs/`.
+- **verify_playtest.** `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_playtest.ps1 -Package <zip>` printed `PASS: 329 manifest hashes; v0.1.0 (99d013a); copied executable smoke; native capture=False` and exited 0 (`target/playtest-verification/e55154be25404c80b0d8486e255a7211/`).
+- **Version stamp.** The packed `Lastlight.exe --version`, run through Start-Process with redirected streams, printed `Lastlight: Horde Defense v0.1.0 (99d013a)` (HEAD's short hash) and exited 0 in 1.71 s.
+- **Packaged smoke time.** The packed `Lastlight.exe --smoke` was run from the package folder through Start-Process, with streams redirected and the launcher's catalogue variables set (stderr names each `content/*.json`). All three runs exited 0 with a first line beginning `PASS: 242 country profiles; 5 encounters; ...`, in 1.50, 1.50 and 1.72 s of wall time. An earlier set of three runs without those variables (the catalogues fell back to the bundled defaults) also passed, in 1.65, 1.73 and 1.70 s.
+- **Not re-run here.** The review package with `-NativeCapture` and the dirty-tree refusal were not repeated; their record at 61bced1a stands below.
+
 ## Closing playtest package — 16 November 2026 (W7-02, closing)
 
-Built and verified at HEAD `61bced1a` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.
+Superseded as the current package by "Closing playtest package at the final HEAD" above. Built and verified at HEAD `61bced1a` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1` (184 s with the build) wrote `target/playtest/Lastlight-playtest-v0.1.0-61bced1-20261116-175626.zip`, **52,427,602 bytes**, SHA-256 `ef09c5e3bd121bee4217cb46566cb02eadd2293beb7818627c8747fdc9eb9b33`, and its unpacked folder: 330 files, 116,258,368 bytes (`Lastlight.exe` 83,117,568 bytes). The manifest is version 2: stamp `v0.1.0 (61bced1)`, `dirty` false, branch `claude/horde-production-pass`, profile `playtest`, no features, 329 file records.
 
