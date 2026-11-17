@@ -473,7 +473,9 @@ Usage rules:
   - Model and capture must agree within ±0.03 (graft B).
   - Measured coverage: 31 of 1026 stages are checkpoint, and 22 countries have both a checkpoint and a dawn stage.
 - **Cue gate:** at least 3:1 against the INK halo. The raw ratio against graded p90 is also reported.
-- **Reduced MOTION gate** (fx-stress): consecutive-frame |Δmean L| < 0.01 and no 32x32 block ΔL > 0.1.
+- **Reduced MOTION gate** (fx-stress): consecutive-frame |Δmean L| < 0.01 and no 32x32 block ΔL > 0.1 from a flash or pulse effect.
+  - The block criterion covers flash and pulse effects only (user decision R63, 2026-11-17, CF-3-22). Damage numbers and MISS labels that appear in place, and the static 1-pt tracers of reduced mode, may change a block by more.
+  - `measure_field_luminance.py motion` still reports every block over 0.1. A reported block passes when every flash field of its frame in the export's manifest is 0 (`flash_alpha_max`, `sky_flash`, `muzzle_flash_count`) and the block holds only such popups or tracers.
 - **Storm MOTION gate** (normal): frame ΔL < 0.2, with peaks at least 240 frames apart.
 
 ## 13. Budgets (docs/PERF_BUDGET.json fx block; schema owned by perf-architecture)
@@ -544,7 +546,7 @@ The full list with tests is in `steps`.
   - night/dawn ratio: model ≈ 0.45, gate ≤ 0.70;
   - cue contrast vs INK, and raw vs graded p90;
   - sky-flash ΔL (≤ 0.091 model, gate < 0.2) and minimum pulse spacing (≥ 240 ticks);
-  - reduced MOTION Δmean L < 0.01 and block ΔL < 0.1.
+  - reduced MOTION Δmean L < 0.01 and block ΔL < 0.1 for flash and pulse effects (R63; §12).
 - **Storm coverage:** 131/1026 stages in 120 countries.
 - **fx-stress:** interface mean ms at 225 enemies against 1.13 / 1.03, p99, frames > 50 ms (must stay 0), and the per-frame counters against the budget.
 - **Wave-0 safe-area mean L at 1440x900:** battle 0.026, arid 0.062, tropical 0.033, peak 0.030. At 1050x700: 0.027, 0.063, 0.034, 0.031.
