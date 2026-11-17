@@ -1764,6 +1764,8 @@ W7-09 re-measure at the release candidate (2026-11-16, HEAD 30847f90, after the 
 
 W7-09 attempt 2 (2026-11-17, HEAD e54faa88): the same command passes 14 of 14 (`target/perf/w7-09-a2/offline-mix.out.txt`) with every number unchanged: stage-1 -24.1 LUFS (TP 0.405), rain -22.9 (TP 0.399), `dense_battle_60s` -23.0 (TP 0.885), `max_sliders_60s` -20.3 (TP 0.632). The calibrations stay.
 
+A6-18 cue-log replay (closing, 2026-11-17, 27d763c with the change committed as ef778e28): `LASTLIGHT_PERF_AUDIO` now keeps any perf-run review scene at the default sliders, not only `npc-stutter`. A 3600-frame `npc` motion run (Mara on stage 0) wrote a cue log of 3606 frames and 128 starts. `replay_cue_log` reads 61.3 s at -23.6 LUFS integrated (S-max -21.5, M-max -18.8, TP 0.586): inside the gate and +0.5 LU from the `reference_mixed_60s` stage-1 render, within design-audio 6.18's 1 LU (`target/production-after/closing/cue-log/npc-60s`; recipe in AUDIO_SURVIVAL.md).
+
 **Risk for the listening pass (closing phase).** The bed now reads about 4 LU over the level-0 gunfire in integrated terms (gunfire still peaks higher: 0.39 against a bed peak near 0.2). If the listening pass finds the bed too forward, the alternatives are a music track (fills the gate from the Music bus) or more voice gain with the onset pile-up removed (a lower Effects start budget, or density gain applied at the start of a voice), not a quieter bed alone: that fails the gate. Themes other than stage-1 dry and rain (wind 0.40, cold 0.26, urban 0.18) are not gated.
 
 **FU-AUD-MUSIC (A6-15, follow-up).** 7 track slots deferred, no files, no AI music: every slot of `horde_audio::music::TRACKS` is `Track::Deferred` (decision 9; the user's chat decision is the approval record). The director, the Music bus, the "Music & stingers" slider and `Track::File` playback with its 2 s crossfade are in; a later track only fills a slot.
@@ -2441,7 +2443,7 @@ G3.11 read 9 / 9 = 1.00 at W4-c, W4-12 and W4-14. It passes since W4-15 at exact
 | `dense_battle_60s` | -23.0 LUFS | 0.885 |
 | `max_sliders_60s` (logged) | -20.3 LUFS | 0.632 |
 
-The A6-18 60 s cue-log replay of a live battle ran at 27d763cb: a 3600-frame `npc` motion run gave 128 starts, -23.6 LUFS and true peak 0.586, +0.5 LU from the stage-1 render (`target/production-after/closing/cue-log/npc-60s`). Its `LASTLIGHT_PERF_AUDIO` change and its records are still uncommitted in the working tree (12.10).
+The A6-18 60 s cue-log replay of a live battle ran at 27d763cb: a 3600-frame `npc` motion run gave 128 starts, -23.6 LUFS and true peak 0.586, +0.5 LU from the stage-1 render (`target/production-after/closing/cue-log/npc-60s`). Its `LASTLIGHT_PERF_AUDIO` change is committed as ef778e28 (12.10).
 
 **Save clone (R58)**: a quiet `measure_performance.ps1 -SaveClone` run at c34c39cd, `save_snapshot` p99 against the 1 ms gate (G1.8). Every size passes, so R58 changes nothing and the copy-on-write stash lever is not pulled. The remedy that made 20,000 items fit is 11778f21 (shared item definition IDs).
 
@@ -2578,7 +2580,7 @@ All 11 are recorded as "pending human check" in §11 and in docs/ACCEPTANCE.md. 
 
 ### 12.10 Open work that needs no decision
 
-- **The A6-18 change in the working tree.** It touches `launch.rs`, `ui/review/fixtures.rs`, `matrix.rs` and `tests.rs`, and the VALIDATION.md, AUDIO_SURVIVAL.md and §9.3 records. It is uncommitted. Its test fails under `--no-default-features` (12.6). The writer has to make the test hold in the build without the review feature, then commit, or drop the change.
+- **The A6-18 change: done.** Its test failed under `--no-default-features` (12.6) because it had no `review` feature gate, which every review-scene test carries. With the gate it is committed as ef778e28; with `keeps_audio` reverted it fails (left 0.0, right 0.8), and it passes in the default and `dev` builds (986 and 996 passed); the `--no-default-features` build leaves it out and is green (922 passed). Its VALIDATION.md, AUDIO_SURVIVAL.md and §9.3 records are committed after it. A `replay_cue_log` re-run on the kept log reads the recorded numbers.
 - **The W7-09 record has no pin test.** No test pins `PERF_BUDGET.json acceptance.closing` (`RECORDED_CPU_GATED_SCENES` at perf_budget.rs:130 is still progressed-peak and stress). Writing the test was blocked on a passing attempt, and attempt 2 now passes, so `perf_budget_records_the_closing_acceptance` can be written.
 - **The package at the final HEAD** (12.7).
 - **Captures.** One capture run after the four code commits of 12.5, and the two carried items 10.5 left open.
