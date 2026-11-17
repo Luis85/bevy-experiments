@@ -93,7 +93,42 @@ Every pin below is a constant in `crates/horde_core/tests/determinism.rs` or `cr
 - W4-08, the single re-bless for waves 3 and 4: nothing provisional to fold, `GOLDEN` and `GAMEPLAY_TRACE` 0/6, ruleset 4. W4-09 then added the progressed pair and `V7_CONTINUATION_FNV`.
 - The closing re-bless of the production pass (rulings R36, R59, R61): it folds the pins W4-14 and W4-15 set after W4-08. `GOLDEN` 3/6 and `GAMEPLAY_TRACE` 3/6 (the three Npc runs: W4-14 aim, an Npc aims only when the aim raises its expected hits per turn, and W4-14 arrival, `npc_arrival_factor` 0.9 -> 0.5), `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 4/4 (the two recruit takeovers by W4-14, all four by W4-15's Survivor network price 1,700 -> 1,500), and `V7_CONTINUATION_FNV` (W4-14 aim: the fixture's live root defense is Mara's). Every move is class G; W4-16, W4-15's `train_companions` and waves 5 to 7 moved no pin. Ruleset 5. `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None; the reason per digest is in the `tests/determinism.rs` header.
 
-Waves 5 to 7 are presentation, audio and docs and moved no pin. Under ruling R36 a digest move after W4-08 stays provisional and is re-blessed once in the closing phase, as above. The V1-V6 continuation pins never move.
+Waves 5 to 7 are presentation, audio and docs and moved no pin. Under ruling R36 a digest move after W4-08 stays provisional and is re-blessed once in the closing phase, as above. The V1-V6 continuation pins never move. The zero-move records W5-12, A6-19 and W7-10 prove it from git history and the pin tests at the release candidate: no wave-5 or wave-6 commit touches `crates/horde_core`, and wave 7 touches it only with a doc comment and tests. See VALIDATION.md, "Zero-move records and the pins at the release candidate".
+
+**Pin values at the release candidate** (17 November 2026, HEAD 387e7f7b; `SAVE_VERSION` 7, `RULESET_VERSION` and `TRACE_RULESET` 5):
+
+| Run | `GOLDEN` / `PROGRESSED_GOLDEN` | `GAMEPLAY_TRACE` / `PROGRESSED_TRACE` |
+|---|---|---|
+| 0x1 Personal | 0xbed5e2714b6590fe | 0xa6caa6de7fd92b1a |
+| 0x1 Npc | 0x61341ecf1c422fd8 | 0x77cec20196014f8d |
+| 0x1a571167 Personal | 0x3368f18097f7fb5e | 0x5cc8bde4faf09763 |
+| 0x1a571167 Npc | 0x0118059a899fb437 | 0x1fb8dfb5f91248c7 |
+| 0xdeadbeef2026 Personal | 0x7be5c84d229d8d71 | 0x46a2adc6720f8678 |
+| 0xdeadbeef2026 Npc | 0x7a662cd4a007adc2 | 0x6fedc1ce190ab8e3 |
+| 0x1 HardCapstone | 0xab7276a741312f38 | 0x7aef2a4298a6356a |
+| 0x1 RecruitTakeover | 0x6ffd2abd5ec559b7 | 0x89869eb54e0b06ea |
+| 0xdeadbeef2026 HardCapstone | 0x52782b9ffeef7166 | 0xf483cce12e822eaa |
+| 0xdeadbeef2026 RecruitTakeover | 0xa040f93de56591c4 | 0x9e1e5d57ab945f10 |
+
+The save pins at the same commit:
+
+| Pin | Value |
+|---|---|
+| `V1_CONTINUATION_FNV` | 0xcceb2db851a07913 |
+| `V2_CONTINUATION` | six recorded lines |
+| `V3_CONTINUATION_FNV` | 0x83c6c66877caad9f |
+| `V4_CONTINUATION_FNV` | 0x6e4451024b8bcc56 |
+| `V5_CONTINUATION_FNV` | 0xbc2af76c324f6287 |
+| `V6_CONTINUATION_FNV` | 0x90a013c2877b6b59 |
+| `V6_DROP_TRACE_FNV` | 0x2016774bb9f63c67 |
+| `V6_STASH_TABLE_FNV` | 0x78686fdb47d02c09 |
+| `QUALITY_ROLL_TABLE_FNV` | 0x1f6bc2826f97e583 |
+| `FROZEN_CATALOGUE_FNV` | 0x58a8acb754431bad |
+| `V7_FIXTURE_CHECKSUM` | 8527615155064533385 |
+| `V7_FIXTURE_BYTES` | 95,266 |
+| `V7_CONTINUATION_FNV` | 0x4998700c0fb61012 |
+
+The constants in the two test files are the source of truth. Update this table at the re-bless that moves one.
 
 ## Keyed rolls and RNG streams
 

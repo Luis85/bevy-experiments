@@ -790,7 +790,7 @@ Digest ledger:
 | 2 | F, T, C (+ G if a pick changes), one re-bless W2-49 | 0 expected | unchanged | 3 |
 | 3 | 0 | 0 | unchanged | 3 |
 | 4 | G, one re-bless W4-08 | G | unchanged (charges pin re-blessed with reason only if it moves) | 4 |
-| 5-7 | 0 | 0 (PROGRESSED 0/4) | unchanged | 4 |
+| 5-7 | 0 (verified: W5-12, A6-19, W7-10) | 0 (PROGRESSED 0/4, V7 continuation unchanged) | unchanged | 4 |
 | closing re-bless (W4-14, W4-15 after W4-08) | 3/6 (G, the Npc runs: W4-14) | 3/6 (G, W4-14); PROGRESSED 4/4 golden and trace (G: W4-14 the takeovers, W4-15 price all four); V7 continuation moved (G, W4-14 aim) | unchanged | 5 |
 
 ### The freeze (W1-63)
@@ -852,6 +852,19 @@ Digest ledger:
 
 W4-15's `train_companions` (62f90d3, pacing-bot code) and W4-16 (9f18943, the power readout, never saved) moved no pin, and no wave-5, wave-6 or wave-7 commit set one. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins and the frozen-catalogue pin are unchanged. `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None with no causes. `RULESET_VERSION` and `TRACE_RULESET` move 4 -> 5: the bump names W4-14 aim, W4-14 arrival and W4-15 price (rules: a defender's aim test, an arrival factor in `progression.json`, a skill price); `train_companions` and the W4-16 readout are not rules (the readout feeds the defender cards, `OutbreakPlan::recommended_defender` and the strategy pacing bot's recruit choice, bot code and never a `Game::apply` rule). Details: VALIDATION.md "Closing re-bless and ruleset 5".
 
+**Final zero-move record (W5-12, A6-19, W7-10; 17 November 2026, HEAD 387e7f7b):** waves 5, 6 and 7 moved no pin. From a9fc30a to HEAD, `git log -G` over the pin lines finds only W4-09 (new pins), W4-14, W4-15 and the closing re-bless (8787675c), which folded them. The `horde_core` tree is the same object (055c8219) before and after waves 5 and 6 (5098a066, f461c72d). Wave 7 touches `horde_core` only with a doc comment and tests (W7-05, W7-06). W4-08, with waves 5 and 6 as ancestors, ran green on the W2-49 pins. At HEAD the determinism binary passes 13 of 13 with `determinism_anatomy`, and its 44 hash lines equal the closing re-bless's after-run. The save pin binaries pass 71 of 71 (`target/zero-move/`). The three provisional pins are None.
+
+| Family | Values at HEAD (seed order 0x1, 0x1a571167, 0xdeadbeef2026; Personal then Npc) | Last moved |
+|---|---|---|
+| `GOLDEN` | 0xbed5e2714b6590fe, 0x61341ecf1c422fd8, 0x3368f18097f7fb5e, 0x0118059a899fb437, 0x7be5c84d229d8d71, 0x7a662cd4a007adc2 | Personal W2-49; Npc closing |
+| `GAMEPLAY_TRACE` | 0xa6caa6de7fd92b1a, 0x77cec20196014f8d, 0x5cc8bde4faf09763, 0x1fb8dfb5f91248c7, 0x46a2adc6720f8678, 0x6fedc1ce190ab8e3 | Personal pre-pass (0x1a571167: W1-69); Npc closing |
+| `PROGRESSED_GOLDEN` (0x1, 0xdeadbeef2026; HardCapstone then RecruitTakeover) | 0xab7276a741312f38, 0x6ffd2abd5ec559b7, 0x52782b9ffeef7166, 0xa040f93de56591c4 | closing |
+| `PROGRESSED_TRACE` (same order) | 0x7aef2a4298a6356a, 0x89869eb54e0b06ea, 0xf483cce12e822eaa, 0x9e1e5d57ab945f10 | closing |
+| `V7_CONTINUATION_FNV` | 0x4998700c0fb61012 | closing |
+| V1-V6 continuations, `V6_DROP_TRACE_FNV`, `save_v7.json` (checksum 8527615155064533385, 95,266 bytes) | unchanged | never |
+
+`SAVE_VERSION` 7, `RULESET_VERSION` and `TRACE_RULESET` 5. The full table is in SIMULATION.md "Determinism pins" and VALIDATION.md "Zero-move records and the pins at the release candidate".
+
 ### Expected moves after the freeze
 
 | Wave | Digest | Expected | Class | Cause (commit) | Re-bless |
@@ -870,7 +883,7 @@ W4-15's `train_companions` (62f90d3, pacing-bot code) and W4-16 (9f18943, the po
 | 4 | trap `charges_per_rank` pin | not expected | G | re-blessed in W4-08 with its reason if it moves | W4-08 |
 | 4 | PROGRESSED_GOLDEN (4), PROGRESSED_TRACE, `V7_CONTINUATION_FNV` | new pins | - | cut at the wave-4 close (W4-09) | - |
 | 4, after W4-08 | the Npc GOLDEN and GAMEPLAY_TRACE runs, the two takeover PROGRESSED runs, the v7 continuation; any family W4-15 or W4-16 reaches | yes for W4-14 (measured, §9.6); W4-15 and W4-16 only if their change reaches a pinned run (a `skills.json` price or gate, the `defender_power` reading; W4-16 measured: no pinned run reads it, none moves) | G for W4-14; W4-15 and W4-16 as `support::classify` assigns | the Npc combat pass (W4-14, R59), earlier recruitment and the trained recruits (W4-15, R61: measured, the Survivor network price moves the four PROGRESSED runs, class G; `train_companions` moves none), the Npc power readout (W4-16, R62) | closing phase (`PROVISIONAL` / `PROGRESSED_PROVISIONAL` / `V7_CONTINUATION_PROVISIONAL` until then); folded in the closing re-bless |
-| 5-7 | every family | no | - | any core move: stop and ask the user | - |
+| 5-7 | every family | no (measured: none moved; W5-12, A6-19, W7-10) | - | any core move: stop and ask the user | - |
 
 ---
 

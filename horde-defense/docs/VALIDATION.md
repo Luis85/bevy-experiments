@@ -1390,7 +1390,7 @@ SIMULATION.md now describes save format 7 as built: "Save format 7" (the v1→v2
 
 The gate is `repo_checks::save_docs_name_the_v7_format_every_migration_step_pin_and_tag`. It reads the facts from the code, not from a list: every `fn v<a>_to_v<b>` step in `sim/migrations.rs` (and that the chain ends at `SAVE_VERSION`), every `save_v*.json` under `tests/fixtures/`, every top-level pin constant of the two test files (a name ending in `GOLDEN`, `TRACE`, `CONTINUATION`, `_FNV`, `FIXTURE_CHECKSUM` or `FIXTURE_BYTES`) and every tag in `hash.rs`'s `mod tags`. SIMULATION.md must say "the envelope is currently v7" and name each fact in its section; ARCHITECTURE.md must state the envelope, `RULESET_VERSION` and `SETTINGS_VERSION` values the code defines. A later migration step, fixture, pin, tag or version bump therefore fails it until the docs follow. `save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap` exercises the readers and each kind of gap on planted text.
 
-**Pins at this commit (source state, not a run).** No commit after W4-09 (`fa616e99`) changes `tests/determinism.rs`, `tests/save_migration.rs` or `tests/fixtures/`: the waves 5-7 builds set no provisional pin, `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None and both cause lists are empty. Whether the pins still hold at the release candidate is the final zero-move record (W5-12, A6-19 and W7-10's record: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6, the V1-V6 continuations, `V7_CONTINUATION_FNV` and the `save_v7.json` identity unchanged). Under ruling R36 that run belongs to the closing phase and is recorded there.
+**Pins at this commit (source state, not a run).** No commit after W4-09 (`fa616e99`) changes `tests/determinism.rs`, `tests/save_migration.rs` or `tests/fixtures/`: the waves 5-7 builds set no provisional pin, `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None and both cause lists are empty. Whether the pins still hold at the release candidate is the final zero-move record (W5-12, A6-19 and W7-10's record: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6, the V1-V6 continuations, `V7_CONTINUATION_FNV` and the `save_v7.json` identity unchanged). Under ruling R36 that run belongs to the closing phase and is recorded there (see "Zero-move records and the pins at the release candidate" below).
 
 Amended 14 November 2026 (W4-14, R59): the Npc combat balance pass landed after W4-09 and moves Npc runs on purpose, so the pins above are no longer all at their tables. `PROVISIONAL` holds the three Npc `GOLDEN` and `GAMEPLAY_TRACE` digests and `PROGRESSED_PROVISIONAL` the two recruit-takeover runs, each with the cause rows "W4-14 aim" and "W4-14 arrival" (class G); the takeovers start `PROGRESSED_TAKEOVER_BOSS_LEAD` (3000) ticks before the boss. The v7 continuation moved with the aim fix (the fixture's root defense is Mara's) and is held in `V7_CONTINUATION_PROVISIONAL` with `V7_CONTINUATION_CAUSES`, the same ledger shape. The V1-V6 continuations, `V6_DROP_TRACE_FNV`, the `save_v7.json` identity and the frozen-catalogue pin do not move: pre-v7 attempts keep the old aim test and their frozen snapshots. The closing phase folds the provisional pins (plan §9.6, "W4-14 Npc combat balance").
 
@@ -1415,6 +1415,53 @@ W4-08 (4498e26c) has every wave-5 commit as an ancestor. It ran the full verify 
 `crates/horde_audio` is a new path crate that depends on `horde_core`, not the reverse. The Cargo.lock diff adds only the `horde_audio` package and one `horde_audio` entry in `horde-defense`'s dependencies, so `horde_core`'s own dependency set does not change. Audio reads `SimEvent`s and never draws the core RNG (`horde_audio_never_reads_core_rng`). `SETTINGS_VERSION` 2 (A6-16) belongs to the settings file, which never enters the state digest.
 
 The W4-08 run above also has every wave-6 commit as an ancestor: 0/6 and 0/6 on the W2-49 pins. The progressed pair and the v7 continuation were cut at W4-09 on a tree that already held wave 6. No pin moved, and the V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity did not move.
+
+**W7-10, wave 7: no pin moved.** Wave 7 covers W7-01..W7-11 and W7-09's records. Only two of its commits touch `crates/horde_core`:
+- W7-05 (39225d69): the `charges_at_rank` doc comment in `content.rs`, a test in `tests/progression_tree.rs` and one in `examples/pacing.rs`.
+- W7-06 (c61efe1a): tests in `tests/defenders.rs`.
+
+Neither changes a rule or a pin. W7-11's two capture fixes (c3eb0aa8, d53cfe0f) are `horde_game` presentation. No W7 commit sets or changes a pin.
+
+**The pins at the release candidate (HEAD 387e7f7b, 17 November 2026; the record commits after it are docs only and leave the `horde_core` tree at ddbb4f51).**
+- `cargo test --locked -p horde_core --test determinism -- --include-ignored --nocapture --test-threads 1`: 13 passed, `determinism_anatomy` included (`target/zero-move/determinism.out`). Its 44 printed hash lines (golden, trace, keys, items, core and outcome for the six runs and the four progressed runs, and their digest and summary lines) equal the closing re-bless's after-run (`target/closing-rebless/determinism_before.out`) line for line. So the closing-phase core commits after the re-bless moved no hash either: the 20,000-item save clone (764dc4f3, 11778f21), the briefing and hover text fixes (cb825361, 54b27970, 9994bafb) and the bot's expedition-rank recruit rating (8d569d23).
+- `cargo test --locked -p horde_core --test save_migration --test save_snapshot --test schema_v7 --test balance_extras`: 11, 48, 5 and 7 passed (`target/zero-move/pins.out`). They include every continuation, drop-trace, stash, quality-roll, frozen-catalogue and `save_v7.json` pin.
+- `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None, and their cause lists are empty.
+
+Final digest table at HEAD (`SAVE_VERSION` 7, `RULESET_VERSION` and `TRACE_RULESET` 5, `SETTINGS_VERSION` 2):
+
+| Run (1800 ticks) | `GOLDEN` | `GAMEPLAY_TRACE` | Last moved |
+|---|---|---|---|
+| 0x1 Personal | 0xbed5e2714b6590fe | 0xa6caa6de7fd92b1a | golden W2-49; trace since the v4 build (c6f518d) |
+| 0x1 Npc | 0x61341ecf1c422fd8 | 0x77cec20196014f8d | closing re-bless (W4-14) |
+| 0x1a571167 Personal | 0x3368f18097f7fb5e | 0x5cc8bde4faf09763 | golden W2-49; trace W1-69 |
+| 0x1a571167 Npc | 0x0118059a899fb437 | 0x1fb8dfb5f91248c7 | closing re-bless (W4-14) |
+| 0xdeadbeef2026 Personal | 0x7be5c84d229d8d71 | 0x46a2adc6720f8678 | golden W2-49; trace since the v4 build (c6f518d) |
+| 0xdeadbeef2026 Npc | 0x7a662cd4a007adc2 | 0x6fedc1ce190ab8e3 | closing re-bless (W4-14) |
+
+| Run (rank 12, 3600 ticks) | `PROGRESSED_GOLDEN` | `PROGRESSED_TRACE` | Last moved |
+|---|---|---|---|
+| 0x1 HardCapstone | 0xab7276a741312f38 | 0x7aef2a4298a6356a | closing re-bless (W4-15 price) |
+| 0x1 RecruitTakeover | 0x6ffd2abd5ec559b7 | 0x89869eb54e0b06ea | closing re-bless (W4-14, W4-15 price) |
+| 0xdeadbeef2026 HardCapstone | 0x52782b9ffeef7166 | 0xf483cce12e822eaa | closing re-bless (W4-15 price) |
+| 0xdeadbeef2026 RecruitTakeover | 0xa040f93de56591c4 | 0x9e1e5d57ab945f10 | closing re-bless (W4-14, W4-15 price) |
+
+| Save pin | Value | Last moved |
+|---|---|---|
+| `V1_CONTINUATION_FNV` | 0xcceb2db851a07913 | never (recorded on the v2 build) |
+| `V2_CONTINUATION` | six recorded lines (t46 to t942) | never |
+| `V3_CONTINUATION_FNV` | 0x83c6c66877caad9f | never |
+| `V4_CONTINUATION_FNV` | 0x6e4451024b8bcc56 | never |
+| `V5_CONTINUATION_FNV` | 0xbc2af76c324f6287 | never |
+| `V6_CONTINUATION_FNV` | 0x90a013c2877b6b59 | never |
+| `V6_DROP_TRACE_FNV` | 0x2016774bb9f63c67 | never |
+| `V6_STASH_TABLE_FNV` | 0x78686fdb47d02c09 | never |
+| `QUALITY_ROLL_TABLE_FNV` | 0x1f6bc2826f97e583 | never |
+| `FROZEN_CATALOGUE_FNV` | 0x58a8acb754431bad | never (cut at W2-53) |
+| `V6_PAYLOAD_FNV` (`tests/save_snapshot.rs`) | 11732925792674115074 | never |
+| `V7_FIXTURE_CHECKSUM`, `V7_FIXTURE_BYTES` | 8527615155064533385, 95,266 bytes | never (the W1-63 freeze) |
+| `V7_CONTINUATION_FNV` | 0x4998700c0fb61012 | closing re-bless (W4-14 aim; cut at W4-09) |
+
+Across the whole pass after the wave-2 close, the closing re-bless (8787675c) is the only re-bless that moved a pin. It folded W4-14 and W4-15, and no other move happened in waves 5, 6 or 7.
 
 ## Closing playtest package — 16 November 2026 (W7-02, closing)
 
