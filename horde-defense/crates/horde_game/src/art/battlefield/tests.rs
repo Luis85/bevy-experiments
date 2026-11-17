@@ -2986,6 +2986,12 @@ fn cue_bars_and_labels_scale_with_zoom_inside_their_clamps() {
         assert!((10.0..=14.0).contains(&cue::font(sy)));
         assert_eq!((cue::font(sy) * 2.0).fract(), 0.0, "half-point steps");
     }
+    // `font_steps` lists exactly the sizes `font` returns (the damage pass
+    // warms them).
+    let steps: Vec<f32> = cue::font_steps().collect();
+    let mut returned: Vec<f32> = (0..1600).map(|n| cue::font(n as f32 * 0.25)).collect();
+    returned.dedup();
+    assert_eq!(steps, returned);
 }
 
 /// Design-vfx-lighting §13 (W5-09): every `perf_budget::FX_BUDGET` row equals

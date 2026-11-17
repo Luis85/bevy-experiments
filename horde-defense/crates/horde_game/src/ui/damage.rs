@@ -294,12 +294,20 @@ struct Warmed {
 }
 /// The fonts of battle text whose characters change while it plays: enemy
 /// labels (8, 10), HUD and overlay readouts (10-14, DPS 12), coin pop-ups
-/// (15, 16), the body and button styles (16), the field labels (18) and the
-/// monospace trap charges and terrain notes (10).
+/// (15, 16), the body and button styles (16), the field labels (18), the
+/// monospace trap charges and terrain notes (10) and every size the cue
+/// pass lays its labels out in on any field (`art::cue_label_sizes`: the
+/// half-point cue fonts and their CRIT callout).
 fn battle_text_fonts() -> impl Iterator<Item = FontId> {
-    [8.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0]
-        .map(FontId::proportional)
+    let mut sizes: Vec<f32> = [8.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0]
         .into_iter()
+        .chain(art::cue_label_sizes())
+        .collect();
+    sizes.sort_by(f32::total_cmp);
+    sizes.dedup_by(|a, b| a.to_bits() == b.to_bits());
+    sizes
+        .into_iter()
+        .map(FontId::proportional)
         .chain([FontId::monospace(10.0)])
 }
 /// Printable ASCII plus the separators the battle readouts use.
@@ -1169,6 +1177,75 @@ mod tests {
                 0,
                 "pixels_per_point {pixels_per_point}: font texture uploads after pass \
                  {WARMUP_PASSES} in passes {late:?}"
+            );
+        }
+    }
+    /// Closing phase (G7.x egui uploads): the cue pass lays its labels out
+    /// at `cue::font(sy)` and its CRIT fraction, sizes no fixed battle font
+    /// holds (a 9.2-pt CRIT · FIGHTING first painted 2 s into the peak
+    /// fixture uploaded 6,420 B after warmup). After one damage pass,
+    /// battle text at every cue label size adds no glyph to the atlas, at
+    /// each pixel density of the two budget sizes.
+    #[test]
+    fn damage_pass_warms_every_cue_label_size() {
+        for (native, zoom, window) in [
+            (1.0, 1.0, vec2(1440.0, 900.0)),
+            (2.0, 1.0, vec2(1440.0, 900.0)),
+            (1.0, 1.35, vec2(1050.0, 700.0)),
+            (2.0, 1.35, vec2(1050.0, 700.0)),
+        ] {
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, zoom);
+            let screen = window / zoom;
+            let mut game = fixture();
+            game.attempt_mut().unwrap().events.clear();
+            let a = game.attempt().unwrap();
+            let settings = Settings::default();
+            let mut state = Feedback::default();
+            let input = || {
+                let mut input = egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), screen)),
+                    ..Default::default()
+                };
+                input
+                    .viewports
+                    .entry(egui::ViewportId::ROOT)
+                    .or_default()
+                    .native_pixels_per_point = Some(native);
+                input
+            };
+            let mut warmup = ctx.run_ui(input(), |ui| {
+                let arena = Rect::from_min_size(pos2(24.0, 124.0), screen - vec2(48.0, 208.0));
+                draw_for(
+                    ui,
+                    a,
+                    art::ArenaProjection::for_attempt(arena, a),
+                    SceneBlend::NONE,
+                    0,
+                    &mut state,
+                    &settings,
+                    review::LootCaptureMode::Disabled,
+                    &[],
+                );
+            });
+            warmup.textures_delta.clear();
+            let mut cues = ctx.run_ui(input(), |ui| {
+                for size in art::cue_label_sizes() {
+                    let _ = ui.painter().layout_no_wrap(
+                        battle_text_glyphs(),
+                        FontId::proportional(size),
+                        Color32::WHITE,
+                    );
+                }
+            });
+            let uploads = cues.textures_delta.set.len();
+            cues.textures_delta.clear();
+            assert_eq!(
+                uploads,
+                0,
+                "pixels_per_point {}: a cue label size added glyphs after the damage pass",
+                native * zoom
             );
         }
     }

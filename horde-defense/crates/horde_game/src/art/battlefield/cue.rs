@@ -44,6 +44,11 @@ pub(super) fn font(sy: f32) -> f32 {
     ((0.16 * sy).clamp(10.0, 14.0) * 2.0).round() / 2.0
 }
 
+/// Every size [`font`] returns, 10 to 14 pt in half-point steps.
+pub(super) fn font_steps() -> impl Iterator<Item = f32> {
+    (20..=28u8).map(|half| f32::from(half) * 0.5)
+}
+
 /// The halo of a cue drawn in `color`: INK, fading with the cue.
 fn halo(color: C) -> C {
     HALO.gamma_multiply(f32::from(color.a()) / 255.0)

@@ -309,6 +309,14 @@ const CRIT_LIFT: f32 = 0.44;
 /// The callout a critically wounded hostile shows in place of its bar.
 const CRIT_TEXT: &str = "CRIT · FIGHTING";
 
+/// Every point size the cue pass lays a label out in, on any field: each
+/// [`cue::font`] step (names, phases, INCOMING, REINFORCEMENTS) and its CRIT
+/// fraction. The damage pass rasterises battle text in each (W1-64), so the
+/// first critically wounded hostile adds no glyph to the font atlas.
+pub(crate) fn cue_label_sizes() -> impl Iterator<Item = f32> {
+    cue::font_steps().flat_map(|font| [font, font * CRIT_FONT])
+}
+
 /// The plate under the CRIT callout of a critically wounded hostile drawn
 /// at `at` on a field of lane height `sy`, laid out with `p`'s fonts where
 /// no clip moves it. The damage popups keep clear of it as of a health bar
