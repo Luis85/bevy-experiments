@@ -475,7 +475,7 @@ Usage rules:
 - **Cue gate:** at least 3:1 against the INK halo. The raw ratio against graded p90 is also reported.
 - **Reduced MOTION gate** (fx-stress): consecutive-frame |Δmean L| < 0.01 and no 32x32 block ΔL > 0.1 from a flash or pulse effect.
   - The block criterion covers flash and pulse effects only (user decision R63, 2026-11-17, CF-3-22). Damage numbers and MISS labels that appear in place, and the static 1-pt tracers of reduced mode, may change a block by more.
-  - `measure_field_luminance.py motion` still reports every block over 0.1. A reported block passes when every flash field of its frame in the export's manifest is 0 (`flash_alpha_max`, `sky_flash`, `muzzle_flash_count`) and the block holds only such popups or tracers.
+  - `measure_field_luminance.py motion` still reports every block over 0.1. A reported block fails only when a flash or pulse effect changed it (a flash field of its frame in the export's manifest above 0: `flash_alpha_max`, `sky_flash`, `muzzle_flash_count`; pulses through the per-feature `reduced_*` tests). Popups, tracers and other non-flash changes pass.
 - **Storm MOTION gate** (normal): frame ΔL < 0.2, with peaks at least 240 frames apart.
 
 ## 13. Budgets (docs/PERF_BUDGET.json fx block; schema owned by perf-architecture)
