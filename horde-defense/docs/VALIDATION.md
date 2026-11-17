@@ -1468,6 +1468,53 @@ The W7-09 attempt above stands as recorded (R34). This is new evidence at a late
 - **playtest -VsyncOff at `a0278a08`** (`acc2-playtest-novsync`, exit 0, quiet window mean 11%). progressed-peak 5.06 / 5.06, stress 6.08 / 5.40 and fx-stress 6.03 / 5.50 ms. Peak uploads 0.
 - **Not re-run here.** The dev VSync-on interface pass (G1.10), the R31 A/B, the shipped-default VSync-on pass (gate 3) and the smoke times. The tree carried another session's uncommitted A6-18 edits (the `LASTLIGHT_PERF_AUDIO` help text and `keeps_audio`, inert without that variable). The perf runs above never set it.
 
+## W7-09 final perf acceptance, attempt 2 — 17 November 2026 (W7-09, closing)
+
+Attempt 2 of the W7-09 acceptance at HEAD `e54faa88`, after the closing perf fixes (`400c8efb` and `27d763cb` posed-mesh and appearance caches, `b33f03fe` cue-label glyph warm-up, `a0278a08` single-threaded frame schedules). It ran the same matrix as attempt 1: the W1-61 / W2-47 passes with `-Repeat 3`, the shipped-default stress pass for gate 3 (R26), W5-11's stress and fx-stress `-VsyncOff` gates, the R31 A/B, the shipped smoke, `measure_battlefield_egui_load --ignored` and the offline loudness tests. Evidence: `target/perf/w7-09-a2/` (not committed; `passes.log` and `cargo.log` list every invocation, `tools/` holds the driver). Attempt 1's overs stand as recorded for `30847f90` (R34). This is a new measurement at a later HEAD, not a re-measure of them. No gate, threshold, budget or code was changed.
+
+**Verdict: the acceptance is met at `e54faa88`.** All four `measure_performance.ps1` passes exit 0 on their first invocation with every group valid, no pass prints a VALID OVER, and the R31 A/B passes.
+
+**Conditions.**
+- dev exe `483ba953…`, playtest exe `0167474a…`, shipped smoke exe `a5e047d0…`, built by `measure_performance.ps1`; A/B arms `b196cbef…` (ab03da9) and `6f6a0d94…` (HEAD). RTX 1000 Ada, Vulkan, mains, power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35. Passes 2026-11-17 03:18 to 06:24 UTC, cargo steps 06:31 to 06:51 UTC.
+- The tree carried another session's uncommitted A6-18 edits (7 files: the `LASTLIGHT_PERF_AUDIO` help text, `fixtures::keeps_audio` and its test, and doc lines). They are inert without `LASTLIGHT_PERF_AUDIO`, which no run set. The A/B records B as dirty for that reason.
+- Before every pass, tasklist showed no horde-defense.exe. Every pass held the display on (R27) and waited for an R30 quiet window (86-245 s, mean load 9-16%). No foreign build ran. The user was at the machine (input idle under a minute after the driver's 30-minute courtesy wait), and every sample frame was focused. Retried runs: dev -VsyncOff stress small r2 (a Kernel-Power 507 during attempt 1), and five runs with one or two unreadable CPU load samples (dev VSync on peak normal r2; playtest VSync on peak small r3, stress small r1, fx-stress normal r3). Each was valid on its retry. Load maxima of kept runs were 54% (dev -VsyncOff), 70% (playtest -VsyncOff), 80% (dev VSync on) and 76% (playtest VSync on).
+
+| Pass | Command | Exit | Result |
+|---|---|---|---|
+| dev -VsyncOff | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | `acc-dev-novsync`, every cell passes |
+| playtest -VsyncOff | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | `acc-playtest-novsync`, every cell passes |
+| dev VSync on | `-Scene all -Profile dev -Repeat 3` | 0 | `acc-dev-vsync`, G1.10 and the peak interface gate pass |
+| playtest VSync on (shipped default) | `-Scene all -Profile playtest -Pipelined on -Repeat 3` | 0 | `acc-playtest-vsync`, gate 3 holds |
+| R31 A/B | `ab_interface_total.ps1 -Pairs 5` | 0 | `ab-interface-total`, all 20 runs valid, B / A 0.913 (normal), 0.912 (small) |
+
+Kept cells (median of 3; normal / small):
+
+| Metric | Scene | dev | playtest | Gate | Attempt 1 (dev / playtest) |
+|---|---|---|---|---|---|
+| cpu_frame p99 (ms, -VsyncOff) | progressed-peak | 5.52 / 6.36 | 5.38 / 4.78 | ≤ 10.0 | 9.22 / 8.56, 6.73 / 8.18 |
+| | stress | 6.32 / 6.70 | 6.41 / 6.19 | ≤ 10.0 | 9.80 / 9.44, 8.78 / 8.25 |
+| | fx-stress | 6.66 / 6.79 | 5.87 / 5.92 | ≤ 10.0 | **10.22** / 9.10, 8.97 / 8.95 |
+| | peak | 4.80 / 4.58 | 4.53 / 4.16 | not gated | 9.42 (normal) |
+| interface_draw mean (ms, dev, VSync on) | progressed-peak | 0.932 / 0.903 | | ≤ 1.129 / 1.030 | **1.1395 / 1.1421** |
+| | peak | 0.714 / 0.712 | | ≤ 1.1904 / 1.0752 | 0.876 / 0.876 |
+| | stress | 1.276 / 1.266 | | not gated | 1.471 / 1.469 |
+| | fx-stress | 1.372 / 1.376 | | not gated (design targets 1.13 / 1.03) | 1.592 / 1.629 |
+| interface_total mean (ms, dev, VSync on) | progressed-peak | 1.750 / 1.657 | | R31 A/B | 2.113 / 2.025 |
+| | fx-stress | 2.285 / 2.228 | | not gated | 2.642 / 2.638 |
+| egui texture uploads after warmup (worst) | every scene | 0 | 0 | 0 | **1** at peak normal (-VsyncOff) |
+
+- **The attempt-1 overs.** fx-stress dev -VsyncOff normal p99 is 6.66 ms (repeats 7.72 / 6.63 / 6.66), 3.3 ms under the gate. Peak normal uploads nothing after warmup in either profile (`b33f03fe`). progressed-peak interface_draw is 0.932 / 0.903 ms, 17% / 12% under G1.10. In the A/B sitting interface_draw read a median of about 0.990 / 0.969 ms for A (ab03da9) and 0.914 / 0.907 ms for B, so HEAD is now about 7-8% under the wave-1 exe in one sitting. In attempt 1 it was 8-9% over.
+- **CPU headroom.** The tightest gated cell is dev fx-stress small at 6.79 ms, 3.2 ms under 10.0. This agrees with the closing follow-up at `a0278a08` (`acc2-dev-novsync`: 5.79 / 5.75, 6.57 / 6.39, 7.15 / 6.82 ms). W2-47's 0.35 ms margin at dev stress small is now 3.3 ms.
+- **Frames over 50 ms.** 0 in every kept repeat of every pass and 0 driver stalls. The R34 W2-47 dev -VsyncOff progressed-peak over (12.7565 ms) is answered by this new measurement: 5.52 / 6.36 ms.
+- **Gate 3 in the shipped default configuration (R26).** `acc-playtest-vsync` stress (playtest, pipelined on, VSync on): 60.00 FPS at both sizes, p99 interval 17.65 / 19.84 ms, 0 frames over 33 ms and 0 over 50 ms in every repeat. Every other scene ran at 59.99-60.00 FPS with 0 frames over 33 ms. Gate 3 holds.
+- **Live battlefield egui gates.** Primitives at most 18 / 19 / 21 / 21 with VSync on (peak / progressed-peak / stress / fx-stress) and 19 / 20 / 22 / 22 with VSync off, against 23. Vertices (VSync on, normal): progressed-peak 38,707 of 40,000 (1,293 of headroom; 38,021 with VSync off), stress 55,055 of 61,098 (52,285 off), fx-stress 60,311 (54,482 off), the same maxima as attempt 1. fx-stress has no vertex gate; it is 787 under the stress gate. The fx-stress fixture draws 400 enemies with the rig sheet, live bursts, light pools, blood decals, sparks and loot fly-ups, so these are the W5-11 fx caps under load.
+- **Headless egui evidence.** `measure_battlefield_egui_load -- --ignored` (184.33 s, exit 0) reproduces `evidence.egui_measured` exactly for the third time: 18 primitives in every scene. Normal arena vertices: peak 32,968, progressed-peak 38,839 (1,161 of headroom), stress 57,330 and stress-5000-corpses 60,811 (287 under 61,098), at the same maximum ticks. `live_battlefield_runs_stay_within_the_egui_gates` passes. No gate moves (`egui_measured.w7_09_attempt_2`).
+- **R31 A/B.** `ab-interface-total` (06:11-06:24 UTC, every run valid in the first sitting): A median interface_total 1.8865 / 1.8168 ms, B 1.7221 / 1.6575 ms, B / A 0.9129 / 0.9124 against 1.05. Each A arm still exits 2 alone because the ab03da9 frame report predates the battlefield egui fields, as in attempt 1; the A/B reads only interface_total.
+- **Shipped and packaged smoke.** Shipped `--smoke` (playtest `--no-default-features`, `acc-playtest-novsync/shipped`): 2.131, 0.888 and 0.877 s, median 0.888 s. The first, cold run is the slow one. The packaged `Lastlight.exe --smoke` from the Package phase (61bced1a) took 1.50, 1.51 and 1.47 s. It was not re-packaged here.
+- **Loudness (offline_mix, `--include-ignored --nocapture`, 06:50 UTC, 14 passed).** `reference_mixed_60s` stage-1 -24.1 LUFS (S-max -21.5, M-max -19.1, TP 0.405), rain -22.9 (TP 0.399), `dense_battle_60s` -23.0 (TP 0.885), `max_sliders_60s` -20.3 (TP 0.632, logged). Identical to attempt 1 and to the closing record, so no calibration moves.
+- **Integrated GPU.** Not measured; it stays pending (`PERF_BUDGET.json hardware.integrated_gpu`).
+- **Still not covered by a gated span.** The perf scenes do not show the BossNotice banner after warmup, the low-HP band or an open Auto-sell panel, so those three interface costs stay unmeasured. The closing follow-up's per-schedule profile above gives the struck_props pass (inside the 0.10 ms damage pass), the EnemyVoiceIndex sync with tick_sounds (0.08 ms a frame) and W3-24's due check (under 0.01 ms). The A6-18 60 s cue-log replay and the W7-11 live-flash luminance (storm max frame delta 0.084 < 0.2) are recorded above.
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:
