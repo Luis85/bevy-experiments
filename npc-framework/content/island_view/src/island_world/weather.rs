@@ -272,12 +272,40 @@ impl SkyChange {
     }
 }
 
-/// The sky under a weather and a shock, `amount` of the way in. Rain, a
-/// storm and snow are overcast: the sun is mostly taken, so shadows all but
-/// go, and the sky light carries the day. Rain greys, a storm darkens, snow
-/// pales the haze and brings it close; a drought is dusty and warm, a harsh
-/// winter cold, a blight sallow.
+/// The sky under a weather and a shock, `amount` of the way in, at full
+/// day. Rain and a storm are overcast: the sun is mostly taken, so shadows
+/// all but go, and the sky light carries the day. A snow day is bright with
+/// soft shadows: it keeps 0.4 of the sun and a little less sky light than
+/// the overcast. Rain greys, a storm darkens, snow pales the haze and brings
+/// it close; a drought is dusty and warm, a harsh winter cold, a blight
+/// sallow. The light system asks [`sky_change_at`] the hour.
+#[cfg(test)]
 pub(crate) fn sky_change(kind: Weather, shock: Option<Shock>, amount: f32) -> SkyChange {
+    sky_change_at(kind, shock, amount, 1.0)
+}
+
+/// Snow's sun and sky light by night and at dusk: the overcast it had
+/// before snow days were brightened, so a snowy night, dusk and the lamps in
+/// it read as they did.
+const SNOW_NIGHT: (f32, f32) = (0.25, 1.4);
+/// Snow's sun and sky light by full day: soft shadows on a bright island.
+const SNOW_DAY: (f32, f32) = (0.4, 1.2);
+
+/// The sky under a weather and a shock at an hour: `day` is the sun's strength
+/// ([`sun_strength`], 0 at midnight, 0.5 at sunrise, 1 at noon). Only snow
+/// differs by the hour: its day sun and sky light come in over the first
+/// hour or so after sunrise, so the dusk and the night keep the overcast.
+pub(crate) fn sky_change_at(
+    kind: Weather,
+    shock: Option<Shock>,
+    amount: f32,
+    day: f32,
+) -> SkyChange {
+    let snow_day = {
+        let t = ((day - 0.6) / 0.25).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
+    let snow = |night: f32, full: f32| night + (full - night) * snow_day;
     let weather = match kind {
         Weather::Clear => SkyChange::CLEAR,
         Weather::Rain => SkyChange {
@@ -295,8 +323,8 @@ pub(crate) fn sky_change(kind: Weather, shock: Option<Shock>, amount: f32) -> Sk
             tint_amount: 0.58,
         },
         Weather::Snow => SkyChange {
-            sun: 0.25,
-            ambient: 1.4,
+            sun: snow(SNOW_NIGHT.0, SNOW_DAY.0),
+            ambient: snow(SNOW_NIGHT.1, SNOW_DAY.1),
             visibility: 0.32,
             tint: [0.86, 0.89, 0.93],
             tint_amount: 0.5,
@@ -981,12 +1009,32 @@ mod tests {
         assert!(storm.sun < rain.sun && rain.sun < snow.sun && snow.sun < 1.0);
         for sky in [rain, storm, snow] {
             assert!(sky.visibility < 0.5 && sky.tint_amount >= 0.4);
+            assert!(sky.ambient > 0.9);
+        }
+        for sky in [rain, storm] {
             // Overcast: the sun is mostly taken, so shadows all but go, and
             // the sky light carries the day (a night or a season's colours
             // still read through it).
             assert!(sky.sun > 0.0 && sky.sun <= 0.25, "{}", sky.sun);
-            assert!(sky.ambient > 0.9);
         }
+        // A snow day is bright with soft shadows: it keeps more of the sun
+        // than the overcast, the sky light still above a clear day's.
+        assert!(
+            (0.35..=0.45).contains(&snow.sun),
+            "a snow day is bright with soft shadows: sun {}",
+            snow.sun
+        );
+        assert!(snow.ambient > 1.0 && snow.ambient < 1.4, "{}", snow.ambient);
+        // By night and at dusk snow keeps the overcast it always had, so
+        // the night and the lamps read as before; rain does not change by
+        // the hour.
+        for dusk in [0.0, 0.3, 0.5, 0.6] {
+            let night = sky_change_at(Weather::Snow, None, 1.0, dusk);
+            assert_eq!((night.sun, night.ambient), (0.25, 1.4), "at {dusk}");
+            assert_eq!(sky_change_at(Weather::Rain, None, 1.0, dusk), rain);
+        }
+        let morning = sky_change_at(Weather::Snow, None, 1.0, 0.75);
+        assert!(morning.sun > 0.25 && morning.sun < snow.sun);
         // Under rain the sky light outweighs the sun several times over.
         assert!(rain.ambient / rain.sun > 5.0);
         // Snow pales, a storm darkens.

@@ -2151,12 +2151,18 @@ fn weather(
         let srgb = |[r, g, b]: [f32; 3]| Color::srgb(r, g, b);
         // Today's weather and a shock dim the sun, bring the haze nearer
         // and mix the sky towards their own grey. The grey follows the
-        // hour, so a wet night is still a night.
+        // hour, so a wet night is still a night; a snow day's brighter sun
+        // comes in only by full day.
         let (change, flash) = weather.as_deref().map_or(
             (crate::island_world::weather::SkyChange::CLEAR, 0.0),
             |look| {
                 (
-                    crate::island_world::weather::sky_change(look.kind, look.shock, look.amount),
+                    crate::island_world::weather::sky_change_at(
+                        look.kind,
+                        look.shock,
+                        look.amount,
+                        crate::island_atmosphere::sky::sun_strength(daylight),
+                    ),
                     look.flash,
                 )
             },

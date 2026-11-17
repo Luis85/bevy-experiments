@@ -1073,9 +1073,18 @@ In clear weather nothing is spawned and the falling pass returns at once.
 The second pass (`island_world::weather`, `fields`, `living_scene`):
 
 - **Overcast.** Rain takes the sun to 0.14 and lifts the sky light to 1.3,
-  a storm 0.06 and 0.95, snow 0.25 and 1.4: shadows all but go and the day
-  is carried by the sky light, through the same daylight pipeline, so a night
-  and the season's colours still read.
+  a storm 0.06 and 0.95: shadows all but go and the day is carried by the
+  sky light, through the same daylight pipeline, so a night and the season's
+  colours still read.
+- **A snow day is bright with soft shadows.** By full day snow keeps 0.4 of
+  the sun and 1.2 of the sky light (it was overcast at 0.25 and 1.4, which
+  left the island soft and milky from the overview), so houses, roads and
+  trees cast soft shadows. By night and at dusk snow keeps 0.25 and 1.4, so
+  a snowy night and its lamps read as before; the day values come in over
+  the first hour after sunrise (`weather::sky_change_at`, sun strength 0.6
+  to 0.85). Lying snow's glow is its own (it follows the hour, not the
+  weather's sun), and a clear winter day's full sun does not blow it out, so
+  0.4 cannot.
 - **Streaks.** 14,000 pairs of quads in a box 150 m square and 26 m high
   centred under the camera, not on the focus. Their size is in world metres
   and never grows with the zoom: rain 2.2 cm by 0.55 m, a storm 2.6 cm by
