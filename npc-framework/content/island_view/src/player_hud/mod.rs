@@ -13,6 +13,8 @@ mod rest;
 mod session;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod trade_tests;
 mod workspace;
 
 #[cfg(test)]

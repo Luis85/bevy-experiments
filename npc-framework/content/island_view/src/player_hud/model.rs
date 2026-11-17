@@ -1,5 +1,6 @@
 //! Actor-scoped player projections. Queries describe choices; they never apply work.
 mod sites;
+pub(super) mod trade;
 use bevy::prelude::*;
 use npc_framework::prelude::{SimId, SimPos};
 use serde_json::{Value, json};
@@ -708,23 +709,10 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
                     });
                 }
             }
-            // What the merchant boat wants at its next call (or this one):
-            // a sale worth carrying to the trading post.
-            let boat = view::boat(world);
-            let orders = crate::island_shell::model::boat_order_lines(
-                &crate::island_shell::boat_orders(&boat),
-                boat.docked,
-            );
-            if boat.enabled && !orders.is_empty() {
-                rows.push(Row::heading("boat_orders", "The merchant boat"));
-                for (index, line) in orders.into_iter().enumerate() {
-                    rows.push(Row::note(
-                        format!("boat_order_{index}"),
-                        line,
-                        "Sell it at the trading post while the boat is in.",
-                    ));
-                }
-            }
+            // The merchant boat: when it calls, what it buys and brings, its
+            // orders; then what you have laid on stalls. World reads, no writes.
+            trade::boat_rows(world, &mut rows);
+            trade::consigned_rows(world, &mut rows);
             if array(&village["nearby_market"]).is_empty() {
                 rows.push(Row::note(
                     "trade_empty",

@@ -1053,31 +1053,37 @@ fn outlook(world: &World) -> model::Outlook {
     }
     let boat = village::view::boat(world);
     if boat.enabled {
-        let (tick, config) = (
-            world
-                .get_resource::<SimClock>()
-                .map_or(0, |clock| clock.tick),
-            world
-                .get_resource::<SimConfig>()
-                .copied()
-                .unwrap_or_default(),
-        );
         outlook.boat_orders = model::boat_order_lines(&boat_orders(&boat), boat.docked);
-        outlook.boat = Some(match boat.leaves_at.filter(|_| boat.docked) {
-            Some(leaves) => model::BoatOutlook::In {
-                until: crate::resident_inspector::model::clock_text(
-                    config.time_of_day_permille(leaves) as i32,
-                ),
-            },
-            None => {
-                let today = village::calendar_at(tick, &config, true).0 + 1;
-                model::BoatOutlook::Due {
-                    days: boat.next_visit_day.saturating_sub(today),
-                }
-            }
-        });
+        outlook.boat = Some(boat_when(world, &boat));
     }
     outlook
+}
+
+/// Where the merchant boat is: in until a clock time, or due in some days.
+/// Shared by the calendar and the Trade workspace.
+pub(crate) fn boat_when(world: &World, boat: &village::merchant::BoatView) -> model::BoatOutlook {
+    let (tick, config) = (
+        world
+            .get_resource::<SimClock>()
+            .map_or(0, |clock| clock.tick),
+        world
+            .get_resource::<SimConfig>()
+            .copied()
+            .unwrap_or_default(),
+    );
+    match boat.leaves_at.filter(|_| boat.docked) {
+        Some(leaves) => model::BoatOutlook::In {
+            until: crate::resident_inspector::model::clock_text(
+                config.time_of_day_permille(leaves) as i32,
+            ),
+        },
+        None => {
+            let today = village::calendar_at(tick, &config, true).0 + 1;
+            model::BoatOutlook::Due {
+                days: boat.next_visit_day.saturating_sub(today),
+            }
+        }
+    }
 }
 
 fn activate(
