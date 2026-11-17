@@ -1410,6 +1410,12 @@ No wave-5, wave-6 or wave-7 commit is among them, and `tests/fixtures/` is uncha
 
 W4-08 (4498e26c) has every wave-5 commit as an ancestor. It ran the full verify green (1,826 passed) with `GOLDEN` and `GAMEPLAY_TRACE` at their W2-49 values and `PROVISIONAL` None: 0/6 and 0/6. W4-09 cut the progressed pair on a tree that already held wave 5, so wave 5 is inside their baseline. With no core change, wave 5 cannot move them, and the run at HEAD below confirms 0/4. The V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity did not move.
 
+**A6-19, wave 6: `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4.** Wave 6 is A6-00..A6-18 (acc1c8e4..aef2c788) and the integration fixes 40361897 and b258ce29. A6-00..A6-18 and 40361897 lie in the same 5098a066..f461c72d range, where the `horde_core` tree does not change. b258ce29 (the cue log names cues through `horde_audio::cue_log::cue_name`) comes after wave 4's W4-l and before W4-12, and touches only `horde_game` and `horde_audio`.
+
+`crates/horde_audio` is a new path crate that depends on `horde_core`, not the reverse. The Cargo.lock diff adds only the `horde_audio` package and one `horde_audio` entry in `horde-defense`'s dependencies, so `horde_core`'s own dependency set does not change. Audio reads `SimEvent`s and never draws the core RNG (`horde_audio_never_reads_core_rng`). `SETTINGS_VERSION` 2 (A6-16) belongs to the settings file, which never enters the state digest.
+
+The W4-08 run above also has every wave-6 commit as an ancestor: 0/6 and 0/6 on the W2-49 pins. The progressed pair and the v7 continuation were cut at W4-09 on a tree that already held wave 6. No pin moved, and the V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity did not move.
+
 ## Closing playtest package — 16 November 2026 (W7-02, closing)
 
 Built and verified at HEAD `61bced1a` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.

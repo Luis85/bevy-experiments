@@ -1080,6 +1080,8 @@ Wave-5 exit (plan §7): fx-stress within budget, the reduced MOTION gates pass a
 
 The listening pass is logged as pending.
 
+- **A6-19 result (2026-11-17, closing phase):** done, docs only. Wave 6 moved no pin: `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, and the V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity are unchanged. A6-00..A6-18 and the integration fix 40361897 leave the `horde_core` tree at 055c8219. The later fix b258ce29 touches only `horde_audio` and `horde_game`. `horde_audio` depends on `horde_core`, never the reverse, and draws no core RNG (`horde_audio_never_reads_core_rng`). No A6 commit sets or changes a pin, and W4-08, which has wave 6 as an ancestor, ran green on the W2-49 pins. The record is in VALIDATION.md, "Zero-move records and the pins at the release candidate".
+
 Wave-6 exit (plan §7): the -23 ±2 LUFS integrated / TP ≤ 0.95 FS gate is closed and the listening pass is logged as pending. Checked in the closing phase under R36.
 
 ---
