@@ -629,11 +629,12 @@ fn refresh(world: &mut World) {
         .query_filtered::<(&Hovered, &ScrollbarDragState, &mut BackgroundColor), With<PanelThumb>>()
         .iter_mut(world)
     {
-        color.0 = if hovered.get() || drag.dragging {
+        // Only a real change: a written colour re-extracts the node.
+        color.set_if_neq(BackgroundColor(if hovered.get() || drag.dragging {
             GOLD
         } else {
             Color::srgb(0.71, 0.58, 0.31)
-        };
+        }));
     }
     let font = world
         .get_resource::<ScrollFont>()

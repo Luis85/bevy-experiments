@@ -563,7 +563,10 @@ fn refresh(world: &mut World) {
             .query_filtered::<&mut Node, Or<(With<CursorTag>, With<StatusLane>)>>()
             .iter_mut(world)
         {
-            node.display = Display::None;
+            // Only a real change: a written node is laid out again.
+            if node.display != Display::None {
+                node.display = Display::None;
+            }
         }
         return;
     }

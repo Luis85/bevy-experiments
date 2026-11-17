@@ -135,17 +135,24 @@ pub(super) fn refresh(world: &mut World) {
         .query_filtered::<&mut Node, With<DeathRoot>>()
         .iter_mut(world)
     {
-        node.display = if prompt { Display::Flex } else { Display::None };
+        // Only a real change: a written node is laid out again.
+        let display = if prompt { Display::Flex } else { Display::None };
+        if node.display != display {
+            node.display = display;
+        }
     }
     for mut node in world
         .query_filtered::<&mut Node, With<SpectatorLifeRoot>>()
         .iter_mut(world)
     {
-        node.display = if watching {
+        let display = if watching {
             Display::Flex
         } else {
             Display::None
         };
+        if node.display != display {
+            node.display = display;
+        }
     }
     let stopped = world
         .get_resource::<SimControl>()

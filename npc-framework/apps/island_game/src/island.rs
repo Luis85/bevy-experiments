@@ -43,6 +43,20 @@ struct LocalIsland {
     auto_failed: bool,
     /// When this session last wrote the autosave.
     last_auto: Option<Instant>,
+    /// The minute timer's save, finishing beside the frame.
+    writing: Option<BackgroundSave>,
+}
+
+/// A timer save whose file is being written on its own thread: the frame
+/// reads the world (`island_save::begin_save`, about 20 ms instead of about
+/// 290 ms for the whole save in release), the thread turns the two big
+/// grids into JSON and writes the file, the same file a synchronous save
+/// writes. Every other save, and anything that reads or removes the save
+/// files, waits for it first ([`settle_saves`]).
+struct BackgroundSave {
+    /// The autosave (player session) or the save itself (developer host).
+    auto: bool,
+    thread: std::thread::JoinHandle<Result<(), String>>,
 }
 #[derive(Component)]
 struct SaveLabel;
@@ -347,11 +361,15 @@ fn install(
         leave_unsaved: false,
         auto_failed: false,
         last_auto: None,
+        writing: None,
     })
     .add_systems(Startup, spawn_label)
     .init_resource::<island_view::BehaviourFileRequest>()
     .add_systems(Update, behaviour_file)
-    .add_systems(Update, (save_input, close_requested, refresh_label).chain())
+    .add_systems(
+        Update,
+        (finish_saves, save_input, close_requested, refresh_label).chain(),
+    )
     .add_systems(Last, save_on_exit.in_set(bevy::app::OnAppExitSystems));
 }
 
@@ -440,12 +458,14 @@ pub(crate) fn autosave_path(path: &Path) -> PathBuf {
     path.with_extension("autosave.json")
 }
 
-/// Write the island in play to `target`. Nothing is written while no island
-/// is in play (the title, or after a failed restore).
-fn write_island(world: &mut World, target: &Path) -> Result<bool, String> {
+/// Read the island in play for a save, with the host's header. `None`
+/// while no island is in play (the title, or after a failed restore).
+fn capture_island(
+    world: &mut World,
+) -> Result<Option<island_content::village::island_save::SaveInProgress>, String> {
     let local = world.resource::<LocalIsland>();
     if !local.active {
-        return Ok(false);
+        return Ok(None);
     }
     if local._lock.is_none() {
         return Err(
@@ -454,23 +474,113 @@ fn write_island(world: &mut World, target: &Path) -> Result<bool, String> {
     }
     // Stamped with the island's save version and content: a later build
     // tells an older save from a damaged one.
-    let mut snapshot = island_content::village::island_save::save_island(world)?;
+    let mut capture = island_content::village::island_save::begin_save(world)?;
     let local = world.resource::<LocalIsland>();
-    snapshot.header.insert("local_island".into(), 1.into());
-    snapshot.header.insert(
+    let header = capture.header_mut();
+    header.insert("local_island".into(), 1.into());
+    header.insert(
         "scenario".into(),
         serde_json::to_value(&local.doc).map_err(|e| e.to_string())?,
     );
-    snapshot.header.insert("seed".into(), local.seed.into());
-    snapshot::write_atomic(target, &snapshot).map_err(|e| e.to_string())?;
-    Ok(true)
+    header.insert("seed".into(), local.seed.into());
+    Ok(Some(capture))
+}
+
+/// The slow half of a save: the big grids to JSON, then the file.
+fn write_capture(
+    capture: island_content::village::island_save::SaveInProgress,
+    target: &Path,
+) -> Result<(), String> {
+    let snapshot = capture.finish()?;
+    snapshot::write_atomic(target, &snapshot).map_err(|e| e.to_string())
+}
+
+/// Write the island in play to `target`, now. Nothing is written while no
+/// island is in play (the title, or after a failed restore).
+fn write_island(world: &mut World, target: &Path) -> Result<bool, String> {
+    settle_saves(world);
+    match capture_island(world)? {
+        Some(capture) => write_capture(capture, target).map(|()| true),
+        None => Ok(false),
+    }
+}
+
+/// The minute timer's save: read the island on this frame, write the file
+/// on a thread ([`BackgroundSave`]); [`finish_saves`] takes its outcome.
+fn begin_timer_save(world: &mut World, auto: bool) {
+    settle_saves(world);
+    let target = {
+        let local = world.resource::<LocalIsland>();
+        if auto {
+            autosave_path(&local.path)
+        } else {
+            local.path.clone()
+        }
+    };
+    world.resource_mut::<LocalIsland>().last = Instant::now();
+    let capture = match capture_island(world) {
+        Ok(Some(capture)) => capture,
+        other => {
+            let result = other.map(|_| false);
+            timer_save_done(world, auto, result);
+            return;
+        }
+    };
+    let thread = std::thread::Builder::new()
+        .name("island-save".into())
+        .spawn(move || write_capture(capture, &target));
+    match thread {
+        Ok(thread) => {
+            world.resource_mut::<LocalIsland>().writing = Some(BackgroundSave { auto, thread });
+        }
+        Err(error) => timer_save_done(world, auto, Err(error.to_string())),
+    }
+}
+
+/// Takes the outcome of a finished timer save (each frame, before input).
+fn finish_saves(world: &mut World) {
+    let done = world
+        .get_resource::<LocalIsland>()
+        .and_then(|local| local.writing.as_ref())
+        .is_some_and(|writing| writing.thread.is_finished());
+    if done {
+        settle_saves(world);
+    }
+}
+
+/// Waits for a timer save still being written and takes its outcome.
+pub(crate) fn settle_saves(world: &mut World) {
+    let Some(writing) = world
+        .get_resource_mut::<LocalIsland>()
+        .and_then(|mut local| local.writing.take())
+    else {
+        return;
+    };
+    let result = writing
+        .thread
+        .join()
+        .unwrap_or_else(|_| Err("the save thread stopped".into()))
+        .map(|()| true);
+    timer_save_done(world, writing.auto, result);
+}
+
+/// What a finished timer save leaves: the autosave's quiet bookkeeping, or
+/// the developer host's routine save.
+fn timer_save_done(world: &mut World, auto: bool, result: Result<bool, String>) {
+    if auto {
+        autosave_done(world, result);
+    } else {
+        match saved(world, result) {
+            // A failed timer save is still reported; a completed one is routine.
+            Ok(()) => world.resource_mut::<LocalIsland>().routine = true,
+            Err(error) => note_failure(world, error),
+        }
+    }
 }
 
 /// The player session's autosave: the second file, never the player's own
 /// save. A failure is said once in a lasting toast, retried every minute.
-fn autosave(world: &mut World) {
-    let target = autosave_path(&world.resource::<LocalIsland>().path);
-    let result = write_island(world, &target);
+fn autosave_done(world: &mut World, result: Result<bool, String>) {
     let mut local = world.resource_mut::<LocalIsland>();
     local.last = Instant::now();
     match result {
@@ -503,7 +613,9 @@ fn autosave(world: &mut World) {
 pub(crate) const AUTOSAVE_FAILED: &str = "The autosave failed. Your own save is not affected.";
 
 /// Remove the autosave: after a clean exit, or quitting without saving.
-pub(crate) fn remove_autosave(world: &World) {
+pub(crate) fn remove_autosave(world: &mut World) {
+    // An autosave still being written would come back after the removal.
+    settle_saves(world);
     let Some(local) = world.get_resource::<LocalIsland>() else {
         return;
     };
@@ -556,7 +668,14 @@ pub(crate) fn autosave_failed(world: &World) -> bool {
 
 pub(crate) fn save(world: &mut World) -> Result<(), String> {
     let path = world.resource::<LocalIsland>().path.clone();
-    if !write_island(world, &path).map_err(|error| format!("{SAVE_FAILED} Details: {error}"))? {
+    let result = write_island(world, &path);
+    saved(world, result)
+}
+
+/// The bookkeeping of a save of the player's file (`Ok(false)`: nothing
+/// was in play to save).
+fn saved(world: &mut World, result: Result<bool, String>) -> Result<(), String> {
+    if !result.map_err(|error| format!("{SAVE_FAILED} Details: {error}"))? {
         return Ok(());
     }
     let frontend = world.contains_resource::<crate::frontend::FrontendState>();
@@ -649,15 +768,20 @@ pub(crate) const SAVE_FAILED: &str =
     "The island could not be saved. Free some disk space or check the folder, then try again.";
 fn report_save(world: &mut World) -> bool {
     if let Err(error) = save(world) {
-        error!("{error}");
-        let mut local = world.resource_mut::<LocalIsland>();
-        local.last = Instant::now();
-        local.failed = true;
-        local.message = error;
+        note_failure(world, error);
         false
     } else {
         true
     }
+}
+
+/// A failed save of the player's file, said where the save notice reads it.
+fn note_failure(world: &mut World, error: String) {
+    error!("{error}");
+    let mut local = world.resource_mut::<LocalIsland>();
+    local.last = Instant::now();
+    local.failed = true;
+    local.message = error;
 }
 fn save_input(world: &mut World) {
     if world
@@ -681,13 +805,11 @@ fn save_input(world: &mut World) {
     let player = world.contains_resource::<crate::frontend::FrontendState>();
     if key {
         report_save(world);
-    } else if due && player {
+    } else if due {
         // The player session's minute timer writes the autosave beside the
-        // save; the player's own save is only what they asked for.
-        autosave(world);
-    } else if due && report_save(world) {
-        // A failed autosave is still reported; a completed one is routine.
-        world.resource_mut::<LocalIsland>().routine = true;
+        // save; the player's own save is only what they asked for. The
+        // developer host's timer writes the save itself.
+        begin_timer_save(world, player);
     }
 }
 pub(crate) fn close_requested(world: &mut World) {
@@ -792,13 +914,20 @@ fn refresh_label(
     gate: Option<Res<island_view::FrontendGate>>,
     mut labels: Query<(&mut Text, &mut Node), With<SaveLabel>>,
 ) {
+    let display = if gate.as_ref().is_some_and(|gate| gate.0) {
+        Display::None
+    } else {
+        Display::Flex
+    };
     for (mut label, mut node) in &mut labels {
-        label.0.clone_from(&local.message);
-        node.display = if gate.as_ref().is_some_and(|gate| gate.0) {
-            Display::None
-        } else {
-            Display::Flex
-        };
+        // Written only when it differs: a written text is measured and
+        // laid out again on the next frame.
+        if label.0 != local.message {
+            label.0.clone_from(&local.message);
+        }
+        if node.display != display {
+            node.display = display;
+        }
     }
 }
 
@@ -1018,6 +1147,7 @@ mod tests {
         // Not yet due and no key: nothing is written or said.
         let before = save_notice(app.world()).unwrap();
         save_input(app.world_mut());
+        settle_saves(app.world_mut());
         let quiet = save_notice(app.world()).unwrap();
         assert_eq!((quiet.text, quiet.routine), (before.text, false));
 
@@ -1025,6 +1155,7 @@ mod tests {
         run_ticks(app.world_mut(), 9);
         overdue(&mut app);
         save_input(app.world_mut());
+        settle_saves(app.world_mut());
         let auto = save_notice(app.world()).unwrap();
         assert!(auto.routine && !auto.failed);
         assert!(auto.age < Duration::from_secs(5), "the timer was reset");
@@ -1036,6 +1167,7 @@ mod tests {
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::F9);
         save_input(app.world_mut());
+        settle_saves(app.world_mut());
         let asked = save_notice(app.world()).unwrap();
         assert!(!asked.routine && !asked.failed);
         app.world_mut()
@@ -1044,6 +1176,7 @@ mod tests {
         // So is a save from the pause menu, which calls `save` directly.
         overdue(&mut app);
         save_input(app.world_mut());
+        settle_saves(app.world_mut());
         assert!(save_notice(app.world()).unwrap().routine);
         save(app.world_mut()).unwrap();
         assert!(!save_notice(app.world()).unwrap().routine);
@@ -1053,6 +1186,7 @@ mod tests {
         app.world_mut().resource_mut::<LocalIsland>().path =
             dir.join("missing-parent").join("save.json");
         save_input(app.world_mut());
+        settle_saves(app.world_mut());
         let failed = save_notice(app.world()).unwrap();
         assert!(failed.failed && !failed.routine);
         assert!(failed.text.starts_with(SAVE_FAILED), "{}", failed.text);

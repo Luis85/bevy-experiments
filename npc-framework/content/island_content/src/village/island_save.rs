@@ -87,6 +87,104 @@ pub fn save_island(world: &mut World) -> Result<WorldSnapshot, String> {
     Ok(snap)
 }
 
+/// An island save taken in two steps, so its slow part can leave the frame.
+///
+/// Two dense grids are 98% of a save (the spatial grid's static layer and
+/// the terrain, 9 of 9.2 MB of JSON in a village-life save) and most of its
+/// cost: turning them into JSON values took about 110 of 135 ms (release).
+/// [`begin_save`] reads the world as [`save_island`] does, but with those
+/// two resources swapped for empty stand-ins during the call (without
+/// change detection: no system sees a change, and the world holds the same
+/// values afterwards), and keeps copies of them; [`SaveInProgress::finish`]
+/// turns the copies into JSON values by their own registered functions, on
+/// any thread. The finished snapshot equals [`save_island`]'s.
+pub struct SaveInProgress {
+    snapshot: WorldSnapshot,
+    /// Only the copied grids, the snapshot registry and the content stamp.
+    grids: World,
+}
+
+/// Starts a save of the island in play (see [`SaveInProgress`]).
+///
+/// # Errors
+/// As [`save_island`].
+pub fn begin_save(world: &mut World) -> Result<SaveInProgress, String> {
+    use super::frontier::terrain::TerrainState;
+    use npc_framework::kernel::registry::ContentHash;
+    use npc_framework::prelude::{GridBounds, SpatialGrid};
+    use npc_framework::snapshot::SnapshotRegistry;
+    // Freezes the content first, so the copy carries its stamp.
+    content_hash(world);
+    let mut grids = World::new();
+    if let Some(registry) = world.get_resource::<SnapshotRegistry>() {
+        grids.insert_resource(registry.clone());
+    }
+    if let Some(stamp) = world.get_resource::<ContentHash>() {
+        grids.insert_resource(stamp.clone());
+    }
+    let empty_grid = || SpatialGrid::new(1, GridBounds::centered(0, 0));
+    let empty_terrain = || TerrainState {
+        width: 0,
+        height: 0,
+        cells: Vec::new(),
+        revision: 0,
+    };
+    let grid = world
+        .get_resource_mut::<SpatialGrid>()
+        .map(|mut grid| std::mem::replace(grid.bypass_change_detection(), empty_grid()));
+    let terrain = world
+        .get_resource_mut::<TerrainState>()
+        .map(|mut terrain| std::mem::replace(terrain.bypass_change_detection(), empty_terrain()));
+    let read = snapshot::save(world);
+    // Back in place before anything else can look.
+    if let Some(grid) = grid {
+        grids.insert_resource(grid.clone());
+        *world
+            .resource_mut::<SpatialGrid>()
+            .bypass_change_detection() = grid;
+    }
+    if let Some(terrain) = terrain {
+        grids.insert_resource(terrain.clone());
+        *world
+            .resource_mut::<TerrainState>()
+            .bypass_change_detection() = terrain;
+    }
+    let mut snapshot = read?;
+    stamp(world, &mut snapshot);
+    Ok(SaveInProgress { snapshot, grids })
+}
+
+impl SaveInProgress {
+    /// The finished snapshot: the copied grids saved by their own registered
+    /// functions, in place of the stand-ins [`begin_save`] read.
+    ///
+    /// # Errors
+    /// As [`save_island`].
+    pub fn finish(self) -> Result<WorldSnapshot, String> {
+        let Self {
+            mut snapshot,
+            mut grids,
+        } = self;
+        use super::frontier::terrain::TerrainState;
+        use npc_framework::kernel::hash::SimHashResource;
+        use npc_framework::prelude::SpatialGrid;
+        let mut part = snapshot::save(&mut grids)?;
+        // Only the two grids: other resources' functions may say something
+        // of an empty world too (`key_replan_pending` does).
+        for name in [SpatialGrid::NAME, TerrainState::NAME] {
+            if let Some(value) = part.resources.remove(name) {
+                snapshot.resources.insert(name.to_owned(), value);
+            }
+        }
+        Ok(snapshot)
+    }
+
+    /// The header, for the host's own keys.
+    pub fn header_mut(&mut self) -> &mut serde_json::Map<String, Value> {
+        &mut self.snapshot.header
+    }
+}
+
 /// Writes this build's identity into a snapshot's header.
 pub fn stamp(world: &mut World, snap: &mut WorldSnapshot) {
     let me = identity(world);

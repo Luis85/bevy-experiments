@@ -1252,9 +1252,15 @@ fn label_typography(
         return;
     }
     let Some(font) = font else { return };
+    let face: bevy::text::FontSource = font.0.clone().into();
     for (mut text, actor) in &mut labels {
-        text.font = font.0.clone().into();
-        text.font_size = FontSize::Px(if actor { 13.0 } else { 12.0 });
+        // Written only when it differs: a written font re-measures and
+        // re-lays out the label (139 labels every frame before).
+        let size = FontSize::Px(if actor { 13.0 } else { 12.0 });
+        if text.font != face || text.font_size != size {
+            text.font = face.clone();
+            text.font_size = size;
+        }
     }
 }
 fn caption_short(value: &str, limit: usize) -> String {

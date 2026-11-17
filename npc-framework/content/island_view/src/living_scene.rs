@@ -27,7 +27,15 @@ pub(crate) struct TerrainChunk {
     x: i32,
     z: i32,
     signature: u64,
+    /// The season its colours were drawn for (`None`: never drawn).
+    season: Option<Season>,
 }
+
+/// How many land chunks a season change recolours per frame. A whole
+/// island at once took 170 ms in one frame (release) and a burst of mesh
+/// uploads; spread out, the new season sweeps over the land in about a
+/// second and no frame pays more than a few milliseconds.
+const SEASON_CHUNKS_PER_FRAME: usize = 3;
 /// The translucent shallow-water tint of one chunk, kept beside its land.
 #[derive(Component)]
 pub(crate) struct ShoreChunk {
@@ -1264,6 +1272,7 @@ fn spawn_terrain_chunks(
                     x,
                     z,
                     signature: chunk_signature(terrain, x, z),
+                    season: Some(season),
                 },
                 MeshMaterial3d(material.clone()),
                 Transform::default(),
@@ -1637,8 +1646,15 @@ fn sync_terrain(
 ) {
     let (_, season, _) = island_content::village::calendar_at(clock.tick, &config, true);
     let season = crate::island_world::ambient::view_season().unwrap_or(season);
-    let season_changed = style.season != season;
-    if !terrain.is_changed() && !season_changed {
+    if style.season != season {
+        style.season = season;
+    }
+    // A season still sweeping over the land keeps this system working until
+    // every chunk wears it.
+    let sweeping = chunks
+        .iter()
+        .any(|(_, chunk, _)| chunk.season != Some(season));
+    if !terrain.is_changed() && !sweeping {
         return;
     }
     if let Some(mut built) = built {
@@ -1646,32 +1662,42 @@ fn sync_terrain(
     }
 
     let roads = roads.map(|roads| roads.clone()).unwrap_or_default();
+    let mut recoloured = 0;
     for (entity, mut chunk, handle) in &mut chunks {
+        // A shape edit is drawn at once; a new season only within the
+        // frame's budget (`SEASON_CHUNKS_PER_FRAME`).
+        let edited =
+            terrain.is_changed() && chunk_signature(&terrain, chunk.x, chunk.z) != chunk.signature;
+        let stale = chunk.season != Some(season);
+        if !edited && !(stale && recoloured < SEASON_CHUNKS_PER_FRAME) {
+            continue;
+        }
         let signature = chunk_signature(&terrain, chunk.x, chunk.z);
-        if signature != chunk.signature || season_changed {
-            match terrain_mesh(&terrain, &roads, chunk.x, chunk.z, season) {
-                Some(mesh) => {
-                    if let Some(handle) = handle
-                        && let Some(mut asset) = meshes.get_mut(&handle.0)
-                    {
-                        *asset = mesh;
-                    } else {
-                        commands.entity(entity).insert(Mesh3d(meshes.add(mesh)));
-                    }
+        match terrain_mesh(&terrain, &roads, chunk.x, chunk.z, season) {
+            Some(mesh) => {
+                if !edited {
+                    recoloured += 1;
                 }
-                None => {
-                    if let Some(handle) = handle {
-                        commands.entity(entity).remove::<(Mesh3d, Aabb)>();
-                        // Each chunk owns its asset. Remove it immediately so
-                        // no stale land or empty replacement reaches rendering.
-                        meshes.remove(handle.id());
-                    }
+                if let Some(handle) = handle
+                    && let Some(mut asset) = meshes.get_mut(&handle.0)
+                {
+                    *asset = mesh;
+                } else {
+                    commands.entity(entity).insert(Mesh3d(meshes.add(mesh)));
                 }
             }
-            chunk.signature = signature;
+            None => {
+                if let Some(handle) = handle {
+                    commands.entity(entity).remove::<(Mesh3d, Aabb)>();
+                    // Each chunk owns its asset. Remove it immediately so
+                    // no stale land or empty replacement reaches rendering.
+                    meshes.remove(handle.id());
+                }
+            }
         }
+        chunk.signature = signature;
+        chunk.season = Some(season);
     }
-    style.season = season;
 }
 
 fn sync_shore(
@@ -2131,7 +2157,10 @@ pub(crate) fn elevation(
             let y = cell.height_mm.max(0) as f32 / 1000.0;
             if actor {
                 transform.translation.y += y;
-            } else {
+            } else if transform.translation.y != y {
+                // Written only when it differs: a written root re-propagates
+                // its whole model and re-uploads its instances (about 130
+                // buildings, plots and animals every frame before).
                 transform.translation.y = y;
             }
         }

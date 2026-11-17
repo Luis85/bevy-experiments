@@ -198,3 +198,32 @@ fn a_save_after_a_hunt_a_death_a_removed_patch_and_a_cancelled_site_continues() 
         assert!(error.contains("is missing"), "{error}");
     }
 }
+
+/// The host's minute timer reads the island on the frame and writes the
+/// two big grids on a thread (`island_save::begin_save`): the finished save
+/// is the whole save byte for byte, and the world it was taken from runs on
+/// exactly as a twin that was never saved (no change detection is touched).
+#[test]
+fn a_save_finished_off_the_frame_is_the_whole_save_and_changes_nothing() {
+    use village::island_save::{begin_save, save_island};
+    let mut saved = world_with(world);
+    let mut twin = world_with(world);
+    for round in 0..6 {
+        let begun = begin_save(saved.world_mut()).expect("begun");
+        let finished = std::thread::spawn(move || begun.finish())
+            .join()
+            .expect("the thread")
+            .expect("finished");
+        let whole = save_island(saved.world_mut()).expect("whole");
+        assert_eq!(
+            serde_json::to_vec(&finished).expect("json"),
+            serde_json::to_vec(&whole).expect("json"),
+            "round {round}"
+        );
+        for _ in 0..250 {
+            run_ticks(saved.world_mut(), 1);
+            run_ticks(twin.world_mut(), 1);
+            assert_eq!(state_hash(saved.world_mut()), state_hash(twin.world_mut()));
+        }
+    }
+}

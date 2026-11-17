@@ -66,6 +66,22 @@ pub fn end_tick() {
     }
 }
 
+/// Closes one tick like [`end_tick`] and returns that tick's sums
+/// (nanoseconds) by probe name, for a per-tick breakdown of slow ticks.
+pub fn end_tick_rows() -> Vec<(&'static str, u64)> {
+    let mut rows = Vec::new();
+    if let Ok(mut table) = TABLE.lock() {
+        for (name, row) in table.iter_mut() {
+            if row.tick_ns > 0 {
+                let sum = std::mem::take(&mut row.tick_ns);
+                row.ticks.push(sum);
+                rows.push((*name, sum));
+            }
+        }
+    }
+    rows
+}
+
 /// A copy of the table, by probe name.
 pub fn table() -> BTreeMap<&'static str, Row> {
     TABLE.lock().map(|table| table.clone()).unwrap_or_default()

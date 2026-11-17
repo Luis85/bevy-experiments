@@ -155,3 +155,118 @@ at startup. A 20 ms tick then costs one late frame (about 25-30 ms at 10x) and a
 (about 20-30 ms) instead of a cascade; the clock loses those few ticks of backlog instead of stalling. A
 wall-time budget per frame in the driver (`npc_kernel::driver`) would be smoother still, but that is a
 generic-crate change.
+
+## S6: the 10x hitches and the view's frame floor
+
+Fixture `village-life` (41 residents, three villages, from 10:05 of day 2), developer host
+(`--island-save` copy, `--island-mode inspector`, island overview camera, 1280x720, muted),
+`ISLAND_FRAME_LOG`, the first 10 s of running frames dropped; the same script and fixture as the S5
+capture pass (`target/npc-out/s5/captures.md`). Before = S5's numbers (HEAD `d8e43979`, the S5
+release and dev builds); after = this tree. Output: `target/npc-out/s6/` (`frames/*/frames.csv`,
+`profile-*.json`, `before/`, `after/` profiler reports from `npc/perf`).
+
+### What the 200-330 ms frames were
+
+None of them was a simulation tick. The whole-day headless profile of the same save (the profile
+test with `PROFILE_SAVE`, `PROFILE_TICKS=24000`, `PROFILE_WORST`; `target/npc-out/s6/profile-before-day.json`)
+has its worst tick at 21.5 ms; the frame log puts the long frames at the host and the view:
+
+| Long frame (release, 10x) | When | Cause | Cost |
+|---|---|---|---|
+| 240-330 ms | every 60 s of real time (59.7, 120.0, 180.2 s; any time of day) | the minute timer's save on the frame: `snapshot::save` 206 ms (two dense grids, the spatial grid's statics 5.6 MB and the terrain 3.9 MB, are 98% of the 9 MB save and most of its cost), JSON 35-53 ms, `sync_all` and rename | 290 ms on one frame |
+| 240-290 ms | at 00:00 of the day the season changes (tick of day 14-20) | `living_scene::sync_terrain` re-meshed every land chunk of the island for the new season's colours in one frame | 168 ms, plus 18 ms of mesh uploads |
+| ~100 ms (rare) | 02:49, 05:35, 15:37 in S5 and again in S6 | not identified; one frame each, view side (the sim's worst tick is 21 ms) | |
+
+Sim ticks, whole day, release, headless (unchanged by this pass; no sim code changed):
+
+| tick | time of day | ms | biggest probes |
+|---|---|---|---|
+| 44800 | 20:48 | 21.5 | `eco.frontier` 20.9 |
+| 57000 | 09:00 | 17.6 | `eco.market` 7.9, `eco.frontier` 6.0 |
+| 34523 | 10:31 | 14.4 | `sup.route_estimate.start` 10.6 (`start.life.hunt` 7.3) |
+| every 600 ticks | | 11-15 | the market round (`eco.market` 6-8) with `eco.frontier` 2-7 |
+| 49047 | 01:02 | 13.1 | `eco.production_refresh` 6.0 |
+
+Mean 1.43 ms, p50 1.0, p95 3.8, p99 6.4 ms a tick over the day (41 residents). In the game, with the
+profiler's spans and probes on, a daytime tick costs about 2.2 ms (`drive_sim` p50 13 ms at 6 ticks).
+
+### What was changed
+
+- The timer save leaves the frame (`content/island_content/src/village/island_save.rs`
+  `begin_save` / `SaveInProgress::finish`; `apps/island_game/src/island.rs` `begin_timer_save`,
+  `finish_saves`, `settle_saves`). The frame reads the world with the two grids swapped for empty
+  stand-ins (without change detection) and keeps copies, 19.5 ms instead of 206 ms (release); a
+  thread turns the copies into JSON by their own registered functions and writes the file. The
+  finished snapshot equals `save_island`'s byte for byte (profile test `save_cost`, and
+  `island_save_continue::a_save_finished_off_the_frame_is_the_whole_save_and_changes_nothing`: six
+  saves 250 ticks apart, the saved world's hash equal to an unsaved twin's every tick). Ctrl+S, the
+  pause menu, quitting and the title still save synchronously, and each first waits for a timer save
+  in flight; removing or adopting the autosave waits too.
+- A new season sweeps over the land (`content/island_view/src/living_scene.rs` `sync_terrain`,
+  `SEASON_CHUNKS_PER_FRAME = 3`): three land chunks a frame are recoloured, in about a second; shape
+  edits are still drawn at once. Kenney materials still turn at once.
+- The paused frame wrote to UI and scene components every frame, and each write re-ran text
+  measurement, layout or transform propagation: 139 world-label fonts (`village_world::label_typography`),
+  the save label's text and display (`island_game` `refresh_label`), 40 patch chips and the cursor tag
+  of the closed shape tools (`shape_tools/resources.rs`, `shape_tools/palette.rs`), the death and
+  spectator roots (`player_hud/life.rs`), the panel thumb colour (`panel_scroll.rs`), and the height of
+  about 130 static models (`living_scene::elevation`). Each now writes only a value that differs.
+  After: no `Text`/`TextFont` changes on a paused frame; 2,819 bone and 484 wind-plant transforms
+  still change (animations and wind, by design).
+- Measurement: `probe::end_tick_rows` and the profile test's `PROFILE_SAVE`, `PROFILE_SKIP`,
+  `PROFILE_WORST` (slowest ticks with time of day and probes) and `PROFILE_SAVE_COST`.
+
+### Before and after
+
+Paused frame (clock stopped, same camera):
+
+| Build | Frames | Mean ms | p50 | p95 | Max | > 18 ms | > 20 ms | > 25 ms |
+|---|---|---|---|---|---|---|---|---|
+| release before | 2544 | 18.45 | 17.93 | 22.0 | 38.3 | 1217 (48%) | 569 | 13 |
+| release after | 1907 | 16.70 | 16.64 | 18.1 | 68.3 | 105 (6%) | 32 | 5 |
+| dev before | 989 | 21.42 | 20.70 | 26.5 | 40.7 | 942 (95%) | 605 | 96 |
+| dev after | 1824 | 17.43 | 16.50 | 22.6 | 52.0 | 600 (33%) | 302 | 37 |
+
+The release paused frame is now at the display's 60 Hz (16.67 ms; "> 16.7 ms" only counts vsync
+jitter there, so the table counts > 18 ms). Main-thread work on a paused frame (`npc/perf`, release):
+Bevy systems 8.9 → 6.0 ms, island view 3.8 → 3.4 ms, `measure_text_system` 2.0 → 0 ms; the render
+thread now waits about 6 ms a frame for the swap chain.
+
+10x:
+
+| Build | Frames | Game days | Mean ms | p95 | p99 | Max | > 16.7 ms | > 33 ms | > 50 ms | Sim speed |
+|---|---|---|---|---|---|---|---|---|---|---|
+| release before | 5897 | 1.64 | 36.3 | 52.4 | 62.7 | 332.1 | 5897 (100%) | 3284 (56%) | 494 | 9.2x |
+| release after | 6836 | 1.72 | 31.7 | 47.9 | 57.6 | 103.6 | 6836 (100%) | 3074 (45%) | 212 | 9.6x |
+| dev before | 4161 | 1.34 | 51.9 | 74.4 | 97.4 | 351.7 | 4161 (100%) | 3860 (93%) | 2280 | 7.5x |
+| dev after, run 1 | 5008 | 1.47 | 43.1 | 66.2 | 92.9 | 2063.9 | 5008 (100%) | 3266 (65%) | 1509 | 8.2x |
+| dev after, run 2 | 5170 | 1.52 | 41.8 | 63.1 | 79.0 | 162.3 | 5170 (100%) | 3371 (65%) | 1427 | 8.5x |
+
+Release 10x frames by ticks run: 3 ticks 18.8 ms, 4 ticks 21.0, 5 ticks 24.2, 6 ticks 30.4,
+7 ticks 35.8, 8 ticks 44.0 ms (before: 4 ticks 23.0 ... 8 ticks 46.3). The 240-330 ms frames are gone
+(worst 104 ms). Dev run 1 had one 2.06 s frame at
+110 s of real time (04:26), not at a minute mark and with nothing in the log; run 2 of the same
+build had none (worst 162 ms), so it is noted, not explained.
+
+### What remains
+
+- 10x is still not smooth: the steady cost is the simulation itself. A 10x frame at 60 Hz needs
+  3.3 ticks; at about 2.2 ms a daytime tick in the game (13-14 ms per frame at the 6 ticks a 30 ms
+  frame needs) plus the view's 9-10 ms of main-thread work, a frame takes 21-30 ms, so the next one
+  needs more ticks. Closing that needs the sim cheaper per tick (the leaf starts' supplier and route
+  lookups are still 25-40% of a tick; the market round and `eco.frontier` 6-21 ms every 600 ticks) or
+  run beside the frame; neither is a view or host change.
+- Turning the profiler's spans off (`RUST_LOG=warn`) gave only 31.7 → 30.4 ms mean at 10x: the
+  debug-tools build's tracing is not the cost.
+- Rare single ~100 ms frames at fixed-looking times (02:49, 05:35, 15:37), not caught by the
+  profiler in a short run; `island_world::boat::sync` costs 2.5 ms four times a second
+  (`merchant::status` prices every good the boat trades).
+
+### Hash neutrality and checks (S6)
+
+- `target/release/npcctl replay verify tests/replays/island_living_world_s{7,11,23}.json`: each
+  `{"ok":true,"checked":40,"first_mismatch":null}`.
+- `cargo test --locked -p island_content --no-fail-fast`: 70 test binaries ok, 307 passed, 0 failed,
+  41 ignored; `cargo test --locked -p island_view -p island_game`: 586 + 52 + 1 passed, 0 failed.
+- `cargo clippy --locked -p island_content -p island_view -p island_game --all-targets -- -D warnings`
+  and `cargo fmt --all -- --check`: clean.

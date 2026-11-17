@@ -1008,12 +1008,9 @@ fn refresh(world: &mut World) {
     }
     if !shown {
         hide::<TagRoot>(world);
-        for mut node in world
-            .query_filtered::<&mut Node, With<PatchLabel>>()
-            .iter_mut(world)
-        {
-            node.display = Display::None;
-        }
+        // Only a real change: a written node is laid out again (the 40
+        // patch chips every frame before, with the tools closed).
+        hide::<PatchLabel>(world);
         return;
     }
     // The goods grid, built once the world's goods are known.
@@ -1143,11 +1140,15 @@ fn refresh(world: &mut World) {
         if let Some(mut node) = world.get_mut::<Node>(tag) {
             match (cursor, line.is_some()) {
                 (Some(cursor), true) => {
-                    node.display = Display::Flex;
-                    node.left = px(cursor.x / scale + 18.0);
-                    node.top = px(cursor.y / scale + 18.0);
+                    let (left, top) = (px(cursor.x / scale + 18.0), px(cursor.y / scale + 18.0));
+                    if node.display != Display::Flex || node.left != left || node.top != top {
+                        node.display = Display::Flex;
+                        node.left = left;
+                        node.top = top;
+                    }
                 }
-                _ => node.display = Display::None,
+                _ if node.display != Display::None => node.display = Display::None,
+                _ => {}
             }
         }
     }
@@ -1264,10 +1265,15 @@ fn labels(world: &mut World, open: bool, scale: f32) {
                 };
                 w::set_text(world, text, &words);
                 w::show(world, text, !words.is_empty());
+                // Written only when it moved: a written node is laid out
+                // again (40 chips every frame before).
                 if let Some(mut node) = world.get_mut::<Node>(entity) {
-                    node.display = Display::Flex;
-                    node.left = px(chip.left_top.x.round());
-                    node.top = px(chip.left_top.y.round());
+                    let (left, top) = (px(chip.left_top.x.round()), px(chip.left_top.y.round()));
+                    if node.display != Display::Flex || node.left != left || node.top != top {
+                        node.display = Display::Flex;
+                        node.left = left;
+                        node.top = top;
+                    }
                 }
             }
             None => {

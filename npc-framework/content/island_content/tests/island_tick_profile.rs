@@ -10,6 +10,13 @@
 //!   cargo test --locked --release -p island_content --test island_tick_profile -- --ignored --nocapture
 //! ```
 //!
+//! Whole-day hunt for slow ticks (S6): `PROFILE_SAVE=PATH` profiles a saved
+//! island (a capture fixture or a player save) instead of a warmed-up seed,
+//! `PROFILE_SKIP=N` runs N ticks before measuring, `PROFILE_TICKS` sets the
+//! window (24,000 is one day), `PROFILE_WORST=N` lists the N slowest ticks
+//! with their time of day and each probe's share, and `PROFILE_SAVE_COST=1`
+//! times one island save (snapshot, JSON, file) at the end.
+//!
 //! Wall time is read only to report it; it never feeds the sim.
 use bevy_ecs::prelude::*;
 use island_content::village::{self, Villager, probe};
@@ -38,17 +45,77 @@ fn timed_tick(world: &mut World) -> Duration {
     start.elapsed()
 }
 
+/// One slow tick: its wall time (ns), its tick and each probe's sum (ns).
+type SlowTick = (u64, u64, Vec<(&'static str, u64)>);
+
+/// The island of a save, opened as the host's Continue does.
+fn open_save(path: &str) -> bevy_app::App {
+    use npc_framework::snapshot;
+    let saved = snapshot::read(std::path::Path::new(path)).expect("a readable save");
+    let doc: npc_framework::agent_io::scenario::ScenarioDoc =
+        serde_json::from_value(saved.header["scenario"].clone()).expect("the save's scenario");
+    let seed = saved.header["seed"].as_u64().expect("the save's seed");
+    let mut loaded = island_content::scenario::load_with(&doc, seed, |_| {}).expect("loads");
+    npc_framework::agent_io::scenario::attach_controllers(&doc, &mut loaded).expect("controllers");
+    let mut app = loaded.app;
+    snapshot::load(app.world_mut(), &saved, snapshot::LoadMode::Strict).expect("restores");
+    app
+}
+
+#[allow(clippy::disallowed_methods)] // determinism: profiling only; never feeds the sim.
+fn save_cost(world: &mut World) -> Value {
+    let start = Instant::now();
+    let snap = village::island_save::save_island(world).expect("snapshot");
+    let snapshot_us = start.elapsed().as_micros();
+    let start = Instant::now();
+    let bytes = serde_json::to_vec(&snap).expect("json");
+    let json_us = start.elapsed().as_micros();
+    let start = Instant::now();
+    let begun = village::island_save::begin_save(world).expect("begin");
+    let begin_us = start.elapsed().as_micros();
+    let start = Instant::now();
+    let split = begun.finish().expect("finish");
+    let finish_us = start.elapsed().as_micros();
+    let same = serde_json::to_vec(&split).expect("json") == bytes;
+    let start = Instant::now();
+    let _ = npc_framework::kernel::hash::state_hash(world);
+    let state_hash_us = start.elapsed().as_micros();
+    let path = std::env::temp_dir().join("island_tick_profile_save.json");
+    let start = Instant::now();
+    npc_framework::snapshot::write_atomic(&path, &snap).expect("written");
+    let write_us = start.elapsed().as_micros();
+    let _ = std::fs::remove_file(&path);
+    json!({
+        "bytes": bytes.len(),
+        "snapshot_us": snapshot_us,
+        "json_us": json_us,
+        "write_atomic_us (json + sync + rename)": write_us,
+        "begin_save_us (on the frame)": begin_us,
+        "finish_us (off the frame)": finish_us,
+        "state_hash_us": state_hash_us,
+        "split_save_equals_save_island": same,
+    })
+}
+
 #[test]
 #[ignore = "profile run (S4): minutes per warm-up day; run with --release"]
 fn island_tick_profile() {
     let seed = env("PROFILE_SEED", 11);
     let days = env("PROFILE_DAYS", 7);
     let ticks = env("PROFILE_TICKS", 2_000);
-    let mut app = island_content::replay::try_new_replay_app(seed, "island:living_world", 1)
-        .expect("island app");
+    let worst = usize::try_from(env("PROFILE_WORST", 20)).unwrap_or(20);
+    let save = std::env::var("PROFILE_SAVE").ok();
+    let mut app = match &save {
+        Some(path) => open_save(path),
+        None => island_content::replay::try_new_replay_app(seed, "island:living_world", 1)
+            .expect("island app"),
+    };
     let day = app.world().resource::<SimConfig>().day_length;
     let world = app.world_mut();
-    run_ticks(world, days * day);
+    if save.is_none() {
+        run_ticks(world, days * day);
+    }
+    run_ticks(world, env("PROFILE_SKIP", 0));
     let residents = world
         .query::<(Entity, &Villager)>()
         .iter(world)
@@ -59,9 +126,18 @@ fn island_tick_profile() {
     let revision = |world: &World| world.resource::<SpatialGrid>().revision();
     let mut last = revision(world);
     let mut revisions = 0_u64;
+    // (ns, tick, probes of that tick), the slowest `worst` kept.
+    let mut slow: Vec<SlowTick> = Vec::new();
     for _ in 0..ticks {
-        tick_ns.push(u64::try_from(timed_tick(world).as_nanos()).unwrap_or(u64::MAX));
-        probe::end_tick();
+        let at = world.resource::<SimClock>().tick;
+        let ns = u64::try_from(timed_tick(world).as_nanos()).unwrap_or(u64::MAX);
+        tick_ns.push(ns);
+        let parts = probe::end_tick_rows();
+        if slow.len() < worst || slow.last().is_some_and(|(least, ..)| ns > *least) {
+            slow.push((ns, at, parts));
+            slow.sort_by_key(|(ns, at, _)| (std::cmp::Reverse(*ns), *at));
+            slow.truncate(worst);
+        }
         let now = revision(world);
         revisions += u64::from(now != last);
         last = now;
@@ -95,7 +171,23 @@ fn island_tick_profile() {
             })
         })
         .collect();
+    let slow: Vec<Value> = slow
+        .into_iter()
+        .map(|(ns, at, mut parts)| {
+            let of_day = at % day;
+            parts.sort_by_key(|(name, ns)| (std::cmp::Reverse(*ns), *name));
+            json!({
+                "tick": at,
+                "time_of_day": format!("{:02}:{:02}", of_day * 24 / day, of_day * 24 * 60 / day % 60),
+                "tick_of_day": of_day,
+                "ms": format!("{:.1}", Duration::from_nanos(ns).as_secs_f64() * 1000.0),
+                "probes_ms": parts.iter().take(12).map(|(name, ns)| format!("{name} {:.1}", Duration::from_nanos(*ns).as_secs_f64() * 1000.0)).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    let save_cost = (env("PROFILE_SAVE_COST", 0) != 0).then(|| save_cost(world));
     let out = json!({
+        "save": save,
         "seed": seed,
         "warmup_days": days,
         "residents": residents,
@@ -110,6 +202,8 @@ fn island_tick_profile() {
         "leaf_starts_us": ms(starts),
         "ticks_with_grid_changes": revisions,
         "grid_cells": world.resource::<SpatialGrid>().bounds().len(),
+        "slowest_ticks": slow,
+        "save_cost": save_cost,
         "rows": rows,
     });
     let text = serde_json::to_string_pretty(&out).expect("json");

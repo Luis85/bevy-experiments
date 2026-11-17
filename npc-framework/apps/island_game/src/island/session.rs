@@ -75,6 +75,7 @@ pub(crate) fn summary(world: &World) -> Summary {
 /// "Continue from the autosave": put the newer autosave in place of the
 /// save the title opened, after the same checks, then continue as usual.
 pub(crate) fn adopt_autosave(world: &mut World) -> Result<(), String> {
+    super::settle_saves(world);
     let auto = super::autosave_path(&world.resource::<LocalIsland>().path);
     let saved = snapshot::read(&auto)?;
     use island_content::village::island_save::{self, IslandSaveCheck};
