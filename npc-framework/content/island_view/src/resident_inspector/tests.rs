@@ -994,3 +994,100 @@ fn asleep_at_the_inn_keeps_its_own_words_like_asleep_at_home() {
     );
     assert_eq!(own_rest_label("going home"), None);
 }
+
+#[test]
+fn the_meal_line_says_eaten_not_yet_or_missed() {
+    // A meal block 600..650 of the day (20:24 to 21:36).
+    let meal = [(600, 650)];
+    assert_eq!(meal_line(false, &[], 100), None, "no meal block, no line");
+    assert_eq!(
+        meal_line(true, &meal, 700).as_deref(),
+        Some("Has eaten today.")
+    );
+    assert_eq!(
+        meal_line(false, &meal, 100).as_deref(),
+        Some("Not eaten yet today. Meal at 20:24.")
+    );
+    assert_eq!(
+        meal_line(false, &meal, 620).as_deref(),
+        Some("Not eaten yet today. It is meal time.")
+    );
+    assert_eq!(
+        meal_line(false, &meal, 700).as_deref(),
+        Some("Missed today's meal.")
+    );
+    // A block wrapping past sunrise is meal time on both sides of it and
+    // otherwise still to come.
+    let late = [(980, 20)];
+    assert_eq!(
+        meal_line(false, &late, 10).as_deref(),
+        Some("Not eaten yet today. It is meal time.")
+    );
+    assert_eq!(
+        meal_line(false, &late, 500).as_deref(),
+        Some("Not eaten yet today. Meal at 05:31.")
+    );
+}
+
+#[test]
+fn the_day_tab_reads_todays_meal_from_the_world_and_changes_nothing() {
+    let mut app = living_world();
+    let played = app.world().resource::<village::VillageState>().played;
+    let (id, entity) = residents(app.world())
+        .into_iter()
+        .find(|(id, _)| *id != played)
+        .expect("a resident");
+    app.world_mut().resource_mut::<Selected>().0 = Some(id);
+    app.world_mut().resource_mut::<Inspector>().tab = Tab::Day;
+    let meal = |app: &mut App| {
+        let before = state_hash(app.world_mut());
+        let rows = entries(app.world());
+        assert_eq!(
+            before,
+            state_hash(app.world_mut()),
+            "reading changes nothing"
+        );
+        rows.iter()
+            .find(|entry| entry.key == "day_meal")
+            .map(|entry| entry.text.clone())
+    };
+    // Sunrise of the first day: the meal is still to come.
+    run_ticks(app.world_mut(), 1);
+    let first = meal(&mut app).expect("a meal line");
+    println!("{first}");
+    assert!(
+        first.starts_with("Not eaten yet today. Meal at "),
+        "{first}"
+    );
+    // Through the day: once the resident sits down, the card says so.
+    let day_length = app
+        .world()
+        .resource::<npc_framework::prelude::SimConfig>()
+        .day_length;
+    let mut eaten = None;
+    for _ in 0..(day_length / 50) {
+        run_ticks(app.world_mut(), 50);
+        let line = meal(&mut app);
+        let day = app
+            .world()
+            .resource::<npc_framework::prelude::SimClock>()
+            .tick
+            / day_length;
+        let sat = app
+            .world()
+            .get::<resident::DayRhythm>(entity)
+            .is_some_and(|rhythm| rhythm.last_meal == Some(day));
+        if sat {
+            eaten = line;
+            break;
+        }
+    }
+    let eaten = eaten.expect("the resident sat down to a meal on the first day");
+    println!("{eaten}");
+    assert_eq!(eaten, "Has eaten today.");
+    // The played character runs no resident routine: no meal line.
+    app.world_mut()
+        .resource_mut::<village::VillageState>()
+        .played = id;
+    assert_eq!(meal(&mut app), None);
+}

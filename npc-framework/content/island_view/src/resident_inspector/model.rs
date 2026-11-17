@@ -439,6 +439,42 @@ pub(crate) fn clock_text(permille: i32) -> String {
     format!("{:02}:{:02}", minutes / 60, minutes % 60)
 }
 
+/// Whether the resident has sat down to today's meal (the simulation's one
+/// sit-down meal a day), from their own meal blocks `(from, to)` in day
+/// permille and the time now: "Has eaten today.", "Not eaten yet today. Meal
+/// at 20:24.", "Not eaten yet today. It is meal time." or "Missed today's
+/// meal." `None` when the day has no meal block.
+pub(crate) fn meal_line(eaten_today: bool, meals: &[(i32, i32)], permille: i32) -> Option<String> {
+    if meals.is_empty() {
+        return None;
+    }
+    if eaten_today {
+        return Some("Has eaten today.".to_owned());
+    }
+    let inside = |(from, to): (i32, i32)| {
+        if from <= to {
+            from <= permille && permille < to
+        } else {
+            permille >= from || permille < to
+        }
+    };
+    if meals.iter().copied().any(inside) {
+        return Some("Not eaten yet today. It is meal time.".to_owned());
+    }
+    // A block that starts later today is still to come; the day (as the
+    // simulation counts it) ends at sunrise, so a block that wraps past it
+    // is never behind.
+    let next = meals
+        .iter()
+        .filter(|(from, _)| *from > permille)
+        .map(|(from, _)| *from)
+        .min();
+    Some(match next {
+        Some(from) => format!("Not eaten yet today. Meal at {}.", clock_text(from)),
+        None => "Missed today's meal.".to_owned(),
+    })
+}
+
 /// "Work now · meal 12:00 · free time 21:21 · sleep 22:48": the current slot
 /// and the next three changes, wrapping past sunrise.
 pub(crate) fn schedule_caption(plan: &[Segment], permille: i32) -> String {

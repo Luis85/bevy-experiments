@@ -485,6 +485,41 @@ pub(crate) fn why_text(world: &World, id: SimId, entity: Entity) -> String {
     }
 }
 
+/// Today's sit-down meal on the Day tab, read from the resident's
+/// `DayRhythm` (the day of their last sit-down meal) and their own meal
+/// blocks. The day is the simulation's (`tick / day_length`), as the meal
+/// rule counts it. The played character runs no resident routine and sits
+/// down to no such meal, so the line is left out for them.
+fn todays_meal(
+    world: &World,
+    id: SimId,
+    entity: Entity,
+    blocks: &[(resident::BlockKind, i32, i32)],
+    permille: i32,
+) -> Option<String> {
+    if world
+        .get_resource::<village::VillageState>()
+        .is_some_and(|state| state.played == id)
+    {
+        return None;
+    }
+    let meals: Vec<(i32, i32)> = blocks
+        .iter()
+        .filter(|(kind, _, _)| *kind == resident::BlockKind::Meal)
+        .map(|(_, from, to)| (*from, *to))
+        .collect();
+    let day_length = world
+        .get_resource::<npc_framework::prelude::SimConfig>()
+        .map_or(1, |config| config.day_length.max(1));
+    let day = world
+        .get_resource::<npc_framework::prelude::SimClock>()
+        .map_or(0, |clock| clock.tick / day_length);
+    let eaten = world
+        .get::<resident::DayRhythm>(entity)
+        .is_some_and(|rhythm| rhythm.last_meal == Some(day));
+    model::meal_line(eaten, &meals, permille)
+}
+
 /// The parts of "Why": what they chose, what was passed over, what was
 /// checked and fine, and the plan. `Err` is one sentence where there is no
 /// decision to explain.
@@ -880,6 +915,9 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
                     } else {
                         Entry::text(&format!("day_next{index}"), line, false)
                     });
+                }
+                if let Some(line) = todays_meal(world, id, entity, &blocks, permille) {
+                    rows.push(Entry::text("day_meal", line, false));
                 }
             }
             None => rows.push(Entry::text(
