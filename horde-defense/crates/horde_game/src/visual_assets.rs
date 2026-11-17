@@ -42,13 +42,65 @@ pub fn resolve_player_model(
     size: Vec2,
 ) -> Result<crate::player_model::ResolvedPlayerPose, String> {
     let catalogue = crate::player_model::startup::active_or_bundled()?;
-    crate::player_model::resolve_equipped_model(
+    let appearance = player_appearance(catalogue, model_id, equipment)?;
+    crate::player_model::resolve_equipped_pose(
         catalogue,
         model_id,
-        equipment,
+        &appearance,
         sample,
         player_model_placement(model_id, center, size)?,
     )
+}
+/// How many resolved appearances [`player_appearance`] keeps per thread.
+const RECENT_APPEARANCES: usize = 8;
+/// One remembered appearance: the catalogue's address (a `'static`
+/// catalogue is never freed, so the address cannot be reused), the model and
+/// the equipment it was resolved for.
+type RecentAppearance = (
+    usize,
+    String,
+    horde_core::survivors::EquipmentVisual,
+    std::sync::Arc<crate::player_model::ResolvedAppearance>,
+);
+/// The appearance `catalogue` resolves for `model_id` in `equipment`. The
+/// battle resolves its survivor every pass from frozen gear, so the last few
+/// combinations are kept (the most recent first) and handed back; an error
+/// is never kept.
+fn player_appearance(
+    catalogue: &'static crate::player_model::CompiledCatalogue,
+    model_id: &str,
+    equipment: &horde_core::survivors::EquipmentVisual,
+) -> Result<std::sync::Arc<crate::player_model::ResolvedAppearance>, String> {
+    thread_local! {
+        static RECENT: std::cell::RefCell<Vec<RecentAppearance>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    }
+    let identity = std::ptr::from_ref(catalogue) as usize;
+    RECENT.with_borrow_mut(|recent| {
+        if let Some(index) = recent
+            .iter()
+            .position(|(c, m, e, _)| *c == identity && m == model_id && e == equipment)
+        {
+            let entry = recent.remove(index);
+            let appearance = entry.3.clone();
+            recent.insert(0, entry);
+            return Ok(appearance);
+        }
+        let appearance = std::sync::Arc::new(crate::player_model::resolve_appearance(
+            catalogue, model_id, equipment,
+        )?);
+        recent.truncate(RECENT_APPEARANCES - 1);
+        recent.insert(
+            0,
+            (
+                identity,
+                model_id.to_owned(),
+                equipment.clone(),
+                appearance.clone(),
+            ),
+        );
+        Ok(appearance)
+    })
 }
 pub fn draw_player_model(
     painter: &Painter,

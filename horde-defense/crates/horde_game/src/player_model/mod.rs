@@ -25,7 +25,9 @@ pub use bind::{ModelPlacement, SourceToDisplay};
 pub use catalogue::{
     ModelDefinition, PlayerModelCatalogue, SkinDefinition, SourceChannel, SourceDefinition,
 };
+#[cfg(any(test, feature = "review"))]
 pub use equipped_pose::resolve_equipped_model;
+pub use equipped_pose::resolve_equipped_pose;
 pub use pose::{DrawPacket, PlayerAction, PlayerPoseSample, ResolvedPlayerPose};
 pub use source_masks::{
     CompiledCatalogue, CompiledModel, CompiledSource, LocalMesh, MaskRect, MaskRun,

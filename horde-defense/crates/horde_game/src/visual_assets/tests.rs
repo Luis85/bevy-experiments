@@ -920,3 +920,35 @@ fn procedural_shadow_texture_matches_three_ring_profile() {
         }
     }
 }
+
+/// Closing phase (G1.10): the battle resolves the survivor every pass from
+/// frozen gear that does not change within an attempt, so the appearance
+/// the active catalogue resolves for one model in one equipment is kept and
+/// handed back, while other equipment resolves its own.
+#[test]
+fn a_repeated_model_and_equipment_reuse_their_resolved_appearance() {
+    use crate::player_model::{resolve_appearance, startup::active_or_bundled, verification};
+    use horde_core::weapons::WeaponClass;
+    let catalogue = active_or_bundled().unwrap();
+    let pistol =
+        verification::review_equipment(Some(WeaponClass::Pistol), Some("armor.cloth"), None)
+            .unwrap();
+    let rifle = verification::review_equipment(Some(WeaponClass::Rifle), Some("armor.cloth"), None)
+        .unwrap();
+    let first = player_appearance(catalogue, "rook", &pistol).unwrap();
+    let again = player_appearance(catalogue, "rook", &pistol).unwrap();
+    assert!(
+        Arc::ptr_eq(&first, &again),
+        "the same model and gear reuse it"
+    );
+    let other = player_appearance(catalogue, "rook", &rifle).unwrap();
+    assert!(!Arc::ptr_eq(&first, &other));
+    for (equipment, resolved) in [(&pistol, &first), (&rifle, &other)] {
+        let fresh = resolve_appearance(catalogue, "rook", equipment).unwrap();
+        assert_eq!(resolved.part_indices, fresh.part_indices);
+        assert_eq!(resolved.attachment_ids, fresh.attachment_ids);
+        assert_eq!(resolved.hold_id, fresh.hold_id);
+        assert_eq!(resolved.skin_id, fresh.skin_id);
+        assert_eq!(resolved.frozen_equipment, fresh.frozen_equipment);
+    }
+}
