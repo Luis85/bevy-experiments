@@ -141,7 +141,9 @@ reads 0.67 and passes. The rule reads item levels, not tiers, and floors
 the excess levels over the four slots: a recruit wearing tier-4 drops with
 at most three item levels above 1 in all (for example one level-4 item and
 three level-1 items) still plays rank 0, while four level-2 items play
-rank 1 and four level-4 items rank 3.
+rank 1 and four level-4 items rank 3. The user accepted this reading of
+gear by item level, not tier (decision R66, 2026-11-17), and the human
+difficulty playtest judges it.
 
 ## Country difficulty band
 

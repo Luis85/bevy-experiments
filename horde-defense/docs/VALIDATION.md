@@ -1520,7 +1520,7 @@ Kept cells (median of 3; normal / small):
 | interface_draw mean (ms, dev, VSync on) | progressed-peak | **1.1395 / 1.1421** | | ≤ 1.129 / 1.030 | 1.026 / 0.992 |
 | | peak | 0.876 / 0.876 | | ≤ 1.1904 / 1.0752 | 0.816 / 0.783 |
 | | stress | 1.471 / 1.469 | | not gated | 1.183 / 1.203 |
-| | fx-stress | 1.592 / 1.629 | | not gated (design targets 1.13 / 1.03) | first measurement |
+| | fx-stress | 1.592 / 1.629 | | not gated (R65: the 1.13 / 1.03 design target is for 225 enemies; fx-stress at 400 is a measured stress scene) | first measurement |
 | interface_total mean (ms, dev, VSync on) | progressed-peak | 2.113 / 2.025 | | R31 A/B | 1.966 / 1.799 |
 | egui texture uploads after warmup (worst, -VsyncOff) | peak normal | **1** (6,420 B, 1 frame, every repeat) | **1** (same) | 0 | 0 (also 0 at the wave-2 close, 41ce143) |
 
@@ -1579,7 +1579,7 @@ Kept cells (median of 3; normal / small):
 | interface_draw mean (ms, dev, VSync on) | progressed-peak | 0.932 / 0.903 | | ≤ 1.129 / 1.030 | **1.1395 / 1.1421** |
 | | peak | 0.714 / 0.712 | | ≤ 1.1904 / 1.0752 | 0.876 / 0.876 |
 | | stress | 1.276 / 1.266 | | not gated | 1.471 / 1.469 |
-| | fx-stress | 1.372 / 1.376 | | not gated (design targets 1.13 / 1.03) | 1.592 / 1.629 |
+| | fx-stress | 1.372 / 1.376 | | not gated (R65: the 1.13 / 1.03 design target is for 225 enemies; fx-stress at 400 is a measured stress scene) | 1.592 / 1.629 |
 | interface_total mean (ms, dev, VSync on) | progressed-peak | 1.750 / 1.657 | | R31 A/B | 2.113 / 2.025 |
 | | fx-stress | 2.285 / 2.228 | | not gated | 2.642 / 2.638 |
 | egui texture uploads after warmup (worst) | every scene | 0 | 0 | 0 | **1** at peak normal (-VsyncOff) |
@@ -1588,13 +1588,13 @@ Kept cells (median of 3; normal / small):
 - **CPU headroom.** The tightest gated cell is dev fx-stress small at 6.79 ms, 3.2 ms under 10.0. This agrees with the closing follow-up at `a0278a08` (`acc2-dev-novsync`: 5.79 / 5.75, 6.57 / 6.39, 7.15 / 6.82 ms). W2-47's 0.35 ms margin at dev stress small is now 3.3 ms.
 - **Frames over 50 ms.** 0 in every kept repeat of every pass and 0 driver stalls. The R34 W2-47 dev -VsyncOff progressed-peak over (12.7565 ms) is answered by this new measurement: 5.52 / 6.36 ms.
 - **Gate 3 in the shipped default configuration (R26).** `acc-playtest-vsync` stress (playtest, pipelined on, VSync on): 60.00 FPS at both sizes, p99 interval 17.65 / 19.84 ms, 0 frames over 33 ms and 0 over 50 ms in every repeat. Every other scene ran at 59.99-60.00 FPS with 0 frames over 33 ms. Gate 3 holds.
-- **Live battlefield egui gates.** Primitives at most 18 / 19 / 21 / 21 with VSync on (peak / progressed-peak / stress / fx-stress) and 19 / 20 / 22 / 22 with VSync off, against 23. Vertices (VSync on, normal): progressed-peak 38,707 of 40,000 (1,293 of headroom; 38,021 with VSync off), stress 55,055 of 61,098 (52,285 off), fx-stress 60,311 (54,482 off), the same maxima as attempt 1. fx-stress has no vertex gate; it is 787 under the stress gate. The fx-stress fixture draws 400 enemies with the rig sheet, live bursts, light pools, blood decals, sparks and loot fly-ups, so these are the W5-11 fx caps under load.
+- **Live battlefield egui gates.** Primitives at most 18 / 19 / 21 / 21 with VSync on (peak / progressed-peak / stress / fx-stress) and 19 / 20 / 22 / 22 with VSync off, against 23. Vertices (VSync on, normal): progressed-peak 38,707 of 40,000 (1,293 of headroom; 38,021 with VSync off), stress 55,055 of 61,098 (52,285 off), fx-stress 60,311 (54,482 off), the same maxima as attempt 1. fx-stress has no vertex gate, and user decision R65 (2026-11-17) keeps it ungated; it is 787 under the stress gate. The fx-stress fixture draws 400 enemies with the rig sheet, live bursts, light pools, blood decals, sparks and loot fly-ups, so these are the W5-11 fx caps under load.
 - **Headless egui evidence.** `measure_battlefield_egui_load -- --ignored` (184.33 s, exit 0) reproduces `evidence.egui_measured` exactly for the third time: 18 primitives in every scene. Normal arena vertices: peak 32,968, progressed-peak 38,839 (1,161 of headroom), stress 57,330 and stress-5000-corpses 60,811 (287 under 61,098), at the same maximum ticks. `live_battlefield_runs_stay_within_the_egui_gates` passes. No gate moves (`egui_measured.w7_09_attempt_2`).
 - **R31 A/B.** `ab-interface-total` (06:11-06:24 UTC, every run valid in the first sitting): A median interface_total 1.8865 / 1.8168 ms, B 1.7221 / 1.6575 ms, B / A 0.9129 / 0.9124 against 1.05. Each A arm still exits 2 alone because the ab03da9 frame report predates the battlefield egui fields, as in attempt 1; the A/B reads only interface_total.
 - **Shipped and packaged smoke.** Shipped `--smoke` (playtest `--no-default-features`, `acc-playtest-novsync/shipped`): 2.131, 0.888 and 0.877 s, median 0.888 s. The first, cold run is the slow one. The packaged `Lastlight.exe --smoke` from the Package phase (61bced1a) took 1.50, 1.51 and 1.47 s. It was not re-packaged here.
 - **Loudness (offline_mix, `--include-ignored --nocapture`, 06:50 UTC, 14 passed).** `reference_mixed_60s` stage-1 -24.1 LUFS (S-max -21.5, M-max -19.1, TP 0.405), rain -22.9 (TP 0.399), `dense_battle_60s` -23.0 (TP 0.885), `max_sliders_60s` -20.3 (TP 0.632, logged). Identical to attempt 1 and to the closing record, so no calibration moves.
 - **Integrated GPU.** Not measured; it stays pending (`PERF_BUDGET.json hardware.integrated_gpu`).
-- **Still not covered by a gated span.** The perf scenes do not show the BossNotice banner after warmup, the low-HP band or an open Auto-sell panel, so those three interface costs stay unmeasured. The closing follow-up's per-schedule profile above gives the struck_props pass (inside the 0.10 ms damage pass), the EnemyVoiceIndex sync with tick_sounds (0.08 ms a frame) and W3-24's due check (under 0.01 ms). The A6-18 60 s cue-log replay and the W7-11 live-flash luminance (storm max frame delta 0.084 < 0.2) are recorded above.
+- **Still not covered by a gated span.** The perf scenes do not show the BossNotice banner after warmup, the low-HP band or an open Auto-sell panel, so those three interface costs stay unmeasured. The user was not asked about them, and the default stands (2026-11-17): no fixture is added, and the aggregate interface_draw and cpu_frame gates cover them. The closing follow-up's per-schedule profile above gives the struck_props pass (inside the 0.10 ms damage pass), the EnemyVoiceIndex sync with tick_sounds (0.08 ms a frame) and W3-24's due check (under 0.01 ms). The A6-18 60 s cue-log replay and the W7-11 live-flash luminance (storm max frame delta 0.084 < 0.2) are recorded above.
 
 ## Full verify
 

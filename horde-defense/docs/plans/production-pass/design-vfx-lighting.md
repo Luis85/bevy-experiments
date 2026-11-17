@@ -483,7 +483,7 @@ Usage rules:
 - lights 24, decals 64, scorch 8, explosions_concurrent 8, tracers 96, hit_events 64;
 - flames_per_zone 21 (reduced 9), fire_zones_drawn 8, elite_tells 48, particles 128.
 
-fx-stress interface mean must stay at or under the perf targets of 1.13 ms (1440x900) and 1.03 ms (1050x700@1.35) at 225 enemies.
+The interface mean must stay at or under the perf targets of 1.13 ms (1440x900) and 1.03 ms (1050x700@1.35) at the 225-enemy design point. That target is G1.10, gated on progressed-peak at ≤ 1.129 / 1.030 ms. fx-stress (400 enemies under the fx caps) is a measured, ungated stress scene (user decision R65, 2026-11-17): its interface mean (1.372 / 1.376 ms at W7-09 attempt 2) and battlefield vertex count (60,311) are recorded, not gated, and `PERF_BUDGET.json scenes.fx-stress` gates only frames over 50 ms and CPU p99.
 
 ## 14. Review scenes (ui/review/matrix.rs, fixtures.rs)
 
@@ -548,7 +548,7 @@ The full list with tests is in `steps`.
   - sky-flash ΔL (≤ 0.091 model, gate < 0.2) and minimum pulse spacing (≥ 240 ticks);
   - reduced MOTION Δmean L < 0.01 and block ΔL < 0.1 for flash and pulse effects (R63; §12).
 - **Storm coverage:** 131/1026 stages in 120 countries.
-- **fx-stress:** interface mean ms at 225 enemies against 1.13 / 1.03, p99, frames > 50 ms (must stay 0), and the per-frame counters against the budget.
+- **fx-stress:** interface mean ms at 400 enemies, recorded and not gated (R65; the 1.13 / 1.03 target is the 225-enemy design point, §13), p99, frames > 50 ms (must stay 0), and the per-frame counters against the budget.
 - **Wave-0 safe-area mean L at 1440x900:** battle 0.026, arid 0.062, tropical 0.033, peak 0.030. At 1050x700: 0.027, 0.063, 0.034, 0.031.
 
 ---
