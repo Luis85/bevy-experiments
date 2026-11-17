@@ -2609,4 +2609,5 @@ The user answered items 1, 2, 3, 5 and 7 in chat on 2026-11-17 (R63-R66, §2.4).
 - **The W7-09 record has no pin test.** No test pins `PERF_BUDGET.json acceptance.closing` (`RECORDED_CPU_GATED_SCENES` at perf_budget.rs:130 is still progressed-peak and stress). Writing the test was blocked on a passing attempt, and attempt 2 now passes, so `perf_budget_records_the_closing_acceptance` can be written.
 - **The package at the final HEAD: done** (12.7).
 - **Captures.** One capture run after the four code commits of 12.5, and the two carried items 10.5 left open.
-- **The merge into local `main` (R64).** The orchestrator performs it after the closing commits, as a merge commit, and pushes nothing. No other open work comes from the 2026-11-17 decisions. R63, R65 and R66 change no code, budget or data, and the reduced MOTION gate needs no capture rerun (12.9 item 1).
+- **The merge into local `main` (R64): done** (2026-11-17, `713bd877`, parents `a058087d` and `d7877b3a`; nothing pushed). No other open work comes from the 2026-11-17 decisions. R63, R65 and R66 change no code, budget or data, and the reduced MOTION gate needs no capture rerun (12.9 item 1).
+- **Follow-up.** The next iterations are proposed in [2026-11-17-next-iterations.md](2026-11-17-next-iterations.md). The W7-09 pin and the capture run are carried there as D1 and B1.
