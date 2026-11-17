@@ -19,6 +19,9 @@ use island_content::village::{
 use npc_framework::prelude::{SimClock, SimConfig, SimId, SimIndex, SimPos};
 use npc_framework::view_helpers::{ViewSystems, VisualIndex, VisualOf};
 
+#[path = "living_scene/pond.rs"]
+mod pond;
+
 const CHUNK: i32 = 16;
 /// Gentle dry steps share slope lighting; banks and larger cliffs stay faceted.
 const GENTLE_RISER_MM: i32 = 350;
@@ -1076,7 +1079,12 @@ fn terrain_mesh(
     // The ocean owns water rendering. Keep open-water chunks as bookkeeping
     // entities, without ever uploading a zero-vertex asset to the renderer.
     // A beach reaches one cell into the water, so land beside the chunk counts.
-    if !(z - 1..z + CHUNK + 1).any(|cz| (x - 1..x + CHUNK + 1).any(|cx| dry(cx, cz))) {
+    // A pond's bank can lie a few metres from its land, so a chunk with a
+    // pond cell is drawn too.
+    let ponds = pond::PondField::around(terrain, x, z, CHUNK);
+    if ponds.is_none()
+        && !(z - 1..z + CHUNK + 1).any(|cz| (x - 1..x + CHUNK + 1).any(|cx| dry(cx, cz)))
+    {
         return None;
     }
     // One colour per grid corner, shared by the up to four cells around it.
@@ -1164,6 +1172,10 @@ fn terrain_mesh(
             {
                 continue;
             }
+            // A pond's bank is a rounded slope of its own, below.
+            if pond::is_pond(terrain, cx, cz) {
+                continue;
+            }
             let corners = [(0, 0), (0, 1), (1, 1), (1, 0)];
             let heights = corners.map(|(dx, dz)| ground::beach_corner(terrain, cx + dx, cz + dz));
             if heights.iter().all(Option::is_none) {
@@ -1197,6 +1209,24 @@ fn terrain_mesh(
             geometry.beach_quad(points, colors);
         }
     }
+    // Wetland ponds: a smooth bank with rounded corners and a wobbling
+    // edge, so the waterline the pond tint makes against it is a natural
+    // outline, not the cells' rectangle.
+    if let Some(ponds) = &ponds {
+        for cz in z..z + CHUNK {
+            for cx in x..x + CHUNK {
+                if pond::is_pond(terrain, cx, cz) {
+                    let colors = [
+                        corner(cx, cz),
+                        corner(cx + 1, cz),
+                        corner(cx, cz + 1),
+                        corner(cx + 1, cz + 1),
+                    ];
+                    ponds.bank(&mut geometry, cx, cz, colors);
+                }
+            }
+        }
+    }
     (!geometry.vertices.is_empty()).then(|| geometry.mesh())
 }
 
@@ -1223,7 +1253,9 @@ fn shore_mesh(terrain: &TerrainState, x: i32, z: i32) -> Option<Mesh> {
             // shallows: one dark, even tint over the whole pond. Drawn as
             // shallows, every pond cell was near land, so the whole pond
             // turned the pale turquoise of a beach and breathed white with
-            // the swell: pale rectangles on the island.
+            // the swell: pale rectangles on the island. The tint covers the
+            // whole cell; the pond's rounded bank (`pond`) rises through it,
+            // and that draws the pond's soft outline.
             if terrain
                 .cell(cx, cz)
                 .is_some_and(|cell| cell.biome == Biome::Wetland)
