@@ -46,7 +46,7 @@ Both were checked against `main`. Every change is already in `main` in a more de
 
 **Uncommitted edits.** This worktree was clean. The only uncommitted edits the production plan names (the A6-18 change, §12.6) are committed as `ef778e28`, an ancestor of HEAD. The main checkout and the other worktrees of this repository were not inspected for uncommitted edits.
 
-**The merge.** The production pass is merged into local `main` as `713bd877` (R64; parents `a058087d` and `d7877b3a`), and nothing is pushed. The R64 merge is no longer open work.
+**The merge.** The production pass is merged into local `main` as `713bd877` (R64; parents `a058087d` and `d7877b3a`). The user then chose to push `main` to origin (R67), with this file's commit. The R64 merge is no longer open work.
 
 ## 3. Binding constraints carried from the production pass
 

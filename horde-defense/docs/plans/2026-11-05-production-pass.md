@@ -11,7 +11,7 @@ This file is the plan of record. The detail lives in `docs/plans/production-pass
 | `acceptance.md` | The acceptance matrix: every brief criterion, user restatement and ruling mapped to its proof and wave. |
 | `design-<remit>.md` (10 files) | Each expert remit's synthesized spec, followed by the integration rulings that supersede parts of it. |
 
-Precedence when documents disagree: user decisions, then orchestrator rulings R1-R66 and RL, then `schema-v7.md` / `waves.md` / `acceptance.md`, then the "Integration rulings" section of each design doc, then the synthesized spec text above it.
+Precedence when documents disagree: user decisions, then orchestrator rulings R1-R67 and RL, then `schema-v7.md` / `waves.md` / `acceptance.md`, then the "Integration rulings" section of each design doc, then the synthesized spec text above it.
 
 ## Contents
 
@@ -246,6 +246,7 @@ Shipped WAV count: 90 today, 78 after W1-57, 75 after W1-58. `docs/audio/surviva
 | R64 | User decision (2026-11-17), answering §12.9 item 7 with its option (a): the branch goes into local `main` as a merge commit, and nothing is pushed. The orchestrator performs the merge after the closing commits. This plan only records the decision. |
 | R65 | User decision (2026-11-17), answering §12.9 items 2 and 3: fx-stress interface_draw (1.372 / 1.376 ms at 400 enemies, W7-09 attempt 2) and the fx-stress battlefield vertex count (60,311 with VSync on) stay ungated. The 1.13 / 1.03 ms interface target of design-vfx-lighting §13 and §17 is stated for the 225-enemy design point, which G1.10 gates on progressed-peak (≤ 1.129 / 1.030 ms). fx-stress (400 enemies under the fx caps) is a measured, ungated stress scene. `PERF_BUDGET.json scenes.fx-stress` keeps gating only frames over 50 ms and CPU p99, and `egui.battlefield_vertices_max` gains no fx-stress entry. No budget, harness or test changes. |
 | R66 | User decision (2026-11-17), answering §12.9 item 5 with "Accept it": the W4-12 expedition rule keeps pricing gear by item level, not tier, with the excess levels floored over the four slots. So a recruit in the early tier-4 drops of item level 1-4 keeps threat rank 0, and G3.11 passes as measured (6 / 9 = 0.67, §12.3). No data, rule or acceptance number changes. The human difficulty playtest (§11, beside G6.11 and G6.12) judges whether the rule leaves expeditions too easy. |
+| R67 | User decision (2026-11-17, after R64): local `main` is pushed to origin, with the R64 merge and the next-iterations plan commit. This replaces R64's "nothing is pushed". No code, data or budget changes. |
 
 R12-R23 are the wave-1 close rulings (2026-11-07), recorded verbatim. Where they land:
 - **R12:** schema-v7.md §11 note and VALIDATION.md "save_v6.json as cut".
@@ -323,6 +324,7 @@ R63-R66 are user decisions made in chat (2026-11-17), answering the open decisio
 - **R64:** the §2.5 row "Fast-forwarding local `main` at the end", the §12 preamble, §12.9 item 7 and §12.10.
 - **R65:** design-vfx-lighting §13 and §17, acceptance.md G7.5 (and docs/ACCEPTANCE.md), the W5-11 results (attempts 1 and 2) in waves.md, the fx-stress interface rows of VALIDATION.md "W7-09 final perf acceptance" (attempts 1 and 2), the §9.1 fx-stress row, §12.3 and §12.9 items 2 and 3.
 - **R66:** acceptance.md G3.11 (and docs/ACCEPTANCE.md), the W4-12 "Also owns" note in waves.md, design-campaign-defenders §1.14, PROGRESSION_SCALING.md "Expedition threat", the §11 row "Human difficulty playtest" (and docs/ACCEPTANCE.md), §12.3 and §12.9 item 5.
+- **R67:** §12.10 and the next-iterations plan's "The merge" paragraph.
 - **Not asked, defaults stand (2026-11-17):** §12.9 item 4 (no perf fixture is added for the boss banner, the low-HP band or an open Auto-sell panel; the aggregate interface_draw and cpu_frame gates cover them) and item 6 (R30 is unchanged).
 
 One wave-2 finding is not ruled, because it would change a user decision: R30's quiet window is checked only before measuring. It is the §2.5 row "A foreign build that starts during a perf pass". The user was not asked, and its default stands (2026-11-17): R30 is unchanged.
@@ -2609,5 +2611,5 @@ The user answered items 1, 2, 3, 5 and 7 in chat on 2026-11-17 (R63-R66, §2.4).
 - **The W7-09 record has no pin test.** No test pins `PERF_BUDGET.json acceptance.closing` (`RECORDED_CPU_GATED_SCENES` at perf_budget.rs:130 is still progressed-peak and stress). Writing the test was blocked on a passing attempt, and attempt 2 now passes, so `perf_budget_records_the_closing_acceptance` can be written.
 - **The package at the final HEAD: done** (12.7).
 - **Captures.** One capture run after the four code commits of 12.5, and the two carried items 10.5 left open.
-- **The merge into local `main` (R64): done** (2026-11-17, `713bd877`, parents `a058087d` and `d7877b3a`; nothing pushed). No other open work comes from the 2026-11-17 decisions. R63, R65 and R66 change no code, budget or data, and the reduced MOTION gate needs no capture rerun (12.9 item 1).
+- **The merge into local `main` (R64): done** (2026-11-17, `713bd877`, parents `a058087d` and `d7877b3a`), and `main` is pushed to origin (R67). No other open work comes from the 2026-11-17 decisions. R63, R65 and R66 change no code, budget or data, and the reduced MOTION gate needs no capture rerun (12.9 item 1).
 - **Follow-up.** The next iterations are proposed in [2026-11-17-next-iterations.md](2026-11-17-next-iterations.md). The W7-09 pin and the capture run are carried there as D1 and B1.
