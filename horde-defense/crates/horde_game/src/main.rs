@@ -150,6 +150,8 @@ fn main() -> AppExit {
     let _ = review;
     #[cfg(feature = "dev")]
     app.add_plugins(debug_tools::DebugPlugin);
+    // Last, so no plugin replaces a frame schedule after it.
+    app.add_plugins(render_plan::SingleThreadedFramePlugin);
     app.run()
 }
 

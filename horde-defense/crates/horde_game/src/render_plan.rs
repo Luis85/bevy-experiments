@@ -12,7 +12,11 @@ use crate::{
     settings::{Settings, WindowModeSetting},
 };
 use bevy::{
-    app::PluginGroupBuilder,
+    app::{
+        FixedFirst, FixedLast, FixedPostUpdate, FixedPreUpdate, PluginGroupBuilder,
+        RunFixedMainLoop, SpawnScene,
+    },
+    ecs::schedule::{InternedScheduleLabel, ScheduleLabel},
     prelude::*,
     render::pipelined_rendering::PipelinedRenderingPlugin,
     window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode, WindowResolution},
@@ -174,6 +178,47 @@ impl Plugin for DisplayPlugin {
     }
 }
 
+/// The schedules of one main-world frame: the main loop and the fixed loop
+/// inside `RunFixedMainLoop`.
+pub fn frame_schedules() -> [InternedScheduleLabel; 13] {
+    [
+        First.intern(),
+        PreUpdate.intern(),
+        StateTransition.intern(),
+        RunFixedMainLoop.intern(),
+        FixedFirst.intern(),
+        FixedPreUpdate.intern(),
+        FixedUpdate.intern(),
+        FixedPostUpdate.intern(),
+        FixedLast.intern(),
+        Update.intern(),
+        SpawnScene.intern(),
+        PostUpdate.intern(),
+        Last.intern(),
+    ]
+}
+
+/// Runs every [`frame_schedules`] schedule on the single-threaded executor,
+/// on the thread that updates the app (closing perf pass, W7-09 follow-up).
+/// The frame's systems are small and mostly ordered, so the multi-threaded
+/// executor's per-system task hand-off cost more than its parallelism won:
+/// in an interleaved dev `-VsyncOff` fx-stress A/B, main_cpu fell from about
+/// 3.6 to 3.0 ms (StateTransition 0.21 to 0.05 ms, PreUpdate 0.33 to
+/// 0.13 ms) with the same draw. Ordering constraints, `ApplyDeferred` sync
+/// points and exclusive systems keep their meaning; the render world,
+/// pipelined rendering and Bevy's task pools are untouched. Added after
+/// every other plugin, so no plugin replaces a schedule afterwards.
+pub struct SingleThreadedFramePlugin;
+impl Plugin for SingleThreadedFramePlugin {
+    fn build(&self, app: &mut App) {
+        for label in frame_schedules() {
+            app.edit_schedule(label, |schedule| {
+                schedule.set_executor(bevy::ecs::schedule::SingleThreadedExecutor::new());
+            });
+        }
+    }
+}
+
 /// Writes the primary window's mode and, unless `LASTLIGHT_PERF_PRESENT_MODE`
 /// fixed it, its present mode, each only when it differs. Pipelined rendering never
 /// changes here.
@@ -201,6 +246,58 @@ pub fn apply_display_settings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Closing perf pass (W7-09 follow-up): every system of a frame's
+    /// schedules runs on the thread that updates the app, so no frame pays
+    /// the multi-threaded executor's task hand-off for its small systems.
+    /// Several systems that could run in parallel stand in each schedule.
+    #[test]
+    fn frame_schedules_run_every_system_on_the_app_thread() {
+        use std::{
+            sync::{Arc, Mutex},
+            thread::ThreadId,
+            time::{Duration, Instant},
+        };
+        let seen: Arc<Mutex<Vec<(String, ThreadId)>>> = Arc::default();
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, bevy::state::app::StatesPlugin))
+            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                Duration::from_millis(40),
+            ));
+        for label in frame_schedules() {
+            for _ in 0..6 {
+                let (seen, name) = (seen.clone(), format!("{label:?}"));
+                app.add_systems(label, move || {
+                    let busy = Instant::now();
+                    while busy.elapsed() < Duration::from_micros(200) {
+                        std::hint::spin_loop();
+                    }
+                    seen.lock()
+                        .unwrap()
+                        .push((name.clone(), std::thread::current().id()));
+                });
+            }
+        }
+        app.add_plugins(SingleThreadedFramePlugin);
+        for _ in 0..3 {
+            app.update();
+        }
+        let seen = seen.lock().unwrap();
+        let app_thread = std::thread::current().id();
+        for label in frame_schedules() {
+            let name = format!("{label:?}");
+            assert!(seen.iter().any(|(ran, _)| *ran == name), "{name} never ran");
+        }
+        let elsewhere: Vec<_> = seen
+            .iter()
+            .filter(|(_, thread)| *thread != app_thread)
+            .map(|(name, _)| name.as_str())
+            .collect();
+        assert!(
+            elsewhere.is_empty(),
+            "systems ran off the app thread in {elsewhere:?}"
+        );
+    }
 
     fn perf(present_mode: Option<PresentModeOverride>, pipelined: Option<bool>) -> PerfOptions {
         PerfOptions {
