@@ -4,7 +4,7 @@ id: debrief-combat-log
 title: "Live authoritative combat log"
 parent: battle-management
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::field_details"
+source: "crates/horde_game/src/ui/battle/details.rs::field_details"
 ---
 
 # Live authoritative combat log

@@ -26,7 +26,8 @@
         "width_per_step": 2,
         "width_level_step": 3,
         "preset": "Easy"
-      }
+      },
+      "extras": { "elite_rate_pct": 50, "front_ramp_pct": 75, "boss_phase_bonus": 0 }
     },
     {
       "id": "Normal",
@@ -53,7 +54,8 @@
         "width_per_step": 2,
         "width_level_step": 3,
         "preset": "Normal"
-      }
+      },
+      "extras": { "elite_rate_pct": 100, "front_ramp_pct": 100, "boss_phase_bonus": 0 }
     },
     {
       "id": "Hard",
@@ -80,7 +82,8 @@
         "width_per_step": 2,
         "width_level_step": 3,
         "preset": "Hard"
-      }
+      },
+      "extras": { "elite_rate_pct": 150, "front_ramp_pct": 150, "boss_phase_bonus": 1 }
     }
   ]
 }

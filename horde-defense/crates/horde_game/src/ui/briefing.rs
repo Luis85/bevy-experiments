@@ -1,13 +1,22 @@
 //! A planned deployment is UI intent, never an extra authoritative attempt.
-use super::{Screen, Tab, UiCtx, chrome, muted, primary};
+use super::{Tab, UiCtx, chrome, muted, primary};
 use crate::art::{self, AMBER, GREEN, RED};
 use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
-use horde_core::content::{Mode, content};
+use horde_core::{
+    content::{Mode, content},
+    defenders::DefenderId,
+    progression::BossRank,
+    sim::Game,
+};
 mod view;
 use view::BriefingView;
 
 pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let Some(view) = view::view_model(f.game, f.campaign.mode, f.campaign.stage) else {
+    // The briefing is for the next defender (ruling D16). The camp's
+    // equipment and training pages follow the same owner.
+    let defender = f.game.next_defender();
+    f.campaign.mode = defender.mode();
+    let Some(view) = view::view_model(f.game, defender, f.campaign.stage) else {
         chrome::page_title(
             ui,
             "Choose a front first",
@@ -15,7 +24,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         );
         return;
     };
-    let (country, mode) = (view.country, f.campaign.mode);
+    let country = view.country;
     f.campaign.stage = view.stage;
     // One header row: the defense, its picker and the defender. Readiness
     // and the field loadout follow directly, above the encounter detail.
@@ -43,14 +52,15 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
                 }
             });
         ui.add_space(16.0);
-        chrome::mode_picker(ui, f);
+        chrome::defender_picker(ui, f);
     });
     ui.add_space(6.0);
-    // A stage or defender picked this frame renders immediately.
-    let view = if (f.campaign.stage, f.campaign.mode) == (view.stage, mode) {
+    // A stage picked this frame renders immediately; a defender picked this
+    // frame is a queued command and shows once core has accepted it.
+    let view = if f.campaign.stage == view.stage {
         view
     } else {
-        view::view_model(f.game, f.campaign.mode, f.campaign.stage).expect("active country")
+        view::view_model(f.game, defender, f.campaign.stage).expect("active country")
     };
     if ui.available_width() >= 820.0 {
         let width = (ui.available_width() - 28.0) * 0.55;
@@ -94,18 +104,29 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     };
     let (pressure, next_pressure) = (&forecast.pressure, &forecast.next);
-    ui.label(format!(
-        "Boss: {} · arrives after {:.0}s",
-        level.boss_name, forecast.boss_seconds
-    ));
-    ui.label(format!(
-        "{} build supply · {:.2}× regional difficulty",
-        forecast.supply, country.difficulty
-    ));
+    ui.horizontal_wrapped(|ui| {
+        ui.label(format!(
+            "Boss: {} · arrives after {:.0}s",
+            level.boss_name, forecast.boss_seconds
+        ));
+        // The rank is named once, in words, by the badge; the amber only
+        // repeats it, and the terms beside it say what the rank adds.
+        if let Some((badge, hint)) = forecast_badge(forecast) {
+            ui.label(RichText::new(badge).strong().color(AMBER))
+                .on_hover_text(&hint);
+            if let Some(terms) = &view.boss_rank_terms {
+                ui.colored_label(AMBER, terms).on_hover_text(&hint);
+            }
+        }
+    });
+    ui.label(supply_and_difficulty(forecast.supply, forecast.difficulty));
     ui.label(format!(
         "Threat rank {} · arrival groups {} · population cap {} (+ boss) · new gear Lv {}",
         pressure.rank, pressure.batch_size, pressure.enemy_cap, pressure.item_level
     ));
+    if let Some(line) = front_ramp_line(view.stage, view.levels, pressure.front_ramp) {
+        ui.label(line);
+    }
     ui.label(format!(
         "Next deployment: {} lanes · {:.0} yd path · defender lane {} · +{} character XP on victory",
         view.lanes, view.path_yards, view.defender_lane, view.completion_xp
@@ -120,9 +141,9 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     egui::CollapsingHeader::new("Next victory").show(ui, |ui| {
         ui.label(format!("Rank {} → {} · groups {} → {} · new gear Lv {} → {}", pressure.rank, next_pressure.rank, pressure.batch_size, next_pressure.batch_size, pressure.item_level, next_pressure.item_level));
-        muted(ui, format!("Threat-only enemy health {:.2}× → {:.2}× · contact damage {:.2}× → {:.2}× · rewards {:.2}× → {:.2}×", pressure.enemy_health, next_pressure.enemy_health, pressure.enemy_damage, next_pressure.enemy_damage, pressure.reward_multiplier, next_pressure.reward_multiplier));
+        muted(ui, format!("Enemy health from threat and front depth {:.2}× → {:.2}× · contact damage {:.2}× → {:.2}× · rewards {:.2}× → {:.2}×", pressure.enemy_health, next_pressure.enemy_health, pressure.enemy_damage, next_pressure.enemy_damage, pressure.reward_multiplier, next_pressure.reward_multiplier));
         ui.label(format!("Completion XP forecast: character {} → {} · lanes {} → {} · population cap {} → {}",view.character_level,view.level_after_victory,view.lanes,view.lanes_after_victory,pressure.enemy_cap,next_pressure.enemy_cap));
-        muted(ui,if view.max_level {"Character MAX is reached; victories continue raising future threat."} else if f.campaign.mode==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
+        muted(ui,if view.max_level {"Character MAX is reached; victories continue raising future threat."} else if view.defender.mode()==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
         ui.label(format!("Path forecast: {:.0} → {:.0} yd", view.path_yards, view.next_path_yards));
         muted(ui, "Every victory raises future threat, including replays and NPC victories. Defeats and withdrawals do not. Threat keeps growing after character MAX; this deployment snapshots its lane count and pressure.");
     });
@@ -143,6 +164,48 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.label("Survive until the boss arrives, then defeat it. The timer alone does not clear the defense. Coins and recovered items are banked as you earn them.");
     });
 }
+/// "N build supply · D× regional difficulty", D the difficulty the country
+/// plays at (`StagePreview::difficulty`, the start clamp included).
+fn supply_and_difficulty(supply: i64, difficulty: f32) -> String {
+    format!("{supply} build supply · {difficulty:.2}× regional difficulty")
+}
+/// The boss badge of the previewed stage: its rank, and the phases that
+/// rank adds at the previewed threat (`StagePreview::rank_phases`).
+fn forecast_badge(forecast: &view::Forecast) -> Option<(String, String)> {
+    boss_badge(forecast.boss_rank, forecast.rank_phases)
+}
+/// The badge beside the boss line and its hover text: a Regional or
+/// Capstone boss is named by core's rank label; a Sector boss has none. The
+/// hover counts the `extra_phases` the rank adds to this deployment's boss,
+/// none once the phase cap leaves nothing to add.
+fn boss_badge(rank: BossRank, extra_phases: u8) -> Option<(String, String)> {
+    let place = match rank {
+        BossRank::Sector => return None,
+        BossRank::Regional => "A regional checkpoint: every sixth defense of a long front.",
+        BossRank::Capstone => "The last defense of this front.",
+    };
+    let phases = match extra_phases {
+        0 => String::new(),
+        1 => " Its boss enters one more phase before it falls.".to_owned(),
+        2 => " Its boss enters two more phases before it falls.".to_owned(),
+        n => format!(" Its boss enters {n} more phases before it falls."),
+    };
+    Some((
+        format!("{} BOSS", rank.label().to_uppercase()),
+        format!("{place}{phases}"),
+    ))
+}
+/// "Front depth: defense 4 of 9 · enemy health and arrivals ×1.07": the
+/// in-country ramp this stage's snapshot carries, or None on a stage
+/// without one (the first, and every stage of a neutral ramp).
+fn front_ramp_line(stage: usize, levels: usize, ramp: f32) -> Option<String> {
+    (ramp > 1.0).then(|| {
+        format!(
+            "Front depth: defense {} of {levels} · enemy health and arrivals ×{ramp:.2}",
+            stage + 1
+        )
+    })
+}
 /// A briefing column heading; the loadout's carries its one action.
 fn heading(ui: &mut egui::Ui, title: &str) {
     ui.label(RichText::new(title).size(18.0).strong());
@@ -152,7 +215,11 @@ fn loadout(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
         heading(ui, "Field loadout");
         ui.add_space(12.0);
         if ui.button("Change equipment").clicked() {
-            f.open_preparation(Tab::Armory);
+            // A recruit's gear is managed with the roster in Operations.
+            f.open_preparation(match view.defender {
+                DefenderId::Recruit(_) => Tab::Operations,
+                DefenderId::Player | DefenderId::Mara => Tab::Armory,
+            });
         }
     });
     // Two slots per row keep the loadout to two lines above the fold.
@@ -185,7 +252,7 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
             ui.label("Emergency aid ready");
         });
     }
-    if f.campaign.mode == Mode::Personal {
+    if view.defender == DefenderId::Player {
         let points = view.character_points;
         if points > 0 {
             ui.colored_label(AMBER, format!("{points} character points available"));
@@ -201,10 +268,17 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
     } else {
         ui.label(format!(
             "{} · {} unspent training points",
-            view.npc_name, view.npc_unspent
+            view.defender_name, view.training_unspent
         ));
-        if ui.button("Review survivor training").clicked() {
-            f.open_preparation(Tab::Survivor);
+        if ui
+            .button(format!("Review {}'s training", view.defender_name))
+            .clicked()
+        {
+            // Mara trains on her own page; recruits train in Operations.
+            f.open_preparation(match view.defender {
+                DefenderId::Recruit(_) => Tab::Operations,
+                DefenderId::Player | DefenderId::Mara => Tab::Survivor,
+            });
         }
     }
     let owned = view.blueprints;
@@ -224,35 +298,38 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
         );
     }
 }
-/// The camp footer's primary action. A live main defense always offers the
-/// one return to it; other Prepare pages lead to the briefing, and only the
-/// briefing deploys.
+/// The camp footer's primary action. It follows Camp home's rule
+/// (`home::home_primary`): a live main defense always offers the one return
+/// to it, a liberation still to be closed offers "Choose next country", and
+/// other Prepare pages lead to the briefing, where only the briefing deploys.
 pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
-    if f.game.attempt().is_some() {
-        if primary(ui, "Return to active defense") {
-            f.go(Screen::Battle);
-            f.battle.fire_latched = false;
-        }
-        return;
-    }
-    let Some(country) = f.game.campaign().world.active_country() else {
-        if primary(ui, "Choose a country") {
-            f.open_campaign();
-        }
-        return;
-    };
-    if f.tab != Tab::Briefing {
+    let action = super::home::home_primary(f.game);
+    let country = f.game.campaign().world.active_country();
+    let deploys = f.tab == Tab::Briefing
+        && country.is_some()
+        && matches!(
+            action,
+            super::home::HomePrimary::GoToBriefing | super::home::HomePrimary::ChooseNextCountry
+        );
+    if !deploys {
         ui.horizontal_wrapped(|ui| {
-            if primary(ui, "Go to briefing") {
-                f.open_preparation(Tab::Briefing);
+            if primary(ui, action.label()).clicked() {
+                super::home::run_home_primary(f, action);
             }
-            muted(
-                ui,
-                format!("{} · {}", country.name, chrome::defender_name(f)),
-            );
+            if action == super::home::HomePrimary::GoToBriefing
+                && let Some(country) = country
+            {
+                muted(
+                    ui,
+                    format!("{} · {}", country.name, chrome::next_defender_name(f.game)),
+                );
+            }
         });
         return;
     }
+    let Some(country) = country else {
+        return;
+    };
     let name = country.name.clone();
     f.campaign.stage = f.campaign.stage.min(
         f.game
@@ -261,21 +338,142 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             .completed(&country.id)
             .min(country.level_count() - 1),
     );
+    let defender = chrome::next_defender_name(f.game);
     ui.horizontal_wrapped(|ui| {
-        if primary(
-            ui,
-            if f.campaign.mode == Mode::Personal {
-                "Deploy personally"
-            } else {
-                "Deploy survivor"
-            },
-        ) {
+        if primary(ui, &deploy_label(f.game)).clicked() {
             f.begin();
         }
         ui.label(format!(
-            "{name} · Defense {} · {}",
-            f.campaign.stage + 1,
-            chrome::defender_name(f)
+            "{name} · Defense {} · {defender}",
+            f.campaign.stage + 1
         ));
     });
+}
+/// The briefing primary's label: "Deploy personally" for the player, else
+/// "Deploy <name>" with the next defender's card name.
+pub(super) fn deploy_label(game: &Game) -> String {
+    match game.next_defender() {
+        DefenderId::Player => "Deploy personally".into(),
+        DefenderId::Mara | DefenderId::Recruit(_) => {
+            format!("Deploy {}", chrome::next_defender_name(game))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use horde_core::{survivors::SurvivorId, world::world};
+
+    /// Closing: the Capstone hover counts the phases its rank adds at the
+    /// previewed threat, not the catalogue's term. Past rank 4 a Hard Sector
+    /// boss already has the two-phase cap (the rank gate plus Hard's
+    /// `boss_phase_bonus`), so a Hard Capstone there adds none; Normal at
+    /// rank 5 and Hard at rank 0 still add one.
+    #[test]
+    fn capstone_hover_counts_the_phases_its_rank_adds() {
+        use horde_core::balance::{BalancePreset, BalanceSettings};
+        use horde_core::command::Command;
+        const ONE_MORE: &str = "Its boss enters one more phase before it falls.";
+        for (preset, rank, says) in [
+            (BalancePreset::Hard, 5, false),
+            (BalancePreset::Normal, 5, true),
+            (BalancePreset::Hard, 0, true),
+        ] {
+            let mut game = Game::default();
+            game.campaign_mut()
+                .choose_survivor(SurvivorId::Rook)
+                .unwrap();
+            game.campaign_mut().choose_start_country("DEU").unwrap();
+            game.apply(&Command::SetBalance(BalanceSettings::for_preset(preset)))
+                .unwrap();
+            let last = world().country("DEU").unwrap().level_count() - 1;
+            game.campaign_mut()
+                .world
+                .country_levels
+                .insert("DEU".into(), last);
+            game.campaign_mut().victories = rank;
+            assert_eq!(u64::from(game.campaign().progression_rank()), rank);
+            let view = view::view_model(&game, DefenderId::Player, last).unwrap();
+            let forecast = view.forecast.as_ref().unwrap();
+            assert_eq!(forecast.boss_rank, BossRank::Capstone);
+            let (badge, hint) = forecast_badge(forecast).unwrap();
+            assert_eq!(badge, "CAPSTONE BOSS");
+            assert_eq!(
+                hint.contains(ONE_MORE),
+                says,
+                "{preset:?} rank {rank}: {hint}"
+            );
+        }
+    }
+
+    /// The briefing's supply line shows the difficulty the deployment plays
+    /// (`Game::effective_country_difficulty`): Bangladesh's raw 1.60 is
+    /// clamped to 1.05 as the start country (W2 review).
+    #[test]
+    fn briefing_difficulty_reads_the_effective_value() {
+        let mut game = Game::default();
+        game.campaign_mut()
+            .choose_survivor(SurvivorId::Rook)
+            .unwrap();
+        game.campaign_mut().choose_start_country("BGD").unwrap();
+        let bgd = world().country("BGD").unwrap();
+        assert_eq!(bgd.difficulty, 1.60);
+        let difficulty = |id: &str| {
+            game.stage_preview(id, 0, Mode::Personal)
+                .unwrap()
+                .difficulty
+        };
+        assert_eq!(
+            supply_and_difficulty(9, difficulty("BGD")),
+            "9 build supply · 1.05× regional difficulty"
+        );
+        // A country beside the start keeps its raw value.
+        assert_eq!(
+            supply_and_difficulty(9, difficulty("AUT")),
+            "9 build supply · 0.85× regional difficulty"
+        );
+    }
+
+    /// W3-23: the badge is core's rank label; a Sector boss carries none.
+    /// Its hover counts the phases the rank adds at the previewed threat
+    /// (closing: core's `StagePreview::rank_phases`, at most the catalogue's
+    /// `extra_transitions`), so it never names a phase the boss does not
+    /// enter.
+    #[test]
+    fn boss_badge_names_regional_and_capstone_only() {
+        let ranks = &horde_core::progression::catalog().boss_ranks;
+        assert_eq!(
+            boss_badge(BossRank::Sector, ranks.sector.extra_transitions),
+            None
+        );
+        let (regional, hint) =
+            boss_badge(BossRank::Regional, ranks.regional.extra_transitions).unwrap();
+        assert_eq!(regional, "REGIONAL BOSS");
+        assert_eq!(
+            hint,
+            "A regional checkpoint: every sixth defense of a long front."
+        );
+        let (capstone, hint) =
+            boss_badge(BossRank::Capstone, ranks.capstone.extra_transitions).unwrap();
+        assert_eq!(capstone, "CAPSTONE BOSS");
+        assert_eq!(
+            hint,
+            "The last defense of this front. Its boss enters one more phase before it falls."
+        );
+        assert_eq!(
+            boss_badge(BossRank::Capstone, 0).unwrap().1,
+            "The last defense of this front."
+        );
+        assert_eq!(
+            boss_badge(BossRank::Regional, 2).unwrap().1,
+            "A regional checkpoint: every sixth defense of a long front. Its boss enters two \
+             more phases before it falls."
+        );
+        assert_eq!(front_ramp_line(0, 9, 1.0), None);
+        assert_eq!(
+            front_ramp_line(3, 9, 1.068).unwrap(),
+            "Front depth: defense 4 of 9 · enemy health and arrivals ×1.07"
+        );
+    }
 }

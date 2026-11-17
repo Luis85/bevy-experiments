@@ -1,0 +1,1116 @@
+# Master wave plan (waves 1-7)
+
+## Global rules for every commit
+- **One commit per finding.** Writers run one at a time.
+- **Test-first.** Each commit's named test fails on the parent commit. A characterisation pin must record a mutation or perturbation proof in the commit message.
+- **Verify before committing.** Every commit leaves the full verify green: fmt, the 3 clippy configs, the workspace tests, the `-p horde-defense --no-default-features` and `--features dev` tests, `--smoke` and check_views.
+- **Wave-close rule (R25, user decision 2026-11-07).** A wave closes when two review rounds in a row find nothing above minor, the perf acceptance and the full verify are green at HEAD, and every confirmed finding is fixed or explicitly ruled. Remaining minor findings carry into the next wave's review.
+- **Build, then one closing phase (R36, user decision 2026-11-13).** Waves 3-7 are built in one go. A commit still writes its row's tests first and records the failure line (or, for a pin, the mutation or perturbation proof) in its body. Before committing it runs `cargo fmt --all`, `cargo check --locked --workspace --all-targets` (plus `-p horde-defense --no-default-features` and `--features dev` when it touches horde_game) and its own new and directly affected tests; `scripts/tests/run_script_tests.ps1` when it touches scripts; and pacing only when its row is a pacing measurement or tuning (wave 4). A digest move sets the provisional pin with its cause (P3). The full verify, the review rounds, captures, perf acceptance, smoke and pacing re-runs move to one closing phase after the wave-7 build, which also fixes, improves and polishes what they show. A row's verification half (captures, perf passes, smoke, a capture-matrix review) is a closing-phase item, not build work. W4-08 stays the single re-bless for waves 3-4; any later digest move stays provisional and is re-blessed once in the closing phase. The R25 close conditions apply once, to the closing phase. For waves 3-7 this bullet wins over the "Verify before committing", "Wave-close rule", "Captures" and "Wave close" bullets where they differ.
+- **Digest moves.** A commit that moves a digest sets the provisional pin and its cause (P3). Only the wave's SD re-bless commit folds the pins.
+- **Scope.** No root-repo file is touched (R6). The review checks `git diff --name-only main... | grep -v ^horde-defense/` is empty.
+- **Scripts.** Scripts run under Windows PowerShell 5.1 and use `Native.ps1` once it exists (W1-02).
+- **Captures.** Every wave closes with before/after captures at 1440x900@1.0 and 1050x700@1.35, in normal and `LASTLIGHT_REVIEW_REDUCED`. Pacing is re-run whenever balance moved.
+- **Wave close.** The completeness critic checks PROVISIONAL is None, the capture ledger, and that every AC row of the wave has evidence.
+
+---
+
+## WAVE 1: goal 1, camera (R1), sale eligibility, the v7 schema plus migration plus fixtures, enemy_visuals v2, the archive, PS 5.1, the review panic fix
+
+The full commit detail is in `wave1_commits`. Order and summary:
+
+| Id | Owner | Title | Depends |
+|---|---|---|---|
+| W1-01 | save-determinism | v6 evidence commit on untouched v6 code: `save_v6.json`, recording fixtures, `settings_v0.json`, V6 pins | - |
+| W1-02 | qa-captures | `scripts/lib/Native.ps1` and `run_script_tests.ps1`; `.gitignore` gets `/scripts/__pycache__/` | - |
+| W1-03 | qa-captures | 5.1 lint (`repo_checks`) and ports of `capture_review.ps1` and `capture_motion.ps1` | W1-02 |
+| W1-04 | qa-captures | Rust log isolation guard | - |
+| W1-05 | qa-captures | Scene registry, `--list-scenes`, launch validation, the **fixtures.rs:138 panic fix**, practice status | - |
+| W1-06 | qa-captures | Supplemental before-captures (7 scenes x 2 sizes x 2 modes) recorded in the plan | W1-05 |
+| W1-07 | save-determinism | Determinism tooling and the provisional-pin ledger | W1-01 |
+| W1-08 | save-determinism | Architecture test: presentation never reads core RNG (scanner self-test) | - |
+| W1-09 | save-determinism | `crate::schema` predicates and the `crate::hash` mix/keyed/tags extraction | W1-07 |
+| W1-10 | campaign-defenders | `defenders.rs` identity types (DefenderId, DefenderSeat, resolve, RECRUIT_IDENTITIES) and labels | - |
+| W1-11 | campaign-defenders | `RecruitStatus::Defending`, `reserve_defender`/`release_defender`, tick_world predicate | W1-10 |
+| W1-12 | campaign-defenders | `DefenseInProgress` / `DefenderUnavailable` errors and the Defending pre-checks | W1-11 |
+| W1-13 | campaign-defenders | Attempt/Report `"defender"` seat and accessors; lifecycle copies the seat | W1-10 |
+| W1-14 | save-determinism | **SAVE_VERSION 7**: v6_to_v7 (a)+(e), `Game::from_payload`, replay migrates old headers | W1-13 |
+| W1-15 | save-determinism | Worker seat and appearance stamping at both deploy sites, plus worker-seat validation | W1-14 |
+| W1-16 | campaign-defenders | Campaign `next_defender` and `reserved_recruit`; ParallelBattle `summary`; StrategyState `folded_outcomes`; Recruit `containments` (types) | W1-14 |
+| W1-17 | save-determinism | D7 seat, Defending and reservation validation; D10 summary bounds; the `stage_takeover` seam | W1-11, W1-15, W1-16 |
+| W1-18 | loot-economy | Characterisation: the old Campaign filter sells a recruit-equipped item | W1-01 |
+| W1-19 | loot-economy | Route every sell path through `Game::sale_eligibility` / `plan_sale` (no behaviour change) | W1-18 |
+| W1-20 | loot-economy | Strict SellItem, `DeletePreset`, the armory button is disabled with a reason, RULESET 2, the recording-divergence test | W1-19, W1-14 |
+| W1-21 | loot-economy | Loot schema types, v6_to_v7 (b), validation, `loot_only` + `purchasable()` | W1-14 |
+| W1-22 | loot-economy | Shared upgrade metric (moved from wave 2; P2) | W1-19 |
+| W1-23 | loot-economy | `SetAutoSell`, `ApplyAutoSellToStash`, `Sold`, stash preview | W1-20, W1-21, W1-22 |
+| W1-24 | progression-tree | Progression ledgers and v6_to_v7 (c)(d) | W1-14 |
+| W1-25 | progression-tree | Receipts: `Report.progression_rewards`, RunRecord grant and milestone coins | W1-24 |
+| W1-26 | progression-tree | Skill and content schema at neutral values | W1-09 |
+| W1-27 | progression-tree (with enemy-balance) | CombatTelemetry fields | W1-09 |
+| W1-28 | enemy-balance | Enemy-side saved fields, EventKind appends, MAX_WAVE_TIER 15, GAMEPLAY_ENEMY_CAP | W1-09 |
+| W1-29 | enemy-balance | PresetExtras catalogue, `balance_extras_basis`, accessors | W1-09 |
+| W1-30 | save-determinism | `V7_SAVED_KEYS` registry and `schema_v7` guards | W1-15 to W1-29 |
+| W1-31 | save-determinism | Settings v2 fields, salvage loader, `read_settings` | W1-01 |
+| W1-32 | perf-architecture | `docs/PERF_BUDGET.json` (10 ms gate, integrated GPU pending) and `perf_budget.rs` | - |
+| W1-33 | perf-architecture | Frame report v3 on PerfProbe | W1-32 |
+| W1-34 | perf-architecture | `render_plan`: present mode, low latency, pipelined; single startup settings read; live display apply | W1-31, W1-33 |
+| W1-35 | perf-architecture | 400-enemy stress review seam and the `stress` screen | W1-28, W1-32 |
+| W1-36 | perf-architecture | `measure_performance.ps1` rewrite on Native.ps1 | W1-02, W1-03, W1-33, W1-35 |
+| W1-37 | perf-architecture | v3 re-baseline on the unchanged renderer | W1-36 |
+| W1-38 | perf-architecture | Pure move: `battle_view` split | W1-37 |
+| W1-39 | perf-architecture | Pure move: `ui/battle` split (ui/battle/mod.rs) | W1-37 |
+| W1-40 | perf-architecture | Pure move: `art` split | W1-37 |
+| W1-41 | perf-architecture | Pure move: `upgrade_graph` split | W1-37 |
+| W1-42 | perf-architecture | BattleFrame: one BattleScreen, BattleViewModel and HudView per egui pass | W1-39 |
+| W1-43 | vfx-lighting | C1: `art/camera.rs` fit_field and pins | W1-40 |
+| W1-44 | vfx-lighting | C2: BattleLayout and main-battle wiring | W1-43, W1-39, W1-42 |
+| W1-45 | vfx-lighting | C3: observer window fit | W1-44 |
+| W1-46 | vfx-lighting | C4: INCOMING occlusion chevron | W1-44 |
+| W1-47 | perf-architecture | Record the camera-zoom perf delta (the commit before C2 vs C2) | W1-44 |
+| W1-48 | perf-architecture | Batched battlefield meshes. R14: the done_when's peak, progressed-peak and stress pair review is satisfied by the wave-close pair review (target/production-after/wave1 against target/production-before, 356 captures, CF ledger rows; plan §10.3) | W1-44, W1-42 |
+| W1-49 | perf-architecture | Corpse sampling and the cached settled mesh | W1-48 |
+| W1-50 | perf-architecture | Save-clone benchmark, `save_snapshot`, conditional remedy | W1-35, W1-30 |
+| W1-51 | perf-architecture | Tighten the egui budgets | W1-48, W1-49 |
+| W1-52 | vfx-lighting | `enemy_visuals.json` v2 loader (v1 still loads) | - |
+| W1-53 | qa-captures | ReviewFrameFacts sidecar | W1-44 |
+| W1-54 | qa-captures | New wave-1 review scenes | W1-05, W1-35 |
+| W1-55 | qa-captures | check_views sources, 5.1 doc commands, the AGENTS.md target rule | W1-03 |
+| W1-56 | qa-captures | `horde_core::sha256` (test-support) | - |
+| W1-57 | qa-captures | Archive move, asset_audit, generator retarget plus `--check` (both `--check` runs join the docs/VALIDATION.md Full verify), CREDITS index | W1-56 |
+| W1-58 | audio | Retire NpcShot and archive survival_npc_shot_0..2 | W1-57 |
+| W1-59 | qa-captures | Motion manifest v2 and `-Viewport` | W1-03 |
+| W1-60 | qa-captures | Camera capture review with written reasons | W1-45, W1-46, W1-53 |
+| W1-61 | perf-architecture | Acceptance runs, the pipelined decision, shipped smoke timing | W1-34, W1-36, W1-48 to W1-51 |
+| W1-62 | perf-architecture | Rewrite ARCHITECTURE.md as an ownership table plus the coverage gate | W1-38 to W1-46 |
+| W1-63 | save-determinism | Wave-1 close: freeze `save_v7.json`, docs | W1-17, W1-23, W1-25, W1-28, W1-29, W1-30 |
+| W1-64 | perf-architecture | Fixed damage-popup font sizes so battle frames stop re-uploading the egui font atlas (gates 2 and 1) | W1-61 |
+| W1-65 | perf-architecture | Paint the ground once: skip patches under the field and cache ground/backdrop meshes (gate 1) | W1-64 |
+| W1-66 | perf-architecture | One quad per hit flash via a packed white silhouette (gates 1 and 2) | W1-65 |
+| W1-67 | perf-architecture | Build BattleFrame without per-enemy maps and clones (gate 1) | W1-66 |
+| W1-68 | perf-architecture | Attribute the 0.5 s frames: between-frame gap, pipelined wait, per-frame event counts (gate 3 investigation) | W1-67 |
+| W1-69 | enemy-balance | Enemies never block each other: no lane queue, overlap allowed, every enemy that reaches the line or a structure attacks (user decision, 2026-11-06); the wave-1 GOLDEN/TRACE re-bless | W1-68 |
+
+W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-ran after W1-68 and W1-69 (W1-69, db25cd7, landed on W1-68's review commit 63168c1, before every W1-61 commit), so its acceptance, measured on 199d823, includes the overlap rule.
+
+W1-64 done_when evidence (review fix, 2026-11-06): the W1-64 commit's probes ran on a shared machine (41-56% CPU from other processes) and missed render_schedule and cpu_frame. They were re-run with `measure_performance.ps1 -Scene all -Profile playtest -VsyncOff -Repeat 3`, the budget's repeat_acceptance, at about 22-24% load from other processes before the run. All 18 runs were valid and the script exited 0 with the new egui upload gate in place. Medians of 3 are given as 1440x900 / 1050x700@1.35. Progressed-peak: extract p95 0.328 / 0.291, render_schedule p95 2.644 / 2.370, cpu_frame p99 6.785 / 6.099. Stress: extract p95 0.324 / 0.340, render_schedule p95 2.803 / 2.976, cpu_frame p99 7.847 / 8.188. Every scene had 0 egui texture uploads and 0 frames over 50 ms. One stress repeat per size went above 3.0 ms render_schedule p95 (3.075 at 1440x900, 3.083 at 1050x700@1.35), and peak, which is not part of done_when, has a render_schedule median of 3.506 at 1440x900. Evidence is in `target/perf/w1-64/review-playtest-novsync`. Gate 3 (the 0.5 s frames) is still W1-68's.
+
+W1-65 done_when evidence (2026-11-06): `measure_performance.ps1 -Scene progressed-peak -Profile dev -Repeat 3` (VSync on), before in `target/perf/w1-65/before-dev-vsync` and after in `target/perf/w1-65/after-dev-vsync`, medians of 3 as 1440x900 / 1050x700@1.35. Backdrop 0.230 / 0.110 ms before, 0.011 / 0.013 ms after. Battlefield paint 0.603 / 0.504 before, 0.472 / 0.481 after. interface_draw 1.436 / 1.212 before, 1.081 / 1.109 after: under 1.129 at 1440x900, still over 1.03 at 1050x700@1.35. egui mesh vertices 49,875 / 39,033 before, 45,056 / 37,750 after; indices 121,932 / 85,422 before, 105,685 / 80,977 after; textured quads 14,632 / 8,644 before, 11,941 / 8,149 after. Captures: 11 battle scenes (max-lanes and progressed-peak are 17x30) at both sizes, normal and reduced, two runs per build, in `target/production-before/w1-65-a`, `-b` and `target/production-after/w1-65`, `-b`. Captures are not repeatable run to run (poses and HUD timing), so pixels were compared where both runs of both builds agree. All 8 17x30 captures differ by 0 px there. Normal max-lanes-small is byte-identical in all four runs. 35 of the 44 captures differ by 0 px. The other 9 differ only at the survivor's aiming pose or at small HUD spots, which also differ between two runs of one build. The skipped patches lie wholly inside the field's opaque soil, so they cannot change any pixel.
+
+W1-66 done_when evidence (2026-11-06): `measure_performance.ps1 -Scene progressed-peak` and `-Scene stress`, `-Profile dev -Repeat 3` (VSync on), before (with the new `scene_load.flashing_enemies` / `flash_quads` counts, mask runs still drawn) in `target/perf/w1-66/before-dev-vsync`, `-stress` and after in `target/perf/w1-66/after-dev-vsync`, `-stress`, medians of 3 as 1440x900 / 1050x700@1.35. One before progressed-peak 1440x900 repeat was unfocused twice (invalid), so that size has two valid before repeats. The share is small: these scenes have at most 1 flashing hostile in a frame (mean 0.05 progressed-peak, 0.03 stress). Flash quads were mean 9.69 and max 249 before, and mean 0.05 and max 1 after (stress 6.45 / 249 before, 0.03 / 1 after), so the flash quad count equals the flashing hostiles. Textured quads 11,941 / 8,149 before, 11,932 / 8,140 after (stress 13,855 / 10,064 before, 13,849 / 10,057 after). Battlefield paint 0.470 / 0.469 ms before, 0.468 / 0.473 after (stress 0.510 / 0.508, 0.501 / 0.504). egui mesh vertices 44,463 / 38,266 before, 45,243 / 37,708 after (stress 50,579 / 43,625, 51,136 / 43,606) and indices 103,759 / 82,742 before, 106,211 / 80,904 after (stress 110,306 / 86,472, 112,173 / 86,454). The vertex and index means move by up to about 2,500 between repeats of one build (HUD and pose timing), more than the at most 996 flash vertices of a peak frame. interface_draw 1.073 / 1.089 before, 1.104 / 1.090 after: still over 1.03 at 1050x700@1.35, no gate moved. The silhouettes fit the free column under the actor sheet, so the packed atlas stays 2898x1402. `flash_silhouette_matches_mask_runs` pins the geometry: every silhouette texel equals its 2x2 block's run coverage, the unposed quad, sampled NEAREST at every pixel centre that is not on a run edge, lights exactly the run pixels for every enemy frame (one size, 140x117 pt), and a posed quad (lean and scale) equals the unposed quad under the same `pose_vertices` transform that poses the runs. Captures: damage, damage-4x, battle, boss, peak, progressed-peak and max-lanes at both sizes, normal and reduced, two runs per build, in `target/production-before/w1-66-before-a`, `-b` and `target/production-after/w1-66-after-a`, `-b`. Recounted and inspected in the W1 review: pixels are compared only where both runs of each build agree (exact RGBA), and every differing pixel was grouped into clusters and inspected in before/after crops. The captures do hold hit flashes: in damage and damage-4x the struck brute is lit by the normal-mode additive flash at both sizes, and reduced damage-4x shows the reduced-mode warm tint, so the posed flash is compared at 1440x900 and 1050x700@1.35. Per pair (28):
+- 0 px (10): normal boss-small, max-lanes-small, peak-small, progressed-peak-small; reduced battle-small, damage, damage-small, max-lanes-small, peak-small, progressed-peak-small.
+- Flash silhouette edge pixels only (5): normal damage 6 px, damage-4x 3, damage-4x-small 1; reduced damage-4x 11 (two run-edge rows of 7 and 4 px), damage-4x-small 1. Each pixel lies on the flash's outline, where a run edge and the NEAREST-sampled silhouette edge fall on different sides of a pixel centre (before ground and after lit, or the reverse); no interior flash pixel differs. This is the done_when's antialias-edge allowance.
+- A damage-popup digit only (1): normal battle-small 2 px, a channel delta of 1.
+- OS pointer, survivor pose and popups (10): normal battle 241, boss 85, max-lanes 376, peak 83, progressed-peak 84; reduced battle 151, boss 100, max-lanes 37, peak 57, progressed-peak 72. The clusters are the hover reticle, its ammo readout and aim line at the OS pointer (CF-1-03), the survivor's aiming pose, and fading damage-popup digits. None lies on a flashing hostile.
+- Hover plus the above (2): normal damage-small 23,329 px, of which 23,327 are the hovered "Toggle firing" button (OS pointer) and 2 are flash edge pixels; reduced boss-small 24,236 px, the same 23,327 hover pixels plus 909 px of a fading "32" popup.
+
+So every difference has a written reason, the flash itself differs only at edge pixels, and the flash quad count equals the flashing hostiles. The W1-66 commit's own tally (8 at 0 px, 8 at 1-16, 8 at 38-225, 4 at 379-24,240, the rest not inspected, "no capture holds a flash") is superseded by this recount.
+
+W1-67 done_when evidence (2026-11-06): `measure_performance.ps1 -Scene progressed-peak` and `-Scene stress`, `-Profile dev -Repeat 3` (VSync on), after in `target/perf/w1-67/after-dev-vsync` and `-stress`, against the W1-66 after runs in `target/perf/w1-66/after-dev-vsync` and `-stress` as before, medians of 3 as 1440x900 / 1050x700@1.35. battle_frame_build 0.279 / 0.281 ms before, 0.165 / 0.162 after: under 0.20 at both sizes (stress 0.417 / 0.421 before, 0.218 / 0.220 after). Both scenes hold about 224 visible hostiles. Battlefield paint did not move: 0.468 / 0.473 before, 0.480 / 0.471 after (stress 0.501 / 0.504, 0.502 / 0.503). interface_draw 1.104 / 1.090 before, 0.963 / 0.943 after. That is under 1.129 and 1.030, so the 1050x700@1.35 interface_draw gate passes for the first time (stress 1.250 / 1.242, 1.025 / 1.037). Every run was valid with 0 egui texture uploads. Both scripts still exit 1, on frames_over_50ms only: progressed-peak worst 5 / 1, stress 11 / 14. W1-66 had 0. These are the isolated 0.5 s and 1.0 s frames of gate 3. Main CPU in those frames is 7-13 ms, and the time is spent in the present wait (about 500 or 1,000 ms) or between frames. That is W1-68's attribution, and no gate was changed. Where the time went, measured headless in the dev test profile on the live progressed peak (222 enemies, 18 structures, 45 events): scene sample plus view 0.190 ms before and 0.088 after. Most of the gain comes from one pass over the events for every enemy's latest hit and attack pulse, instead of two event scans per enemy. The aligned pose and position stores and the hoisted structure range give the rest. Equivalence: a before/after digest of 516 views per scene (progressed-peak and stress, 1,200 live ticks, fractions 0.5, 0.25 reduced and 1.0) was 9245be1f2bb82098 / 17a033d3804309dd at both builds. The permanent pins are `field_views_equal_the_by_id_reference_on_peak_and_stress` and `enemy_pulses_match_the_latest_event_scans`.
+
+W1-68 done_when evidence (2026-11-06): the report now records the between-frames gap, hand-off, channel wait, time outside the update, render idle, per-frame events, wall-clock instants and a window attribution (`slow_frame_reports_unattributed_time`, `perf_launch_records_the_between_frames_gap_and_events`). Fresh probes in `target/perf/w1-68/`, 11 passes of `-Repeat 3` at both sizes (66 runs), had 0 frames over 50 ms. The passes are:
+- playtest, VSync off, progressed-peak: pipelined default, pipelined off, Intel Arc adapter, DX12, and 3,600 frames;
+- playtest, VSync off, stress;
+- dev, VSync on, progressed-peak and stress;
+- playtest, VSync on, stress;
+- two passes of the unchanged W1-67 binary, dev VSync-on stress.
+
+At 18:09 that binary had 4-14 such frames per stress run. With 0 slow frames, the 95% coverage holds trivially. Over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms), 1,077 are covered to 100%; the other 3 are first samples whose windows begin before the first kept sample. That 100% is an identity: `outside_update` is the gap's residual, so `coverage` is 1.0 inside the recorded range. The W1-68 review added `named_coverage`, `covered_95_named` and `max_outside_update_ms`, which leave the residual out, and pins for both hand-off paths. Cause, in two halves (narrowed by the review):
+- VSync on (W1-67): named. It is an intermittent swap-chain acquire stall in the driver or compositor, not in-process. The stall sits in `get_current_texture` in 47 of 56 frames, and the 1.0 s frames equal wgpu-core's acquire timeout.
+- VSync off (W1-61, the spec's 446-532 ms stalls): not named. All 16 frames over 50 ms had present_wait 0.09-0.20 ms, so they were not in the acquire call and sat outside every span then recorded. None has recurred under the new probe. **W1-68 is not done for this half.** **Closed by W1-61 (2026-11-06):** this half is the same swap-chain acquire stall. With `slowest_present`, all 220 VSync-off frames over 50 ms in the W1-61 A/B, pipelined or not, were acquire waits (acquire shares 0.981-0.992, in-process work 7.8-19.2 ms). Pipelined, the render frame that stalled was replaced before the main thread read it; W1-61 gives that as the reason these 16 frames showed a present_wait of 0.09-0.20 ms. See plan 9.4 and VALIDATION.md, "Goal-1 acceptance".
+
+The 0 egui uploads, 0 asset events and 0 audio voices (review scenes are muted) come from probes with no stalls, so they exclude nothing. No fix commit follows. Gate 3 needs a user ruling on two open items: the environmental VSync-on stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe. No gate was moved. Details are in VALIDATION.md. Both items are settled since: the user ruled "Exclude driver stalls" on 2026-11-06 (plan §2.2), and W1-61 named the VSync-off half as the same acquire stall.
+
+Open (W1-61 review, 2026-11-07; W1-68's VSync-off half is closed by W1-61): one W1-61 A/B repeat in the shipped default configuration (playtest, pipelined on, VSync on, stress normal: `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2`) ran a sustained 15-20 FPS episode. It had about 400 frames of 47-67 ms. Outside driver stalls: 6 frames over 50 ms (exit 1), 407 over 33 ms, p99 47.1 ms, 46.3 FPS. It is not a driver stall under the ruling (named coverage 0.89-0.94, 4-6 ms per frame outside App::update) and is not attributed. Scheduled as W2-50 (perf-architecture, before the W2-47 re-gate) and tracked in plan §2.5; details in plan 9.4 and VALIDATION.md.
+
+W1-69 done_when evidence (2026-11-06): enemies never block each other, the user's decision of 2026-11-06 (plan §2.2). In core, `sim/movement.rs` lost the lane queue (the stop 0.65 yd behind the body in front, `EnemyPhase::Queued`) and the speed-difference passing offsets. Each enemy stops only at the defense line or the face of a live non-trap structure in its lane, and attacks there. `Queued` stays for old saves (`a_saved_queued_enemy_resolves_on_the_next_tick`), and a saved `pass_offset` eases back to 0 at the old rate. The commit pins the rule in `enemies_in_one_lane_never_block_each_other` and `enemies_still_stop_at_structures`. `tests/overtaking.rs` and the simulation.rs hit-stop test were rewritten for the new rule. Presentation-only changes:
+- a static per-id crowd stagger, R2 sequence, at most 0.15 yd behind the feet and 0.12 lane across;
+- lanes painted far to near, then by id (drawn-feet tie-break since bb78430);
+- one contact band per lane and one windup ring per stack;
+- prop hit outlines moved to the readout pass, so struck walls no longer split the props pass. With every wall struck, the progressed peak drew 51 primitives against the gate of 48; the pin is `struck_structures_add_no_primitives`.
+
+Without the per-stack rings the progressed peak drew 40,124 vertices at tick 420 against the gate of 40,000, from 59 enemies in contact where there were 19. No gate was moved. Re-bless (wave-1, R7): GOLDEN 1/6 and GAMEPLAY_TRACE 3/6, class G, with a reason per digest in `tests/determinism.rs`. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins did not move. Pacing (60 runs) and smoke before and after are in plan §9.6. The novice Germany profile has 5 → 8 defeats and its first victory moves from run 3 to run 5. Smoke passes, with failed attempts Personal 2 → 1 and Npc 1 → 3. Balance is not retuned; wave 2's pacing work owns the shift. Captures: peak, progressed-peak and fx-stress stills at both sizes in both modes (12 of 12, `target/production-after/w1-69`), plus motion for progressed-peak and stress at both viewports (`target/production-after/w1-69-motion`), reviewed in ledger rows CF-1-06 (fixed) and CF-1-07 (open, vfx-lighting).
+
+Wave-1 exit:
+- **Closed under R25 at HEAD ab03da9 (2026-11-07).** Review rounds 5-10 confirmed 4, 9, 2, 5, 3 and 3 findings, all minor and all fixed except the Invoke-Native item, which R24 resolves (rounds 1-4: 22, 14, 16, 13). The Goal-1 acceptance re-run at bee4236 passed every cell (ab03da9), and the full verify at ab03da9 was green (`target/production-after/wave1/verify-final/`). Evidence and the items handed on are in plan §7, "Wave-1 close": `pacing_targets` (W2-03), the W1-69 balance shift (wave 2), the gate-3 sample-932 frame and stress-on-r2 episode (W2-50), W2-52 before W2-49, the R18 items in W2-47, and the pending human checks.
+- GOLDEN 1/6, TRACE 3/6, all from the W1-69 re-bless; V1-V6 unchanged.
+- PERF gates pass at 199d823 except the open gate-3 episode (stress-on-r2), which W2-50 owns (W1-61; plan §2.5). At 867f786 the extra dev VSync-on stress pass also kept one stall-tail frame gated (sample 932, acquire share 0.794); W2-50 owns it too.
+- `save_v7.json` frozen.
+- Capture review logged (W1-60).
+- The first freeze's open items are closed.
+
+---
+
+## WAVE 2: auto-sell, takeover, SelectCountry, scaling, archetypes, elites, bosses, progression and skills
+
+Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
+
+**W2-01 · progression-tree · Pacing harness v2**
+- Files: `sim/pacing.rs`, `examples/pacing.rs`, `src/strategy.rs` (seeded-rng seam), `tests/pacing_harness.rs`.
+- What it adds:
+  - `PacingProfile { id, name, seed, country, aim, spend, max_runs, difficulty, plan, stop_after }`;
+  - the registry `by_id`, `DEFAULT_PROFILE_ID = "expert-deu"`;
+  - `pacing_sweep` with thread::scope;
+  - `MilestoneStats` (lower median/p25/p75; a missing milestone counts as max_runs+1);
+  - the milestones `OperationsOpen`, `Liberation(n)`, `TreeExhausted`, `Rank`, `FirstTakeover`, `TierOwned`;
+  - `--csv`, `--profile`, `--seeds`, `--fit-tiers`, `--values` stub. Unknown arguments exit 2.
+- Fail-first:
+  - `pacing_registry_ids_are_unique_and_default_is_expert_deu`
+  - `stop_after_liberation_ends_the_profile_after_that_run`
+  - `pacing_sweep_is_order_independent_of_thread_count`
+  - `milestone_stats_counts_missing_as_max_runs_plus_one`
+- Pin: the default `pacing 60 --runs` output equals the post-W1-69 baseline `target/production-after/w1-69/pacing.txt` (UTF-8, no BOM, LF), not the wave-0 `target/production-before/pacing.txt`: W1-69 moved pacing on purpose (plan §9.6). Mutation proof: change the legacy seed.
+- Pin amended by R28 (2026-11-09): from W2-08 on, the baseline is the latest recorded output, `target/production-after/w2-41/pacing.txt` (sha256 e19f06694be215fe05068c542cb3f56e8741d2ed959aa5db03ba9d68d6bbe65c; UTF-8, no BOM, LF). Later commits diff the default `pacing 60 --runs` output against it. A wave-2 commit may move pacing on purpose if it records the before/after rows in plan §9.6, and the output it records then becomes the baseline.
+- Done: the 20-seed "before" baseline CSV is recorded.
+- Deps: W1 close.
+
+**W2-02 · progression-tree · `Game::operations_available` moves to core**
+- Files: the predicate moves verbatim from `ui/context.rs:230-240`; `Milestone::OperationsOpen`.
+- Pin: `operations_available_matches_legacy_ui_predicate` over 5 fixtures. Mutation proof: drop the roster term.
+- Also: `context_operations_available_delegates_to_core`.
+- Deps: W2-01.
+
+**W2-03 · progression-tree · Goal-5 evaluators and `tests/pacing_targets.rs`**
+- Files: `unlock_order`, `tree_outlasts_liberation`, `tier_affordable_runs`; the file is all `#[ignore = "release-only"]` with a OnceLock sweep cache; AGENTS.md gains the run command.
+- Fail-first (synthetic):
+  - `unlock_order_rejects_mara_before_fortifications`
+  - `unlock_order_rejects_same_run_mara_and_operations_median`
+  - `tree_outlasts_rejects_exhaustion_before_second_liberation`
+  - `tree_exhausted_ignores_retired_nodes`
+- Done: the ignored goal5_* tests exist, and their "before" values are recorded.
+- Deps: W2-02.
+
+**W2-04 · enemy-balance · Goal-6 pacing rows and evaluators**
+- Files: the rows `lux-easy`, `lux-normal`, `lux-hard` (stop_after Liberation(1), max_runs 20), `start-aut`, `start-bgd`; the evaluators `defeat_rate_windows(20)`, `max_win_streak(11)`, `boss_ttk_median_s`, `archetype_coverage`, `runs_to_liberate`; ignored goal6_* tests.
+- Fail-first (synthetic):
+  - `runs_to_liberate_ratio_rejects_hard_above_1_5x_normal`
+  - `summary_windows_and_per_seed_streaks_on_synthetic_runs`
+- Done: `target/production-before/pacing_targets_before.txt` is written.
+- Deps: W2-01.
+
+**W2-05 · enemy-balance · Per-archetype telemetry population (T move)**
+- Files: `director.rs:218`, `combat.rs:351`, the npc injury path, `lifecycle.rs` RunRecord `elite_kills`, `boss_ttk_ticks`, `boss_rank`.
+- Writer obligation (schema-v7 §3.12, design-progression-tree "Schema v7 §3.12"): loading rejects an archetype with more kills than spawns, and an attempt resumed from an older save has living enemies whose spawns were never counted. So a kill is counted in `kills_by_archetype` only while that archetype's kills are below its `spawned_by_archetype` count.
+- Fail-first:
+  - `combat_telemetry_counts_spawns_kills_and_damage_taken_by_archetype`
+  - `kills_by_archetype_sums...`
+  - `resumed_attempt_counts_a_kill_only_below_its_archetype_spawns`: a resumed attempt kills an enemy spawned before the maps were written, and the save still loads.
+- Done: provisional GOLDEN with cause T, "telemetry population, no gameplay change". TRACE unchanged.
+- Deps: W2-01.
+
+**W2-06 · loot-economy · L1: drop_ids, drop_tier always Some, Report loot fields; byte-identical legacy path (R4)**
+- Files: `combat.rs:368-395` (the `drop_tier.is_none()` branch is verbatim today's code), `deploy_internal`, `lifecycle.rs:307-372`, `loot.rs` (`max_drop_tier`).
+- Fail-first:
+  - `drop_ids_complete_beyond_128_receipts`
+  - `new_attempts_always_store_some_drop_tier`
+  - `legacy_attempt_never_pushes_drop_ids_and_is_never_auto_sold`
+  - `late_country_stage_sets_unlocked_drop_tier`
+- Pin: `V6_DROP_TRACE_FNV` is asserted. Mutation proof: route None through DropTable.
+- Done: provisional GOLDEN cause F. TRACE, smoke and pacing unchanged.
+- Deps: W2-05.
+
+**W2-07 · loot-economy · L2: relative quality `roll_relative` (b1)**
+- Fail-first:
+  - `relative_roll_never_drops_a_tier4_below_epic`
+  - `floor_zeroing_distribution_matches_table`
+  - `drop_quality_consumes_no_combat_rng`
+- Pin: `roll_relative_with_common_base_and_no_floor_equals_roll`.
+- Done: provisional cause G (Uncommon-base tier-1 items), only if a GOLDEN digest moves.
+- Deps: W2-06.
+
+**W2-08 · loot-economy · L3: 39 `loot_only` items (indices 29-67) and `purchasable()` at every site**
+- Fail-first:
+  - `every_tier_1_to_4_has_one_ranged_per_class_and_three_per_other_slot`
+  - `loot_only_items_are_never_offered_bought_or_recommended`
+- Pin: `appended_ids_keep_v1_order`.
+- Done: provisional cause C.
+- Pacing (W2-08 review, 2026-11-08): the default `pacing 60 --runs` output moved (`recommended_node` reads owned drops), so it no longer equals the W2-01 pin's `w1-69/pacing.txt`. The rows and `target/production-after/w2-08/pacing.txt` are in plan §9.6; the re-baseline is an open plan §2.5 item, and W2-01's pin wording stays until it is ruled. **Ruled by R28 (2026-11-09):** the move is accepted and pacing is re-baselined on `target/production-after/w2-41/pacing.txt` (the W2-01 pin above is amended). W2-08 is complete.
+- Deps: W2-07, W2-53 (the frozen-catalogue guard lands before the first wave-2 catalogue edit).
+
+**W2-09 · loot-economy · L4: weighted single-draw DropTable**
+- Fail-first:
+  - `weighted_drops_favour_current_tier`
+  - `trained_class_weighted`
+  - `npc_mode_weights_its_own_weapon_class`
+  - `definition_pick_consumes_exactly_one_draw`
+- Done: TRACE unchanged (the gate). Provisional GOLDEN cause G only if moved.
+- Deps: W2-08.
+- **R33 (2026-11-09, orchestrator ruling; plan §2.4).** W2-09 moved the 0x1a571167 Personal GOLDEN digest, and its provisional cause stays class G, as this row and plan §6 say. `support::classify` labels the move C because outcome and trace are unchanged, but the change is a gameplay mechanic (the weighted drop pick). W2-49 records both labels in its reason table. The pacing test it turned red, `goal6_clamped_starts_first_victory_runs_2_to_4` (the AUT start's first victory 3 -> 5; plan §9.6), is owned by the wave-4 tuning loop (W4-04..n).
+
+**W2-10 · campaign-defenders · `liberated_count` rewrite and the 10-level allowance**
+- Fail-first:
+  - `allowance_reaches_level_ten_by_sixth_liberation` (84; today 36)
+  - `three_stage_only_route_keeps_raising_the_allowance`
+  - `allowance_never_below_legacy_and_monotonic`
+  - `liberated_count_matches_full_scan`
+- Done: smoke equals smoke.txt; GOLDEN unchanged.
+- Deps: W1 close.
+
+**W2-11 · campaign-defenders · Takeover core (D6 + D8)**
+- Files:
+  - `deploy_as(level, DefenderId, stage)` with preflight then commit;
+  - `defender_npc(seat)`/`_mut`, `record_defender_progress`, with the reads replaced at sim.rs:1106-1117, npc.rs:72/102/125/181/272 and lifecycle.rs:318;
+  - `reserve_takeover`, the stamp via `stamp_recruit_defender`;
+  - finish order: victory credit, then the npc attempts bump moves out of `finish_attempt`, then takeover release, then the H1 slot, then RunRecord `recruit_id`, then the Report seat.
+- Fail-first (`tests/defenders.rs`):
+  - `recruit_takeover_deploys_with_recruit_loadout_and_identity`
+  - `takeover_uses_recruit_recall_not_maras`
+  - `takeover_progress_accrues_to_roster_recruit_only`
+  - `takeover_victory_credits_recruit_not_mara`
+  - `takeover_defeat_and_withdraw_return_recruit_ready_and_release_items`
+  - `takeover_save_reload_mid_battle_continues_identically`
+  - `v7_fixture_withdraw_returns_defending_recruit_ready_and_releases_items`
+- Pins: `mode_owner_paths_are_byte_identical`; `mara_finish_matches_legacy_attempt_counting`.
+- Deps: W2-10.
+
+**W2-12 · campaign-defenders · Next defender (D9)**
+- Files: `SetNextDefender`, `BeginDefense`; ContinueJourney, retry and repeat use the report's defender; `available_defenders`, `defender_card`, `active_defender`, `battle_defender_card`; the dispatch resets next_defender with a note.
+- Fail-first:
+  - `next_defender_persists_through_save_load_and_continue_deploys_it`
+  - `set_next_defender_typed_rejections_leave_state_unchanged`
+  - `begin_defense_for_mara_matches_legacy_deploy_digest`
+  - `deploy_command_stays_player_or_mara_with_next_defender_set`
+  - `dispatching_the_next_defender_resets_it_to_player_with_note`
+  - `recruit_on_main_run_cannot_be_dispatched_trained_or_equipped`
+  - `migrated_v6_continues_with_mara` (the v6 fixture loads with `next_defender` None, pinned in wave 1 by `v6_fixture_defenders_resolve`; a retry or repeat of its settled Mara report deploys Mara and `active_defender()` then names Mara)
+  - `new_defender_commands_round_trip_serde`
+- Deps: W2-11.
+
+**W2-13 · campaign-defenders · `SetRecruitTactics` (D12)**
+- Fail-first:
+  - `set_recruit_tactics_edits_ready_and_defending_only`
+  - `mid_battle_tactics_change_takes_effect_next_turn_deterministically`
+- Deps: W2-12.
+
+**W2-14 · loot-economy · H1 main-run auto-sell**
+- Files: `sim/auto_sell.rs`; finish() after the takeover release; the judge is `UpgradeJudge::Defender(a.defender())`.
+- Fail-first:
+  - `rule_off_moves_nothing`
+  - `rule_sells_only_this_runs_drops_below_threshold`
+  - `guarded_drops_are_kept`
+  - `keep_upgrades_judges_the_takeover_recruits_loadout_not_maras`
+  - `takeover_auto_sell_runs_after_release_and_never_sells_the_recruits_loadout`
+  - `auto_sell_consumes_no_rng`
+  - `wallet_overflow_keeps_items`
+  - `fifty_sales_one_receipt_12_lines_exact_totals`
+- Done: no digest move.
+- Deps: W2-11, W2-09.
+
+**W2-15 · campaign-defenders · Expedition settlement writers (D10)**
+- Files: summary create, update and finalise; folded pruning; `AcknowledgeOutcomes`; `unacknowledged_outcomes`; `liberation_line`; idempotent `settle_parallel`.
+- Fail-first:
+  - `each_settled_expedition_yields_exactly_one_notice_across_save_reload`
+  - `country_operation_notice_appears_once_after_final_stage_with_liberation_and_fronts`
+  - `pruning_folds_unacknowledged_outcomes_and_conserves_the_count`
+  - `pruning_prefers_acknowledged_and_legacy_battles`
+  - `settle_parallel_twice_is_a_no_op`
+  - `random_tick_recall_interleavings_settle_each_battle_once` (200 cases)
+- Pins:
+  - `v6_settled_battles_produce_no_notice_burst`;
+  - `worker_victory_credits_recruit_and_threat_once` (acceptance G3.8; design-campaign-defenders §1.9 "Worker credit"): a settled worker victory writes exactly one RunRecord with `recruit_id` Some(id), and the parent's victory and threat credit is applied once, across a repeated `settle_parallel` and a save reload. Mutation proof: apply the parent's credit for the worker victory twice.
+- Deps: W2-11.
+
+**W2-16 · loot-economy · W-a worker and expedition auto-sell plus the final sweep**
+- Judge: `Loadout { Npc, battle.loadout, battle.game.campaign.npc }`.
+- Fail-first:
+  - `worker_loot_sold_exactly_once_in_main_campaign`
+  - `repeated_settle_parallel_is_idempotent`
+  - `save_mid_expedition_preserves_pending_auto_sell_and_sells_once`
+  - `apply_to_npc_runs_false_leaves_expedition_loot`
+  - `chained_operation_gets_one_receipt_per_stage_with_count_le_loot`
+  - `v6_inflight_attempt_and_expedition_sell_nothing_after_enabling_rule`
+- Deps: W2-15, W2-14.
+
+**W2-17 · loot-economy · `results_loot` view-model and the 500-case property test**
+- Fail-first:
+  - `results_loot_survives_reload_and_offers_upgrades_for_defender`
+  - `worker_report_results_loot_has_no_kept_or_upgrades`
+  - `previews_and_results_loot_do_not_mutate_game`
+  - `properties::sale_paths_never_sell_guarded_items`
+- Deps: W2-16.
+
+**W2-18 · progression-tree · W2-D threat-scaled prices and UI literals (R10/D15)**
+- Files: `camp_price`, `Campaign::recruit_price()`, `npc_training_price()`; `strategy.rs:296`, `progression.rs:726`; `ui/operations.rs:158/160/206`, `ui/character.rs:193`.
+- Fail-first:
+  - `recruit_and_training_prices_scale_with_threat` (100/110/200/300/600; 25/30/50/75/150)
+  - `camp_price_labels_follow_core_price_at_rank_10`
+- Done: the grep test finds no literal 25 or raw `recruit_cost` in core purchase paths.
+- Deps: W2-10.
+
+**W2-19 · campaign-defenders · `SelectCountry`, `outbreak_plan`, `country_choice_preview`**
+- Fail-first:
+  - `select_country_never_creates_an_attempt`
+  - `select_country_typed_rejections_leave_state_unchanged`
+  - `outbreak_plan_targets_final_stage_and_lists_ready_guards`
+  - `begin_defense_from_plan_replays_final_stage_and_contains_the_outbreak`
+- Deps: W2-12.
+
+**W2-20 · campaign-defenders · `RecruitAs`, two-archetype keyed offer, origin trait**
+- Files: also adds `DefenderCard.archetype: Option<Archetype>` (design-campaign-defenders §1.5, deferred from W2-12).
+- Fail-first:
+  - `recruit_offer_has_two_distinct_archetypes_and_recruit_as_applies_the_choice`
+  - `legacy_recruit_equals_first_offer`
+  - `recruit_as_rejects_unoffered_archetype`
+  - `recruit_offer_names_the_missing_recruitment_node`
+  - `recruiting_draws_no_strategy_rng`
+  - `recruit_offer_price_reads_core_price`
+- Deps: W2-18.
+
+**W2-21 · campaign-defenders · `defender_power`, `service_record`, containments writer**
+- Files: also adds `DefenderOption.power: DefenderPower` to `available_defenders` (design-campaign-defenders §1.4, deferred from W2-12), and `OutbreakPlan.recommended_defender: DefenderId`, the highest-power selectable defender (§1.8, deferred from W2-19).
+- Fail-first:
+  - `fresh_starter_power_is_100_at_threat_zero_in_both_models`
+  - `defender_power_drops_as_threat_rises`
+  - `defender_power_is_pure`
+  - `defender_power_inputs_match_the_deployed_attempt`
+  - `guard_containment_increments_recruit_containments_and_survives_guard_removal`
+  - `service_record_is_derived_from_run_history_and_containments`
+- Deps: W2-11.
+
+**W2-22 · progression-tree · W2-C `settle_progression_rewards`**
+- Files: finish() after H1; once at the end of settle_parallel when idle; milestone item keyed MILESTONE; remove `Campaign::claim_neutral_milestones` (the wave-1 neutral claim from 3df1242, called from `first_clear`), which this settlement replaces.
+- Fail-first:
+  - `level_grant_is_paid_once_at_root_finish` (77)
+  - `grant_is_not_paid_while_the_attempt_is_live`
+  - `worker_victory_level_up_pays_the_grant_once_in_the_parent_and_never_in_the_worker`
+  - `milestone_paid_once_per_rank_across_save_reload`
+  - `milestone_item_pick_draws_no_rng`
+  - `finish_settlement_order_auto_sell_runs_before_milestone_item`
+  - `settle_parallel_defers_rewards_while_main_attempt_is_live`
+- Done: GOLDEN unchanged; smoke and pacing before/after recorded.
+- Deps: W2-14, W2-16.
+- **R32 (2026-11-09, orchestrator ruling; plan §2.4).** Both §2.5 items this row opened keep their defaults. W2-54 authors the level grant and the rank milestones before W2-49. The `settle_parallel` narrowing stays: settlement runs only on an idle pass that credited a victory.
+
+**W2-23 · progression-tree · W2-E `NpcTraining::TRAINABLE` and `TrainingUnsupported`**
+- Fail-first:
+  - `npc_trainable_rows_exclude_iq_hp_fp`
+  - `apply_train_npc_intelligence_returns_training_unsupported`
+- Deps: W1 close.
+
+**W2-24 · progression-tree · W2-F mechanisms at neutral authored values**
+- Files: class perks baked into the profile, armor penetration, `hazard_scaled`, `charges_at_rank` (sim.rs:979).
+- Fail-first:
+  - `class_modifier_applies_only_to_matching_class`
+  - `armor_penetration_reduces_enemy_armor_for_personal_shots_only`
+  - `hazard_scaled_is_identity_at_one_and_scales_at_point_six`
+  - `trap_rank_r_places_three_plus_r_charges` (test-only authored value; the shipped trap has authored the same 1 since W4-03)
+- Pin: `existing_structures_keep_charges_without_charges_per_rank` (renamed `structures_without_charges_per_rank_keep_their_charges` by W4-03, which gives the shipped shrapnel trap charges_per_rank 1; the pin now covers the structures that author none and a trap with its charges_per_rank cleared).
+- Deps: W2-23.
+
+**W2-25 · progression-tree · W2-G `tree_value` and `--values`**
+- Fail-first:
+  - `field_fitness_ehp_gain_matches_ratio`
+  - `quick_throw_is_zero_today` (renamed `quick_throw_is_valued_by_its_charges` by W4-03, which gives Quick throw one grenade and one Molotov charge)
+  - `dominance_groups_pair_vitality_with_health_add`
+- Deps: W2-24.
+
+**W2-26 · enemy-balance · Two-axis snapshot**
+- Files: `FrontPosition`; `progression_for(.., Option<FrontPosition>)`; front ramp 0.18 × extras pct; the extras fold (elite pct, boss_phase_bonus); BossRank stamping; boss_damage rank term at read sites `combat.rs:102-108` (Personal) and `:166-176` (NPC).
+- Fail-first:
+  - `front_ramp_final_over_first_normal_is_at_least_1_35` (ranks 0/5/10/20/40, all countries with ≥ 2 stages)
+  - `front_ramp_orders_hard_over_normal_over_easy`
+  - `boss_damage_multiplier_follows_rank`
+  - `personal_boss_contact_damage_scales_with_boss_damage_multiplier`
+  - `npc_boss_attack_adds_include_boss_damage_term`
+  - `boss_rank_derivation_usa_24`
+  - `regional_checkpoint_distribution_is_219_12_4_7`
+- Pins: `front_ramp_is_exactly_one_without_country`; `boss_damage_multiplier_is_exactly_one_through_rank_4`; `neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0`; `stage_theme_with_is_unchanged_on_checkpoint_stages`.
+- Deps: W2-04, W2-53 (the frozen-catalogue guard lands before the enemy catalogue rows W2-26..W2-36).
+
+**W2-27 · enemy-balance · Spitter**
+- Files: reach, station, walls, followers walk through (W1-69: no queue, no overtaking); far-half guard.
+- Fail-first:
+  - `spitter_never_winds_up_or_damages_from_the_far_half`
+  - `spitter_stations_at_clamped_stop`
+  - `wall_in_lane_intercepts_spit`
+  - `npc_spitter_uses_range_penalty_and_dodge`
+- Pin: `reach_zero_profile_identical`.
+- Deps: W2-26.
+
+**W2-28 · vfx-lighting · Visual twin for ranged windups**
+- Files: `EnemyView.aim_target`; a dashed aim line.
+- Fail-first: `spitter_windup_draws_aim_line_to_wall_or_defender`.
+- Pin: `every_windup_event_has_a_windup_view_in_the_same_frame` (normal and reduced). Mutation proof: force windup None.
+- Wave-2 close capture item (W2 review, 2026-11-10): W2-31 shipped the spitter with `reach` 4.0 (`enemy_catalog.json`), so it winds up as far as four yards beyond the defense line and its dashed aim line crosses that gap. The W2-47 stress fixture (787929f) covers the vertex half: it draws every catalogue archetype, the spitter included. The visual half is not yet checked. The wave-2 close captures include a spitter mid-windup at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, checking that the aim line runs from the spitter to the wall or defender it targets, stays legible over the lanes and does not hide the defender, the spitter or the HUD. Spitters spawn from rank 6, so the shipped `battle` and `boss` stills (rank 0) never show one. Name the still used (`fx-stress` or `stress` if one frames a windup, otherwise a new spitter-windup still, which needs a waves.md slot). A defect found there becomes a capture-ledger row (plan §10).
+- Close capture result (W2 review, 2026-11-11, HEAD 22a8ef4; plan §10.4): no still or motion export frames a spitter winding up at its reach. The paused `fx-stress` still holds no windup at all, and in the `stress` and `fx-stress` motion every spitter spits from the wall face, so its aim line is a few dashes inside the stack (once under a wall MISS popup). The visual half stays unchecked: capture-ledger row CF-2-04, which needs a spitter-windup still and a waves.md id. W2-57 (W2 review) registers it as the `spitter-windup` still: a rank-6 field paused with a catalogue spitter at its 4-yard reach halfway through its windup, aiming at the defender. Captured at d697cc4 (`target/production-after/wave2/review-cf204/stills`): at both sizes and modes the dashed aim line runs from the spitter to the defender along the middle lane, legible over the grass, and hides neither of them nor the HUD; reduced draws the same static line. CF-2-04 is closed.
+- Deps: W2-27.
+
+**W2-29 · enemy-balance · Exploder and splitter; `rules::resolve_blast` / `resolve_object_blast`; NPC rules**
+- Fail-first:
+  - `resolve_blast_draws_defense_only_when_dodged`
+  - `npc_exploder_fuse_detonates_on_turn_without_reward_or_corpse`
+  - `npc_death_burst_hits_enemies_in_radius_in_id_order_never_defender`
+  - `npc_split_children_use_own_npc_stats_and_draw_no_rng`
+  - `chain_bursts_resolve_one_tick_later_and_terminate`
+  - `splitter_at_cap_minus_one_spawns_exactly_one_child_and_saves`
+- Deps: W2-26.
+
+**W2-30 · enemy-balance · Shield ranged armor, juggernaut stagger immunity, sprinter groups, hazard seam**
+- Fail-first:
+  - `shield_ranged_armor_applies_to_shot_and_turret_until_contact...`
+  - `npc_juggernaut_major_wound_clears_stagger_flags_and_matches_draw_count`
+  - `npc_sprinter_group_spawns_group_size_members_without_extra_rng`
+- Deps: W2-29.
+
+**W2-31 · enemy-balance · Composition: 7 archetypes plus waves 5-11 plus the catalogue floor check**
+- Fail-first:
+  - `catalogue_has_twelve_tiers_with_monotone_mean_health`
+  - `npc_resolution_for_each_new_archetype`
+  - `every_new_archetype_uses_an_existing_visual_sprite`
+  - `every_floor_tier_exists_in_enemy_catalog`
+- Pin: `waves_0_to_4_byte_identical`.
+- Deps: W2-30.
+
+**W2-32 · enemy-balance · Growth knee and `pressure_floors` rows 5..=28**
+- Fail-first:
+  - `snapshot_wave_tiers_at_10_20_40_are_7_10_11`
+  - `growth_matches_gear_within_band`
+  - `rank_20_boss_armor_exceeds_rank_0_both_modes`
+- Pin: `ranks_zero_to_four_snapshot_pinned`.
+- Deps: W2-31.
+
+**W2-33 · enemy-balance · Elites**
+- Files: `elite_bp`; keyed ELITE and AFFIX rolls; affix bake; the shared health guard.
+- Fail-first:
+  - `elite_bp_pins`
+  - `elites_consume_no_combat_rng`
+  - `elite_fraction_at_rank_13_is_8_5_pm_0_5_over_20k`
+  - `hard_elite_rate_1_5x_normal_easy_0_5x`
+  - `no_elites_below_rank_three`
+- Pin: `quality_rolls_unchanged...`.
+- Deps: W2-32.
+
+**W2-34 · vfx-lighting · Validate `enemy_visuals` affix ids against the core elite table**
+- Fail-first: `v2_unknown_affix_rejected`.
+- Note (W2-33, 2026-11-08): the core table's ids are `EnemyCatalog::elite_affix_ids()` (hardened, frenzied, vicious, shielded, volatile, in table order).
+- Deps: W2-33, W1-52.
+
+**W2-35 · loot-economy · Elite forced drop**
+- Files: `combat.rs:368` normal/elite split; keyed ELITE_PICK; `roll_relative` Uncommon floor.
+- Fail-first:
+  - `elite_status_never_changes_combat_rng_draw_count`
+  - `elite_only_drop_uses_keyed_pick_and_draws_no_rng`
+  - `split_child_kill_takes_the_drop_draw_and_never_drops`
+  - `elite_drop_quality_is_at_least_uncommon_and_boss_drop_has_no_floor`
+- Note (W2-33, 2026-11-08): an elite is `e.resolved.as_ref().is_some_and(|r| r.elite.is_some())` (bosses carry no snapshot), and W2-33 already counts `elites_killed` in the reap; W2-35 only changes the drop.
+- Note (W2-29 review, 2026-11-08): the split-child half of ruling E8 already landed in W2-29. In `combat.rs` reap a split child takes and discards the 3% roll and never drops (`drop = e.boss || (!e.split_child && (rolled || kills % 20 == 0))`), and `npc_split_children_use_own_npc_stats_and_draw_no_rng` checks it. So `split_child_kill_takes_the_drop_draw_and_never_drops` passes on W2-35's parent. Treat it as a characterisation pin and record a mutation proof instead of fail-first evidence (for example, drop `!e.split_child &&` from the drop expression and watch the pin fail). W2-35 keeps only the elite/normal split, the keyed ELITE_PICK and the Uncommon floor.
+- Deps: W2-33.
+
+**W2-36 · enemy-balance · Bosses**
+- Files: armor scaling, single-profile phases with a 90-tick hold, `BossPhase` event, Capstone +1 transition.
+- Fail-first:
+  - `boss_crossing_50_percent_enters_phase_once_with_90_tick_hold_event_and_survives_save`
+  - `normal_rank_4_boss_has_no_phases_rank_5_has_one`
+  - `hard_has_two_above_rank_4`
+  - `caller_phase_shortens_interval`
+  - `second_transition_clamped`
+- Note (W2-32, 2026-11-08): the rank boss armor of design-enemy-balance §2 ("Boss armor") landed in W2-32. `ProgressionCatalog::snapshot` writes `boss_armor_multiplier` and `npc_boss_armor_add`, and `place_enemy` applies them to the boss's armor at spawn, so exposure still zeroes it. W2-36's "armor scaling" is only the phase `armor_mult` in `enemy_armor_vs`, on top of that spawn armor; do not apply the rank terms a second time.
+- Note (W2-26 review, 2026-11-08): `ProgressionSnapshot::fold_extras` (W2-26) already adds `boss_phase_bonus`, and only past rank 4. Add only the `(r>4)` and `extra_transitions` terms; adding the bonus again would count it twice. Hard at ranks 0-4 (schema-v7 §3.10 gives 1 phase, W2-26's neutral-snapshot pin gives none) is open in plan §2.5. Settle it with a test of Hard ranks 0-4 that matches the ruling, and amend schema §3.10 or the pin to match. **Settled by W2-36 (2026-11-08)** on the plan §2.5 default: Hard at ranks 0-4 has Normal's count (`hard_ranks_zero_to_four_have_normals_phase_count`), and schema-v7 §3.10 and the design-enemy-balance §6 table are amended.
+- Deps: W2-32.
+
+**W2-37 · vfx-lighting · Visual twin for BossPhase**
+- Files: `BattleView.boss_phase`; the "PHASE n - NAME" label and a ring for the whole hold (static ring in reduced mode).
+- Fail-first: `boss_phase_hold_shows_phase_label_and_ring_for_90_ticks` (normal and reduced).
+- Note (W2-36, 2026-11-08): the saved `Event` of kind `BossPhase` carries the transition number in `value`, the hold in `duration_ticks` (90) and the boss in `actor_id`; `SimEvent::BossPhase { boss_id, kind, phase, lane, at }` is unchanged. The live state is `Enemy.boss_state` (`entered`, `hold_until`, `profile.name`; `BossState::held(tick)`), so the hold left is `hold_until - tick`. horde_game still maps `SimEvent::BossPhase` to no cue (`runner/runtime.rs`).
+- Wave-2 close capture item (W2 review, 2026-11-10): no shipped review scene shows a phase hold. Phases start past rank 4, the `boss` still deploys stage 0 of a fresh campaign (rank 0), and the rank-50 render fixtures spawn a phased boss but enter no transition until it is hurt (plan §9.6, W2-36). The wave-2 close captures include a boss inside its 90-tick phase hold at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, checking that the "PHASE n - NAME" label sits legibly over the boss's name callout and clear of the HUD and banners (in the top lane too), and that the ring circles the boss's feet for the whole hold (static in reduced mode). Taking it needs a phased-boss review scene (a boss past rank 4, hurt into its first transition), which needs a waves.md slot. A defect found there becomes a capture-ledger row (plan §10). W2-55 (W2 review) registers it as the `boss-phase` still: a rank-5 boss in the middle lane of a 3x12 field, paused with 60 of its 90 hold ticks left (a motion export plays the rest). The close captures take it; the top-lane half stays with the vertex test `boss_phase_label_and_name_never_overprint_in_the_top_lane`, since the director always spawns the boss in the middle lane.
+- Close capture result (W2 review, 2026-11-11, HEAD 22a8ef4; plan §10.4): the `boss-phase` still is a 7x16 field (the rank-5 survivor deploys 7 lanes, not 3x12). At both sizes and modes "PHASE 1 - BREACH" sits over the boss's "EXPOSED · FIRE NOW" callout, clear of the HUD, the bars and the PAUSED banner, and the amber ring circles its feet (same radii in reduced). Two rows: CF-2-05 (polish; the unbacked label crosses the bodies behind the boss at 1050x700@1.35) and CF-2-03 (minor; the motion export starts at native frame 60, after the remaining 60 hold ticks, so only frame-0000 shows the hold and the reduced ring's stillness is unverified). W2-56 fixed CF-2-03 (770b715): the export now plays the whole hold, frames 0-22 with the ring and label (the reduced ring static) and frame 23 the hold's end, at both sizes and modes (`target/production-after/wave2/review-cf203`).
+- Deps: W2-36.
+
+**W2-38 · enemy-balance · generate_world.py commit A (writer only)**
+- Files: indent-2 writer, `--from-existing` default, `--check`, `--rebuild` with sha256 pins (exit 3) and the stage-count guard (exit 4), `--self-test`.
+- Fail-first: `--check` with the OLD formula exits 0 (today the compact writer fails); `--self-test`.
+- Deps: W1 close.
+
+**W2-39 · enemy-balance · generate_world.py commit B: difficulty bands, regeneration, start clamp**
+- Files: bands 85-115 / 100-135 / 120-160 by stage count; `Country::effective_difficulty` and `Game::effective_country_difficulty`; `tests/simulation.rs:372` reason "start clamp"; WORLD.md paragraph.
+- Fail-first:
+  - `world_difficulty_matches_band_formula` (242 countries)
+  - `start_country_difficulty_is_clamped`
+- Pin: `world_stage_themes_and_strategy_config_survive_regeneration`.
+- Deps: W2-38, W2-26.
+
+**W2-40 · enemy-balance · Victory-to-threat guard tests**
+- Files: `tests/threat_guard.rs`; proptest rank == committed victories over 120 seeds.
+- Fail-first: the Capstone, Regional and takeover rows. Existing rows are mutation-checked by removing `saturating_add` at `campaign/world.rs:50` (:47 in the original plan).
+- Note (W2 review, 2026-11-10): none of the three rows failed first. ebdbe47's body records that the Capstone, Regional and takeover rows pass on its parent 1c778e1 (the guard already held), so `tests/threat_guard.rs` and `threat_rank_equals_committed_victories` are characterisation pins and carry mutation proofs instead of fail-first evidence, each recorded in that body and reverted: removing `self.victories = self.victories.saturating_add(1);` at `campaign/world.rs:50` (line 50 at ebdbe47 and at HEAD; ebdbe47's body miscites it as :47, matching design-enemy-balance.md's ":50 (:47 when written)") fails every positive row and the property; replacing the takeover branch's `commit_victory` with `false` in `finish` fails only `takeover`; crediting only a Sector boss's victory fails `Regional`, `Capstone` and `reopened outbreak` (a Capstone too). The wave-close completeness check reads those mutation proofs as W2-40's evidence.
+- Deps: W2-36, W2-11.
+
+**W2-41 · progression-tree · W2-H: 8 decision-19 nodes (ids 170-177)**
+- Fail-first:
+  - `skill_catalog_is_append_only_with_eight_weapon_mastery_nodes`
+  - `counters_name_catalog_archetypes`
+  - `counter_nodes_open_no_later_than_their_archetypes`
+- Note: if `big_game_rounds` replaces `blast_discipline`, R5's serde-defaulted `heavy_target_damage_multiplier` lands here.
+- Note (W2-41, 2026-11-08): the burst and reach paths had landed (W2-27, W2-29), so `blast_discipline` shipped and the fallback did not. The counters name the catalogue id `sprinter` (design §5 wrote "sprinter-swarm"). The gate rule of design §5's footnote, applied to every node with counters against the W2-31/W2-32 tiers (sprinter and spitter from rank 6, exploder and shield-bearer from rank 8, splitter and juggernaut from rank 10), moved shield_breaker and blast_discipline V10 to V5, smg_spray_control V15 to V10 and mg_belt_feeder V20 to V5; `counter_nodes_open_no_later_than_their_archetypes` rejects the table's gates. Prices are the table's, for W4-p to fit.
+- Note (W2-41 review, 2026-11-08): the W2-41 commit body's reason for not re-running pacing ("tier_cost excludes" milestone-gated purchases) is wrong: `tier_cost` counts every node at depth <= d until W4-p lands design-progression-tree §4's tier definition, so tiers 2 / 3 / 4 grew to 5,190 / 11,675 / 15,655 coins and the default `pacing 60 --runs` output moved (plan §9.6, "W2-41 moved the default pacing output"; latest baseline `target/production-after/w2-41/pacing.txt`, plan §2.5). Smoke did not move. The review also pins each counter gate to the largest milestone at or below the first spawn rank and adds `every_milestone_rank_opens_a_new_non_ladder_node` (design §3 item 8).
+- Wave-2 close capture item (W2-41 review): design §3 item 8 checks that milestone-gated nodes do not collide by "validator plus capture"; only the validator ran. The wave-2 close captures include Journey upgrades focused on Firearms and on Survival at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, checking that the new Firearms nodes at x = -1780 and x = -660 and the `rifle_training` → `rifle_breath_control` route (a straight line from (-1220, 190) to (-1780, 380) passes 90 units from `shotgun_training` at (-1500, 190) and `rapid_cycle` at (-1500, 380)) keep their title and caption envelopes clear. A collision found there becomes a capture-ledger row.
+- Capture taken (W2 review, 2026-11-10, HEAD 1cb775a, debug build sha256 `ab71071c10bb…`, `windows_scale` 2, player logs unchanged): `scripts/capture_review.ps1 -Scenes skills,skills-survival -Modes normal,reduced -OutputDirectory target/production-after/w2-review-ui2-upgrades-b` and `-Scenes skills-search -NoBuild` into `target/production-after/w2-review-ui2-upgrades-c` (not committed; 12 of 12 captures, every sidecar check passes). No registered still opens on the Firearms branch except `skills-search` (focus `combat_reload`, Firearms tab selected); `skills` opens on Body development and `skills-survival` on Survival. At 1440x900 `skills-search` (normal and reduced `19e914ffb24d`) shows Pump drill (-1780, 190; title at the canvas top), Breath control (-1780, 380) and Belt feeder (-660, 380) with their titles and captions clear, and the `rifle_training` → `rifle_breath_control` wire runs down from Rifle proficiency, left between the 190 row's captions and the 380 row's icons, and into Breath control's top port, clear of Shotgun proficiency and Rapid cycling. Its compact 1050x700@1.35 view frames only the 570 row. `skills-survival` shows Spray control (-660, 0) at both sizes and finds one collision, capture-ledger row CF-2-01 (plan §10; scheduled as W3-32): the long `pistol_training` → `smg_training` stub and its "from Survivor foundations" label lie on the new `smg_training` → `smg_spray_control` wire, and at 1050x700@1.35 the label runs under the Spray control icon. Pistol double tap (-1780, 0) is in no registered still's opening view. W2-55 (W2 review) registers `skills-firearms`, focused on Pistol double tap, for the missing halves: the -1780 Firearms nodes at both sizes and the compact view of the `rifle_training` → `rifle_breath_control` route. The wave-2 close captures take it at both sizes and modes and record the result here; a collision becomes a CF-2 row.
+- Close capture result (W2 review, 2026-11-11, HEAD 22a8ef4; plan §10.4): `skills-firearms` opens on Pistol double tap at both sizes and modes. At 1440x900 it shows Double tap, Reload drill and Steady hands on the 0 row, Pump drill, Shotgun proficiency and Rifle proficiency on the 190 row (Rifle proficiency's caption lies under the minimap, as other captions do in wave-1 stills) and the top of the 380 row at the canvas bottom. At 1050x700@1.35 it frames only the 0 row, so the compact view of the `rifle_training` → `rifle_breath_control` route is still not captured. One collision: capture-ledger row CF-2-02 (the stub label into Reload drill runs under the Steady hands icon at 1050x700@1.35; it predates wave 2 and has the CF-2-01 mechanism).
+- Deps: W2-31, W2-25.
+
+**W2-42 · progression-tree · W2-I: profiles needing other remits' commands**
+- Profiles: auto-sell, manual-sell, takeover (`PacingDefender::RecruitWhenReady`), farm, Easy/Hard, 150-run.
+- Fail-first:
+  - `auto_sell_profile_records_auto_sold_coins`
+  - `takeover_profile_records_first_takeover`
+- Note (W2-42, 2026-11-09): each row varies expert-deu by one option; `takeover` starts in Luxembourg (first liberation by run 5) and `farm` uses the novice aim (replay after 2 frontier defeats). The takeover plan gives every stage a recruit lost back to the survivor. Manual-sale coins are not in `cumulative_coins` (design §11 counts auto-sold coins only). The equip-drops profile of acceptance G5.6 has no wave-2 row and stays unimplemented. The default pacing output does not move (plan §9.6).
+- Note (W4-p, R51, 2026-11-13): the note above is wrong to say each row varies expert-deu by one option. `manual-sell`, `auto-sell`, `easy`, `hard` and `long` change one field. `takeover` changes two (the defender plan and the Luxembourg start) and `farm` changes two (the farm plan and the novice aim), so those two columns do not isolate their plan. The registry comment in `sim/pacing.rs` says so, and the pin is renamed `w2_42_rows_vary_the_acceptance_profile_only_in_their_named_fields` (assertions unchanged).
+- Note (W2 review, 2026-11-10): G5.6 listed the equip-drops profile and no row owned it, so it could not close under R25. The review implemented it on this row: `PacingPlan.equip_drops` is supported in the solo loop (the strategy bot still rejects it), and the appended `equip-drops` row varies expert-deu by that option alone. Each camp first runs `sim::equip_dropped_upgrades`, which equips per slot, through `Command::Equip`, the owned item with the largest `Campaign::upgrade_gain` for the survivor (the recommender's own test, ties to the lowest id, items held by a recruit or expedition skipped). Fail-first `equip_drops_profile_wears_dropped_upgrades`. The default `pacing 60 --runs` output does not move (sha256 902cd895...c7f7d738, identical to `target/production-after/w2-54/pacing.txt`). Informational, 5 seeds, debug build: the first victory median is 2 runs against expert-deu's 4 and the first liberation 10 against 15, which is W4's input, not tuned here.
+- Deps: W2-14, W2-12, W2-20.
+
+**W2-43 · campaign-defenders · Strategy rows and evaluators on PT's API**
+- Evaluators: liberations 2/4/10, coins per minute, parallel vs solo, outbreak reopens. Ignored goal-3 tests.
+- Fail-first:
+  - `pacing_seeds_vary_strategy_rng`
+  - `strategy_bot_acts_only_through_commands`
+- Pin: `solo_plan_is_todays_profile`.
+- Done: `target/production-before/strategy-pacing.txt`.
+- Note (W2-43, 2026-11-09): the rows are `strategy` (S1), `neighbours-solo` (S2a) and `neighbours-parallel` (S2b) on `PacingPlan.strategy` (design-campaign-defenders 1.13, "As built"). The 20-seed table (`pacing --strategy --seeds 20`, sha256 85b7ace5...0b474ad6, not committed) is in plan §9.6, "W2-43 strategy pacing before tuning". G3.10 reports, G3.12 passes (no overrun in any seed), and G3.11 fails at 9 / 9 runs: no expedition cleared a stage in any seed (S1 settles a median 367, S2b 18), because the bot sends recruits on their starter loadout. That is W4-c's input. The default `pacing 60 --runs` output does not move.
+- Deps: W2-42, W2-15.
+
+**W2-44 · ux-flow · Core labels (`Slot::label`, `DamageKind::label`)**
+- Fail-first: `labels_are_human_over_all`.
+- Deps: W1-10.
+
+**W2-45 · ux-flow · `Campaign::feature_unlock` (pure)**
+- Fail-first:
+  - `feature_unlock_companion_is_75_after_1_liberation` (renamed `feature_unlock_companion_quotes_its_node_price_after_1_liberation` by W4-p, which reprices Meet Mara to 400 coins)
+  - `feature_unlock_is_pure`
+- Deps: W1 close.
+
+**W2-46 · qa-captures · Staging helpers through Commands**
+- Fail-first:
+  - `equipment_autosell_rule_counts_only_below_uncommon_in_core`
+  - `briefing_recruit_staging_sets_next_defender_through_command`
+  - `repo_checks::production_fixtures_stage_features_through_commands`
+- Deps: W2-12, W1-23.
+
+**W2-47 · perf-architecture · Stress fixture follows the new content, then re-gate**
+- Fail-first: `stress_render_fixture_includes_every_catalog_archetype_and_an_elite`.
+- Done: `-Scene stress -VsyncOff` (dev and playtest) exits 0.
+- Deps: W2-36, W2-33, W2-50, W2-51.
+- Also owns (R18, wave-1 close):
+  - the sustained 15-20 FPS VSync-on stress episode (`target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2`; W2-50 attributes it first);
+  - the 1050x700@1.35 VSync-on p99 interval of 19.1-19.7 ms;
+  - script-level battlefield primitive and vertex gates in `measure_performance.ps1`;
+  - any egui_probe/present_wait span-ordering item not fixed in wave 1, including the `baseline.v3` item below.
+- Open before this re-gate (W1 review, 2026-11-07): review commit `7abb0ab` changed the egui_pass and present_wait spans after baseline.v3 and the W1-61 acceptance. The orchestrator or the user decides whether `PERF_BUDGET.json baseline.v3` is re-measured on the new spans before interface_total is gated again. Until then, interface_total and cpu_frame compare unlike spans (plan 2.5; VALIDATION.md W1-61 "Span boundaries changed after this acceptance"). The same applies to W5-11 and W7-09.
+- Open before this re-gate (W2-50, 2026-11-08): unattended passes let Windows turn the display off (Modern Standby on the idle timeout), and that is where every 500 ms or 1,000 ms driver stall and the gated stall tails come from (plan 9.4). This re-gate does not start until both W2-50 §2.5 rows are answered (W2-50 Done). After that ruling: if the harness change is ruled in, run the re-gate with the display held on and treat a run that overlaps a 506/507 display-off interval as invalid; in any case record the display state and the Kernel-Power 506/507 events for the pass window.
+- **Fixture half landed (2026-11-09); the re-gate has not started.** The main field of `stress_render_fixture` now cycles all 18 catalogue archetypes as director wave picks at the last authored wave tier (11). Each pick rolls elite at the field's snapshot rate: 37 elites in the authored 225, 69 in the staged 400, at 1500 bp and rank 50. The boss carries its phase state. The 1,500 corpses cycle the same archetypes. The three expeditions are simulated but not drawn, so they keep the wave-1 crowd of the five legacy kinds; with the new crowd, two of them settle before tick 300. Done (`-Scene stress -VsyncOff`, dev and playtest, exits 0) and the R18 items stay open until both W2-50 §2.5 rows are answered; interface_total is not gated again before the `baseline.v3` span row is answered either.
+- **Answered 2026-11-09 (R26-R27, user decisions; R29, orchestrator ruling; plan §2.4):**
+  - R26 closes the stress-on-r2 episode (the first R18 item) as environmental. Gate 3 in the shipped default configuration can be claimed once this re-gate passes.
+  - R27 keeps the `driver_stall` rule. The re-gate runs on the R27 `measure_performance.ps1`, which holds the display on for the whole run and treats a run that overlaps a Kernel-Power 506/507 event as invalid evidence (rerun once, exit 2 if invalid twice). Its summary records the display hold and the 506/507 events per run.
+  - R29: `PERF_BUDGET.json baseline.v3` is re-measured here on the 7abb0ab egui_pass and present_wait spans, before any interface_total re-gate (this one, then W5-11 and W7-09). The old values stay under a previous key. Under R22 the gates only tighten: where the re-measured baseline would loosen a gate, the old gate value stays.
+- **Answered 2026-11-09 (R30 and R31, user decisions; plan §2.4):**
+  - R30: every pass of this re-gate waits for a quiet machine first. No foreign cargo, rustc, cargo-nextest or other build or test process may run (the pass's own children are ignored), and the mean CPU load (`Win32_Processor.LoadPercentage`, sampled every 5 s) must have stayed under 35% for 60 s. `measure_performance.ps1 -WaitQuiet [-QuietTimeoutMinutes N]` is on by default with a 240-minute timeout, logs what it waited for, and exits 2 on a timeout. A 5 s load sampler runs beside every run, and a run with any sample of 90% or more is invalid evidence, rerun once (exit 2 if invalid twice); the summary records the load mean and max per run. Gates are unchanged.
+  - **R29 landed (2026-11-09, `feat(horde): baseline.v3 re-measured on the 7abb0ab spans [W2-47]`).** The 2339a3d renderer with only the 7abb0ab span edits, every profile and VSync state, `-Repeat 3` (`target/perf/w2-47/v3-spans-*`). `baseline.v3` holds it (`spans` 7abb0ab, `measured_interface_total_mean_ms`), the W1-37 values are under `baseline.v3.previous`, and the gated progressed-peak pair re-measured 4.8218 / 4.7083, above W1-37, so under R22 it keeps 4.6447 / 4.5895 (`kept_previous`). Fail-first `perf_budget_v3_baseline_is_re_measured_on_the_7abb0ab_spans` (plan 9.4, VALIDATION.md "baseline.v3 on the 7abb0ab spans"). R35 (2026-11-10, plan §2.4) confirms this reading of R29: the re-measure ran on the 2339a3d renderer with only the 7abb0ab span edits, not at HEAD, and the gated progressed-peak pair kept its W1-37 values under R22.
+  - **A/B build fix (2026-11-10, `fix(horde): ab_interface_total cleans each arm's packages and refuses identical arms [W2-47]`).** The first A/B measured ab03da9 in both arms: cargo kept one fingerprint for both trees' packages, so B's build was fresh and left A's exe. Each arm's build now cleans horde-defense and horde_core first, and identical arms exit 3 (VALIDATION.md "The first A/B measured A twice"). Review follow-up (`fix(horde): ab_interface_total leaves no wave-1 build in the workspace target [W2-47 review]`): `-ExecutableB` needs `-ExecutableA`, and when A was built but B's build did not follow, the script cleans horde-defense and horde_core in the workspace before it exits (`Restore-AbWorkspaceBuild`, `ab.json workspace_cleaned`).
+  - **Re-gate result (2026-11-10, `test(horde): record the W2-47 re-gate on the wave-2 stress fixture [W2-47]`). Done is met:** dev and playtest `-Scene all -VsyncOff -Repeat 3` exit 0 (stress cpu_frame p99 dev 8.46 / 9.65 ms, playtest 7.68 / 7.17 ms), dev and playtest VSync on exit 0 (progressed-peak interface_draw 1.026 / 0.992 ms), 0 frames over 50 ms and 0 driver stalls in every kept repeat, and the R31 A/B passes (B / A 0.962 / 0.963). Gate 3 in the shipped default configuration is claimed (R26). The small-size VSync-on p99 interval comes and goes with the hour (19.5-20.0 ms, then 17.6-17.7 ms) and sits in the swap-chain acquire, not in the process; it gates nothing. Groups with an invalid run after the rerun (foreign builds at 90-100% CPU) were re-measured as whole groups. `PERF_BUDGET.json acceptance.w2_47`, pinned by `perf_budget_records_the_w2_47_regate`; VALIDATION.md "W2-47 re-gate on the wave-2 stress fixture". Watch for W5-11: dev stress small cpu_frame p99 is 0.35 ms under the gate.
+  - **Review correction (2026-11-10, `fix(horde): record the valid dev -VsyncOff over the re-gate reran [W2-47 review]`).** The first dev -VsyncOff invocation (`gate-dev-novsync`) was not invalid only: besides three invalid groups it had a valid progressed-peak small cpu_frame p99 over (median 12.7565 ms against 10.0), masked to exit 2 by the invalid runs. The whole pass was rerun, which R30 and the W1-37 method do not allow for a valid group. `acceptance.w2_47` now records each invocation (start, commit, executable, exit, invalid groups, over cells, re-measured groups), `commits` 43184d1 and bd12d1c and the 22:15 window start. dev-novsync has `gate_clean` false, and the pin checks that an over is listed with its cell. Plan §2.5 row "A valid over in a pass masked by invalid runs": by its default the dev -VsyncOff progressed-peak gate is not claimed clean at W2-47, and W5-11 re-gates it. Done (stress) is unaffected.
+  - **R34 (2026-11-10, orchestrator ruling; plan §2.4) answers that row with its default.** The over stands, G1.9 dev -VsyncOff progressed-peak is not claimed clean at W2-47, and a valid gated over may not be re-measured away, whatever the machine load below the R30 threshold. The wave-2 close's own perf acceptance at HEAD is a new measurement, not a re-measure. `measure_performance.ps1` keeps its exit precedence but prints "VALID OVER: <scene> <size> <metric> <value> > <gate>" for every valid gated over and lists them in summary.json `valid_overs` (`feat(horde): measure_performance names every valid gated over [W2 review]`, with its fail-first case in `scripts/tests/run_script_tests.ps1`).
+  - R31 answers this row's "interface_total re-gate needs a tolerance" item. The interface_total re-gate is an interleaved A/B against the wave-1-close executable: in one sitting, A (sources at ab03da9) and B (HEAD) alternate, 5 pairs per size (normal and small), on progressed-peak, dev, VSync on, the default pipelined state. Per size, B's median interface_total must be at most 1.05 × A's median. `scripts/ab_interface_total.ps1` runs it, with the R30 quiet window and load validity. R29 still holds: `baseline.v3` is re-measured on the 7abb0ab spans and recorded, but the interface_total gate decision is the A/B, not the absolute baseline.
+
+**W2-48 · save-determinism · RNG isolation and legacy guards, plus behaviour tests on the v6/v7 fixtures**
+- Fail-first:
+  - `elite_roll_consumes_no_combat_rng`
+  - `rank_zero_deploy_spawns_no_elites_and_has_no_new_archetypes`
+  - `legacy_attempt_snapshots_have_zero_elite_rate_and_no_boss_phases` (v1-v6)
+  - `v6_active_attempt_spawns_no_elites_for_3600_ticks`
+  - `v6_legacy_boss_has_no_phases`
+  - `continue_journey_after_migrated_companion_report_redeploys_companion`
+  - `v6_fixture_recruit_can_take_over_the_next_defense`
+  - `worker_level_up_does_not_pay_the_level_grant_twice`
+  - `migrated_threat_jump_pays_no_milestone`
+  - `commands_round_trip_through_serde_for_replay` (all 9 appended variants)
+- Deps: W2-01 to W2-47.
+- **Done is met (2026-11-10).** The ten tests exist: `elite_roll_consumes_no_combat_rng` in `src/sim/elite_tests.rs`, `commands_round_trip_through_serde_for_replay` in `src/command.rs` (one sample per appended variant, checked by an exhaustive variant match), and the other eight in the new `tests/legacy_guards.rs`. Every behaviour they guard landed in an earlier wave-2 commit (W2-11/12, W2-22, W2-33, W2-36, W2-54), so each passed on the parent ad61a22 and carries a mutation proof instead of a fail-first line (VALIDATION.md "Legacy guards and fixture behaviour"). No production code changed; no digest moved, `PROVISIONAL` is unchanged, and V1-V6, `V6_DROP_TRACE_FNV` and `save_v7.json` are untouched.
+
+**W2-49 · save-determinism · Wave-2 re-bless (single)**
+- Steps: fold PROVISIONAL into GOLDEN; write a per-digest reason table (classes F/T/C/G with anatomy diffs); `RULESET_VERSION` 3 and `TRACE_RULESET`; smoke and pacing after in `target/production-after-wave2/`.
+- R15 (wave-1 close): W1-69 did not bump the ruleset, so the 2 -> 3 bump names both W1-69 (no lane queue) and the wave-2 change, in the commit body, the reason table and VALIDATION.md. Until this commit a recording made before W1-69 replays without a ruleset warning.
+- R16: it also folds the three Personal GOLDEN state digests that W2-52 moves.
+- R33 (2026-11-09): the reason table records both labels where they differ. W2-09's row is class G (the weighted drop pick is a gameplay mechanic), and the table also names `support::classify`'s C (outcome and trace unchanged, items only).
+- Fail-first: `envelopes_carry_version_ruleset_and_fingerprint` asserts 3.
+- Done: PROVISIONAL None; V1-V6 unchanged.
+- Deps: W2-48, W2-52, W2-54.
+- **Done is met (2026-11-10).** `PROVISIONAL` is None and `PROVISIONAL_CAUSES` is empty.
+  - `GOLDEN` folded the six provisional digests. Each run nets F against the wave-1 close anatomy (ab03da9): key paths and the telemetry-stripped payload move, while items, outcome and trace do not. `GAMEPLAY_TRACE` 0/6.
+  - The re-bless log in `tests/determinism.rs` has one row per digest with its causes: W2-05 T, W2-06 F, W2-08 C, W2-52 F, W2-09 G with `support::classify`'s C (R33), and W2-54 F. Below the log is the wave-1 → W2-49 anatomy diff.
+  - `RULESET_VERSION` and `TRACE_RULESET` are 3. The doc comment, the log and VALIDATION.md name W1-69 (no lane queue) and the wave-2 rules.
+  - Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` asserts 3 (`left: Some(2)`, `right: Some(3)` on the parent).
+  - V1-V6, `V6_DROP_TRACE_FNV` and `save_v7.json` are unchanged.
+  - In `target/production-after-wave2/`, smoke and default pacing are byte-identical to W2-54's, and the 20-seed acceptance is in plan §9.2 and §9.6 (VALIDATION.md "Wave-2 re-bless and ruleset 3").
+
+**W2-50 · perf-architecture · The gate-3 episode in the shipped default configuration, before the W2-47 re-gate**
+- Slot: before W2-47; the id is appended so no id changes. W1-61's A/B repeat `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2` (playtest, pipelined on, VSync on, stress normal: the shipped default configuration) ran about 400 frames of 47-67 ms. Outside driver stalls it had 6 frames over 50 ms (exit 1), 407 over 33 ms, a p99 of 47.1 ms and 46.3 FPS. It is not a driver stall under the user ruling (named coverage 0.89-0.94) and is not attributed (4-6 ms per frame outside App::update). Plan 9.4 and §2.5; VALIDATION.md W1-61.
+- Also owns (W1 review, 2026-11-07): the second gated VSync-on stress frame on this branch. In the Goal-1 acceptance re-run at 867f786, `target/perf/w1-review/acc-dev-vsync-stress/stress-normal-r1.json` sample 932 (dev, VSync on, stress normal) was 54.74 ms with a present wait of 50.61 ms and an acquire wait of 43.46 ms: acquire share 0.794, under the 0.80 threshold, so the rule keeps it gated and that pass exited 1. Named coverage 0.989, in-process work about 11 ms; it comes directly after three ~1,000 ms stalls (samples 929-931). The acquire wait is counted only where the hand-off overlaps prepare_windows (43.5 of the 50.6 ms present wait). Plan 9.4 and §2.5; VALIDATION.md 'Goal-1 acceptance re-run at HEAD'.
+- Steps:
+  - reproduce that configuration (`measure_performance.ps1 -Scene stress -Profile playtest -Pipelined on`, VSync on) at both sizes, at least 12 repeats per size, under the W1-68 probe and with the load sampler beside it;
+  - record per repeat `named_coverage`, `covered_95_named`, `max_outside_update_ms`, and the per-frame events of every frame over 33 ms outside stalls;
+  - attribute the episode (name the span, or the process outside the update, that holds the time) or fix it.
+  - for the sample-932 tail: decide whether the frame right after a stall counts its whole present wait toward the acquire share, or whether such tails stay gated. A change to the `driver_stall` rule is a gate change: it needs a user ruling (§2.5 row) first and lands as its own commit with a pin in `frame_report/tests.rs`.
+- Fail-first: only when a fix lands: a pin for the attributed cause that fails on the parent (a test in the owning crate, or a `scripts/fixtures/perf/` report that `-SelfTest` must classify). Attribution alone needs no test.
+- Done: evidence in `target/perf/w2-50/`. VALIDATION.md and plan 9.4 record the attribution, the fix, or that the repeats did not reproduce it, and the sample-932 tail's outcome; both §2.5 rows are answered. No gate is moved without that ruling.
+- Deps: none; W2-47 depends on it.
+- **Result (2026-11-08, measured at ddea5a6, recorded in 8efd9ff; plan 9.4, VALIDATION.md "Gate 3 in the shipped default configuration").** Attribution only: no fix, no test and no gate move. **Done is not yet met:** both §2.5 rows await the orchestrator or user answer, and W2-47 does not start its re-gate until they are answered.
+  - 28 repeats per size of the shipped default configuration ran, unattended and locked: 14 per size with the display on throughout (12 held on, 8 of them added in the W2-50 review) and 14 display-off or crossing a transition. None reproduced the stress-on-r2 episode.
+  - The episode's time is the swap-chain acquire (about three vblanks per frame, 6-8 ms in-process). Its 4-6 ms outside the update is winit input dispatch in frames carrying window input events, during user activity. The cause of the slowed presentation is not named.
+  - Driver stalls and the sample-932 tail come from the display being off (Modern Standby on the idle timeout). 518 of 521 stalls were display-off or within 5 s of a transition, and holding the display on removed them (24 runs, 0 stalls).
+  - Both §2.5 rows now carry the evidence and a recommendation. Their defaults stand until the orchestrator or the user answers them (episode open, tail gated). Still to rule: close the stress-on-r2 episode as environmental or keep it open for a supervised pointer-input repro; and accept or reject the harness ruling (hold the display on, display-off runs invalid) together with the sample-932 tail's outcome.
+- **Rulings (2026-11-09, user decisions R26 and R27; plan §2.4).** Both §2.5 rows are answered:
+  - R26: the stress-on-r2 episode closes as environmental (user activity during an evidence run: the laptop had been woken 5 minutes before, and the run carried window input). It was not reproduced in 28 repeats per size, 14 of them with the display on throughout. Gate 3 in the shipped default configuration can be claimed once the W2-47 re-gate passes.
+  - R27: the 80% driver-stall rule stays unchanged, and the sample-932 tail is closed as display-off. Instead, `measure_performance.ps1` holds the display on for the whole run (`SetThreadExecutionState`, released in a finally block), and a run that overlaps a display-off interval (Kernel-Power 506 or 507 between its start and end) is invalid evidence, rerun like the script's other invalid runs. That harness change is its own commit, test-first in `scripts/tests/run_script_tests.ps1`.
+  - **Done is met once the R27 commit (`feat(horde): measure_performance holds the display on and rejects display-off runs [W2-50]`) lands.** W2-47's re-gate then runs on it.
+  - **Done is met (2026-11-09).** The R27 commit landed: `scripts/lib/DisplayPower.ps1` holds the display and reads Kernel-Power 506/507 per run, `measure_performance.ps1` marks an overlapping run invalid and reruns it, and the summary records the hold and the events. Fail-first: six cases in `scripts/tests/run_script_tests.ps1` (VALIDATION.md "Gate 3 in the shipped default configuration", "R27 landed").
+
+**W2-51 · perf-architecture · Apply the W1-51 egui gate re-derivation decision, before the W2-47 re-gate**
+- Slot: before W2-47; the id is appended so no id changes. W1-51's done_when derives the egui gates as min(W1-32 ceiling, ceil(measured max x 1.25)). The W1 review re-measured on the post-W1-69 renderer (4d599a5, `PERF_BUDGET.json evidence.egui_measured`; the a93e340 figures are in `.previous`): 19 primitives in every scene, stress vertices 47,435 and stress-5000-corpses 49,502. Re-deriving moves `BATTLEFIELD_PRIMITIVES_MAX` 48 -> 24 and the stress vertex gate 61098 -> 61878; progressed-peak stays at its 40,000 ceiling. The plan §2.5 row decides which of them moves (default: primitives only).
+- Steps: change `PERF_BUDGET.json` (`egui` and the `egui_measured` gate source) and `crates/horde_game/src/perf_budget.rs` (the constants and their doc comments) in the same commit, so `perf_budget_json_matches_presentation_caps` stays bidirectional and `egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings` re-derives the decided gates from the recorded maxima.
+- Fail-first: `egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings` with the decided maxima recorded as the gate source and the old constants, failing before the constants move.
+- Done: `measure_battlefield_egui_load -- --ignored` and `live_battlefield_runs_stay_within_the_egui_gates` pass at the decided gates; the §2.5 row is answered.
+- Deps: none; W2-47 depends on it.
+- **Applied in the W1 review (R22, wave-1 close):** gates only tighten. `BATTLEFIELD_PRIMITIVES_MAX` 48 -> 24, the stress vertex gate stays 61098 (no loosening; measured 49,502), progressed-peak stays at its 40,000 ceiling, `evidence.egui_measured` holds the post-W1-69 maxima, and `live_battlefield_runs_stay_within_the_egui_gates` paints every 2nd tick of the first 420. W2-47 still depends on this row, which has nothing left to change.
+
+**W2-52 · progression-tree · Neutral level-ups keep the grant ledger paid (the `level_grant_paid` shim), before the W2-49 re-bless**
+- Slot: before W2-49 (R16, wave-1 close); the id is appended so no id changes. Wave 1 writes saves at v7 but nothing keeps `Player.level_grant_paid` current while no grant is paid, so a wave-1 save can owe level grants that a migrated v6 save at the same level never gets. The milestone half was fixed in the W1 review (3df1242, `Campaign::claim_neutral_milestones`); this level-grant half moves the three Personal GOLDEN state digests, so it waits for the wave-2 re-bless.
+- Fail-first: `neutral_level_ups_keep_the_grant_ledger_paid`.
+- Digest: sets `PROVISIONAL` for the three Personal GOLDEN digests with a `PROVISIONAL_CAUSES` row (P3). W2-49 folds them.
+- Deps: W1 close; W2-49 depends on it.
+
+**W2-53 · save-determinism · Frozen catalogue records guard, before the first wave-2 catalogue edit**
+- Slot: before W2-08 (the first wave-2 commit that edits a catalogue file: content.json gains 39 items) and W2-26 (the first enemy catalogue row; W2-31 appends the 7 archetype records and waves 5-11); the id is appended so no id changes. W1 review: acceptance ISO-3 and design-save-determinism §13 risk 2 named this guard, but no wave-1 commit or waves.md row created it.
+- Files: a horde_core test beside the V1-V6 continuation pins (`tests/save_migration.rs`), using `support::fnv1a` like those pins.
+- Fail-first (characterisation pin): `legacy_catalogue_records_that_tick_saved_encounters_are_frozen`. It pins the FNV-1a of the catalogue records that V1-V6 encounters tick (design-save-determinism invariant 3): the 11 existing archetype resolutions, wave tiers 0..=4 of `enemy_catalog.json` and the 5 `content.json` levels, as the bundled catalogue resolves them. Appended records, tiers 5 and up, and new fields at their skipped neutral default do not move it. Mutation proof: change one value of a tier-0..=4 wave and one existing archetype's resolved health; each fails the pin.
+- Done: no digest move; V1-V6 pins unchanged. A later wave-2 or wave-4 commit that moves this pin edited a frozen (append-only, ISO-3) record: fix the edit. If a content-driven change is meant to reach legacy attempts (Ruling R4), the continuation pins it moves are re-blessed in that wave's GOLDEN re-bless with a written reason. There is no `rules_revision` field (R4).
+- Deps: W1 close; W2-08 and W2-26 depend on it.
+
+**W2-54 · progression-tree · Author the level grant and the rank milestones, before the W2-49 re-bless**
+- Slot: before W2-49; the id is appended so no id changes. W2-22 shipped only the settlement writer on the neutral `progression.json` (W2-22 review), so decision 14, PT7 and PT8 have no shipped value until this row. R32 (2026-11-09, orchestrator ruling; plan §2.4) accepted the §2.5 item's default, so this row runs as written.
+- Files: `crates/horde_core/progression.json` `rewards.level_grant_xp_fraction` 0.25 and the four design-progression-tree §7 milestones (rank 5 500 coins Uncommon, 10 1000 Uncommon, 15 1500 Rare, 20 2000 Rare); the pins the values move, each with its reason (the §2.5 item lists them; the `schema_v7` guard with save-determinism's agreement).
+- Fail-first: `shipped_catalogue_authors_the_design_grant_and_milestones` (`level_grant(2) == 5`, the four milestones as listed).
+- Digest: sets `PROVISIONAL` for the three Personal state digests with a `PROVISIONAL_CAUSES` row as `support::classify` assigns (P3): the grant makes the W2-52 shim inert. `GAMEPLAY_TRACE`, V1-V6 and `V6_DROP_TRACE` do not move. W2-49 folds them.
+- Done: smoke and pacing before/after recorded in plan §9.6 (R28); decision 14, PT7 and PT8 closed.
+- Deps: W2-22; W2-49 depends on it.
+- **Done is met (2026-11-09).** `progression.json` authors the grant and the four milestones. `PROVISIONAL` takes the three Personal GOLDEN digests with a ("W2-54", F) cause, the same values the W2-22 review measured; the Npc digests, `GAMEPLAY_TRACE`, V1-V6 and `V6_DROP_TRACE` do not move. The moved pins were updated with a reason each: the `schema_v7` guard (two `WRITTEN_V7_KEYS` rows, under R32), `MODE_OWNER_DIGEST` (a neutral-rewards probe restores the W2-09 value), the three coin pins (now read the settlement receipt; 270 -> 298 in the arena route), and the neutral pins in `progression.rs` and `progression_schema.rs` (the W2-52 and W2-22 neutral tests run under a neutral `override_rewards`, and the W2-52 test checks that the shim is inert with the shipped grant). Pacing and smoke moved on purpose (plan §9.2 and §9.6, "W2-54 moved the default pacing output and smoke"), and so did the 20-seed acceptance (AUT clamped start now passes; the tier windows come earlier, which is W4-p's).
+
+**W2-55 · qa-captures · Wave-2 close review stills: `boss-phase` and `skills-firearms`**
+- Slot: before the wave-2 close captures; the id is appended so no id changes. W2 review (2026-11-10): W2-37's close capture item needs a boss inside its phase hold, which no registered still showed (the `boss` still is rank 0, and the rank-50 render fixtures enter no transition). W2-41's needs the Firearms column at x = -1780 at both sizes, which no still opened on (`skills-search` frames only the 570 row at 1050x700@1.35, and Pistol double tap was in no still's opening view).
+- Files: `review_scenes.rs` (`wave2_still`, `since_wave` 2, before proxy a wave-0 still), `ui/review/fixtures/production.rs`, `ui/review/matrix.rs`, `ui/review/tests.rs`. Review feature only: no core change, no digest, pacing or smoke move.
+- `boss-phase` (owner vfx-lighting, before proxy `boss`, motion): a stage-0 Germany defense at rank 5 (`entitle_victories`; the first rank whose Normal boss has a phase), 20 s of smoke-input play, then the clock advances one tick short of the boss's time (as `peak_render_fixture` does; a level-1 survivor does not outlast the rank-5 horde to its 240-second boss) and the director spawns the boss by its own rule. After 8 s of walk-in, the boss is wounded to half its hit points (`entitle_boss_wound`), enters phase 1 on the next tick and holds 30 more ticks before the still pauses, so 60 of the 90 hold ticks remain. Both staging steps are `entitle_*` helpers (ISO-5); the ticks are play (R13). Amended by W2-56 (CF-2-03): the still now pauses on the entry tick with all 90 hold ticks left, and its motion export plays the whole hold.
+- `skills-firearms` (owner progression-tree, before proxy `skills`): the skills matrix recipe focused on `pistol_double_tap` (Firearms, -1780, 0), so Journey upgrades opens on the Firearms column at x = -1780.
+- Fail-first:
+  - `boss_phase_fixture_pauses_a_boss_inside_its_phase_hold` (normal and reduced: `BattleViewModel.boss_phase` is the boss's transition 1 with 60 ticks left)
+  - `skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes` (the tree selects Pistol double tap and paints its title inside the canvas at 1440x900@1.0 and at the compact 1050x700@1.35)
+- Done: the wave-2 close captures take `boss-phase` and `skills-firearms` at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, and record the results on the W2-37 and W2-41 rows; a defect becomes a capture-ledger row (plan §10).
+- Deps: W2-37, W2-41.
+
+**W2-56 · qa-captures · The `boss-phase` motion export plays the whole phase hold (CF-2-03)**
+- Slot: after W2-55, in the W2 review; the id is appended so no id changes. CF-2-03: W2-55 paused the still with 60 of the 90 hold ticks left for "a motion export plays the rest", but `capture_sequence` takes frame-0000 at native frame 60 (`FIRST`, after a 59-frame warm-up) and the field ran one tick per native frame from startup, so only frame-0000 drew the hold (the reduced ring's stillness could not be checked).
+- Files: `ui/review/fixtures/production.rs` (`prepare_boss_phase` pauses on the entry tick; `BOSS_PHASE_HOLD_PLAYED` goes), `ui/review/mod.rs` (`motion_release_frame`, `schedule_motion_release`; `apply_motion_override` leaves a fixture with a release frame paused), `capture_sequence.rs` (`FIRST`, `STEP`, `COUNT`, `LAST` and `frame_index` shared with the test; `capture_frames` schedules the release), `ui/review/tests.rs`. Review feature only: no core change, no digest, pacing or smoke move.
+- Behaviour: the still pauses on the tick the boss enters phase 1 (90 hold ticks left). Under `LASTLIGHT_CAPTURE_SEQUENCE` the export keeps it paused through the warm-up and, on native frame `FIRST - 1`, enqueues the ordinary `Command::SetPaused(false)` (the gesture exports' timing bridge, applied by `RuntimeSet::Apply`). So frames 0-22 draw hold ticks 1-89 (89, 85, ..., 1 left) and frame 23 the hold's end. A live motion review without an export, and every other scene, still starts unpaused.
+- Fail-first: `boss_phase_motion_export_plays_the_whole_hold` (normal and reduced: `BattleViewModel.boss_phase` on each of the 24 captured native frames is the boss's transition 1 with 89 - 4k ticks left for k = 0..22, and None on frame 23); `boss_phase_fixture_pauses_a_boss_inside_its_phase_hold` now asserts the whole 90 ticks left.
+- Done: `boss-phase` re-captured (still and motion) at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, and the CF-2-03 ledger row closed with the after evidence.
+- Deps: W2-55.
+
+**W2-57 · qa-captures · The `spitter-windup` review still (CF-2-04)**
+- Slot: after W2-56, in the W2 review; the id is appended so no id changes. CF-2-04: W2-28's close capture item needs a spitter mid-windup at its reach, which no still or motion export frames (spitters spawn from rank 6, so `battle`, `boss` and `boss-phase` field none; the paused `fx-stress` holds no windup, and in the `stress` and `fx-stress` motion every spitter spits from a wall face).
+- Files: `review_scenes.rs` (a `wave2_still`), `ui/review/fixtures/production.rs`, `ui/review/tests.rs`. Review feature only: no core change, no digest, pacing or smoke move.
+- `spitter-windup` (owner vfx-lighting, before proxy `battle`, no motion): a stage-0 Germany defense at rank 6 (`entitle_victories`; rank 6 plays wave tier 5, the first that fields the catalogue spitter), played with the smoke input (it shoots the nearest hostile, so a stationed spitter outlives the crowd at the line) until the director's first spitter stands at its reach, `DEFENSE_LINE` + 4 yd, winding up a spit. It is then left unanswered until half its windup is left, and the still pauses. Only the rank is entitled (ISO-5); the ticks are play (R13). At HEAD it pauses on tick 3172 of a 7x16 field: the spitter at x 5.5 in lane 3 aims at the defender (0.5, 3.5) with 48 of 96 windup ticks left.
+- Fail-first: `spitter_windup_fixture_pauses_a_spitter_mid_windup_at_its_reach` (rank 6 or more; a catalogue spitter with reach 4.0 at `DEFENSE_LINE` + 4, mid-windup within a tick of halfway; in normal and reduced effects its `EnemyView` shows the windup and `aim_target` is `Attempt::spit_target`).
+- Done: the still captured at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, and the CF-2-04 ledger row closed with the after evidence; vfx-lighting judges the aim line there (W2-28), and a defect becomes a new capture-ledger row.
+- Deps: W2-28, W2-31.
+
+Wave-2 exit:
+- One re-bless with reasons.
+- Pacing and smoke before/after recorded.
+- Captures (stress, battles) taken.
+- Audio handoffs exist: the BossPhase event and the twins W2-28/W2-37.
+- The gate-3 episode of the shipped default configuration (W2-50) is attributed or fixed, or closed by the §2.5 decision; the sample-932 stall-tail question is answered.
+- Handed on (W2 review, 2026-11-10): capture row CF-2-01, opened by the W2-41 close capture (the `pistol_training` → `smg_training` stub label on the new Spray control wire), is fixed by W3-32 before W3-27's matrix review.
+- **Review closed at a9fc30a (2026-11-13; plan §7 "Wave-2 close").** Review rounds 1-5 confirmed 24, 12, 7, 8 and 11 findings, with nothing above minor in rounds 4 and 5, so R25's two-round condition is met. Every confirmed finding is fixed or ruled (R34-R35, R37-R54), except the R30 question that the user owns (plan §2.5). The perf acceptance and the full verify at HEAD did not run: a usage limit stopped them, and R36 then moved them to the closing phase, together with the capture items listed in plan §7. Checked in the closing phase under R36.
+
+---
+
+## WAVE 3: goal 2 and the UI for goals 3-4 (horde_game only, plus pure core reads)
+
+**W3-01 · ux-flow · Harness conventions, `View::Full`, the amber primary registry**
+- Fail-first:
+  - `primary_is_amber_and_registered`
+  - `at_most_one_screen_primary_matrix`
+  - `registry_empty_on_running_battle_frame`
+
+**W3-02 · ux-flow · `Tab::Home` default, 6-entry row, drill-downs (Mara, Operations), Home-owned clock**
+- Fail-first:
+  - `camp_default_tab_is_home`
+  - `clock_controls_only_on_home`
+  - `roster_shows_core_power_and_status_labels`
+  - `home_primary_after_liberation_is_choose_next_country`
+- Rewrites: `navigation_tests` (reason recorded).
+- Also owns (W2 review, 2026-11-10): the recruit service-record display in the roster drill-down, with the "since records began" label that design-campaign-defenders §1.10 asks for on a record whose runs predate v7. W2-21's `ServiceRecord` has no such flag, and no other row names a service-record display. The signal is a pure core read on `ServiceRecord`, never a saved field (save_v7.json is frozen); the writer picks the derivation (one candidate: the recruit's `npc_attempts` exceeding its counted `deployments`). If no derivable signal holds, the writer records that in plan §2.5 instead of saving one.
+
+**W3-03 · ux-flow · `Screen::Upgrades` split and 3-action Results**
+- Fail-first:
+  - `results_action_bar_has_exactly_three_buttons`
+  - `results_primary_table`
+  - `upgrade_opens_upgrades_screen_with_back_to_battle_and_back_to_camp`
+  - `back_to_battle_retries_same_stage`
+- As built (W3-03, 2026-11-14): `Screen::Upgrades` (`Screen::ALL` is 8) drawn by `ui/upgrades.rs`: the camp row, the strip [continue] "Back to camp" and the tree. `upgrades::upgrades_continue` gives "Return to active defense", "Choose next country" or "Back to battle"; with nothing to continue the action is hidden and "Back to camp" is the amber primary. Results (`ui/results.rs`) has no camp row and no tree: the outcome strip, the inline content (loot block, liberation block, defender picker, "N upgrades affordable") in a scroll area, and `Panel::bottom("results_actions")` with exactly [Upgrade] [continue] [Leave journey]; the amber one is `results::results_primary` (Upgrade only after a defeat or withdrawal whose recommended node is `NodeStatus::Available`). "More", "Plan or replay a defense" and the title-less upgrade home are gone. Results drawn with no settled report hands over to Camp home, and `resume()` opens Results only when a report exists. `open_upgrades`, the row's Upgrades entry and the Skills/Engineering redirects go to Upgrades; Withdraw and SimulationFinished go to Results with `go_tab(Tab::Home)`. Escape: Upgrades goes to Results when a report exists, else to Camp home; Camp home's "back to Results" uses `open_results`. Settings return labels: "Save and return to results" and "Save and return to upgrades". The camp-row callouts show on Camp and Upgrades, not on Results. The row entry keeps its label "Journey upgrades".
+- Rewrites (W3-03): the tree tests (`progression_tests`, two `character_tests`, the `navigation_tests` redirects) and the review tree scenes (`skills*`, `skills-search`, `engineering`, `upgrades`) moved to `Screen::Upgrades`; `the_upgrade_home_shares_the_camp_header_and_orders_its_actions` became `results_and_upgrades_share_the_camp_header_and_only_upgrades_has_the_row`; the primary matrix row `results-live` became `upgrades-live` with `upgrades` and `upgrades-no-report` beside it; the escape matrix gained the Upgrades rows (the contexts are 8 x 9 x 13 x 512). `journey-upgrades` (wave 0) stays the Results a first round ends on.
+
+**W3-04 · ux-flow · Escape router, pure `escape_action`, `keyboard_owner`, Quit and ReturnToMenu modals**
+- Fail-first:
+  - `escape::tests::matrix_table` (~45 rows)
+  - `properties`
+  - `escape_on_menu_opens_quit_confirmation`
+  - `escape_in_construction_closes_without_pausing`
+  - `pause_bound_to_escape_still_pauses_after_router_consumes`
+- Scan: no `Key::Escape` outside escape.rs.
+
+**W3-05 · ux-flow · One "Save" label and the toast layer**
+- Note: the battle toast draws in `layout.receipt_slot` and takes priority over the receipt.
+- Fail-first:
+  - `exactly_one_save_label`
+  - `manual_save_shows_saved_toast_on_results`
+  - `battle_toast_draws_in_receipt_slot`
+  - `toast_expires_after_3s_and_is_static_in_reduced_effects`
+
+**W3-06 · ux-flow · Storage-error modal, runner `OpenSaveFolder`/`ReloadProfile`, settings-unreadable modal text**
+- Fail-first:
+  - `save_failure_opens_retry_modal`
+  - `open_save_folder_uses_profile_directory`
+  - `unreadable_settings_modal_names_copy`
+
+**W3-07 · ux-flow · Unapplied difficulty draft warning**
+- Fail-first: `dirty_draft_escape_opens_warning`.
+
+**W3-08 · ux-flow · Scale slider applies on release**
+- Fail-first: `scale_applies_only_on_release`.
+
+**W3-09 · ux-flow · Decision-18 settings widgets**
+- Rows: Display (window mode, vsync, low latency with "(applies after restart)"), Readability (quality markers, palette), Audio (Music & stingers, Interface sounds), Controls.
+- Note: no apply system here; perf's W1-34 owns it.
+- Fail-first:
+  - `settings_show_music_and_stingers_and_interface_sounds_sliders`
+  - `colour_blind_palette_changes_marker_colours_and_shapes`
+  - `low_latency_row_shows_restart_note_exactly_when_pipelined_differs`
+
+**W3-10 · ux-flow · Extra bindings**
+- Files: `ExtraAction`, `binding_pressed`; rebind spans both tables; `cycle_attack`, `world_clock`.
+- Fail-first:
+  - `rebind_conflict_spans_core_and_extra_tables`
+  - `unbound_extra_action_never_fires`
+  - `cycle_attack_key_cycles_unlocked_attacks`
+
+**W3-11 · ux-flow · Bar-rows characterisation**
+- Files: `BarRows`; `BattleUi.bar_rows`; qa `ReviewFrameFacts.hud_rows`.
+- Pin: `battle_bar_rows_measure_todays_bar` (expected 3). Mutation proof is in the commit message.
+
+**W3-12 · ux-flow · Battle bar ≤ 2 rows**
+- Change: Reload, Strike contact lane and Toggle firing move to Management > Field actions; the status row is removed.
+- Fail-first:
+  - `battle_bar_stays_within_two_rows_at_small_size` (matrix)
+  - `field_actions_keep_their_keys`
+- Deps: W3-11.
+- Done: capture row CF-1-08 (the controls legend at `layout.legend_anchor` lies under the second button row at 1050x700@1.35) is fixed in the plan's capture ledger; the legend is clear of the bar at both sizes.
+
+**W3-13 · ux-flow · Hold-to-retreat (0.8 s)**
+- Fail-first:
+  - `single_click_retreat_does_not_withdraw`
+  - `held_retreat_withdraws_after_0_8s_and_opens_results`
+  - `retreat_hold_stepped_in_reduced_effects`
+
+**W3-14 · ux-flow · Wall-clock boss banner at the BattleLayout position**
+- Fail-first:
+  - `boss_banner_visible_at_1_2s_and_gone_after_2s_wall_at_speed_4`
+  - `boss_arrived_banner_lasts_1_5s`
+  - `boss_banner_never_overlaps_the_hint_callout`
+  - `boss_banner_static_in_reduced_effects`
+
+**W3-15 · ux-flow · Low-HP edge warning with hysteresis (30/35%)**
+- Fail-first:
+  - `low_hp_edge_below_30_percent`
+  - `low_hp_hysteresis_exits_above_35`
+  - `ui_frames_do_not_change_state_digest`
+
+**W3-16 · ux-flow · Defender picker and takeover labels (D16)**
+- Changes: the Briefing primary dispatches `BeginDefense`; the HUD hard-coded "MARA" and the forced portrait are removed.
+- Fail-first:
+  - `picker_lists_ready_recruit_and_dispatches_set_next_defender`
+  - `guarding_recruit_disabled_with_core_reason`
+  - `results_picker_persists_choice_across_save_load`
+  - `recruit_takeover_hud_names_the_recruit`
+  - `hud_tactics_dispatch_set_recruit_tactics_during_takeover`
+
+**W3-17 · vfx-lighting · Battlefield appearance from the stamped profile (D17); the observer names the recruit**
+- Fail-first:
+  - `battlefield_draws_profile_appearance_not_forced_female`
+  - `observer_window_draws_the_expedition_recruit_not_mara`
+- Pin: `mara_battlefield_model_unchanged`.
+
+**W3-18 · ux-flow · World "Plan defense" and outbreak "Plan response" via SelectCountry**
+- Fail-first:
+  - `world_footer_never_creates_attempt`
+  - `plan_response_opens_briefing_without_attempt`
+
+**W3-19 · ux-flow · Liberation recruit block and Recruit modal (price from core) with "Back to camp"**
+- Fail-first:
+  - `liberation_results_offers_recruit_when_node_owned`
+  - `liberation_results_names_missing_survivor_network`
+  - `liberation_recruit_price_reads_core_at_rank_10`
+  - `liberation_results_action_bar_still_three_buttons`
+
+**W3-20 · loot-economy · Results loot block, history columns, no-sale-in-battle guards**
+- Fail-first:
+  - `results_shows_drops_by_quality_and_auto_sold_line`
+  - `results_better_than_equipped_row_dispatches_equip_command`
+  - `recruit_upgrade_row_points_to_operations`
+  - `results_loot_block_fits_1050x700_at_1_35`
+  - `battle_and_observer_never_render_sale_text`
+  - `history_lists_auto_sold_count_and_coins`
+
+**W3-21 · loot-economy · Equipment auto-sell panel, confirmation modal, blocked-sale shortcuts**
+- Fail-first:
+  - `equipment_autosell_panel_preview_counts_match_core` ("would have sold N")
+  - `apply_to_stash_requires_confirmation_and_escape_closes`
+  - `stale_quote_refreshes_modal`
+  - `threshold_chips_show_text_and_shape_markers`
+  - `blocked_sale_shows_typed_reason_and_shortcut`
+  - `delete_preset_shortcut_dispatches_command`
+- Also owns (W2 review, 2026-11-10): the armory item row (`ui/armory.rs:141`) prints "unlock tier N" for every definition, loot-only ones included, and no UI shows `content::LOOT_ONLY_REASON`. A loot-only definition shows a loot-only label read from core (that constant, or the typed reason the armory command already returns) in place of the unlock tier. W3-26 rewrites the `{:?}` slot in the same line; whichever lands second keeps both changes.
+
+**W3-22 · progression-tree · Goal-5 UI**
+- Content: Results level and milestone lines, TRAINABLE lists, IQ text removed, perk and counter previews.
+- Fail-first:
+  - `results_shows_level_grant_line`
+  - `results_shows_rank_10_milestone_headline`
+  - `training_lists_have_no_iq_hp_fp_text`
+  - `counter_node_tooltip_names_its_archetypes`
+
+**W3-23 · enemy-balance · Enemy UI hooks**
+- Content: `stage_preview`, effective difficulty, Capstone/Regional badge, Results elites and boss TTK, "Custom (Hard rules)".
+- Fail-first:
+  - `briefing_shows_effective_difficulty_and_capstone_badge`
+  - `results_lists_elite_kills_and_boss_ttk`
+  - `preferences_shows_custom_basis_label`
+- Also owns (W2 review, 2026-11-10), three enemy readouts no row named. Each is presentation over a pure core read; none moves a digest.
+  - The briefing forecast (`deployment_progression` / `next_victory_progression`) is rank-only and does not show W2-26's in-country front ramp on later stages. The briefing shows the stage's ramp. W4-02 owns only the regional-checkpoint lines.
+  - The HUD danger detail ("N attacks winding up", `ui/hud/view.rs:216`) counts only `contact() && Windup`, so a stationed spitter's windup (W2-28, `EnemyView.aim_target`) is left out. The count and its wording include ranged windups.
+  - The inspector's "protection N" (`inspector.rs:75`, through `Attempt::enemy_protection`) shows base armor only. A shield-bearer's ranged armor (W2-30/W2-31), which player shots meet, is shown too.
+
+**W3-24 · ux-flow · Onboarding callouts and country dossier**
+- Files: `seed_seen_callouts`, `CampaignFeature::id`; New game sets Some(empty); `restore_defaults` keeps `seen_callouts`.
+- Fail-first:
+  - `unlock_callout_shows_once_and_survives_restart`
+  - `none_is_seeded_with_every_unlocked_callout_at_profile_load`
+  - `restore_defaults_keeps_seen_callouts_and_writes_current_version`
+  - `country_dossier_names_defense_count_and_mara_timing`
+  - `campaign_feature_ids_are_stable_and_unique`
+
+**W3-25 · ux-flow · Expedition outcome toasts**
+- Files: `unacknowledged_outcomes`; `AcknowledgeOutcomes` is dispatched in the same frame.
+- Fail-first:
+  - `one_toast_per_unacknowledged_outcome_and_ack_dispatched_same_frame`
+  - `folded_overflow_shows_single_summary_toast`
+  - `expedition_toasts_deferred_during_live_unpaused_battle`
+
+**W3-26 · ux-flow · Remove `{:?}` labels; source scans**
+- Fail-first:
+  - `no_debug_format_in_player_text` (17 hits today)
+  - `ui_has_no_literal_camp_prices_or_mara_mapping`
+
+**W3-27 · qa-captures · UI scenes for goals 2-4 and the W3 capture matrix**
+- Scenes: `results-defeat`, `results-liberation-recruit`, `upgrades`, `camp-home`, `briefing-recruit`, `equipment-autosell`, `save-error`, takeover battle.
+- Fail-first: the scene tests (per the qa #11 list).
+- As built (W3-27, 2026-11-14): six stills registered with `since_wave` 3 (`upgrades`, `camp-home`, `briefing-recruit`, `equipment-autosell`, `results-liberation-recruit`, `takeover-battle`); `results-defeat` and `save-error` are the W1-54 stills, and `save-error` now shows the W3-06 storage modal (`save_error_fixture_opens_retry_modal`). The matrix is `review_scenes::WAVE3_MATRIX` (scene, the rows that changed it, what the still must show) with `expected_stills` (`<mode>/<scene>[-small].png`, both sizes, both modes). Taking and reviewing it is a closing-phase item (R36).
+- Closed by W3-03 (2026-11-14): `upgrades` follows `UiCtx::open_upgrades` onto `Screen::Upgrades`, its registered primary is "Back to battle" and `upgrades_fixture_has_one_amber_primary_back_to_battle` pins it. `results-liberation-recruit` buys the Recruitment node after the win, not before it: the node needs one liberated country (`minimum_liberated` 1).
+
+**W3-28 · ux-flow · Full-loop headless acceptance test at both sizes**
+- Fail-first: `full_loop_new_game_to_recruit_defends`. Each of the 10 steps asserts Screen, Tab and exactly one primary. The battle steps assert "Begin defense" / "Resume defense".
+- As built (W3-28, 2026-11-14): `ui/tests/loop_tests.rs` walks a first launch (`IsolatedFrontend::first_launch`, nothing preset) by clicks and keys on `View::Full` at `Target::BOTH`; every step also asserts that no modal is open. Stand-ins, each marked in the test: a defense is lost by the runner settling an attempt at 0 HP and won by the runner settling one whose boss is out and whose last enemy is down, and the wallet is set to 100 000 coins after the first defeat. A running battle has no primary, so the battle steps assert "Begin defense" on the paused first defense and "Resume defense" after a pause; "Back to battle", "Next defense" and the Briefing primary deploy live. The path to Survivor network (Field fitness, Meet Mara) is bought in the tree through its search box. The walk found one loop break, fixed in its own commit: the Briefing primary's `BeginDefense` deployed the defense and left the Briefing open (`briefing_primary_opens_the_field_of_the_defense_it_deploys`; `notices.rs` now opens the field as for `Deploy`).
+
+**W3-29 · vfx-lighting · Pause banner and midpoint label placement (capture rows CF-1-01, CF-1-02)**
+- Slot: beside W3-14 (the ux-flow banner work), not after W3-28: the id is appended so no id changes. `pause_banner_center` is C-3 geometry and C-11 bars ux-flow from redefining it, so this is a BattleLayout change by vfx-lighting (design-perf-architecture.md, "Zoom-to-fit and wave-3 UI"). The new banner place is the owner's choice; design-vfx-lighting.md's letterbox rule alone does not help a height-limited 7x16 field.
+- R17 (wave-1 close): owner vfx-lighting, before W3-27's capture matrix is reviewed.
+- Fail-first:
+  - `pause_banner_never_covers_the_bottom_lane` over the zoomed 7x16 and the 3x12 hint-band fields at both sizes (CF-1-01)
+  - `midpoint_label_clears_the_construction_panel` at 1050x700@1.35: the label rect and `construction_panel` do not intersect (CF-1-02)
+- Done: CF-1-01 and CF-1-02 are fixed in the plan's capture ledger.
+- Deps: W3-14.
+
+**W3-30 · vfx-lighting · Review captures ignore the OS pointer (capture row CF-1-03)**
+- Slot: before the W3-27 capture matrix is reviewed; the id is appended so no id changes. R17 (wave-1 close): owner vfx-lighting (first qa-captures), beside the other field placement rows W3-29 and W3-31.
+- Fail-first: `review_capture_aim_ignores_the_os_pointer`: with a review-capture launch and a hover position over the field, `f.battle.aim` stays at the scene's pinned aim and no hover reticle or inspector draws.
+- Done: CF-1-03 is fixed in the plan's capture ledger.
+- Deps: none; W3-27's matrix review depends on it.
+
+**W3-31 · vfx-lighting · Wall-hit numbers clear the wall face and its stack (capture row CF-1-07)**
+- Slot: beside W3-29 (the other vfx-lighting placement fix over the field), before W3-27's capture matrix is reviewed; the id is appended so no id changes. R17 (wave-1 close) confirms the owner and slot. Since W1-69 every stacked enemy strikes its wall, so at 1050x700@1.35 the wall-hit numbers ("-80", "MISS") cover the wall face and the front of its stack. The placement is `ui/damage.rs` presentation only: it reads the drawn wall and stack rects and never touches core RNG or state. The new place is the owner's choice, and reduced mode uses the same placement.
+- Fail-first: `wall_hit_numbers_clear_the_wall_face_and_its_stack_at_small_size`: at 1050x700@1.35, on the progressed-peak field, the drawn rect of each wall-hit popup does not intersect the struck wall's face rect or the drawn body of the front enemy in its stack.
+- Done: CF-1-07 is fixed in the plan's capture ledger, with after-capture evidence from progressed-peak and from stress motion (`scripts/capture_motion.ps1 -Scene stress -Viewport small`) at 1050x700@1.35.
+- Deps: none.
+
+**W3-32 · progression-tree · Cross-graph stub label clears the drawn wires and nodes (capture row CF-2-01)**
+- Slot: before W3-27's capture matrix is reviewed; the id is appended so no id changes. W2 review (2026-11-10): the W2-41 wave-2 close capture opened CF-2-01 without a slot. W2-41's Spray control (`smg_spray_control`, -660, 0) takes SMG proficiency's exit along y = 0, where the long `pistol_training` → `smg_training` wire arrives, so the 70-unit stub draws over the start of the `smg_training` → `smg_spray_control` edge and its "from Survivor foundations" label lies on that edge (at 1050x700@1.35 it runs under the Spray control icon). The fix is the stub-label placement or the wire routing in `ui/progression/upgrade_graph` (`wires.rs`, `viewport.rs`; Graph::show is progression-tree's), presentation only; the owner picks which. Reduced mode draws the same.
+- Fail-first: `stub_label_clears_every_drawn_edge_and_node_at_both_zooms`: on the skills-survival focus (`field_fitness`), at the 1440x900@1.0 zoom and the compact 1050x700@1.35 zoom, each stub's label rect meets no drawn edge and no node's icon, title or caption envelope, and its path shares no segment with another drawn edge.
+- Done: CF-2-01 is fixed in the plan's capture ledger, with after captures of `skills-survival` at both sizes, normal and `LASTLIGHT_REVIEW_REDUCED`.
+- Deps: none; W3-27's matrix review depends on it.
+
+Wave-3 exit:
+- GOLDEN and TRACE 0.
+- The W3 capture matrix is reviewed.
+- Capture rows CF-1-01, CF-1-02 (W3-29), CF-1-03 (W3-30), CF-1-07 (W3-31), CF-1-08 (W3-12) and CF-2-01 (W3-32) are fixed.
+- The construction-rect CF row is closed (already fixed in W1).
+- Checked in the closing phase under R36: the full-loop headless test runs with the build, and the W3 capture matrix and the CF rows' after captures are taken and reviewed there.
+
+---
+
+## WAVE 4: balance (goals 5-6) and the goal-3 numbers
+
+| Id | Owner | Title | Fail-first / gate | Deps |
+|---|---|---|---|---|
+| W4-01 | enemy-balance | Regional and Capstone boss multipliers: Regional HP and reward x1.2; Capstone HP x1.4, armor x1.25, NPC armor +2, reward x1.4, damage x1.10 | `regional_boss_health_and_reward_are_1_2x_sector_at_equal_rank`, `boss_damage_capstone_factor_is_1_10` | W2 |
+| W4-02 | campaign-defenders | Regional checkpoint presentation lines: briefing "Regional checkpoint - boss +20% health, +20% reward" and "Final stand"; world panel "N checkpoints", read from `CountryChoicePreview.checkpoints`, which this commit adds from `Country::regional_checkpoints()` (design-campaign-defenders §1.8, deferred from W2-19; P6); Results "Regional checkpoint secured" | `briefing_names_regional_checkpoint_on_checkpoint_stage` | W4-01 |
+| W4-03 | progression-tree | Effect retunes: steady_hands, hardened, quick_throw, combat_reload; shrapnel_trap `charges_per_rank` 1 | `hardened_leaves_runner_contact_damaging`, `trap_mastery_1_adds_a_trap_charge`, `steady_hands_..._at_most_40_percent`; pacing and smoke before/after | W2 |
+| W4-04..n | enemy-balance | Tuning loop, one lever per commit, in this order: health_per_rank_late, boss_health slope, front_ramp_max ∈ [0.17, 0.25], affixes, capstone HP | Ignored `pacing_targets` goal6_* in release; each commit records pacing and smoke before/after and its provisional cause G. Owns `goal6_clamped_starts_first_victory_runs_2_to_4` (R33): red from W2-09 (AUT first victory 3 -> 5), green again since W2-54 (AUT 4 [2, 4], plan §9.6); the tuning loop keeps it green | W4-01 |
+| W4-p | progression-tree | Repricing, tree-quality rules and the blueprint price fix (one green commit), then the calibration loop | `no_valued_node_is_dominated_at_its_reference_states`, `cheap_nodes_stay_within_twice_branch_value_per_coin`, `tier_costs_sit_in_design_bands`, goal5_* (release) | W4-03, EB loop |
+| W4-l | loot-economy | Auto-sell pacing gate and stash-growth measurement | `auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3`, `stash_growth_reported_for_150_runs` | W4-p |
+| W4-c | campaign-defenders | Goal-3 strategy acceptance (20 seeds) | `strategy_profile_reports_liberations_2_4_10_and_coins_per_minute`, `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`, `fewer_than_five_outbreak_reopens_over_ten_liberations` | W4-l |
+| W4-08 | save-determinism | Balance re-bless (single): RULESET 4; the conditional `follow_named_preset` if existing preset values changed; continuation re-bless reasons if any | `v6_hard_campaign_deploys_with_current_hard_threat_but_in_flight_snapshot_stays_legacy`; ruleset assert = 4 | all W4 tuning; also W4-12 and W4-13, which come before it in the build order (R56, R57) |
+| W4-09 | save-determinism | PROGRESSED_GOLDEN (4 runs: seeds {1, 0xDEAD_BEEF_2026} x {Personal Hard capstone, Npc recruit takeover}, rank 12, 3600 ticks), PROGRESSED_TRACE, `V7_CONTINUATION_FNV` | `progressed_golden_runs_exercise_elites_boss_phases_and_new_archetypes` (perturbation proofs) | W4-08 |
+| W4-10 | enemy-balance | Docs: ENEMY_COMPOSITION.md, PROGRESSION_SCALING.md, the goal-6 section of BALANCE_AND_RUN_STATS.md, the WORLD.md band paragraph | qa `required_docs_sections_exist` | W4-09 |
+| W4-11 | progression-tree | Docs: the goal-5 section of BALANCE_AND_RUN_STATS.md (tier definition, TreeExhausted, OperationsOpen) and the AGENTS.md pacing_targets section | check_views | W4-09 |
+| W4-12 | campaign-defenders (with enemy-balance) | Expedition threat follows the recruit (R57): a pure horde_core rule for the threat rank an expedition plays at, derived from the recruit (training and level, gear) rather than the campaign rank, applied when an expedition attempt is created, within the frozen v7 schema; main runs keep the campaign rank. Npc GOLDEN and smoke move, PROVISIONAL with cause G. Calibrated until the goal-3 tests pass in release over 20 seeds | `expedition_threat_rank_follows_the_recruit_not_the_campaign_rank`, `expedition_threat_rank_is_set_when_the_attempt_is_created`, `main_run_threat_rank_still_follows_the_campaign_rank`; gate (release, 20 seeds): `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs` within 2/3, with `strategy_profile_reports_liberations_2_4_10_and_coins_per_minute` and `fewer_than_five_outbreak_reopens_over_ten_liberations` still green | W4-c |
+| W4-13 | enemy-balance (with qa) | Goal-6 measurement profile (R56): a weaker acceptance bot profile, its parameters defined from the existing bot profile knobs (`PacingAim`, `PacingSpend`, start country, preset, `PacingPlan`), that still finishes the campaign path the goal-6 rows need (a first victory and the full window span on every seed); `goal6_defeat_rate_windows` and `goal6_no_15_streak_after_run_10` use it; the expert-deu numbers are kept as an informational report; no balance data change | `goal6_measurement_profile_differs_from_expert_deu_only_in_its_named_fields`, `goal6_measurement_profile_reaches_the_first_victory_on_every_seed`; gate (release, 20 seeds): `goal6_defeat_rate_windows`, `goal6_no_15_streak_after_run_10` on the new profile | W4-p |
+| W4-14 | campaign-defenders (with enemy-balance) | Npc combat balance pass (R59) so Npc defenders hold country stages: reproduce an Npc stage on a headless run and compare it with a Personal run of the same stage and rank, fix each Npc combat defect as a defect, then tune the Npc model's own data and rules (not the enemy curve, not the Personal rules) until Mara and a trained recruit hold stage 1 of a fresh country at low ranks and expeditions under the W4-12 rule clear stages. Npc GOLDEN, smoke and Mara's main runs move, `PROVISIONAL` with cause G for the closing phase | `aim_pays_only_when_it_raises_expected_hits_per_turn`, `marksman_shoots_unaimed_when_two_shots_land_more_than_one_aimed`, `npc_defenders_hold_stage_one_of_a_fresh_neighbour_at_low_ranks` (release); gate (release, 20 seeds): `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs` within 2/3, with `strategy_profile_reports_liberations_2_4_10_and_coins_per_minute`, `fewer_than_five_outbreak_reopens_over_ten_liberations` and the goal5_* rows green and the goal-6 table no worse | W4-12 |
+| W4-15 | campaign-defenders (with progression-tree) | Earlier recruitment (R61): price or gate Survivor network (`recruitment_network`, 1,700 coins since W4-p) so the strategy bot's recruits join a camp or two earlier, and build the designed `train_companions` plan option so the acceptance bot trains (and, where the plan says, equips) each recruit before it leaves, through `Game::apply` only (`TrainRecruit`, `EquipRecruit`); `PacingPlan::unsupported` and the strategy bot's `unsupported` stop rejecting it, and the strategy profiles that measure G3.11 set it. The goal-5 table before and after in plan §9.6. Digest moves `PROVISIONAL` (or `PROGRESSED_PROVISIONAL`) with their cause class for the closing phase | `train_companions_is_a_supported_strategy_plan_option`, `train_companions_trains_each_recruit_before_its_expedition_through_commands_only`, `survivor_network_opens_a_camp_earlier_than_the_w4_p_price` (the price or gate pin, red on the 1,700-coin node); gate (release, 20 seeds): `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs` within 2/3, with `strategy_profile_reports_liberations_2_4_10_and_coins_per_minute`, `fewer_than_five_outbreak_reopens_over_ten_liberations`, the goal5_* rows and the `tests/progression_tree.rs` rules green and the goal-6 table no worse | W4-14, W4-16 |
+| W4-16 | campaign-defenders (with enemy-balance) | Npc defender power readout (R62): rebuild the Npc model of `Game::defender_power` (design-campaign-defenders §1.11) to read the range-penalised hit chance, the Aim turns that pay (`sim::npc::aim_turns_that_pay`) and the backlog of arrivals against the turn-limited kill rate; calibrate the rating and its bands against W4-14's win table (plan §9.6, wins of 18 per persona at 9 x 18 and 17 x 28). Still pure and sharing `deployment_inputs`; the Personal model unchanged. It moves the strategy bot's `RecruitAs` archetype choice, `SetNextDefender`, `OutbreakPlan.recommended_defender` and the UI power band; the G3.10-G3.12 tables before and after in plan §9.6. Digest moves `PROVISIONAL` with their cause class for the closing phase | `npc_power_reads_the_range_penalised_hit_chance`, `npc_power_counts_only_the_aim_turns_that_pay`, `npc_power_weighs_arrivals_against_the_turn_limited_kill_rate`, `guns_training_raises_npc_power_at_the_recruits_expedition_rank` (red today: trained 20 reads 98 at rank 1 against the starter's 100 at rank 0), `npc_power_band_agrees_with_the_w4_14_win_table`; `fresh_starter_power_is_100_at_threat_zero_in_both_models`, `defender_power_drops_as_threat_rises`, `defender_power_is_pure` and `roster_shows_core_power_and_status_labels` stay green | W4-14 |
+
+Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
+- **W4-l:** optional single-home cleanup. `validate_attempt_loot` (`sim/persistence.rs:455`) calls `content().max_drop_tier()` rather than `crate::loot::max_drop_tier()` (`loot.rs:23`). The two are equivalent today, so the change moves no digest. It is not a defect, and the row may drop it. **Done by W4-l (2026-11-13)** in its own commit: the validator reads `crate::loot::max_drop_tier()`; no test changed and no digest moved.
+
+Also owns (wave-2 close, 2026-11-13; orchestrator rulings R37-R53, plan §2.4):
+- **W4-04..n (R37):** G6.11 has no minimum seed count per window. The goal-6 defeat-window summary reports how many seeds each window pooled; at a9fc30a `defeat_rate_windows` names only the seeds of the lowest and highest windows and the fewest-to-most range, so the loop's first commit adds the count for every window (test-first), and every tuning commit reads those counts beside the rates.
+- **W4-03 and W4-08 (R38):** structures in saved encounters have no frozen pin; the continuation pins and R4 cover them. If W4-03's shrapnel_trap `charges_per_rank` 1 moves a continuation pin, W4-03 sets it provisional with its cause, and W4-08 re-blesses it with a written reason.
+- **W4-l (R39):** the two unmeasured post-L4 loot numbers: the median stash size after 60 and 150 runs and the auto-sold coins per run in runs 1-6 (auto-sell profile, 20 seeds, median), recorded in plan §9.7 beside the rank-23 figure (75.6 extra elite drops per run).
+- **W4-p (R48):** before it runs `no_valued_node_is_dominated_at_its_reference_states`, records in design-progression-tree §2 the three dominance groups W2-25 gave the decision-19 kinds (`CadenceMultiplier`, `ArmorPenetration`, `HazardDamageMultiplier`) and the multi-axis gain sum.
+- **W4-p (R55):** runs before the W4-04..n loop resumes, not after it as the table's Deps column ("EB loop") says. The loop's enemy levers left 26-34 of 38 defeat windows outside 10-25% and a 40-49 win streak after run 10, with the tree exhausted at run 27 in every variant (plan §2.4 R55), so progression is tuned first. After its calibration W4-p runs the goal-6 filter once and reports the table; the loop resumes on the repriced tree.
+- **W4-p result (2026-11-13):** done. `skills.json` is repriced (tiers 2,030 / 8,700 / 19,830, tree 96,920), `sim::tier_cost` leaves out nodes gated at 5 victories or more, `Campaign::blueprint_price` is the price every blueprint offer and the smoke preparation read, and rules 1-6 of design-progression-tree §3 are tests in `tests/progression_tree.rs`. The four goal5_* rows pass in release (plan §9.6, "W4-p repricing and goal-5 calibration"). Rule 3 covers non-ladder nodes and rule 4 checks Perception by halves (design-progression-tree §3 "As built"). `goal6_defeat_rate_windows` (32 of 38 windows out) and `goal6_no_15_streak_after_run_10` (median 49) are still red and stay with W4-04..n; `goal6_lux_hard_at_most_1_5x_normal` now passes (Hard 13 against Normal 9). For W4-c: Survivor network costs 1,700 coins (was 100), Parallel command 1,100 (was 150) and Country operations 1,500 (was 225), so the strategy rows open later than their wave-2 baseline.
+- **W4-04..n result (2026-11-13):** the loop resumed on the repriced tree and kept no lever; `progression.json` and `enemy_catalog.json` are unchanged and no digest moved. Every listed lever was measured in release (plan §9.6, "W4-04..n tuning loop, resumed on the repriced tree"): inside the G6.17 band each leaves 32-33 of 38 defeat windows outside 10-25% and a 46-50 win streak, the baseline's numbers. `front_ramp_max` stays 0.18: `goal6_lux_hard_at_most_1_5x_normal` passes there since W4-p, and 0.25 turns no red row green, puts one more window out and moves the LUX Easy median onto its cap of 6. `goal6_clamped_starts_first_victory_runs_2_to_4` (R33) stays green (AUT 3 [3, 5], BGD 3 [3, 4]). `goal6_defeat_rate_windows` and `goal6_no_15_streak_after_run_10` stay red and wait for a user decision (plan §2.5, "G6.11 and G6.12 stay red after the listed enemy levers"). W4-08 has no enemy-balance move to re-bless from this row.
+- **W4-l result (2026-11-13):** done. `sim/pacing/loot.rs` holds the two evaluators (`auto_sell_within_default`, `stash_growth`) and `PacingRun::items_owned` records the stash after each run; both are pinned on synthetic reports in `tests/pacing_harness.rs`. In release (20 seeds, plan §9.7 "W4-l: stash growth and early auto-sold coins") the gate passes: tiers 1 / 2 / 3 affordable at runs 4 / 8 / 11 with auto-sell against 4 / 8 / 12 without. The stash is a median 5,317 items after 60 runs and 19,615 after 150, with 112 and 298 auto-sold; the auto-sold coins of runs 1-6 are 31 / 56 / 68 / 50 / 36 / 25. No drop or sale rule changed and no digest moved, so W4-08 has no loot move to re-bless from this row. The stash sizes are above every save-clone fixture; whether a lever of design-loot-economy Risks item 3 is pulled is open in plan §2.5 ("The stash outgrows the save-clone fixtures"). For W4-c: the gate's sweep adds about 30 s to a full `pacing_targets` run and the 150-run stash sweep about 5 minutes.
+- **W4-c result (2026-11-13):** measured, G3.11 still red, no data change and no digest move. The 20-seed strategy sweep at ad80ed5 (plan §9.6, "W4-c goal-3 strategy acceptance"): `strategy_profile_reports_liberations_2_4_10_and_coins_per_minute` passes (S1 liberations 2 / 4 / 10 at runs 9 [10] / 19 [20] / 42 [45], 3,290.5 coins per minute), `fewer_than_five_outbreak_reopens_over_ten_liberations` passes (median 0), and `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs` fails at 9 / 9 runs (1.00 against 0.67). No expedition clears a stage in any seed: a recruit under the Npc rules does not hold a stage at threat rank 13 and up, on its starter loadout or, in one-seed probes, on stash gear, on item-level-15 gear with full training, or with the Npc arrival rate at 0.2. No `strategy_config` value is a lever, so the row shipped only this record; the decision is open in plan §2.5 ("G3.11 stays red: expeditions clear no stage"). W4-08 has no strategy move to re-bless from this row. Seen on the way: `Game::defender_power` rates those losing recruits 999 (Strong).
+- **W4-p (R51):** the W2-42 "one option" correction, in its own commit: `takeover` also starts in Luxembourg and `farm` also plays the novice aim. It corrects the registry comment in `sim/pacing.rs`, renames `w2_42_rows_vary_the_acceptance_profile_by_one_option` to `w2_42_rows_vary_the_acceptance_profile_only_in_their_named_fields` (assertions unchanged; a doc comment names each row's changed fields), adds a correcting note under W2-42 above and one sentence to plan §9.6 saying the takeover and farm columns do not isolate their plan. It changes no behaviour (a comment, a test name and docs), so like a doc fix it has no fail-first test; the commit body says so.
+- **W4-10 (R52):** the comment in `target_urgency_is_authored_data_with_a_legacy_category_default` (`crates/horde_core/src/enemy_catalog.rs`): only the W2-31 exploder (-4, Shambler-based) and spitter (-2, Runner-based) author an urgency other than their category default; runner, caller-pack, skitter and plated-runner author the Runner -3 explicitly; sprinter and splitter-brood omit it and take that -3. Comment only, in its own commit.
+- **W4-11 (R53), unless an earlier commit did it:** `scripts/check_views.py` exits 1 at a9fc30a ("ARCHITECTURE.md: guard test not found: sim/elite_tests.rs"). The first build commit that edits docs/ARCHITECTURE.md or has check_views as its gate writes `crates/horde_core/src/sim/elite_tests.rs` in place of `sim/elite_tests.rs` in the core `loot.rs` and `sim/combat.rs` rows; W4-11's check_views gate needs it at the latest.
+
+Also owns (user decisions R56-R62, 2026-11-14; plan §2.4):
+- **W4-12 (R57):** answers the §2.5 row "G3.11 stays red: expeditions clear no stage" (W4-c). The rule is new horde_core behaviour, tested first and reached only through `Game::apply`. It moves the Npc GOLDEN runs and smoke; W4-12 sets `PROVISIONAL` with cause G and explains the move in its commit body, and W4-08 re-blesses it. Mara's main runs and the survivor's runs keep the campaign rank. If the rule cannot be stored within the frozen v7 schema, the row stops and asks. **User decision R66 (2026-11-17):** the rule keeps pricing gear by item level, not tier, so recruits in early tier-4 drops keep threat rank 0. That is how G3.11 passes since W4-15. The user accepted it, and the human difficulty playtest (G6) judges it.
+- **W4-13 (R56):** answers the §2.5 row "G6.11 and G6.12 stay red after the listed enemy levers" (W4-04..n). It changes the acceptance bot, not the balance data, so it moves no GOLDEN or GAMEPLAY_TRACE digest. The expert-deu goal-6 table stays printed as information beside the new profile's. The human difficulty playtest (plan §11) still decides the real difficulty.
+- **W4-14 (R59):** answers the §2.5 row "G3.11 stays red after the W4-12 expedition rule" (W4-12). Systematic debugging first (an instrumented Npc stage run beside a Personal run of the same stage and rank); each defect gets its own fail-first commit, and the tuning touches only the Npc model's own data and rules. It records the investigation and the before/after table in plan §9.6 ("W4-14 Npc combat balance") and design-campaign-defenders ("As built"). If G3.11 still fails on W4-c's timing finding, the row reports it with numbers for a new user decision; it changes neither the acceptance bot nor progression prices.
+- **W4-14 result (2026-11-14):** two findings, one commit each, then this record (plan §9.6, "W4-14 Npc combat balance"). fbedee2 fixes a defect: the Npc aimed when the aim lowered its expected hits per turn (below skill 14, and the Marksman always); `aim_turns_that_pay` decides now, pre-v7 attempts keep the old test. 93321b8 is the root cause: one action per turn caps the Npc kill rate, and the Npc arrivals reached that cap at stage 1, so `npc_arrival_factor` falls 0.9 -> 0.5. Mara and a starter recruit win stage 1 of a fresh neighbour at rank 0 17 of 18 times (0 before), a recruit trained 20 points 18 of 18 at rank 1 (7 before); the expeditions clear stages (S1 12 [15], S2b 4 [5]); G3.10, G3.12 and the goal5_* rows pass and the goal-6 table is unchanged. G3.11 stays 1.00 and reads 0.78 even at the Npc arrival floor (W4-c's timing), so it needs a new user decision (plan §2.5, "G3.11 stays red after the Npc combat balance pass"). Digests: the Npc GOLDEN and GAMEPLAY_TRACE runs, the two takeover PROGRESSED runs and the v7 continuation stay PROVISIONAL with cause G for the closing phase; V1-V6 do not move.
+- **W4-15 (R61):** answers the §2.5 row "G3.11 stays red after the Npc combat balance pass" (W4-14) with its options (a) and (b) together. The price or gate is a value change in `skills.json` (no id changes; the content files stay append-only) or a catalogue-rule change that keeps every `tests/progression_tree.rs` rule green; the `train_companions` option is bot code in `sim/pacing.rs` and `sim/pacing/strategy.rs` that acts only through `Game::apply`. It measures G3.11 after W4-16 lands, because W4-16 changes which archetype the bot recruits. If no price or gate that keeps the goal5_* rows and the tree rules green meets G3.11, the row reports it with numbers for a new user decision; it narrows no acceptance row.
+- **W4-15 result (2026-11-14):** done, measured before W4-16 (which has not landed; the closing phase re-runs the goal-3 rows after it). 63283a9 lowers Survivor network 1,700 -> 1,500 coins (`survivor_network_opens_a_camp_earlier_than_the_w4_p_price`; Mara / Operations 16 / 18, a tie from 1,400 down), and 62f90d3 builds `train_companions` (`train_companions_is_a_supported_strategy_plan_option`, `train_companions_trains_each_recruit_before_its_expedition_through_commands_only`): S2b buys each recruit up to 12 awarded points, equips the free stash item of the highest Npc upgrade gain that keeps its expedition rank, and trains Guns, before the tree spending. G3.11 reads 6 / 9 = 0.67, PASS; G3.10, G3.12, the goal5_* rows and the tree rules are green and the goal-6 table is unchanged (plan §9.6, "W4-15 earlier recruitment"). The price moves the four `PROGRESSED` runs (`PROGRESSED_PROVISIONAL`, class G); `train_companions` moves no digest.
+- **W4-16 (R62):** answers W4-14's `defender_power` note (plan §9.6, "W4-14 Npc combat balance"; the same §2.5 row). The rebuild touches only the Npc model in `sim/power.rs` and its reference; the Personal model, `deployment_inputs` and the deploy do not change. It writes the "As built (W4-16)" note in design-campaign-defenders §1.11 with the calibration table (rating and band per W4-14 persona beside its wins of 18). The cost stays recorded, not cached (R41).
+- **W4-16 result (2026-11-14):** done (9f18943; plan §9.6, "W4-16 Npc power readout"). The Npc model plays the stage turn by turn and rates the heaviest arrival load the defender still wins at, over a fresh Mara's (100); the Personal model, the bands and the G2.3 pins are unchanged. The five row tests are in `tests/npc_power.rs` (normal suite); the calibration table reads Even or Strong for every persona that wins most of its 18 stages and Weak for every one that loses most (trained 20 at rank 1: 127 / 133 Strong; stage 2: 66 / 65 Weak; Capstone: 1 / 22 Weak). Two test expectations moved, no rule: the outbreak-plan test makes its recruits stronger with Guns instead of HT, and `s1_strategy_bot_acts_only_through_commands` reads seed index 0 (the bot's `RecruitAs` choice reads the new rating). In release over 20 seeds G3.10, G3.11 (6 / 9 = 0.67) and G3.12 still pass; no digest moves, so the closing re-bless has nothing from this row. Cost: about 50-66 µs per Npc call and 0.8 ms for `available_defenders` with 13 defenders (W2-21: 6.9 µs and 105-110 µs), recorded (R41).
+- **W4-15 and W4-16 digests (R61, R62):** both land after the W4-08 re-bless, like W4-14. Any `GOLDEN`, `GAMEPLAY_TRACE`, `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` or v7 continuation move either makes stays `PROVISIONAL` (`PROGRESSED_PROVISIONAL`, `V7_CONTINUATION_PROVISIONAL`) with one cause row per commit and its class as `support::classify` assigns, explained in the commit body, and is folded by the closing-phase re-bless before the full verify. V1-V6 never move.
+- **Closing phase (R60):** answers the §2.5 row "G6.11 and G6.12 stay red on the goal-6 measurement profile" (W4-13). Both rows are accepted red for this pass: `goal6-novice` stays the gate profile, expert-deu stays information, and the closing report lists both rows as open with the human difficulty playtest (plan §11) pending.
+- **W4-08 result (2026-11-14):** done. No commit since W2-49 set `PROVISIONAL` (W4-12's GOLDEN runs create no expedition, so its expected Npc move did not happen), so the re-bless folds nothing: `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6, and the `tests/determinism.rs` header records why each wave-4 rule leaves the six runs alone. `RULESET_VERSION` and `TRACE_RULESET` are 4. `balance.json` is unchanged since W2-49, so `follow_named_preset` is not added; `v6_hard_campaign_deploys_with_current_hard_threat_but_in_flight_snapshot_stays_legacy` (`tests/balance_extras.rs`, mutation-proven) pins the behaviour without it. No continuation pin moved (R38: no charges reason owed). Smoke, pacing and plan §9.2's "After W4" column are closing-phase work (R36).
+- **W4-08 and W4-14 (R59):** W4-14 lands after the W4-08 re-bless (RULESET 4), not before it as W4-12 and W4-13 did. Any `GOLDEN`, `GAMEPLAY_TRACE`, `PROGRESSED_GOLDEN` or `PROGRESSED_TRACE` move W4-14 makes therefore stays `PROVISIONAL` (or `PROGRESSED_PROVISIONAL`) with its cause class G and is re-blessed in the closing phase, which also re-runs smoke and pacing at HEAD (R36).
+- **W4-10 result (2026-11-14):** done, in two commits. R52's comment is fixed on its own. The docs commit writes ENEMY_COMPOSITION.md "Composition archetypes" and "Regional and Capstone bosses", PROGRESSION_SCALING.md "Two-axis threat", "Elite rate", "Regional checkpoints and the Capstone", "Expedition threat" (W4-12) and "Country difficulty band" plus the `boss_ranks` table row, the BALANCE_AND_RUN_STATS.md section "Goal 6: enemy difficulty acceptance" (profiles, the six pacing rows at the wave-4 close, G6.11 and G6.12 red pending plan §2.5) and the WORLD.md "Country difficulty band" heading with a checkpoint paragraph. The gate `required_docs_sections_exist` did not exist, so W4-10 adds it to `crates/horde_game/src/repo_checks.rs` with enemy-balance's four docs in `REQUIRED_DOC_SECTIONS` (presence only, ruling W-15); W7-08 appends the rest of the design-qa-captures §1.13 inventory. No digest moved.
+- **W4-11 result (2026-11-14):** done, docs only. BALANCE_AND_RUN_STATS.md gets the section "Goal 5: progression pacing acceptance": the goal-5 command, the expert-deu sweep, the milestone counting, the tier definition (`sim::tier_cost` leaves out the 23 nodes gated at `TIER_GATE_VICTORIES` 5 or more, six of them inside tiers 2-3), `TierAffordable`, the report-only `TierOwned`, `Liberation(n)`, `TreeExhausted` (ruling W-3) and `OperationsOpen` (`Game::operations_available`, ruling W-2), the four goal5_* rows with their wave-4 close numbers from plan §9.6 (all pass) and what the repricing did. The AGENTS.md pacing_targets paragraph drops "Rows may fail until the wave-4 balance pass", names the goal5 and goal6 filters and points at the two BALANCE_AND_RUN_STATS.md sections. `REQUIRED_DOC_SECTIONS` gains the goal-5 heading, which is the row's fail-first. R53 was already done by W4-p (b0a987c), and `scripts/check_views.py` exits 0. No digest moved.
+- **Closing phase (R58):** answers the §2.5 row "The stash outgrows the save-clone fixtures" (W4-l). The drop and sale rules stay. The closing phase runs `save_clone` at 5,000 and 20,000 items (it adds the 20,000-item size to `ITEM_COUNTS`) against the G1.8 gate, p99 at most 1 ms, and fixes the cost only if the gate fails.
+
+Wave-4 exit: every ignored `pacing_targets` assertion passes in release (goal 3, goal 4 auto-sell, goal 5, goal 6), with before/after tables in the plan. Checked in the closing phase under R36: the tuning rows still measure pacing as their own work, and the closing phase re-runs every `pacing_targets` assertion at HEAD.
+
+---
+
+## WAVE 5: goal 7 (horde_game only)
+
+| Id | Owner | Title | Fail-first | Deps |
+|---|---|---|---|---|
+| W5-01 | vfx-lighting | 5a: render-pass split, theme grades, cue halos with ink backing, vignette move, `STORM_THEME_IDS`/`is_storm`, static storm grade on storm stages in reduced mode, observer `scene_look` | `night_grade_at_most_0_70_of_dawn...`, `every_cue_primitive_has_an_ink_backing_with_contrast_at_least_3`, `storm_stage_coverage_is_131_of_1026`, `reduced_effects_storm_stage_draws_static_storm_grade_and_no_flash`, `worker_view_uses_biome_theme_not_level`; pin `stage_theme_ids_are_pinned_to_the_10_in_order` with its self-test | W4 |
+| W5-02 | vfx-lighting | 5b: wall-clock lightning (`SKY_SLOT_MS` 8000, quiet windows; ΔL < 0.2) | `sky_flash_starts_at_least_4000_ms_apart_at_observation_speed_4x`, `sky_flash_peak_delta_below_0_2...`, `sky_flash_never_reads_core_rng` | W5-01 |
+| W5-03 | vfx-lighting | 5c: weapon_fx profiles (6 classes plus turret), shotgun fan, MG tracers, gear-snapshot class | `every_class_and_turret_profile_distinct_on_two_axes...`, `shotgun_volley_paints_one_flash_and_nine_streaks`, `machine_gun_bright_tracer_every_third_volley`, `reduced_shot_paints_no_flash...`; pin `shot_fx_never_mutates_attempt` (acceptance ISO-8: painting every weapon_fx profile leaves the attempt, its RNG and the state digest unchanged) | W5-01 |
+| W5-04 | vfx-lighting | 5d: additive light pools (cap 24) | `light_pools_capped_at_24...`, `reduced_has_no_light_pools` | W5-03 |
+| W5-05 | vfx-lighting | 5e: multi-frame explosions and fire; grenade vs Molotov | `grenade_and_molotov_explosions_paint_distinct_shape_sets`, `explosion_has_at_least_4_distinct_frames...` | W5-04 |
+| W5-06 | vfx-lighting | 5f: damage-scaled hits, boss kill burst, blood decals (opt-in, cap 64) | `hit_spark_length_monotonic_in_damage...`, `blood_decals_zero_when_off_newest_64...`; new `field_rect_never_offsets_on_damage_or_explosion` (no screen shake) | W5-05 |
+| W5-07 | vfx-lighting | 5g: elite and affix tells | `elite_enemy_paints_ring_and_marker_with_ink_backing_in_cue_pass`, `reduced_elite_has_no_pulse` | W5-01 |
+| W5-08 | vfx-lighting | 5h: quality glint, tier markers, static reduced fly-ups | `rare_or_better_flyup_paints_one_glint_common_none`, `reduced_flyup_is_static_and_glintless`; pin `flyup_never_shows_sale_status` (acceptance G4.9: no fly-up in ui/loot.rs draws auto-sell or sale text, normal and reduced) | W5-01 |
+| W5-09 | vfx-lighting | 5i: review scenes (weapon-classes, storm, night-checkpoint, dawn-reference, fx-stress, elite-tells), `measure_field_luminance.py`, fx budget, reduced MOTION gate | `reduced_96_frame_fx_stress_sequence_has_no_additive_vertex...`, `fx_stress_shape_counts_within_perf_budget` | W5-01..08 |
+| W5-10 | qa-captures | Storm scene, weapon snapshot assertion, flash counters in manifest v2; reduced zero asserts | `storm_fixture_is_a_storm_tagged_stage`, `manifest_v2_records_flash_counters` | W5-09 |
+| W5-11 | perf-architecture | Re-gate after graphics: fx caps in PERF_BUDGET (decals 64, lights 24, explosion frames 8, flames 21/9); fx-stress gates. *As built (414d77de):* the budget row is `explosions_concurrent` 8 (`explosion::EXPLOSIONS_MAX`); an explosion draws `EXPLOSION_FRAMES` 6 frames, a sequence length and not a budget row. The other caps match, and `fx_budget_matches_presentation_caps` reads every row from its constant | `perf_budget_json_matches_presentation_caps`, `perf_scenes_agree...`; stress and fx-stress exit 0 with -VsyncOff | W5-09 |
+| W5-12 | save-determinism | Zero-move verification record (0/6, 0/4, 0/6) | existing pins | W5-11 |
+
+Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
+- **W5-11:** hardening the wave-1 test `egui_pass_excludes_unrelated_post_update_systems` (`crates/horde_game/src/diagnostics/tests.rs:283`, `review` feature). It sleeps on the wall clock and asserts the relative bound `egui_pass_ms + 8.0 <= main_cpu_ms`. It failed once under load in the wave-2 review and passed on rerun; the failure output was not captured. Until W5-11 lands, a failure is rerun once and its output is kept in the commit body or the review notes; a second failure on a quiet machine is a finding for that wave's review, not a flake. The hardened test still proves what it proves today (the 8 ms PostUpdate sleeper lies outside the egui_pass span in either registration order) without a bound that machine load can break.
+  - The same rerun-once rule covers the three R30 `Invoke-Native -Sample` cases in `scripts/tests/run_script_tests.ps1`. The W2 review replaced their absolute wall-clock bounds (W2-47: 4 to 6 samples over a 2 s child, a first sample within 0.4 s) with structural asserts. Exactly one sample is taken before the first wait, and it sees no exit marker. A 2 s child gets at least 2 samples. A timed-out run gets at least 1. The only upper bounds are twice the wait slices that fit in the run's own measured length or in its 1 s timeout. Load lengthens the run or takes time from the loop, so it cannot push a count over them. W5-11 owes no further work on them.
+
+The human review for weapon-classes and night/storm is logged as pending if it is not done.
+
+- **W5-11 result (measured in the closing phase by W7-09, 2026-11-16, HEAD 30847f90):** the fx-stress and stress -VsyncOff gates were measured for the first time on the integrated tree (`PERF_BUDGET.json acceptance.closing`, VALIDATION.md "W7-09 final perf acceptance at the release candidate"). **Done is not met:** dev fx-stress normal cpu_frame p99 is a valid over at 10.2157 ms against 10.0 (repeats 10.15 / 10.22 / 10.33 ms), and small is 9.10 ms. Playtest fx-stress passes at 8.97 / 8.95 ms. Stress passes in both profiles (dev 9.80 / 9.44, playtest 8.78 / 8.25 ms), and every repeat has 0 frames over 50 ms outside driver stalls. Live battlefield primitives reach at most 22 of 23. fx-stress vertices reach 60,311 with VSync on, and the scene has no vertex gate. With VSync on, dev fx-stress interface_draw is 1.592 / 1.629 ms, measured and not gated: the 1.13 / 1.03 ms interface target of design-vfx-lighting §13 is for the 225-enemy design point (G1.10, progressed-peak), and fx-stress (400 enemies) is a measured, ungated stress scene (R65).
+- **W5-11 result, W7-09 attempt 2 (2026-11-17, HEAD e54faa88):** **Done is met.** stress and fx-stress exit 0 with -VsyncOff in dev and playtest: fx-stress p99 dev 6.66 / 6.79 and playtest 5.87 / 5.92 ms, stress dev 6.32 / 6.70 and playtest 6.41 / 6.19 ms, 0 frames over 50 ms and 0 driver stalls, live primitives at most 22 of 23. fx-stress vertices reach 60,311 with VSync on (no vertex gate; 787 under the stress gate). dev VSync-on fx-stress interface_draw is 1.372 / 1.376 ms, measured and not gated (R65: the 1.13 / 1.03 ms target is for the 225-enemy design point, and fx-stress at 400 is a measured stress scene; `PERF_BUDGET.json acceptance.closing.attempt_2`).
+- **W5-12 result (2026-11-17, closing phase):** done, docs only. Wave 5 moved no pin: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6, and the V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity are unchanged. No wave-5 commit (0512735a..b60ef556, with the fixes up to f461c72d) touches `crates/horde_core`: its tree object is 055c8219 before and after. No wave-5 commit sets or changes a pin (`git log -G` over the pin lines finds only W4-09, W4-14, W4-15 and the closing re-bless). W4-08, which has wave 5 as an ancestor, ran green on the W2-49 pins. The record is in VALIDATION.md, "Zero-move records and the pins at the release candidate".
+
+Wave-5 exit (plan §7): fx-stress within budget, the reduced MOTION gates pass and the human review is logged. Checked in the closing phase under R36: W5-11's fx-stress perf passes and the capture review run there. Since user decision R63 (2026-11-17, CF-3-22) the gates' block criterion covers flash and pulse effects only. The block deltas of reduced-mode damage numbers and static tracers are accepted, so the reduced MOTION gates pass on the W7-11 exports.
+
+---
+
+## WAVE 6: goal 8 (new gun/enemy/UI audio; no new music files; tracks Deferred)
+
+| Id | Owner | Title | Fail-first | Deps |
+|---|---|---|---|---|
+| A6-00 | audio | (if the user approves; P8) Bevy-free path crate `crates/horde_audio`; Cargo.lock diff = one path entry; uses `horde_core::sha256` through dev-dependencies | `horde_audio_builds_without_bevy` (cargo tree) | W5 |
+| A6-01 | audio | 6.1: move Cue, BankId and legacy synthesis verbatim | `raw_synthesis_matches_v1_library`, `bank_ordinals_are_append_only` | A6-00 |
+| A6-02 | audio | 6.2: move the mix table out of horde_game (value-preserving); `WARNING_TWINS` names vfx predicates (W2-28/W2-37/existing windup ring) | `horde_game_audio_sources_define_no_gain_tables`, `every_warning_row_names_a_visual_twin` | A6-01 |
+| A6-03 | audio | 6.3: BS.1770-4 meter and 4x true peak | `ebu3341_case1...`, `true_peak_of_fs_over_4_sine_at_45deg_is_unity` | A6-01 |
+| A6-04 | audio | 6.4: offline renderer and BEFORE numbers (gate red, ignored) | `reference_mixed_60s_meets_loudness_gate` recorded at about -38..-42 LUFS | A6-03 |
+| A6-05 | audio | 6.5: exporter v2. 5+ variants for frequent cues; new gun, enemy, boss and UI families; offline per-clip true-peak ceiling as mastering (R3); schema-2 SURVIVAL_PROVENANCE with the v1 file archived; refresh of the CREDITS index; reel to `target/audio-audition/` | `frequent_cues_have_at_least_five_variants`, `survival_generator_sha256_matches_lf_normalised_sources`, `schema2_survival_records_have_seed_and_true_peak`, `credits_index_matches_provenance` | A6-04 |
+| A6-06 | audio | 6.6: buses Master, Music, Effects, UI, Atmosphere; UI and Music routing; sliders | `ui_cues_follow_ui_volume_not_effects`, `stingers_follow_music_bus_and_warnings_do_not` | A6-05 |
+| A6-07 | audio | 6.7: lane pan (balance law, mono-compatible), `mono_audio` | `pan_is_mono_compatible_for_every_lane_count_3_to_17`, `mono_audio_forces_centre` | A6-06 |
+| A6-08 | audio | 6.8: selection budgets and the player-weapon lane | `player_shot_starts_even_with_two_critical_cues_in_frame` | A6-07 |
+| A6-09 | audio | 6.9: caps and oldest-first stealing with a 40 ms fade | `steal_prefers_oldest_among_equal_priority_and_fades_40ms` | A6-08 |
+| A6-10 | audio | 6.10: per-bank round-robin and presentation-counter jitter | `round_robin_never_repeats_in_1000_triggers`, `horde_audio_never_reads_core_rng` | A6-09 |
+| A6-11 | audio | 6.11: ducking (Atmosphere and Music only) and density compensation | `boss_arrival_ducks_atmosphere_6db_releases_800ms`, `effects_bus_never_ducks` | A6-10 |
+| A6-12 | audio | 6.12: exhaustive SimEvent mapping, enemy voices by catalog id, BossKind banks, class shots (NPCs use their own class), quality tone, Windup and Contact cues, visual twins | `sim_event_mapping_is_exhaustive`, `every_catalog_archetype_has_explicit_voice_row_with_existing_files`, `every_boss_kind_has_arrival_phase_death_banks...`, `warning_cue_table_has_a_visual_twin` | A6-11 |
+| A6-13 | audio | 6.13: GunTracker (staged reloads, shell inserts, bolt, dry fire) | `manual_reload_plays_out_in_finish_once`, `dry_trigger_auto_reload_off_plays_dry_fire_once_per_350ms` | A6-12 |
+| A6-14 | audio | 6.14: UI cues. Runner LootDrop and loot reveal; one CoinBatch per auto-sell or stash batch (R9); no hover sound | `fifty_auto_sold_items_one_coin_batch_on_results_none_on_rerender`, `sell_extras_of_50_plays_one_coin_batch`, `no_widget_hover_writes_a_sound_request` (with mutation proof) | A6-13 |
+| A6-15 | audio | 6.15: MusicPlugin director, Music bus, stingers from existing banks, tracks Deferred, slider "Music & stingers" | `music_director_matrix`, `every_stinger_resolves_to_existing_bank`, `music_volume_scales_stingers_only` | A6-14 |
+| A6-16 | audio | Settings: `SETTINGS_VERSION` 2 and the per-field default migration | `untouched_wave1_defaults_migrate_once_per_field`, `customised_levels_are_kept`, `version_2_file_never_remigrates` | A6-15 |
+| A6-17 | audio | 6.17: calibrate and close the gate. 60 s mix at default sliders: -23 ±2 LUFS integrated, TP ≤ 0.95 FS. A runtime master limiter is added only if the measured TP exceeds 0.95 (R3). | `reference_mixed_60s_meets_loudness_gate` (both themes), `dense_battle_60s_true_peak_at_most_0_95` | A6-16 |
+| A6-18 | audio | (optional) 6.18: review cue log and replay cross-check | `cue_log_round_trips_frame_actions` | A6-17 |
+| A6-19 | save-determinism | Zero-move verification record | existing pins | A6-17 |
+
+The listening pass is logged as pending.
+
+- **A6-19 result (2026-11-17, closing phase):** done, docs only. Wave 6 moved no pin: `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, and the V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity are unchanged. A6-00..A6-18 and the integration fix 40361897 leave the `horde_core` tree at 055c8219. The later fix b258ce29 touches only `horde_audio` and `horde_game`. `horde_audio` depends on `horde_core`, never the reverse, and draws no core RNG (`horde_audio_never_reads_core_rng`). No A6 commit sets or changes a pin, and W4-08, which has wave 6 as an ancestor, ran green on the W2-49 pins. The record is in VALIDATION.md, "Zero-move records and the pins at the release candidate".
+
+Wave-6 exit (plan §7): the -23 ±2 LUFS integrated / TP ≤ 0.95 FS gate is closed and the listening pass is logged as pending. Checked in the closing phase under R36.
+
+---
+
+## WAVE 7: goals 9-10 and docs
+
+| Id | Owner | Title | Fail-first / gate |
+|---|---|---|---|
+| W7-01 | qa-captures | Build stamp (menu, crash report, startup log, `--version`) | `stamp_formats_dev_and_commit_builds`, `version_flag_selects_version_action`, `crash_report_names_build_stamp` |
+| W7-02 | qa-captures | package_playtest and verify_playtest under 5.1, manifest v2 (version and commit), curated docs, `PENDING_W7` emptied | `playtest_guide_has_no_links_outside_the_package`; `verify_playtest` PASS; the packaged `--smoke` passes |
+| W7-03 | audio | AUDIO_SURVIVAL.md, PLAYTEST_GUIDE listening pass (pending), ACCEPTANCE (-23 LUFS gate), CREDITS, packaging excludes `docs/audio` | check_views link check |
+| W7-04 | loot-economy | Docs: PROGRESSION.md:23 (drop "no automatic sale"), GDD, ITEM_QUALITY, BALANCE columns, PLAYTEST_GUIDE auto-sell | `rg 'There is no automatic sale system' docs` is empty |
+| W7-05 | progression-tree | Docs: PROGRESSION, SKILLS_AND_WEAPONS, BALANCE CLI | check_views |
+| W7-06 | campaign-defenders | Docs: STRATEGY, JOURNEYS (takeover, picker, BeginDefense, SelectCountry), PROGRESSION allowance table, VALIDATION:291, PLAYTEST_GUIDE | check_views |
+| W7-07 | ux-flow | Docs: UI_REDESIGN, VIEW_HIERARCHY (Upgrades, Home, modals, toasts, BattleLayout), JOURNEYS loop map, `docs/components`, PLAYTEST_GUIDE Escape table | check_views (VIEW_HIERARCHY lists the new views) |
+| W7-08 | qa-captures | Docs inventory, PLAYTEST_GUIDE sections (Loop, Escape, Auto-sell, Takeover, Listening pass, Click-to-photon), ACCEPTANCE ACs, human-check rows | `playtest_guide_covers_the_production_loop`, `required_docs_sections_exist` |
+| W7-09 | perf-architecture | Final acceptance at the release candidate: full matrix, Repeat 3, packaged smoke time, integrated GPU still pending or informational | measure_performance exits 0 |
+| W7-10 | save-determinism | SIMULATION/VALIDATION/ARCHITECTURE v7 docs; final zero-move record | existing pins |
+| W7-11 | qa-captures | Final full-loop capture review at both sizes, normal and reduced; findings table with owners; pairs in `docs/screenshots/production/` (≤ 40 MB) | `check_capture_findings.py --final` exits 0 only when every CF row is fixed or "approved by user" |
+| W7-12 | orchestrator | The plan's Outcome section: branch, commits, change per finding, numbers, verify results, pending human checks; ask before fast-forwarding `main` | n/a |
+
+- **W7-04 result (2026-11-14):** done in one commit. PROGRESSION.md drops the stale no-sale sentence and the 29-item count and gains "### Auto-sell" (the rule's fields and defaults, hooks H1 and W-a, guards, receipt, the stash apply and its error order). GDD.md §15 gains "## Auto-sell" and the elite drop; ITEM_QUALITY.md gains "## Auto-sell threshold" (absolute quality, the five chips, the W4-l share) and "## Quality markers"; BALANCE_AND_RUN_STATS.md gains the RunRecord auto-sold fields and "## Goal 4: auto-sell pacing and stash growth" (the CSV columns, the auto-sell profile, G4.13 and the R39 report at the wave-4 close, R58); PLAYTEST_GUIDE.md gains "## Auto-sell" and its operation sentence no longer says an operation never sells. The gate is a test: `repo_checks::docs_drop_retired_loot_claims` scans `docs/` outside `docs/plans/` (which quotes the retired sentence as history, this row's own gate included, so the literal `rg` over all of `docs` still finds those three plan lines), and the six headings join `REQUIRED_DOC_SECTIONS`. No digest moved.
+- **W7-05 result (2026-11-14):** done in one commit. PROGRESSION.md gains "### Level-up grant and rank milestones" (the grant formula and values, the milestone table, the milestone item's candidates, keyed pick, level and quality, `MilestoneItemLost`, the ledgers and when settlement pays, the receipt and the W3-22 Results lines), "### Skill tree prices" (the W4-p prices, ladders, blueprints and features, with the foundation pass as history) and "### Camp prices" (`camp_price` and the training and recruit price table); the trap's `charges_per_rank` 1 (W4-03) replaces "no shipped structure authors it". SKILLS_AND_WEAPONS.md's weapon-mastery table carries the W4-p prices (shotgun_pump_drill 1,000, mg_belt_feeder 1,200) and the counter display, and gains "## Prices and the tree rules" (tier and tree costs, ladders, the value model and `--values` columns, the six rules with their tests, what the rules forced, the W4-03 retunes) and "## Weapon class presentation" (weapon_fx and gun audio, the design-qa-captures §1.13 vfx and audio part of this doc). BALANCE_AND_RUN_STATS.md gains "## Pacing CLI": every argument, exit codes 2 and 3, the output and the R28 reference, seeds and statistics, the CSV header, the 20 registry profiles and what reads each, and the smoke command. The gates are tests: `repo_checks::required_docs_sections_exist` (six headings), `repo_checks::docs_drop_retired_progression_claims` (five retired claims), `progression_tree::skills_doc_mastery_table_and_prices_match_the_catalogue` (the table, tier and tree costs equal `skills.json`) and the pacing example's `pacing_cli_doc_names_every_flag_profile_and_csv_column` (every USAGE flag, registry id and CSV column). `scripts/check_views.py` exits 0. No digest moved.
+- **W7-06 result (2026-11-14):** done in one commit. STRATEGY.md gains "## Defenders and the next defense" (DefenderId and the saved seat, `next_defender`, the Meet Mara and Survivor network gates, `SetNextDefender` with its blocker order and texts, `BeginDefense`, the defender-aware continue, retry and repeat, the frozen `Deploy`, the dispatch reset, the reads and the picker), "## Recruit takeover" (the preflight and commit, the roster npc as the battle's npc, `SetRecruitTactics`, the refused commands, the finish order and the takeover save rules), "## Expedition outcomes" (`ExpeditionSummary`, `unacknowledged_outcomes`, `AcknowledgeOutcomes`, pruning and `folded_outcomes`, the toasts, worker seats and credit) and "## Defender power and service records"; its status sentence names the four `RecruitStatus` values. JOURNEYS.md gains "## Choosing who defends" (the picker, BeginDefense, the takeover as the player meets it) and "## Choosing a country" (`ChooseStart`, `SelectCountry` with its error order, Plan response, `outbreak_plan`, `country_choice_preview`, the legacy `EnterCountry`), and its continue sentence deploys `next_defender`. PROGRESSION.md gains "### Recruit advancement allowance" (the formula, the L = 0..6 table, the level-10 stop, the first-clear term, the advancement level and the raise hint) in place of the first-clear-only sentence, and its recruit-creation sentence names the two-archetype offer. VALIDATION.md's "every committed victory raises future threat once" (the brief's :291 anchor, line 293 at HEAD) gains a W7-06 amendment for takeovers and expeditions with its pins. PLAYTEST_GUIDE.md gains "## Takeover", a nine-step check without links. The gates are tests: `repo_checks::required_docs_sections_exist` (eight headings), `repo_checks::docs_drop_retired_defender_claims` (three retired claims), `defenders::progression_doc_allowance_table_matches_the_core` (the table equals `Campaign::allowance` and `advancement_cap_level`) and the characterisation pin `defenders::takeover_victory_raises_future_threat_once_and_a_loss_does_not` (mutation-proved). `scripts/check_views.py` exits 0. No digest moved.
+- **W7-07 result (2026-11-14):** done in one commit. 17 new View files in `docs/components` (camp-home, onboarding-callouts, defender-picker, results-loot-block, recruit-modal, equipment-auto-sell, auto-sell-stash-apply, quit-confirmation, return-to-menu-confirmation, storage-error, draft-warning, toasts, battle-layout, battle-retreat-hold, battle-boss-banner, battle-low-hp, menu-build-stamp; Upgrades keeps the `journey-upgrades` id), 25 stale ones corrected (the Mara and Operations drill-downs move under camp-home, the retained debrief task ids under results), and VIEW_HIERARCHY.md gains the tree of all 87 Views and "## Production pass views". JOURNEYS.md gains "## Loop map" (every screen's amber primary and Escape target, the overlay order and the pinning tests) and renames "Every main round returns to upgrades" to "## Every main round ends on Results"; UI_REDESIGN.md gains "## Production pass — 14 November 2026" (Escape and decision 18, one amber primary, Camp home / Results / Upgrades, modals and toasts, the battle layout and the two-row bar) and marks the foundation-pass Escape bullet superseded; PLAYTEST_GUIDE.md gains "## Escape", the Escape table, and its construction sentence no longer says Escape is a separate pause. The gates are tests: `scripts/check_views.py` `check_view_hierarchy` (every View listed once under its front-matter parent, the inventory count, the 18 `PRODUCTION_VIEWS`) with its self-tests in `scripts/tests/test_check_views.py`, `repo_checks::required_docs_sections_exist` (ten headings) and `repo_checks::docs_drop_retired_ux_claims` (six retired claims). No digest moved.
+- **W7-08 result (2026-11-14):** done in one commit. PLAYTEST_GUIDE.md gains "## Loop" (the whole loop in eight steps, from New game through Results, Upgrade, Back to battle, liberation, Recruit and Back to camp to Camp home and the recruit defending, with the amber primary and button count to check at each) and "## Click-to-photon" (the design-qa-captures §1.14 protocol, Status PENDING, the three rows, the 50 / 34 / 67 ms targets and a table template); its battle step no longer says Escape pauses at any point. ACCEPTANCE.md's AC01 states 3..17 odd lanes frozen per attempt with zoom-to-fit, and the ledger gains "## Production pass criteria": every row of `production-pass/acceptance.md` with a Defined in column naming the files that define each function its Proof names (three elided names written out in full), and its pending human checks now equal plan §11 (weapon-classes review, night and storm look, click-to-photon, the world generator run and the human difficulty playtest added). EXPANSION.md gains "## Production pass requirements — November 2026" (the camera requirement and decisions 8, 9 and 19) and a decision-1 supersession note on the old upgrade-screen bullet; the ARCHITECTURE.md `repo_checks.rs` row names the docs checks. The gates are tests: `repo_checks::playtest_guide_covers_the_production_loop` (the six headings and what the Loop, Listening pass and Click-to-photon sections must say), `repo_checks::required_docs_sections_exist` (the rest of the §1.13 inventory: PLAYTEST_GUIDE, ACCEPTANCE, AUDIO_SURVIVAL, EXPANSION, VALIDATION "Full verify" and ARCHITECTURE "Ownership"), `repo_checks::acceptance_ledger_lists_every_production_pass_row` (perturbation-proved) and `repo_checks::acceptance_lists_every_pending_human_check`. `scripts/check_views.py` exits 0. No digest moved. The click-to-photon run and the listening pass stay pending human checks.
+- **W7-10 final zero-move record (2026-11-17, closing phase):** done, docs only. Wave 7 moved no pin. It touches `crates/horde_core` only in W7-05 (a doc comment, tests and the pacing example's test) and W7-06 (tests). At HEAD 387e7f7b the determinism binary passes 13 of 13 with `determinism_anatomy`, and its 44 hash lines equal the closing re-bless's after-run. The save pin binaries pass 71 of 71. `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None. After the wave-2 close, the only pin moves are W4-14 and W4-15, folded by the closing re-bless (8787675c). The final digest table is in SIMULATION.md "Determinism pins", in VALIDATION.md "Zero-move records and the pins at the release candidate" and in plan §6.
+- **W7-11 result (2026-11-16, closing phase):** the final full-loop capture review ran twice over the whole still matrix (312 of 312, both sizes and modes) with motion of menu, storm, fx-stress and the shotgun, machine-gun and turret classes, from clean snapshots (`target/production-after/closing/final`, then `closing/w7-11` after the fixes). It opened CF-7-01 (damage numbers over banked-coin pop-ups and INCOMING spawn tags, c3eb0aa8) and CF-7-02 (the construction popup over the midpoint label and overlay cue, d53cfe0f), both fixed and re-captured; 33 pairs (39,099,685 B) are in `docs/screenshots/production/` with both indexes. `check_capture_findings.py --final` exited 1 only on CF-3-22, the reduced MOTION gate row that waited on the user decision it names. User decision R63 (2026-11-17) chose option (c), so CF-3-22 is fixed (b79b1099) and `--final` passes (56 fixed, 0 open). The record is plan section 10.6.
+- **W7-09 result (2026-11-16, closing phase, attempt 1, HEAD 30847f90):** the full matrix ran with `-Repeat 3`: dev and playtest -VsyncOff `-Scene all`, dev and playtest VSync on `-Scene all` (playtest with pipelined on, the shipped default), and the R31 A/B. **measure_performance does not exit 0**, and four valid gated overs stand (R34). (1) dev -VsyncOff fx-stress normal cpu_frame p99 10.2157 > 10.0. (2) peak normal egui texture uploads after warmup 1 > 0 in dev and in playtest -VsyncOff: 6,420 B on one frame in every repeat, where the wave-2 close (41ce143) had 0. (3) and (4) dev VSync-on progressed-peak interface_draw 1.1395 > 1.129 and 1.1421 > 1.030 (G1.10). Passing: progressed-peak and stress cpu_frame p99 in both profiles, 0 frames over 50 ms outside driver stalls and 0 driver stalls in every kept repeat, gate 3 in the shipped default (stress 60.00 FPS, 0 frames over 33 ms), the R31 A/B (B / A 1.038 / 1.026), the live battlefield gates (progressed-peak 38,707 of 40,000 vertices, stress 55,055 of 61,098, primitives 22 of 23), the headless `egui_measured` re-measure (identical at HEAD) and the loudness gate (identical to the closing record). Shipped smoke median 1.056 s; packaged smoke 1.50 / 1.51 / 1.47 s. The integrated GPU stays pending. Evidence `target/perf/w7-09/`; `PERF_BUDGET.json acceptance.closing`; VALIDATION.md "W7-09 final perf acceptance at the release candidate".
+- **W7-09 result, attempt 2 (2026-11-17, closing phase, HEAD e54faa88):** after the closing perf fixes (400c8efb, 27d763cb, b33f03fe, a0278a08) the same matrix ran again with `-Repeat 3`. **measure_performance exits 0 in all four passes** on the first invocation with every group valid, and no valid over is printed. dev -VsyncOff cpu_frame p99 at most 6.79 ms (fx-stress small), playtest at most 6.41 ms; dev VSync-on progressed-peak interface_draw 0.932 / 0.903 ms (G1.10); 0 egui texture uploads after warmup; 0 frames over 50 ms and 0 driver stalls; gate 3 in the shipped default (stress 60.00 FPS, 0 over 33 ms); R31 A/B B / A 0.913 / 0.912; live battlefield gates as before (progressed-peak 38,707 of 40,000, stress 55,055 of 61,098, primitives 22 of 23); headless `egui_measured` and loudness identical. Shipped smoke median 0.888 s; packaged smoke 1.50 / 1.51 / 1.47 s (61bced1a). The integrated GPU stays pending. **The W7-09 Done (measure_performance exits 0) is met at e54faa88.** Evidence `target/perf/w7-09-a2/`; `PERF_BUDGET.json acceptance.closing.attempt_2`; VALIDATION.md "W7-09 final perf acceptance, attempt 2".
+
+Wave-7 exit (plan §7): the package is verified under 5.1, `check_capture_findings.py --final` exits 0 and the Outcome is written. Checked in the closing phase under R36: W7-09's final acceptance, W7-11's final capture review and the packaged verify are closing-phase work, and W7-12's Outcome is written after the closing phase.

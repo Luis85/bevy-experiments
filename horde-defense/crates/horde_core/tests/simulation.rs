@@ -1,6 +1,6 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 mod support;
-use horde_core::content::{EnemyKind, Mode, StructureKind, content};
+use horde_core::content::{EnemyKind, Mode, Policy, StructureKind, content};
 use horde_core::sim::{DEFENSE_LINE, Game, Input, Outcome};
 use horde_core::status::StatusId;
 use support::{advance, enemy, game, legacy_game, nodes_price, strategic_game};
@@ -130,20 +130,32 @@ fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
     let a = g.attempt_mut().unwrap();
     a.enemies.iter_mut().find(|e| e.boss).unwrap().hp = 0;
     let before = g.campaign().coins;
+    let level_before = g.campaign().player.level;
     advance(&mut g, 1);
     assert!(g.attempt().is_none());
     let r = g.last_result().unwrap();
     assert_eq!(r.outcome, Outcome::Victory);
     assert!(r.first_clear);
+    // W2-54: the finish also pays, once, the shipped level grants the
+    // victory XP raised (the report's progression receipt), 28 coins, so
+    // the wallet moves 130 -> 158.
+    let receipt = &r.progression_rewards;
+    let settled = receipt.level_coins + receipt.milestones.iter().map(|m| m.coins).sum::<u64>();
+    let level_after = g.campaign().player.level;
     assert_eq!(
-        g.campaign().coins - before,
-        content().levels[0].boss_reward + content().levels[0].completion_bonus
+        receipt.level_coins,
+        (level_before + 1..=level_after)
+            .map(horde_core::progression::level_grant)
+            .sum::<u64>(),
+        "the grant is the shipped one for each level gained"
     );
+    assert_eq!(settled, 28, "the shipped grant for the victory's levels");
+    let payout = content().levels[0].boss_reward + content().levels[0].completion_bonus;
+    assert_eq!(payout, 130);
+    assert_eq!(g.campaign().coins - before, 158);
+    assert_eq!(g.campaign().coins - before, payout + settled);
     advance(&mut g, 10);
-    assert_eq!(
-        g.campaign().coins - before,
-        content().levels[0].boss_reward + content().levels[0].completion_bonus
-    );
+    assert_eq!(g.campaign().coins - before, payout + settled);
 }
 #[test]
 fn construction_bounds_invalid_spend_salvage_and_blocking() {
@@ -307,8 +319,27 @@ fn parallel_rewards_and_unique_loot_settle_exactly_once() {
         .iter()
         .map(|b| (payout as f32 * b.game().attempt().unwrap().modifiers.reward).round() as u64)
         .sum();
+    let records = g.campaign().run_history.len();
+    let level_before = g.campaign().player.level;
     advance(&mut g, 1);
-    assert_eq!(g.campaign().coins - coins, expected_payout);
+    // W2-54: the idle pass that credited the victories also pays, once, the
+    // shipped level grants they raised (the run records' receipts): 49
+    // coins, so the wallet moves 322 -> 371.
+    let settled: u64 = g.campaign().run_history[records..]
+        .iter()
+        .map(|r| r.level_grant_coins + r.milestone_coins)
+        .sum();
+    assert_eq!(
+        settled,
+        (level_before + 1..=g.campaign().player.level)
+            .map(horde_core::progression::level_grant)
+            .sum::<u64>(),
+        "the grant is the shipped one for each level gained"
+    );
+    assert_eq!(settled, 49, "the shipped grant for the victories' levels");
+    assert_eq!(expected_payout, 322);
+    assert_eq!(g.campaign().coins - coins, 371);
+    assert_eq!(g.campaign().coins - coins, expected_payout + settled);
     assert_eq!(g.campaign().items.len(), items + 2);
     let ids: std::collections::BTreeSet<_> = g.campaign().items.iter().map(|i| i.id).collect();
     assert_eq!(ids.len(), g.campaign().items.len());
@@ -353,6 +384,50 @@ fn failed_parallel_loot_insert_is_reported_once_instead_of_silently_lost() {
     advance(&mut g, 3);
     assert!(g.take_settlement_issues().is_empty());
 }
+/// W2 review: the expedition summary's `loot_count` counts the drops the
+/// settlement pass stored in the shared stash, once each, and never a drop
+/// it reported as `LootLost`.
+#[test]
+fn parallel_summary_loot_count_counts_stored_drops_not_lost_ones() {
+    use horde_core::sim::SettlementIssue;
+    let mut g = strategic_game();
+    let country = g.campaign().world.cleared[0].clone();
+    let recruit = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    let battle = g.deploy_survivor(recruit, &country, 0).unwrap();
+    // One identity left in the shared stash: the first drop is stored and
+    // the second is lost.
+    g.campaign_mut().next_item_id = u64::MAX - 1;
+    let items = g.campaign().items.len();
+    for level in [8, 9] {
+        g.battles_mut()[0]
+            .game_mut()
+            .campaign_mut()
+            .add_item_with_quality(4, level, None)
+            .unwrap();
+    }
+    g.tick(Input::default());
+    assert_eq!(g.campaign().items.len(), items + 1, "one drop is stored");
+    let issues = g.take_settlement_issues();
+    assert!(
+        matches!(
+            issues.as_slice(),
+            [SettlementIssue::LootLost { level: 9, .. }]
+        ),
+        "{issues:?}"
+    );
+    let loot_count = |g: &Game| {
+        g.battles()
+            .iter()
+            .find(|b| b.id == battle)
+            .and_then(|b| b.summary.as_ref())
+            .map(|s| s.loot_count)
+    };
+    assert_eq!(loot_count(&g), Some(1), "the stored drop, not the lost one");
+    advance(&mut g, 3);
+    assert_eq!(loot_count(&g), Some(1), "counted once");
+}
 #[test]
 fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let mut g = legacy_game();
@@ -368,9 +443,10 @@ fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let a = g.attempt().unwrap();
     assert_eq!(a.country_id.as_deref(), Some(id.as_str()));
     let country = horde_core::world::world().country(&id).unwrap();
+    // The start clamp: the start country deploys at its effective difficulty.
     assert_eq!(
         a.modifiers.enemy_health,
-        country.modifiers.enemy_health * country.difficulty
+        country.modifiers.enemy_health * country.effective_difficulty(&g.campaign().world)
     );
     g.set_paused(false);
     enemy(&mut g, 5, 25.0, true);
@@ -582,6 +658,65 @@ fn cautious_policy_aims_when_useful_even_if_optional_aiming_is_disabled() {
     assert!(a.decision.starts_with("Attack: shoot"));
     assert_eq!(a.shots, 1);
     assert_eq!(a.ammo, magazine - 1);
+}
+/// W4-14: an aim is useful only when it raises the expected hits per turn.
+/// At effective skill 12 (Guns 16, 9.5 yards: -4) two unaimed shots land
+/// 2 x 74.1% = 1.48 expected hits, while a one-second Aim (+5 Acc, skill 17)
+/// and its shot land 98.1% in the same two turns. Every policy shoots, the
+/// Marksman too, which used to aim two seconds whatever the odds.
+#[test]
+fn marksman_shoots_unaimed_when_two_shots_land_more_than_one_aimed() {
+    for policy in [Policy::Marksman, Policy::Balanced] {
+        let mut g = game(Mode::Npc);
+        g.campaign_mut().npc.policy = policy;
+        g.campaign_mut().npc.prefer_aim = true;
+        enemy(&mut g, 5, 10.0, false);
+        let a = g.attempt_mut().unwrap();
+        a.profile.ranged_skill = 16;
+        a.profile.npc.skill_bonus = 0;
+        a.profile.npc.accuracy = 5;
+        advance(&mut g, 60);
+        let a = g.attempt().unwrap();
+        assert!(
+            a.decision.starts_with("Attack: shoot"),
+            "{policy:?}: {}",
+            a.decision
+        );
+        assert_eq!((a.shots, a.aim_ticks), (1, 0), "{policy:?}");
+    }
+}
+/// W4-14: a long shot still earns its Aim. At effective skill 9 (Guns 16,
+/// 29 yards: -7) one aimed shot (skill 14, 90.7%) beats two unaimed ones
+/// (2 x 37.5%), so both policies aim for one second and then shoot; the
+/// Marksman's second Aim second (skill 15, 95.4% over three turns) does not
+/// pay, so it no longer takes it.
+#[test]
+fn npc_aims_a_long_shot_for_one_second_when_the_aim_pays() {
+    for policy in [Policy::Marksman, Policy::Balanced] {
+        let mut g = game(Mode::Npc);
+        g.campaign_mut().npc.policy = policy;
+        g.campaign_mut().npc.prefer_aim = true;
+        enemy(&mut g, 5, 29.5, false);
+        let a = g.attempt_mut().unwrap();
+        a.profile.ranged_skill = 16;
+        a.profile.npc.skill_bonus = 0;
+        a.profile.npc.accuracy = 5;
+        advance(&mut g, 60);
+        let a = g.attempt().unwrap();
+        assert!(
+            a.decision.starts_with("Aim at"),
+            "{policy:?}: {}",
+            a.decision
+        );
+        advance(&mut g, 60);
+        let a = g.attempt().unwrap();
+        assert!(
+            a.decision.starts_with("Attack: shoot"),
+            "{policy:?}: {}",
+            a.decision
+        );
+        assert_eq!((a.shots, a.aim_ticks), (1, 60), "{policy:?}");
+    }
 }
 #[test]
 fn risk_preference_changes_low_odds_actions_only_at_the_next_legal_turn() {
@@ -1009,8 +1144,11 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
     );
 }
 
+/// W1-69 (user decision, 2026-11-06): enemies no longer queue, so the body
+/// 0.65 yd behind the one in contact keeps advancing instead of waiting
+/// `Queued`. Hit-stop still holds its translation for the fixed ticks only.
 #[test]
-fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
+fn hit_stop_expires_in_fixed_ticks_while_contacted_or_advancing_in_either_mode() {
     use horde_core::sim::EnemyPhase;
     for mode in [Mode::Personal, Mode::Npc] {
         let mut g = game(mode);
@@ -1019,8 +1157,9 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         advance(&mut g, 1);
         let a = g.attempt_mut().unwrap();
         assert_eq!(a.enemies[0].attack_phase, EnemyPhase::Windup);
-        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
+        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Advance);
         let windup = a.enemies[0].attack_left;
+        let held = a.enemies[1].x;
         for e in &mut a.enemies {
             e.statuses.refresh(StatusId::HitStop, 6);
         }
@@ -1028,7 +1167,10 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         let a = g.attempt().unwrap();
         assert!(a.enemies.iter().all(|e| e.hit_stop_remaining() == 0));
         assert_eq!(a.enemies[0].attack_left, windup - 6);
-        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
+        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Advance);
+        assert_eq!(a.enemies[1].x, held, "hit-stop held the advancing body");
+        advance(&mut g, 1);
+        assert!(g.attempt().unwrap().enemies[1].x < held);
     }
 }
 

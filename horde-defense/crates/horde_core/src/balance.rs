@@ -2,9 +2,12 @@
 use crate::catalog::{self as shared, ContentError};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BalancePreset {
     Easy,
+    /// The default is only the neutral serde value of saved fields such as
+    /// `Campaign.balance_extras_basis`; `BalanceSettings::default()` is separate.
+    #[default]
     Normal,
     Hard,
     Custom,
@@ -137,6 +140,55 @@ impl BalanceSettings {
         )
     }
 }
+/// Catalogue-only rules a preset adds beyond its `BalanceSettings` (never
+/// saved, never in the digest). Integer percents and a phase count, so the
+/// wave-2 fold stays integer math; the default is Normal's neutral values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PresetExtras {
+    /// Elite spawn-rate scale in percent, 0..=300.
+    pub elite_rate_pct: u16,
+    /// Country front-ramp scale in percent, 0..=300.
+    pub front_ramp_pct: u16,
+    /// Extra boss phase transitions, 0..=2.
+    pub boss_phase_bonus: u8,
+}
+impl Default for PresetExtras {
+    fn default() -> Self {
+        Self {
+            elite_rate_pct: 100,
+            front_ramp_pct: 100,
+            boss_phase_bonus: 0,
+        }
+    }
+}
+impl PresetExtras {
+    pub const MAX_PCT: u16 = 300;
+    pub const MAX_BOSS_PHASE_BONUS: u8 = 2;
+    /// The catalogue extras of `preset`; Custom has Normal's.
+    pub fn for_preset(preset: BalancePreset) -> Self {
+        let id = if preset == BalancePreset::Custom {
+            BalancePreset::Normal
+        } else {
+            preset
+        };
+        catalog()
+            .presets
+            .iter()
+            .find(|p| p.id == id)
+            .expect("validated preset")
+            .extras
+    }
+    pub fn validate(&self) -> Result<(), String> {
+        if self.elite_rate_pct > Self::MAX_PCT
+            || self.front_ramp_pct > Self::MAX_PCT
+            || self.boss_phase_bonus > Self::MAX_BOSS_PHASE_BONUS
+        {
+            return Err("Balance preset extras exceed supported ranges".into());
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BalancePresetDefinition {
@@ -144,6 +196,9 @@ pub struct BalancePresetDefinition {
     pub name: String,
     pub description: String,
     pub settings: BalanceSettings,
+    /// Absent in older catalogues, which then give every preset Normal's.
+    #[serde(default)]
+    pub extras: PresetExtras,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -175,6 +230,7 @@ impl BalanceCatalog {
         let mut seen = std::collections::BTreeSet::new();
         for p in &self.presets {
             p.settings.validate()?;
+            p.extras.validate()?;
             if p.id == BalancePreset::Custom
                 || p.id != p.settings.preset
                 || !seen.insert(p.id as u8)

@@ -2,7 +2,7 @@
 type: View
 id: survivor
 title: "Mara survivor"
-parent: preparation
+parent: camp-home
 status: Implemented
 source: "crates/horde_game/src/ui/character.rs::survivor"
 ---
@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/character.rs::survivor"
 
 Prepare the autonomous defender with training, equipment and a visible tactical policy.
 
-- **Entry, exit and actions:** Choose Mara, follow Meet Mara after the introductory attempt, or enter from readiness; open training/policy or change Mara's equipment.
+- **Entry, exit and actions:** A drill-down under Camp home: Mara's "Training ›" on the Defenders list, the Briefing's "Review Mara's training" or the Mara callout open it, with the breadcrumb "‹ Camp home · Mara"; Escape goes back to Camp home. Open training/policy or change Mara's equipment.
 - **State boundary:** Mara has an independent character record and advancement allowance. The availability message follows campaign progression.
 - **Responsiveness and accessibility:** Summary text exposes CP, relevant combat values and the current advancement allowance; detailed rules remain optional.
 

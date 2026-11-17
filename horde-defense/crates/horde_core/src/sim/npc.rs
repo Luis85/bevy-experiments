@@ -69,7 +69,7 @@ impl Game {
             a.injury.clear_shock();
             return;
         }
-        let policy = self.campaign.npc.policy;
+        let policy = self.defender_npc(a.seat).policy;
         let target = select_npc_target(a, policy);
         let Some(target) = target else {
             a.decision = "Do Nothing · watching the approach".into();
@@ -99,7 +99,7 @@ impl Game {
             return;
         }
         if (a.ammo == 0
-            || (self.campaign.npc.early_reload && a.ammo <= a.magazine / 4 && !imminent))
+            || (self.defender_npc(a.seat).early_reload && a.ammo <= a.magazine / 4 && !imminent))
             && !melee
         {
             a.maneuver = NpcManeuver::Reload;
@@ -122,7 +122,11 @@ impl Game {
         if !melee {
             // This preference limits action selection, never the dice. Even a
             // risk-taking policy cannot make an illegal skill-below-3 attack.
-            let minimum_skill = if self.campaign.npc.allow_risk { 3 } else { 8 };
+            let minimum_skill = if self.defender_npc(a.seat).allow_risk {
+                3
+            } else {
+                8
+            };
             let aimed_seconds = if a.aim_target == Some(id) {
                 a.aim_seconds
             } else {
@@ -174,19 +178,45 @@ impl Game {
                 return;
             }
         }
-        let useful_aim = a.profile.ranged_skill
-            + a.profile.npc.skill_bonus
-            + rules::range_penalty(current_range)
-            < 14;
-        let prefer_aim = self.campaign.npc.prefer_aim
-            && (policy == Policy::Marksman || (!imminent && !contact))
-            && (policy == Policy::Marksman || useful_aim);
         let desired_aim = if policy == Policy::Marksman && !imminent {
             2
         } else {
             1
         };
-        if !melee && prefer_aim && (a.aim_target != Some(id) || a.aim_seconds < desired_aim) {
+        let aimed = if a.aim_target == Some(id) {
+            a.aim_seconds
+        } else {
+            0
+        };
+        let wants_aim = self.defender_npc(a.seat).prefer_aim
+            && (policy == Policy::Marksman || (!imminent && !contact));
+        let aim = if a.drop_tier.is_none() {
+            // An attempt deployed before save format 7 keeps the old test
+            // (ruling R4's byte-identical legacy path): aim below effective
+            // skill 14, the Marksman always, up to the desired seconds.
+            let useful_aim = a.profile.ranged_skill
+                + a.profile.npc.skill_bonus
+                + rules::range_penalty(current_range)
+                < 14;
+            wants_aim
+                && (policy == Policy::Marksman || useful_aim)
+                && (a.aim_target != Some(id) || a.aim_seconds < desired_aim)
+        } else {
+            // An aim is useful only when it raises the expected hits per
+            // turn (W4-14): every policy, the Marksman too, weighs the turn
+            // it costs.
+            wants_aim
+                && aim_turns_that_pay(
+                    a.profile.ranged_skill
+                        + a.profile.npc.skill_bonus
+                        + rules::range_penalty(current_range)
+                        - a.injury.shock,
+                    a.profile.npc.accuracy,
+                    aimed,
+                    desired_aim,
+                ) > 0
+        };
+        if !melee && aim {
             a.maneuver = NpcManeuver::Aim;
             if a.aim_target != Some(id) {
                 a.aim_seconds = 0;
@@ -248,13 +278,21 @@ impl Game {
             damage,
             armor_divisor: 1,
         };
-        let armor = enemy_armor(a, e);
+        let armor = enemy_armor_vs(
+            a,
+            e,
+            if melee {
+                HitSource::Melee
+            } else {
+                HitSource::Shot
+            },
+        );
         let dodge = e.injury.dodge(enemy_dodge(a, e));
         let ht = enemy_ht(a, e);
         let point = [e.x, e.y()];
         let target_name = enemy_name(a, e);
         a.maneuver = NpcManeuver::Attack;
-        let result = rules::resolve_attack(
+        let mut result = rules::resolve_attack(
             &mut a.rng,
             attack,
             Some(dodge),
@@ -262,6 +300,7 @@ impl Game {
             &mut a.enemies[target].injury,
             ht,
         );
+        a.enemies[target].log_hit(&mut result);
         if !melee {
             a.ammo -= 1;
             a.shots += 1;
@@ -269,7 +308,7 @@ impl Game {
         if result.hit {
             a.hits += 1;
             if !melee {
-                self.campaign.record_npc_progress(1, 0);
+                self.record_defender_progress(a.seat, 1, 0);
             }
         }
         if result.requires_ready {
@@ -333,6 +372,25 @@ impl Game {
         a.hp = a.injury.hp;
         a.stamina = a.injury.fp as f32;
     }
+}
+
+/// The further Aim turns, at most `most - aimed`, after which one shot
+/// lands the most expected hits per turn spent, for a shooter at effective
+/// `skill` (before any aim bonus) with weapon `accuracy` who has already
+/// aimed `aimed` seconds at the target. 0 means shoot now; ties shoot
+/// sooner. The target's dodge scales every option alike, so it cancels.
+/// Pure: reads no RNG. The Npc `defender_power` model reads it too (W4-16).
+pub(super) fn aim_turns_that_pay(skill: i32, accuracy: i32, aimed: u8, most: u8) -> u8 {
+    let rate = |more: u8| {
+        rules::attack_success_probability(skill + rules::aim_bonus(accuracy, aimed + more))
+            / f32::from(more + 1)
+    };
+    (1..=most.saturating_sub(aimed)).fold(
+        0,
+        |best, more| {
+            if rate(more) > rate(best) { more } else { best }
+        },
+    )
 }
 
 fn select_npc_target(a: &Attempt, policy: Policy) -> Option<usize> {
@@ -400,4 +458,32 @@ pub(super) fn structure_bonus(a: &Attempt, rank: u32) -> f32 {
         } else {
             a.profile.modifiers.engineering_multiplier
         }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::aim_turns_that_pay;
+
+    /// W4-14: the further Aim turns that land the most expected hits per
+    /// turn, from `rules::attack_success_probability` (3d6 with criticals).
+    #[test]
+    fn aim_pays_only_when_it_raises_expected_hits_per_turn() {
+        // Acc 5. Skill 9: one aimed shot (14, 90.7%) beats two unaimed ones
+        // (2 x 37.5%). Skill 10: two unaimed (2 x 50.0%) beat one aimed
+        // (15, 95.4%), so the old threshold (aim below 14) aimed at 10-13
+        // and lost hits.
+        assert_eq!(aim_turns_that_pay(9, 5, 0, 1), 1);
+        assert_eq!(aim_turns_that_pay(10, 5, 0, 1), 0);
+        assert_eq!(aim_turns_that_pay(13, 5, 0, 1), 0);
+        // The Marksman's second second (skill 15 over three turns, 31.8%
+        // per turn) loses to the first (45.4%), and once aimed, shooting
+        // now (90.7%) beats aiming on (47.7% per turn).
+        assert_eq!(aim_turns_that_pay(9, 5, 0, 2), 1);
+        assert_eq!(aim_turns_that_pay(9, 5, 1, 2), 0);
+        // Only a desperate shot takes both seconds: Acc 1 at skill 4
+        // (1.9%) aims to 6 (9.3% over three turns, 3.1% per turn).
+        assert_eq!(aim_turns_that_pay(4, 1, 0, 2), 2);
+        // Nothing left to aim: shoot.
+        assert_eq!(aim_turns_that_pay(4, 1, 2, 2), 0);
+    }
 }

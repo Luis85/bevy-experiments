@@ -1,7 +1,7 @@
 //! Data-driven geographical campaign, independent of renderer and battle rules.
 use crate::catalog::{self, ContentError};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
@@ -144,6 +144,9 @@ fn default_stage_themes() -> Vec<StageThemeDefinition> {
 fn stable_hash(text: &str) -> u64 {
     crate::hash::fnv1a(text.as_bytes())
 }
+/// The start clamp: the campaign's start country plays its difficulty
+/// inside this window (`Country::effective_difficulty`).
+pub const START_DIFFICULTY_CLAMP: (f32, f32) = (0.95, 1.05);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Country {
     pub id: String,
@@ -201,6 +204,25 @@ impl Country {
             variation,
         }
     }
+    /// The difficulty a deployment here is played at: the campaign's start
+    /// country is clamped to [`START_DIFFICULTY_CLAMP`], so no start opens
+    /// far easier or harder than the rest (design-enemy-balance §8). Before
+    /// a start is chosen every country is a candidate start and reads
+    /// clamped, so the start picker shows the value the first defense
+    /// plays. Every other country plays its raw `difficulty`. Derived,
+    /// never saved.
+    pub fn effective_difficulty(&self, progress: &WorldProgress) -> f32 {
+        if progress
+            .start
+            .as_deref()
+            .is_none_or(|start| start == self.id)
+        {
+            let (lo, hi) = START_DIFFICULTY_CLAMP;
+            self.difficulty.clamp(lo, hi)
+        } else {
+            self.difficulty
+        }
+    }
     pub fn level_count(&self) -> usize {
         self.level_count_with(world())
     }
@@ -213,6 +235,20 @@ impl Country {
             config.min_levels as u64,
             config.max_levels.max(config.min_levels) as u64,
         ) as usize
+    }
+    /// Where `stage` sits on this country's front (axis 2 of the threat).
+    pub fn front_position(&self, stage: usize) -> crate::progression::FrontPosition {
+        crate::progression::FrontPosition {
+            stage: u32::try_from(stage).unwrap_or(u32::MAX),
+            count: u32::try_from(self.level_count()).unwrap_or(u32::MAX),
+        }
+    }
+    /// The 0-based stages with a Regional boss: every sixth stage short of
+    /// the Capstone (at most 3 for 24 stages). Derived, never saved.
+    pub fn regional_checkpoints(&self) -> Vec<usize> {
+        (0..self.level_count())
+            .filter(|stage| self.front_position(*stage).is_checkpoint())
+            .collect()
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -442,6 +478,34 @@ pub fn world() -> &'static WorldContent {
     catalog::lazy(&WORLD, "world", WorldContent::try_load, || {
         WorldContent::from_json_str(include_str!("world.json"))
     })
+}
+/// The one liberation wording, shared by the main run's ContinueJourney
+/// notice and expedition notices: "Belgium liberated · 2 new fronts open on
+/// the map.", or "Belgium liberated." when no front opened.
+pub fn liberation_line(country_name: &str, fronts: usize) -> String {
+    match fronts {
+        0 => format!("{country_name} liberated."),
+        1 => format!("{country_name} liberated · 1 new front open on the map."),
+        n => format!("{country_name} liberated · {n} new fronts open on the map."),
+    }
+}
+/// The installed world's countries by id with their stage counts, built once
+/// (country ids are unique, `WorldContent::validate`).
+static COUNTRY_INDEX: OnceLock<HashMap<&'static str, usize>> = OnceLock::new();
+/// `level_count()` of the installed world's country `id`, `None` for an id
+/// outside the catalogue. Same answer as `world().country(id)` without the
+/// linear scan.
+pub(crate) fn country_stage_count(id: &str) -> Option<usize> {
+    COUNTRY_INDEX
+        .get_or_init(|| {
+            world()
+                .countries
+                .iter()
+                .map(|c| (c.id.as_str(), c.level_count()))
+                .collect()
+        })
+        .get(id)
+        .copied()
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WorldProgress {

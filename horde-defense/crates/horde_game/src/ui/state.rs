@@ -7,9 +7,9 @@ use super::{
 use crate::{
     audio::Cue as SoundCue,
     launch::LaunchConfig,
-    profile::{LoadedProfile, ProfilePaths},
+    profile::{LoadedProfile, ProfilePaths, SettingsLoad},
     runner::{AttackAims, GameSession, Runtime, RuntimeNotice},
-    settings::{Action, Settings},
+    settings::{Action, BindingId, ExtraAction, Settings},
     visual_assets::ArtTextures,
     worldmap::MapCache,
 };
@@ -35,17 +35,32 @@ pub(crate) struct Navigation {
     pub(super) return_world_paused: bool,
     /// Set when a new deployment starts; `OnEnter(Screen::Battle)` consumes it.
     pub(super) battle_reset: bool,
+    /// What Camp home highlights when it opens (`open_camp_home`).
+    pub(super) home_focus: Option<HomeFocus>,
+    /// The screen and camp tab the onboarding last checked for arrival
+    /// (`onboarding::visit`).
+    pub(super) onboarding_place: Option<(Screen, Tab)>,
+}
+
+/// What Camp home highlights when a route opens it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HomeFocus {
+    /// The roster row of this recruit (a recruit who just joined, from the
+    /// Recruit modal's "Back to camp").
+    Recruit(u64),
 }
 impl Default for Navigation {
     fn default() -> Self {
         Self {
-            tab: Tab::World,
+            tab: Tab::Home,
             last_prepare_tab: Tab::Briefing,
             history_return: Screen::Menu,
             history_world_paused: true,
             return_screen: Screen::Menu,
             return_world_paused: false,
             battle_reset: false,
+            home_focus: None,
+            onboarding_place: None,
         }
     }
 }
@@ -59,6 +74,27 @@ pub(crate) struct StatusUi {
     pub(super) feedback: FeedbackState,
     pub(super) feedback_revision: u64,
     pub(super) save_pending: bool,
+    /// Short non-blocking feedback (ui/toast.rs), oldest first.
+    pub(super) toasts: super::toast::Toasts,
+    /// The bottom of this frame's camp navigation (the tab row and the
+    /// callout row under it), where the toast stack starts on Camp and
+    /// Upgrades; `None` on a frame that drew no tab row. Taken by the toast
+    /// layer at the end of the frame (CF-3-26).
+    pub(super) toast_floor: Option<f32>,
+    /// The status message the battle last turned into a toast, with its
+    /// revision and error flag (`toast::status_toast`).
+    pub(super) toasted: Option<(String, u64, bool)>,
+    /// An `AcknowledgeOutcomes` this UI queued that the runner may not have
+    /// applied yet (`expedition_notices::deliver`).
+    pub(super) outcome_ack_pending: bool,
+    /// The one application modal slot (ui/modal.rs).
+    pub(super) modal: Option<super::modal::AppModal>,
+    /// The storage modal's note: "Path copied." or why the folder could not
+    /// be opened. Cleared when the modal opens or closes.
+    pub(super) storage_note: String,
+    /// The save error the player dismissed: the same autosave failure does
+    /// not reopen the modal until a save succeeds.
+    pub(super) dismissed_save_error: Option<String>,
     pub(super) practice_profile: bool,
     pub(super) profile_exists: bool,
 }
@@ -75,6 +111,9 @@ pub(crate) struct CampaignUi {
     pub(super) improvement_focus: Option<RecommendationAction>,
     /// Search text the tree applies once on its next draw (review scenes).
     pub(super) tree_search_seed: Option<String>,
+    /// A world position (as `SkillNode::position`) the tree centres once on
+    /// its next draw, keeping the focused node selected (review scenes).
+    pub(super) tree_centre_seed: Option<[f32; 2]>,
     /// The expedition shown on the operations tab.
     pub(super) observed: Option<u64>,
 }
@@ -89,6 +128,10 @@ pub(crate) struct ArmoryUi {
     pub(super) pending_sale: Option<u64>,
     pub(super) preset_name: String,
     pub(super) sell_confirm: bool,
+    /// Open the Auto-sell panel and keep it in view on the Equipment page
+    /// until the player first presses, scrolls or types, then clear: set by
+    /// a route that leads to the panel (the equipment-autosell review scene).
+    pub(super) reveal_auto_sell: bool,
 }
 impl Default for ArmoryUi {
     fn default() -> Self {
@@ -101,6 +144,7 @@ impl Default for ArmoryUi {
             pending_sale: None,
             preset_name: "Field loadout".into(),
             sell_confirm: false,
+            reveal_auto_sell: false,
         }
     }
 }
@@ -121,13 +165,85 @@ pub(crate) struct BattleUi {
     pub(super) pending_attack_aims: AttackAims,
     pub(super) arena_rect: Option<Rect>,
     pub(super) effects_rect: Option<Rect>,
+    /// The top-band HUD rects the overlay popups keep clear of, written with
+    /// `effects_rect` (presentation only; CF-1-09).
+    pub(super) effects_keep_clear: [Rect; 5],
+    /// The worker observer window's fitted field, written each frame the
+    /// window draws a live attempt and cleared when it closes (presentation
+    /// only; review captures read it).
+    pub(super) observer_arena_rect: Option<Rect>,
+    /// The lanes the construction panel hides a live enemy in, in lane
+    /// order: written each frame construction is open, cleared when it closes
+    /// (presentation only; the INCOMING chevrons mark them).
+    pub(super) occluded_lanes: Vec<u8>,
+    /// The rows the control bar took in the last drawn battle frame
+    /// (`battle::BarRows`); 0 before any battle frame
+    /// (presentation only; review captures report it as `hud_rows`).
+    pub(super) bar_rows: u8,
+    /// The rect around every widget of that bar, and the key legend's drawn
+    /// rect under it (presentation only; the legend stays clear of the bar,
+    /// CF-1-08). `None` before any battle frame.
+    pub(super) bar_bounds: Option<Rect>,
+    pub(super) legend_rect: Option<Rect>,
+    /// The wall-clock seconds the bar's retreat button has been held, `None`
+    /// while it is not (presentation only; `battle::retreat`, UX-13).
+    pub(super) retreat_hold: Option<f64>,
+    /// This press of the retreat button already withdrew or was cancelled by
+    /// Escape: it holds nothing more until the button is released.
+    pub(super) retreat_hold_spent: bool,
+    /// The egui frame the retreat button last drew in. A hold older than the
+    /// frame before this one belongs to a battle that ended under it.
+    pub(super) retreat_hold_frame: u64,
+    /// The main battle's boss banner: which warning or arrival it announces
+    /// and its wall-clock seconds shown (presentation only;
+    /// `battle::boss_banner`, UX-11). `None` before the first.
+    pub(super) boss_banner: Option<super::battle::BossBanner>,
+    /// The same for the worker observer window, keyed by the observed
+    /// expedition's battle id.
+    pub(super) observer_boss_banner: Option<super::battle::BossBanner>,
+    /// Which report the Results screen last sounded, and its loot reveal and
+    /// coin batch still due (presentation only; `notices::results_audio`,
+    /// A6-14). It is keyed by attempt id, and attempt ids start over in a new
+    /// journey, so a new or reloaded journey clears it.
+    pub(super) results_audio: horde_audio::loot::ResultsAudioGuard,
+    /// Where the main battle painted its boss banner in the last drawn
+    /// battle frame, `None` when it painted none (presentation only).
+    pub(super) boss_banner_rect: Option<Rect>,
+    /// Where the main battle painted its READY / PAUSED banner in the last
+    /// drawn battle frame, `None` when it painted none (presentation only;
+    /// CF-1-01).
+    pub(super) pause_banner_rect: Option<Rect>,
+    /// Whether the main battle's defender is low on HP, with the 30/35%
+    /// hysteresis of `battle::low_hp` (presentation only; UX-12): the edge
+    /// band and the HUD's "· LOW" read it. Written each battle frame.
+    pub(super) low_hp: bool,
+    /// The attempt `low_hp` was last judged for; another attempt starts from
+    /// "not low".
+    pub(super) low_hp_attempt: u64,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
     /// Pre-tick actor positions and this frame's blend; see `battle_view`.
     pub(crate) interpolation: crate::battle_view::ActorInterpolation,
+    /// The storm lightning clock in ms: real time over unpaused frames, or
+    /// the attempt's tick in a fixed-step export (presentation only; see
+    /// `battle_view::interpolation`).
+    pub(crate) sky_wall_ms: f64,
+    /// Whether the lightning clock was frozen this frame (the world clock is
+    /// paused or no battle runs): every view's flash is dark, an unpaused
+    /// expedition's included (presentation only; ruling W-8).
+    pub(crate) sky_frozen: bool,
 }
 impl BattleUi {
+    /// This frame's lightning clock at the chosen observation speed.
+    pub(crate) fn sky_clock(&self) -> crate::art::SkyClock {
+        crate::art::SkyClock {
+            wall_ms: self.sky_wall_ms,
+            speed: self.speed,
+            frozen: self.sky_frozen,
+        }
+    }
+
     fn new(aim: [f32; 2]) -> Self {
         Self {
             construction: false,
@@ -143,10 +259,54 @@ impl BattleUi {
             pending_attack_aims: AttackAims::default(),
             arena_rect: None,
             effects_rect: None,
+            effects_keep_clear: [Rect::NOTHING; 5],
+            observer_arena_rect: None,
+            occluded_lanes: Vec::new(),
+            bar_rows: 0,
+            bar_bounds: None,
+            legend_rect: None,
+            retreat_hold: None,
+            retreat_hold_spent: false,
+            retreat_hold_frame: u64::MAX,
+            boss_banner: None,
+            observer_boss_banner: None,
+            results_audio: horde_audio::loot::ResultsAudioGuard::default(),
+            boss_banner_rect: None,
+            pause_banner_rect: None,
+            low_hp: false,
+            low_hp_attempt: u64::MAX,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
             interpolation: crate::battle_view::ActorInterpolation::default(),
+            sky_wall_ms: 0.0,
+            sky_frozen: false,
+        }
+    }
+    /// Whether the retreat button is being held as of egui frame `frame`: a
+    /// hold the bar drew in this frame or the one before.
+    pub(super) fn retreat_holding(&self, frame: u64) -> bool {
+        self.retreat_hold.is_some() && frame.wrapping_sub(self.retreat_hold_frame) <= 1
+    }
+    /// Escape during a hold: the hold ends, and the press that began it holds
+    /// nothing more.
+    pub(super) fn cancel_retreat_hold(&mut self) {
+        self.retreat_hold = None;
+        self.retreat_hold_spent = true;
+    }
+    /// A new or reloaded journey: attempt ids start over, so a banner kept
+    /// for the old journey's attempt would mark the new one's warning as
+    /// already announced.
+    pub(super) fn clear_boss_banners(&mut self) {
+        self.boss_banner = None;
+        self.observer_boss_banner = None;
+    }
+    /// Opens or closes the construction overlay. Closing clears
+    /// `occluded_lanes` at once, whether or not a battle frame follows.
+    pub(super) fn set_construction(&mut self, open: bool) {
+        self.construction = open;
+        if !open {
+            self.occluded_lanes.clear();
         }
     }
 }
@@ -155,8 +315,43 @@ impl BattleUi {
 #[derive(Resource, Default)]
 pub(crate) struct SettingsUi {
     pub(super) balance_draft: Option<horde_core::balance::BalanceSettings>,
+    /// The player chose Custom over a named draft. It highlights Custom and
+    /// makes Apply store an unedited named draft as Custom on that preset's
+    /// basis (R21, `Campaign::custom_balance_steps`); the draft keeps the
+    /// named preset so the core keeps its extras.
+    pub(super) balance_custom_chosen: bool,
+    /// The interface scale while its slider is held (UX-10). `Settings::scale`
+    /// keeps the applied value until the drag ends, so the screen does not
+    /// rescale under the pointer; `None` whenever the slider is at rest.
+    pub(super) scale_draft: Option<f32>,
+    /// The core Controls row waiting for a key.
     pub(super) rebind: Option<Action>,
+    /// The extra Controls row waiting for a key. At most one of `rebind` and
+    /// `rebind_extra` is set (`start_rebind`).
+    pub(super) rebind_extra: Option<ExtraAction>,
     pub(super) binding_armed: bool,
+}
+impl SettingsUi {
+    /// The Controls row waiting for a key, in either table.
+    pub(super) fn rebinding(&self) -> Option<BindingId> {
+        self.rebind
+            .map(BindingId::Core)
+            .or(self.rebind_extra.map(BindingId::Extra))
+    }
+    /// Opens the key prompt of `id`, closing any other. The prompt arms on
+    /// the next frame, so the click that opened it is never captured.
+    pub(super) fn start_rebind(&mut self, id: BindingId) {
+        (self.rebind, self.rebind_extra) = match id {
+            BindingId::Core(action) => (Some(action), None),
+            BindingId::Extra(action) => (None, Some(action)),
+        };
+        self.binding_armed = false;
+    }
+    /// Closes the key prompt without binding.
+    pub(super) fn cancel_rebind(&mut self) {
+        self.rebind = None;
+        self.rebind_extra = None;
+    }
 }
 
 #[derive(Resource, Default)]
@@ -187,17 +382,34 @@ pub(crate) struct FrontendParts {
     pub(super) menu: MenuUi,
     pub(super) cues: Vec<SoundCue>,
     pub(super) notices: Vec<RuntimeNotice>,
+    /// Stands in for `RenderPlan::pipelined`, which the App's widget pass
+    /// reads from the display plugin's resource.
+    pub(super) plan_pipelined: bool,
 }
 impl FrontendParts {
-    /// Production startup: reads the save, then applies review or practice scenarios.
-    pub fn load(config: &LaunchConfig) -> Self {
-        let paths = ProfilePaths::from_config(config);
-        let profile = LoadedProfile::load(&paths);
+    /// Production startup: reads the save beside the one startup settings
+    /// read `main` made before the App (never `settings.json` again), then
+    /// applies review or practice scenarios. An isolated review reads no save
+    /// (`LoadedProfile::for_launch`).
+    pub fn load(config: &LaunchConfig, startup_settings: SettingsLoad) -> Self {
+        Self::load_from(config, &ProfilePaths::from_config(config), startup_settings)
+    }
+    /// `load` over explicit profile paths, so a test can stage the folder.
+    pub(crate) fn load_from(
+        config: &LaunchConfig,
+        paths: &ProfilePaths,
+        startup_settings: SettingsLoad,
+    ) -> Self {
+        // The read ran before logging existed; report its warning now.
+        if let Some(warning) = &startup_settings.warning {
+            warn!("{warning}");
+        }
+        let profile = LoadedProfile::for_launch(config, paths, startup_settings);
         let resumed_practice = config.practice
             && (profile.game.campaign().selected_survivor.is_some()
                 || profile.game.campaign().attempts > 0
                 || profile.game.campaign().world.start.is_some());
-        let mut f = Self::new(profile, config, &paths);
+        let mut f = Self::new(profile, config, paths);
         if !resumed_practice {
             super::review::prepare(&mut f);
         } else {
@@ -210,14 +422,7 @@ impl FrontendParts {
             config.practice,
             config.review().is_some_and(|r| r.reduced),
         );
-        // Explicit automated-motion fixtures use a separate temporary profile.
-        // This changes startup state only; fixed systems still own every tick.
-        if config.scenario.is_some() && !config.practice && config.motion_review() {
-            f.game.set_paused(false);
-            f.battle.construction = false;
-            f.status.message =
-                "Live motion review · progress is isolated from your campaign".into();
-        }
+        super::review::apply_motion_override(&mut f, config);
         f
     }
     /// Pure construction: touches no files and no environment variables.
@@ -229,8 +434,25 @@ impl FrontendParts {
             game,
             settings,
             warning: message,
-            ..
+            load_error,
+            settings_warning,
+            settings_at_risk,
         } = profile;
+        // A startup storage failure opens the storage modal (UX-08): the
+        // load failure first, with the settings warning behind it.
+        // A settings file from before the onboarding callouts takes every
+        // callout the loaded journey already unlocked (ruling S4). A save
+        // that could not be read is not that journey: seeding then waits
+        // for "Retry load" or a New game.
+        let mut settings = settings;
+        if load_error.is_none() {
+            super::onboarding::seed_seen_callouts(&mut settings, &game);
+        }
+        let modal = super::modal::startup_modal(load_error, settings_warning);
+        let mut runtime = Runtime::default();
+        if settings_at_risk {
+            runtime.guard_settings_original();
+        }
         let selected_country = game
             .campaign()
             .world
@@ -253,7 +475,7 @@ impl FrontendParts {
             .unwrap_or(SurvivorId::Rook);
         Self {
             game,
-            runtime: Runtime::default(),
+            runtime,
             settings,
             paths: paths.clone(),
             launch: config.clone(),
@@ -264,8 +486,10 @@ impl FrontendParts {
             nav: Navigation::default(),
             status: StatusUi {
                 message,
-                practice_profile: config.practice || config.scenario.is_some(),
+                // An isolated review stages a throwaway profile, not a practice save.
+                practice_profile: config.practice,
                 profile_exists,
+                modal,
                 ..StatusUi::default()
             },
             campaign: CampaignUi {
@@ -277,6 +501,7 @@ impl FrontendParts {
                 map: MapCache::default(),
                 improvement_focus: None,
                 tree_search_seed: None,
+                tree_centre_seed: None,
                 observed: None,
             },
             armory: ArmoryUi::default(),
@@ -286,6 +511,7 @@ impl FrontendParts {
             menu: MenuUi::default(),
             cues: Vec::new(),
             notices: Vec::new(),
+            plan_pipelined: crate::render_plan::PIPELINED_DEFAULT,
         }
     }
     /// Lends every part to widget code, as the draw system does with resources.
@@ -310,6 +536,8 @@ impl FrontendParts {
             prefs: &mut self.prefs,
             menu: &mut self.menu,
             cues: &mut self.cues,
+            perf: None,
+            plan_pipelined: self.plan_pipelined,
         }
     }
     /// Lends the runner's view of the parts; notices collect in `self.notices`.
@@ -323,6 +551,7 @@ impl FrontendParts {
             notices: &mut self.notices,
             cues: &mut self.cues,
             game_changed: false,
+            perf: None,
         }
     }
     /// Startup only: everything becomes resources, `screen` the initial state.
@@ -347,6 +576,7 @@ impl FrontendParts {
             menu,
             cues: _,
             notices: _,
+            plan_pipelined: _,
         } = self;
         // A pending sub-state value is used when the camp first exists.
         let tab = nav.tab;

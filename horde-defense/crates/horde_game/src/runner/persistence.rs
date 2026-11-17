@@ -24,6 +24,9 @@ pub(super) struct Snapshot {
     pub settings: Settings,
     pub campaign_path: PathBuf,
     pub settings_path: PathBuf,
+    /// Copy the settings file aside before its first replacement
+    /// (`profile::preserve_settings_original`).
+    pub preserve_settings: bool,
 }
 #[derive(Debug)]
 enum Payload {
@@ -49,6 +52,9 @@ struct Job {
 #[derive(Debug)]
 pub(super) enum Commit {
     Saved,
+    /// The campaign was saved; settings.json was left untouched because its
+    /// original could not be copied aside first (the error says why).
+    SavedWithoutSettings(String),
     Reset {
         game: Box<Game>,
         archive: Option<PathBuf>,
@@ -83,6 +89,9 @@ trait Backend: Send + 'static {
 #[derive(Default)]
 struct FileStore {
     preserved: Vec<(PathBuf, u64)>,
+    /// Settings files already copied aside this session; later saves replace
+    /// only this session's own writes and must not copy them over the original.
+    settings_preserved: Vec<PathBuf>,
 }
 impl Backend for FileStore {
     fn execute(&mut self, job: Job) -> Completion {
@@ -93,6 +102,18 @@ impl Backend for FileStore {
                 recovered =
                     apply::preserve_unreadable(&snapshot.campaign_path, &mut self.preserved)?;
                 snapshot.game.save(&snapshot.campaign_path)?;
+                // The settings guard holds back only the settings write: the
+                // campaign above is already committed, so a Quit still closes.
+                if snapshot.preserve_settings
+                    && !self.settings_preserved.contains(&snapshot.settings_path)
+                {
+                    if let Err(error) =
+                        crate::profile::preserve_settings_original(&snapshot.settings_path)
+                    {
+                        return Ok(Commit::SavedWithoutSettings(error));
+                    }
+                    self.settings_preserved.push(snapshot.settings_path.clone());
+                }
                 apply::write_settings(&snapshot.settings, &snapshot.settings_path)?;
                 Ok(Commit::Saved)
             }
@@ -431,6 +452,9 @@ pub(crate) struct Stamp {
     pub epoch: u64,
     pub reset: bool,
     pub coins: u64,
+    /// Transient event records the job's game still carries (counted on a
+    /// clone, so the job itself is written unchanged).
+    pub events: usize,
 }
 #[cfg(test)]
 pub(crate) struct Gate {
@@ -460,15 +484,18 @@ pub(super) fn gated() -> (Service, Gate) {
     }
     impl Backend for Controlled {
         fn execute(&mut self, job: Job) -> Completion {
-            let coins = match &job.payload {
-                Payload::Save(s) => s.game.campaign().coins,
-                Payload::Reset { old, .. } => old.campaign().coins,
+            let game = match &job.payload {
+                Payload::Save(s) => &s.game,
+                Payload::Reset { old, .. } => &**old,
             };
+            let coins = game.campaign().coins;
+            let events = game.clone().drain_events().count();
             self.started
                 .send(Stamp {
                     epoch: job.identity.epoch,
                     reset: job.identity.reset,
                     coins,
+                    events,
                 })
                 .unwrap();
             self.release
@@ -523,6 +550,7 @@ mod tests {
                 settings: Settings::default(),
                 campaign_path: self.0.join("campaign.json"),
                 settings_path: self.0.join("settings.json"),
+                preserve_settings: false,
             }
         }
     }

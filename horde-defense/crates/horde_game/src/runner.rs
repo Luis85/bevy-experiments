@@ -4,6 +4,7 @@
 //! boundary.
 mod apply;
 mod command;
+mod folder;
 mod persistence;
 mod plugin;
 mod runtime;
@@ -14,9 +15,12 @@ mod tests;
 pub use apply::{RuntimeCtx, flush, step};
 #[cfg(test)]
 pub(crate) use apply::{flush_for_test, poll_one_save_for_test};
-pub use command::{AppCommand, AppOutcome, AttackAims, ControlFrame, RuntimeNotice, SaveIntent};
+pub use command::{
+    AppCommand, AppOutcome, AttackAims, ControlFrame, RuntimeNotice, SAVE_SUPERSEDED, SaveIntent,
+};
+#[cfg(test)]
+pub(crate) use folder::RecordingOpener;
 #[cfg(feature = "review")]
 pub use persistence::PersistenceMetrics;
 pub use plugin::{RuntimeSet, SimRuntimePlugin};
-pub(crate) use runtime::push_cue;
 pub use runtime::{GameSession, Runtime};

@@ -1,0 +1,1167 @@
+//! The review scene registry: every name `LASTLIGHT_REVIEW_SCREEN` accepts.
+//! UI-free and compiled in every build, so launch validation and
+//! `--list-scenes` never depend on the private review module. Scene names are
+//! ids and never change; rows are only appended. The expected screen and tab of
+//! every still live in a test table beside the fixtures (`ui/review/tests.rs`).
+
+use SceneKind::{MotionOnly, NeedsInputSave, Workshop};
+
+/// How a scene is captured.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SceneKind {
+    /// A still capture_review.ps1 takes by default.
+    Still,
+    /// Only meaningful as an isolated motion export (capture_motion.ps1).
+    MotionOnly,
+    /// Needs a copied save generation (`LASTLIGHT_REVIEW_INPUT_SAVE`).
+    NeedsInputSave,
+    /// Drawn by the review-only player-model workshop.
+    Workshop,
+}
+impl SceneKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Still => "Still",
+            Self::MotionOnly => "MotionOnly",
+            Self::NeedsInputSave => "NeedsInputSave",
+            Self::Workshop => "Workshop",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReviewScene {
+    pub name: &'static str,
+    pub kind: SceneKind,
+    /// capture_motion.ps1 accepts it.
+    pub motion: bool,
+    /// A performance fixture (measure_performance.ps1, trace_npc.ps1).
+    pub perf: bool,
+    /// Shipped as a practice scene (`LASTLIGHT_PRACTICE=1`), listed by every build.
+    pub practice: bool,
+    /// The exact amber primary label from the loop map, once the screen has one.
+    pub primary: Option<&'static str>,
+    /// The wave-0 scene used as the "before" until this one has its own capture.
+    pub before_proxy: Option<&'static str>,
+    /// The remit that owns the fixture (read by tests and the capture review).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub owner: &'static str,
+    pub since_wave: u8,
+}
+
+const fn scene(
+    name: &'static str,
+    kind: SceneKind,
+    motion: bool,
+    perf: bool,
+    practice: bool,
+) -> ReviewScene {
+    ReviewScene {
+        name,
+        kind,
+        motion,
+        perf,
+        practice,
+        primary: None,
+        before_proxy: None,
+        owner: "qa-captures",
+        since_wave: 0,
+    }
+}
+const fn still(name: &'static str) -> ReviewScene {
+    scene(name, SceneKind::Still, false, false, false)
+}
+const fn motion_still(name: &'static str) -> ReviewScene {
+    scene(name, SceneKind::Still, true, false, false)
+}
+const fn practice_still(name: &'static str) -> ReviewScene {
+    scene(name, SceneKind::Still, false, false, true)
+}
+/// A wave-1 still with its owner and its wave-0 "before" scene.
+const fn wave1_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    motion: bool,
+) -> ReviewScene {
+    ReviewScene {
+        before_proxy: Some(before_proxy),
+        owner,
+        since_wave: 1,
+        ..scene(name, SceneKind::Still, motion, false, false)
+    }
+}
+
+/// A wave-2 close still (W2-55) with its owner and its wave-0 "before" scene.
+const fn wave2_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    motion: bool,
+) -> ReviewScene {
+    ReviewScene {
+        since_wave: 2,
+        ..wave1_still(name, owner, before_proxy, motion)
+    }
+}
+
+/// A wave-3 UI still (W3-27) with its owner, its wave-0 "before" scene and
+/// its amber primary from the loop map, where the screen has one.
+const fn wave3_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    primary: Option<&'static str>,
+) -> ReviewScene {
+    ReviewScene {
+        primary,
+        since_wave: 3,
+        ..wave1_still(name, owner, before_proxy, false)
+    }
+}
+
+/// A wave-5 graphics still (W5-09 and W5-10, design-vfx-lighting §14).
+const fn wave5_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    motion: bool,
+) -> ReviewScene {
+    ReviewScene {
+        since_wave: 5,
+        ..wave1_still(name, owner, before_proxy, motion)
+    }
+}
+
+/// Every named scene. Workshop prefixes are in `WORKSHOP_PREFIXES`.
+pub const REVIEW_SCENES: &[ReviewScene] = &[
+    // The 41 wave-0 capture_review.ps1 stills, in that script's order.
+    motion_still("menu"),
+    motion_still("menu-female"),
+    motion_still("survivor-select"),
+    motion_still("battle-female"),
+    still("progressed-battle"),
+    still("leveled-armory"),
+    still("quality-armory"),
+    motion_still("quality-loot"),
+    motion_still("reticle-reload"),
+    motion_still("damage"),
+    motion_still("damage-4x"),
+    motion_still("critical-npc"),
+    scene("progressed-peak", SceneKind::Still, true, true, false),
+    still("world"),
+    still("campaign"),
+    still("briefing"),
+    still("briefing-npc"),
+    motion_still("intro"),
+    motion_still("battle"),
+    motion_still("npc"),
+    still("npc-expanded"),
+    motion_still("boss"),
+    practice_still("construction"),
+    still("character"),
+    still("character-max"),
+    still("survivor"),
+    still("armory"),
+    still("skills"),
+    still("skills-survival"),
+    still("skills-ordnance"),
+    motion_still("ordnance"),
+    still("engineering"),
+    still("results"),
+    practice_still("operations"),
+    still("settings"),
+    still("history"),
+    still("history-empty"),
+    motion_still("arid"),
+    motion_still("tropical"),
+    scene("peak", SceneKind::Still, true, true, false),
+    still("active-camp"),
+    // Stills the matrix already staged but the wave-0 script did not list.
+    motion_still("max-lanes"),
+    still("journey-victory"),
+    still("journey-liberated"),
+    still("journey-upgrades"),
+    still("skills-search"),
+    // Not stills.
+    scene("gesture-throws", MotionOnly, true, false, false),
+    scene("gesture-melee", MotionOnly, true, false, false),
+    scene("npc-stutter", NeedsInputSave, false, true, false),
+    scene("model-workshop", Workshop, false, false, false),
+    scene("model-comparison", Workshop, false, false, false),
+    // Wave 1.
+    ReviewScene {
+        before_proxy: Some("max-lanes"),
+        owner: "perf-architecture",
+        since_wave: 1,
+        // The unsaveable 400-enemy perf fixture; never a practice campaign.
+        ..scene("stress", MotionOnly, true, true, false)
+    },
+    // Wave-1 stills (design-qa-captures 1.8).
+    wave1_still("results-defeat", "ux-flow", "results", false),
+    wave1_still("save-error", "ux-flow", "world", false),
+    wave1_still("night-checkpoint", "qa-captures", "arid", false),
+    wave1_still("weapon-classes-pistol", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-smg", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-shotgun", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-rifle", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-marksman", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-machine-gun", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-turret", "qa-captures", "construction", true),
+    // The stress fixture as a paused still; never a practice campaign. Run
+    // live it is also the wave-5 effect-load perf scene (W5-11).
+    ReviewScene {
+        perf: true,
+        ..wave1_still("fx-stress", "perf-architecture", "max-lanes", true)
+    },
+    wave1_still("battle-mid", "ux-flow", "battle", false),
+    wave1_still("operations-observer", "ux-flow", "operations", false),
+    // Wave-2 close stills (W2-55): W2-37's phase hold and W2-41's Firearms
+    // column at x = -1780.
+    wave2_still("boss-phase", "vfx-lighting", "boss", true),
+    wave2_still("skills-firearms", "progression-tree", "skills", false),
+    // W2-57 (CF-2-04): W2-28's ranged windup, a spitter mid-windup at reach.
+    wave2_still("spitter-windup", "vfx-lighting", "battle", false),
+    // Wave-3 UI stills for goals 2-4 (W3-27, design-qa-captures 1.8).
+    wave3_still(
+        "upgrades",
+        "ux-flow",
+        "journey-upgrades",
+        Some("Back to battle"),
+    ),
+    wave3_still(
+        "camp-home",
+        "ux-flow",
+        "active-camp",
+        Some("Go to briefing"),
+    ),
+    // The staged recruit is recruit 1 from Germany, Alex Rowan.
+    wave3_still(
+        "briefing-recruit",
+        "campaign-defenders",
+        "briefing-npc",
+        Some("Deploy Alex Rowan"),
+    ),
+    wave3_still("equipment-autosell", "loot-economy", "quality-armory", None),
+    wave3_still(
+        "results-liberation-recruit",
+        "campaign-defenders",
+        "journey-liberated",
+        Some("Choose next country"),
+    ),
+    wave3_still("takeover-battle", "campaign-defenders", "npc", None),
+    // W5-09 (design-vfx-lighting §12, §14): the night-checkpoint scene's dawn
+    // pair for the luminance gate, and one elite of every shipped affix.
+    wave5_still("dawn-reference", "vfx-lighting", "arid", false),
+    wave5_still("elite-tells", "vfx-lighting", "battle", false),
+    // W5-10 (design-qa-captures 1.8, ruling W-8): the first storm stage of
+    // the world, staged so a motion export holds one lightning pulse.
+    wave5_still("storm", "vfx-lighting", "battle", true),
+    // Closing phase (R36): the W3-14 boss banner, which no other still
+    // shows. The still holds it one second into its life on the warning
+    // tick; a motion export resumes from the tick before the warning.
+    ReviewScene {
+        motion: true,
+        ..wave3_still("boss-warning", "ux-flow", "boss", None)
+    },
+    // Closing phase (R36): the W3-25 expedition toasts, which no other still
+    // shows: two settled outcomes and a folded count on Camp home.
+    wave3_still(
+        "camp-reports",
+        "ux-flow",
+        "active-camp",
+        Some("Go to briefing"),
+    ),
+    // Closing phase (R36): the UX-16 callout row, which every other staged
+    // scene hides by marking its unlocks seen; the camp-home state with the
+    // Expeditions callout unread, on Camp home and on Upgrades.
+    wave3_still(
+        "callout-camp",
+        "ux-flow",
+        "active-camp",
+        Some("Go to briefing"),
+    ),
+    wave3_still(
+        "callout-upgrades",
+        "ux-flow",
+        "journey-upgrades",
+        Some("Back to camp"),
+    ),
+    // Closing phase (R36): the W3-15 low-HP band, for the personal defender
+    // and for the observed main run Mara holds.
+    wave3_still("low-hp", "ux-flow", "battle", None),
+    wave3_still("low-hp-observed", "ux-flow", "npc", None),
+    // Closing phase (R36): W2-41's close capture item, which also closes
+    // design-progression-tree §3 item 8. skills-firearms, centred on Double
+    // tap, leaves the column's 380 row below the canvas; this still centres
+    // its 190 row, so the 0, 190 and 380 rows and the rifle_training ->
+    // rifle_breath_control route fit at both sizes.
+    wave2_still(
+        "skills-firearms-column",
+        "progression-tree",
+        "skills",
+        false,
+    ),
+];
+
+/// The capture modes of a wave matrix: `capture_review.ps1 -Modes`, and the
+/// directory of each still (`reduced` sets `LASTLIGHT_REVIEW_REDUCED`).
+#[cfg_attr(not(test), allow(dead_code))]
+pub const CAPTURE_MODES: [&str; 2] = ["normal", "reduced"];
+/// The capture sizes of a wave matrix as (file suffix, width, height, UI
+/// scale): 1440x900@1.0 and the compact 1050x700@1.35.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const CAPTURE_SIZES: [(&str, u32, u32, f32); 2] =
+    [("", 1440, 900, 1.0), ("-small", 1050, 700, 1.35)];
+
+/// One scene of a wave's capture-review matrix.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MatrixRow {
+    /// A registered still.
+    pub scene: &'static str,
+    /// The rows that changed what the still shows.
+    pub changed_by: &'static str,
+    /// What the reviewed still must show.
+    pub shows: &'static str,
+}
+#[cfg_attr(not(test), allow(dead_code))]
+const fn row(scene: &'static str, changed_by: &'static str, shows: &'static str) -> MatrixRow {
+    MatrixRow {
+        scene,
+        changed_by,
+        shows,
+    }
+}
+
+/// The wave-3 capture matrix (W3-27): the stills the wave-3 review reads,
+/// each at both `CAPTURE_SIZES` in both `CAPTURE_MODES` (`expected_stills`).
+/// It holds every wave-3 scene with its "before" scene, then the earlier
+/// stills wave 3 changed. The closing phase (R36) takes and reviews them:
+/// `capture_review.ps1 -Modes normal,reduced` captures every registered
+/// still, and this list says which pairs to read and what each must show.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const WAVE3_MATRIX: &[MatrixRow] = &[
+    // The wave-3 scenes.
+    row(
+        "upgrades",
+        "W3-03, W3-27",
+        "the Upgrades screen after a first round: the camp row, amber Back to battle and Back \
+         to camp above the tree, the recommended node focused",
+    ),
+    row(
+        "camp-home",
+        "W3-02, W3-16, W3-25",
+        "Camp home: next defense in Poland, You, Mara, a guard and an expedition recruit with \
+         status and power, the France outbreak alert, the live expedition, amber Go to briefing",
+    ),
+    row(
+        "briefing-recruit",
+        "W3-16",
+        "the Poland briefing with the recruit selected in the defender picker and the amber \
+         Deploy Alex Rowan",
+    ),
+    row(
+        "equipment-autosell",
+        "W3-21",
+        "Equipment with the Auto-sell panel open: enabled, Common and below, Would sell 2 now",
+    ),
+    row(
+        "results-liberation-recruit",
+        "W3-19, W3-20",
+        "Results of the liberating victory: Recruit from Germany with core's price, the loot \
+         block with Auto-sold 2, amber Choose next country",
+    ),
+    row(
+        "takeover-battle",
+        "W3-16, W3-17",
+        "a paused Poland defense held by the recruit: his name on the HUD, his own (male) rig \
+         on the field, amber Begin defense, at most two bar rows",
+    ),
+    row(
+        "boss-warning",
+        "W3-14, closing",
+        "the paused warning tick: BOSS APPROACHING with the boss name and its countdown at \
+         full strength in both modes, top-centre of the field, clear of the HUD and the pause \
+         banner; the sidecar's boss_banner_rect is the drawn banner",
+    ),
+    row(
+        "camp-reports",
+        "W3-25, closing",
+        "Camp home with three expedition toasts top-right: the two recruits' Czech Republic \
+         outcomes with their coins and \"3 more expedition outcomes · Operations\"; the same \
+         two lines under Recent reports, amber Go to briefing",
+    ),
+    row(
+        "callout-camp",
+        "W3-24, closing",
+        "Camp home with the callout row under the camp row: \"New: Expeditions - Camp home › \
+         Operations\" in amber with Show me and Got it, static in both modes",
+    ),
+    row(
+        "callout-upgrades",
+        "W3-24, closing",
+        "the Upgrades screen with the same callout row under the camp row, above the tree; \
+         amber Back to camp (no round to continue)",
+    ),
+    row(
+        "low-hp",
+        "W3-15, closing",
+        "a paused personal defense at 25% HP: the 8 pt red band inside all four canvas edges, \
+         static at 0.40 in both modes, and \"ROOK · HP h / m · LOW\" on the HUD",
+    ),
+    row(
+        "low-hp-observed",
+        "W3-15, closing",
+        "the same band and \"MARA · HP h / m · LOW\" on Mara's paused main-run defense",
+    ),
+    // Their "before" scenes.
+    row(
+        "journey-upgrades",
+        "W3-01, W3-16",
+        "Results after a first round: the outcome strip and the three-action bar, no tree (the \
+         upgrades pair)",
+    ),
+    row(
+        "active-camp",
+        "W3-02, W3-18",
+        "the world map with a live defense: amber Return to active defense (the camp-home pair)",
+    ),
+    row(
+        "briefing-npc",
+        "W3-16, W3-23",
+        "the briefing with Mara selected: amber Deploy Mara, the stage preview",
+    ),
+    row(
+        "quality-armory",
+        "W3-09, W3-21",
+        "Equipment sorted by quality with quality markers; the Auto-sell panel collapsed",
+    ),
+    row(
+        "journey-liberated",
+        "W3-19, W3-20, W3-22",
+        "Results of a liberation without the Recruitment node: the muted learn-to-recruit line",
+    ),
+    row(
+        "npc",
+        "W3-12, W3-16, W3-17",
+        "Mara's defense: her name on the HUD, her rig, at most two bar rows",
+    ),
+    // Earlier stills wave 3 changed.
+    row("menu", "W3-01, W3-05", "one amber primary; one Save label"),
+    row("survivor-select", "W3-01", "amber Continue as Rook"),
+    row(
+        "world",
+        "W3-01, W3-18",
+        "the world map before the first start: amber Start journey",
+    ),
+    row(
+        "campaign",
+        "W3-02, W3-18",
+        "the 6-entry camp row; Plan defense or Manage country, never a deploy",
+    ),
+    row(
+        "briefing",
+        "W3-16, W3-23",
+        "amber Deploy personally; the stage preview with its boss badge",
+    ),
+    row(
+        "character",
+        "W3-02, W3-22",
+        "the camp row with amber Go to briefing; the shared trainable rows",
+    ),
+    row(
+        "survivor",
+        "W3-02, W3-22",
+        "Mara's training as a drill-down from Camp home",
+    ),
+    row(
+        "armory",
+        "W3-21",
+        "Equipment with the Manage equipment section",
+    ),
+    row(
+        "operations",
+        "W3-02, W3-18",
+        "Operations as a drill-down; outbreaks offer Plan response",
+    ),
+    row(
+        "operations-observer",
+        "W3-17",
+        "the observer window titled with the recruit, drawing the recruit's rig",
+    ),
+    row(
+        "settings",
+        "W3-07, W3-08, W3-09, W3-10",
+        "Display, quality markers and palette, Music and Interface sliders, the rebind table \
+         with the world clock and cycle attack keys",
+    ),
+    row(
+        "results",
+        "W3-16, W3-20, W3-22, W3-23",
+        "Results with the defender picker, the loot block and the progression lines",
+    ),
+    row(
+        "results-defeat",
+        "W3-16, W3-20",
+        "a defeat: the cause and tip, amber Try again",
+    ),
+    row(
+        "journey-victory",
+        "W3-20, W3-22, W3-23",
+        "a first victory: amber Next defense",
+    ),
+    row("history", "W3-20", "run history with the auto-sold line"),
+    row("skills", "W3-22", "the tree with counter names"),
+    row(
+        "skills-survival",
+        "W3-32",
+        "no stub or stub label on another drawn wire or node (CF-2-01)",
+    ),
+    row(
+        "save-error",
+        "W3-06",
+        "the storage modal over the camp: the OS error, amber Retry, Open folder",
+    ),
+    row(
+        "intro",
+        "W3-12, W3-29",
+        "the first defense paused: amber Begin defense, the pause banner clear of the lanes",
+    ),
+    row(
+        "battle",
+        "W3-12, W3-29",
+        "at most two bar rows; the pause banner clear of the lanes (CF-1-01); the controls \
+         legend clear of the bar at both sizes (CF-1-08)",
+    ),
+    row(
+        "construction",
+        "W3-12, W3-29",
+        "the construction panel over an unmoved field; the midpoint label left of the panel \
+         (CF-1-02)",
+    ),
+    row(
+        "battle-mid",
+        "W3-12, W3-29",
+        "the 7x16 field: the pause banner clear of the lanes",
+    ),
+    row(
+        "npc-expanded",
+        "W3-12, W3-16",
+        "the observed defense with its two-row bar",
+    ),
+    row(
+        "boss",
+        "W3-12, W3-14",
+        "the boss fight with its two-row bar",
+    ),
+    row(
+        "max-lanes",
+        "W3-12, W3-29",
+        "the 17x30 field: no arena move, the banner clear of the lanes",
+    ),
+    row(
+        "progressed-peak",
+        "W3-30, W3-31",
+        "wall-hit numbers beside the struck face (CF-1-07); no hover reticle (CF-1-03)",
+    ),
+    row(
+        "fx-stress",
+        "W3-31",
+        "wall-hit numbers clear of every wall face and stack front (CF-1-07)",
+    ),
+];
+
+/// The stills a capture run of `matrix` leaves under its output directory,
+/// as `capture_review.ps1` names them: `<mode>/<scene>[-small].png`, in
+/// matrix order, each scene large then small, normal then reduced.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn expected_stills(matrix: &[MatrixRow]) -> Vec<String> {
+    matrix
+        .iter()
+        .flat_map(|row| {
+            CAPTURE_MODES.iter().flat_map(move |mode| {
+                CAPTURE_SIZES
+                    .iter()
+                    .map(move |(suffix, ..)| format!("{mode}/{}{suffix}.png", row.scene))
+            })
+        })
+        .collect()
+}
+
+/// The closing phase's own still matrix (R36), read beside `WAVE3_MATRIX`,
+/// each scene at both `CAPTURE_SIZES` in both `CAPTURE_MODES`
+/// (`expected_stills`): the capture items plan §7 "Wave-2 close" hands to the
+/// closing phase (W2-37's phase hold, W2-41's Firearms column and
+/// design-progression-tree §3 item 8), the CF-1-01 and CF-1-08 stills the W3
+/// matrix leaves out (damage, peak) and the wave-5 stills the plan §11 human
+/// checks read. No scene is also a W3 row.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const CLOSING_MATRIX: &[MatrixRow] = &[
+    // Plan §7 "Wave-2 close" capture items.
+    row(
+        "boss-phase",
+        "W2-37, W2-55, CF-2-05",
+        "a rank-5 boss paused in its phase hold on the 7x16 field: \"PHASE 1 - BREACH\" over \
+         the \"EXPOSED · FIRE NOW\" callout, both on their ink backing (CF-2-05), and the amber \
+         ring on the boss's feet, clear of the HUD, the bar and the pause banner; the reduced \
+         ring has the same radii",
+    ),
+    row(
+        "skills-firearms",
+        "W2-41, W2-55, CF-2-02",
+        "Journey upgrades on Double tap (-1780, 0), the column's 0 row; the stub label into \
+         Reload drill clear of Steady hands (CF-2-02)",
+    ),
+    row(
+        "skills-firearms-column",
+        "W2-41, closing",
+        "the -1780 column's 190 and 380 rows (Pump drill, Breath control) beside Rifle \
+         proficiency, with the Rifle proficiency -> Breath control wire between them; no node, \
+         title or stub label on another (design-progression-tree §3 item 8)",
+    ),
+    // CF-1-01 and CF-1-08 stills outside the W3 matrix.
+    row(
+        "damage",
+        "W3-12, W3-29",
+        "the paused damage target: the pause banner clear of the bottom lane and its damage \
+         number (CF-1-01); the controls legend clear of the bar at both sizes (CF-1-08)",
+    ),
+    row(
+        "peak",
+        "W3-12, W3-29",
+        "the pause banner clear of the bottom-lane barricade (CF-1-01); at most two bar rows \
+         and the controls legend clear of the bar at both sizes (CF-1-08)",
+    ),
+    // Wave-5 stills (plan §11: the weapon-classes review, the night and storm
+    // look).
+    row(
+        "weapon-classes-pistol",
+        "W5-03, W5-09",
+        "the pistol's weapon_fx profile one tick after its shot, distinct from the other \
+         classes; no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-smg",
+        "W5-03, W5-09",
+        "the SMG's weapon_fx profile one tick after its shot, distinct from the other classes; \
+         no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-shotgun",
+        "W5-03, W5-09, CF-1-12",
+        "the shotgun fan one tick after its shot: one flash and nine pellet streaks, one MISS \
+         per shot; no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-rifle",
+        "W5-03, W5-09",
+        "the rifle's weapon_fx profile one tick after its shot, distinct from the other classes; \
+         no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-marksman",
+        "W5-03, W5-09",
+        "the marksman's weapon_fx profile one tick after its shot, distinct from the other \
+         classes; no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-machine-gun",
+        "W5-03, W5-09",
+        "the machine gun's tracers one tick after its shot, distinct from the other classes; \
+         no muzzle flash in reduced",
+    ),
+    row(
+        "weapon-classes-turret",
+        "W5-03, W5-09",
+        "the placed turret's own weapon_fx profile on its first shot, distinct from every hand \
+         weapon; no muzzle flash in reduced",
+    ),
+    row(
+        "storm",
+        "W5-01, W5-02, W5-10",
+        "the world's first storm stage at a lightning pulse: the storm grade and sky flash with \
+         every cue on its ink backing; reduced draws the static storm grade and no flash",
+    ),
+    row(
+        "night-checkpoint",
+        "W5-01, W5-09",
+        "the checkpoint stage at night: the night grade with every cue readable on its ink \
+         backing; field mean L at most 0.70 of dawn-reference (measure_field_luminance.py)",
+    ),
+    row(
+        "dawn-reference",
+        "W5-09",
+        "the same country's dawn stage on the same lanes and width, paused at tick 0 with no \
+         enemies: the night gate's reference",
+    ),
+    row(
+        "elite-tells",
+        "W5-07, W5-09",
+        "one elite of every shipped affix, each ring and marker on its ink backing in the cue \
+         pass; no pulse in reduced",
+    ),
+];
+
+/// The viewports of a motion export (`capture_motion.ps1 -Viewport`), the
+/// motion twins of `CAPTURE_SIZES`.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const MOTION_VIEWPORTS: [&str; 2] = ["normal", "small"];
+
+/// The motion exports the closing phase reads (R36), each at both
+/// `MOTION_VIEWPORTS`, normal and `-ReducedEffects` (`expected_motion`).
+#[cfg_attr(not(test), allow(dead_code))]
+pub const CLOSING_MOTION: &[MatrixRow] = &[
+    row(
+        "boss-phase",
+        "W2-37, W2-56 (CF-2-03)",
+        "the ring on the boss's feet and the PHASE label in every frame of the 90-tick hold, \
+         the ring changing frame to frame in normal and static in reduced",
+    ),
+    row(
+        "storm",
+        "W5-02, W5-10",
+        "a lightning pulse lit in two neighbouring frames in normal (manifest sky_flash above \
+         0), luminance step below 0.2 (measure_field_luminance.py storm); no flash in any \
+         reduced frame",
+    ),
+    row(
+        "weapon-classes-shotgun",
+        "W5-03, CF-1-12",
+        "each shot one flash, nine pellet streaks and at most one MISS; no flash in reduced",
+    ),
+    row(
+        "weapon-classes-machine-gun",
+        "W5-03",
+        "the bright tracer on every third volley; no flash in reduced",
+    ),
+];
+
+/// The motion exports a capture run of `matrix` reads, named as the wave
+/// reviews leave them: `motion/<scene>-<viewport>-<mode>`, in matrix order,
+/// each scene normal then small, normal then reduced.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn expected_motion(matrix: &[MatrixRow]) -> Vec<String> {
+    matrix
+        .iter()
+        .flat_map(|row| {
+            MOTION_VIEWPORTS.iter().flat_map(move |viewport| {
+                CAPTURE_MODES
+                    .iter()
+                    .map(move |mode| format!("motion/{}-{viewport}-{mode}", row.scene))
+            })
+        })
+        .collect()
+}
+
+/// Workshop scenes named `<prefix><model id>`.
+pub const WORKSHOP_PREFIXES: [&str; 4] = [
+    "model-parity-",
+    "model-parts-",
+    "model-matrix-",
+    "model-repairs-",
+];
+
+/// The kind of a known scene; a workshop prefix plus a non-empty id is Workshop.
+pub fn lookup(name: &str) -> Option<SceneKind> {
+    REVIEW_SCENES
+        .iter()
+        .find(|scene| scene.name == name)
+        .map(|scene| scene.kind)
+        .or_else(|| {
+            WORKSHOP_PREFIXES
+                .iter()
+                .any(|prefix| name.strip_prefix(prefix).is_some_and(|id| !id.is_empty()))
+                .then_some(SceneKind::Workshop)
+        })
+}
+
+pub fn is_workshop(name: &str) -> bool {
+    lookup(name) == Some(SceneKind::Workshop)
+}
+
+/// Whether a build can stage `name`: exactly the scenes `list_lines` lists for
+/// it. Without `review` that is only the practice rows (no workshop names).
+pub fn accepts(name: &str, review_build: bool) -> bool {
+    if review_build {
+        lookup(name).is_some()
+    } else {
+        REVIEW_SCENES
+            .iter()
+            .any(|scene| scene.practice && scene.name == name)
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn stills() -> impl Iterator<Item = &'static ReviewScene> {
+    REVIEW_SCENES
+        .iter()
+        .filter(|scene| scene.kind == SceneKind::Still)
+}
+
+/// TSV header of `list_lines`.
+pub const LIST_HEADER: &str =
+    "name\tkind\tmotion\tperf\tpractice\tprimary\tbefore_proxy\tsince_wave";
+
+/// `--list-scenes`: a header, then one TSV row per scene and per workshop
+/// prefix (empty fields are absent values). A build without the `review`
+/// feature lists only practice scenes, the only ones it can stage.
+pub fn list_lines(review_build: bool) -> Vec<String> {
+    let rows = REVIEW_SCENES
+        .iter()
+        .filter(|scene| review_build || scene.practice)
+        .map(|scene| {
+            format!(
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                scene.name,
+                scene.kind.label(),
+                scene.motion,
+                scene.perf,
+                scene.practice,
+                scene.primary.unwrap_or(""),
+                scene.before_proxy.unwrap_or(""),
+                scene.since_wave
+            )
+        });
+    let prefixes = WORKSHOP_PREFIXES
+        .iter()
+        .filter(|_| review_build)
+        .map(|prefix| format!("{prefix}\tWorkshop\tfalse\tfalse\tfalse\t\t\t0"));
+    std::iter::once(LIST_HEADER.to_owned())
+        .chain(rows)
+        .chain(prefixes)
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn names_are_unique_and_never_shadow_a_workshop_prefix() {
+        let mut names: Vec<_> = REVIEW_SCENES.iter().map(|scene| scene.name).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), REVIEW_SCENES.len(), "duplicate scene name");
+        for scene in REVIEW_SCENES {
+            assert!(
+                !WORKSHOP_PREFIXES
+                    .iter()
+                    .any(|prefix| scene.name.starts_with(prefix)),
+                "{} hides behind a workshop prefix",
+                scene.name
+            );
+            assert!(!scene.name.contains(['\t', ' ']), "{}", scene.name);
+        }
+    }
+    #[test]
+    fn the_wave0_stills_plus_the_five_unlisted_ones_are_46() {
+        assert_eq!(stills().filter(|scene| scene.since_wave == 0).count(), 46);
+        for name in [
+            "max-lanes",
+            "journey-victory",
+            "journey-liberated",
+            "journey-upgrades",
+            "skills-search",
+        ] {
+            assert_eq!(lookup(name), Some(SceneKind::Still), "{name}");
+        }
+    }
+    #[test]
+    fn wave1_registers_its_13_stills_with_wave0_before_proxies() {
+        let wave1: Vec<_> = stills().filter(|scene| scene.since_wave == 1).collect();
+        assert_eq!(wave1.len(), 13);
+        for scene in &wave1 {
+            let proxy = scene
+                .before_proxy
+                .expect("a wave-1 still has a before proxy");
+            assert!(
+                stills().any(|still| still.name == proxy && still.since_wave == 0),
+                "{}: before proxy {proxy} is not a wave-0 still",
+                scene.name
+            );
+            assert!(!scene.practice, "{}", scene.name);
+            // fx-stress is the one wave-1 still measure_performance.ps1 runs.
+            assert_eq!(scene.perf, scene.name == "fx-stress", "{}", scene.name);
+        }
+        for name in ["weapon-classes-shotgun", "weapon-classes-machine-gun"] {
+            assert!(
+                wave1.iter().any(|scene| scene.name == name && scene.motion),
+                "capture_motion accepts {name}"
+            );
+        }
+    }
+    /// The six W3-27 stills, then the closing phase's boss-warning (the
+    /// W3-14 banner), the one wave-3 still a motion export also takes, and
+    /// camp-reports (the W3-25 expedition toasts), the W3-24 callout pair and
+    /// the W3-15 low-HP pair.
+    #[test]
+    fn wave3_registers_its_12_stills_with_wave0_before_proxies() {
+        let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
+        assert_eq!(
+            wave3.iter().map(|scene| scene.name).collect::<Vec<_>>(),
+            [
+                "upgrades",
+                "camp-home",
+                "briefing-recruit",
+                "equipment-autosell",
+                "results-liberation-recruit",
+                "takeover-battle",
+                "boss-warning",
+                "camp-reports",
+                "callout-camp",
+                "callout-upgrades",
+                "low-hp",
+                "low-hp-observed",
+            ]
+        );
+        for scene in &wave3 {
+            let proxy = scene
+                .before_proxy
+                .expect("a wave-3 still has a before proxy");
+            assert!(
+                stills().any(|still| still.name == proxy && still.since_wave == 0),
+                "{}: before proxy {proxy} is not a wave-0 still",
+                scene.name
+            );
+            assert!(
+                !scene.practice && !scene.perf && scene.motion == (scene.name == "boss-warning"),
+                "{}",
+                scene.name
+            );
+        }
+        assert!(list_lines(true).contains(
+            &"camp-home\tStill\tfalse\tfalse\tfalse\tGo to briefing\tactive-camp\t3".into()
+        ));
+        assert!(
+            list_lines(true).contains(&"boss-warning\tStill\ttrue\tfalse\tfalse\t\tboss\t3".into())
+        );
+    }
+    #[test]
+    fn wave3_matrix_rows_are_unique_registered_stills_with_reasons() {
+        assert!(!WAVE3_MATRIX.is_empty(), "the W3 matrix is defined");
+        let mut names: Vec<_> = WAVE3_MATRIX.iter().map(|row| row.scene).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), WAVE3_MATRIX.len(), "duplicate matrix scene");
+        for row in WAVE3_MATRIX {
+            assert_eq!(lookup(row.scene), Some(SceneKind::Still), "{}", row.scene);
+            assert!(
+                row.changed_by.contains("W3-"),
+                "{}: a wave-3 row",
+                row.scene
+            );
+            assert!(!row.shows.is_empty(), "{}: what it must show", row.scene);
+        }
+    }
+    #[test]
+    fn wave3_matrix_holds_every_wave3_still_and_its_before_scene() {
+        let listed = |name: &str| WAVE3_MATRIX.iter().any(|row| row.scene == name);
+        let wave3: Vec<_> = stills().filter(|scene| scene.since_wave == 3).collect();
+        assert_eq!(wave3.len(), 12);
+        for scene in wave3 {
+            assert!(listed(scene.name), "{} is not in the matrix", scene.name);
+            let proxy = scene.before_proxy.expect("a before proxy");
+            assert!(listed(proxy), "{}: its pair {proxy}", scene.name);
+        }
+        // The stills the wave-3 placement fixes are read on (CF-1-01,
+        // CF-1-02, CF-1-03, CF-1-07, CF-2-01) and the W3-06 modal.
+        for name in [
+            "battle",
+            "construction",
+            "progressed-peak",
+            "fx-stress",
+            "skills-survival",
+            "save-error",
+        ] {
+            assert!(listed(name), "{name} is not in the matrix");
+        }
+    }
+    #[test]
+    fn wave3_matrix_expects_each_scene_at_both_sizes_in_both_modes() {
+        let stills = expected_stills(WAVE3_MATRIX);
+        assert_eq!(stills.len(), WAVE3_MATRIX.len() * 4);
+        let mut unique = stills.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), stills.len(), "duplicate still path");
+        assert_eq!(
+            expected_stills(&[row("camp-home", "W3-02", "Camp home")]),
+            [
+                "normal/camp-home.png",
+                "normal/camp-home-small.png",
+                "reduced/camp-home.png",
+                "reduced/camp-home-small.png",
+            ]
+        );
+        assert_eq!(
+            CAPTURE_SIZES,
+            [("", 1440, 900, 1.0), ("-small", 1050, 700, 1.35)]
+        );
+    }
+    /// CF-1-08: the battle row reads the legend as well as the bar rows.
+    #[test]
+    fn wave3_battle_row_reads_the_controls_legend_at_both_sizes() {
+        let battle = WAVE3_MATRIX
+            .iter()
+            .find(|row| row.scene == "battle")
+            .expect("battle is in the W3 matrix");
+        assert!(
+            battle
+                .shows
+                .contains("the controls legend clear of the bar at both sizes (CF-1-08)"),
+            "{}",
+            battle.shows
+        );
+    }
+    /// The closing phase's own reading list (R36): the plan §7 Wave-2 close
+    /// capture items (W2-37's phase hold, W2-41's Firearms column and
+    /// design-progression-tree §3 item 8), the CF-1-01 and CF-1-08 stills the
+    /// W3 matrix leaves out (damage, peak) and the wave-5 stills the §11
+    /// human checks read. Each scene is read once: none is also a W3 row.
+    #[test]
+    fn closing_matrix_rows_are_unique_registered_stills_outside_the_w3_matrix() {
+        let mut names: Vec<_> = CLOSING_MATRIX.iter().map(|row| row.scene).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), CLOSING_MATRIX.len(), "duplicate matrix scene");
+        for row in CLOSING_MATRIX {
+            assert_eq!(lookup(row.scene), Some(SceneKind::Still), "{}", row.scene);
+            assert!(!row.changed_by.is_empty(), "{}: a changing row", row.scene);
+            assert!(!row.shows.is_empty(), "{}: what it must show", row.scene);
+            assert!(
+                !WAVE3_MATRIX.iter().any(|w3| w3.scene == row.scene),
+                "{} is already a W3 row",
+                row.scene
+            );
+        }
+        let listed = |name: &str| CLOSING_MATRIX.iter().any(|row| row.scene == name);
+        for name in [
+            "boss-phase",
+            "skills-firearms",
+            "skills-firearms-column",
+            "damage",
+            "peak",
+        ] {
+            assert!(listed(name), "{name} is not in the closing matrix");
+        }
+        for scene in stills()
+            .filter(|scene| scene.since_wave == 5 || scene.name.starts_with("weapon-classes-"))
+        {
+            assert!(
+                listed(scene.name),
+                "wave-5 still {} is not in the closing matrix",
+                scene.name
+            );
+        }
+        let stills = expected_stills(CLOSING_MATRIX);
+        assert_eq!(stills.len(), CLOSING_MATRIX.len() * 4);
+        assert!(stills.contains(&"reduced/skills-firearms-column-small.png".to_owned()));
+    }
+    /// The motion exports the closing phase reads, as capture_motion.ps1
+    /// leaves them in the wave reviews: `motion/<scene>-<viewport>-<mode>`
+    /// for both viewports and both modes. boss-phase plays W2-37's 90-tick
+    /// hold (CF-2-03's fix), storm a lightning pulse, and the shotgun and
+    /// machine-gun galleries their weapon_fx (design-qa-captures item 14).
+    #[test]
+    fn closing_motion_rows_are_motion_scenes_at_both_viewports_in_both_modes() {
+        for name in [
+            "boss-phase",
+            "storm",
+            "weapon-classes-shotgun",
+            "weapon-classes-machine-gun",
+        ] {
+            assert!(
+                CLOSING_MOTION.iter().any(|row| row.scene == name),
+                "{name} is not a closing motion row"
+            );
+        }
+        for row in CLOSING_MOTION {
+            let scene = REVIEW_SCENES
+                .iter()
+                .find(|scene| scene.name == row.scene)
+                .unwrap_or_else(|| panic!("{} is registered", row.scene));
+            assert!(scene.motion, "capture_motion accepts {}", row.scene);
+            assert!(!row.changed_by.is_empty() && !row.shows.is_empty());
+        }
+        let boss = CLOSING_MOTION
+            .iter()
+            .find(|row| row.scene == "boss-phase")
+            .expect("boss-phase motion");
+        assert!(
+            boss.shows.contains("90-tick hold") && boss.shows.contains("static in reduced"),
+            "{}",
+            boss.shows
+        );
+        assert_eq!(
+            expected_motion(&[row("boss-phase", "W2-37", "the hold")]),
+            [
+                "motion/boss-phase-normal-normal",
+                "motion/boss-phase-normal-reduced",
+                "motion/boss-phase-small-normal",
+                "motion/boss-phase-small-reduced",
+            ]
+        );
+        assert_eq!(
+            expected_motion(CLOSING_MOTION).len(),
+            CLOSING_MOTION.len() * 4
+        );
+    }
+    #[test]
+    fn workshop_prefixes_need_an_id() {
+        assert_eq!(lookup("model-parity-rook"), Some(SceneKind::Workshop));
+        assert!(is_workshop("model-repairs-june") && is_workshop("model-workshop"));
+        assert_eq!(lookup("model-parity-"), None);
+        assert_eq!(lookup("camp-hmoe"), None);
+        assert!(!is_workshop("battle"));
+        assert_eq!(lookup("npc-stutter"), Some(SceneKind::NeedsInputSave));
+    }
+    #[test]
+    fn a_build_accepts_exactly_the_scenes_it_lists() {
+        for review_build in [true, false] {
+            let listed = list_lines(review_build);
+            for scene in REVIEW_SCENES {
+                let row = listed
+                    .iter()
+                    .any(|line| line.split('\t').next() == Some(scene.name));
+                assert_eq!(accepts(scene.name, review_build), row, "{}", scene.name);
+            }
+        }
+        assert!(accepts("model-parity-rook", true));
+        assert!(!accepts("model-parity-rook", false));
+        assert!(!accepts("camp-hmoe", true) && !accepts("camp-hmoe", false));
+    }
+    #[test]
+    fn list_lines_are_tsv_and_a_plain_build_lists_only_practice() {
+        let review = list_lines(true);
+        assert_eq!(review[0], LIST_HEADER);
+        let columns = LIST_HEADER.split('\t').count();
+        assert!(
+            review
+                .iter()
+                .all(|line| line.split('\t').count() == columns)
+        );
+        assert_eq!(
+            review.len(),
+            1 + REVIEW_SCENES.len() + WORKSHOP_PREFIXES.len()
+        );
+        assert_eq!(
+            review
+                .iter()
+                .filter(|line| line.contains("\tStill\t"))
+                .count(),
+            46 + 13 + 4 + 12 + 3
+        );
+        assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
+        assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));
+        let plain = list_lines(false);
+        assert_eq!(
+            plain,
+            vec![
+                LIST_HEADER.to_owned(),
+                "construction\tStill\tfalse\tfalse\ttrue\t\t\t0".into(),
+                "operations\tStill\tfalse\tfalse\ttrue\t\t\t0".into(),
+            ]
+        );
+    }
+}

@@ -21,8 +21,18 @@ pub enum AppCommand {
     /// Serialized storage barrier; never reaches `Game::apply`.
     NewJourney,
     Save(SaveIntent),
+    /// Shows the profile directory in the OS file manager through the
+    /// runtime's `FolderOpener`; answered by `RuntimeNotice::SaveFolderOpened`.
+    OpenSaveFolder,
+    /// Reads `campaign.json` again after a failed startup load; answered by
+    /// `RuntimeNotice::ProfileReloaded`. Refused once the in-memory journey
+    /// or the file changed (`Runtime::reload_allowed`).
+    ReloadProfile,
     Game(Command),
 }
+/// The error of a save a confirmed new journey replaced: not a storage
+/// failure, so the frontend offers no retry for it.
+pub const SAVE_SUPERSEDED: &str = "Save superseded by the confirmed new journey";
 impl From<Command> for AppCommand {
     fn from(command: Command) -> Self {
         Self::Game(command)
@@ -46,7 +56,21 @@ pub enum RuntimeNotice {
         intent: SaveIntent,
         result: Result<(), String>,
     },
+    /// A user intent finished without a save (`Runtime::forbid_saves`): its
+    /// navigation still runs, but nothing was written.
+    SaveSkipped {
+        intent: SaveIntent,
+    },
+    /// The campaign was saved but settings.json was not
+    /// (`persistence::Commit::SavedWithoutSettings`); a later save retries it.
+    SettingsNotSaved(String),
     SimulationFinished,
+    /// `AppCommand::OpenSaveFolder` finished: the file manager was started,
+    /// or why it could not be.
+    SaveFolderOpened(Result<(), String>),
+    /// `AppCommand::ReloadProfile` finished: the saved journey replaced the
+    /// in-memory one, or why it did not.
+    ProfileReloaded(Result<(), String>),
     RecoveryCopies(Vec<PathBuf>),
     /// Expedition transfers that could not be applied to the shared campaign.
     SettlementIssues(Vec<SettlementIssue>),

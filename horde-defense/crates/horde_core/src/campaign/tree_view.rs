@@ -6,7 +6,10 @@
 use super::loadout::coordination_reload_factor;
 use super::{BodyAttribute, Campaign, NodePayment, RecommendationAction};
 use crate::content::{Mode, StructureKind};
-use crate::skill_catalog::{CampaignFeature, SkillEffect, SkillNode, skills, unlock_label};
+use crate::skill_catalog::{
+    CampaignFeature, ClassStat, SkillEffect, SkillNode, skills, unlock_label,
+};
+use crate::weapons::WeaponClass;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Purchase state of one node for the tree canvas and detail panel.
@@ -69,7 +72,7 @@ pub struct Requirement {
     pub kind: RequirementKind,
     /// Sentence case, no trailing period, for example "Learn Steady hands",
     /// "Win 3 defenses (1 / 3)", "Liberate 2 countries (0 / 2)" or
-    /// "40 coins (have 25)".
+    /// "1,500 coins (have 300)" (amounts grouped by `coins::grouped`).
     pub label: String,
     pub met: bool,
 }
@@ -113,6 +116,13 @@ pub enum PreviewStat {
     ReloadTime,
     /// Personal shot-interval multiplier (lower fires faster).
     ShotInterval,
+    /// One weapon class's perk: a damage, reload or shot-interval
+    /// multiplier, or an added weak-spot bonus fraction.
+    ClassStat(WeaponClass, ClassStat),
+    /// Enemy armor ignored by personal shots.
+    ArmorPenetration,
+    /// Multiplier on hazard (blast and spit) damage taken.
+    HazardDamage,
     GrenadeCharges,
     MolotovCharges,
     OrdnanceDamage,
@@ -142,6 +152,18 @@ impl PreviewStat {
             Self::DamageMultiplier => "Firearm damage".into(),
             Self::ReloadTime => "Reload time".into(),
             Self::ShotInterval => "Time between shots".into(),
+            Self::ClassStat(class, stat) => format!(
+                "{} {}",
+                class.name(),
+                match stat {
+                    ClassStat::Damage => "damage",
+                    ClassStat::Reload => "reload time",
+                    ClassStat::Cadence => "time between shots",
+                    ClassStat::WeakBonus => "weak-spot damage",
+                }
+            ),
+            Self::ArmorPenetration => "Armor penetration".into(),
+            Self::HazardDamage => "Blast and spit damage taken".into(),
             Self::GrenadeCharges => "Grenade charges".into(),
             Self::MolotovCharges => "Molotov charges".into(),
             Self::OrdnanceDamage => "Ordnance damage".into(),
@@ -160,10 +182,14 @@ impl PreviewStat {
     pub fn format(&self, value: f32) -> String {
         match self {
             Self::DamageBonus => format!("+{}", value.round() as i64),
-            Self::WeakSpotBonus => format!("+{}%", (value * 100.0).round() as i64),
+            Self::WeakSpotBonus | Self::ClassStat(_, ClassStat::WeakBonus) => {
+                format!("+{}%", (value * 100.0).round() as i64)
+            }
             Self::DamageMultiplier
             | Self::ReloadTime
             | Self::ShotInterval
+            | Self::ClassStat(..)
+            | Self::HazardDamage
             | Self::OrdnanceDamage
             | Self::OrdnanceRadius
             | Self::BurnDuration
@@ -174,6 +200,7 @@ impl PreviewStat {
             | Self::Stamina
             | Self::Armor
             | Self::MeleeDamage
+            | Self::ArmorPenetration
             | Self::GrenadeCharges
             | Self::MolotovCharges
             | Self::StructureRank(_)
@@ -205,6 +232,18 @@ impl StatDelta {
             ),
         }
     }
+}
+
+/// The display names of the enemy archetypes `node` is authored to answer
+/// (`SkillNode::counters`), in authored order, read from the enemy
+/// catalogue. An id the loaded catalogue does not resolve keeps its id, so
+/// a screen never drops a counter. Empty for a node with no counters.
+pub fn counter_names(node: &SkillNode) -> Vec<String> {
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    node.counters
+        .iter()
+        .map(|id| catalog.resolve(id).map_or_else(|_| id.clone(), |e| e.name))
+        .collect()
 }
 
 /// "1 defense" / "3 defenses".
@@ -248,6 +287,26 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
                 * coordination_reload_factor(rank(BodyAttribute::Coordination)),
         ),
         (PreviewStat::ShotInterval, modifiers.cadence_multiplier),
+    ];
+    for class in WeaponClass::ALL {
+        let perk = modifiers
+            .class_modifiers
+            .get(&class)
+            .copied()
+            .unwrap_or_default();
+        stats.extend(
+            ClassStat::ALL.map(|stat| (PreviewStat::ClassStat(class, stat), perk.get(stat))),
+        );
+    }
+    stats.extend([
+        (
+            PreviewStat::ArmorPenetration,
+            modifiers.armor_penetration as f32,
+        ),
+        (
+            PreviewStat::HazardDamage,
+            modifiers.hazard_damage_multiplier,
+        ),
         (
             PreviewStat::GrenadeCharges,
             modifiers.grenade_charges as f32,
@@ -276,7 +335,7 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
             PreviewStat::StructurePower,
             modifiers.engineering_multiplier,
         ),
-    ];
+    ]);
     stats.extend(StructureKind::ALL.map(|kind| {
         (
             PreviewStat::StructureRank(kind),
@@ -422,7 +481,11 @@ impl Campaign {
             match self.node_payment(id) {
                 Ok(NodePayment::Coins(price)) => rows.push(Requirement {
                     kind: RequirementKind::Coins,
-                    label: format!("{price} coins (have {})", self.coins),
+                    label: format!(
+                        "{} coins (have {})",
+                        crate::coins::grouped(price),
+                        crate::coins::grouped(self.coins)
+                    ),
                     met: self.coins >= price,
                 }),
                 Ok(NodePayment::LegacyBodyPoints(points)) => rows.push(Requirement {
@@ -530,11 +593,22 @@ impl Campaign {
         deltas
     }
 
+    /// Whether the survivor owns a non-npc_only Ranged item of `class`.
+    /// Mara's starter guns are not the survivor's.
+    fn survivor_owns_gun_of(&self, class: crate::weapons::WeaponClass) -> bool {
+        self.items.iter().any(|item| {
+            item.definition().slot == crate::content::Slot::Ranged
+                && !item.definition().npc_only
+                && !self.npc.loadout.contains(&item.id)
+                && crate::weapons::WeaponSpec::from_item(item.definition()).class == class
+        })
+    }
+
     /// How much `node` would do for `mode` right now: 2 when an effect acts
     /// at once, 1 for an incremental body rank (or a marginal ordnance
-    /// cooldown), 0 when nothing can act yet (a weapon class without its
-    /// gun, construction or structure upgrades without a blueprint, a
-    /// personal effect for Mara).
+    /// cooldown), 0 when nothing can act yet (a weapon class or class perk
+    /// without its gun, construction or structure upgrades without a
+    /// blueprint, a personal effect for Mara).
     fn node_value(&self, node: &SkillNode, mode: Mode) -> u8 {
         let personal = mode == Mode::Personal;
         let any_blueprint = self.blueprints.iter().any(|owned| *owned);
@@ -573,16 +647,12 @@ impl Campaign {
                         0
                     }
                 }
-                SkillEffect::WeaponTraining(class) => {
-                    // Mara's starter guns are not the survivor's.
-                    let owned = self.items.iter().any(|item| {
-                        item.definition().slot == crate::content::Slot::Ranged
-                            && !item.definition().npc_only
-                            && !self.npc.loadout.contains(&item.id)
-                            && crate::weapons::WeaponSpec::from_item(item.definition()).class
-                                == *class
-                    });
-                    if personal && owned { 2 } else { 0 }
+                SkillEffect::WeaponTraining(class) | SkillEffect::ClassModifier { class, .. } => {
+                    if personal && self.survivor_owns_gun_of(*class) {
+                        2
+                    } else {
+                        0
+                    }
                 }
                 _ => {
                     if personal {
@@ -755,6 +825,62 @@ impl Campaign {
 mod tests {
     use super::*;
     use crate::survivors::SurvivorId;
+
+    #[test]
+    fn counter_names_are_catalogue_names_in_authored_order() {
+        let catalog = crate::enemy_catalog::enemy_catalog();
+        let mut counters = 0;
+        for node in &skills().nodes {
+            let names = counter_names(node);
+            assert_eq!(names.len(), node.counters.len(), "{}", node.id);
+            for (id, name) in node.counters.iter().zip(&names) {
+                assert_eq!(*name, catalog.resolve(id).unwrap().name, "{}", node.id);
+                assert_ne!(name, id, "{}: a display name, not the id", node.id);
+                counters += 1;
+            }
+        }
+        assert!(counters >= 6, "the decision-19 nodes author counters");
+        // An id the catalogue does not know keeps its id.
+        let mut probe = skills().node("shield_breaker").unwrap().clone();
+        probe.counters.push("no-such-archetype".into());
+        assert_eq!(
+            counter_names(&probe).last().map(String::as_str),
+            Some("no-such-archetype")
+        );
+    }
+
+    #[test]
+    fn perk_preview_stats_have_labels_formats_and_neutral_snapshot_values() {
+        let shotgun = |stat| PreviewStat::ClassStat(WeaponClass::Shotgun, stat);
+        assert_eq!(
+            shotgun(ClassStat::Cadence).label(),
+            "Shotgun time between shots"
+        );
+        assert_eq!(shotgun(ClassStat::Cadence).format(0.8), "×0.80");
+        assert_eq!(shotgun(ClassStat::Damage).label(), "Shotgun damage");
+        assert_eq!(shotgun(ClassStat::Reload).label(), "Shotgun reload time");
+        assert_eq!(shotgun(ClassStat::WeakBonus).format(0.15), "+15%");
+        assert_eq!(PreviewStat::ArmorPenetration.format(4.0), "4");
+        assert_eq!(PreviewStat::HazardDamage.format(0.6), "×0.60");
+        // Every perk stat is in the snapshot at its neutral value, so no
+        // shipped node previews a change to it.
+        let (stats, _) = stat_snapshot(&Campaign::default());
+        let value = |stat: PreviewStat| stats.iter().find(|(s, _)| *s == stat).unwrap().1;
+        for class in WeaponClass::ALL {
+            for stat in ClassStat::ALL {
+                let neutral = if stat == ClassStat::WeakBonus {
+                    0.0
+                } else {
+                    1.0
+                };
+                assert_eq!(value(PreviewStat::ClassStat(class, stat)), neutral);
+            }
+        }
+        assert_eq!(value(PreviewStat::ArmorPenetration), 0.0);
+        assert_eq!(value(PreviewStat::HazardDamage), 1.0);
+        let order: Vec<_> = stats.iter().map(|(s, _)| s.clone()).collect();
+        assert!(order.windows(2).all(|w| w[0] < w[1]), "PreviewStat order");
+    }
 
     #[test]
     fn a_milestone_just_met_names_the_nodes_it_opened() {
@@ -1012,7 +1138,10 @@ mod tests {
             [
                 ("Learn Steady hands".to_owned(), false),
                 (
-                    format!("{} coins (have 25)", price("shotgun_training")),
+                    format!(
+                        "{} coins (have 25)",
+                        crate::coins::grouped(price("shotgun_training"))
+                    ),
                     false
                 )
             ]
@@ -1022,9 +1151,27 @@ mod tests {
             [
                 ("Learn Field fitness".to_owned(), false),
                 ("Liberate 1 country (0 / 1)".to_owned(), false),
-                ("75 coins (have 25)".to_owned(), false)
+                (
+                    format!(
+                        "{} coins (have 25)",
+                        crate::coins::grouped(price("companion_contact"))
+                    ),
+                    false
+                )
             ]
         );
+        // Both amounts group by thousands, like every price on screen.
+        c.coins = 1_234;
+        let network = labels(&c, "recruitment_network");
+        assert_eq!(
+            network.last().unwrap().0,
+            format!(
+                "{} coins (have 1,234)",
+                crate::coins::grouped(price("recruitment_network"))
+            )
+        );
+        assert!(price("recruitment_network") >= 1_000, "a grouped price");
+        c.coins = 25;
         assert_eq!(
             labels(&c, "parallel_command")[1],
             ("Liberate 2 countries (0 / 2)".to_owned(), false)
@@ -1190,7 +1337,7 @@ mod tests {
         assert_eq!(reload[0].summary(), "Reload time ×1.00 → ×0.80");
         assert_eq!(
             delta(&c, "steady_hands", PreviewStat::DamageBonus),
-            (0.0, 8.0)
+            (0.0, 4.0)
         );
         assert_eq!(PreviewStat::DamageBonus.format(8.0), "+8");
         // Body ranks change the rank and the derived stat.
@@ -1356,7 +1503,15 @@ mod tests {
     #[test]
     fn the_recommendation_buys_what_helps_now_before_body_ranks() {
         let mut c = started();
-        let route = recommended_route(&mut c, 400);
+        // Enough for every node that acts now up to Endurance drill's price
+        // (the dearest of the four starters below), with too little left
+        // over for the next one, so the leftover goes to a body rank.
+        let budget: u64 = 3_000;
+        let route = recommended_route(&mut c, budget);
+        assert!(
+            route.iter().any(|id| id.starts_with("body_")),
+            "{budget} coins leave nothing for a body rank: {route:?}"
+        );
         let first_body = route
             .iter()
             .position(|id| id.starts_with("body_"))
@@ -1444,10 +1599,65 @@ mod tests {
         );
     }
 
+    /// Design progression-tree §5 "Recommender": a class perk acts now only
+    /// with an owned, non-npc_only Ranged item of its class that is not one
+    /// of Mara's guns, and never for Mara. Six of the shipped nodes 170-177
+    /// (W2-41) author class perks; the test injects its own node so the rule
+    /// is pinned apart from the shipped tree.
+    #[test]
+    fn class_modifier_node_acts_now_only_with_owned_class_weapon() {
+        use crate::weapons::{WeaponClass, WeaponSpec};
+        let perk_node = |class| SkillNode {
+            effects: vec![SkillEffect::ClassModifier {
+                class,
+                stat: ClassStat::Damage,
+                value: 1.2,
+            }],
+            ..skills().node("steady_hands").unwrap().clone()
+        };
+        let mut c = started();
+        let class_of =
+            |c: &Campaign, id: u64| WeaponSpec::from_item(c.item(id).unwrap().definition()).class;
+        let survivor_gun = class_of(&c, c.player.loadout[crate::content::Slot::Ranged.index()]);
+        let mara_gun = class_of(&c, c.npc.loadout[crate::content::Slot::Ranged.index()]);
+        assert_eq!(c.node_value(&perk_node(survivor_gun), Mode::Personal), 2);
+        assert_eq!(
+            c.node_value(&perk_node(survivor_gun), Mode::Npc),
+            0,
+            "personal-only perk"
+        );
+        assert_ne!(mara_gun, survivor_gun, "the fixture separates the two guns");
+        assert_eq!(
+            c.node_value(&perk_node(mara_gun), Mode::Personal),
+            0,
+            "Mara's starter gun is not the survivor's"
+        );
+        assert_eq!(
+            c.node_value(&perk_node(WeaponClass::Rifle), Mode::Personal),
+            0
+        );
+        let rifle = crate::content::content()
+            .items
+            .iter()
+            .position(|i| {
+                i.slot == crate::content::Slot::Ranged
+                    && !i.npc_only
+                    && WeaponSpec::from_item(i).class == WeaponClass::Rifle
+            })
+            .unwrap();
+        c.add_item(rifle).unwrap();
+        assert_eq!(
+            c.node_value(&perk_node(WeaponClass::Rifle), Mode::Personal),
+            2
+        );
+        assert_eq!(c.node_value(&perk_node(WeaponClass::Rifle), Mode::Npc), 0);
+    }
+
     #[test]
     fn recommended_node_is_never_owned_and_prefers_buyable_starters() {
         let mut c = started();
-        c.coins = 40;
+        // The price of the cheapest starter that acts now.
+        c.coins = price("steady_hands");
         let id = c.recommended_node(Mode::Personal).unwrap();
         assert!(c.node_state(&id).is_buyable(), "{id}");
         let node = skills().node(&id).unwrap();

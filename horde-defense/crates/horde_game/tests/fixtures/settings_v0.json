@@ -1,0 +1,24 @@
+{
+  "scale": 1.15,
+  "aim_assist": 0.25,
+  "auto_reload": false,
+  "toggle_fire": true,
+  "outlines": true,
+  "numbers": false,
+  "reduced_effects": true,
+  "show_guidance": false,
+  "blood": true,
+  "master": 0.8,
+  "effects": 0.45,
+  "ambience": 0.3,
+  "bindings": [
+    "Mouse1",
+    "Mouse3",
+    "T",
+    "Q",
+    "E",
+    "C",
+    "P",
+    "G"
+  ]
+}

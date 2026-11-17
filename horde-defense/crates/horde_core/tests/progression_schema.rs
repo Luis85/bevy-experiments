@@ -1,0 +1,406 @@
+//! Progression receipts (W1-25): `Report.progression_rewards`, the
+//! `RunRecord.level_grant_coins` / `milestone_coins` totals and the
+//! transient `SettlementIssue::MilestoneItemLost`, beside the W1-24 ledgers
+//! `Player.level_grant_paid` and `Campaign.milestones_claimed`. Settlement
+//! (W2-22, tests/progression_settlement.rs) pays the shipped grant and
+//! milestones (W2-54); these tests stage the receipts as a save would.
+mod support;
+use horde_core::{
+    campaign::Player,
+    command::Command,
+    content::{ItemDefId, Mode},
+    progression::{
+        ProgressionRewardCatalog, RewardsOverride, catalog, level_grant, override_rewards,
+    },
+    sim::{Game, MilestoneReward, ProgressionRewards, SAVE_VERSION, SaveError, SettlementIssue},
+};
+use serde_json::{Value, json};
+use support::strategic_game;
+
+/// A strategic game with a settled expedition (its own report and run
+/// record), a withdrawn root run (report and run record) and a live root
+/// Personal attempt. Returns the game and the settled battle's position.
+fn receipt_game() -> (Game, usize) {
+    let mut g = strategic_game();
+    let country = g.campaign().world.cleared[0].clone();
+    let recruit = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    let settled = g.deploy_survivor(recruit, &country, 0).unwrap();
+    g.recall_survivor(settled).unwrap();
+    g.deploy(0, Mode::Personal).unwrap();
+    g.apply(&Command::Withdraw).unwrap();
+    // Deploying clears the report; restore it as a save made later would hold.
+    let report = g.last_result().cloned();
+    g.deploy(0, Mode::Personal).unwrap();
+    *g.last_result_mut() = report;
+    let settled = g.battles().iter().position(|b| b.id == settled).unwrap();
+    assert!(g.battles()[settled].settled);
+    assert!(g.battles()[settled].game().last_result().is_some());
+    assert!(g.last_result().is_some() && g.attempt().is_some());
+    (g, settled)
+}
+
+/// The staged save: a root report receipt with two milestones (one with its
+/// granted item, one whose item was lost), a settled expedition report
+/// receipt with level coins only, run-record coin totals, and the ledgers.
+struct Staged {
+    value: Value,
+    settled: usize,
+    item: u64,
+}
+
+fn staged() -> Staged {
+    let (game, settled) = receipt_game();
+    let mut value = serde_json::to_value(&game).unwrap();
+    let item = game.campaign().next_item_id - 1;
+    let level = game.campaign().player.level;
+    value["last_result"]["progression_rewards"] = json!({
+        "level_from": 1, "level_to": 6, "level_coins": 77,
+        "milestones": [
+            {"rank": 5, "coins": 500, "item_id": item, "item_definition": "fire_axe"},
+            {"rank": 10, "coins": 1000}
+        ]
+    });
+    value["battles"][settled]["game"]["last_result"]["progression_rewards"] =
+        json!({"level_from": 2, "level_to": 3, "level_coins": 9, "milestones": []});
+    let record = value["campaign"]["run_history"]
+        .as_array_mut()
+        .unwrap()
+        .last_mut()
+        .unwrap();
+    record["level_grant_coins"] = json!(77);
+    record["milestone_coins"] = json!(1500);
+    value["campaign"]["player"]["level_grant_paid"] = json!(level);
+    Staged {
+        value,
+        settled,
+        item,
+    }
+}
+
+fn load(value: Value) -> Result<Game, SaveError> {
+    Game::from_payload(value, SAVE_VERSION)
+}
+
+/// `staged()` with `edit` applied.
+fn edited(edit: impl FnOnce(&mut Staged)) -> Value {
+    let mut s = staged();
+    edit(&mut s);
+    s.value
+}
+
+/// Loads every row and fails with the names of the rows that loaded or
+/// failed with anything but the receipt's own `SaveError::Invalid`.
+fn assert_each_invalid(rows: Vec<(&str, Value)>) {
+    let loaded: Vec<String> = rows
+        .into_iter()
+        .filter_map(|(name, value)| match load(value) {
+            Err(SaveError::Invalid(message)) if message.contains("progression receipt") => None,
+            Ok(_) => Some(format!("{name}: loaded")),
+            Err(error) => Some(format!("{name}: {error}")),
+        })
+        .collect();
+    assert_eq!(loaded, Vec::<String>::new(), "rows that did not fail");
+}
+
+fn milestone(rank: u32) -> Value {
+    json!({"rank": rank, "coins": 100})
+}
+
+#[test]
+fn progression_rewards_round_trip_and_reject_five_milestones() {
+    let Staged {
+        value,
+        settled,
+        item,
+    } = staged();
+    let loaded = load(value.clone()).unwrap_or_else(|e| panic!("staged receipt save: {e}"));
+    assert_eq!(serde_json::to_value(&loaded).unwrap(), value);
+    assert_eq!(
+        loaded.last_result().unwrap().progression_rewards,
+        ProgressionRewards {
+            level_from: 1,
+            level_to: 6,
+            level_coins: 77,
+            milestones: vec![
+                MilestoneReward {
+                    rank: 5,
+                    coins: 500,
+                    item_id: Some(item),
+                    item_definition: Some(ItemDefId("fire_axe".into())),
+                },
+                MilestoneReward {
+                    rank: 10,
+                    coins: 1000,
+                    item_id: None,
+                    item_definition: None,
+                },
+            ],
+        }
+    );
+    let worker = loaded.battles()[settled].game().last_result().unwrap();
+    assert_eq!(worker.progression_rewards.level_coins, 9);
+
+    // Four milestones at strictly increasing ranks and level_to at the cap
+    // still load.
+    let cap = Player::level_cap();
+    load(edited(|s| {
+        let receipt = &mut s.value["last_result"]["progression_rewards"];
+        receipt["milestones"] = json!([5, 10, 15, 20].map(milestone));
+        receipt["level_from"] = json!(cap);
+        receipt["level_to"] = json!(cap);
+    }))
+    .unwrap_or_else(|e| panic!("four milestones at the cap: {e}"));
+
+    let root = |field: &'static str, v: Value| {
+        edited(move |s| s.value["last_result"]["progression_rewards"][field] = v)
+    };
+    assert_each_invalid(vec![
+        (
+            "five milestones",
+            root("milestones", json!([5, 10, 15, 20, 25].map(milestone))),
+        ),
+        (
+            "worker five milestones",
+            edited(|s| {
+                s.value["battles"][s.settled]["game"]["last_result"]["progression_rewards"]["milestones"] =
+                    json!([1, 2, 3, 4, 5].map(milestone))
+            }),
+        ),
+        (
+            "ranks descending",
+            root("milestones", json!([10, 5].map(milestone))),
+        ),
+        (
+            "rank repeated",
+            root("milestones", json!([5, 5].map(milestone))),
+        ),
+        ("level_from above level_to", root("level_from", json!(7))),
+        ("level_to above the cap", root("level_to", json!(cap + 1))),
+        (
+            "unknown item definition",
+            edited(|s| {
+                s.value["last_result"]["progression_rewards"]["milestones"][0]["item_definition"] =
+                    json!("no_such_item")
+            }),
+        ),
+        (
+            "item id without its definition",
+            edited(|s| {
+                let milestone = &mut s.value["last_result"]["progression_rewards"]["milestones"][0];
+                milestone.as_object_mut().unwrap().remove("item_definition");
+            }),
+        ),
+        (
+            "item definition without its id",
+            edited(|s| {
+                let milestone = &mut s.value["last_result"]["progression_rewards"]["milestones"][0];
+                milestone.as_object_mut().unwrap().remove("item_id");
+            }),
+        ),
+    ]);
+}
+
+/// Every saved location of a W1-24 or W1-25 key in `value` that is present,
+/// over the root game and each worker game.
+fn progression_keys(value: &Value) -> Vec<String> {
+    fn check(object: &Value, path: &str, keys: &[&str], found: &mut Vec<String>) {
+        for key in keys {
+            if object.as_object().is_some_and(|o| o.contains_key(*key)) {
+                found.push(format!("{path}.{key}"));
+            }
+        }
+    }
+    fn game(value: &Value, at: &str, found: &mut Vec<String>) {
+        let campaign = &value["campaign"];
+        check(
+            campaign,
+            &format!("{at}campaign"),
+            &["milestones_claimed"],
+            found,
+        );
+        check(
+            &campaign["player"],
+            &format!("{at}campaign.player"),
+            &["level_grant_paid"],
+            found,
+        );
+        let history = campaign["run_history"].as_array().into_iter().flatten();
+        let pending = value["pending_runs"].as_array().into_iter().flatten();
+        for (n, record) in history.chain(pending).enumerate() {
+            let keys = ["level_grant_coins", "milestone_coins"];
+            check(record, &format!("{at}record[{n}]"), &keys, found);
+        }
+        check(
+            &value["last_result"],
+            &format!("{at}last_result"),
+            &["progression_rewards"],
+            found,
+        );
+        let battles = value["battles"].as_array().into_iter().flatten();
+        for (n, battle) in battles.enumerate() {
+            game(&battle["game"], &format!("{at}battles[{n}].game."), found);
+        }
+    }
+    let mut found = Vec::new();
+    game(value, "", &mut found);
+    found
+}
+
+#[test]
+fn progression_ledgers_round_trip_and_skip_at_default() {
+    assert!(ProgressionRewards::default().is_empty());
+    let Staged { value, settled, .. } = staged();
+    let loaded = load(value.clone()).unwrap_or_else(|e| panic!("staged receipt save: {e}"));
+    assert_eq!(serde_json::to_value(&loaded).unwrap(), value);
+    let record = loaded.campaign().run_history.last().unwrap();
+    assert_eq!(
+        (record.level_grant_coins, record.milestone_coins),
+        (77, 1500)
+    );
+    assert_eq!(
+        loaded.campaign().player.level_grant_paid,
+        loaded.campaign().player.level
+    );
+    assert!(record.validate().is_ok());
+    // The totals carry no bound of their own.
+    let mut large = record.clone();
+    (large.level_grant_coins, large.milestone_coins) = (u64::MAX, u64::MAX);
+    assert!(large.validate().is_ok());
+
+    // Emptied again, every key leaves the save.
+    let mut game = loaded;
+    game.campaign_mut().player.level_grant_paid = 0;
+    let record = std::sync::Arc::make_mut(&mut game.campaign_mut().run_history)
+        .last_mut()
+        .unwrap();
+    (record.level_grant_coins, record.milestone_coins) = (0, 0);
+    game.last_result_mut().as_mut().unwrap().progression_rewards = ProgressionRewards::default();
+    game.battles_mut()[settled]
+        .game_mut()
+        .last_result_mut()
+        .as_mut()
+        .unwrap()
+        .progression_rewards = ProgressionRewards::default();
+    let emptied = serde_json::to_value(&game).unwrap();
+    assert_eq!(progression_keys(&emptied), Vec::<String>::new());
+
+    // A fresh game's save holds none of the keys, and defaults read back.
+    let (fresh, settled) = receipt_game();
+    let value = serde_json::to_value(&fresh).unwrap();
+    assert_eq!(progression_keys(&value), Vec::<String>::new());
+    let loaded = load(value).unwrap();
+    assert!(loaded.last_result().unwrap().progression_rewards.is_empty());
+    let worker = loaded.battles()[settled].game().last_result().unwrap();
+    assert!(worker.progression_rewards.is_empty());
+    let record = loaded.campaign().run_history.last().unwrap();
+    assert_eq!((record.level_grant_coins, record.milestone_coins), (0, 0));
+}
+
+#[test]
+fn milestone_item_lost_names_rank_and_item() {
+    let issue = SettlementIssue::MilestoneItemLost {
+        rank: 10,
+        definition: ItemDefId("fire_axe".into()),
+        error: "Inventory is full".into(),
+    };
+    assert_eq!(
+        issue.to_string(),
+        "Rank 10 milestone item fire_axe was not stored: Inventory is full"
+    );
+}
+
+/// A reward block that authors no level grant and no milestone, for this
+/// thread. The shipped catalogue authors both since W2-54; the neutral
+/// paths below still cover a catalogue that authors none.
+fn neutral_rewards() -> RewardsOverride {
+    override_rewards(ProgressionRewardCatalog {
+        level_grant_xp_fraction: 0.0,
+        milestones: Vec::new(),
+        ..catalog().rewards.clone()
+    })
+}
+
+/// While the catalogue authors no milestones, settlement claims every frozen
+/// v7 milestone the rank reached, unpaid (W2-22, which replaces the wave-1
+/// `claim_neutral_milestones`), so authoring them later pays a native v7
+/// save no backlog, like a migrated v6 save (step (d)). A victory credit
+/// alone claims nothing; the run's finish does.
+#[test]
+fn neutral_victories_claim_the_reached_milestones() {
+    let _neutral = neutral_rewards();
+    let mut game = Game::default();
+    for _ in 0..12 {
+        game.campaign_mut().first_clear(0, Mode::Personal);
+    }
+    assert!(game.campaign().milestones_claimed.is_empty());
+    game.campaign_mut().attempts = 1;
+    game.deploy(0, Mode::Personal).unwrap();
+    let coins = game.campaign().coins;
+    game.apply(&Command::Withdraw).unwrap();
+    assert_eq!(game.campaign().coins, coins, "nothing is paid");
+    assert!(game.last_result().unwrap().progression_rewards.is_empty());
+    let campaign = game.campaign();
+    assert_eq!(campaign.progression_rank(), 12);
+    assert_eq!(campaign.milestones_claimed, [5, 10].into());
+    let loaded = load(serde_json::to_value(&game).unwrap()).unwrap();
+    assert_eq!(loaded.campaign().milestones_claimed, [5, 10].into());
+}
+
+/// W2-52 (R16): while every level-up grant is 0 coins (the catalogue
+/// authors no grant), a level-up owes nothing, so the ledger follows the
+/// level and W2-22 pays a native v7 save no backlog, like a migrated v6 save
+/// (step (c)). It covers mid-run kill XP, victory XP and a played Personal
+/// run; an Npc reward levels no player and moves no ledger. With the shipped
+/// grant (W2-54) the shim is inert: a level-up leaves the ledger owed and the
+/// run's finish pays it.
+#[test]
+fn neutral_level_ups_keep_the_grant_ledger_paid() {
+    {
+        let mut game = Game::default();
+        game.campaign_mut().reward(0, 60, Mode::Personal);
+        let player = &game.campaign().player;
+        assert!(player.level >= 2, "kill XP levelled the player");
+        assert_eq!(player.level_grant_paid, 0, "the shipped grant is owed");
+        let (level, coins) = (player.level, game.campaign().coins);
+        game.campaign_mut().attempts = 1;
+        game.deploy(0, Mode::Personal).unwrap();
+        game.apply(&Command::Withdraw).unwrap();
+        let owed: u64 = (2..=level).map(level_grant).sum();
+        assert!(owed > 0);
+        assert_eq!(game.campaign().coins, coins + owed, "the finish pays it");
+        assert_eq!(game.campaign().player.level_grant_paid, level);
+    }
+    let _neutral = neutral_rewards();
+    let cap = catalog().player_level_cap;
+    assert!(
+        (2..=cap).all(|level| level_grant(level) == 0),
+        "the neutral block authors no level grant"
+    );
+    let ledger = |game: &Game| {
+        let player = &game.campaign().player;
+        (player.level, player.level_grant_paid)
+    };
+    let mut game = Game::default();
+    assert_eq!(ledger(&game), (1, 0));
+    game.campaign_mut().reward(0, 10_000, Mode::Npc);
+    assert_eq!(ledger(&game), (1, 0), "an Npc reward levels no player");
+    game.campaign_mut().reward(0, 60, Mode::Personal);
+    let (level, paid) = ledger(&game);
+    assert!(level >= 2, "kill XP levelled the player");
+    assert_eq!(paid, level, "kill XP level-up");
+    for _ in 0..3 {
+        game.campaign_mut().first_clear(0, Mode::Personal);
+    }
+    let (level, paid) = ledger(&game);
+    assert!(level > 2, "victory XP levelled the player");
+    assert_eq!(paid, level, "victory level-up");
+    let loaded = load(serde_json::to_value(&game).unwrap()).unwrap();
+    assert_eq!(ledger(&loaded), (level, level), "the ledger is saved");
+
+    let run = support::smoke_run(1, Mode::Personal, 1800, |_| {});
+    let (level, paid) = ledger(&run);
+    assert!(level >= 2, "the seed-1 Personal run levels up");
+    assert_eq!(paid, level, "a played Personal run");
+}

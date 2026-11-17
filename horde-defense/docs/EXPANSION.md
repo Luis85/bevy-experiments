@@ -25,6 +25,13 @@ context; it is not silently rewritten.
   Skills, and permits live retry. The first battle should teach recovery
   naturally; roughly 3–5 early runs is the pacing target, with country-specific
   balance evidence pending.
+  - **Superseded 4 November 2026 (foundation pass, B2) and in the production
+    pass (decision 1, W3-18):** Start journey (`ChooseStart`) deploys the first
+    Personal defense paused, and Begin defense starts it, with the first-defense
+    hint and the key legend on the field. Every later country is only chosen
+    (`SelectCountry`) and its defense starts from the Briefing. A retreat ends
+    on Results, whose Upgrade opens the tree on its own Upgrades screen; the
+    Skills tab is retired. See JOURNEYS.md, "Choosing a country" and "Loop map".
 - Opening construction, placing and salvaging do not pause combat, including
   observed expeditions. Explicit pause and Settings still freeze simulation
   clocks. Layouts are saved separately per country during live combat.
@@ -74,6 +81,7 @@ These explicit later decisions supersede fixed-eleven geometry, unique-clear-onl
 - Earned loot appears at the actual death position with a quality outline and rises/fades in real UI time. It is already banked; presentation never grants or requires collecting a second item.
 - The menu survivor returns to the original source-image cabin anchor (0.400, 0.807), at 21% source-image height. Fringes are corrected in the managed premultiplied upload path; original PNG pixels/hashes remain unchanged.
 - Faster enemies may overtake slower moving peers within the same lane. Structures/contact still block and traps cover the full lane. Saved displacement and Enemy.y() are authoritative for aim, range, corpses and loot.
+- **Superseded 2026-11-06 (W1-69): enemies never block each other.** No lane queue and no overtaking side step: bodies overlap, and every enemy that reaches the defense line or a live non-trap structure attacks. Structures still block; traps still cover the full lane.
 - Keep the pinned GURPS injury rules. Conscious zero/negative-HP NPC enemies may fight and must be visibly labeled critical with signed inspection. Actual terminal actors stop/reap/pay in the resolving fixed tick; zero HP alone does not grant NPC death rewards.
 - Character MAX is 50, with up to 120 once-only completion XP per successful run in either mode. NPC kill XP remains separate. New deployment lanes unlock from 11 to 13/15/17 at levels 11/21/31; active geometry and legacy eleven-lane saves remain frozen.
 - Every committed victory, including replay, outbreak and parallel/worker victories, raises future threat exactly once. Defeat/withdrawal do not. The old fifty rank is a bounded-growth knee, while health/damage continue to an explicit numerical support guard. Independent caps still bound lanes, groups, population and item level.
@@ -83,7 +91,7 @@ These explicit later decisions supersede fixed-eleven geometry, unique-clear-onl
 
 ## Menu pose, cursor and impact presentation — 3 November 2026
 
-The user's additional presentation requests preserve all quality, victory-threat, frozen-lane, overtaking and GURPS contracts above.
+The user's additional presentation requests preserve all quality, victory-threat, frozen-lane, enemy-overlap (W1-69) and GURPS contracts above.
 
 - Replace the assembled menu arms/gun with a new cohesive Rook/June low-ready-pistol atlas. Keep the original cabin anchor/21% source height, planted boots and restrained breathing. The calibrated battle aiming rig stays unchanged.
 - The focused unobscured battlefield has one custom crosshair with ammunition/reload/charge feedback. Native pointer visibility restores for ordinary menus, controls, popups, leaving the window and focus loss.
@@ -97,6 +105,7 @@ The source catalogue now has seven active managed textures, eight pixel provenan
 These explicit user changes supersede the earlier fresh11/30 opening; legacy active fields stay frozen.
 
 - Normal starts at 3 lanes/12 yards, with 1.25× authored movement, adding two lanes/two yards every three character levels, capped 17/30. The clearing grows physically rather than stretching three rows across the viewport.
+  - **Superseded 4 November 2026 (user requirement, camera):** the field now uses uniform zoom-to-fit. It keeps the lane:yard proportion of the per-geometry clearing above and zooms until one axis fills the bounded arena, so fewer lanes or yards zoom in (3x12 is 2.5x). Every already-filling field (17x30, 11x20, all eleven-plus-lane fields) stays pixel-identical. Construction is an overlay panel and never rescales the arena. See docs/plans/2026-11-05-production-pass.md (CAM-1, CAM-2) and `art::camera::fit_field`.
 - Validated Easy/Normal/Hard/Custom JSON presets and saved per-profile settings apply to the next run, including a chained worker's next deployment. Active attempts retain copied settings and dimensions.
 - Actual DPS uses five simulation seconds, plus whole-run average/peak and damage-source totals. Pause,4× observation and checkpoint restoration preserve its time base.
 - Every newly settled victory/defeat/withdrawal produces a saved context/gear/balance/geometry/reward/XP/damage/DPS record. Parent-owned worker outboxes append once. History is not silently truncated or retroactively invented.
@@ -109,9 +118,20 @@ These explicit user changes supersede the earlier fresh11/30 opening; legacy act
 These latest user requirements supersede the separate personal body/skill/fortification purchase screens and the early management-first flow. The pixel-survival identity, fixed defender, earned equipment, retained rewards and later country strategy remain.
 
 - The main menu offers New game. A new journey confirms a survivor, selects its infected starting country on the map and starts live defense. An existing campaign must be protected before a confirmed new game replaces the active profile.
+  - **Superseded 4 November 2026 (foundation pass, B2):** Start journey opens the first defense paused; it starts with Begin defense. See JOURNEYS.md, "Choosing a country".
 - Every completed main round returns to one upgrade screen. The player spends retained earnings, equips owned gear and chooses to continue the journey or leave it. A failed round is a retreat, rest and training opportunity; a victory advances to the next local defense. A liberated country opens its eligible neighbors. Leaving is not a prestige reset and does not erase earned progression.
+  - **Superseded in the production pass (decision 1):** every main round now ends on Results, whose three actions are Upgrade (the upgrade screen, now its own screen), the continuation and Leave journey; Upgrades returns to battle or to Camp home. See JOURNEYS.md, "Loop map".
 - One connected, data-driven skill tree contains personal development, weapon training, abilities, fortifications and access to later systems. Paths branch from a shared foundation. Path navigation changes the camera rather than splitting the tree into separate tabs. Weapon proficiency and buying/looting a weapon remain separate requirements.
 - Start with the incremental battle/upgrade loop. Introduce companions, construction, recruitment and country protection through earned unlocks and the existing liberation milestones. Individual NPC rules advancement remains attached to that NPC; it must not silently modify the personal survivor or bypass the pinned GURPS accounting.
 - Survivors use interchangeable body, clothing, carried equipment, arm/hand and weapon parts. Actual equipped instance metadata determines equipment appearance. A shared rig must keep hands on weapon grips, long-gun stocks near the shoulder and tracer origins at the displayed muzzle through aiming, recoil and reload. Animation remains presentation-only and cannot change the fixed defender position or an already resolved hit.
 
 The implementation/authoring contracts and measured validation for this increment are recorded separately; this section records requested behavior, not a claim that visual inspection or human playtesting has passed.
+
+## Production pass requirements — November 2026
+
+These user requirements and decisions of the production pass (4 to 14 November 2026, recorded in docs/plans/2026-11-05-production-pass.md §2) supersede the sections above where they differ. Decisions 8, 9 and 19 were asked and approved before the work started; the camera requirement was given on 4 November 2026. Each item names the acceptance rows in ACCEPTANCE.md that prove it.
+
+- **Camera.** Every battlefield uses uniform zoom-to-fit. The per-geometry clearing keeps its lane:yard proportion and zooms, centred, until one axis fills the bounded arena, so fewer lanes or yards zoom in (a 3x12 field is 2.5x) and every already-filling field (17x30, 11x20 and every field of eleven or more lanes) stays pixel-identical. The Operations observer window uses the same fit. Construction is an overlay panel over the field and never rescales the arena; an INCOMING chevron marks spawns the panel covers. (`art::camera::fit_field`; G7.9, G2.10.)
+- **Save format (decision 8).** SAVE_VERSION 7. Saves of versions 1 to 6 still load and migrate; `save_v6.json` and `save_v7.json` are frozen fixtures, and older settings files load with the new defaults. (D8, ISO-4.)
+- **Assets (decision 9).** New gun, enemy and UI audio: yes. No new music files (every music track slot stays deferred, and the music director builds its stingers from existing banks) and no new ImageGen sheets. Every shipped file records its generator, seed and sha256 in a provenance manifest and has a line in assets/CREDITS.md. (D9, G8.4, G8.7.)
+- **Skills (decision 19).** The tree is repriced, and up to eight new append-only nodes were approved: eight weapon-mastery nodes follow the first 169, so the catalogue holds 177, and no id changes. (G5.3, G5.11.)

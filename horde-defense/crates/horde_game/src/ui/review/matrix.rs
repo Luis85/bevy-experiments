@@ -7,23 +7,47 @@ use horde_core::{
     survivors::SurvivorId,
 };
 
+/// Stages the launch's scenario, if it names one. A staged scene shows its
+/// screen, not onboarding callouts for what the staging unlocked; a callout
+/// still leaves its one callout unread (`production::unread_callout`).
 pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
+    stage(f);
+    if let Some(scene) = f.launch.scenario.as_deref() {
+        crate::ui::onboarding::mark_unlocked_seen(&mut f.settings, &f.game);
+        if let Some(id) = production::unread_callout(scene)
+            && let Some(seen) = f.settings.seen_callouts.as_mut()
+        {
+            seen.remove(id);
+        }
+    }
+}
+
+fn stage(f: &mut FrontendParts) {
     let launch = f.launch.clone();
     let Some(screen) = launch.scenario.clone() else {
         return;
     };
+    // The scene replaces any journey the frontend was built with, so a
+    // "Campaign restored…" line no longer describes it and never reaches a
+    // still (CF-3-13). An isolated review's startup reads no save at all
+    // (CF-3-24, `profile::reads_saved_profile`).
+    if !launch.practice && f.status.message == crate::profile::CAMPAIGN_RESTORED {
+        f.status.message.clear();
+    }
     if screen == "npc-stutter" {
         prepare_copied_npc(f);
         return;
     }
     f.game = Game::default();
-    if !launch.practice {
+    if !launch.practice && !keeps_audio(&launch) {
         f.settings.master = 0.0;
     }
     if let Some(scale) = launch.review().and_then(|r| r.scale) {
         f.settings.scale = scale;
     }
-    f.status.message = "Practice scenario - progress is isolated from your campaign".into();
+    if launch.practice {
+        f.status.message = "Practice scenario - progress is isolated from your campaign".into();
+    }
     if screen == "menu" {
         return;
     }
@@ -50,6 +74,29 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         f.screen = Screen::Menu;
         return;
     }
+    // The unsaveable 400-enemy perf fixture (launch refuses it as practice):
+    // it never submits a save, so no autosave can fail on it. fx-stress is
+    // the same fixture registered as a still (one fixture, two names), plus
+    // its effect load.
+    #[cfg(feature = "review")]
+    if matches!(screen.as_str(), "stress" | "fx-stress") {
+        f.game = horde_core::sim::stress_render_fixture().expect("stress render fixture");
+        f.runtime.forbid_saves();
+        f.screen = Screen::Battle;
+        f.campaign.mode = Mode::Npc;
+        f.campaign.selected_country = f
+            .game
+            .attempt()
+            .and_then(|a| a.country_id.clone())
+            .expect("stress country stage");
+        f.status.message = "Synthetic stress fixture · 400 drawn + 3 expeditions · perf headroom, not a gameplay claim".into();
+        // The still also carries the wave-5 effect load (W5-09); the perf
+        // scene stays the bare fixture.
+        if screen == "fx-stress" {
+            production::entitle_fx_stress_load(f);
+        }
+        return;
+    }
     if matches!(screen.as_str(), "peak" | "progressed-peak" | "max-lanes") {
         f.game = if matches!(screen.as_str(), "progressed-peak" | "max-lanes") {
             horde_core::sim::maximum_progression_render_fixture()
@@ -63,6 +110,11 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         f.status.message = if matches!(screen.as_str(),"progressed-peak"|"max-lanes") { "Synthetic maximum-rank fixture · authored population cap plus boss · no gameplay or FPS claim" } else { "Paused peak-render fixture · no simulation FPS claim" }.into();
         return;
     }
+    // The wave-1 scenes stage their own country and state through commands,
+    // before the shared progression below.
+    if production::prepare(f, &screen) {
+        return;
+    }
     f.screen = Screen::Camp;
     if screen == "history-empty" {
         f.screen = Screen::History;
@@ -72,6 +124,8 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         return;
     }
     if screen == "world" {
+        // Before the first start the camp is the world map (no Camp home yet).
+        f.nav.tab = Tab::World;
         f.game.set_paused(true);
         return;
     }
@@ -89,6 +143,12 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
     if matches!(screen.as_str(), "briefing" | "briefing-npc") {
         if screen == "briefing-npc" {
             prepare_progression(&mut f.game);
+            // The briefing reads core's next defender (ruling D16).
+            f.game
+                .apply(&horde_core::command::Command::SetNextDefender(
+                    horde_core::defenders::DefenderId::Mara,
+                ))
+                .expect("Mara defends the briefing-npc scene");
             f.campaign.mode = Mode::Npc;
         }
         f.act(|c| c.open_briefing());
@@ -130,6 +190,9 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         return;
     }
     if matches!(screen.as_str(), "progressed-battle" | "leveled-armory") {
+        // Before the clears: their levels grant the character points that
+        // prepare_progression invests (without the flag the third allocation fails).
+        enable_legacy_ledgers(&mut f.game);
         let count = f
             .game
             .campaign()
@@ -221,30 +284,45 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
                 .find(|i| !i.protected)
                 .map(|i| i.id);
         }
-        "skills" | "skills-survival" | "skills-ordnance" => {
-            f.screen = Screen::Results;
+        "skills"
+        | "skills-survival"
+        | "skills-ordnance"
+        | "skills-firearms"
+        | "skills-firearms-column" => {
+            f.screen = Screen::Upgrades;
             f.nav.tab = Tab::Skills;
             f.campaign.improvement_focus =
                 Some(horde_core::campaign::RecommendationAction::LearnNode(
                     match screen.as_str() {
                         "skills-survival" => "field_fitness",
                         "skills-ordnance" => "grenade_training",
+                        // W2-55: the Firearms column at x = -1780.
+                        "skills-firearms" => "pistol_double_tap",
+                        // Closing phase: Pump drill, the column's 190 row.
+                        "skills-firearms-column" => "shotgun_pump_drill",
                         _ => "pistol_training",
                     }
                     .into(),
                 ));
+            if screen == "skills-firearms-column" {
+                // No node focus fits the 190 and 380 rows in the compact
+                // canvas, so centre the point between Pump drill (-1780,
+                // 190), Breath control (-1780, 380) and Rifle proficiency
+                // (-1220, 190), the two ends of W2-41's route.
+                f.campaign.tree_centre_seed = Some([-1500.0, 285.0]);
+            }
         }
         "skills-search" => {
             // A search with a goal path: "reload" matches, and the focused
             // depth-3 node draws its unowned chain and "N steps · M coins".
-            f.screen = Screen::Results;
+            f.screen = Screen::Upgrades;
             f.campaign.tree_search_seed = Some("reload".into());
             f.campaign.improvement_focus = Some(
                 horde_core::campaign::RecommendationAction::LearnNode("combat_reload".into()),
             );
         }
         "engineering" => {
-            f.screen = Screen::Results;
+            f.screen = Screen::Upgrades;
             f.campaign.improvement_focus = horde_core::skill_catalog::skills()
                 .nodes
                 .iter()
@@ -355,7 +433,15 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         }
         "battle" | "battle-female" | "progressed-battle" | "construction" | "ordnance" | "npc"
         | "boss" | "results" | "arid" | "tropical" => prepare_battle(f, &screen),
-        _ => f.nav.tab = Tab::World,
+        // Launch validation admits only registered names, so only the
+        // workshop scenes reach this arm; workshop.rs draws them.
+        _ => {
+            debug_assert!(
+                crate::review_scenes::is_workshop(&screen),
+                "registry admitted {screen}"
+            );
+            f.nav.tab = Tab::World;
+        }
     }
     f.game.set_paused(true);
 }

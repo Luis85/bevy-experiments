@@ -60,9 +60,14 @@ impl Game {
             };
             a.event_with(EventKind::Shot, origin, point, 0, meta);
             let bonus = structure_bonus(a, self.campaign.structure_upgrades[d.kind]);
+            let hit = if d.kind == StructureKind::Trap {
+                HitSource::Trap
+            } else {
+                HitSource::Turret
+            };
             let damage = if a.mode == Mode::Personal {
                 let damage = ((d.damage as f32 * bonus).round() as i32
-                    - enemy_armor(a, &a.enemies[target]))
+                    - enemy_armor_vs(a, &a.enemies[target], hit))
                 .max(0);
                 if damage == 0 {
                     a.telemetry.absorbed += 1;
@@ -92,9 +97,9 @@ impl Game {
                     armor_divisor: 1,
                 };
                 let dodge = e.injury.dodge(enemy_dodge(a, e));
-                let armor = enemy_armor(a, e);
+                let armor = enemy_armor_vs(a, e, hit);
                 let ht = enemy_ht(a, e);
-                let result = rules::resolve_attack(
+                let mut result = rules::resolve_attack(
                     &mut a.rng,
                     attack,
                     Some(dodge),
@@ -102,6 +107,7 @@ impl Game {
                     &mut a.enemies[target].injury,
                     ht,
                 );
+                a.enemies[target].log_hit(&mut result);
                 if result.requires_ready {
                     a.structures[n].ready_turns = 1;
                 }

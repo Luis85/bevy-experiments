@@ -222,17 +222,19 @@ fn peripheral_sprite_bases_share_the_requested_ground_plane() {
             Prop::Rock,
             Prop::Lamp,
         ] {
-            assert!(prop_grounded(
-                ui.painter(),
-                ArtTextures {
-                    props: Some(TextureId::User(2)),
-                    ..Default::default()
-                },
-                kind,
-                foot,
-                vec2(90., 80.),
-                Color32::WHITE
-            ));
+            ui.painter().add(
+                prop_grounded_shape(
+                    ArtTextures {
+                        props: Some(TextureId::User(2)),
+                        ..Default::default()
+                    },
+                    kind,
+                    foot,
+                    vec2(90., 80.),
+                    Color32::WHITE,
+                )
+                .expect("the prop sheet is loaded"),
+            );
         }
     });
     let meshes: Vec<_> = output
@@ -359,8 +361,9 @@ fn calibrated_pixel_sources_keep_their_original_dimensions_and_rgba_pixels() {
             0xbe09_5ad1_ad84_d49d,
         ),
         (
+            // Archived (production-pass decision 10): the edit source of keyart-v2.
             "keyart",
-            include_bytes!("../../../../assets/art/pixel/keyart-v1.png").as_slice(),
+            include_bytes!("../../../../archive/art/pixel/keyart-v1.png").as_slice(),
             [1672., 941.],
             0x6759_02fc_df6f_a532,
         ),
@@ -873,4 +876,79 @@ fn hit_flash_paints_additive_light_only_from_the_published_masks() {
     assert!(paint(rejected, lit, Actor::Enemy(sprite)).is_empty());
     loading::publish_flash_masks(&context, None);
     assert!(paint(textures, lit, Actor::Player).is_empty());
+}
+#[test]
+fn procedural_shadow_texture_matches_three_ring_profile() {
+    let image = soft_shadow_image();
+    assert_eq!(image.size, SOFT_SHADOW_SIZE);
+    let [width, height] = SOFT_SHADOW_SIZE;
+    // Premultiplied black everywhere.
+    assert!(
+        image
+            .pixels
+            .iter()
+            .all(|p| p.r() == 0 && p.g() == 0 && p.b() == 0)
+    );
+    let alpha = |x: usize, y: usize| image.pixels[y * width + x].a();
+    // Centre: all three rings, 10 + 15 + 23.
+    assert_eq!(alpha(width / 2, height / 2), 48);
+    // Along the horizontal axis, the texel at spread `s` of the shadow size
+    // (the image spans 1.35 either side of the centre).
+    let at = |spread: f32| (width as f32 * 0.5 * (1.0 + spread / 1.35)) as usize;
+    assert_eq!(alpha(at(0.8), height / 2), 48);
+    assert_eq!(alpha(at(1.0), height / 2), 25, "outer two rings");
+    assert_eq!(alpha(at(1.25), height / 2), 10, "outer ring only");
+    assert_eq!(
+        alpha(width - 1, height / 2),
+        10,
+        "the image spans the outer ring"
+    );
+    assert_eq!(alpha(0, 0), 0);
+    assert_eq!(alpha(width - 1, height - 1), 0);
+    // The quad spans the outer ring at the requested strength.
+    let (rect, tint) = soft_shadow_quad(pos2(10.0, 20.0), vec2(4.0, 2.0), 0.7);
+    assert_eq!(
+        rect,
+        Rect::from_center_size(pos2(10.0, 20.0), vec2(10.8, 5.4))
+    );
+    assert_eq!(tint, Color32::from_black_alpha(179));
+    // Symmetric about both axes.
+    for y in 0..height {
+        for x in 0..width {
+            assert_eq!(alpha(x, y), alpha(width - 1 - x, y));
+            assert_eq!(alpha(x, y), alpha(x, height - 1 - y));
+        }
+    }
+}
+
+/// Closing phase (G1.10): the battle resolves the survivor every pass from
+/// frozen gear that does not change within an attempt, so the appearance
+/// the active catalogue resolves for one model in one equipment is kept and
+/// handed back, while other equipment resolves its own.
+#[test]
+fn a_repeated_model_and_equipment_reuse_their_resolved_appearance() {
+    use crate::player_model::{resolve_appearance, startup::active_or_bundled, verification};
+    use horde_core::weapons::WeaponClass;
+    let catalogue = active_or_bundled().unwrap();
+    let pistol =
+        verification::review_equipment(Some(WeaponClass::Pistol), Some("armor.cloth"), None)
+            .unwrap();
+    let rifle = verification::review_equipment(Some(WeaponClass::Rifle), Some("armor.cloth"), None)
+        .unwrap();
+    let first = player_appearance(catalogue, "rook", &pistol).unwrap();
+    let again = player_appearance(catalogue, "rook", &pistol).unwrap();
+    assert!(
+        Arc::ptr_eq(&first, &again),
+        "the same model and gear reuse it"
+    );
+    let other = player_appearance(catalogue, "rook", &rifle).unwrap();
+    assert!(!Arc::ptr_eq(&first, &other));
+    for (equipment, resolved) in [(&pistol, &first), (&rifle, &other)] {
+        let fresh = resolve_appearance(catalogue, "rook", equipment).unwrap();
+        assert_eq!(resolved.part_indices, fresh.part_indices);
+        assert_eq!(resolved.attachment_ids, fresh.attachment_ids);
+        assert_eq!(resolved.hold_id, fresh.hold_id);
+        assert_eq!(resolved.skin_id, fresh.skin_id);
+        assert_eq!(resolved.frozen_equipment, fresh.frozen_equipment);
+    }
 }

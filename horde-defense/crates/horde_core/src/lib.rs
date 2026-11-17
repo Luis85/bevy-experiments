@@ -1,15 +1,21 @@
 pub mod balance;
 pub mod campaign;
 pub mod catalog;
+pub mod coins;
 pub mod command;
 pub mod content;
+pub mod defenders;
 pub mod enemy_catalog;
 mod hash;
 pub mod kind_map;
+pub mod loot;
 pub mod ordnance;
 pub mod progression;
 pub mod quality;
 pub mod rules;
+mod schema;
+#[cfg(any(test, feature = "test-support"))]
+pub mod sha256;
 pub mod sim;
 pub mod skill_catalog;
 pub mod stats;

@@ -143,7 +143,11 @@ pub struct GearRecord {
 pub struct RunRecord {
     pub id: u64,
     pub attempt_id: u64,
+    /// The expedition that ran this attempt; None for a main-run record.
     pub worker_id: Option<u64>,
+    /// The recruit who defended. With `worker_id` Some it is the expedition's
+    /// survivor; with `worker_id` None it marks a main-run recruit takeover,
+    /// which is always an Npc run.
     pub recruit_id: Option<u64>,
     pub outcome: Outcome,
     pub mode: Mode,
@@ -177,6 +181,25 @@ pub struct RunRecord {
     pub end_hp: i32,
     pub max_hp: i32,
     pub legacy: bool,
+    /// How many of this run's drops settlement auto-sold, and for how much.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub auto_sold_count: u32,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub auto_sold_coins: u64,
+    /// The level-up grant and milestone coins settlement paid with this run
+    /// (receipts; no bound of their own).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub level_grant_coins: u64,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub milestone_coins: u64,
+    /// Elites killed in this run (at most `kills`).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub elite_kills: u32,
+    /// Ticks from the boss's arrival to its defeat (at most `duration_ticks`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boss_ttk_ticks: Option<u64>,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub boss_rank: crate::progression::BossRank,
 }
 impl RunRecord {
     pub fn duration_seconds(&self) -> f32 {
@@ -192,6 +215,7 @@ impl RunRecord {
             || !(8.0..=30.0).contains(&self.width_yards)
             || self.max_hp <= 0
             || self.end_hp > self.max_hp
+            || (self.worker_id.is_none() && self.recruit_id.is_some() && self.mode != Mode::Npc)
             || self.country_name.len() > 120
             || self.defender_name.len() > 120
             || self.cause.len() > 1000
@@ -208,6 +232,12 @@ impl RunRecord {
                 .map(|v| u64::from(*v))
                 .sum::<u64>()
                 > u64::from(self.loot)
+            || self.auto_sold_count > self.loot
+            || (self.auto_sold_count == 0 && self.auto_sold_coins != 0)
+            || self.elite_kills > self.kills
+            || self
+                .boss_ttk_ticks
+                .is_some_and(|ticks| ticks > self.duration_ticks)
         {
             return Err("Invalid persistent run record".into());
         }

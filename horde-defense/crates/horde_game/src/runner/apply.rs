@@ -16,6 +16,8 @@ pub struct RuntimeCtx<'a> {
     pub cues: &'a mut Vec<SoundCue>,
     /// Set when the pass mutated `game`, so `GameSession` change ticks stay honest.
     pub game_changed: bool,
+    /// Perf launches only; tests and normal play pass `None`.
+    pub perf: Option<&'a crate::diagnostics::PerfProbe>,
 }
 impl RuntimeCtx<'_> {
     pub(super) fn notice(&mut self, notice: RuntimeNotice) {
@@ -35,6 +37,16 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
             AppCommand::Game(command) => command,
             AppCommand::Save(intent) => {
                 ctx.runtime.request_save(intent);
+                continue;
+            }
+            AppCommand::OpenSaveFolder => {
+                let result = open_save_folder(ctx);
+                ctx.notice(RuntimeNotice::SaveFolderOpened(result));
+                continue;
+            }
+            AppCommand::ReloadProfile => {
+                let result = reload_profile(ctx);
+                ctx.notice(RuntimeNotice::ProfileReloaded(result));
                 continue;
             }
             AppCommand::NewJourney => {
@@ -78,6 +90,8 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
         ctx.game_changed = true;
         if result.is_ok() {
             ctx.runtime.dirty = true;
+            // A pause is not progress: `ReloadProfile` stays possible.
+            ctx.runtime.commands_applied |= !matches!(command, Command::SetPaused(_));
             if matches!(command, Command::LeaveJourney) {
                 ctx.runtime.request_save(SaveIntent::Menu);
             }
@@ -88,6 +102,15 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
             if confirms_purchase(&command) {
                 push_cue(ctx.cues, SoundCue::Confirm);
             }
+        }
+        // One CoinBatch per sale command that sold anything (R9), never in
+        // a battle; a command may also settle an expedition's batch.
+        if let Ok(outcome) = &result {
+            let in_battle = ctx.game.attempt().is_some();
+            if let Some(cue) = horde_audio::loot::sale_cue(&command, outcome, in_battle) {
+                push_cue(ctx.cues, cue);
+            }
+            ctx.runtime.hear_expedition_coins(ctx.game, ctx.cues);
         }
         ctx.notice(RuntimeNotice::CommandCompleted {
             command: AppCommand::Game(command),
@@ -100,6 +123,40 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
     }
     persist_pending(ctx)
 }
+/// `AppCommand::OpenSaveFolder`: the profile directory (or, before the first
+/// save creates it, its nearest existing ancestor) through the runtime's
+/// `FolderOpener`. Runner-side IO; the game is not touched.
+fn open_save_folder(ctx: &mut RuntimeCtx) -> Result<(), String> {
+    let directory = super::folder::folder_to_open(&ctx.paths.directory());
+    ctx.runtime.folder_opener.0.open(&directory)
+}
+/// `AppCommand::ReloadProfile`: reads `campaign.json` (or its backup) again
+/// and swaps the in-memory journey for it. Refused once that journey or the
+/// files changed since startup (`Runtime::reload_allowed`); a failed read
+/// leaves the in-memory journey as it was.
+fn reload_profile(ctx: &mut RuntimeCtx) -> Result<(), String> {
+    if !ctx.runtime.reload_allowed() {
+        return Err(RELOAD_REFUSED.into());
+    }
+    let game = Game::load(&ctx.paths.campaign()).map_err(|error| error.to_string())?;
+    // The swap happens at a tick a recording cannot place.
+    #[cfg(feature = "dev")]
+    ctx.runtime
+        .stop_recording(ctx.game, "a profile reload cannot be replayed");
+    *ctx.game = game;
+    ctx.game_changed = true;
+    let runtime = &mut *ctx.runtime;
+    runtime.clear_input();
+    runtime.controls = ControlFrame::default();
+    runtime.observed_battle = None;
+    runtime.dirty = false;
+    runtime.save_ticks = 0;
+    runtime.retry_save_at = 0;
+    Ok(())
+}
+/// Why `AppCommand::ReloadProfile` was refused.
+pub(super) const RELOAD_REFUSED: &str =
+    "The journey changed since it was loaded, so the save is not read again";
 /// Camp purchases, training and equipment changes that earn a confirmation cue.
 fn confirms_purchase(command: &Command) -> bool {
     matches!(
@@ -113,6 +170,7 @@ fn confirms_purchase(command: &Command) -> bool {
             | Command::BuyRecruitPoint(_)
             | Command::TrainRecruit { .. }
             | Command::Recruit(_)
+            | Command::RecruitAs { .. }
     )
 }
 /// Settlement runs inside ticks and recalls; its failures become one notice.
@@ -129,6 +187,11 @@ pub(super) fn report_settlement_issues(ctx: &mut RuntimeCtx) {
 }
 /// The reset is a serialized storage barrier. Live state swaps only on its ack.
 pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result<(), String> {
+    // `Runtime::forbid_saves`: the reset writes an archive and a fresh
+    // campaign.json, so an unsaveable review refuses it before any of that.
+    if ctx.runtime.unsaveable {
+        return Err("This review never saves, so it cannot start a new journey".into());
+    }
     // The live state is swapped on the storage acknowledgement, at a tick a
     // recording cannot place, so the recording ends here.
     #[cfg(feature = "dev")]
@@ -137,16 +200,28 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
     let path = ctx.paths.campaign();
     let old = ctx.game.clone();
     let mut fresh = Game::default();
-    fresh
-        .apply(&horde_core::command::Command::SetBalance(
-            old.campaign().balance_settings.clone(),
-        ))
-        .map_err(|e| e.to_string())?;
+    // A Custom balance keeps the named preset its extras came from: apply that
+    // preset first, so the Custom settings record it as the previous preset.
+    let balance = &old.campaign().balance_settings;
+    let mut carried = Vec::with_capacity(2);
+    if balance.preset == horde_core::balance::BalancePreset::Custom {
+        carried.push(horde_core::balance::BalanceSettings::for_preset(
+            old.campaign().balance_extras_preset(),
+        ));
+    }
+    carried.push(balance.clone());
+    for settings in carried {
+        fresh
+            .apply(&horde_core::command::Command::SetBalance(settings))
+            .map_err(|e| e.to_string())?;
+    }
     let cancelled = {
         let runtime = &mut *ctx.runtime;
         let mut cancelled = runtime.storage.reset(old, fresh, path)?;
         persistence::dedup(&mut cancelled, std::mem::take(&mut runtime.save_requests));
         runtime.reset_success = Some(success);
+        runtime.commands_applied = true;
+        runtime.saved = true;
         runtime.seen.clear();
         runtime.seen.push(AppCommand::NewJourney);
         runtime.clear_input();
@@ -155,7 +230,7 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
     for intent in cancelled {
         ctx.notice(RuntimeNotice::Saved {
             intent,
-            result: Err("Save superseded by the confirmed new journey".into()),
+            result: Err(SAVE_SUPERSEDED.into()),
         });
     }
     Ok(())
@@ -165,7 +240,11 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
 /// authoritative ticks; one-shot controls are consumed only by the first tick.
 pub fn step(ctx: &mut RuntimeCtx) {
     let before = ctx.runtime.simulated_ticks;
-    let finished = ctx.runtime.advance(ctx.game, ctx.cues);
+    // The dry trigger repeats on the gate of the current effects setting.
+    ctx.runtime
+        .guns
+        .set_reduced_effects(ctx.settings.reduced_effects);
+    let finished = ctx.runtime.advance(ctx.game, ctx.cues, ctx.perf);
     ctx.game_changed |= ctx.runtime.simulated_ticks != before;
     report_settlement_issues(ctx);
     if finished {
@@ -236,7 +315,7 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
                     runtime.retry_save_at = 0;
                     Ok(AppOutcome::JourneyArchived(archive))
                 }
-                Ok(persistence::Commit::Saved) => {
+                Ok(persistence::Commit::Saved | persistence::Commit::SavedWithoutSettings(_)) => {
                     Err("Storage reset acknowledgement did not match its command".into())
                 }
                 Err(error) => Err(error),
@@ -248,12 +327,17 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
                 success,
             });
         } else {
+            let mut settings_error = None;
             let result = done.result.and_then(|commit| match commit {
                 persistence::Commit::Saved => Ok(()),
-                _ => Err("Storage acknowledgement mismatch".into()),
+                persistence::Commit::SavedWithoutSettings(error) => {
+                    settings_error = Some(error);
+                    Ok(())
+                }
+                persistence::Commit::Reset { .. } => Err("Storage acknowledgement mismatch".into()),
             });
             let runtime = &mut *ctx.runtime;
-            if result.is_err() {
+            if result.is_err() || settings_error.is_some() {
                 runtime.dirty = true;
                 runtime.retry_save_at = runtime.simulated_ticks + 600;
             } else {
@@ -266,17 +350,34 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
                     result: result.clone(),
                 });
             }
+            if let Some(error) = settings_error {
+                ctx.notice(RuntimeNotice::SettingsNotSaved(error));
+            }
         }
     }
     quit
 }
 pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
     // This main-thread phase measures only polling, snapshot capture and enqueue.
-    let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Persistence);
+    let _work =
+        crate::diagnostics::work_timer(ctx.perf, crate::diagnostics::WorkPhase::Persistence);
     let quit = poll_storage(ctx);
     let intents = {
         let runtime = &mut *ctx.runtime;
         if runtime.storage.reset_pending() {
+            return quit;
+        }
+        if runtime.unsaveable {
+            // `Runtime::forbid_saves`: nothing reaches storage, no autosave.
+            // Every user intent still finishes, so its navigation runs.
+            runtime.dirty = false;
+            let intents = std::mem::take(&mut runtime.save_requests);
+            let quit = quit || intents.contains(&SaveIntent::Quit);
+            for intent in intents {
+                if intent != SaveIntent::Autosave {
+                    ctx.notice(RuntimeNotice::SaveSkipped { intent });
+                }
+            }
             return quit;
         }
         if runtime.dirty && runtime.simulated_ticks >= runtime.retry_save_at {
@@ -288,10 +389,12 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         return quit;
     }
     let snapshot = persistence::Snapshot {
-        game: ctx.game.clone(),
+        // Saved fields only: the transient event outbox stays with the frontend.
+        game: ctx.game.save_snapshot(),
         settings: ctx.settings.clone(),
         campaign_path: ctx.paths.campaign(),
         settings_path: ctx.paths.settings(),
+        preserve_settings: ctx.runtime.settings_at_risk,
     };
     let result = {
         let runtime = &mut *ctx.runtime;
@@ -299,6 +402,7 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         if result.is_ok() {
             runtime.dirty = false;
             runtime.save_ticks = 0;
+            runtime.saved = true;
         } else {
             runtime.dirty = true;
             runtime.retry_save_at = runtime.simulated_ticks + 600;

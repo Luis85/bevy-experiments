@@ -1,38 +1,93 @@
+mod auto_sell;
+#[cfg(test)]
+mod boss_phase_tests;
 mod combat;
+#[cfg(test)]
+mod composition_tests;
+mod country;
+#[cfg(test)]
+mod death_effect_tests;
+mod defense;
 mod director;
+#[cfg(test)]
+mod drop_table_tests;
+#[cfg(test)]
+mod elite_tests;
+#[cfg(test)]
+mod enemy_trait_tests;
 mod events;
 mod fixtures;
 mod journey;
 mod lifecycle;
 mod manual;
+#[cfg(test)]
+mod mechanism_tests;
 mod migrations;
 mod movement;
 mod npc;
 mod pacing;
 mod parallel;
 mod persistence;
+mod power;
+mod progression_rewards;
+mod recruitment;
+mod sale_resolution;
 mod smoke;
+#[cfg(test)]
+mod spitter_tests;
+mod stage_preview;
 mod structures;
 mod telemetry;
-pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
+pub use auto_sell::{AutoSellPreview, AutoSellScope, KeptDrop, ResultsLoot, UpgradeOffer};
+pub use country::{CountryChoicePreview, OutbreakPlan};
+pub use events::{Actor, BattleId, DetonationTrigger, SimEvent, SimEventRecord, Strike};
+#[cfg(any(test, feature = "test-support", feature = "review"))]
+pub use fixtures::{
+    STRESS_ENEMY_CAP, save_clone_fixture, stress_authored_fixture, stress_render_fixture,
+};
 pub use fixtures::{Staging, maximum_progression_render_fixture, peak_render_fixture};
 pub use journey::JourneyContinuation;
 pub use migrations::SAVE_VERSION;
+pub(crate) use migrations::V7_MILESTONE_RANKS;
 use npc::structure_bonus;
 pub use pacing::{
-    Milestone, PacingAim, PacingProfile, PacingReport, PacingRun, PacingSpend, node_depths,
-    pacing_profiles, simulate_pacing, tier_cost,
+    AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, ArchetypeRun, DEFAULT_PROFILE_ID,
+    DEU_THREE_STAGE_NEIGHBOURS, DefeatWindow, EarnedAfter, GOAL3_LIBERATIONS,
+    GOAL3_NEIGHBOURS_FREED, GOAL3_PARALLEL_OVER_SOLO, GOAL3_REOPEN_LIMIT, GOAL3_REOPEN_WINDOW,
+    GOAL4_AUTO_SELL_SLACK_RUNS, GOAL4_AUTO_SELL_TIERS, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS,
+    GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT, GOAL6_LUX_EASY_MAX_RUNS,
+    GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS, GOAL6_MEASUREMENT_PROFILE_ID,
+    GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS,
+    LEGACY_PROFILE_IDS, Milestone, MilestoneStats, Overrun, PacingAim, PacingDefender, PacingFarm,
+    PacingParallel, PacingPlan, PacingProfile, PacingReport, PacingRoute, PacingRun, PacingSell,
+    PacingSpend, RunsToLiberate, STASH_GROWTH_RUNS, STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS,
+    StrategyPlan, StrategyReport, StrategyRun, StrategyStep, StrategyTrace, StrategyUnlock,
+    UNLOCK_ORDER, archetype_coverage, auto_sell_within_default, boss_ttk_median_s, by_id,
+    clamped_start_first_victory, defeat_rate_windows, defeat_windows, equip_dropped_upgrades,
+    liberations_and_coins_per_minute, longest_win_streak, max_win_streak, median_earned_after,
+    median_run_within, node_depths, node_retired, nodes_left, outbreak_reopens,
+    pacing_archetype_ids, pacing_profiles, pacing_registry, pacing_seed, pacing_start,
+    pacing_sweep, pacing_sweep_with_threads, parallel_frees_neighbours, reopens_over_liberations,
+    replay_strategy, runs_to_free_neighbours, runs_to_liberate, simulate_pacing,
+    simulate_pacing_seed, simulate_strategy, simulate_strategy_seed, simulate_strategy_traced,
+    stash_growth, strategy_sweep, strategy_table, tier_affordable_runs, tier_cost, tree_exhausted,
+    tree_outlasts_liberation, unlock_order,
 };
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;
 pub use persistence::{RULESET_VERSION, SaveError};
+pub use power::DeploymentInputs;
 pub use smoke::{desktop_smoke, smoke, smoke_input, smoke_prepare, smoke_seed};
+pub use stage_preview::StagePreview;
 pub use telemetry::CombatTelemetry;
 
-use crate::campaign::{Campaign, DefenderProfile};
+use crate::campaign::{
+    Campaign, DefenderProfile, SaleBlock, SaleOrigin, SalePlan, SaleQuote, SaleRefs,
+};
 use crate::content::{
     BossKind, BossTiming, EnemyKind, ItemDefId, Mode, Policy, StructureKind, content,
 };
+use crate::defenders::{DefenderId, DefenderSeat, resolve};
 use crate::kind_map::KindMap;
 use crate::ordnance::{self, FireZone, OrdnanceKind, OrdnanceState, ThrowRequest, ThrownOrdnance};
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
@@ -63,6 +118,8 @@ pub const DEFENSE_LINE: f32 = 1.5;
 const DT: f32 = 1.0 / 60.0;
 const MAX_LOG: usize = 80;
 pub const MAX_EVENTS: usize = 512;
+/// The most drops one run tracks in `Attempt::drop_ids` (save bound).
+pub const MAX_RUN_DROPS: usize = 4096;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Input {
@@ -95,6 +152,7 @@ pub struct Enemy {
     #[serde(default = "legacy_width")]
     pub arena_width: f32,
     /// Saved within-lane passing displacement; real hit and area geometry use y().
+    /// Overtaking is gone since W1-69, so it only eases back to 0 (older saves).
     #[serde(default)]
     pub pass_offset: f32,
     pub id: u64,
@@ -126,6 +184,92 @@ pub struct Enemy {
     pub statuses: Statuses,
     #[serde(default)]
     pub resolved: Option<crate::enemy_catalog::ResolvedEnemy>,
+    /// Spawned by a splitter's death: never elite, never splits, never drops.
+    #[serde(default, skip_serializing_if = "crate::schema::is_false")]
+    pub split_child: bool,
+    /// A phased boss's profile and progress, snapshotted at spawn; None is a
+    /// boss without phases (every legacy boss).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boss_state: Option<BossState>,
+}
+/// How a boss changes when it enters a phase, one profile per [`BossKind`].
+/// Transition `n` applies each multiplier to the power `n`, clamped at the
+/// profile bounds.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BossPhaseProfile {
+    pub name: String,
+    pub speed_mult: f32,
+    pub armor_mult: f32,
+    pub call_interval_mult: f32,
+    pub siege_recovery_mult: f32,
+    /// Ticks the boss neither moves nor counts down its attack after entering
+    /// a phase.
+    pub hold_ticks: u32,
+}
+impl BossPhaseProfile {
+    pub fn valid(&self) -> bool {
+        let within = |v: f32, min: f32, max: f32| v.is_finite() && (min..=max).contains(&v);
+        !self.name.trim().is_empty()
+            && self.name.len() <= 40
+            && within(self.speed_mult, 1.0, 2.0)
+            && within(self.armor_mult, 0.25, 1.0)
+            && within(self.call_interval_mult, 0.3, 1.0)
+            && within(self.siege_recovery_mult, 0.3, 1.0)
+            && self.hold_ticks <= 180
+    }
+}
+/// A phased boss: its profile, how many transitions it may enter, how many it
+/// has entered, and the tick its current hold ends.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BossState {
+    pub profile: BossPhaseProfile,
+    pub transitions: u8,
+    pub entered: u8,
+    pub hold_until: u64,
+}
+impl BossState {
+    /// `base` to the power of the transitions entered, clamped by `bound`.
+    /// Exactly 1.0 before the first transition.
+    fn factor(&self, base: f32, bound: impl Fn(f32) -> f32) -> f32 {
+        if self.entered == 0 {
+            return 1.0;
+        }
+        bound(base.powi(i32::from(self.entered)))
+    }
+    /// The speed multiplier after the transitions entered, at most 2.
+    pub fn speed_mult(&self) -> f32 {
+        self.factor(self.profile.speed_mult, |m| m.min(2.0))
+    }
+    /// The armor multiplier after the transitions entered, at least 0.25.
+    pub fn armor_mult(&self) -> f32 {
+        self.factor(self.profile.armor_mult, |m| m.max(0.25))
+    }
+    /// The Caller's call-interval multiplier, at least 0.3.
+    pub fn call_interval_mult(&self) -> f32 {
+        self.factor(self.profile.call_interval_mult, |m| m.max(0.3))
+    }
+    /// The Siege Brute's recovery multiplier, at least 0.3.
+    pub fn siege_recovery_mult(&self) -> f32 {
+        self.factor(self.profile.siege_recovery_mult, |m| m.max(0.3))
+    }
+    /// Whether the boss holds at `tick`: it neither moves nor counts down
+    /// its attack for `hold_ticks` from the tick it entered a phase.
+    pub fn held(&self, tick: u64) -> bool {
+        tick < self.hold_until
+    }
+    /// Valid in an attempt at `tick`: a hold began at or before `tick`, so it
+    /// ends at most `hold_ticks` later, and a boss that entered no transition
+    /// holds nothing.
+    pub fn valid(&self, tick: u64) -> bool {
+        self.profile.valid()
+            && self.transitions <= 2
+            && self.entered <= self.transitions
+            && if self.entered == 0 {
+                self.hold_until == 0
+            } else {
+                self.hold_until <= tick.saturating_add(u64::from(self.profile.hold_ticks))
+            }
+    }
 }
 /// Permanent battlefield remains for this attempt, independent of transient effects.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -141,6 +285,9 @@ pub struct CorpseRecord {
 pub enum EnemyPhase {
     #[default]
     Advance,
+    /// Waiting behind another enemy. Never assigned since W1-69 (enemies
+    /// overlap, user decision 2026-11-06); kept so older saves load, and
+    /// resolved to `Advance` or contact on the next movement step.
     Queued,
     Windup,
     Recovery,
@@ -165,14 +312,36 @@ impl Enemy {
     pub fn critically_wounded(&self, mode: Mode) -> bool {
         self.condition(mode) == EnemyCondition::Critical
     }
+    /// Hits never interrupt a stagger-immune hostile (the juggernaut, W2-30):
+    /// no hit-stop, prone, stun or dropped weapon. Bosses fight with their
+    /// level's stats and are never immune.
+    fn stagger_immune(&self) -> bool {
+        !self.boss && self.resolved.as_ref().is_some_and(|r| r.stagger_immune)
+    }
+    /// Call on an NPC rules result against this hostile before its log line
+    /// is built: a stagger-immune hostile's major wound is logged without
+    /// the stagger [`Self::apply_damage`] clears (W2 review).
+    fn log_hit(&self, result: &mut rules::AttackResult) {
+        if self.stagger_immune() {
+            result.log_stagger_immune();
+        }
+    }
     fn apply_damage(&mut self, damage: i32, mode: Mode) {
+        let immune = self.stagger_immune();
         if mode == Mode::Personal {
             self.hp -= damage;
         } else {
             // The rules resolver has already applied NPC injury exactly once.
             self.hp = self.injury.hp;
+            if immune {
+                // Ruling W-7: the injury rolls are unchanged (the same draw
+                // count); only their stagger is cleared after every injury.
+                self.injury.stunned = false;
+                self.injury.prone = false;
+                self.injury.weapon_dropped = false;
+            }
         }
-        if damage > 0 {
+        if damage > 0 && !immune {
             self.statuses
                 .refresh(StatusId::HitStop, ENEMY_HIT_STOP_TICKS);
         }
@@ -180,6 +349,11 @@ impl Enemy {
     /// Movement steps still held by hit-stop; 0 when the enemy may move.
     pub fn hit_stop_remaining(&self) -> u32 {
         self.statuses.remaining(StatusId::HitStop)
+    }
+    /// A phased boss holding after a transition at `tick` (see
+    /// [`BossState::held`]); never a regular enemy or a boss without phases.
+    pub fn boss_held(&self, tick: u64) -> bool {
+        self.boss_state.as_ref().is_some_and(|s| s.held(tick))
     }
     pub fn y(&self) -> f32 {
         self.lane as f32 + 0.5 + self.pass_offset
@@ -264,6 +438,14 @@ pub enum EventKind {
     Throw,
     Explosion,
     Burn,
+    /// A ranged enemy strike (actor = spitter, target = structure or None).
+    Spit,
+    /// A blast from a dying or fused enemy; value = radius in hundredths.
+    Detonation,
+    /// A splitter's death spawned children; value = child count.
+    Split,
+    /// A boss entered a phase; value = the transition number.
+    BossPhase,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -292,6 +474,8 @@ struct EventMetadata {
     lane: Option<u8>,
     duration_ticks: u32,
     ordnance: Option<OrdnanceKind>,
+    /// Typed stream only (never saved): what set a `Detonation` off.
+    detonation: Option<DetonationTrigger>,
 }
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
@@ -344,6 +528,14 @@ pub struct Attempt {
     #[serde(with = "crate::content::level_ref")]
     pub level: usize,
     pub mode: Mode,
+    /// Who holds the line, saved as `"defender"`; absent means the mode
+    /// owner. Read through [`Attempt::defender`].
+    #[serde(
+        rename = "defender",
+        default,
+        skip_serializing_if = "DefenderSeat::is_mode_owner"
+    )]
+    pub(crate) seat: DefenderSeat,
     pub tick: u64,
     pub paused: bool,
     pub country_id: Option<String>,
@@ -372,6 +564,16 @@ pub struct Attempt {
     pub kills: u32,
     pub coins: u64,
     pub loot: u32,
+    /// Every item this run dropped, ascending (the receipts in `loot_events`
+    /// are capped; this list is not, up to [`MAX_RUN_DROPS`]). Written only
+    /// at depth 0 on the `drop_tier` Some path.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drop_ids: Vec<u64>,
+    /// The highest item tier this run drops, frozen at deploy, in
+    /// `1..=Content::max_drop_tier()`. None marks an attempt deployed before
+    /// v7, which keeps the legacy drop path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drop_tier: Option<u8>,
     pub decision: String,
     /// Bounded presentation window for scene replay; the typed stream is
     /// `Game::drain_events`.
@@ -423,8 +625,25 @@ pub struct Attempt {
     event_seq: u64,
     #[serde(skip)]
     emitted: Vec<SimEventRecord>,
+    /// Never saved: the tick of the latest death burst (W2-29) and the
+    /// hostiles it defeated, which `reap` leaves on the field until the next
+    /// tick. A save lands between ticks, when the hold has already lapsed,
+    /// so a resumed attempt reaps them exactly as an uninterrupted one.
+    #[serde(skip)]
+    burst_victims: (u64, Vec<u64>),
 }
 impl Attempt {
+    /// The defender holding this attempt's line: the mode owner unless a
+    /// recruit holds the seat.
+    pub fn defender(&self) -> DefenderId {
+        resolve(self.mode, self.seat)
+    }
+    /// The appearance the battlefield draws this attempt's defender with:
+    /// the one stamped on the profile at deploy (ruling D17). Mara's deploy
+    /// stamps Female, a recruit's its identity-table appearance.
+    pub fn defender_appearance(&self) -> crate::survivors::Appearance {
+        self.profile.appearance
+    }
     /// The surviving structures as a reusable country layout plan.
     pub fn structure_layout(&self) -> Vec<crate::campaign::Placement> {
         self.structures
@@ -526,6 +745,23 @@ impl Attempt {
             self.progression.enemy_cap
         }
     }
+    /// Review/test-only seam (ruling W-11): raises this attempt's regular
+    /// enemy cap to `cap`, at most [`STRESS_ENEMY_CAP`], so the director refills
+    /// the field past the gameplay cap. Production validation still rejects
+    /// any cap above [`crate::progression::GAMEPLAY_ENEMY_CAP`], so a staged
+    /// attempt is unsaveable by construction. Fails without a change when
+    /// `cap` would lower the cap or exceed the stress cap.
+    #[cfg(any(test, feature = "test-support", feature = "review"))]
+    pub fn stage_review_enemy_cap(&mut self, cap: usize) -> Result<(), String> {
+        if !(self.enemy_cap()..=STRESS_ENEMY_CAP).contains(&cap) {
+            return Err(format!(
+                "A review enemy cap must lie between {} and {STRESS_ENEMY_CAP}",
+                self.enemy_cap()
+            ));
+        }
+        self.progression.enemy_cap = cap;
+        Ok(())
+    }
     pub fn enemy_protection(&self, enemy: &Enemy) -> i32 {
         enemy_armor(self, enemy)
     }
@@ -543,6 +779,15 @@ impl Attempt {
             .boss_time
             .max(self.progression.boss_time_floor)
             * self.balance.boss_time
+    }
+    /// The tick the boss warning was due, once the director has sent it
+    /// (`None` before): the boss's tick less the level's warning lead, the
+    /// tick of the `BossWarning` event. Pure: no mutation, no RNG.
+    pub fn boss_warning_tick(&self) -> Option<u64> {
+        self.boss_warning_sent.then(|| {
+            let warning = content().levels[self.level].boss_timing.warning;
+            u64::from(seconds(self.boss_time())).saturating_sub(u64::from(seconds(warning)))
+        })
     }
     pub fn arrival_rate(&self) -> f32 {
         let l = &content().levels[self.level];
@@ -687,6 +932,14 @@ pub struct Report {
     #[serde(with = "crate::content::level_ref")]
     pub level: usize,
     pub mode: Mode,
+    /// The finished attempt's seat, saved as `"defender"`; absent means the
+    /// mode owner. Read through [`Report::defender`].
+    #[serde(
+        rename = "defender",
+        default,
+        skip_serializing_if = "DefenderSeat::is_mode_owner"
+    )]
+    pub(crate) seat: DefenderSeat,
     pub elapsed: f32,
     pub kills: u32,
     pub country_id: Option<String>,
@@ -695,6 +948,25 @@ pub struct Report {
     pub country_freed: bool,
     pub coins: u64,
     pub loot: u32,
+    /// The finished run's dropped item ids (the owning game's ids: worker-local
+    /// in an expedition report).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drop_ids: Vec<u64>,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub loot_by_quality: crate::kind_map::KindMap<crate::quality::Quality, u32>,
+    /// What settlement auto-sold from this run's drops.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::campaign::AutoSoldReceipt::is_empty"
+    )]
+    pub auto_sold: crate::campaign::AutoSoldReceipt,
+    /// The level-up grants and rank milestones settlement paid with this
+    /// report (a receipt, never read back by the simulation).
+    #[serde(default, skip_serializing_if = "ProgressionRewards::is_empty")]
+    pub progression_rewards: ProgressionRewards,
+    /// The rank of the stage's boss (no writer before wave 2).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub boss_rank: crate::progression::BossRank,
     pub cause: String,
     pub tip: String,
     pub first_clear: bool,
@@ -706,6 +978,66 @@ pub struct Report {
     pub log: Vec<String>,
     #[serde(default)]
     pub telemetry: CombatTelemetry,
+}
+/// The most milestone rewards one receipt may list: the catalogue authors
+/// four milestone ranks (schema v7 §3.4).
+pub const MAX_RECEIPT_MILESTONES: usize = 4;
+/// What progression settlement paid with one report: the level-up grants
+/// for the levels from `level_from` (exclusive) to `level_to`, and each
+/// newly claimed rank milestone in ascending rank order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProgressionRewards {
+    pub level_from: u32,
+    pub level_to: u32,
+    pub level_coins: u64,
+    pub milestones: Vec<MilestoneReward>,
+}
+impl ProgressionRewards {
+    /// Nothing was paid; the serde skip predicate.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+    /// Adds a later settlement's receipt for the same report: the level
+    /// ranges join, the coins add (saturating) and the milestones append
+    /// (each rank is claimed once, so they stay in ascending order).
+    pub(crate) fn absorb(&mut self, later: Self) {
+        if later.level_coins > 0 {
+            self.level_from = if self.level_coins > 0 {
+                self.level_from.min(later.level_from)
+            } else {
+                later.level_from
+            };
+            self.level_to = self.level_to.max(later.level_to);
+            self.level_coins = self.level_coins.saturating_add(later.level_coins);
+        }
+        self.milestones.extend(later.milestones);
+    }
+    /// The coins of every milestone in the receipt (saturating).
+    pub(crate) fn milestone_coins(&self) -> u64 {
+        self.milestones
+            .iter()
+            .fold(0, |sum, m| sum.saturating_add(m.coins))
+    }
+}
+/// One paid rank milestone: its coins and the item granted with it. The
+/// item fields are None when no item was stored (see
+/// [`SettlementIssue::MilestoneItemLost`]).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MilestoneReward {
+    pub rank: u32,
+    pub coins: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_definition: Option<ItemDefId>,
+}
+impl Report {
+    /// The defender who fought the reported attempt.
+    pub fn defender(&self) -> DefenderId {
+        resolve(self.mode, self.seat)
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 ///
@@ -758,6 +1090,50 @@ pub struct ParallelBattle {
     pub loadout: [u64; 4],
     #[serde(default)]
     pub country_operation: bool,
+    /// The settled expedition's outcome notice. None while it runs, and for
+    /// battles settled before save version 7 (they are never announced).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ExpeditionSummary>,
+    /// Parent-side ids of this expedition's drops awaiting its auto-sale.
+    /// Empty once the battle is settled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending_auto_sell: Vec<u64>,
+}
+/// What a settled expedition achieved, kept until the player acknowledges
+/// it. `outcome` and `acknowledged` imply the battle is settled; it lists at
+/// most 32 newly opened `fronts`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ExpeditionSummary {
+    pub outcome: Option<Outcome>,
+    pub stages_cleared: u32,
+    pub liberated: bool,
+    pub fronts: Vec<String>,
+    pub coins: u64,
+    pub loot_count: u32,
+    pub acknowledged: bool,
+}
+impl ExpeditionSummary {
+    /// The most newly opened fronts one notice lists (save validation bound).
+    pub const MAX_FRONTS: usize = 32;
+}
+/// One settled expedition the player has not acknowledged yet: who went
+/// where, and its saved [`ExpeditionSummary`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExpeditionNotice {
+    pub battle: u64,
+    pub recruit_id: u64,
+    pub recruit_name: String,
+    pub country_id: String,
+    pub country_name: String,
+    pub summary: ExpeditionSummary,
+}
+/// [`Game::unacknowledged_outcomes`]: the pending notices, oldest first, and
+/// how many unacknowledged outcomes pruning folded into one count.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct OutcomeNotices {
+    pub notices: Vec<ExpeditionNotice>,
+    pub folded: u32,
 }
 impl Default for Game {
     fn default() -> Self {
@@ -776,6 +1152,246 @@ impl Default for Game {
             settlement_issues: Vec::new(),
             next_event_seq: 0,
             event_outbox: Vec::new(),
+        }
+    }
+}
+impl Game {
+    /// The copy a save is written from: every saved field cloned, the
+    /// transient never-saved state left empty (the typed event outbox, the
+    /// live attempt's queued records and settlement issues, here and in every
+    /// expedition's worker game). It serializes to exactly this game's bytes;
+    /// the runtime hands it to the storage worker instead of a full clone.
+    pub fn save_snapshot(&self) -> Game {
+        // Destructured so a new field must choose: saved (cloned) or transient.
+        let Game {
+            pending_runs,
+            campaign,
+            attempt,
+            last_result,
+            next_attempt_id,
+            seed,
+            repeat_remaining,
+            strategy,
+            battles,
+            global_paused,
+            worker,
+            settlement_issues: _,
+            next_event_seq,
+            event_outbox: _,
+        } = self;
+        Game {
+            pending_runs: pending_runs.clone(),
+            campaign: campaign.clone(),
+            attempt: attempt.as_ref().map(Attempt::save_snapshot),
+            last_result: last_result.clone(),
+            next_attempt_id: *next_attempt_id,
+            seed: *seed,
+            repeat_remaining: *repeat_remaining,
+            strategy: strategy.clone(),
+            battles: battles.iter().map(ParallelBattle::save_snapshot).collect(),
+            global_paused: *global_paused,
+            worker: *worker,
+            settlement_issues: Vec::new(),
+            next_event_seq: *next_event_seq,
+            event_outbox: Vec::new(),
+        }
+    }
+}
+impl Attempt {
+    /// A clone without the queued, never-saved event records, which are
+    /// never copied.
+    fn save_snapshot(&self) -> Attempt {
+        // Destructured so a new field must choose: saved (cloned) or transient.
+        let Attempt {
+            width_yards,
+            balance,
+            dps,
+            gear_snapshot,
+            kill_xp,
+            loot_quality_counts,
+            lane_count,
+            loot_events,
+            progression,
+            id,
+            level,
+            mode,
+            seat,
+            tick,
+            paused,
+            country_id,
+            country_name,
+            stage,
+            modifiers,
+            enemies,
+            corpses,
+            structures,
+            layout_omissions,
+            hp,
+            max_hp,
+            stamina,
+            max_stamina,
+            ammo,
+            magazine,
+            reload_left,
+            shot_cooldown,
+            melee_cooldown,
+            melee_commit,
+            supply,
+            boss_spawned,
+            kills,
+            coins,
+            loot,
+            drop_ids,
+            drop_tier,
+            decision,
+            events,
+            log,
+            latest_resolution,
+            last_damage_lane,
+            profile,
+            rng,
+            injury,
+            reward_ledger,
+            first_contact,
+            shots,
+            hits,
+            active_damage,
+            structure_damage,
+            reload_ticks,
+            aim_ticks,
+            next_id,
+            telemetry,
+            maneuver,
+            decision_target,
+            defense_bonus,
+            ordnance,
+            spawn_credit,
+            lane_history,
+            aim_target,
+            aim_seconds,
+            ready_turns,
+            npc_holding_melee,
+            heal_used,
+            statuses,
+            caller_tick,
+            boss_warning_sent,
+            caller_lanes,
+            event_seq,
+            emitted: _,
+            burst_victims: _,
+        } = self;
+        Attempt {
+            width_yards: *width_yards,
+            balance: balance.clone(),
+            dps: dps.clone(),
+            gear_snapshot: gear_snapshot.clone(),
+            kill_xp: *kill_xp,
+            loot_quality_counts: loot_quality_counts.clone(),
+            lane_count: *lane_count,
+            loot_events: loot_events.clone(),
+            progression: progression.clone(),
+            id: *id,
+            level: *level,
+            mode: *mode,
+            seat: *seat,
+            tick: *tick,
+            paused: *paused,
+            country_id: country_id.clone(),
+            country_name: country_name.clone(),
+            stage: *stage,
+            modifiers: *modifiers,
+            enemies: enemies.clone(),
+            corpses: corpses.clone(),
+            structures: structures.clone(),
+            layout_omissions: *layout_omissions,
+            hp: *hp,
+            max_hp: *max_hp,
+            stamina: *stamina,
+            max_stamina: *max_stamina,
+            ammo: *ammo,
+            magazine: *magazine,
+            reload_left: *reload_left,
+            shot_cooldown: *shot_cooldown,
+            melee_cooldown: *melee_cooldown,
+            melee_commit: *melee_commit,
+            supply: *supply,
+            boss_spawned: *boss_spawned,
+            kills: *kills,
+            coins: *coins,
+            loot: *loot,
+            drop_ids: drop_ids.clone(),
+            drop_tier: *drop_tier,
+            decision: decision.clone(),
+            events: events.clone(),
+            log: log.clone(),
+            latest_resolution: latest_resolution.clone(),
+            last_damage_lane: *last_damage_lane,
+            profile: profile.clone(),
+            rng: *rng,
+            injury: injury.clone(),
+            reward_ledger: reward_ledger.clone(),
+            first_contact: *first_contact,
+            shots: *shots,
+            hits: *hits,
+            active_damage: *active_damage,
+            structure_damage: *structure_damage,
+            reload_ticks: *reload_ticks,
+            aim_ticks: *aim_ticks,
+            next_id: *next_id,
+            telemetry: telemetry.clone(),
+            maneuver: *maneuver,
+            decision_target: *decision_target,
+            defense_bonus: *defense_bonus,
+            ordnance: ordnance.clone(),
+            spawn_credit: *spawn_credit,
+            lane_history: lane_history.clone(),
+            aim_target: *aim_target,
+            aim_seconds: *aim_seconds,
+            ready_turns: *ready_turns,
+            npc_holding_melee: *npc_holding_melee,
+            heal_used: *heal_used,
+            statuses: statuses.clone(),
+            caller_tick: *caller_tick,
+            boss_warning_sent: *boss_warning_sent,
+            caller_lanes: *caller_lanes,
+            event_seq: *event_seq,
+            emitted: Vec::new(),
+            burst_victims: Default::default(),
+        }
+    }
+}
+impl ParallelBattle {
+    /// A clone whose worker game is its [`Game::save_snapshot`].
+    fn save_snapshot(&self) -> ParallelBattle {
+        let ParallelBattle {
+            id,
+            recruit_id,
+            country_id,
+            stage,
+            game,
+            synced_coins,
+            synced_item_id,
+            synced_item_index,
+            settled,
+            loadout,
+            country_operation,
+            summary,
+            pending_auto_sell,
+        } = self;
+        ParallelBattle {
+            id: *id,
+            recruit_id: *recruit_id,
+            country_id: country_id.clone(),
+            stage: *stage,
+            game: Box::new(game.save_snapshot()),
+            synced_coins: *synced_coins,
+            synced_item_id: *synced_item_id,
+            synced_item_index: *synced_item_index,
+            settled: *settled,
+            loadout: *loadout,
+            country_operation: *country_operation,
+            summary: summary.clone(),
+            pending_auto_sell: pending_auto_sell.clone(),
         }
     }
 }
@@ -819,6 +1435,22 @@ impl Game {
     pub fn global_paused(&self) -> bool {
         self.global_paused
     }
+    /// The Operations page is reachable: Recruitment, Parallel defenses or
+    /// Country operations is unlocked, or a recruit or an expedition already
+    /// exists (older saves). Pure: no mutation, no RNG. Moved verbatim from
+    /// the camp UI (W2-02), which delegates here; the pacing harness records
+    /// `Milestone::OperationsOpen` from it.
+    pub fn operations_available(&self) -> bool {
+        [
+            crate::skill_catalog::CampaignFeature::Recruitment,
+            crate::skill_catalog::CampaignFeature::Parallel,
+            crate::skill_catalog::CampaignFeature::Operations,
+        ]
+        .into_iter()
+        .any(|feature| self.campaign.has_feature(feature))
+            || !self.strategy.roster.is_empty()
+            || !self.battles.is_empty()
+    }
 }
 /// Test-only mutators (`test-support` feature, or this crate's unit tests).
 /// They bypass every rule `apply` enforces; production builds never see them.
@@ -842,6 +1474,12 @@ impl Game {
     }
     pub fn battles_mut(&mut self) -> &mut Vec<ParallelBattle> {
         &mut self.battles
+    }
+    /// A worker game's finished-run records awaiting the parent's sync, for
+    /// staging the receipt fields they carry (the v7 fixture's
+    /// `pending_runs` keys).
+    pub fn pending_runs_mut(&mut self) -> &mut Vec<crate::stats::RunRecord> {
+        &mut self.pending_runs
     }
     /// Runs `f` with the strategy layer and the campaign it mutates, for
     /// strategy calls that take `&mut Campaign` (recruiting, equipping).
@@ -877,28 +1515,86 @@ impl Game {
     pub fn take_settlement_issues(&mut self) -> Vec<SettlementIssue> {
         std::mem::take(&mut self.settlement_issues)
     }
-    pub fn sale_preview(&self, id: u64) -> Result<crate::strategy::StrategySaleQuote, String> {
-        self.strategy.sale_preview(&self.campaign, id)
+    /// The difficulty country `id` is deployed at in this campaign: the
+    /// start clamp for the start country, else the raw value
+    /// (`Country::effective_difficulty`). `None` outside the catalogue.
+    /// Pure: no mutation, no RNG.
+    pub fn effective_country_difficulty(&self, id: &str) -> Option<f32> {
+        crate::world::world()
+            .country(id)
+            .map(|c| c.effective_difficulty(&self.campaign.world))
     }
-    pub fn sell_item(&mut self, id: u64) -> Result<u64, String> {
-        self.sale_preview(id)?;
-        let coins = self.campaign.sell(id)?;
-        self.strategy.reconcile_loadouts(&self.campaign);
-        Ok(coins)
+    /// The rank the boss of 0-based `stage` of country `id` carries
+    /// (schema v7 §6): `Country::front_position(stage).boss_rank()`, the
+    /// derivation deploy stamps. `None` outside the catalogue or past the
+    /// country's last stage. Pure: no mutation, no RNG.
+    pub fn stage_boss_rank(&self, id: &str, stage: usize) -> Option<crate::progression::BossRank> {
+        crate::world::world()
+            .country(id)
+            .filter(|c| stage < c.level_count())
+            .map(|c| c.front_position(stage).boss_rank())
     }
+    /// The single public sale-eligibility read (LE-1): what selling `id` pays
+    /// now, or the first guard that blocks it. Pure: no mutation, no RNG.
+    pub fn sale_eligibility(&self, id: u64) -> Result<SaleQuote, SaleBlock> {
+        self.sale_eligibility_for(id, SaleOrigin::Player, &self.strategy.sale_refs())
+    }
+    /// The one eligibility implementation behind every sell path.
+    pub(crate) fn sale_eligibility_for(
+        &self,
+        id: u64,
+        origin: SaleOrigin,
+        refs: &SaleRefs,
+    ) -> Result<SaleQuote, SaleBlock> {
+        self.campaign.sale_eligibility_for(id, origin, refs)
+    }
+    /// The eligible subset of `ids`, with the sale references built once.
+    pub(crate) fn plan_sale(
+        &self,
+        origin: SaleOrigin,
+        ids: impl IntoIterator<Item = u64>,
+    ) -> SalePlan {
+        self.campaign
+            .plan_batch(&self.strategy.sale_refs(), origin, ids)
+    }
+    /// `Command::SellItem`, strict since ruleset 2 (W1-20): sells `id` for
+    /// its `sale_eligibility` quote, or answers `SaleBlocked` with the first
+    /// guard and changes nothing. A sale never rewrites a loadout, so no
+    /// recruit reconciliation follows (`reconcile_loadouts` stays for save
+    /// repair only).
+    pub fn sell_item(&mut self, id: u64) -> Result<u64, crate::command::CommandError> {
+        self.campaign.sell(id, &self.strategy.sale_refs())
+    }
+    /// What `SellUnprotected` pays: the summed `sale_eligibility` Ok set.
     pub fn sell_extras_quote(&self) -> u64 {
-        self.strategy.sell_extras_quote(&self.campaign)
+        self.plan_sale(SaleOrigin::Player, self.campaign.owned_item_ids())
+            .coins
     }
-    pub fn sell_extras(&mut self) -> Result<u64, String> {
-        self.strategy.sell_extras(&mut self.campaign)
+    /// Sells exactly the `sale_eligibility` Ok set; `Ok(0)` while a defender
+    /// is deployed, and nothing when the wallet would overflow.
+    pub fn sell_extras(&mut self) -> Result<u64, crate::command::CommandError> {
+        let plan = self.plan_sale(SaleOrigin::Player, self.campaign.owned_item_ids());
+        self.campaign.execute_plan(&plan)
     }
-    pub fn sell_unprotected(&mut self) -> Result<u64, String> {
+    pub fn sell_unprotected(&mut self) -> Result<u64, crate::command::CommandError> {
         self.sell_extras()
     }
+    /// Deploys the mode owner (the player or Mara) on catalogue `level`.
     pub fn deploy(&mut self, level: usize, mode: Mode) -> Result<(), String> {
-        self.deploy_internal(level, mode, None)
+        self.deploy_as(level, DefenderId::from_mode(mode), None)
     }
+    /// Deploys the mode owner on the active country's `stage`.
     pub fn deploy_country_stage(&mut self, stage: usize, mode: Mode) -> Result<(), String> {
+        self.deploy_country_stage_as(stage, DefenderId::from_mode(mode))
+    }
+    /// Deploys `defender` on the active country's `stage`. A recruit takes
+    /// the main run over with its own loadout, tactics and identity
+    /// (rulings D6, D8); the player and Mara deploy as their mode owner.
+    pub fn deploy_country_stage_as(
+        &mut self,
+        stage: usize,
+        defender: DefenderId,
+    ) -> Result<(), String> {
         let country = self
             .campaign
             .world
@@ -907,7 +1603,7 @@ impl Game {
         if stage >= country.level_count() || stage > self.campaign.world.next_stage() {
             return Err("Secure the preceding country stage first".into());
         }
-        self.deploy_internal(stage % content().levels.len(), mode, Some(stage))
+        self.deploy_as(stage % content().levels.len(), defender, Some(stage))
     }
     /// Pauses or resumes the whole game. `Command::SetPaused` is the player's
     /// path; the runtime also calls this directly as pause plumbing (pausing on
@@ -957,9 +1653,19 @@ impl Game {
         Ok(())
     }
     pub fn place(&mut self, kind: StructureKind, lane: u8, column: u8) -> Result<(), String> {
+        self.place_definition(content().structure(kind), lane, column)
+    }
+    /// [`Self::place`] from an explicit definition (the catalogue's in play;
+    /// tests place authored values the catalogue does not ship yet).
+    fn place_definition(
+        &mut self,
+        d: &crate::content::StructureDefinition,
+        lane: u8,
+        column: u8,
+    ) -> Result<(), String> {
+        let kind = d.kind;
         self.preview_placement(kind, lane, column)?;
         let a = self.attempt.as_mut().expect("preview checked attempt");
-        let d = content().structure(kind);
         a.supply -= d.supply;
         let id = a.next_id;
         a.next_id += 1;
@@ -976,7 +1682,7 @@ impl Game {
             hp: durability,
             max_hp: durability,
             cooldown: 0,
-            charges: d.charges,
+            charges: d.charges_at_rank(self.campaign.structure_upgrades[kind]),
             cost: d.supply,
             ready_turns: 0,
         });
@@ -1064,6 +1770,10 @@ impl Game {
         a.melee_cooldown = a.melee_cooldown.saturating_sub(1);
         a.melee_commit = a.melee_commit.saturating_sub(1);
         a.statuses.tick();
+        // Hostiles a death burst defeated last tick (W2-29) are reaped before
+        // anything acts; without one this finds nothing and draws nothing.
+        // A boss among them is a victory at this tick's first boss check.
+        self.reap(&mut a);
         if a.mode == Mode::Personal {
             self.advance_ordnance(&mut a);
             self.reap(&mut a);
@@ -1101,10 +1811,11 @@ impl Game {
             self.finish(a, Outcome::Victory, "The sector boss was defeated".into());
             return;
         }
+        let recall_percent = self.defender_npc(a.seat).recall_percent;
         if a.mode == Mode::Npc
             && a.tick.is_multiple_of(60)
-            && self.campaign.npc.recall_percent > 0
-            && a.hp * 100 <= a.max_hp * self.campaign.npc.recall_percent as i32
+            && recall_percent > 0
+            && a.hp * 100 <= a.max_hp * recall_percent as i32
         {
             self.finish(
                 a,
@@ -1114,7 +1825,7 @@ impl Game {
             return;
         }
         if a.mode == Mode::Npc && a.tick.is_multiple_of(60) {
-            self.campaign.record_npc_progress(0, 60);
+            self.record_defender_progress(a.seat, 0, 60);
             self.npc_turn(&mut a);
             debug!(
                 maneuver = ?a.maneuver,
@@ -1178,35 +1889,198 @@ fn choose_lane(a: &mut Attempt) -> u8 {
     }
     lane
 }
+/// The most hit points one hostile of a supported encounter may spawn with.
+const MAX_ENCOUNTER_HEALTH: f32 = 10_000_000.0;
+/// The largest hit points one hostile of an encounter on `level` in `mode`
+/// can spawn with (design enemy-balance §5 "Health guard"): the boss (its
+/// floor and `boss_health_multiplier`) or the largest catalogue record,
+/// and the largest elite when the snapshot rolls elites, times the
+/// encounter's health modifier (the front ramp is already inside it). The
+/// one guard of deploy and save validation.
+fn encounter_health_bound(
+    level: &crate::content::LevelDefinition,
+    mode: Mode,
+    progression: &crate::progression::ProgressionSnapshot,
+    modifiers: &Modifiers,
+) -> f32 {
+    let boss = if mode == Mode::Npc {
+        level.boss_npc_hp.max(progression.npc_boss_health_floor)
+    } else {
+        level.boss_health.max(progression.boss_health_floor)
+    };
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    let mut regular = catalog.maximum_health(mode);
+    if progression.elite_rate_bp > 0 {
+        regular = regular.max(catalog.maximum_elite_health(mode));
+    }
+    (boss as f32 * progression.boss_health_multiplier).max(regular as f32) * modifiers.enemy_health
+}
 fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
     e.resolved
         .as_ref()
         .unwrap_or_else(|| crate::enemy_catalog::enemy_catalog().default_profile(e.kind))
 }
-fn enemy_step_speed(a: &Attempt, e: &Enemy) -> f32 {
-    if e.statuses.active(StatusId::HitStop)
-        || (a.mode == Mode::Npc && (e.injury.prone || e.injury.stunned))
-    {
-        return 0.0;
-    }
-    let mut multiplier = a.modifiers.enemy_speed;
-    if a.mode == Mode::Npc {
-        if e.injury.hp * 3 < e.injury.max_hp {
-            multiplier *= 0.5;
-        }
-        if e.injury.fp * 3 < e.injury.max_fp {
-            multiplier *= 0.5;
-        }
-    }
-    (if e.boss { 0.6 } else { enemy_profile(e).speed }) * multiplier
+/// Yards beyond the defense line `e` attacks from; 0 is melee. Bosses fight
+/// with their level's stats and never reach.
+fn enemy_reach(e: &Enemy) -> f32 {
+    if e.boss { 0.0 } else { enemy_profile(e).reach }
 }
+/// Every boss walks at this many yards a second before its phases.
+pub const BOSS_BASE_SPEED: f32 = 0.6;
+/// The boss phase thresholds, in percent of its maximum hit points:
+/// transition n enters at or below `BOSS_PHASE_THRESHOLDS[n - 1]` (design
+/// enemy-balance §6).
+pub const BOSS_PHASE_THRESHOLDS: [i32; 2] = [50, 25];
+/// A boss's walking speed in yards a second before encounter modifiers:
+/// [`BOSS_BASE_SPEED`] times its phase speed multiplier (exactly the base
+/// before its first transition and for a boss without phases).
+pub fn boss_speed(boss: &Enemy) -> f32 {
+    match &boss.boss_state {
+        Some(state) if state.entered > 0 => BOSS_BASE_SPEED * state.speed_mult(),
+        _ => BOSS_BASE_SPEED,
+    }
+}
+/// `ticks` scaled by a phase multiplier `m`, rounded; exactly `ticks` at
+/// 1.0.
+fn phase_ticks(ticks: u32, m: f32) -> u32 {
+    if m == 1.0 {
+        ticks
+    } else {
+        (ticks as f32 * m).round() as u32
+    }
+}
+/// Where an enemy with `reach` stops on a `width`-yard field (design
+/// enemy-balance §4, W2-27): `clamp(DEFENSE_LINE + reach, DEFENSE_LINE,
+/// width / 2)`, so no enemy stations in the far half (acceptance G6.6).
+/// Reach 0 is exactly the defense line.
+pub(crate) fn ranged_stop(width: f32, reach: f32) -> f32 {
+    (DEFENSE_LINE + reach).min(0.5 * width).max(DEFENSE_LINE)
+}
+/// The live non-trap structure nearest a spitter stationed at `x` in `lane`,
+/// between it and the line (walls intercept spit); ties go to the lower id.
+fn spit_wall(a: &Attempt, lane: u8, x: f32) -> Option<u64> {
+    a.structures
+        .iter()
+        .filter(|s| s.lane == lane && s.kind != StructureKind::Trap && s.hp > 0 && s.x() <= x)
+        .max_by(|s, t| s.x().total_cmp(&t.x()).then(t.id.cmp(&s.id)))
+        .map(|s| s.id)
+}
+/// The yards a spit from `e` at `structure` (None: the defender) travels, or
+/// None when the attack is a melee strike: no reach, or in contact at the
+/// line or at the structure's face.
+fn spit_range(a: &Attempt, e: &Enemy, structure: Option<&Structure>) -> Option<f32> {
+    if enemy_reach(e) == 0.0 {
+        return None;
+    }
+    let (face, at) = match structure {
+        Some(s) => (s.x() + s.blocking_radius(), [s.x(), s.y()]),
+        None => (DEFENSE_LINE, a.defender_position()),
+    };
+    (e.x > face + 0.01).then(|| (e.x - at[0]).hypot(e.y() - at[1]))
+}
+/// The far-half guard (acceptance G6.6): true when `e` stands past the
+/// middle of the field, where no spit flies. `ranged_stop` never stations a
+/// spitter there, so valid play never reaches it. The one predicate of the
+/// resolution (sim/combat.rs) and of [`Attempt::spit_target`].
+fn spit_from_far_half(a: &Attempt, e: &Enemy) -> bool {
+    e.x > a.width_yards * 0.5 + 0.01
+}
+impl Attempt {
+    /// Where the strike `e` has in hand lands when it is a spit (W2-28, the
+    /// aim line that is the visual twin of a ranged windup): the centre of
+    /// the wall it targets, else the defender, the point its `Spit` event
+    /// carries. None for a hostile out of contact, a melee strike (no reach,
+    /// or at the line or a structure's face) and from the far half, where
+    /// the resolution guard never lets a spit fly.
+    pub fn spit_target(&self, e: &Enemy) -> Option<[f32; 2]> {
+        e.contact_since?;
+        let structure = e
+            .target_structure
+            .and_then(|id| self.structures.iter().find(|s| s.id == id));
+        spit_range(self, e, structure)?;
+        if spit_from_far_half(self, e) {
+            return None;
+        }
+        Some(structure.map_or(self.defender_position(), |s| [s.x(), s.y()]))
+    }
+    /// Where a Windup event of `e` published at `from` points: a stationed
+    /// spitter's [`Attempt::spit_target`] (the wall centre or the defender
+    /// its Spit lands on), else the defender for a strike at the line and
+    /// `from` itself for a melee strike at a structure's face.
+    pub(crate) fn windup_to(&self, e: &Enemy, from: [f32; 2]) -> [f32; 2] {
+        self.spit_target(e).unwrap_or_else(|| {
+            if e.target_structure.is_none() {
+                self.defender_position()
+            } else {
+                from
+            }
+        })
+    }
+}
+/// What struck a hostile, for the armor it meets (design enemy-balance §4
+/// "Shield-bearer").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HitSource {
+    /// The defender's gunfire (Personal shots, NPC shooting).
+    Shot,
+    /// A turret's shot.
+    Turret,
+    /// The defender's melee strike and sweep.
+    Melee,
+    /// Grenades and blasts: ordnance impacts and death bursts.
+    Area,
+    /// A trap.
+    Trap,
+    /// A Molotov's fire zone.
+    Fire,
+}
+impl HitSource {
+    /// Shots and turret fire meet ranged armor; nothing else does.
+    fn ranged(self) -> bool {
+        matches!(self, Self::Shot | Self::Turret)
+    }
+}
+/// The armor `e` meets from `source`: its armor, plus its ranged armor
+/// (`ranged_armor` Personal, `npc_ranged_armor` NPC) against shots and turret
+/// fire while it is not in contact at the line. Bosses carry none (their
+/// phase armor is in [`enemy_armor`]).
+fn enemy_armor_vs(a: &Attempt, e: &Enemy, source: HitSource) -> i32 {
+    let armor = enemy_armor(a, e);
+    if e.boss || !source.ranged() || e.contact() {
+        return armor;
+    }
+    let profile = enemy_profile(e);
+    armor
+        + if a.mode == Mode::Personal {
+            profile.ranged_armor
+        } else {
+            profile.npc_ranged_armor
+        }
+}
+/// The armor `e` has before any ranged armor, which the inspector shows as
+/// its protection. A boss's is the rank armor it spawned with, scaled by its
+/// phase `armor_mult` (design enemy-balance §6), and 0 while it is exposed.
 fn enemy_armor(a: &Attempt, e: &Enemy) -> i32 {
     if e.boss {
-        if e.exposed_at(a.tick) { 0 } else { e.armor }
+        if e.exposed_at(a.tick) {
+            0
+        } else {
+            boss_phase_armor(e)
+        }
     } else if e.contact() {
         (e.armor as f32 * enemy_profile(e).contact_armor_fraction).floor() as i32
     } else {
         e.armor
+    }
+}
+/// A boss's spawn armor scaled by its phase `armor_mult` and rounded; its
+/// armor exactly before the first transition and without phases.
+fn boss_phase_armor(e: &Enemy) -> i32 {
+    let m = e.boss_state.as_ref().map_or(1.0, BossState::armor_mult);
+    if m == 1.0 {
+        e.armor
+    } else {
+        (e.armor as f32 * m).round() as i32
     }
 }
 fn enemy_defeated(a: &Attempt, e: &Enemy) -> bool {

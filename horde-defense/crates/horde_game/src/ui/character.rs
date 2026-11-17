@@ -6,6 +6,7 @@ use horde_core::{
     campaign::NpcTraining,
     command::{Command, MAX_RECALL_PERCENT, NpcTactics},
     content::{Mode, Policy, Slot},
+    defenders::DefenderId,
 };
 
 pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
@@ -120,12 +121,35 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     });
     egui::CollapsingHeader::new("Current equipment & advancement rules").show(ui, |ui| {
-        for slot in Slot::ALL { ui.label(format!("{:?}: {}", slot, f.game.campaign().equipped(Mode::Personal, slot).name)); }
-        muted(ui, "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.");
+        for slot in Slot::ALL {
+            ui.label(format!(
+                "{}: {}",
+                slot.label(),
+                f.game.campaign().equipped(Mode::Personal, slot).name
+            ));
+        }
+        muted(ui, ADVANCEMENT_RULES);
     });
 }
+/// The note under "Current equipment & advancement rules".
+const ADVANCEMENT_RULES: &str = "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.";
+/// Mara's tactical policy (`SetNpcPolicy`).
 pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let npc = &f.game.campaign().npc;
+    tactics(ui, f, DefenderId::Mara);
+}
+/// The tactics of survivor defender `defender`, edited through core: Mara
+/// with `SetNpcPolicy`, a recruit (in camp, or defending the main run) with
+/// `SetRecruitTactics`. A recruit no longer on the roster shows nothing.
+pub(super) fn tactics(ui: &mut egui::Ui, f: &mut UiCtx, defender: DefenderId) {
+    let npc = match defender {
+        DefenderId::Recruit(id) => {
+            let Some(recruit) = f.game.strategy().roster.iter().find(|r| r.id == id) else {
+                return;
+            };
+            &recruit.npc
+        }
+        DefenderId::Player | DefenderId::Mara => &f.game.campaign().npc,
+    };
     let mut proposed = NpcTactics {
         policy: npc.policy,
         prefer_aim: npc.prefer_aim,
@@ -135,10 +159,10 @@ pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
     };
     let before = proposed.clone();
     egui::ComboBox::from_id_salt("policy")
-        .selected_text(format!("{:?}", proposed.policy))
+        .selected_text(proposed.policy.label())
         .show_ui(ui, |ui| {
             for p in Policy::ALL {
-                ui.selectable_value(&mut proposed.policy, p, format!("{p:?}"));
+                ui.selectable_value(&mut proposed.policy, p, p.label());
             }
         });
     ui.checkbox(&mut proposed.prefer_aim, "Aim when the line is safe");
@@ -154,16 +178,24 @@ pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
     if proposed != before {
         f.dispatch(
-            Command::SetNpcPolicy(proposed),
+            match defender {
+                DefenderId::Recruit(id) => Command::SetRecruitTactics {
+                    id,
+                    tactics: proposed,
+                },
+                DefenderId::Player | DefenderId::Mara => Command::SetNpcPolicy(proposed),
+            },
             "Policy applies at the next legal decision.",
         );
     }
 }
 
 pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
+    // The companion's name is the core record's, never a UI literal.
+    let name = f.game.campaign().npc.name.clone();
     chrome::page_title(
         ui,
-        "Mara Vale",
+        &name,
         "Train and equip your autonomous defender, then review her tactical policy.",
     );
     if !f.game.campaign().npc_available() {
@@ -190,8 +222,18 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
     chrome::section(ui, "Training");
     ui.horizontal_wrapped(|ui| {
-        if ui.add_enabled(f.game.campaign().coins >= 25 && n.awarded < f.game.campaign().allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyNpcPoint, "Training point awarded."); }
-        if ui.button("Change Mara's equipment").clicked() { f.campaign.mode = Mode::Npc; f.open_preparation(Tab::Armory); }
+        let buy = super::camp_prices::training_point(f.game.campaign(), &n);
+        if ui
+            .add_enabled(buy.enabled, egui::Button::new(buy.label))
+            .on_disabled_hover_text(buy.disabled_hover)
+            .clicked()
+        {
+            f.dispatch(Command::BuyNpcPoint, "Training point awarded.");
+        }
+        if ui.button("Change Mara's equipment").clicked() {
+            f.campaign.mode = Mode::Npc;
+            f.open_preparation(Tab::Armory);
+        }
     });
     muted(
         ui,
@@ -201,31 +243,17 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
             (n.combat_ticks as f32 / 60.0).min(120.0)
         ),
     );
-    for t in NpcTraining::ALL {
-        if matches!(
-            t,
-            NpcTraining::Intelligence | NpcTraining::HitPoints | NpcTraining::Fatigue
-        ) {
-            continue;
-        }
-        ui.push_id(t.name(), |ui| {
+    for row in training_rows(&n) {
+        ui.push_id(row.label, |ui| {
             chrome::row(ui, |ui| {
-                ui.strong(t.name());
-                ui.label(format!("{} CP", t.cost()));
-                let supported = t != NpcTraining::Strength || n.st < 20;
+                ui.strong(row.label);
+                ui.label(format!("{} CP", row.cost));
                 if ui
-                    .add_enabled(
-                        supported && n.unspent >= t.cost(),
-                        egui::Button::new("Train"),
-                    )
-                    .on_disabled_hover_text(if !supported {
-                        "Supported Strength maximum is 20."
-                    } else {
-                        "Earn or buy enough training CP first."
-                    })
+                    .add_enabled(row.enabled, egui::Button::new("Train"))
+                    .on_disabled_hover_text(row.disabled_hover)
                     .clicked()
                 {
-                    f.dispatch(Command::TrainNpc(t), "Survivor trained.");
+                    f.dispatch(Command::TrainNpc(row.training), "Training applied.");
                 }
             });
         });
@@ -239,11 +267,44 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::section(ui, "Tactical policy");
     policy(ui, f);
     egui::CollapsingHeader::new("Character ledger & combat rules").show(ui, |ui| {
-        ui.label(format!("Creation budget {} CP · ST {} · DX {} · IQ {} (informational) · HT {}", n.creation.budget, n.st, n.dx, n.iq, n.ht));
-        muted(ui, "Free survivor with campaign recovery. Redistribution refunds advancement; historical awards and the campaign allowance remain intact. HP and FP derive from ST and HT; direct HP, FP and IQ training are outside the supported scope.");
+        ui.label(format!("Creation budget {} CP · ST {} · DX {} · HT {}", n.creation.budget, n.st, n.dx, n.ht));
+        muted(ui, "Free survivor with campaign recovery. Redistribution refunds advancement; historical awards and the campaign allowance remain intact. HP and FP derive from ST and HT.");
         muted(ui, "GURPS Fourth Edition Lite (August 2004), supported subset. Attack success precedes active defense and armor. A shot resolves once. Zero HP requires consciousness checks; it does not mean death. Stun and knockdown allow recovery.");
         for skill in [8, 10, 12, 14, 16] { ui.label(format!("Skill {skill}: {:.1}% attack-roll success, before defense/armor", horde_core::rules::attack_success_probability(skill) * 100.0)); }
     });
+}
+
+/// One training row of a survivor defender (Mara or a recruit).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct TrainingRow {
+    pub training: NpcTraining,
+    pub label: &'static str,
+    pub cost: u32,
+    pub enabled: bool,
+    pub disabled_hover: &'static str,
+}
+/// The rows `npc` can train: core's `NpcTraining::TRAINABLE`, in its order,
+/// for Mara's page and the recruit rows in Operations alike. A row is
+/// enabled when the survivor has the CP and, for Strength, room under the
+/// supported maximum.
+pub(super) fn training_rows(npc: &horde_core::campaign::Npc) -> Vec<TrainingRow> {
+    NpcTraining::TRAINABLE
+        .into_iter()
+        .map(|training| {
+            let supported = training != NpcTraining::Strength || npc.st < 20;
+            TrainingRow {
+                training,
+                label: training.name(),
+                cost: training.cost(),
+                enabled: supported && npc.unspent >= training.cost(),
+                disabled_hover: if supported {
+                    "Earn or buy enough training CP first."
+                } else {
+                    "Supported Strength maximum is 20."
+                },
+            }
+        })
+        .collect()
 }
 
 pub(super) fn mode_selector(ui: &mut egui::Ui, f: &mut UiCtx) {

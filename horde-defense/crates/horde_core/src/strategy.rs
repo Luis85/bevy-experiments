@@ -1,17 +1,12 @@
 //! Persistent late-campaign recruitment, garrisons and seeded plague pressure.
 //! The caller advances this clock only while the global simulation is running.
-use crate::campaign::{Campaign, Npc, NpcCreation, NpcTraining};
+use crate::campaign::{Campaign, Npc, NpcTraining, SaleRefs};
 use crate::content::{Mode, Slot, content};
+use crate::defenders::Archetype;
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
 use crate::world::world;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StrategySaleQuote {
-    pub coins: u64,
-    pub affected_presets: Vec<String>,
-    pub affected_survivors: Vec<String>,
-}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecruitReadiness {
     pub role: String,
@@ -31,6 +26,21 @@ pub enum RecruitStatus {
     Ready,
     Guarding,
     Deployed,
+    /// Appended (D5): the depth-0 main-run defender. Never on an expedition.
+    Defending,
+}
+impl RecruitStatus {
+    pub const ALL: [Self; 4] = [Self::Ready, Self::Guarding, Self::Deployed, Self::Defending];
+    /// Player-facing status text. `Deployed` means away on an expedition;
+    /// `Defending` means holding the main defense.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ready => "Ready",
+            Self::Guarding => "Guarding",
+            Self::Deployed => "On expedition",
+            Self::Defending => "Defending",
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Recruit {
@@ -39,6 +49,10 @@ pub struct Recruit {
     pub origin: String,
     pub npc: Npc,
     pub status: RecruitStatus,
+    /// Outbreaks this recruit contained while guarding. Saved because the
+    /// guard assignment that saw them is removed.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub containments: u32,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GuardAssignment {
@@ -83,7 +97,14 @@ pub struct StrategyState {
     pub next_outbreak_id: u64,
     pub peak_freed: usize,
     pub log: Vec<String>,
+    /// Settled expedition outcomes dropped unacknowledged when the battle
+    /// list was pruned (saturating).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub folded_outcomes: u32,
 }
+/// A fresh game's strategy RNG seed (ASCII "PLAGUE"); [`StrategyState::seeded`]
+/// mixes another seed into it.
+const STRATEGY_RNG_SALT: u64 = 0x504c41475545;
 impl Default for StrategyState {
     fn default() -> Self {
         Self {
@@ -91,15 +112,27 @@ impl Default for StrategyState {
             guards: vec![],
             outbreaks: vec![],
             tick: 0,
-            rng: Rng::new(0x504c41475545),
+            rng: Rng::new(STRATEGY_RNG_SALT),
             next_recruit_id: 1,
             next_outbreak_id: 1,
             peak_freed: 0,
             log: vec![],
+            folded_outcomes: 0,
         }
     }
 }
 impl StrategyState {
+    /// A fresh strategy layer whose RNG starts at `seed ^ STRATEGY_RNG_SALT`,
+    /// so `seeded(0)` is the default. The pacing sweep's seam
+    /// (`sim::pacing_start`): seed index 0 of a plan that does not set
+    /// `seed_strategy` keeps the default RNG; every later index, and every
+    /// index of a plan that sets it, is seeded.
+    pub(crate) fn seeded(seed: u64) -> Self {
+        Self {
+            rng: Rng::new(seed ^ STRATEGY_RNG_SALT),
+            ..Self::default()
+        }
+    }
     pub fn readiness(&self, campaign: &Campaign, id: u64) -> Result<RecruitReadiness, String> {
         let recruit = self
             .roster
@@ -126,9 +159,9 @@ impl StrategyState {
             magazine: profile.npc.magazine,
             status: recruit.status,
             summary: format!(
-                "{} · {:?} · HP {hp}/{} · FP {fp}/{} · DR {} · Guns {} · {} rounds",
+                "{} · {} · HP {hp}/{} · FP {fp}/{} · DR {} · Guns {} · {} rounds",
                 recruit.npc.creation.archetype,
-                recruit.status,
+                recruit.status.label(),
                 profile.max_hp,
                 profile.max_fp,
                 profile.npc.armor,
@@ -151,21 +184,10 @@ impl StrategyState {
         recruit.npc = std::mem::replace(&mut campaign.npc, main);
         result
     }
-    pub fn sale_preview(&self, campaign: &Campaign, id: u64) -> Result<StrategySaleQuote, String> {
-        let quote = campaign.sale_preview(id)?;
-        Ok(StrategySaleQuote {
-            coins: quote.coins,
-            affected_presets: quote.affected_presets,
-            affected_survivors: self
-                .roster
-                .iter()
-                .filter(|r| r.npc.loadout.contains(&id))
-                .map(|r| r.name.clone())
-                .collect(),
-        })
-    }
-    /// Selling an idle survivor's optional item restores the real protected set
-    /// issued at recruitment. Deployed equipment is never eligible for sale.
+    /// Save repair: an idle survivor slot whose item is no longer owned falls
+    /// back to the real protected set issued at recruitment. Sales never need
+    /// it since ruleset 2 (strict `SellItem` refuses recruit-equipped items);
+    /// loading a save still runs it.
     pub fn reconcile_loadouts(&mut self, campaign: &Campaign) -> usize {
         let mut bundles: Vec<u64> = campaign
             .items
@@ -200,63 +222,33 @@ impl StrategyState {
         }
         changed
     }
-    pub fn sell_extras_quote(&self, campaign: &Campaign) -> u64 {
-        if campaign.reserved.is_some() {
-            return 0;
-        }
-        let excluded = self.excluded_equipment(campaign);
-        campaign
-            .items
-            .iter()
-            .filter(|item| {
-                !item.protected && !item.locked && !item.favorite && !excluded.contains(&item.id)
-            })
-            .map(|item| campaign.item_sale_value(item.id).expect("known owned item"))
-            .sum()
-    }
-    pub fn sell_extras(&mut self, campaign: &mut Campaign) -> Result<u64, String> {
-        campaign
-            .coins
-            .checked_add(self.sell_extras_quote(campaign))
-            .ok_or("Batch sale would exceed the wallet limit")?;
-        let ids = self.extra_ids(campaign);
-        let mut total = 0u64;
-        for id in ids {
-            total = total
-                .checked_add(campaign.sell(id)?)
-                .ok_or("Sale proceeds exceed the wallet limit")?;
-        }
-        Ok(total)
-    }
-    fn extra_ids(&self, campaign: &Campaign) -> Vec<u64> {
-        if campaign.reserved.is_some() {
-            return vec![];
-        }
-        let excluded = self.excluded_equipment(campaign);
-        campaign
-            .items
-            .iter()
-            .filter(|i| !i.protected && !i.locked && !i.favorite && !excluded.contains(&i.id))
-            .map(|i| i.id)
-            .collect()
-    }
-    fn excluded_equipment(&self, campaign: &Campaign) -> std::collections::BTreeSet<u64> {
-        let mut ids: std::collections::BTreeSet<u64> = campaign
-            .player
-            .loadout
-            .into_iter()
-            .chain(campaign.npc.loadout)
-            .chain(campaign.reserved_items.iter().copied())
-            .collect();
-        for preset in &campaign.presets {
-            ids.extend(preset.loadout);
-        }
+    /// The idle recruits' loadouts, the only sale references `Campaign`
+    /// cannot see. Built once per sale (`Game::plan_sale`).
+    pub fn sale_refs(&self) -> SaleRefs {
+        let mut equipped = std::collections::BTreeMap::new();
         for recruit in &self.roster {
-            ids.extend(recruit.npc.loadout);
+            for id in recruit.npc.loadout {
+                equipped.entry(id).or_insert_with(|| recruit.name.clone());
+            }
         }
-        ids
+        SaleRefs::new(equipped)
     }
-    fn note(&mut self, text: String) {
+    /// The batch quote over every owned item (0 while a defender is deployed).
+    pub fn sell_extras_quote(&self, campaign: &Campaign) -> u64 {
+        campaign.sell_quote(&self.sale_refs())
+    }
+    /// Sells every eligible item. While a defender is deployed nothing is
+    /// eligible and this returns `Ok(0)`, as it always has.
+    pub fn sell_extras(
+        &mut self,
+        campaign: &mut Campaign,
+    ) -> Result<u64, crate::command::CommandError> {
+        if campaign.reserved.is_some() {
+            return Ok(0);
+        }
+        campaign.sell_unprotected(&self.sale_refs())
+    }
+    pub(crate) fn note(&mut self, text: String) {
         self.log.push(text);
         if self.log.len() > 80 {
             self.log.remove(0);
@@ -277,7 +269,40 @@ impl StrategyState {
         campaign.has_feature(crate::skill_catalog::CampaignFeature::Operations)
             && self.progress(campaign) >= world().strategy_config.strategy_unlock_freed
     }
+    /// The two archetypes the next recruit from `country_id` may join as
+    /// (decision 15, ruling E7): first today's rotation, then one of the
+    /// other three keyed on `seed`, the next recruit id and the country.
+    /// Always distinct; draws no RNG.
+    pub fn recruit_offer_for(&self, seed: u64, country_id: &str) -> [Archetype; 2] {
+        let first = Archetype::rotation(self.next_recruit_id);
+        let key = crate::hash::keyed(
+            seed,
+            self.next_recruit_id,
+            crate::hash::fnv1a(country_id.as_bytes()),
+            crate::hash::tags::RECRUIT_OFFER,
+        );
+        let len = Archetype::ALL.len();
+        let step = 1 + (key % (len as u64 - 1)) as usize;
+        [first, Archetype::ALL[(first.index() + step) % len]]
+    }
+    /// Recruits the rotation archetype, as every recruit joined before the
+    /// choice existed (`Command::Recruit` takes the same first offer).
     pub fn recruit(&mut self, campaign: &mut Campaign, country_id: &str) -> Result<u64, String> {
+        self.recruit_as(
+            campaign,
+            country_id,
+            Archetype::rotation(self.next_recruit_id),
+        )
+    }
+    /// Recruits a survivor from a liberated country as `archetype`: its
+    /// creation, starting stats and default policy. `Game::recruit_offer`
+    /// decides which archetypes a country offers.
+    pub fn recruit_as(
+        &mut self,
+        campaign: &mut Campaign,
+        country_id: &str,
+        archetype: Archetype,
+    ) -> Result<u64, String> {
         if !self.recruitment_unlocked(campaign) {
             return Err("Liberate your first country to recruit local survivors".into());
         }
@@ -293,9 +318,9 @@ impl StrategyState {
         let country = world()
             .country(country_id)
             .ok_or("Unknown recruitment country")?;
-        let price = world().strategy_config.recruit_cost;
+        let price = campaign.recruit_price();
         if campaign.coins < price {
-            return Err(format!("Recruitment requires {price} coins"));
+            return Err(crate::defenders::recruitment_requires(price));
         }
         let next_id = self
             .next_recruit_id
@@ -306,48 +331,25 @@ impl StrategyState {
         campaign.coins -= price;
         let id = self.next_recruit_id;
         self.next_recruit_id = next_id;
-        let names = [
-            "Alex Rowan",
-            "Sam Okoro",
-            "Noor Aziz",
-            "Ren Mori",
-            "Lena Fischer",
-            "Ari Silva",
-            "Mika Chen",
-            "Imani Cole",
-            "Sasha Volk",
-            "Kai Morgan",
-            "Dara Nouri",
-            "Morgan Reyes",
-        ];
-        let base_name = names[((id - 1) % names.len() as u64) as usize];
-        let name = if id <= names.len() as u64 {
-            base_name.to_string()
-        } else {
-            format!("{base_name} {id}")
-        };
+        let name = crate::defenders::recruit_name(id);
         let mut npc = Campaign::default().npc;
         npc.name = name.clone();
         npc.loadout = loadout;
-        npc.creation = NpcCreation::archetype(((id - 1) % 4) as usize);
+        npc.creation = archetype.creation();
         npc.st = npc.creation.st;
         npc.dx = npc.creation.dx;
         npc.iq = npc.creation.iq;
         npc.ht = npc.creation.ht;
         npc.guns = npc.creation.guns;
         npc.melee = npc.creation.melee;
-        npc.policy = match (id - 1) % 4 {
-            0 => crate::content::Policy::Marksman,
-            1 => crate::content::Policy::Guardian,
-            2 => crate::content::Policy::Balanced,
-            _ => crate::content::Policy::BossFocus,
-        };
+        npc.policy = archetype.default_policy();
         self.roster.push(Recruit {
             id,
             name: name.clone(),
             origin: country_id.into(),
             npc,
             status: RecruitStatus::Ready,
+            containments: 0,
         });
         self.peak_freed = self.peak_freed.max(campaign.liberated_count() as usize);
         self.note(format!(
@@ -379,6 +381,34 @@ impl StrategyState {
         }
         r.name = npc.name.clone();
         r.npc = npc;
+        r.status = RecruitStatus::Ready;
+        Ok(())
+    }
+    /// Seats a Ready recruit as the main-run defender (Ready to Defending).
+    /// `reserve_recruit` / `release_recruit` stay expedition-only (Deployed).
+    pub fn reserve_defender(&mut self, id: u64) -> Result<(), String> {
+        let r = self
+            .roster
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if r.status != RecruitStatus::Ready {
+            return Err("Survivor is already on duty".into());
+        }
+        r.status = RecruitStatus::Defending;
+        Ok(())
+    }
+    /// Returns the main-run defender to the roster (Defending to Ready). The
+    /// roster entry is the battle's npc, so there is nothing to copy back.
+    pub fn release_defender(&mut self, id: u64) -> Result<(), String> {
+        let r = self
+            .roster
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if r.status != RecruitStatus::Defending {
+            return Err("Survivor is not defending the main run".into());
+        }
         r.status = RecruitStatus::Ready;
         Ok(())
     }
@@ -442,29 +472,8 @@ impl StrategyState {
         id: u64,
         country_id: &str,
     ) -> Result<(), String> {
-        if !self.grand_strategy_unlocked(campaign) {
-            return Err("Liberate more countries to unlock strategic garrisons".into());
-        }
-        if !campaign.world.cleared.iter().any(|c| c == country_id) {
-            return Err("Guards protect fully liberated countries".into());
-        }
-        if self
-            .guards
-            .iter()
-            .filter(|g| g.country_id == country_id)
-            .count()
-            >= world().strategy_config.max_guards_per_country
-        {
-            return Err("Country garrison is at capacity".into());
-        }
-        let r = self
-            .roster
-            .iter_mut()
-            .find(|r| r.id == id)
-            .ok_or("Unknown survivor")?;
-        if r.status != RecruitStatus::Ready {
-            return Err("Survivor is already on duty".into());
-        }
+        let n = self.guard_verdict(campaign, id, country_id)?;
+        let r = &mut self.roster[n];
         campaign.reserve_external(r.npc.loadout)?;
         let rifle = item_definition(campaign, &r.npc, Slot::Ranged);
         let profile = campaign.profile_for_loadout(Mode::Npc, r.npc.loadout, &r.npc);
@@ -483,6 +492,54 @@ impl StrategyState {
         let name = r.name.clone();
         self.note(format!("{} assigned to guard {}", name, country_id));
         Ok(())
+    }
+    /// `assign_guard`'s verdict without the assignment, in its order:
+    /// garrisons unlocked, the country liberated, room in its garrison, a
+    /// known Ready recruit whose items no other deployment holds. Returns
+    /// the recruit's roster index.
+    fn guard_verdict(
+        &self,
+        campaign: &Campaign,
+        id: u64,
+        country_id: &str,
+    ) -> Result<usize, String> {
+        if !self.grand_strategy_unlocked(campaign) {
+            return Err("Liberate more countries to unlock strategic garrisons".into());
+        }
+        if !campaign.world.cleared.iter().any(|c| c == country_id) {
+            return Err("Guards protect fully liberated countries".into());
+        }
+        if self
+            .guards
+            .iter()
+            .filter(|g| g.country_id == country_id)
+            .count()
+            >= world().strategy_config.max_guards_per_country
+        {
+            return Err("Country garrison is at capacity".into());
+        }
+        let n = self
+            .roster
+            .iter()
+            .position(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if self.roster[n].status != RecruitStatus::Ready {
+            return Err("Survivor is already on duty".into());
+        }
+        campaign.check_external(self.roster[n].npc.loadout)?;
+        Ok(n)
+    }
+    /// The roster recruits, by id, that `assign_guard` would accept for
+    /// `country_id` now. Pure.
+    pub fn eligible_guards(&self, campaign: &Campaign, country_id: &str) -> Vec<u64> {
+        let mut ids: Vec<u64> = self
+            .roster
+            .iter()
+            .map(|r| r.id)
+            .filter(|id| self.guard_verdict(campaign, *id, country_id).is_ok())
+            .collect();
+        ids.sort_unstable();
+        ids
     }
     pub fn release_guard(&mut self, campaign: &mut Campaign, id: u64) -> Result<(), String> {
         let n = self
@@ -591,7 +648,12 @@ impl StrategyState {
     pub fn tick_world(&mut self, campaign: &mut Campaign) {
         let allowance = campaign.allowance();
         for recruit in &mut self.roster {
-            if recruit.status != RecruitStatus::Deployed {
+            // Deployed recruits fight on with a worker copy and Defending ones
+            // claim through the main run; neither claims from the world clock.
+            if !matches!(
+                recruit.status,
+                RecruitStatus::Deployed | RecruitStatus::Defending
+            ) {
                 recruit.npc.claim_objectives(allowance);
             }
         }
@@ -774,6 +836,8 @@ impl StrategyState {
                     outbreak.outcome = OutbreakOutcome::Contained;
                     guard.victories += 1;
                     recruit.npc.victories += 1;
+                    // Kept on the recruit: the guard assignment goes.
+                    recruit.containments = recruit.containments.saturating_add(1);
                     contained.insert(country.clone());
                     notes.push(format!(
                         "{} contained the outbreak in {}",
@@ -796,6 +860,18 @@ impl StrategyState {
                     if outbreak.strength == 0 {
                         outbreak.outcome = OutbreakOutcome::Contained;
                         contained.insert(outbreak.country_id.clone());
+                        // The last group fell to the garrison's wounds:
+                        // every guard of the country contained it.
+                        for guard in &self.guards {
+                            if guard.country_id != outbreak.country_id {
+                                continue;
+                            }
+                            if let Some(r) =
+                                self.roster.iter_mut().find(|r| r.id == guard.recruit_id)
+                            {
+                                r.containments = r.containments.saturating_add(1);
+                            }
+                        }
                     }
                 }
                 continue;
@@ -1132,6 +1208,20 @@ mod tests {
         );
     }
     #[test]
+    fn seeded_zero_is_the_default_and_other_seeds_vary_the_rng() {
+        assert_eq!(StrategyState::seeded(0), StrategyState::default());
+        let mut a = StrategyState::seeded(1);
+        let mut b = StrategyState::seeded(2);
+        assert_ne!(a.rng.next_u64(), b.rng.next_u64());
+        assert_eq!(
+            StrategyState {
+                rng: StrategyState::default().rng,
+                ..StrategyState::seeded(7)
+            },
+            StrategyState::default()
+        );
+    }
+    #[test]
     fn adding_a_reloading_guard_does_not_grant_extra_hostile_actions() {
         let (mut c, mut a) = guarding(1);
         let mut b = a.clone();
@@ -1161,8 +1251,13 @@ mod tests {
         assert!(!s.resolve_outbreak(&id));
         assert_eq!(c.coins, coins);
     }
+    /// Rewritten in W1-20 (was `idle_recruit_sales_warn_and_restore_the_
+    /// original_owned_starter_set`): SellItem is strict, so a recruit-equipped
+    /// item is no longer sold with a warning and replaced by the recruit's
+    /// starter set. The way out is to re-equip the recruit's own starter item;
+    /// then the rifle sells and no loadout needs repair.
     #[test]
-    fn idle_recruit_sales_warn_and_restore_the_original_owned_starter_set() {
+    fn idle_recruit_equipment_sells_only_after_the_recruit_switches_back() {
         let mut c = liberated(1);
         let mut s = StrategyState::default();
         let country = c.world.cleared[0].clone();
@@ -1170,15 +1265,77 @@ mod tests {
         let starter = s.roster[0].npc.loadout[0];
         let rifle = c.add_item(4).unwrap();
         s.equip_recruit(&c, id, rifle).unwrap();
+        let blocked = crate::campaign::SaleBlock::RecruitEquipped {
+            name: s.roster[0].name.clone(),
+        };
         assert_eq!(
-            s.sale_preview(&c, rifle).unwrap().affected_survivors,
-            vec![s.roster[0].name.clone()]
+            c.sale_eligibility_for(rifle, crate::campaign::SaleOrigin::Player, &s.sale_refs()),
+            Err(blocked.clone())
         );
         assert_eq!(s.sell_extras_quote(&c), 0);
-        c.sell(rifle).unwrap();
+        assert_eq!(
+            c.sell(rifle, &s.sale_refs()),
+            Err(crate::command::CommandError::SaleBlocked(blocked))
+        );
+        s.equip_recruit(&c, id, starter).unwrap();
+        assert_eq!(c.sell(rifle, &s.sale_refs()), Ok(22));
+        assert_eq!(s.reconcile_loadouts(&c), 0, "no loadout needs repair");
+        assert!(s.validate(&c).is_ok());
+    }
+    /// The positive leg of the save repair (W1 review; W1-20 rewrote the old
+    /// sale test into a consistent-state check). An old or hand-edited save
+    /// can hold an idle recruit slot whose item is no longer owned; loading
+    /// it puts that slot back on the recruit's own protected starter bundle,
+    /// picked by roster ordinal, and leaves every other recruit alone.
+    #[test]
+    fn reconcile_loadouts_restores_a_missing_item_to_the_recruits_own_starter() {
+        let mut c = liberated(1);
+        let mut s = StrategyState::default();
+        let country = c.world.cleared[0].clone();
+        let first = s.recruit(&mut c, &country).unwrap();
+        s.recruit(&mut c, &country).unwrap();
+        let starter = s.roster[0].npc.loadout[0];
+        let second = s.roster[1].npc.loadout;
+        let rifle = c.add_item(4).unwrap();
+        s.equip_recruit(&c, first, rifle).unwrap();
+        // Stands in for a save whose stash lost the equipped rifle.
+        c.items.retain(|i| i.id != rifle);
+        assert!(s.validate(&c).is_err(), "the damaged state is invalid");
         assert_eq!(s.reconcile_loadouts(&c), 1);
         assert_eq!(s.roster[0].npc.loadout[0], starter);
-        assert_ne!(starter, 1);
+        assert_ne!(starter, 1, "the recruit's own bundle, not Mara's");
+        assert_ne!(starter, second[0], "the first recruit's bundle");
+        assert_eq!(s.roster[1].npc.loadout, second);
+        assert!(s.validate(&c).is_ok());
+    }
+    /// Replaces the W1-18 characterisation test
+    /// `old_campaign_filter_sells_recruit_equipped_item` (LE-1, acceptance
+    /// G4.2), inverted: every sell path reads the recruit loadouts through
+    /// `StrategyState::sale_refs`, so a rifle an idle recruit has equipped is
+    /// neither quoted nor sold, by the batch or by the strict single sale, and
+    /// the strategic state stays valid.
+    #[test]
+    fn strict_sell_rejects_recruit_equipped_item() {
+        let mut c = liberated(1);
+        let mut s = StrategyState::default();
+        let country = c.world.cleared[0].clone();
+        let id = s.recruit(&mut c, &country).unwrap();
+        let rifle = c.add_item(4).unwrap();
+        s.equip_recruit(&c, id, rifle).unwrap();
+        assert_eq!(s.roster[0].npc.loadout[0], rifle);
+        let before = c.clone();
+        assert_eq!(s.sell_extras_quote(&c), 0);
+        assert_eq!(s.sell_extras(&mut c), Ok(0));
+        assert_eq!(
+            c.sell(rifle, &s.sale_refs()),
+            Err(crate::command::CommandError::SaleBlocked(
+                crate::campaign::SaleBlock::RecruitEquipped {
+                    name: s.roster[0].name.clone()
+                }
+            ))
+        );
+        assert_eq!(c, before);
+        assert_eq!(s.roster[0].npc.loadout[0], rifle);
         assert!(s.validate(&c).is_ok());
     }
     #[test]
@@ -1200,6 +1357,90 @@ mod tests {
         assert_eq!(s.roster[1].npc.awarded, 4);
         assert!(s.readiness(&c, a).unwrap().summary.contains("Marksman"));
         assert!(s.validate(&c).is_ok());
+    }
+    /// Ruling E7: the second offer is keyed on exactly the game seed, the
+    /// next recruit id and the country (`keyed(seed, next_recruit_id,
+    /// fnv1a(country), RECRUIT_OFFER)`). A recorded `RecruitAs` replays only
+    /// while that key holds, and no digest covers it, so each input is shown
+    /// to matter and the offers over a grid are pinned.
+    #[test]
+    fn recruit_offer_is_keyed_on_seed_next_recruit_id_and_country() {
+        let seeds = [0, 1, 7, 0xDEAD_BEEF_2026, u64::MAX];
+        let countries: Vec<&str> = world()
+            .countries
+            .iter()
+            .take(6)
+            .map(|c| c.id.as_str())
+            .collect();
+        let offer = |seed: u64, id: u64, country: &str| {
+            let s = StrategyState {
+                next_recruit_id: id,
+                ..StrategyState::default()
+            };
+            s.recruit_offer_for(seed, country)
+        };
+        let mut table = String::new();
+        for &seed in &seeds {
+            for id in 1..=8 {
+                for &country in &countries {
+                    let [first, second] = offer(seed, id, country);
+                    let key = crate::hash::keyed(
+                        seed,
+                        id,
+                        crate::hash::fnv1a(country.as_bytes()),
+                        crate::hash::tags::RECRUIT_OFFER,
+                    );
+                    let step = 1 + (key % 3) as usize;
+                    assert_eq!(first, Archetype::rotation(id));
+                    assert_eq!(
+                        second,
+                        Archetype::ALL[(first.index() + step) % 4],
+                        "seed {seed} id {id} {country}"
+                    );
+                    table.push_str(&format!(
+                        "{seed} {id} {country} {} {}\n",
+                        first.id(),
+                        second.id()
+                    ));
+                }
+            }
+        }
+        // Each key input changes some second offer with the others held
+        // (ids 1 and 5 share a rotation archetype).
+        let second = |seed, id, country| offer(seed, id, country)[1];
+        let base = countries[0];
+        assert!(
+            seeds[1..]
+                .iter()
+                .any(|&seed| second(seed, 1, base) != second(seeds[0], 1, base)),
+            "the seed keys the offer"
+        );
+        assert!(
+            (0..8u64).any(|n| second(1, 1 + 4 * (n + 1), base) != second(1, 1, base)),
+            "the next recruit id keys the offer"
+        );
+        assert!(
+            countries[1..]
+                .iter()
+                .any(|&country| second(1, 1, country) != second(1, 1, base)),
+            "the country keys the offer"
+        );
+        assert_eq!(
+            crate::hash::fnv1a(table.as_bytes()),
+            0xa2c5_0b35_466f_1d3f,
+            "recruit offers moved (ruling E7):\n{table}"
+        );
+    }
+    #[test]
+    fn readiness_summary_has_no_debug_names() {
+        let mut c = liberated(1);
+        let mut s = StrategyState::default();
+        let country = c.world.cleared[0].clone();
+        let id = s.recruit(&mut c, &country).unwrap();
+        s.roster[0].status = RecruitStatus::Deployed;
+        let summary = s.readiness(&c, id).unwrap().summary;
+        assert!(summary.contains("On expedition"), "{summary}");
+        assert!(!summary.contains("Deployed"), "{summary}");
     }
     #[test]
     fn strategic_validation_rejects_duplicate_alerts_and_invalid_guard_injury() {

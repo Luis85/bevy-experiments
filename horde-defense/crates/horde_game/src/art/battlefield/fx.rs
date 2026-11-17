@@ -1,31 +1,84 @@
-//! Weather, impact particles and short-lived event effects: explosions,
-//! callouts, tracers, contact damage and hit sparks.
-use super::super::{AMBER, ArenaProjection, MUTED, PANEL, RED, TEXT, box_at, line};
+//! Weather, impact particles and short-lived event effects. World pass
+//! ([`events`]): tracers, then the hit sparks and kill bursts of [`super::hits`] (bursts are in [`super::explosion`]). Cue pass ([`event_cues`],
+//! after the lighting grade): REINFORCEMENTS, the INCOMING spawn marker,
+//! contact damage and banked-coin numbers, each on its INK backing
+//! ([`super::cue`]). The boss warning and arrival are the wall-clock
+//! banner's (`ui::battle::boss_banner`, W3-14).
+use super::super::{AMBER, ArenaProjection, RED};
+use super::batch::MeshBuilder;
+use super::cue::{self, CueBatch, Label};
+use super::weapon_fx;
 use crate::{
     animation::{Particle, ParticleKind},
-    battle_view::BattleViewModel,
+    battle_view::{BattleViewModel, FxView, Volley, struck_stagger},
     visual_assets::{self, ArtTextures, PropMotion},
 };
-use bevy_egui::egui::{self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, vec2};
-use horde_core::{content::StructureKind, sim::EventKind};
+use bevy_egui::egui::{Align2, Color32 as C, Painter, Pos2, Rect, Vec2, vec2};
+use horde_core::{
+    content::StructureKind,
+    sim::{Attempt, EventKind},
+};
 
 pub(super) struct FxOptions {
     pub numbers: bool,
     pub reduced: bool,
-    pub blood: bool,
     pub textures: ArtTextures,
+    /// See [`super::RenderOptions::occluder`].
+    pub occluder: Option<Rect>,
 }
 
+/// The least gap between a field callout and the overlay that would cover it.
+pub(crate) const OCCLUDER_GAP: f32 = 4.0;
+
+/// The REINFORCEMENTS label's right-centre anchor: a yard inside the right
+/// edge of a `width`-yard field on the lane centre line `lane`, or
+/// [`OCCLUDER_GAP`] left of an `occluder` that would cover it.
+pub(crate) fn reinforcements_anchor(
+    arena: ArenaProjection,
+    width: f32,
+    lane: f32,
+    occluder: Option<Rect>,
+) -> Pos2 {
+    let mut at = arena.world(width - 1.0, lane);
+    if let Some(occluder) = occluder {
+        at.x = at.x.min(occluder.left() - OCCLUDER_GAP);
+    }
+    at
+}
+
+/// Segments of a batched particle dot.
+const DOT_SEGMENTS: u32 = 8;
+
+/// How long after its tick an event can still be painted, in seconds: the
+/// single table the field view's event filter and the painters share. No
+/// painter draws an `FxView` older than this. The one exception is the
+/// scorch mark (W5-05): `BattleViewModel.scorch` derives it from Explosion
+/// events still in the log, up to `SCORCH_SECONDS` (3 s) old, past this
+/// table's 0.5 s, and `explosion::scorch` paints it. No painter here draws
+/// the boss warning or the boss's arrival any more: their banner runs on the
+/// wall clock (`ui::battle::boss_banner`, W3-14), and the warning's 2.0 s is
+/// that banner's nominal time.
+pub(crate) fn fx_lifetime(kind: EventKind) -> f32 {
+    match kind {
+        EventKind::BossWarning => 2.0,
+        EventKind::Explosion => 0.5,
+        _ => 0.45,
+    }
+}
+
+/// Weather and ambient motes as one untextured mesh (lines as 4-vertex
+/// quads, dots as 8-segment fans, no feathering, sub-pixel ones floored at
+/// one pixel), under every body.
 pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
     let sy = arena.lane_height();
+    let mut mesh = MeshBuilder::untextured(particles.len() * 2).pixel_floor(p.pixels_per_point());
     for particle in particles {
         let at = arena.world(particle.at[0], particle.at[1]);
         let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
         match particle.kind {
             ParticleKind::Rain => {
                 let direction = vec2(particle.angle.cos(), particle.angle.sin());
-                line(
-                    p,
+                mesh.line(
                     at - direction * sy * particle.size,
                     at,
                     0.8,
@@ -33,50 +86,56 @@ pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle
                 );
             }
             ParticleKind::Snow => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    (sy * particle.size).clamp(0.7, 1.7),
+                    Vec2::splat((sy * particle.size).clamp(0.7, 1.7)),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(211, 219, 211, alpha),
                 );
             }
             ParticleKind::Mist => {
-                p.add(egui::Shape::ellipse_filled(
+                mesh.fan(
                     at,
                     vec2(sy * particle.size * 3.5, sy * particle.size * 0.35),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(155, 171, 156, alpha),
-                ));
+                );
             }
             ParticleKind::Ash => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    (sy * particle.size).max(0.5),
+                    Vec2::splat((sy * particle.size).max(0.5)),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(175, 171, 154, alpha),
                 );
             }
             // Ambient motes share the dust material, while impact dust is drawn
             // above actors only when its stronger opacity marks a resolved hit.
             ParticleKind::Dust if particle.alpha <= 0.15 => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    (sy * particle.size).max(0.5),
+                    Vec2::splat((sy * particle.size).max(0.5)),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(169, 151, 109, alpha),
                 );
             }
             _ => {}
         }
     }
+    mesh.paint(p);
 }
 
+/// Impact particles as one untextured mesh above every actor.
 pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
     let sy = arena.lane_height();
+    let mut mesh = MeshBuilder::untextured(particles.len() * 2).pixel_floor(p.pixels_per_point());
     for particle in particles {
         let at = arena.world(particle.at[0], particle.at[1]);
         let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
         match particle.kind {
             ParticleKind::Casing => {
                 let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size;
-                line(
-                    p,
+                mesh.line(
                     at - d,
                     at + d,
                     1.1,
@@ -85,8 +144,7 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
             }
             ParticleKind::Spark => {
                 let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size * 1.8;
-                line(
-                    p,
+                mesh.line(
                     at - d,
                     at + d,
                     1.,
@@ -95,8 +153,7 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
             }
             ParticleKind::Debris => {
                 let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size;
-                line(
-                    p,
+                mesh.line(
                     at - d,
                     at + d,
                     (sy * particle.size * 0.65).max(1.),
@@ -104,15 +161,106 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
                 );
             }
             ParticleKind::Dust if particle.alpha > 0.15 => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    sy * particle.size,
+                    Vec2::splat(sy * particle.size),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(156, 144, 109, alpha),
                 );
             }
             _ => {}
         }
     }
+    mesh.paint(p);
+}
+
+/// A Shot event's age in 60 Hz ticks.
+pub(super) fn shot_age_ticks(e: &FxView) -> u32 {
+    (e.age * 60.0).round() as u32
+}
+
+/// The Shot events of `view` the frame paints, oldest first: those that
+/// still draw a flash or a tracer, of the newest whole volleys (one tick and
+/// one actor) that fit in [`weapon_fx::TRACERS_MAX`]. The first older volley
+/// that does not fit ends the selection, so a crowded frame keeps its most
+/// recent shots and never splits a shell's pellets from its flash.
+pub(super) fn shots_drawn(view: &BattleViewModel) -> Vec<&FxView> {
+    use std::collections::{BTreeMap, BTreeSet};
+    let live: Vec<&FxView> = view
+        .fx
+        .iter()
+        .filter(|e| {
+            e.kind == EventKind::Shot
+                && e.source.is_some_and(|source| {
+                    shot_age_ticks(e) < weapon_fx::shot_life_ticks(weapon_fx::weapon_fx(source))
+                })
+        })
+        .collect();
+    let volley = |e: &FxView| (e.tick, e.actor_id);
+    let mut sizes = BTreeMap::new();
+    for e in &live {
+        *sizes.entry(volley(e)).or_insert(0usize) += 1;
+    }
+    let mut kept = BTreeSet::new();
+    let mut total = 0;
+    for e in live.iter().rev() {
+        let key = volley(e);
+        if kept.contains(&key) {
+            continue;
+        }
+        total += sizes[&key];
+        if total > weapon_fx::TRACERS_MAX {
+            break;
+        }
+        kept.insert(key);
+    }
+    live.into_iter()
+        .filter(|e| kept.contains(&volley(e)))
+        .collect()
+}
+
+/// Where a Shot event's flash, tracer and light start: the drawn survivor's
+/// `muzzle` socket (when the rig resolved) for the survivor, the drawn
+/// barrel for a turret, else the event's own origin. `None` for a trap and
+/// for an event without a source: neither draws a shot.
+pub(super) fn shot_origin(
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    e: &FxView,
+    muzzle: Option<Pos2>,
+    textures: ArtTextures,
+) -> Option<Pos2> {
+    e.source?;
+    let Some(id) = e.actor_id else {
+        return Some(muzzle.unwrap_or_else(|| arena.world(e.from[0], e.from[1])));
+    };
+    let structure = view.structure(id);
+    if structure.is_some_and(|s| s.kind == StructureKind::Trap) {
+        return None;
+    }
+    Some(
+        structure
+            .filter(|s| s.kind == StructureKind::Turret)
+            .filter(|_| textures.props.is_some())
+            .map_or_else(
+                || arena.world(e.from[0], e.from[1]),
+                |s| {
+                    let pose = &s.pose;
+                    visual_assets::turret_muzzle(
+                        arena.world(s.position[0], s.position[1]),
+                        vec2(
+                            arena.yard_width() * s.footprint_width,
+                            arena.lane_height() * 0.88,
+                        ),
+                        PropMotion {
+                            target: Some(arena.world(pose.target[0], pose.target[1])),
+                            recoil: pose.recoil,
+                            ..Default::default()
+                        },
+                    )
+                },
+            ),
+    )
 }
 
 /// `muzzle` is the drawn survivor's muzzle socket, when the rig resolved.
@@ -124,248 +272,162 @@ pub(super) fn events(
     options: &FxOptions,
 ) {
     let FxOptions {
+        reduced, textures, ..
+    } = *options;
+    let sy = arena.lane_height();
+    for e in shots_drawn(view) {
+        if let (Some(source), Some(from)) =
+            (e.source, shot_origin(arena, view, e, muzzle, textures))
+        {
+            weapon_fx::paint_shot(
+                p,
+                weapon_fx::weapon_fx(source),
+                weapon_fx::Shot {
+                    from,
+                    to: arena.world(e.to[0], e.to[1]),
+                    lane: sy,
+                    age_ticks: shot_age_ticks(e),
+                    volley: e.volley.unwrap_or(Volley::SINGLE),
+                    reduced,
+                },
+            );
+        }
+    }
+    // Hit sparks and kill bursts, over the tracers.
+    super::hits::paint(p, arena, view, reduced);
+}
+/// The centre of a kill's banked-coin pop-up `age` seconds after the kill at
+/// world point `to` (on the struck body): 12 pt over it, rising 24 pt a
+/// second in normal effects and held in reduced effects.
+fn coin_center(arena: ArenaProjection, to: [f32; 2], age: f32, reduced: bool) -> Pos2 {
+    let rise = if reduced { 0.0 } else { age * 24.0 };
+    arena.world(to[0], to[1]) + vec2(0.0, -12.0 - rise)
+}
+
+/// The rect, outline included, of every banked-coin pop-up the cue pass
+/// paints over `a` this frame with numbers on, laid out with `p`'s fonts:
+/// each Kill that banked coins while it fades ([`fx_lifetime`]), on the
+/// struck body, as [`event_cues`] paints it from the field view. A drop's
+/// quality label keeps clear of them (CF-3-05).
+pub(crate) fn coin_rects(
+    p: &Painter,
+    arena: ArenaProjection,
+    a: &Attempt,
+    reduced: bool,
+) -> Vec<Rect> {
+    a.events
+        .iter()
+        .filter(|e| e.kind == EventKind::Kill && e.value > 0)
+        .filter_map(|e| {
+            let age = a.tick.saturating_sub(e.tick) as f32 / 60.0;
+            // The cue pass paints a coin while its alpha is above 0.
+            (age < fx_lifetime(EventKind::Kill)).then(|| {
+                let [dx, dy] = struck_stagger(a, e);
+                let at = coin_center(arena, [e.to[0] + dx, e.to[1] + dy], age, reduced);
+                super::cue::coin_rect(p, at, e.value, reduced)
+            })
+        })
+        .collect()
+}
+
+/// The chevron points of the INCOMING tag of a spawn at world `at`.
+fn incoming_chevron(at: Pos2) -> [Pos2; 3] {
+    [
+        at + vec2(0.0, -6.0),
+        at + vec2(-8.0, 0.0),
+        at + vec2(0.0, 6.0),
+    ]
+}
+
+/// The INCOMING word of the tag of a spawn at world `at`, in `font` pt.
+fn incoming_label(at: Pos2, font: f32) -> Label {
+    Label::amber(
+        at + vec2(-12.0, 0.0),
+        Align2::RIGHT_CENTER,
+        "INCOMING",
+        font,
+    )
+}
+
+/// The rects, backings included, of every INCOMING tag the cue pass paints
+/// over `a` this frame, laid out with `p`'s fonts: each Spawn while it shows
+/// ([`fx_lifetime`]), as [`event_cues`] paints it from the field view. With
+/// [`coin_rects`] they are the cues a damage number keeps clear of (CF-7-01).
+pub(crate) fn incoming_rects(p: &Painter, arena: ArenaProjection, a: &Attempt) -> Vec<Rect> {
+    let font = cue::font(arena.lane_height());
+    a.events
+        .iter()
+        .filter(|e| e.kind == EventKind::Spawn)
+        .filter(|e| (a.tick.saturating_sub(e.tick) as f32 / 60.0) < fx_lifetime(e.kind))
+        .map(|e| {
+            let [_, dy] = struck_stagger(a, e);
+            let at = arena.world(a.width_yards - 0.5, e.to[1] + dy);
+            let chevron = Rect::from_points(&incoming_chevron(at)).expand(cue::HALO_MARKER * 2.0);
+            chevron.union(cue::plate(p, &incoming_label(at, font)))
+        })
+        .collect()
+}
+
+/// Cue pass: the event cues of `view`, collected into `batch`.
+pub(super) fn event_cues(
+    batch: &mut CueBatch,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    options: &FxOptions,
+) {
+    let FxOptions {
         numbers,
         reduced,
-        blood,
-        textures,
+        occluder,
+        ..
     } = *options;
-    let r = arena.rect;
     let sy = arena.lane_height();
+    let font = cue::font(sy);
     let origin = arena.world(view.defender.position[0], view.defender.position[1]);
     for e in &view.fx {
         let age = e.age;
-        let alpha = (1.0 - age / 0.45).clamp(0.0, 1.0);
+        let alpha = (1.0 - age / fx_lifetime(e.kind)).clamp(0.0, 1.0);
         match e.kind {
-            EventKind::Explosion if age < 0.5 => {
-                let at = arena.world(e.to[0], e.to[1]);
-                let progress = (age / 0.5).clamp(0., 1.);
-                let radius = (e.value as f32 / 100.).max(0.1);
-                let range = vec2(arena.yard_width(), sy) * radius;
-                let alpha = ((1. - progress) * if reduced { 105. } else { 190. }) as u8;
-                p.add(egui::Shape::ellipse_stroke(
-                    at,
-                    range * if reduced { 1. } else { 0.25 + progress * 0.75 },
-                    Stroke::new(
-                        if reduced { 1. } else { 2. },
-                        C::from_rgba_unmultiplied(239, 181, 82, alpha),
-                    ),
-                ));
-                let sprite = !reduced
-                    && visual_assets::ordnance_effect(
-                        p,
-                        textures,
-                        false,
-                        at,
-                        range * (0.9 + progress * 0.8),
-                        C::from_white_alpha(alpha),
-                    );
-                if !reduced && !sprite {
-                    for n in 0..15 {
-                        let theta = n as f32 * 2.399_963;
-                        let spread = ((n + 1) as f32 / 16.).sqrt() * (0.15 + progress * 0.85);
-                        let point =
-                            at + vec2(theta.cos() * range.x, theta.sin() * range.y) * spread;
-                        let size = sy * (0.10 + (1. - progress) * 0.14);
-                        box_at(
-                            p,
-                            point,
-                            vec2(size, size),
-                            C::from_rgba_unmultiplied(230, 152 + (n % 3) as u8 * 20, 65, alpha),
-                        );
-                    }
-                }
-            }
-            EventKind::BossWarning if age < 1.0 => {
-                p.rect_filled(
-                    Rect::from_center_size(
-                        arena.world(view.width * 0.8, view.defender.position[1]),
-                        vec2((r.width() * 0.34).min(290.), 36.),
-                    ),
-                    2.,
-                    PANEL,
-                );
-                p.text(
-                    arena.world(view.width * 0.8, view.defender.position[1]),
-                    Align2::CENTER_CENTER,
-                    "BOSS APPROACHING",
-                    FontId::proportional(14.),
-                    AMBER,
-                );
-            }
-            EventKind::Reinforcements if age < 0.45 => {
+            EventKind::Reinforcements if age < fx_lifetime(EventKind::Reinforcements) => {
                 let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
-                p.text(
-                    arena.world(view.width - 1.0, lane),
+                batch.label(Label::amber(
+                    reinforcements_anchor(arena, view.width, lane, occluder),
                     Align2::RIGHT_CENTER,
                     "REINFORCEMENTS",
-                    FontId::proportional(10.),
-                    AMBER,
-                );
-            }
-            EventKind::Spawn | EventKind::Boss if age < 0.45 => {
-                let at = arena.world(view.width - 0.5, e.to[1]);
-                p.add(egui::Shape::convex_polygon(
-                    vec![
-                        at + vec2(0.0, -6.0),
-                        at + vec2(-8.0, 0.0),
-                        at + vec2(0.0, 6.0),
-                    ],
-                    AMBER,
-                    Stroke::NONE,
+                    font,
                 ));
-                p.text(
-                    at + vec2(-12.0, 0.0),
-                    Align2::RIGHT_CENTER,
-                    if e.kind == EventKind::Boss {
-                        "BOSS"
-                    } else {
-                        "INCOMING"
-                    },
-                    FontId::proportional(10.0),
-                    AMBER,
-                );
             }
-            EventKind::Shot
-                if age < 0.12
-                    && !e.actor_id.is_some_and(|id| {
-                        view.structure(id)
-                            .is_some_and(|s| s.kind == StructureKind::Trap)
-                    }) =>
-            {
-                let from = if e.actor_id.is_none() {
-                    muzzle.unwrap_or_else(|| arena.world(e.from[0], e.from[1]))
-                } else {
-                    e.actor_id
-                        .and_then(|id| view.structure(id))
-                        .filter(|s| s.kind == StructureKind::Turret)
-                        .filter(|_| textures.props.is_some())
-                        .map_or_else(
-                            || arena.world(e.from[0], e.from[1]),
-                            |s| {
-                                let pose = &s.pose;
-                                visual_assets::turret_muzzle(
-                                    arena.world(s.position[0], s.position[1]),
-                                    vec2(arena.yard_width() * s.footprint_width, sy * 0.88),
-                                    PropMotion {
-                                        target: Some(arena.world(pose.target[0], pose.target[1])),
-                                        recoil: pose.recoil,
-                                        ..Default::default()
-                                    },
-                                )
-                            },
-                        )
-                };
-                if !reduced && age < 0.065 {
-                    let direction = (arena.world(e.to[0], e.to[1]) - from).normalized();
-                    let side = vec2(-direction.y, direction.x);
-                    let length = sy * (0.12 + (1. - age / 0.065) * 0.12);
-                    p.add(egui::Shape::convex_polygon(
-                        vec![
-                            from - direction * 1.,
-                            from + side * length * 0.3,
-                            from + direction * length,
-                            from - side * length * 0.3,
-                        ],
-                        C::from_rgba_unmultiplied(248, 207, 117, ((1. - age / 0.065) * 230.) as u8),
-                        Stroke::NONE,
-                    ));
-                }
-                line(
-                    p,
-                    from,
-                    arena.world(e.to[0], e.to[1]),
-                    if reduced { 1.0 } else { 1.25 },
-                    AMBER.gamma_multiply(1.0 - age / 0.12),
-                );
+            // The boss's arrival is the wall-clock banner's, not a spawn tag.
+            EventKind::Spawn if age < fx_lifetime(e.kind) => {
+                let at = arena.world(view.width - 0.5, e.to[1]);
+                batch.marker(incoming_chevron(at), AMBER);
+                batch.label(incoming_label(at, font));
             }
             EventKind::Damage if age < 0.3 && e.target_id.is_none() => {
-                line(
-                    p,
+                batch.line(
                     arena.world(1.5, e.from[1]),
                     arena.world(1.5, e.from[1] + 0.5),
                     4.0,
                     RED.gamma_multiply(alpha),
                 );
-                p.circle_stroke(
+                batch.ellipse(
                     origin,
-                    sy * 0.7,
-                    Stroke::new(2.0, RED.gamma_multiply(alpha)),
+                    Vec2::splat(sy * 0.7),
+                    2.0,
+                    RED.gamma_multiply(alpha),
                 );
             }
-            EventKind::Hit
-            | EventKind::WeakPoint
-            | EventKind::Kill
-            | EventKind::Armor
-            | EventKind::Melee
-                if alpha > 0.0 =>
-            {
-                let at = arena.world(e.to[0], e.to[1]);
-                if blood && !reduced && e.kind == EventKind::Kill {
-                    for n in 0..4 {
-                        p.circle_filled(
-                            at + vec2((n as f32 * 2.3).sin() * 9.0, (n as f32 * 4.2).cos() * 6.0),
-                            2.0,
-                            C::from_rgb(102, 52, 42).gamma_multiply(alpha),
-                        );
-                    }
-                }
-                let color = if e.kind == EventKind::Armor {
-                    MUTED
-                } else if e.kind == EventKind::WeakPoint {
-                    AMBER
-                } else {
-                    TEXT
-                };
-                if !reduced {
-                    for d in [
-                        vec2(-1.0, -1.0),
-                        vec2(1.0, -1.0),
-                        vec2(-1.0, 1.0),
-                        vec2(1.0, 1.0),
-                    ] {
-                        line(
-                            p,
-                            at + d * 4.0,
-                            at + d * 8.0,
-                            1.5,
-                            color.gamma_multiply(alpha),
-                        );
-                    }
-                }
-                // Currency feedback stays separate from the real-time resolved
-                // damage-number cache used by battlefield presentation.
-                if numbers && e.kind == EventKind::Kill && e.value > 0 {
-                    let rise = if reduced { 0.0 } else { age * 24.0 };
-                    coin_popup(p, at + vec2(0.0, -12.0 - rise), e.value, alpha, reduced);
-                }
+            // Currency feedback stays separate from the real-time resolved
+            // damage-number cache used by battlefield presentation.
+            EventKind::Kill if alpha > 0.0 && numbers && e.value > 0 => {
+                batch.coin(
+                    coin_center(arena, e.to, age, reduced),
+                    e.value,
+                    alpha,
+                    reduced,
+                );
             }
             _ => {}
         }
     }
-}
-/// Banked-coin pop-up: amber with the same eight-way dark outline as the
-/// damage numbers, so it reads against any ground. Reduced effects keep it
-/// still (the caller drops the drift) with a thinner outline.
-fn coin_popup(p: &Painter, center: Pos2, coins: i32, alpha: f32, reduced: bool) {
-    let galley = p.layout_no_wrap(
-        format!("+{coins}c"),
-        FontId::proportional(if reduced { 15.0 } else { 16.0 }),
-        AMBER,
-    );
-    let origin = center - galley.size() * 0.5;
-    let outline = C::from_black_alpha((235.0 * alpha.clamp(0.0, 1.0)) as u8);
-    let border = if reduced { 1.0 } else { 1.5 };
-    for direction in [
-        vec2(-1.0, -1.0),
-        vec2(0.0, -1.0),
-        vec2(1.0, -1.0),
-        vec2(-1.0, 0.0),
-        vec2(1.0, 0.0),
-        vec2(-1.0, 1.0),
-        vec2(0.0, 1.0),
-        vec2(1.0, 1.0),
-    ] {
-        p.galley_with_override_text_color(origin + direction * border, galley.clone(), outline);
-    }
-    p.galley_with_override_text_color(origin, galley, AMBER.gamma_multiply(alpha));
 }

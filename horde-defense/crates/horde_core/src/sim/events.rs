@@ -51,6 +51,22 @@ pub struct Strike {
     pub value: i32,
 }
 
+/// What set an exploder's blast off. The saved presentation window keeps
+/// only `EventKind::Detonation` and `target_id`, so a fuse on the defender
+/// and a death burst (both without a target) differ only here.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DetonationTrigger {
+    /// Its windup completed in contact: the blast struck `target_id` (a
+    /// structure, or `None` for the defender) standing at `to`.
+    Fuse {
+        target_id: Option<u64>,
+        to: [f32; 2],
+    },
+    /// It was killed: the burst strikes enemies and structures around it,
+    /// never the defender.
+    Death,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum SimEvent {
     Shot {
@@ -160,6 +176,34 @@ pub enum SimEvent {
         outcome: Outcome,
         mode: Mode,
         cause: String,
+    },
+    /// A ranged enemy strike; `target_id` is a structure, or `None` when the
+    /// defender was struck.
+    Spit(Strike),
+    /// A fused or dying enemy's blast centred on `at`; `trigger` names the
+    /// fuse target or marks a death burst.
+    Detonation {
+        enemy_id: u64,
+        trigger: DetonationTrigger,
+        lane: Option<u8>,
+        at: [f32; 2],
+        /// Blast radius in yards.
+        radius: f32,
+    },
+    /// A splitter died and spawned `count` children.
+    Split {
+        enemy_id: u64,
+        lane: Option<u8>,
+        at: [f32; 2],
+        count: u8,
+    },
+    /// A boss entered phase `phase` (1-based transition number).
+    BossPhase {
+        boss_id: u64,
+        kind: BossKind,
+        phase: u8,
+        lane: Option<u8>,
+        at: [f32; 2],
     },
 }
 
@@ -345,6 +389,48 @@ impl Attempt {
                 radius: value as f32 / 100.0,
                 duration_ticks: meta.duration_ticks,
             },
+            EventKind::Spit => SimEvent::Spit(strike()),
+            EventKind::Detonation => SimEvent::Detonation {
+                enemy_id: id,
+                trigger: {
+                    // The writer names the trigger; the window's target agrees.
+                    debug_assert!(
+                        match meta.detonation {
+                            Some(DetonationTrigger::Fuse { target_id, .. }) => {
+                                target_id == meta.target_id
+                            }
+                            Some(DetonationTrigger::Death) => meta.target_id.is_none(),
+                            None => false,
+                        },
+                        "detonation events name a trigger that matches their target"
+                    );
+                    meta.detonation.unwrap_or(DetonationTrigger::Death)
+                },
+                lane,
+                at: from,
+                radius: value as f32 / 100.0,
+            },
+            EventKind::Split => SimEvent::Split {
+                enemy_id: id,
+                lane,
+                at: from,
+                count: value.clamp(0, i32::from(u8::MAX)) as u8,
+            },
+            EventKind::BossPhase => {
+                let kind = self
+                    .enemies
+                    .iter()
+                    .find(|e| e.id == id)
+                    .and_then(|e| e.boss_kind);
+                debug_assert!(kind.is_some(), "boss phase events name a live boss");
+                SimEvent::BossPhase {
+                    boss_id: id,
+                    kind: kind.unwrap_or(BossKind::Breacher),
+                    phase: value.clamp(0, i32::from(u8::MAX)) as u8,
+                    lane,
+                    at: from,
+                }
+            }
         }
     }
 }
@@ -406,5 +492,137 @@ impl Game {
             let excess = self.event_outbox.len() - MAX_UNDRAINED_EVENTS / 2;
             self.event_outbox.drain(..excess);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn appended_event_kinds_map_to_their_typed_events() {
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        let mut a = game.attempt.take().unwrap();
+        game.spawn_enemy(&mut a, EnemyKind::Runner, 2, false);
+        a.boss_spawned = true;
+        game.spawn_enemy(&mut a, EnemyKind::Brute, 4, true);
+        let runner = a.enemies[0].id;
+        let boss = a.enemies[1].id;
+        let boss_kind = a.enemies[1].boss_kind.unwrap();
+        a.emitted.clear();
+        let meta = |actor: u64, target: Option<u64>, lane: u8| EventMetadata {
+            actor_id: Some(actor),
+            target_id: target,
+            lane: Some(lane),
+            ..EventMetadata::default()
+        };
+        let (from, to) = ([6.0, 2.5], [1.5, 2.5]);
+        a.event_with(EventKind::Spit, from, to, 7, meta(runner, None, 2));
+        // A fuse on a structure, a fuse on the defender and a death burst:
+        // the trigger tells the last two apart although neither has a target.
+        for (target, trigger) in [
+            (
+                Some(9),
+                DetonationTrigger::Fuse {
+                    target_id: Some(9),
+                    to,
+                },
+            ),
+            (
+                None,
+                DetonationTrigger::Fuse {
+                    target_id: None,
+                    to,
+                },
+            ),
+            (None, DetonationTrigger::Death),
+        ] {
+            a.event_with(
+                EventKind::Detonation,
+                from,
+                to,
+                160,
+                EventMetadata {
+                    detonation: Some(trigger),
+                    ..meta(runner, target, 2)
+                },
+            );
+        }
+        a.event_with(EventKind::Split, from, to, 3, meta(runner, None, 2));
+        a.event_with(EventKind::BossPhase, from, to, 2, meta(boss, None, 4));
+        let events: Vec<SimEvent> = a.emitted.iter().map(|r| r.event.clone()).collect();
+        assert_eq!(
+            events,
+            [
+                SimEvent::Spit(Strike {
+                    attacker: Actor::Enemy { id: runner },
+                    target_id: None,
+                    lane: Some(2),
+                    from,
+                    to,
+                    value: 7,
+                }),
+                SimEvent::Detonation {
+                    enemy_id: runner,
+                    trigger: DetonationTrigger::Fuse {
+                        target_id: Some(9),
+                        to,
+                    },
+                    lane: Some(2),
+                    at: from,
+                    radius: 1.6,
+                },
+                SimEvent::Detonation {
+                    enemy_id: runner,
+                    trigger: DetonationTrigger::Fuse {
+                        target_id: None,
+                        to,
+                    },
+                    lane: Some(2),
+                    at: from,
+                    radius: 1.6,
+                },
+                SimEvent::Detonation {
+                    enemy_id: runner,
+                    trigger: DetonationTrigger::Death,
+                    lane: Some(2),
+                    at: from,
+                    radius: 1.6,
+                },
+                SimEvent::Split {
+                    enemy_id: runner,
+                    lane: Some(2),
+                    at: from,
+                    count: 3,
+                },
+                SimEvent::BossPhase {
+                    boss_id: boss,
+                    kind: boss_kind,
+                    phase: 2,
+                    lane: Some(4),
+                    at: from,
+                },
+            ]
+        );
+        // The presentation window saves the appended kinds by name.
+        let saved: Vec<String> = a
+            .events
+            .iter()
+            .rev()
+            .take(6)
+            .map(|e| serde_json::to_string(&e.kind).unwrap())
+            .collect();
+        assert_eq!(
+            saved,
+            [
+                r#""BossPhase""#,
+                r#""Split""#,
+                r#""Detonation""#,
+                r#""Detonation""#,
+                r#""Detonation""#,
+                r#""Spit""#
+            ]
+        );
     }
 }

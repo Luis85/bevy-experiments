@@ -164,7 +164,7 @@ This abstraction is the highest-priority visual playtest. If it feels confusing 
 
 Basic melee selects one contact lane under the cursor and strikes its front eligible enemy. Enemies still approaching farther to the right are ineligible. Later sweep abilities can affect a stated number of adjacent contact lanes, subject to their own rules.
 
-At actual line contact, use an effective distance of one yard and a frontal engagement for both contact attacks and defender responses. This replaces ordinary distance for melee reach and ranged distance modifiers against that contacted enemy. The cursor still selects the enemy at its displayed lane position. Queued enemies behind the contact attacker keep their ordinary world distances until they reach the line.
+At actual line contact, use an effective distance of one yard and a frontal engagement for both contact attacks and defender responses. This replaces ordinary distance for melee reach and ranged distance modifiers against that contacted enemy. The cursor still selects the enemy at its displayed lane position. Enemies still walking behind the contact attacker keep their ordinary world distances until they reach the line (since W1-69 enemies never queue; they overlap).
 
 The effective distance applies only between the active defender and that contacted enemy. Turrets and traps always evaluate range from their own world positions. Manual cursor targeting remains geometric, while any applicable personal weapon range effect uses the same declared contact relationship.
 
@@ -230,9 +230,11 @@ No enemy switches lanes or finds a route around a wall. No baseline enemy damage
 
 ## Contact pressure
 
-Start with one contact attacker slot per lane. Additional enemies queue visibly behind it and remain targetable. This bounds simultaneous contact damage and makes a breach understandable. Structures also have an authored number of attackers that can reach them; the initial value is one per lane-facing contact position.
+**Superseded 2026-11-06 (W1-69, user decision): enemies never block each other.** There is no per-lane attacker slot or queue; every enemy at the defense line or a live non-trap structure attacks, and structures still block.
 
-Reaching contact never grants a free immediate hit. A clear attack windup or the next legal NPC-mode combat action must occur first. Queue and collision rules cannot allow enemies to pass through intact blockers.
+Every enemy that reaches the defense line or the face of a live non-trap structure in its lane makes contact and attacks. Bodies in one lane overlap and are drawn slightly staggered; all of them remain targetable. Simultaneous contact damage is bounded by spawn pressure and the enemy cap, not by a slot per lane.
+
+Reaching contact never grants a free immediate hit. A clear attack windup or the next legal NPC-mode combat action must occur first. Collision rules cannot let enemies pass through intact blockers.
 
 ## Initial enemy families
 
@@ -386,17 +388,21 @@ A percentage damage bonus in personal play must not automatically become a GURPS
 
 Coins and loot collect automatically because the defender cannot move. Cosmetic drops may appear briefly and travel toward the reward indicator, but never require a pickup click. Drop events resolve before the end-of-attempt summary.
 
-Normal enemies have an authored drop chance. Bosses guarantee a relevant equipment reward in addition to coins. A bounded bad-luck rule or milestone reward protects essential progression. Higher rarity expands useful modifiers or specialization; it does not guarantee that an item suits every build.
+Normal enemies have an authored drop chance (3%, and every twentieth kill drops). Elites always drop, at Uncommon quality or better. Bosses guarantee a relevant equipment reward in addition to coins. A bounded bad-luck rule or milestone reward protects essential progression. Higher rarity expands useful modifiers or specialization; it does not guarantee that an item suits every build.
 
 Drop probability must follow kill volume. For example, a 3% chance across 200 eligible kills produces 6 expected item drops. This is a mathematical expectation, not a guarantee. Avoid a late-game stash flooded by hundreds of low-value notifications.
 
 ## Selling and loadout safety
 
-Sell items in preparation. Show total proceeds before a batch sale. Locked items and actively deployed equipment cannot be sold. Favorited items are excluded from batch sales; deliberately selling one requires removing its protection first. Saved loadout references produce a warning if selling would leave a preset incomplete.
+Sell items in preparation. Show total proceeds before a batch sale. One sale rule decides every sale, single or batch: an item sells only when nothing holds it. Locked, favorited, protected starter and NPC-issue items, equipment worn by you, Mara or an idle survivor, items a saved preset references and items reserved by a deployment or a country guard cannot be sold. The armory disables the sale and states the first reason in plain text; unlock, unfavorite, unequip or delete the preset first. A sale never rewrites a loadout and never leaves a preset incomplete (ruleset 2).
 
 Multiple presets may reference the same owned rifle because only one defender deploys at a time. Deployment reserves the actual item; a preset never creates a duplicate. A protected starter equipment set always remains available.
 
-The baseline stash has no hard gameplay item-capacity limit. Automatically collected equipment is never discarded because a bag is full; sorting, filtering, and aggregated notifications control presentation. Optional auto-sell is a later, explicit preference; it must not be enabled by default for unfamiliar or unique items. Equipping, comparing, and switching a valid loadout are free.
+The baseline stash has no hard gameplay item-capacity limit. Automatically collected equipment is never discarded because a bag is full; sorting, filtering, and aggregated notifications control presentation. Equipping, comparing, and switching a valid loadout are free.
+
+## Auto-sell
+
+Auto-sell is an explicit preference in Equipment, off by default. When the player turns it on, the end of each run sells that run's new drops whose quality is below a threshold the player picks (default: Common and below), in the slots the player selects. It keeps a drop that would upgrade the defender who fought the run, and never sells an item the one sale rule protects: starter, locked, favorited, NPC-issue, equipped, preset, recruit and reserved items. It sells only when a run is settled, never during a battle, and draws no randomness. Expeditions and country operations follow the same rule unless the player turns that off. The result screen shows what was sold and for how much ("Auto-sold N · +C"); the battlefield never shows sale text. A separate "Apply rule to stash now" sells the current stash under the same rule after a confirmation that states the count and the proceeds. [PROGRESSION.md](PROGRESSION.md), "Auto-sell", is the exact rule.
 
 # 16 NPC deployment and training
 
@@ -478,7 +484,7 @@ These are explicit mode-specific combat models, not hidden difficulty changes. T
 
 An NPC may defend or change posture while remaining anchored. It receives no benefit that requires a retreat step it cannot take. Knockback or displacement incompatible with the fixed-position rule must be disabled or handled by an explicit adapter. Recalling the whole attempt is different from a defensive retreat maneuver.
 
-Close-engaged enemies use the shared engagement rule in section 5. Their visual lane remains important for traps, walls, targeting, and contact queues. This is an intentional departure from literal tabletop map distance.
+Close-engaged enemies use the shared engagement rule in section 5. Their visual lane remains important for traps, walls, and targeting (since W1-69, user decision 2026-11-06, there are no contact queues). This is an intentional departure from literal tabletop map distance.
 
 ## Probability explanation
 
@@ -524,7 +530,7 @@ The player manages construction through tactical pause in both modes. The NPC do
 
 ## Repeats and offline scope
 
-Default deployment runs one attempt. An optional later repeat control can run an already-cleared level for a selected number of attempts, stopping on defeat, an invalid loadout, a new unlock, or the chosen limit. It never silently advances to a new level, trains, spends permanent coins, or sells equipment.
+Default deployment runs one attempt. An optional later repeat control can run an already-cleared level for a selected number of attempts, stopping on defeat, an invalid loadout, a new unlock, or the chosen limit. It never silently advances to a new level, trains, spends permanent coins, or sells equipment beyond what the player's own auto-sell rule sells.
 
 Offline progression is outside the baseline. Pausing or closing the game does not create simulated rewards. Save and resume preserves the actual current attempt.
 

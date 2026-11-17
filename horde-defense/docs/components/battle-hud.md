@@ -4,21 +4,21 @@ id: battle-hud
 title: "Compact battle HUD and actions"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::corner_hud, personal_controls"
+source: "crates/horde_game/src/ui/battle/overlays.rs::corner_hud; crates/horde_game/src/ui/battle/attack.rs::personal_controls"
 ---
 
 # Compact battle HUD and actions
 
 Show personal identity/portrait, health, ammunition, stamina, boss/time, threat/groups/loot level and essential combat actions.
 
-- **Entry, exit and actions:** Visible during active defense; use Reload, melee, firing toggle or unlocked emergency aid/brace controls as applicable.
+- **Entry, exit and actions:** Visible during active defense. The bar keeps the unlocked Emergency aid and Brace the line; Reload, Strike contact lane and Toggle firing are under Management › Field actions, and their keys and the legend are unchanged. The HUD names the defender from its core card (a recruit's first name in capitals, with its own portrait) and the HP text ends in "· LOW" while the low-HP warning holds.
 - **State boundary:** HUD reads Attempt and its frozen progression/profile snapshot; action controls submit input to the runtime. Displayed values never advance the simulation.
 - **Responsiveness and accessibility:** Mouse alternatives and current binding tooltips supplement remappable keys; numerical readouts accompany bars.
 
 Parent IDs express view containment, not an exclusive navigation route. Implementation status records the existing surface; it does not claim native GUI validation.
 
 
-NPC zero/negative injury HP can mean conscious Critical / still fighting under the explicitly retained GURPS rules. Signed HP and CRIT · FIGHTING labels distinguish that state from an actual terminal. Actual defeated actors stop and reap/pay in the resolving fixed tick. Inspection and targeting follow Enemy.y(), including saved passing displacement.
+NPC zero/negative injury HP can mean conscious Critical / still fighting under the explicitly retained GURPS rules. Signed HP and CRIT · FIGHTING labels distinguish that state from an actual terminal. Actual defeated actors stop and reap/pay in the resolving fixed tick. Hover inspection hit-tests the drawn body (Enemy.y() plus the presentation-only crowd_stagger, W1-69), so each body of a crowd can be inspected; targeting and hits still resolve on the simulation position. Enemies never pass or queue behind each other; a saved Queued phase reads as Approaching.
 
 Focused battlefield hover uses the custom crosshair and exact ammo/reload readout; standard native cursor visibility restores over UI, menus, popups and focus loss. Larger outlined resolved hit numbers use a bounded 0.9-real-second cache, with weak-point/armor/incoming/miss/defense distinctions, a punch/settle/rise and a reduced path without punch/drift. They issue no action and change no authoritative outcomes.
 

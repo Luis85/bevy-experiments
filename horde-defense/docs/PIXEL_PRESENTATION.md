@@ -36,7 +36,7 @@ and sound consume authoritative ordnance state rather than resolving damage.
 
 ## Skills and visual assets
 
-The skill catalog contains 169 nodes in one global connected tree, including personal body, weapons/abilities, fortifications and feature access. A pan/zoom node canvas and selected-detail purchase
+The skill catalog contains 177 nodes in one global connected tree, including personal body, weapons/abilities, fortifications and feature access. A pan/zoom node canvas and selected-detail purchase
 panel show actual prerequisite edges, prices, effects and learned state.
 Fortifications show real blueprint milestones and sequential ranks. Wider
 windows place details beside the graph; compact layouts place them above it.
@@ -67,14 +67,17 @@ successful navigation. Readability controls include scale, outlines, damage
 numbers, contextual guidance, blood and reduced effects. Important sounds have
 visible equivalents; fixed-camera aiming never shakes.
 
-[Survival audio](AUDIO_SURVIVAL.md) describes the 72 original WAV variations,
-bounded mixer and [audition reel](audio/survival-audition.wav). Audio variations
-consume no combat randomness. An audition or file inspection does not establish
-how the live mix sounds on a particular device.
+[Survival audio](AUDIO_SURVIVAL.md) describes the 275 survival WAVs, the
+buses, the bounded mixer, the -23 LUFS loudness gate and how to export an
+audition reel. Audio variations consume no combat randomness. An audition, the
+meter or file inspection does not establish how the live mix sounds on a
+particular device; the listening pass is pending.
 
 ## Short opening, balance and analysis
 
 Normal starts with three lanes/twelve yards and 1.25× authored movement. Every three character levels adds two lanes/two yards, capped at 17/30. The physical clearing grows instead of stretching a few rows across the viewport; active and old eleven-lane/thirty-yard saves stay fixed. Peripheral dressing defines actual edges and retains full-sprite clearance. A separate bounded effects region does not expand gameplay inputs.
+
+> **Superseded 4 November 2026 (user requirement, camera):** the physical clearing no longer stays at the normal yard scale. The field uses uniform zoom-to-fit: the clearing's lane:yard proportion is kept and it zooms until one axis fills the arena, so a 3-lane opening fills the viewport width. Already-filling fields (17x30, 11x20, eleven or more lanes) are pixel-identical; props are capped at the reference lane size; construction overlays the field without rescaling it; overlay effects get 60 pt of headroom above the arena. See docs/plans/2026-11-05-production-pass.md (CAM-1 to CAM-5).
 
 Gameplay presets/custom drafts commit only for the next run. Actual DPS uses five simulation seconds, average/peak and source totals. Read-only History shows saved all-outcome records, frozen detail and last-forty trends while fields are paused. Its plot window never truncates stored history. [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md) defines those contracts and compatibility.
 

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/horde_core", "crates/horde_game"]
+members = ["crates/horde_core", "crates/horde_audio", "crates/horde_game"]
 default-members = ["crates/horde_game"]
 resolver = "3"
 

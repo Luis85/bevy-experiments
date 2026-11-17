@@ -3,13 +3,22 @@
 use super::{command::*, persistence};
 use crate::audio::Cue as SoundCue;
 use bevy::prelude::*;
+pub(crate) use horde_audio::events::push_cue;
 #[cfg(feature = "dev")]
 use horde_core::command::Command;
-use horde_core::{
-    content::{Mode, StructureKind},
-    ordnance::OrdnanceKind,
-    sim::{Actor, BattleId, Game, Input, Outcome, SimEvent},
+// The event-to-cue mapping lives in `horde_audio`, shared with the offline
+// renderer.
+#[cfg(test)]
+pub(super) use horde_audio::events::event_sound;
+use horde_audio::{
+    events::{EventContext, event_requests},
+    gun::GunTracker,
+    loot::{ExpeditionCoins, LootTracker},
+    pan::{self, Places},
+    render::fire_bed_x,
+    voicing::EnemyVoiceIndex,
 };
+use horde_core::sim::{BattleId, Game, Input, SimEvent};
 #[cfg(feature = "review")]
 use persistence::PersistenceMetrics;
 use std::collections::VecDeque;
@@ -35,11 +44,48 @@ pub struct Runtime {
     pub(super) pending_aims: AttackAims,
     pub(super) save_requests: Vec<SaveIntent>,
     pub(super) observed_battle: Option<u64>,
+    /// Lane pan places of the cues drained since the runner last forwarded
+    /// its cues (`RuntimeParams::run` takes them).
+    pub(super) cue_places: Places,
+    /// The voices of the live enemies (`horde_audio::voicing`), synced
+    /// around every tick. Presentation only: never saved, rebuilt from the
+    /// attempt after a load.
+    pub(super) enemy_voices: EnemyVoiceIndex,
+    /// The root defender's gun (`horde_audio::gun`): reload stages, shell
+    /// inserts, the bolt and the dry trigger, heard after every tick with
+    /// that tick's input. Presentation only: never saved; it primes on an
+    /// attempt it has not seen, so a load plays no stage burst. An
+    /// expedition watched from camp has no gun handling. Every fixed step
+    /// hands it the reduced effects setting (the dry trigger's repeat).
+    pub(super) guns: GunTracker,
+    /// The root battle's drops (`horde_audio::loot`): a Rare or better drop
+    /// plays `LootDrop` where it fell. Presentation only: never saved; it
+    /// primes on an attempt it has not seen, so a load replays no drop. No
+    /// widget plays a loot sound.
+    pub(super) loot: LootTracker,
+    /// The settled expeditions whose auto-sold batch has been heard: one
+    /// `CoinBatch` each, never during a battle; what a battle leaves owed
+    /// sounds with its Results screen's coins. Presentation only.
+    pub(super) expedition_coins: ExpeditionCoins,
     pub(super) dirty: bool,
     pub(super) save_ticks: u64,
     pub(super) retry_save_at: u64,
     pub(super) storage: persistence::Service,
     pub(super) reset_success: Option<String>,
+    /// The startup read left `settings.json` uncopied: every save copies it
+    /// first, until the worker has done so once.
+    pub(super) settings_at_risk: bool,
+    /// Review-only: the staged game can never be saved (the stress fixture),
+    /// so no save is ever submitted. See [`Runtime::forbid_saves`].
+    pub(super) unsaveable: bool,
+    /// What `AppCommand::OpenSaveFolder` runs through.
+    pub(super) folder_opener: super::folder::FolderOpenerSlot,
+    /// A gameplay command other than a pause changed the game since startup
+    /// (or since the last successful `ReloadProfile`).
+    pub(super) commands_applied: bool,
+    /// A save or a journey reset was handed to storage since startup, so the
+    /// profile files may no longer be the ones the startup load read.
+    pub(super) saved: bool,
     pub fixed_calls: u64,
     pub simulated_ticks: u64,
     /// `dev`: command/input recording in progress.
@@ -56,8 +102,45 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    /// Called on each egui pass with the native FrameCount. Repeated layout
-    /// passes share a command identity set, preventing duplicate purchases.
+    /// Startup could not preserve `settings.json` (`LoadedProfile::settings_at_risk`).
+    pub fn guard_settings_original(&mut self) {
+        self.settings_at_risk = true;
+    }
+    /// Review-only, for a staged game production validation rejects (the
+    /// stress scene): the periodic autosave never fires and no intent reaches
+    /// storage, so no save can fail. A Quit still closes (a perf report ends
+    /// with one); every other user intent finishes with
+    /// `RuntimeNotice::SaveSkipped`, so its navigation runs without a save.
+    /// The isolated review profile has nothing to keep.
+    #[cfg(feature = "review")]
+    pub fn forbid_saves(&mut self) {
+        self.unsaveable = true;
+    }
+    /// Replaces the opener `AppCommand::OpenSaveFolder` runs through.
+    #[cfg(test)]
+    pub(crate) fn set_folder_opener(&mut self, opener: impl super::folder::FolderOpener) {
+        self.folder_opener = super::folder::FolderOpenerSlot(Box::new(opener));
+    }
+    /// A gameplay command changed the in-memory journey since it was loaded.
+    /// Pausing is not progress and does not count.
+    pub fn commands_applied_since_load(&self) -> bool {
+        self.commands_applied
+    }
+    /// A save or a journey reset reached storage since the journey was loaded.
+    pub fn saved_since_load(&self) -> bool {
+        self.saved
+    }
+    /// Whether `AppCommand::ReloadProfile` may replace the in-memory journey
+    /// (design-ux-flow §3 "Runner"): nothing was played and nothing was saved
+    /// since the load. After a save the unreadable file has been replaced
+    /// (after its recovery copy), so there is nothing left to read again.
+    pub fn reload_allowed(&self) -> bool {
+        !self.commands_applied_since_load()
+            && !self.saved_since_load()
+            && self.simulated_ticks == 0
+            && !self.unsaveable
+            && !self.durable_transition_pending()
+    }
     pub fn durable_transition_pending(&self) -> bool {
         self.storage.blocks_gameplay()
             || self.save_requests.iter().any(|i| {
@@ -106,6 +189,8 @@ impl Runtime {
     pub fn reset_in_progress(&self) -> bool {
         self.storage.reset_pending()
     }
+    /// Called on each egui pass with the native FrameCount. Repeated layout
+    /// passes share a command identity set, preventing duplicate purchases.
     pub fn begin_frame(&mut self, frame: u32) {
         if self.frame != Some(frame) {
             self.frame = Some(frame);
@@ -118,7 +203,10 @@ impl Runtime {
             return false;
         }
         if self.durable_transition_pending()
-            && !matches!(command, AppCommand::Save(_) | AppCommand::NewJourney)
+            && !matches!(
+                command,
+                AppCommand::Save(_) | AppCommand::NewJourney | AppCommand::OpenSaveFolder
+            )
         {
             return false;
         }
@@ -186,8 +274,13 @@ impl Runtime {
         self.pending_aims = AttackAims::default();
         input
     }
-    pub(super) fn advance(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> bool {
-        let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Simulation);
+    pub(super) fn advance(
+        &mut self,
+        game: &mut Game,
+        cues: &mut Vec<SoundCue>,
+        perf: Option<&crate::diagnostics::PerfProbe>,
+    ) -> bool {
+        let _work = crate::diagnostics::work_timer(perf, crate::diagnostics::WorkPhase::Simulation);
         self.fixed_calls += 1;
         #[cfg(feature = "dev")]
         if self.step_requests > 0 {
@@ -221,10 +314,27 @@ impl Runtime {
             recorder.input(self.simulated_ticks, &input);
         }
         let had_attempt = game.attempt().is_some();
-        game.tick(input);
+        // Before the tick: the enemies this tick kills still have voices.
+        sync_voices(game, self.observed_battle, &mut self.enemy_voices);
+        game.tick(input.clone());
         self.simulated_ticks += 1;
         self.save_ticks += 1;
         self.drain_sounds(game, cues);
+        // After the tick's events, so the tracker can tune the Reload the
+        // core announced.
+        match game.attempt() {
+            Some(attempt) => {
+                self.guns
+                    .observe(BattleId::Root, attempt, &input, cues, &mut self.cue_places);
+                self.loot
+                    .observe(BattleId::Root, attempt, cues, &mut self.cue_places);
+            }
+            None => {
+                self.guns.retain(|_| false);
+                self.loot.retain(|_| false);
+            }
+        }
+        self.hear_expedition_coins(game, cues);
         if self.save_ticks >= 600 {
             self.dirty = true;
         }
@@ -237,11 +347,40 @@ impl Runtime {
         }
         false
     }
+    /// One `CoinBatch` when a settled expedition's receipt sold anything
+    /// and its notice is new (`horde_audio::loot::ExpeditionCoins`). Ticks
+    /// and commands call it; during a battle it waits.
+    pub(super) fn hear_expedition_coins(&mut self, game: &Game, cues: &mut Vec<SoundCue>) {
+        if self.expedition_coins.observe_game(game) > 0 {
+            push_cue(cues, SoundCue::CoinBatch);
+        }
+    }
+    /// The expedition batches the battle that just ended left owed, for its
+    /// Results screen's one `CoinBatch` (`ExpeditionCoins::take_for_results`).
+    pub(crate) fn take_results_coins(&mut self) -> usize {
+        self.expedition_coins.take_for_results()
+    }
+    /// Test hook: a battle in which `batches` expeditions settled with
+    /// sales has just ended.
+    #[cfg(test)]
+    pub(crate) fn owe_results_coins_for_test(&mut self, batches: u64) {
+        let coins = &mut self.expedition_coins;
+        coins.observe(&[], true);
+        let settled: Vec<(u64, u32)> = (0..batches).map(|n| (u64::MAX - n, 1)).collect();
+        coins.observe(&settled, true);
+        assert_eq!(coins.observe(&[], false), 0);
+    }
     /// Turns the game's undrained events into cues now. Ticks call it, and so
     /// does a command that finishes the attempt outside a tick (`Withdraw`
     /// pauses the game, so its terminal event would otherwise wait).
     pub(super) fn drain_sounds(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) {
-        let newest_event = tick_sounds(game, self.observed_battle, cues);
+        let newest_event = tick_sounds(
+            game,
+            self.observed_battle,
+            cues,
+            &mut self.cue_places,
+            &mut self.enemy_voices,
+        );
         #[cfg(feature = "dev")]
         {
             self.last_event_seq = newest_event.or(self.last_event_seq);
@@ -349,92 +488,50 @@ pub(super) fn merge_actions(into: &mut Input, from: &Input) {
     }
 }
 
-/// Queues `cue` once per batch.
-pub(crate) fn push_cue(cues: &mut Vec<SoundCue>, cue: SoundCue) {
-    if !cues.contains(&cue) {
-        cues.push(cue);
-    }
-}
-pub(super) fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
-    if let SimEvent::Hit(strike)
-    | SimEvent::Armor(strike)
-    | SimEvent::Miss(strike)
-    | SimEvent::Defended(strike) = event
-        && matches!(
-            strike.attacker,
-            Actor::Structure {
-                kind: StructureKind::Trap,
-                ..
-            }
-        )
-    {
-        push_cue(cues, SoundCue::Trap);
-    }
-    let cue = match event {
-        SimEvent::Boss { .. } => Some(SoundCue::Boss),
-        SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => Some(SoundCue::Wave),
-        SimEvent::BossExposure { .. } | SimEvent::CooldownReady => Some(SoundCue::Ready),
-        SimEvent::StructureLost { .. } => Some(SoundCue::Structure),
-        SimEvent::Damage(_) => Some(SoundCue::Damage),
-        SimEvent::Melee(_) => Some(SoundCue::Melee),
-        SimEvent::Reload => Some(SoundCue::Reload),
-        SimEvent::Shot { shooter, .. } => match *shooter {
-            Actor::Structure {
-                kind: StructureKind::Trap,
-                ..
-            } => Some(SoundCue::Trap),
-            Actor::Structure {
-                kind: StructureKind::Turret,
-                ..
-            } => Some(SoundCue::TurretShot),
-            Actor::Defender {
-                mode: Mode::Npc, ..
-            } => Some(SoundCue::NpcShot),
-            Actor::Defender { weapon, .. } => Some(match weapon {
-                horde_core::weapons::WeaponClass::Pistol => SoundCue::Pistol,
-                horde_core::weapons::WeaponClass::Smg => SoundCue::Smg,
-                horde_core::weapons::WeaponClass::Shotgun => SoundCue::Shotgun,
-                horde_core::weapons::WeaponClass::Rifle => SoundCue::Rifle,
-                horde_core::weapons::WeaponClass::Marksman => SoundCue::Marksman,
-                horde_core::weapons::WeaponClass::MachineGun => SoundCue::MachineGun,
-            }),
-            // A source that no longer exists has no reliable timbre.
-            _ => None,
-        },
-        SimEvent::Throw { .. } => Some(SoundCue::Throw),
-        SimEvent::Explosion {
-            ordnance: OrdnanceKind::Molotov,
-            ..
-        } => Some(SoundCue::Molotov),
-        SimEvent::Explosion { .. } => Some(SoundCue::Explosion),
-        SimEvent::Burn { .. } => Some(SoundCue::Fire),
-        SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(SoundCue::Impact),
-        SimEvent::Armor(_) => Some(SoundCue::Armor),
-        SimEvent::Spawn { .. } => Some(SoundCue::Incoming),
-        SimEvent::Kill { .. } => Some(SoundCue::Kill),
-        SimEvent::AttemptFinished { outcome, .. } => Some(match outcome {
-            Outcome::Victory => SoundCue::Victory,
-            Outcome::Defeat => SoundCue::Defeat,
-            Outcome::Withdrawal => SoundCue::Retreat,
-        }),
-        _ => None,
+/// Brings `voices` up to the battles that can be heard in full: the root
+/// attempt, and from camp the observed expedition. The voices of every other
+/// battle are dropped.
+pub(super) fn sync_voices(game: &Game, observed: Option<u64>, voices: &mut EnemyVoiceIndex) {
+    let heard = if let Some(attempt) = game.attempt() {
+        voices.sync(BattleId::Root, attempt);
+        Some(BattleId::Root)
+    } else {
+        let battle = observed.and_then(|id| {
+            game.battles()
+                .iter()
+                .find(|battle| battle.id == id && !battle.settled)
+        });
+        battle.and_then(|battle| {
+            let attempt = battle.game().attempt()?;
+            let key = BattleId::Expedition(battle.id);
+            voices.sync(key, attempt);
+            Some(key)
+        })
     };
-    if let Some(cue) = cue {
-        push_cue(cues, cue);
-    }
+    voices.retain(|battle| Some(battle) == heard);
 }
+
 /// Sounds for one tick's drained events. The main deployment is always
 /// audible; camp observation hears the observed expedition in full and only
 /// important cues from the others, without multiplying ordinary shots.
+/// The root battle's positional cues get their lane pan place in `places`;
+/// an expedition heard from camp is centred and its shots are distant.
+/// `voices` gives enemies their voices (`horde_audio::voicing`); it is
+/// synced here again, for the enemies the tick spawned.
 /// Returns the newest root event sequence number it drained.
 pub(super) fn tick_sounds(
     game: &mut Game,
     observed: Option<u64>,
     cues: &mut Vec<SoundCue>,
+    places: &mut Places,
+    voices: &mut EnemyVoiceIndex,
 ) -> Option<u64> {
     let camp = game.attempt().is_none();
+    let root_width = game.attempt().map(|a| a.width_yards);
     let mut newest = None;
-    for record in game.drain_events() {
+    sync_voices(game, observed, voices);
+    let records: Vec<_> = game.drain_events().collect();
+    for record in records {
         if record.battle == BattleId::Root {
             newest = Some(record.seq);
         }
@@ -452,11 +549,37 @@ pub(super) fn tick_sounds(
             }
         };
         if audible {
-            event_sound(cues, &record.event);
+            // The root defender's own shot also takes the player-weapon lane.
+            let ctx = match record.battle {
+                BattleId::Root => EventContext {
+                    battle: BattleId::Root,
+                    width_yards: root_width,
+                    distant: false,
+                    // A same-tick spawn and kill resolves from its corpse.
+                    corpses: game.attempt().map_or(&[], |a| a.corpses.as_slice()),
+                },
+                BattleId::Expedition(id) => EventContext {
+                    battle: record.battle,
+                    width_yards: None,
+                    distant: true,
+                    corpses: game
+                        .battles()
+                        .iter()
+                        .find(|battle| battle.id == id)
+                        .and_then(|battle| battle.game().attempt())
+                        .map_or(&[], |a| a.corpses.as_slice()),
+                },
+            };
+            event_requests(cues, places, voices, &record.event, &ctx);
         }
     }
     let fire = match game.attempt() {
-        Some(a) => !a.ordnance.fire_zones.is_empty(),
+        Some(a) => {
+            if let Some(x) = fire_bed_x(&a.ordnance.fire_zones) {
+                places.place(SoundCue::Fire, pan::lane_position(x, a.width_yards));
+            }
+            !a.ordnance.fire_zones.is_empty()
+        }
         None => game.battles().iter().any(|battle| {
             !battle.settled
                 && observed == Some(battle.id)

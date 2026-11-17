@@ -98,7 +98,59 @@ fn escape_closes_the_new_journey_confirmation_without_a_reset() {
     let before = serde_json::to_value(&f.game).unwrap();
     h.click(f, View::Menu, "New game");
     assert!(f.menu.new_journey_confirm);
-    h.key(f, View::Menu, Key::Escape);
+    // W3-04 rewrite: the Escape router closes the confirmation, so the press
+    // goes through the whole frame.
+    h.key(f, View::Full, Key::Escape);
     assert!(!f.menu.new_journey_confirm);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+}
+
+/// CF-3 (closing): the menu's secondary buttons share the primary's 190 pt
+/// column. Settings and History split it between them (with the item gap),
+/// so the pair ends where "Save and quit" ends; on the journey menu "New
+/// game" and "Change survivor" are column-wide too, at both target sizes.
+#[test]
+fn menu_buttons_share_the_primary_column() {
+    for target in Target::BOTH {
+        for journey in [false, true] {
+            let mut fixture = if journey {
+                IsolatedFrontend::new()
+            } else {
+                IsolatedFrontend::first_launch()
+            };
+            let h = Harness::at(target);
+            let f = &mut fixture.frontend;
+            f.screen = Screen::Menu;
+            let output = h.frame(f, View::Menu, vec![]);
+            let frame = |label: &str| {
+                button_frame(&output, label)
+                    .unwrap_or_else(|| panic!("{target:?}: {label} has no frame"))
+            };
+            let column = frame("Save and quit");
+            assert!(
+                (column.width() - 190.0).abs() < 0.5,
+                "{target:?}: {column:?}"
+            );
+            let (settings, history) = (frame("Settings"), frame("History"));
+            assert!(
+                (settings.left() - column.left()).abs() < 0.5
+                    && (history.right() - column.right()).abs() < 0.5,
+                "{target:?}: Settings {settings:?} and History {history:?} leave the column {column:?}"
+            );
+            assert!(
+                settings.right() < history.left(),
+                "{target:?}: the pair overlaps"
+            );
+            if journey {
+                for label in ["New game", "Change survivor"] {
+                    let button = frame(label);
+                    assert!(
+                        (button.left() - column.left()).abs() < 0.5
+                            && (button.right() - column.right()).abs() < 0.5,
+                        "{target:?}: {label} {button:?} is not the column {column:?}"
+                    );
+                }
+            }
+        }
+    }
 }

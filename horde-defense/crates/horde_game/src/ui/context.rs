@@ -16,8 +16,11 @@ use crate::{
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_egui::egui;
+use horde_audio::music::{BattleInput, MusicInput, MusicScreen};
 use horde_core::{
-    campaign::UpgradeFocus, command::Command, sim::Game, skill_catalog::CampaignFeature,
+    campaign::UpgradeFocus,
+    command::Command,
+    sim::{EnemyCondition, Game},
     world::world,
 };
 
@@ -42,8 +45,19 @@ pub(crate) struct UiCtx<'a> {
     pub(super) history: &'a mut HistoryUi,
     pub(super) prefs: &'a mut SettingsUi,
     pub(super) menu: &'a mut MenuUi,
-    /// UI-originated sound cues, forwarded as `SoundCue` messages.
+    /// UI-originated sound cues, forwarded as `CueRequest` messages. No
+    /// widget writes one today (A6-14: a drop sounds from the runner and
+    /// nothing sounds on hover); this stays the one door a widget would use,
+    /// and `no_widget_hover_writes_a_sound_request` watches it.
+    #[allow(dead_code)]
     pub(super) cues: &'a mut Vec<SoundCue>,
+    /// Perf launches only: sub-spans and scene counts inside `ui::draw`.
+    pub(super) perf: Option<&'a crate::diagnostics::PerfProbe>,
+    /// Whether this process started with pipelined rendering
+    /// (`RenderPlan::pipelined`). It never changes live, so Settings marks
+    /// Low latency "(applies after restart)" while the setting asks for the
+    /// other state.
+    pub(super) plan_pipelined: bool,
 }
 
 /// Per-screen UI state resources, grouped to keep `UiParams` within Bevy's
@@ -74,10 +88,17 @@ pub(crate) struct UiParams<'w> {
     next_screen: ResMut<'w, NextState<Screen>>,
     next_tab: ResMut<'w, NextState<Tab>>,
     state: ScreenState<'w>,
+    /// Absent in a headless App without the display plugin.
+    plan: Option<Res<'w, crate::render_plan::RenderPlan>>,
 }
 impl UiParams<'_> {
     pub(crate) fn ctx<'a>(&'a mut self, cues: &'a mut Vec<SoundCue>) -> UiCtx<'a> {
         let state = &mut self.state;
+        // Without a plan nothing is pending a restart.
+        let plan_pipelined = self.plan.as_ref().map_or_else(
+            || crate::render_plan::pipelined_for(self.settings.low_latency, None),
+            |plan| plan.pipelined,
+        );
         UiCtx {
             game: &self.session.game,
             runtime: &mut self.runtime,
@@ -98,9 +119,14 @@ impl UiParams<'_> {
             prefs: &mut state.prefs,
             menu: &mut state.menu,
             cues,
+            perf: None,
+            plan_pipelined,
         }
     }
 }
+
+/// The status text while a save runs (design-ux-flow §4 "Save UX").
+pub(super) const SAVING: &str = "Saving…";
 
 /// Queues a save; menu, quit and settings-return saves pause first.
 pub(crate) fn request_save(runtime: &mut Runtime, status: &mut StatusUi, intent: SaveIntent) {
@@ -113,7 +139,7 @@ pub(crate) fn request_save(runtime: &mut Runtime, status: &mut StatusUi, intent:
     runtime.enqueue(AppCommand::Save(intent), "");
     status.save_pending = true;
     status.feedback_revision = status.feedback_revision.wrapping_add(1);
-    status.message = "Saving campaign and current actions…".into();
+    status.message = SAVING.into();
     status.message_error = false;
 }
 
@@ -166,6 +192,32 @@ pub(crate) fn ambience_target(
     )
 }
 
+/// What the music director scores: the screen, and on the battle screen
+/// the pressure of the shown battle. A read-only projection.
+pub(crate) fn music_input(game: &Game, screen: Screen, tab: Tab) -> MusicInput {
+    let screen = screen.music(tab);
+    let battle = (screen == MusicScreen::Battle)
+        .then(|| game.attempt())
+        .flatten()
+        .map(|a| {
+            let alive = || {
+                a.enemies
+                    .iter()
+                    .filter(|e| e.condition(a.mode) != EnemyCondition::Defeated)
+            };
+            BattleInput {
+                enemies_alive: alive().count() as u32,
+                nearest_x_frac: alive()
+                    .map(|e| horde_audio::pan::lane_position(e.x, a.width_yards))
+                    .fold(1.0, f32::min),
+                hp_frac: a.hp.max(0) as f32 / a.max_hp.max(1) as f32,
+                boss_alive: alive().any(|e| e.boss),
+                paused: a.paused || game.global_paused(),
+            }
+        });
+    MusicInput { screen, battle }
+}
+
 impl UiCtx<'_> {
     // ----- state transitions -----
 
@@ -182,7 +234,11 @@ impl UiCtx<'_> {
         }
     }
     /// Requests camp tab `tab` (remembered while the camp is not shown).
+    /// Leaving Home drops its one-shot highlight.
     pub(super) fn go_tab(&mut self, tab: Tab) {
+        if tab != Tab::Home {
+            self.nav.home_focus = None;
+        }
         self.nav.tab = tab;
         self.next_tab.set(tab);
     }
@@ -207,6 +263,10 @@ impl UiCtx<'_> {
     // ----- queries -----
 
     #[cfg(test)]
+    pub(super) fn music_input(&self) -> MusicInput {
+        music_input(self.game, self.screen, self.tab)
+    }
+    #[cfg(test)]
     pub(super) fn ambience_target(&self) -> SceneAudioTarget {
         ambience_target(
             self.game,
@@ -216,9 +276,15 @@ impl UiCtx<'_> {
             self.settings,
         )
     }
-    /// The expedition the operations tab is showing, if it is open.
+    /// The expedition the operations tab is showing, if its observer drew the
+    /// field this frame. It is heard in full, windups and boss phases
+    /// included, so a collapsed observer (no field, no windup ring or phase
+    /// ring) observes nothing: every audio warning has its visual twin.
     pub(super) fn observed_battle(&self) -> Option<u64> {
-        if self.screen == Screen::Camp && self.tab == Tab::Operations {
+        if self.screen == Screen::Camp
+            && self.tab == Tab::Operations
+            && self.battle.observer_arena_rect.is_some()
+        {
             self.campaign.observed
         } else {
             None
@@ -227,16 +293,10 @@ impl UiCtx<'_> {
     pub(super) fn settings_return_label(&self) -> &'static str {
         self.nav.return_screen.settings_return_label()
     }
+    /// The Operations page is reachable; the rule is core's
+    /// [`Game::operations_available`].
     pub(super) fn operations_available(&self) -> bool {
-        [
-            CampaignFeature::Recruitment,
-            CampaignFeature::Parallel,
-            CampaignFeature::Operations,
-        ]
-        .into_iter()
-        .any(|feature| self.game.campaign().has_feature(feature))
-            || !self.game.strategy().roster.is_empty()
-            || !self.game.battles().is_empty()
+        self.game.operations_available()
     }
 
     // ----- commands -----
@@ -250,9 +310,6 @@ impl UiCtx<'_> {
         if self.runtime.enqueue(command, success) && reset {
             self.status.save_pending = true;
         }
-    }
-    pub(super) fn notify_rare_loot(&mut self) {
-        crate::runner::push_cue(self.cues, SoundCue::Ready);
     }
     pub(super) fn request_new_game(&mut self) {
         if self.runtime.reset_in_progress() {
@@ -275,11 +332,12 @@ impl UiCtx<'_> {
             self.battle.fire_latched = !self.battle.fire_latched;
         }
     }
+    /// The Briefing primary (ruling D16): `BeginDefense` deploys core's
+    /// next defender on the planned stage. The UI names no mode.
     pub(super) fn begin(&mut self) {
         self.dispatch(
-            Command::Deploy {
+            Command::BeginDefense {
                 stage: self.campaign.stage,
-                mode: self.campaign.mode,
             },
             "Defense underway. Rewards stay banked if you retreat.",
         );
@@ -307,6 +365,8 @@ impl UiCtx<'_> {
     }
     pub(super) fn open_settings(&mut self) {
         self.prefs.balance_draft = Some(self.game.campaign().balance_settings.clone());
+        self.prefs.balance_custom_chosen = false;
+        self.prefs.scale_draft = None;
         self.nav.return_screen = self.screen;
         self.nav.return_world_paused = self.game.global_paused();
         self.go(Screen::Settings);
@@ -322,9 +382,21 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
         self.request_save(SaveIntent::Menu);
     }
-    /// The Journey upgrades home: the one route to the complete tree. A live
-    /// main defense stays paused there and is reached from its primary action.
+    /// The Upgrades screen: the one route to the complete tree. A live main
+    /// defense stays paused there and is reached from its primary action.
     pub(super) fn open_upgrades(&mut self) {
+        self.dispatch(Command::SetPaused(true), "");
+        self.go(Screen::Upgrades);
+        self.battle.fire_latched = false;
+        self.runtime.clear_input();
+    }
+    /// The debrief of the settled round, paused. Without a settled report
+    /// there is nothing to show, so the request opens Camp home.
+    pub(super) fn open_results(&mut self) {
+        if self.game.last_result().is_none() {
+            self.open_camp_home(None);
+            return;
+        }
         self.dispatch(Command::SetPaused(true), "");
         self.go(Screen::Results);
         self.battle.fire_latched = false;
@@ -356,9 +428,23 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
     }
     fn preserve_debrief_pause(&mut self) {
-        if self.screen == Screen::Results && !self.game.global_paused() {
+        if matches!(self.screen, Screen::Results | Screen::Upgrades) && !self.game.global_paused() {
             self.dispatch(Command::SetPaused(true), "");
         }
+    }
+    /// Camp home, highlighting `focus` there. Before the first start there
+    /// is no home yet, so the request opens the world map.
+    pub(super) fn open_camp_home(&mut self, focus: Option<super::HomeFocus>) {
+        if self.game.campaign().world.start.is_none() {
+            self.open_campaign();
+            return;
+        }
+        self.preserve_debrief_pause();
+        self.go_tab(Tab::Home);
+        self.nav.home_focus = focus;
+        self.go(Screen::Camp);
+        self.battle.fire_latched = false;
+        self.runtime.clear_input();
     }
     pub(super) fn open_campaign(&mut self) {
         self.preserve_debrief_pause();
@@ -393,12 +479,16 @@ impl UiCtx<'_> {
         }
         if self.game.attempt().is_some() {
             self.go(Screen::Battle);
-        } else if self.game.campaign().world.start.is_some() && self.game.campaign().journey_active
+        } else if self.game.campaign().world.start.is_some()
+            && self.game.campaign().journey_active
+            && self.game.last_result().is_some()
         {
+            // A settled journey resumes on its debrief.
             self.focus_next_upgrade();
             self.go(Screen::Results);
         } else {
-            self.go_tab(Tab::World);
+            // Camp home; before the first start the camp shows the world map.
+            self.go_tab(Tab::Home);
             self.go(Screen::Camp);
         }
         self.battle.fire_latched = false;

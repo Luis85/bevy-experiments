@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "note": "Not shipped; retained by production-pass decision 10; restore with git mv. Entries are keyed relative to archive/art and keep their original records; archive/art/animation/PROVENANCE.json is the original strip manifest, moved verbatim.",
+  "purpose": "Original assets for Lastlight Horde Defense, no external franchise art",
+  "assets": [
+    {
+      "file": "actors-v1.png",
+      "generator": "OpenAI ImageGen built-in tool",
+      "created": "2026-11-01",
+      "transparent": true,
+      "prompt": "Create a production-quality 2D GAME SPRITE ATLAS on a TRUE TRANSPARENT background. Landscape image, 4 columns by 2 rows, eight EXACT equal square cells, consistent 45-degree elevated three-quarter side/top down camera, grounded hand-painted tactical zombie survival art. All figures complete from head to boots, centered in their cell with generous transparent 15% margins, no clipping, no text, no grid lines, no ground, no scenery, no labels. Matching painterly crisp silhouettes, richly textured worn clothes and material highlights, restrained olive/khaki/rust/desaturated teal palette, dusk warm light from upper left. Intended display 40-70px tall, prioritize clear limbs and recognizably different silhouettes over tiny noise. ORIGINAL characters, NO franchise designs. TOP ROW LEFT TO RIGHT: (1) thin shambling infected in torn olive field jacket, vacant gray face, reaching LEFT; (2) lean running infected in torn ochre hoodie, forward athletic pose moving LEFT; (3) enormous muscular brute infected in worn brown work clothes, broad shoulders and heavy arms, facing LEFT; (4) armored infected survivor in scratched gray-blue plate carrier and cracked helmet, facing LEFT. BOTTOM ROW LEFT TO RIGHT: (5) demolisher infected construction worker in dirty amber protective jacket carrying a heavy sledgehammer, facing LEFT; (6) boss Breacher, gigantic armored infected in salvaged rust-red heavy protective plates, unique imposing massive silhouette, facing LEFT; (7) human stationary survivor in khaki field jacket and dark practical trousers aiming a semi-automatic rifle to the RIGHT, alert posture, backpack; (8) human female survivor Mara in slate teal field jacket, dark trousers, practical brown hair and aiming a semi-automatic rifle to the RIGHT, confident posture. All eight sprites share identical world scale except brute and boss intentionally larger, all have readable faces, hands and equipment. No blood, no dismemberment, no lettering. Keep the complete 4-by-2 atlas evenly spaced and isolated on transparent alpha. This is a polished game art asset, not a UI mockup.",
+      "sha256": "d57c0d8237b16c3246076caa9331cdd12c0180e1f41d8d887c4ee2eae578e953",
+      "bytes": 1810349,
+      "archived_from": "assets/art/actors-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "props-v1.png",
+      "generator": "OpenAI ImageGen built-in tool",
+      "created": "2026-11-01",
+      "transparent": true,
+      "prompt": "Create an ORIGINAL high-quality transparent 2D tactical survival GAME PROP SPRITE ATLAS, 4 columns by 2 rows, eight separate isolated objects in eight equal cells with comfortable transparent gaps. Landscape canvas, no text, no UI, no grid lines, no scenery, no platform background. Consistent slightly elevated three-quarter/top down camera. Hand-painted premium game art, worn materials with restrained dark olive, slate teal, khaki, rust and warm amber accents, clear silhouettes for small display. Same grounded post-apocalyptic industrial checkpoint world across all items. TOP ROW LEFT TO RIGHT: (1) improvised spike trap made from a low steel frame and salvaged triangular metal teeth, ready to cross horizontally; (2) stout rectangular barricade wall made from weathered timber planks, a braced sheet of rusty steel and sandbags; (3) improvised automated tripod machine turret aimed RIGHT, visible compact ammo box, gray-green machinery and a small amber status lamp; (4) rugged semi-automatic rifle pointing diagonally to upper right, wood and dark steel, no brands. BOTTOM ROW LEFT TO RIGHT: (5) worn steel machete and crowbar grouped as one melee equipment icon; (6) practical protective plate-carrier vest in faded olive with straps, clear armor silhouette; (7) survival backpack with rolled blanket and small radio, muted brown and teal; (8) a compact medical first aid pouch with simple stitched pale cross and bandages. Full object visible in each cell, no cropping, no overlaps between neighboring cells, simple consistent soft contact shadow under each object, true transparent alpha everywhere else, no graphic blood. Deliver a polished production asset sheet with all eight items evenly placed.",
+      "sha256": "45d9b15d05ec14e8e8d6a85d12d9c5dffb6a25cefe0be3c4a6575e48b304b71f",
+      "bytes": 1944591,
+      "archived_from": "assets/art/props-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "checkpoint-keyart-v1.png",
+      "generator": "OpenAI ImageGen built-in tool",
+      "created": "2026-11-01",
+      "transparent": false,
+      "prompt": "Create a finished cinematic hand-painted key art illustration for LASTLIGHT, an ORIGINAL grounded zombie survival defense game. Wide landscape 16:9 composition. No lettering, no logos, no interface. Dusk in an abandoned temperate European industrial rail district: a battered service road recedes from a fortified checkpoint in the near left foreground toward a hazy ruined town in the far right distance. One human survivor in a worn khaki field jacket and small backpack stands behind improvised wood-and-steel barricades aiming a rifle RIGHT, supported by one scrappy autonomous tripod turret. A hanging amber work lamp lights sandbags, worn timber, battered oil drums, sparse dry grasses, cracked concrete, a few brass cases and a practical field radio. On the distant road, several distinct infected silhouettes emerge from low fog and remain much smaller than the defender. Composition must suggest fixed defense against a right-to-left horde, confident readable silhouettes, environmental storytelling, convincing materials. Art direction: premium painterly tactical game illustration, crisp hand-painted detail and textured weathered surfaces, natural atmospheric depth, desaturated olive green/teal dusk palette, warm amber practical light, small restrained rusty orange accents, tasteful soft edges in distance and sharp focus at checkpoint. Moody but legible, not almost black, not neon, no supernatural effects, no graphic gore. Keep leftmost 35% relatively quiet and dark for overlay game title; concentrate detailed key scene between 40% and 95% width. Camera elevated three-quarter view as in a polished tactical survival game. Mature, richly authored, original art; no recognizable franchise characters.",
+      "sha256": "5d017c83aed98115335645e18ba9418a12098c65176f6e8d219685bef3458f4f",
+      "bytes": 2616782,
+      "archived_from": "assets/art/checkpoint-keyart-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "ground-v1.png",
+      "generator": "OpenAI ImageGen built-in tool",
+      "created": "2026-11-01",
+      "transparent": false,
+      "prompt": "Create a polished tileable-looking overhead terrain illustration for an ORIGINAL post-apocalyptic tactical defense game, landscape 16:9. STRICT ORTHOGRAPHIC TOP DOWN camera straight down at a broad abandoned industrial service road. Ground texture only: weathered dark gray-green asphalt and old cracked concrete, small irregular aggregate, branching hairline cracks, very sparse dry grass tufts and moss in cracks, faint old tire wear, a few tiny gravel fragments and dirty patches. Subtle warm neutral lighting with almost no directional shadows. Muted olive gray palette, intentionally subdued mid-dark values to make small character sprites clearly visible above it. Rich hand-painted material detail at high resolution, grounded convincing surfaces. No people, zombies, buildings, cars, major props, text, symbols, arrows, road markings, lane lines, borders, UI or perspective horizon. Keep the entire middle90% clear and traversable with homogeneous readable ground. No dramatic shadows or bright high-contrast elements. This image will be used directly beneath eleven horizontal tactical lanes drawn separately by the game, so it must remain quiet and consistent from top to bottom. Production-quality game background material, not a scene or a mockup.",
+      "sha256": "2acd20cdb9c4519d86a21cb180c45ae823428b8c674af689e19c754c2e560fa6",
+      "bytes": 4220231,
+      "archived_from": "assets/art/ground-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "biome-panoramas-v1.png",
+      "generator": "OpenAI ImageGen built-in tool",
+      "created": "2026-11-01",
+      "transparent": false,
+      "prompt": "Create one ORIGINAL premium hand-painted environment panorama atlas for a grounded tactical zombie-survival game. Landscape canvas with EXACT 2 columns and 2 rows, four clean equal rectangular panoramic panels touching edge-to-edge. No gutters, no frame, NO TEXT, no characters, no zombies, no UI. Each panel is an atmospheric horizontal landscape, viewed from a slightly elevated tactical camera with a clear readable foreground and detailed regional buildings in middle distance. Use restrained desaturated colors and convincing worn materials, mature polished survival game art, natural light. Put horizon and architecture near the vertical CENTER of each panel so it survives a shallow horizontal banner crop. TOP LEFT: arid North African service-road checkpoint, sun-bleached plaster buildings and flat rooftops, worn ochre concrete, dry dusty hills and distant palms, late afternoon amber light. TOP RIGHT: tropical Southeast Asian market access road, overgrown corrugated metal shop roofs and modest wooden market stalls, rich jungle foliage, wet monsoon asphalt, mist and soft green light. BOTTOM LEFT: northern boreal winter timber depot, Nordic wooden sheds and stacked lumber, pine forest, thin snow on gravel, cold blue-gray overcast atmosphere with one warm practical lamp. BOTTOM RIGHT: alpine mountain service pass, rugged stone and timber roadside shelters, distant sharp mountains, windswept brown-green slopes, high clear cool daylight and worn concrete. Each panel feels culturally grounded and respectfully original, without famous monuments or clichés. All four scenes share the same painterly detail level and muted tonal hierarchy. Keep the scenes landscape-like, no giant foreground props, no dramatic lens flare, no recognizable franchise assets. This is usable backdrop art for four biome variants, not a concept moodboard or UI mockup.",
+      "sha256": "ec5e2283f71fb9278ff55b3e0595c01b39a05ff72bba7316428a981ec26d94b3",
+      "bytes": 3433035,
+      "archived_from": "assets/art/biome-panoramas-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "bosses-v1.png",
+      "generator": "OpenAI ImageGen built-in tool",
+      "created": "2026-11-01",
+      "transparent": true,
+      "prompt": "Use the referenced original Lastlight actor atlas ONLY as a style reference. Generate a NEW transparent game sprite sheet with TWO original boss enemies side by side, each full body isolated on true transparent alpha with generous margins and no overlap. Match the same premium hand-painted grounded tactical zombie survival style, crisp readable silhouette, worn material detail, muted olive/rust/slate palette and elevated three-quarter camera. Both enemies face and move LEFT. LEFT HALF: THE CALLER, a tall gaunt infected former field officer in a weathered dark green hooded coat, chest-mounted battered radio and loudspeaker gear, visible pale face and open howling mouth, one arm raised in a commanding signal, threatening but less bulky than a tank. RIGHT HALF: THE SIEGE BRUTE, an enormously heavy infected demolition worker in dirty ochre protective work gear with salvaged slab armor and tire padding, carrying a giant industrial breaching maul, imposing broad shoulders and reinforced boots, strong industrial silhouette distinct from the red armored Breacher in the reference. No lettering, no names, no labels, no UI, no ground, no backdrop, no blood or dismemberment, no franchise designs. Each figure fits completely in its own equal rectangular half, centered, with at least8% blank transparent margin and feet fully visible. Landscape2:1 composition. This is a finished in-game asset sheet, not an edit or replacement of the reference atlas.",
+      "sha256": "39eff5afb260385661bdca3455907795ae4701fdf9f572d7b4203a28febfe854",
+      "bytes": 1988377,
+      "archived_from": "assets/art/bosses-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "animation/shambler-walk-v1.png",
+      "generator": "OpenAI image_gen",
+      "prompt": "Use the referenced ORIGINAL Lastlight actor atlas as the identity and style reference only. Generate a NEW production 2D GAME WALK-CYCLE SPRITE STRIP on TRUE TRANSPARENT alpha. EXACT FOUR equal-width cells in ONE horizontal row. Wide 3:1 canvas ideally1536x512; each cell384x512. No text, numbers, borders or scene. Four full-body poses of THE SAME CHARACTER, same proportions, camera angle, clothes, light and world scale, facing LEFT in every frame. Feet baseline exactly88% of image height in all four cells; head height and torso center stay aligned; generous transparent margins; complete weapons/hands/boots inside each cell. Premium hand-painted grounded zombie-survival style matching reference, desaturated olive/rust/khaki/slate palette, crisp silhouette readable at40px tall. This must be a coherent looping animation, not four different characters. Pose order: 0 left leg reaches forward towardLEFT and right leg trails; 1 passing stance legs under hips with one knee lifting; 2 right leg reaches forward towardLEFT and left leg trails; 3 opposite passing stance returning naturally into frame0. Keep body leaning/identity consistent and arms subtly counter-swinging. No blood, no dismemberment, no franchise designs. Character: the gaunt SHAMBLER in the reference's first top-left cell, torn olive field jacket, gray vacant face, brown worn trousers, long grasping arms stretched LEFT. Slow stiff shambling gait, moderate small steps, upper body hunched.",
+      "usage": "Original four-pose transparent animation strip. Read-only padded UV sampling; original generated PNG pixels preserved.",
+      "sha256": "d88b0f119f3ae92584636359d5a2c7b55288fbcd1a0ae739cb244f6a1ba99846",
+      "bytes": 1429477,
+      "archived_from": "assets/art/animation/shambler-walk-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "animation/runner-walk-v1.png",
+      "generator": "OpenAI image_gen",
+      "prompt": "Use the referenced ORIGINAL Lastlight actor atlas as the identity and style reference only. Generate a NEW production 2D GAME WALK-CYCLE SPRITE STRIP on TRUE TRANSPARENT alpha. EXACT FOUR equal-width cells in ONE horizontal row. Wide 3:1 canvas ideally1536x512; each cell384x512. No text, numbers, borders or scene. Four full-body poses of THE SAME CHARACTER, same proportions, camera angle, clothes, light and world scale, facing LEFT in every frame. Feet baseline exactly88% of image height in all four cells; head height and torso center stay aligned; generous transparent margins; complete weapons/hands/boots inside each cell. Premium hand-painted grounded zombie-survival style matching reference, desaturated olive/rust/khaki/slate palette, crisp silhouette readable at40px tall. This must be a coherent looping animation, not four different characters. Pose order: 0 left leg reaches forward towardLEFT and right leg trails; 1 passing stance legs under hips with one knee lifting; 2 right leg reaches forward towardLEFT and left leg trails; 3 opposite passing stance returning naturally into frame0. Keep body leaning/identity consistent and arms subtly counter-swinging. No blood, no dismemberment, no franchise designs. Character: the lean RUNNER in the reference's second top cell, dirty ochre hoodie with hood up, pale infected face and worn charcoal trousers. Fast low running gait, visibly alternating large leg strides and arm swing, torso leans LEFT.",
+      "usage": "Original four-pose transparent animation strip. Read-only padded UV sampling; original generated PNG pixels preserved.",
+      "sha256": "3ccda7678bd43ee10be1295e4b7e94b70fd561c27e066c01573739cd94588bb4",
+      "bytes": 1356858,
+      "archived_from": "assets/art/animation/runner-walk-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "animation/brute-walk-v1.png",
+      "generator": "OpenAI image_gen",
+      "prompt": "Use the referenced ORIGINAL Lastlight actor atlas as identity/style reference only. Generate a NEW transparent WALK-CYCLE SPRITE STRIP, EXACT FOUR equal-width cells in ONE horizontal row on a wide3:1 canvas, ideally1536x512. Four complete full-body poses of THE SAME infected character, identical camera/proportions/clothes/materials/light, facing LEFT in every frame. No text, numbers, grid, borders, scenery or ground. Keep feet at the same88% vertical baseline and torso centered in every cell, full hands/equipment/boots inside each cell with transparent gaps. Premium detailed hand-painted grounded zombie-survival art, crisp small-game silhouette, muted olive/rust/khaki/slate palette, elevated three-quarter view. Loop order0left leg reaches LEFT with right leg trailing,1passing stance knee lifts,2right leg reaches LEFT with left leg trailing,3opposite passing stance leading naturally into0; body weight and arms subtly counter-swing. This must be usable animation of one character, not four character variations. Moderate narrow steps so the pose remains within its cell, no overlap between adjacent figures. No graphic blood or dismemberment, no franchise designs. Character is the reference's top-row third BRUTE: enormous muscular bald infected, leathery gray flesh, tattered brown heavy work clothes and reinforced boots, massive wide shoulders. Slow heavy lumbering weight shift, hunched torso, fists low, no weapon. Preserve intimidating bulky silhouette.",
+      "usage": "Original four-pose transparent animation strip. Read-only padded UV sampling; original generated PNG pixels preserved.",
+      "sha256": "16c1517b59e447c5884753bc3002c0ef4908a0c778e90fd8c44510edd067f9d4",
+      "bytes": 1778316,
+      "archived_from": "assets/art/animation/brute-walk-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "animation/armored-walk-v1.png",
+      "generator": "OpenAI image_gen",
+      "prompt": "Use the referenced ORIGINAL Lastlight actor atlas as identity/style reference only. Generate a NEW transparent WALK-CYCLE SPRITE STRIP, EXACT FOUR equal-width cells in ONE horizontal row on a wide3:1 canvas, ideally1536x512. Four complete full-body poses of THE SAME infected character, identical camera/proportions/clothes/materials/light, facing LEFT in every frame. No text, numbers, grid, borders, scenery or ground. Keep feet at the same88% vertical baseline and torso centered in every cell, full hands/equipment/boots inside each cell with transparent gaps. Premium detailed hand-painted grounded zombie-survival art, crisp small-game silhouette, muted olive/rust/khaki/slate palette, elevated three-quarter view. Loop order0left leg reaches LEFT with right leg trailing,1passing stance knee lifts,2right leg reaches LEFT with left leg trailing,3opposite passing stance leading naturally into0; body weight and arms subtly counter-swing. This must be usable animation of one character, not four character variations. Moderate narrow steps so the pose remains within its cell, no overlap between adjacent figures. No graphic blood or dismemberment, no franchise designs. Character is the reference's top-row fourth ARMORED INFECTED: scratched slate gray-blue plate-carrier armor, cracked steel helmet, dark trousers and heavy boots. Stiff heavy patrol walk, arms reaching slightly LEFT. Keep armor plates exactly consistent in all four frames.",
+      "usage": "Original four-pose transparent animation strip. Read-only padded UV sampling; original generated PNG pixels preserved.",
+      "sha256": "0cb1bb44603b446cca8ad1ce86b9f6794a5b43c555dfe60bfad34d83ddc9762f",
+      "bytes": 1566187,
+      "archived_from": "assets/art/animation/armored-walk-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "animation/demolisher-walk-v1.png",
+      "generator": "OpenAI image_gen",
+      "prompt": "Use the referenced ORIGINAL Lastlight actor atlas as identity/style reference only. Generate a NEW transparent WALK-CYCLE SPRITE STRIP, EXACT FOUR equal-width cells in ONE horizontal row on a wide3:1 canvas, ideally1536x512. Four complete full-body poses of THE SAME infected character, identical camera/proportions/clothes/materials/light, facing LEFT in every frame. No text, numbers, grid, borders, scenery or ground. Keep feet at the same88% vertical baseline and torso centered in every cell, full hands/equipment/boots inside each cell with transparent gaps. Premium detailed hand-painted grounded zombie-survival art, crisp small-game silhouette, muted olive/rust/khaki/slate palette, elevated three-quarter view. Loop order0left leg reaches LEFT with right leg trailing,1passing stance knee lifts,2right leg reaches LEFT with left leg trailing,3opposite passing stance leading naturally into0; body weight and arms subtly counter-swing. This must be usable animation of one character, not four character variations. Moderate narrow steps so the pose remains within its cell, no overlap between adjacent figures. No graphic blood or dismemberment, no franchise designs. Character is the reference's bottom-left DEMOLISHER: dirty amber protective work jacket, yellow hardhat, worn gray trousers and boots, holding the SAME heavy sledgehammer close to his body at a downward diagonal, ready to strike LEFT. Small steps and restrained hammer swing so equipment stays within the cell. Same construction-worker outfit and tool in every frame.",
+      "usage": "Original four-pose transparent animation strip. Read-only padded UV sampling; original generated PNG pixels preserved.",
+      "sha256": "a43f83b18faf241ad3f997f0214810421c34d5aa3c003c9a53dda7ce9d2f9b49",
+      "bytes": 1617816,
+      "archived_from": "assets/art/animation/demolisher-walk-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    },
+    {
+      "file": "pixel/keyart-v1.png",
+      "generator": "OpenAI image_gen",
+      "prompt": "Original atmospheric PIXEL-ART background for a grounded zombie survival defense game main menu, wide16:9 composition. View an abandoned rural checkpoint from a high side/top-down game camera at dusk: pine forest silhouettes, broken wood fence and concrete road barrier, one rusty streetlamp with amber illumination, abandoned compact car, mossy cracked road receding into mist. One small olive-jacketed rifle survivor stands guard near the left edge, a few distant gray infected silhouettes approach from the right. World has muted dark pine-green, charcoal/slate, parchment highlights and tiny warm amber lamps, grounded post-apocalyptic mood, no magic/no fantasy/no skeleton armies. True low-resolution pixel art as a 480x270 logical pixel scene enlarged with nearest-neighbor blocks, clearly defined square pixel clusters and stepped silhouettes, restrained2D lighting and fog using broad pixel bands. No painting, no photorealistic texture, no anti-alias, no smooth airbrush. Left third stays very dark and quiet for menu text; right two thirds carry readable woodland checkpoint composition. Full-bleed no borders, no UI, no lettering/logos/text. This must look like a playable pixel survival world, not a rendered illustration.",
+      "sha256": "b71d4240d147e8bd9311ba01cbae37e21abd405c3a10793d081e186951a704bc",
+      "bytes": 1491432,
+      "archived_from": "assets/art/pixel/keyart-v1.png",
+      "archived": "2026-11-06",
+      "reason": "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+    }
+  ]
+}

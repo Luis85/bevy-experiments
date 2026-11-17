@@ -204,7 +204,7 @@ fn withdrawal_plays_retreat_once_without_waiting_for_a_tick() {
 #[test]
 fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
     let mut host = Host::new();
-    host.game.campaign_mut().coins = 100;
+    host.game.campaign_mut().coins = 1_000;
     host.runtime.begin_frame(1);
     host.runtime
         .enqueue(Command::BuySkillNode("steady_hands".into()), "Learned");
@@ -220,13 +220,13 @@ fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
 #[test]
 fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
     let mut game = Game::default();
-    game.campaign_mut().coins = 100;
+    game.campaign_mut().coins = 1_000;
     game.apply(&Command::BuySkillNode("steady_hands".into()))
         .unwrap();
     assert!(game.campaign().has_node("steady_hands"));
     assert_eq!(
         game.campaign().coins,
-        100 - skills().node("steady_hands").unwrap().price
+        1_000 - skills().node("steady_hands").unwrap().price
     );
     let before = game.clone();
     assert!(
@@ -262,6 +262,37 @@ fn runtime_consumes_throw_edge_once_even_at_observation_speed_four() {
     assert_eq!(runtime.input().throw, Some(request));
     assert!(runtime.input().throw.is_none());
     assert!(runtime.input().throw.is_none());
+}
+#[test]
+fn npc_defender_shot_uses_weapon_class_cue() {
+    use horde_core::sim::{Actor, SimEvent};
+    use horde_core::weapons::WeaponClass;
+    // NpcShot is retired: a defender's shot sounds like its weapon in either
+    // mode, so an NPC with a rifle is heard as a rifle.
+    for (weapon, expected) in [
+        (WeaponClass::Pistol, SoundCue::Pistol),
+        (WeaponClass::Smg, SoundCue::Smg),
+        (WeaponClass::Shotgun, SoundCue::Shotgun),
+        (WeaponClass::Rifle, SoundCue::Rifle),
+        (WeaponClass::Marksman, SoundCue::Marksman),
+        (WeaponClass::MachineGun, SoundCue::MachineGun),
+    ] {
+        for mode in [Mode::Npc, Mode::Personal] {
+            let mut cues = Vec::new();
+            event_sound(
+                &mut cues,
+                &SimEvent::Shot {
+                    shooter: Actor::Defender { mode, weapon },
+                    target_id: None,
+                    lane: Some(0),
+                    from: horde_core::sim::DEFENDER,
+                    to: [15.0, 5.5],
+                },
+            );
+            assert_eq!(cues, vec![expected], "{mode:?} {weapon:?}");
+            assert!(cues.iter().all(|cue| !cue.retired()), "{mode:?} {weapon:?}");
+        }
+    }
 }
 #[test]
 fn trap_shots_never_fabricate_a_turret_and_missing_sources_stay_silent() {
@@ -352,6 +383,7 @@ impl Host {
             notices: &mut self.notices,
             cues: &mut self.cues,
             game_changed: false,
+            perf: None,
         }
     }
     fn deploy(&mut self) {
@@ -403,7 +435,7 @@ fn state(game: &Game) -> serde_json::Value {
 #[test]
 fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
     let mut host = Host::new();
-    host.game.campaign_mut().coins = 100;
+    host.game.campaign_mut().coins = 1_000;
     host.runtime.begin_frame(20);
     assert!(
         host.runtime
@@ -418,7 +450,7 @@ fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
     assert!(!flush_for_test(&mut host.ctx()));
     assert_eq!(
         host.game.campaign().coins,
-        100 - skills().node("quick_reload").unwrap().price
+        1_000 - skills().node("quick_reload").unwrap().price
     );
     assert!(host.game.campaign().has_node("quick_reload"));
     assert_eq!(
@@ -531,6 +563,72 @@ fn pressed_reload_is_consumed_once_across_fixed_ticks_and_speed() {
     assert_eq!(attempt.shots, attempt.magazine);
     assert_eq!(attempt.ammo, 0);
     assert_eq!(attempt.reload_left, 0);
+}
+/// The runner feeds the gun tracker (A6-13) after every tick with that
+/// tick's input: the dry trigger, then the stages of the reload, each at the
+/// speed of the weapon class, at 1x and 4x.
+#[test]
+fn run_tick_hears_the_dry_trigger_and_the_reload_stages() {
+    use horde_audio::{
+        bank::{BankId, GunStage},
+        gun::stage_speed,
+    };
+    for speed in [1, 4] {
+        let mut host = Host::new();
+        host.deploy();
+        let dry = Input {
+            fire: true,
+            auto_reload: false,
+            ..Input::default()
+        };
+        let frame = |held: Input, pressed: Input| ControlFrame {
+            enabled: true,
+            speed,
+            held,
+            pressed,
+            pressed_aims: AttackAims::default(),
+        };
+        let idle = Input {
+            auto_reload: false,
+            ..Input::default()
+        };
+        // The first tick primes the tracker: nothing sounds.
+        host.runtime.publish(frame(idle.clone(), idle.clone()));
+        step(&mut host.ctx());
+        host.game.attempt_mut().unwrap().ammo = 0;
+        step(&mut host.ctx());
+        assert!(!host.cues.contains(&SoundCue::DryFire), "speed {speed}");
+        host.runtime.publish(frame(dry.clone(), idle.clone()));
+        step(&mut host.ctx());
+        assert!(host.cues.contains(&SoundCue::DryFire), "speed {speed}");
+        let class = host.game.attempt().unwrap().profile.weapon.class;
+        let click = host.runtime.cue_places.voicing(SoundCue::DryFire);
+        assert_eq!(click.bank, BankId::Gun(GunStage::DryFire));
+        assert_eq!(click.speed, stage_speed(class));
+        // The reload, pressed once.
+        host.cues.clear();
+        host.runtime.publish(frame(
+            idle.clone(),
+            Input {
+                reload: true,
+                ..idle.clone()
+            },
+        ));
+        step(&mut host.ctx());
+        assert!(host.cues.contains(&SoundCue::ReloadOut), "speed {speed}");
+        assert!(!host.cues.contains(&SoundCue::ReloadIn), "speed {speed}");
+        while host.game.attempt().unwrap().reload_left > 0 {
+            step(&mut host.ctx());
+        }
+        for cue in [SoundCue::ReloadOut, SoundCue::ReloadIn, SoundCue::Reload] {
+            assert!(host.cues.contains(&cue), "speed {speed}: {cue:?}");
+        }
+        // No core event carries any of it.
+        assert_eq!(
+            host.runtime.cue_places.voicing(SoundCue::Reload).speed,
+            stage_speed(class)
+        );
+    }
 }
 #[test]
 fn pause_freezes_main_parallel_and_strategy_without_catch_up() {
@@ -666,7 +764,7 @@ fn corrupt_primary_and_backup_are_uniquely_preserved_before_new_campaign_autosav
     let backup = b"unreadable backup bytes";
     std::fs::write(host.directory.join("campaign.json"), original).unwrap();
     std::fs::write(host.directory.join("campaign.bak"), backup).unwrap();
-    let loaded = load_profile(host.directory.clone());
+    let loaded = load_profile(host.directory.clone(), Default::default());
     assert!(loaded.warning.contains("Original files remain unchanged"));
     host.game = loaded.game;
     host.runtime.begin_frame(1);
@@ -720,7 +818,7 @@ fn practice_profiles_save_and_resume_without_changing_the_ordinary_campaign() {
         practice.game.campaign_mut().coins = 300;
         practice.runtime.request_save(SaveIntent::Manual);
         flush_for_test(&mut practice.ctx());
-        let loaded = load_profile(directory);
+        let loaded = load_profile(directory, Default::default());
         assert_eq!(loaded.game.campaign().coins, 300);
         assert_eq!(loaded.game.campaign().world.start.as_deref(), Some("DEU"));
         assert_eq!(
@@ -788,6 +886,16 @@ fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferenc
     host.game.save(&path).unwrap();
     write_settings(&host.settings, &host.directory.join("settings.json")).unwrap();
     let settings = std::fs::read(host.directory.join("settings.json")).unwrap();
+    // A Custom balance edited from Hard keeps the Hard extras (W1-29 review).
+    let mut hard_edit =
+        horde_core::balance::BalanceSettings::for_preset(horde_core::balance::BalancePreset::Hard);
+    hard_edit.supply = 7;
+    host.game.apply(&Command::SetBalance(hard_edit)).unwrap();
+    assert_eq!(
+        host.game.campaign().balance_extras_preset(),
+        horde_core::balance::BalancePreset::Hard
+    );
+    host.game.save(&path).unwrap();
     let before = state(&host.game);
     let balance = host.game.campaign().balance_settings.clone();
     host.runtime.enqueue(AppCommand::NewJourney, "");
@@ -814,7 +922,16 @@ fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferenc
     assert!(!host.game.campaign().journey_active);
     assert!(!host.game.campaign().legacy_features);
     assert_eq!(host.game.campaign().balance_settings, balance);
-    assert_eq!(state(&Game::load(&path).unwrap()), state(&host.game));
+    assert_eq!(
+        host.game.campaign().balance_extras_preset(),
+        horde_core::balance::BalancePreset::Hard
+    );
+    let reloaded = Game::load(&path).unwrap();
+    assert_eq!(
+        reloaded.campaign().balance_extras_basis,
+        horde_core::balance::BalancePreset::Hard
+    );
+    assert_eq!(state(&reloaded), state(&host.game));
     assert_eq!(
         std::fs::read(host.directory.join("settings.json")).unwrap(),
         settings
@@ -855,6 +972,33 @@ fn failed_new_journey_archive_or_commit_preserves_the_current_live_and_saved_gen
             std::fs::remove_dir(path.with_extension("tmp")).unwrap();
         }
     }
+}
+/// W1-35 review: the stress review never saves (`Runtime::forbid_saves`), so
+/// New Journey from its menu is refused before the storage reset: no archive,
+/// no fresh campaign.json, the live game unchanged and a failed completion.
+#[cfg(feature = "review")]
+#[test]
+fn new_journey_on_an_unsaveable_review_writes_nothing() {
+    let mut host = Host::new();
+    host.deploy();
+    host.game.set_paused(true);
+    host.runtime.forbid_saves();
+    let path = host.directory.join("campaign.json");
+    let before = state(&host.game);
+    host.runtime.enqueue(AppCommand::NewJourney, "");
+    assert!(!flush_for_test(&mut host.ctx()));
+    assert!(!path.exists(), "no campaign.json was written");
+    assert!(!host.directory.join("journey-archives").exists());
+    assert!(!host.runtime.reset_in_progress());
+    assert_eq!(state(&host.game), before);
+    assert!(host.notices.iter().any(|n| matches!(
+        n,
+        RuntimeNotice::CommandCompleted {
+            command: AppCommand::NewJourney,
+            result: Err(_),
+            ..
+        }
+    )));
 }
 #[test]
 fn leaving_journey_is_acknowledged_only_after_durable_save_and_never_loses_earned_state() {
@@ -963,6 +1107,36 @@ fn manual_and_navigation_requests_never_acknowledge_an_older_inflight_snapshot()
         ));
     }
 }
+/// `persist_pending` hands the storage worker `Game::save_snapshot`, not a
+/// full clone: the live game's undrained event records stay with the
+/// frontend and never cross to the worker.
+#[test]
+fn a_save_hands_storage_the_snapshot_without_transient_events() {
+    let pending = |game: &Game| game.clone().drain_events().count();
+    let mut host = Host::new();
+    host.deploy();
+    for _ in 0..600 {
+        if pending(&host.game) > 0 {
+            break;
+        }
+        host.game.tick(Input::default());
+    }
+    let live = pending(&host.game);
+    assert!(live > 0, "the live game holds undrained records");
+    let (service, gate) = persistence::gated();
+    host.runtime.storage = service;
+    host.runtime.request_save(SaveIntent::Manual);
+    assert!(!persist_pending(&mut host.ctx()));
+    assert_eq!(
+        gate.started().events,
+        0,
+        "the worker was handed {live} transient records"
+    );
+    assert_eq!(pending(&host.game), live, "the live outbox is untouched");
+    gate.release();
+    persistence::wait_for_test(&mut host.runtime.storage);
+    assert!(!persist_pending(&mut host.ctx()));
+}
 #[test]
 fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_generation() {
     for intent in [SaveIntent::Menu, SaveIntent::Quit, SaveIntent::SettingsBack] {
@@ -971,7 +1145,7 @@ fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_ge
             .campaign_mut()
             .choose_start_country("DEU")
             .unwrap();
-        host.game.campaign_mut().coins = 77;
+        host.game.campaign_mut().coins = skills().node("steady_hands").unwrap().price;
         assert!(
             host.game
                 .campaign()
@@ -1076,4 +1250,432 @@ fn same_batch_new_journey_then_native_close_preserves_quit_for_the_fresh_paused_
     assert_eq!(saved.campaign().coins, 0);
     assert!(saved.global_paused());
     assert!(saved.campaign().selected_survivor.is_none());
+}
+
+/// W3-06 (UX-08): "Open folder" runs in the runner, through the injectable
+/// opener, and shows the profile directory.
+#[test]
+fn open_save_folder_uses_profile_directory() {
+    let mut host = Host::new();
+    let opener = RecordingOpener::default();
+    host.runtime.set_folder_opener(opener.clone());
+    std::fs::create_dir_all(&host.directory).unwrap();
+    let before = state(&host.game);
+    host.runtime.begin_frame(1);
+    assert!(host.runtime.enqueue(AppCommand::OpenSaveFolder, ""));
+    assert!(!flush(&mut host.ctx()));
+    assert_eq!(host.paths.directory(), host.directory);
+    assert_eq!(opener.opened(), vec![host.directory.clone()]);
+    assert!(
+        matches!(
+            host.notices.as_slice(),
+            [RuntimeNotice::SaveFolderOpened(Ok(()))]
+        ),
+        "{:?}",
+        host.notices
+    );
+    // Showing the folder is not gameplay and not a save.
+    assert_eq!(state(&host.game), before);
+    assert!(!host.runtime.commands_applied_since_load());
+    assert!(!host.runtime.saved_since_load());
+    assert!(!host.runtime.durable_transition_pending());
+
+    // An opener that cannot start reports why; nothing else changes.
+    host.notices.clear();
+    host.runtime.set_folder_opener(RecordingOpener::failing(
+        "explorer.exe could not be started: not found",
+    ));
+    host.runtime.begin_frame(2);
+    assert!(host.runtime.enqueue(AppCommand::OpenSaveFolder, ""));
+    flush(&mut host.ctx());
+    assert!(
+        matches!(
+            host.notices.as_slice(),
+            [RuntimeNotice::SaveFolderOpened(Err(error))] if error.contains("not found")
+        ),
+        "{:?}",
+        host.notices
+    );
+
+    // Before the first save creates the profile directory, its nearest
+    // existing ancestor is shown instead of a path the file manager lacks.
+    let mut fresh = Host::new();
+    assert!(!fresh.directory.exists());
+    let opener = RecordingOpener::default();
+    fresh.runtime.set_folder_opener(opener.clone());
+    fresh.runtime.begin_frame(1);
+    fresh.runtime.enqueue(AppCommand::OpenSaveFolder, "");
+    flush(&mut fresh.ctx());
+    assert_eq!(
+        opener.opened(),
+        vec![fresh.directory.parent().unwrap().to_path_buf()]
+    );
+    assert!(
+        !fresh.directory.exists(),
+        "showing a folder creates nothing"
+    );
+}
+
+/// W3-06: `ReloadProfile` reads the save again only while neither the
+/// in-memory journey nor the files changed since the load.
+#[test]
+fn reload_profile_reads_the_save_until_the_journey_or_the_files_change() {
+    let reload = |host: &mut Host, frame: u32| -> Result<(), String> {
+        host.notices.clear();
+        host.runtime.begin_frame(frame);
+        assert!(host.runtime.enqueue(AppCommand::ReloadProfile, ""));
+        flush(&mut host.ctx());
+        match host.notices.as_slice() {
+            [RuntimeNotice::ProfileReloaded(result)] => result.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let mut host = Host::new();
+    std::fs::create_dir_all(&host.directory).unwrap();
+    let path = host.directory.join("campaign.json");
+    // Unreadable: the in-memory journey stays, and nothing is written.
+    std::fs::write(&path, b"not a save").unwrap();
+    let before = state(&host.game);
+    assert!(reload(&mut host, 1).is_err());
+    assert_eq!(state(&host.game), before);
+    assert_eq!(std::fs::read(&path).unwrap(), b"not a save");
+    // Readable: it replaces the in-memory journey.
+    std::fs::remove_file(&path).unwrap();
+    let mut saved = Game::default();
+    saved.campaign_mut().coins = 77;
+    saved.save(&path).unwrap();
+    assert_eq!(reload(&mut host, 2), Ok(()));
+    assert_eq!(host.game.campaign().coins, 77);
+    assert!(host.runtime.reload_allowed());
+    // A pause is not progress.
+    host.runtime.begin_frame(3);
+    host.runtime.enqueue(Command::SetPaused(true), "");
+    host.runtime.enqueue(Command::SetPaused(false), "");
+    flush(&mut host.ctx());
+    assert!(!host.runtime.commands_applied_since_load());
+    // A gameplay command is: the save is not read over it.
+    host.runtime.begin_frame(4);
+    host.runtime.enqueue(
+        Command::ChooseSurvivor(horde_core::survivors::SurvivorId::Rook),
+        "",
+    );
+    flush_for_test(&mut host.ctx());
+    assert!(host.runtime.commands_applied_since_load());
+    assert!(
+        host.runtime.saved_since_load(),
+        "the autosave replaced the file"
+    );
+    assert!(!host.runtime.reload_allowed());
+    let played = state(&host.game);
+    assert_eq!(reload(&mut host, 5), Err(RELOAD_REFUSED.into()));
+    assert_eq!(state(&host.game), played);
+
+    // A save alone closes the door too, with no command applied.
+    let mut host = Host::new();
+    host.runtime.begin_frame(1);
+    host.runtime
+        .enqueue(AppCommand::Save(SaveIntent::Manual), "");
+    flush_for_test(&mut host.ctx());
+    assert!(!host.runtime.commands_applied_since_load());
+    assert!(host.runtime.saved_since_load());
+    assert_eq!(reload(&mut host, 2), Err(RELOAD_REFUSED.into()));
+}
+
+/// Lane pan (A6-07): the root battle's positional cues carry the pan place
+/// of their event, the place depends on the event's x alone, and the
+/// defender's own shots stay centred.
+#[test]
+fn root_battle_cues_carry_their_lane_pan_place() {
+    use horde_audio::pan::{Places, lane_position, positional};
+    let mut game = Game::default();
+    game.deploy(0, Mode::Personal).unwrap();
+    game.set_paused(false);
+    let width = game.attempt().unwrap().width_yards;
+    let mut heard = std::collections::BTreeMap::new();
+    let mut voices = horde_audio::voicing::EnemyVoiceIndex::default();
+    for _ in 0..60 * 60 {
+        if game.attempt().is_none() {
+            break;
+        }
+        let input = horde_core::sim::smoke_input(&game);
+        game.tick(input);
+        let (mut cues, mut places) = (Vec::new(), Places::default());
+        tick_sounds(&mut game, None, &mut cues, &mut places, &mut voices);
+        for cue in cues {
+            let place = places.of(cue);
+            assert!(positional(cue) || place.is_none(), "{cue:?} is centred");
+            if let Some(place) = place {
+                assert!((0.0..=1.0).contains(&place), "{cue:?} at {place}");
+                heard.entry(format!("{cue:?}")).or_insert(place);
+            }
+        }
+    }
+    // Enemies enter at the far end; kills and impacts happen on the field.
+    let incoming = heard["Incoming"];
+    assert!(incoming > lane_position(width - 3.0, width), "{heard:?}");
+    // An enemy dies in its own voice, where it stood.
+    assert!(
+        heard.contains_key("EnemyDeath") && heard.contains_key("Impact"),
+        "{heard:?}"
+    );
+    assert!(heard["EnemyDeath"] < incoming, "{heard:?}");
+}
+
+/// The view of `a` a frame draws at this tick.
+fn twin_view(a: &horde_core::sim::Attempt, reduced: bool) -> crate::battle_view::BattleViewModel {
+    use crate::{animation::SceneAnimation, battle_view::SceneBlend};
+    crate::battle_view::BattleViewModel::build(
+        a,
+        SceneAnimation::sample(a, reduced),
+        SceneBlend::NONE,
+        reduced,
+    )
+}
+/// One runner tick's cues and their places.
+fn twin_tick(
+    game: &mut Game,
+    voices: &mut horde_audio::voicing::EnemyVoiceIndex,
+) -> (Vec<SoundCue>, horde_audio::pan::Places) {
+    sync_voices(game, None, voices);
+    game.tick(Input::default());
+    let (mut cues, mut places) = (Vec::new(), horde_audio::pan::Places::default());
+    tick_sounds(game, None, &mut cues, &mut places, voices);
+    (cues, places)
+}
+
+/// The windup warning and its twins (A6-12, `WARNING_TWINS`): on the tick
+/// the runner requests `EnemyWindup`, the frame's view shows the windup
+/// ring of an enemy winding up against the defender, in normal and reduced
+/// effects, and a ranged windup also shows its aim line. A windup against a
+/// structure requests no cue and still shows its ring.
+#[test]
+fn warning_twin_enemy_windup() {
+    use horde_core::{
+        balance::BalanceSettings, content::EnemyKind, kind_map::KindMap, sim::EventKind,
+    };
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings::legacy())
+        .unwrap();
+    game.campaign_mut().attempts = 1;
+    game.deploy(0, Mode::Personal).unwrap();
+    game.campaign_mut().legacy_features = true;
+    game.campaign_mut().blueprints = KindMap::filled(true);
+    let a = game.attempt_mut().unwrap();
+    (a.max_hp, a.hp) = (1_000_000, 1_000_000);
+    game.set_paused(true);
+    game.place(StructureKind::Wall, 1, 0).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    for (lane, x) in [(0, 6.0), (3, 2.5), (6, 9.0), (1, 12.0)] {
+        game.spawn_enemy(&mut a, EnemyKind::Shambler, lane, false);
+        a.enemies.last_mut().unwrap().x = x;
+    }
+    for (lane, x) in [(5, 8.0), (2, 9.0)] {
+        game.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
+        let e = a.enemies.last_mut().unwrap();
+        let mut profile = horde_core::enemy_catalog::resolve_kind(EnemyKind::Runner);
+        profile.archetype_id = "test-spitter".into();
+        profile.reach = 4.0;
+        profile.validate().unwrap();
+        e.resolved = Some(profile);
+        e.x = x;
+    }
+    a.paused = false;
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    let mut voices = horde_audio::voicing::EnemyVoiceIndex::default();
+    let (mut seen, mut warned, mut ranged, mut structure_only) = (0, 0, 0, 0);
+    for _ in 0..2400 {
+        let (cues, places) = twin_tick(&mut game, &mut voices);
+        let Some(a) = game.attempt() else {
+            break;
+        };
+        let fresh: Vec<_> = a
+            .events
+            .iter()
+            .filter(|e| e.seq >= seen && e.kind == EventKind::Windup)
+            .cloned()
+            .collect();
+        seen = a.events.back().map_or(seen, |e| e.seq + 1);
+        // The cue is requested exactly when a windup targets the defender.
+        let at_defender: Vec<_> = fresh.iter().filter(|e| e.target_id.is_none()).collect();
+        assert_eq!(
+            cues.contains(&SoundCue::EnemyWindup),
+            !at_defender.is_empty(),
+            "tick {}",
+            a.tick
+        );
+        if !fresh.is_empty() && at_defender.is_empty() {
+            structure_only += 1;
+        }
+        if at_defender.is_empty() {
+            continue;
+        }
+        warned += 1;
+        assert!(
+            horde_audio::mix::mix(SoundCue::EnemyWindup)
+                .warning
+                .is_some()
+        );
+        assert!(matches!(
+            places.voicing(SoundCue::EnemyWindup).bank,
+            horde_audio::bank::BankId::Enemy(_, horde_audio::bank::EnemyStage::Windup)
+        ));
+        for reduced in [false, true] {
+            let view = twin_view(a, reduced);
+            for event in &at_defender {
+                let id = event.actor_id.expect("a windup names its hostile");
+                let e = a.enemies.iter().find(|e| e.id == id).unwrap();
+                let drawn = view.enemies.iter().find(|v| v.id == id).unwrap();
+                // The twin: `EnemyView.windup.is_some()`.
+                assert!(
+                    drawn.windup.is_some(),
+                    "reduced {reduced}: the windup of {id} sounds without its ring"
+                );
+                // A ranged windup: `EnemyView.aim_target.is_some()` too.
+                if a.spit_target(e).is_some() {
+                    assert!(drawn.aim_target.is_some(), "reduced {reduced}: {id}");
+                    ranged += usize::from(!reduced);
+                }
+            }
+        }
+    }
+    assert!(warned >= 3, "{warned} defender windups sounded");
+    assert!(ranged >= 1, "no ranged windup sounded");
+    assert!(structure_only >= 1, "no structure-only windup tick");
+}
+
+/// The boss-phase warning and its twin (A6-12, `WARNING_TWINS`): on the
+/// tick the runner requests `BossPhase`, in the boss kind's bank, the
+/// frame's view holds `BattleView.boss_phase`, in normal and reduced
+/// effects.
+#[test]
+fn warning_twin_boss_phase() {
+    use horde_audio::bank::{BankId, BossStage};
+    use horde_core::{balance::BalanceSettings, content::EnemyKind};
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings::legacy())
+        .unwrap();
+    game.deploy(0, Mode::Personal).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    (a.max_hp, a.hp) = (1_000_000, 1_000_000);
+    a.progression.boss_phases = 1;
+    game.spawn_enemy(&mut a, EnemyKind::Brute, 4, true);
+    let boss = a.enemies.last_mut().expect("a boss");
+    boss.x = a.width_yards * 0.6;
+    boss.hp = boss.max_hp / 2;
+    let kind = boss.boss_kind.expect("a boss of a kind");
+    a.paused = false;
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    let mut voices = horde_audio::voicing::EnemyVoiceIndex::default();
+    let (cues, places) = twin_tick(&mut game, &mut voices);
+    assert!(cues.contains(&SoundCue::BossPhase), "{cues:?}");
+    assert!(horde_audio::mix::mix(SoundCue::BossPhase).warning.is_some());
+    assert_eq!(
+        places.voicing(SoundCue::BossPhase).bank,
+        BankId::Boss(kind, BossStage::Phase)
+    );
+    let a = game.attempt().unwrap();
+    for reduced in [false, true] {
+        // The twin: `BattleView.boss_phase.is_some()`.
+        assert!(
+            twin_view(a, reduced).boss_phase.is_some(),
+            "reduced {reduced}: the phase sounds without its label and ring"
+        );
+    }
+}
+/// One sale command is one coin batch, however many items it sold (R9,
+/// A6-14); a sale that sold nothing is silent.
+#[test]
+fn sell_extras_of_50_plays_one_coin_batch() {
+    let mut host = Host::new();
+    for _ in 0..50 {
+        host.game.campaign_mut().add_item(4).unwrap();
+    }
+    let quote = host.game.sell_extras_quote();
+    assert!(quote > 0);
+    host.runtime.begin_frame(1);
+    host.runtime.enqueue(Command::SellUnprotected, "Sold");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.game.campaign().coins, quote);
+    assert_eq!(host.cues, vec![SoundCue::CoinBatch]);
+    host.cues.clear();
+    // Nothing is left to sell: no coins, no cue.
+    host.runtime.begin_frame(2);
+    host.runtime.enqueue(Command::SellUnprotected, "Sold");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.game.campaign().coins, quote);
+    assert_eq!(host.cues, vec![]);
+    // A single strict sale is a batch of one.
+    let id = host.game.campaign_mut().add_item(4).unwrap();
+    host.runtime.begin_frame(3);
+    host.runtime.enqueue(Command::SellItem(id), "Sold");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.cues, vec![SoundCue::CoinBatch]);
+}
+/// The dry trigger repeats on the gate of the effects setting the player
+/// has now: every fixed step hands it to the gun tracker.
+#[test]
+fn fixed_step_hands_reduced_effects_to_the_gun_tracker() {
+    let mut host = Host::new();
+    assert!(!host.runtime.guns.reduced_effects());
+    host.settings.reduced_effects = true;
+    step(&mut host.ctx());
+    assert!(host.runtime.guns.reduced_effects());
+    host.settings.reduced_effects = false;
+    step(&mut host.ctx());
+    assert!(!host.runtime.guns.reduced_effects());
+}
+/// A Rare or better drop sounds from the runner's tracker (A6-14), panned
+/// to where it fell, at its tier's speed; the widgets play nothing.
+#[test]
+fn rare_drop_cue_comes_from_runner_not_widget() {
+    use horde_core::quality::{LootEvent, Quality};
+    let mut host = Host::new();
+    host.deploy();
+    host.runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
+    // The first tick primes the tracker.
+    step(&mut host.ctx());
+    assert!(!host.cues.contains(&SoundCue::LootDrop));
+    let attempt = host.game.attempt_mut().unwrap();
+    let (tick, width) = (attempt.tick, attempt.width_yards);
+    let drop = |item_id, quality| LootEvent {
+        at: [12.0, 1.5],
+        item_id,
+        definition: horde_core::content::content().items[0].id.clone(),
+        level: 1,
+        quality,
+        name: "Test".into(),
+        tick,
+    };
+    attempt.loot_events.push(drop(1, Quality::Uncommon));
+    step(&mut host.ctx());
+    assert!(
+        !host.cues.contains(&SoundCue::LootDrop),
+        "Uncommon is silent"
+    );
+    host.game
+        .attempt_mut()
+        .unwrap()
+        .loot_events
+        .push(drop(2, Quality::Legendary));
+    step(&mut host.ctx());
+    assert!(host.cues.contains(&SoundCue::LootDrop));
+    assert!(!host.cues.contains(&SoundCue::Ready));
+    let places = &host.runtime.cue_places;
+    assert_eq!(
+        places.of(SoundCue::LootDrop),
+        Some(horde_audio::pan::lane_position(12.0, width))
+    );
+    assert_eq!(places.voicing(SoundCue::LootDrop).speed, 1.06);
+    host.cues.clear();
+    step(&mut host.ctx());
+    assert!(!host.cues.contains(&SoundCue::LootDrop), "heard once");
 }

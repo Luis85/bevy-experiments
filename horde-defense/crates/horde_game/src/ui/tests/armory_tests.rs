@@ -22,8 +22,63 @@ fn item_sale_requires_review_and_confirmation_before_changing_the_wallet() {
     assert!(f.armory.pending_sale.is_none());
 }
 
+/// Hovers the disabled `Review sale` button of the selected item for a few
+/// frames and reports whether `reason` was shown.
+fn sale_hover_shows(h: &Harness, f: &mut FrontendParts, label: &str, reason: &str) -> bool {
+    h.ctx
+        .all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
+    let position = h
+        .frame(f, View::Armory, vec![])
+        .shapes
+        .iter()
+        .find_map(|clipped| text_position(&clipped.shape, label))
+        .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+    let mut shown = false;
+    for frame in 0..4 {
+        let events = if frame == 0 {
+            vec![Event::PointerMoved(position)]
+        } else {
+            vec![]
+        };
+        let output = h.frame(f, View::Armory, events);
+        shown |= output
+            .shapes
+            .iter()
+            .any(|clipped| shape_has_text(&clipped.shape, reason));
+    }
+    shown
+}
+
+/// Strict `SellItem` (W1-20): an equipped item cannot be reviewed for sale.
+/// The button stays visible but disabled, and its hover text is the core
+/// `SaleBlock::label()`.
 #[test]
-fn preset_sale_warning_names_the_actual_reference_before_confirmation() {
+fn sell_button_disabled_with_block_label_for_equipped_item() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    let id = f.game.campaign_mut().add_item(6).unwrap();
+    f.game.campaign_mut().equip(Mode::Personal, id).unwrap();
+    f.armory.selected_item = Some(id);
+    let block = f.game.sale_eligibility(id).unwrap_err();
+    assert_eq!(block, horde_core::campaign::SaleBlock::EquippedPersonal);
+    let price = content().items[6].sell_value;
+    let label = format!("Review sale · {price}");
+    let before = serde_json::to_value(&f.game).unwrap();
+    // Hover first: egui hides tooltips after a click until the pointer moves.
+    assert!(sale_hover_shows(&h, f, &label, &block.label()));
+    h.click(f, View::Armory, &label);
+    assert!(f.armory.pending_sale.is_none(), "the button is disabled");
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+}
+
+/// Rewritten in W1-20 (was `preset_sale_warning_names_the_actual_reference_
+/// before_confirmation`, which confirmed the sale through an "incomplete
+/// preset" warning): strict SellItem refuses an item a preset references.
+/// The disabled button names the preset, and deleting the preset from the
+/// presets list is the way out.
+#[test]
+fn preset_item_sale_is_disabled_until_the_preset_is_deleted() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
@@ -39,22 +94,39 @@ fn preset_sale_warning_names_the_actual_reference_before_confirmation() {
         .campaign_mut()
         .save_preset("Patrol rifle".into(), Mode::Personal)
         .unwrap();
+    f.game.campaign_mut().equip(Mode::Personal, 5).unwrap();
+    f.armory.selected_item = Some(id);
     let price = content().items[4].sell_value;
-    h.click(f, View::Armory, &format!("Review sale · {price}"));
-    let output = h.frame(f, View::Armory, vec![]);
-    assert!(output.shapes.iter().any(|shape| shape_has_text(
-        &shape.shape,
-        "These presets will be incomplete: Patrol rifle"
-    )));
-    assert!(f.game.campaign().item(id).is_some());
-    h.click(f, View::Armory, "Confirm item sale");
-    assert_eq!(f.game.campaign().player.loadout[0], 5);
+    let label = format!("Review sale · {price}");
+    assert!(sale_hover_shows(
+        &h,
+        f,
+        &label,
+        "Used by the preset Patrol rifle"
+    ));
+    h.click(f, View::Armory, &label);
+    assert!(f.armory.pending_sale.is_none(), "the button is disabled");
+    // The wide layout fills the frame (the app scrolls it), so the presets
+    // list is reached through the narrow layout of a tall frame.
+    let tall = vec2(900.0, 2400.0);
+    h.click_size(f, View::Armory, "Loadout presets", tall);
+    for _ in 0..12 {
+        // Let the collapsing header finish opening.
+        h.frame_size(f, View::Armory, vec![], tall);
+    }
+    h.click_size(f, View::Armory, "Delete Patrol rifle", tall);
     assert!(
         f.game
-            .campaign_mut()
-            .apply_preset(1, Mode::Personal)
-            .is_err()
+            .campaign()
+            .presets
+            .iter()
+            .all(|p| p.name != "Patrol rifle")
     );
+    h.click(f, View::Armory, &label);
+    h.click(f, View::Armory, "Confirm item sale");
+    assert!(f.game.campaign().item(id).is_none());
+    assert_eq!(f.game.campaign().coins, price);
+    assert_eq!(f.game.campaign().player.loadout[0], 5);
 }
 
 #[test]
@@ -471,6 +543,36 @@ fn equipment_shows_inventory_above_the_fold_at_both_review_sizes() {
     }
 }
 
+/// CF-3-07 (closing): the comparison's weapon line pluralises its count
+/// noun ("1 projectile", "9 projectiles") instead of "projectile(s)".
+#[test]
+fn weapon_line_pluralises_projectiles() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    // A single-projectile marksman rifle and the 9-pellet double-barrel.
+    for (definition, line) in [
+        (4, "Rifle · 1 projectile per shot · 0° spread"),
+        (28, "Shotgun · 9 projectiles per shot · "),
+    ] {
+        assert_eq!(
+            horde_core::weapons::WeaponSpec::from_item(&content().items[definition]).pellets,
+            if definition == 4 { 1 } else { 9 }
+        );
+        let id = f.game.campaign_mut().add_item(definition).unwrap();
+        f.armory.selected_item = Some(id);
+        // A wide, tall frame keeps the whole comparison column on screen.
+        let output = h.frame_size(f, View::Armory, vec![], vec2(1440.0, 2400.0));
+        let has = |text: &str| output.shapes.iter().any(|s| shape_has_text(&s.shape, text));
+        assert!(
+            has(line),
+            "{definition}: {line} is not painted: {:?}",
+            super::loot_block_tests::painted_text(&output)
+        );
+        assert!(!has("projectile(s)"), "{definition}: placeholder plural");
+    }
+}
+
 #[test]
 fn equipment_keeps_its_loadout_comparison_on_screen_at_desktop_size() {
     let mut fixture = IsolatedFrontend::new();
@@ -503,6 +605,18 @@ fn defender_picker_label_shares_its_buttons_centre_line() {
         );
         f.act(|c| c.open_preparation(tab));
         let npc = f.game.campaign().npc.name.clone();
+        // The armory's owner picker reads "Equipment for" and says "You";
+        // the briefing's defender picker reads "Defender" and names the
+        // player's card (W3-16). The two never share a label.
+        let (picker, player) = if tab == Tab::Briefing {
+            let card = f
+                .game
+                .defender_card(horde_core::defenders::DefenderId::Player)
+                .unwrap();
+            ("Defender", card.name)
+        } else {
+            ("Equipment for", "You".to_owned())
+        };
         for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
             settings::configure(&h.ctx, scale);
             f.settings.scale = scale;
@@ -514,12 +628,12 @@ fn defender_picker_label_shares_its_buttons_centre_line() {
                     .center()
                     .y
             };
-            let label = centre("Defender");
-            for button in ["You", npc.as_str()] {
+            let label = centre(picker);
+            for button in [player.as_str(), npc.as_str()] {
                 let y = centre(button);
                 assert!(
                     (y - label).abs() < 1.0,
-                    "{tab:?} {size:?}: {button} at {y}, Defender at {label}"
+                    "{tab:?} {size:?}: {button} at {y}, {picker} at {label}"
                 );
             }
         }

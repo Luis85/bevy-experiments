@@ -1,0 +1,1480 @@
+{
+    "version":  1,
+    "before":  "target/production-before",
+    "supplement":  "target/production-before/supplement",
+    "windows_scale":  2,
+    "captures":  [
+                     {
+                         "scene":  "active-camp",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/active-camp.png",
+                         "bytes":  550515,
+                         "sha256":  "c9b05f0b3140bb943c4751a583def8373a05d77624908f16891b0187aaf58463"
+                     },
+                     {
+                         "scene":  "active-camp",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/active-camp-small.png",
+                         "bytes":  328950,
+                         "sha256":  "3148468bf3649e201703b567738db5b20b841645ec137d48a78b401f14fac3f3"
+                     },
+                     {
+                         "scene":  "arid",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/arid.png",
+                         "bytes":  4989374,
+                         "sha256":  "d4c2e26c04667a95c3ca26268039853a43090c01d5522592dc9c22caeea151d8"
+                     },
+                     {
+                         "scene":  "arid",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/arid-small.png",
+                         "bytes":  2548220,
+                         "sha256":  "2b7c67838c7f823f563602885244cd9dea503318b71f7c30b5d79513ea54d32d"
+                     },
+                     {
+                         "scene":  "armory",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/armory.png",
+                         "bytes":  591044,
+                         "sha256":  "cf02c77313881422641cf2d1efa0e4f634c0dba869f231fa4edd69dd06e53ef4"
+                     },
+                     {
+                         "scene":  "armory",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/armory-small.png",
+                         "bytes":  339039,
+                         "sha256":  "3ddad117924a3d821447d48da48edb00504647df4d14e5ebd9cee8a7830baa2f"
+                     },
+                     {
+                         "scene":  "battle",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/battle.png",
+                         "bytes":  4959644,
+                         "sha256":  "d268c70970d4f90b8ff52b6558741799559963117c4dd69758b4d1c480abd088"
+                     },
+                     {
+                         "scene":  "battle",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/battle-small.png",
+                         "bytes":  2564827,
+                         "sha256":  "208f9aa53aa10b3180dfeac841b892f0dd5f274305a9fba0c3182285562dc440"
+                     },
+                     {
+                         "scene":  "battle-female",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/battle-female.png",
+                         "bytes":  4960916,
+                         "sha256":  "508253b683a7278a212fe9f28c132fba7ae3d66f006c9cc34eeed842c1a3325b"
+                     },
+                     {
+                         "scene":  "battle-female",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/battle-female-small.png",
+                         "bytes":  2566121,
+                         "sha256":  "19321ef09369b551e900f2bdeee38c1a00e6935e12f3468da4331e2337562d31"
+                     },
+                     {
+                         "scene":  "boss",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/boss.png",
+                         "bytes":  5372651,
+                         "sha256":  "fb8dec55376cff7bfa5a481185e96870e308acf3aa3547b2d6bb2397737b9f71"
+                     },
+                     {
+                         "scene":  "boss",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/boss-small.png",
+                         "bytes":  2780370,
+                         "sha256":  "b60a64e26f3568b3c59405f153cfefb9df1f6b79c0276d64b22977721f6d29bb"
+                     },
+                     {
+                         "scene":  "briefing",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/briefing.png",
+                         "bytes":  523320,
+                         "sha256":  "3ee939576149ff7d51becde3c594c492e93f2f63cc0e674ab6e3e219b09bed75"
+                     },
+                     {
+                         "scene":  "briefing",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/briefing-small.png",
+                         "bytes":  301541,
+                         "sha256":  "94392cf6a041eba7f40ba1c5a78602ee17cb7a0a0400d61dff640d7346c94b05"
+                     },
+                     {
+                         "scene":  "briefing-npc",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/briefing-npc.png",
+                         "bytes":  565519,
+                         "sha256":  "310286b830d387ebf11da809b813f645998f30966d5fc6fb09c75f8d9ba333dd"
+                     },
+                     {
+                         "scene":  "briefing-npc",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/briefing-npc-small.png",
+                         "bytes":  319173,
+                         "sha256":  "7d38cf3ccc7141eb5075ead408736233b22aef14d73e494f29d1ad7ba771390f"
+                     },
+                     {
+                         "scene":  "campaign",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/campaign.png",
+                         "bytes":  565529,
+                         "sha256":  "e16f88607979a0bf49b6a9460f0df42d2738414bb6e640b830312422ecfbbad1"
+                     },
+                     {
+                         "scene":  "campaign",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/campaign-small.png",
+                         "bytes":  385523,
+                         "sha256":  "3da3d5a3443255bde2b509764fef754664ffbb8cf99cd10db5af9ea4e8b88b25"
+                     },
+                     {
+                         "scene":  "character",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/character.png",
+                         "bytes":  370323,
+                         "sha256":  "681173169bad476a852697056631aa859273ce6558bca879d09a607697dadaa1"
+                     },
+                     {
+                         "scene":  "character",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/character-small.png",
+                         "bytes":  298083,
+                         "sha256":  "dd068a8ebe52d8b97d946ea5f02600e9a2363efb3b9ec4f4ca7d0204bb6d30c0"
+                     },
+                     {
+                         "scene":  "character-max",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/character-max.png",
+                         "bytes":  396640,
+                         "sha256":  "196f76e1dee3025a9201b6ec6a002446645f3e62212d0f9aa58a8b58f5e95aa4"
+                     },
+                     {
+                         "scene":  "character-max",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/character-max-small.png",
+                         "bytes":  290669,
+                         "sha256":  "16f2df770bd61fda236847d4b3932ed910525316704738acb58559fbe97e57b1"
+                     },
+                     {
+                         "scene":  "construction",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/construction.png",
+                         "bytes":  4878712,
+                         "sha256":  "46805a671ee20e5b520f8435f87befdde8af5f1c2fef2087ee8dd750970575c0"
+                     },
+                     {
+                         "scene":  "construction",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/construction-small.png",
+                         "bytes":  2497426,
+                         "sha256":  "92948ca594154d897321587e92e093e99d17b6521410da02a3fe5a28eb7e2339"
+                     },
+                     {
+                         "scene":  "critical-npc",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/critical-npc.png",
+                         "bytes":  5019866,
+                         "sha256":  "bd919288f74cd8ac2e52017d0545c86212cbe36bdb8c10c06cc78dde9a32d34b"
+                     },
+                     {
+                         "scene":  "critical-npc",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/critical-npc-small.png",
+                         "bytes":  2617649,
+                         "sha256":  "7bfe259465aea4bc6a3e9f98ea01f8b1c4bc342a00cfafcc443be0e9b434803e"
+                     },
+                     {
+                         "scene":  "damage",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/damage.png",
+                         "bytes":  4966267,
+                         "sha256":  "c9ca19d2d045a65704b232afac28071f48d2bbcfa26f569e4e79650e6ea12294"
+                     },
+                     {
+                         "scene":  "damage",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/damage-small.png",
+                         "bytes":  2567263,
+                         "sha256":  "a47b3b3a063622a3d400689418b89ddf69f52ed683f1cf0e5feec532abf8b88d"
+                     },
+                     {
+                         "scene":  "damage-4x",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/damage-4x.png",
+                         "bytes":  5009880,
+                         "sha256":  "1834a97775038074318ab82a24afba131ef3cb834e3ad860b125827346f84353"
+                     },
+                     {
+                         "scene":  "damage-4x",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/damage-4x-small.png",
+                         "bytes":  2612827,
+                         "sha256":  "7e8ec2efcbfd411a3b7c7300196b9ca754b115d35ee8de0f0d4d80a17a0d67cf"
+                     },
+                     {
+                         "scene":  "engineering",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/engineering.png",
+                         "bytes":  364011,
+                         "sha256":  "0b2323983625bb8f21bf0d849580b5d70b196f7db3c6b4d6a12e4cf40484498c"
+                     },
+                     {
+                         "scene":  "engineering",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/engineering-small.png",
+                         "bytes":  314911,
+                         "sha256":  "8861d782061fbde6aa36fe7b997f7274240c071ef4332e74753662af8ee22988"
+                     },
+                     {
+                         "scene":  "history",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/history.png",
+                         "bytes":  435311,
+                         "sha256":  "dfd2d422cc47d39c4e76590a27471dfcaca31301d3d1de67d34c91981b1315af"
+                     },
+                     {
+                         "scene":  "history",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/history-small.png",
+                         "bytes":  273195,
+                         "sha256":  "88170b23555afd124d09826bdf1fd1aad3013f1eb3cf60aa93dd5b2347822a4e"
+                     },
+                     {
+                         "scene":  "history-empty",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/history-empty.png",
+                         "bytes":  193249,
+                         "sha256":  "a3f0b6ca02235af2986f2d3c0b7d7a2232ba6825b7003e23f0079eb370c15d30"
+                     },
+                     {
+                         "scene":  "history-empty",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/history-empty-small.png",
+                         "bytes":  203377,
+                         "sha256":  "18cc93eb794a8285cb1b5513a8dc45a1bd83b081abc452f25023ef8e5546b320"
+                     },
+                     {
+                         "scene":  "intro",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/intro.png",
+                         "bytes":  4784249,
+                         "sha256":  "ca162ff1712d6a4a359fd7e45ad005dcaee4d136da94d2dce7ddef3a710dc907"
+                     },
+                     {
+                         "scene":  "intro",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/intro-small.png",
+                         "bytes":  2451834,
+                         "sha256":  "9950efa786375dd177c178d14d30f7d3f56288959aeeb293722403d9be0ba9f3"
+                     },
+                     {
+                         "scene":  "journey-liberated",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/journey-liberated.png",
+                         "bytes":  414978,
+                         "sha256":  "743c11773db0c666709521d238e85aff2d622f0d33438fc6c1d342380699edfd"
+                     },
+                     {
+                         "scene":  "journey-liberated",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/journey-liberated-small.png",
+                         "bytes":  329554,
+                         "sha256":  "6ab5e301ebcd4e652520c80bd090c21597a220f8ce71866c7b0600c34f49d171"
+                     },
+                     {
+                         "scene":  "journey-upgrades",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/journey-upgrades.png",
+                         "bytes":  385407,
+                         "sha256":  "bf2c07d867186fa1be87a8246a7d37d04eee2fca2d449a4706740fbc347572ea"
+                     },
+                     {
+                         "scene":  "journey-upgrades",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/journey-upgrades-small.png",
+                         "bytes":  295202,
+                         "sha256":  "22742667212c8acade65e0d942fb605cfbfac6006d57bee6ac2e9c2ff07539e6"
+                     },
+                     {
+                         "scene":  "journey-victory",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/journey-victory.png",
+                         "bytes":  384488,
+                         "sha256":  "e0c97fd928e94428f502c898cd9ffab7a8eba1edd52301cdc9070b6fc080c2cc"
+                     },
+                     {
+                         "scene":  "journey-victory",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/journey-victory-small.png",
+                         "bytes":  284545,
+                         "sha256":  "0cf2e3c41209e269e3265a380a506291ad94b82d3f7931ccf60657399797d2c1"
+                     },
+                     {
+                         "scene":  "leveled-armory",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/leveled-armory.png",
+                         "bytes":  572791,
+                         "sha256":  "b6163c62d2a93ea39c2f32032cdece26698fc3a8c547844fcf409bf2b94886c9"
+                     },
+                     {
+                         "scene":  "leveled-armory",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/leveled-armory-small.png",
+                         "bytes":  308667,
+                         "sha256":  "961eb0db88bbf646f311a6d4abd3990f6b80aa4f4d8a787e219cb247bb56e4dd"
+                     },
+                     {
+                         "scene":  "max-lanes",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/max-lanes.png",
+                         "bytes":  5542636,
+                         "sha256":  "f53dea21fffea08c4d4af8a10615c0e3eb1ce28ae47d5e76d984bd93517dd5f4"
+                     },
+                     {
+                         "scene":  "max-lanes",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/max-lanes-small.png",
+                         "bytes":  2880475,
+                         "sha256":  "4cad1a8572b98c2e1cb45f140cb751ca55e17ce5e2b8e4db315045a7af0999eb"
+                     },
+                     {
+                         "scene":  "menu",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/menu.png",
+                         "bytes":  2094623,
+                         "sha256":  "4e9e385a8dd781c41dd56ea2c57a082e25868496fba288b51af2d9b04193856d"
+                     },
+                     {
+                         "scene":  "menu",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/menu-small.png",
+                         "bytes":  1633837,
+                         "sha256":  "1a0ddc3ca26eb1c444e1bcec3d5ae710f4a4c6e3b05fb5409f0cb4847ccb954d"
+                     },
+                     {
+                         "scene":  "menu-female",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/menu-female.png",
+                         "bytes":  2106459,
+                         "sha256":  "3d0317b78aa0d4a7b21bef4ac00c8e20a8ac5aa8e89cef47e0d4a7662c0ff978"
+                     },
+                     {
+                         "scene":  "menu-female",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/menu-female-small.png",
+                         "bytes":  1636924,
+                         "sha256":  "0455e691573273fd1358bfa648e41785d702ba2888943476471d1c520f9177ea"
+                     },
+                     {
+                         "scene":  "npc",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/npc.png",
+                         "bytes":  5011274,
+                         "sha256":  "dbdd65e4ee07d4af7fc6f31053c33711c1cba63ab3f4b15c636c2f887db9ac0b"
+                     },
+                     {
+                         "scene":  "npc",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/npc-small.png",
+                         "bytes":  2611468,
+                         "sha256":  "82a15ccdbb508389aa190700745a98225444a037b63634be3d7d138291bb8f26"
+                     },
+                     {
+                         "scene":  "npc-expanded",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/npc-expanded.png",
+                         "bytes":  4675133,
+                         "sha256":  "ec0b0d3f9532a528c812cfca19424c00980161fff48f69863bba4f0b3c3ccbce"
+                     },
+                     {
+                         "scene":  "npc-expanded",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/npc-expanded-small.png",
+                         "bytes":  1994708,
+                         "sha256":  "17942571b64feaff5282ca15280ee0464cfb22f71c8f9f4df92b4f1fc1f484ec"
+                     },
+                     {
+                         "scene":  "operations",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/operations.png",
+                         "bytes":  444301,
+                         "sha256":  "d7821a00d06714cf0f1de7f257990496416bc6078d5f03a6e3afb6be82a98716"
+                     },
+                     {
+                         "scene":  "operations",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/operations-small.png",
+                         "bytes":  331338,
+                         "sha256":  "094af4195d0ecce3482b9fc29dc79131b93b68f16c8fb0cbe77d24473327956e"
+                     },
+                     {
+                         "scene":  "ordnance",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/ordnance.png",
+                         "bytes":  4969239,
+                         "sha256":  "570b804a4f5a42ca7065c8fa7dd5a10eb5ef2c7583b07f14bb941b1acf4bd04f"
+                     },
+                     {
+                         "scene":  "ordnance",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/ordnance-small.png",
+                         "bytes":  2587580,
+                         "sha256":  "7f72626eb02d3cccc5143e7fc66ee90a558c2c0e66c5c1129581d567abb593ef"
+                     },
+                     {
+                         "scene":  "peak",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/peak.png",
+                         "bytes":  5185801,
+                         "sha256":  "bcb9775d81ee3fdc01f67f05e4911cb8daa87b4d4d25f7f37868a0e4829bf668"
+                     },
+                     {
+                         "scene":  "peak",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/peak-small.png",
+                         "bytes":  2720518,
+                         "sha256":  "e449ccb3713a4e220fb71e85bb84a87053c2a229ab12cc247b1de4e12d033688"
+                     },
+                     {
+                         "scene":  "progressed-battle",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/progressed-battle.png",
+                         "bytes":  4917106,
+                         "sha256":  "1505dd69e6ab149cff182b209f457d46c7779a11cc9699234e79c890a40ee33f"
+                     },
+                     {
+                         "scene":  "progressed-battle",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/progressed-battle-small.png",
+                         "bytes":  2554444,
+                         "sha256":  "1a8b6bdc656774c87edd0a54d7d154c85b7bd1d99e1ffcca79e69a469831abac"
+                     },
+                     {
+                         "scene":  "progressed-peak",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/progressed-peak.png",
+                         "bytes":  5539066,
+                         "sha256":  "c28136294218cb5b54af67e757cb350cceaa5264f538a7236a0ce312a3ba8a30"
+                     },
+                     {
+                         "scene":  "progressed-peak",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/progressed-peak-small.png",
+                         "bytes":  2874066,
+                         "sha256":  "7519c23c0bf595505b6e6e9ee4aeb96e212abe71f30c92abbe634d95c6d67d2b"
+                     },
+                     {
+                         "scene":  "quality-armory",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/quality-armory.png",
+                         "bytes":  554357,
+                         "sha256":  "531b8a40748e89b1ae66fbaceeaf77dcee69a022887b7db272d8576814f4b40b"
+                     },
+                     {
+                         "scene":  "quality-armory",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/quality-armory-small.png",
+                         "bytes":  318710,
+                         "sha256":  "d9f73f4cab9fc0bdf2d49cc80f4b3cbcacd42c76e44482526aa232364b4805be"
+                     },
+                     {
+                         "scene":  "quality-loot",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/quality-loot.png",
+                         "bytes":  4960190,
+                         "sha256":  "2d2277fd666f3cf42bd331f13ad7a3be7a1142ca57da82c238f51359c53e073c"
+                     },
+                     {
+                         "scene":  "quality-loot",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/quality-loot-small.png",
+                         "bytes":  2567183,
+                         "sha256":  "6fdbfe18947a8727c9b0de6a5e0517773fcd040fd95ac68926620a197ccd6915"
+                     },
+                     {
+                         "scene":  "results",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/results.png",
+                         "bytes":  482762,
+                         "sha256":  "ae1ec0f89bf360af6612e76bee24c34d7a951ee05efc9a955462a7313fc4bf0b"
+                     },
+                     {
+                         "scene":  "results",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/results-small.png",
+                         "bytes":  298851,
+                         "sha256":  "9525a80c6572243534b37617785ebd2a6fc3f42a28365b92d1d80b54e0b7ba8e"
+                     },
+                     {
+                         "scene":  "reticle-reload",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/reticle-reload.png",
+                         "bytes":  4959596,
+                         "sha256":  "86f106e859db8d3f1e6fed9ac14b771fdaebf2b1982b4115fa96c945d3b54e1f"
+                     },
+                     {
+                         "scene":  "reticle-reload",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/reticle-reload-small.png",
+                         "bytes":  2559418,
+                         "sha256":  "42b43c78fa13a1896d3f775bc7da9b7b1f4778757d5277e9a9f296159102daf6"
+                     },
+                     {
+                         "scene":  "settings",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/settings.png",
+                         "bytes":  382117,
+                         "sha256":  "83737be1c617f740444c04d782a1a9fe8c19085a985f70f61040d35086177268"
+                     },
+                     {
+                         "scene":  "settings",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/settings-small.png",
+                         "bytes":  266382,
+                         "sha256":  "6370e0bff7312f34d696547afa9d77ae826db776a26fa86cd070f7ba67dde3e9"
+                     },
+                     {
+                         "scene":  "skills",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/skills.png",
+                         "bytes":  469673,
+                         "sha256":  "ab37e3d9bbdf485dc2c8d17793167532cd859449050e9b49c160f872bdd38f96"
+                     },
+                     {
+                         "scene":  "skills",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/skills-small.png",
+                         "bytes":  316592,
+                         "sha256":  "a8584b3ac7856b8e67e28478e0350fc526a80c0d2a40368c059a968e2f60df6d"
+                     },
+                     {
+                         "scene":  "skills-ordnance",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/skills-ordnance.png",
+                         "bytes":  385319,
+                         "sha256":  "723248593396f61fd0843701b53dfd0813737a265ef788ece97ee103a7bf52a2"
+                     },
+                     {
+                         "scene":  "skills-ordnance",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/skills-ordnance-small.png",
+                         "bytes":  316703,
+                         "sha256":  "9be79e5665301e94d2471833b18c7dbc408a619923a53849c747867ff1b37ebc"
+                     },
+                     {
+                         "scene":  "skills-search",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/normal/skills-search.png",
+                         "bytes":  413437,
+                         "sha256":  "579f35076d5bdd463a9fb33c36645ac84c1c80c215da315367cd14beda593e4a"
+                     },
+                     {
+                         "scene":  "skills-search",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/normal/skills-search-small.png",
+                         "bytes":  316911,
+                         "sha256":  "4abe2acf7db40f4dbd51dd60a630a166820819f6a6c5e25cb5adc4ada5257ab2"
+                     },
+                     {
+                         "scene":  "skills-survival",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/skills-survival.png",
+                         "bytes":  378662,
+                         "sha256":  "1560dbc7b7aa5c2f995d0d461eecd4d8c55cc595b1400ec045765b5e7f94ac40"
+                     },
+                     {
+                         "scene":  "skills-survival",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/skills-survival-small.png",
+                         "bytes":  286658,
+                         "sha256":  "3aa9213039d0e018553f030ddaa6d583b392371ee8126d51f6b3be13e1276369"
+                     },
+                     {
+                         "scene":  "survivor",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/survivor.png",
+                         "bytes":  370239,
+                         "sha256":  "73c969d8a8f37faedf7ba98e63f83ffdee834ef28e537b4ea79815cc5062a6be"
+                     },
+                     {
+                         "scene":  "survivor",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/survivor-small.png",
+                         "bytes":  329713,
+                         "sha256":  "61d866b5d01f12f10bb96120bf06b098414192d4f77a5dd063e97fed9f42b0db"
+                     },
+                     {
+                         "scene":  "survivor-select",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/survivor-select.png",
+                         "bytes":  2216740,
+                         "sha256":  "3bba62d7b01df9bd49791c864da192460e10efc750dd4c5102d5122f564e2639"
+                     },
+                     {
+                         "scene":  "survivor-select",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/survivor-select-small.png",
+                         "bytes":  1728490,
+                         "sha256":  "d482d2316dc253a5443ae54f3502d4bacca8937a2c9c569413d9e1a3edf9e539"
+                     },
+                     {
+                         "scene":  "tropical",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/tropical.png",
+                         "bytes":  5142859,
+                         "sha256":  "e584a2cc161dc3b71be678e3e6dc59127b4a08b5216e3faa529d2db4dbf2aee2"
+                     },
+                     {
+                         "scene":  "tropical",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/tropical-small.png",
+                         "bytes":  2673214,
+                         "sha256":  "18e1d2f947dc80074c9fbb3efa277c598fa4aaa6f6c4267a231a35da36ea71b7"
+                     },
+                     {
+                         "scene":  "world",
+                         "mode":  "normal",
+                         "size":  "large",
+                         "file":  "target/production-before/normal/world.png",
+                         "bytes":  589776,
+                         "sha256":  "7cc71c0fa3b50d8e3a3e123909f1775c566281e88e5b68f07918d95ab315a8bb"
+                     },
+                     {
+                         "scene":  "world",
+                         "mode":  "normal",
+                         "size":  "small",
+                         "file":  "target/production-before/normal/world-small.png",
+                         "bytes":  395776,
+                         "sha256":  "b39fbb3b47db63216be8adbf69b0d293ab0a4622dc28d9ee71fbde2411c628d3"
+                     },
+                     {
+                         "scene":  "active-camp",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/active-camp.png",
+                         "bytes":  550515,
+                         "sha256":  "c9b05f0b3140bb943c4751a583def8373a05d77624908f16891b0187aaf58463"
+                     },
+                     {
+                         "scene":  "active-camp",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/active-camp-small.png",
+                         "bytes":  328950,
+                         "sha256":  "3148468bf3649e201703b567738db5b20b841645ec137d48a78b401f14fac3f3"
+                     },
+                     {
+                         "scene":  "arid",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/arid.png",
+                         "bytes":  4994655,
+                         "sha256":  "fb12239f158d74c4e08ef057efea58aaca766d3180d7e2256a07c5e2887c130f"
+                     },
+                     {
+                         "scene":  "arid",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/arid-small.png",
+                         "bytes":  2549610,
+                         "sha256":  "41fb3472f48e581ee97a4af3620ef1d0ceaca460f47e2d9985c90e864973f26d"
+                     },
+                     {
+                         "scene":  "armory",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/armory.png",
+                         "bytes":  591044,
+                         "sha256":  "cf02c77313881422641cf2d1efa0e4f634c0dba869f231fa4edd69dd06e53ef4"
+                     },
+                     {
+                         "scene":  "armory",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/armory-small.png",
+                         "bytes":  339039,
+                         "sha256":  "3ddad117924a3d821447d48da48edb00504647df4d14e5ebd9cee8a7830baa2f"
+                     },
+                     {
+                         "scene":  "battle",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/battle.png",
+                         "bytes":  4960151,
+                         "sha256":  "346e6fbacdc21d14b6641b4d0c0d9253292dee8cbe14cb74bcdd039f2336a671"
+                     },
+                     {
+                         "scene":  "battle",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/battle-small.png",
+                         "bytes":  2566123,
+                         "sha256":  "fa8d5790454e3393fbf9a431b67f3de89ad4bfd25427c07407f73d81b2327257"
+                     },
+                     {
+                         "scene":  "battle-female",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/battle-female.png",
+                         "bytes":  4961381,
+                         "sha256":  "ff9cc5d89ff8ce1e2e256e98b8eb4ab9f1cbf9a9a423a25f9a78152dfa4189ef"
+                     },
+                     {
+                         "scene":  "battle-female",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/battle-female-small.png",
+                         "bytes":  2567005,
+                         "sha256":  "559f846bd17fca426a46b7ef2d83aa548a2c0ca113c37606cdf623cb18abd2e7"
+                     },
+                     {
+                         "scene":  "boss",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/boss.png",
+                         "bytes":  5373986,
+                         "sha256":  "62eb437d31c20849f529cc76c8371fee57addd62200ec1bb9317a86798a32fd7"
+                     },
+                     {
+                         "scene":  "boss",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/boss-small.png",
+                         "bytes":  2781199,
+                         "sha256":  "5ffe9cbd807b073dcf93b534bc25048852fd6aa7ea099146176d83eb408b6f1a"
+                     },
+                     {
+                         "scene":  "briefing",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/briefing.png",
+                         "bytes":  523320,
+                         "sha256":  "3ee939576149ff7d51becde3c594c492e93f2f63cc0e674ab6e3e219b09bed75"
+                     },
+                     {
+                         "scene":  "briefing",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/briefing-small.png",
+                         "bytes":  301541,
+                         "sha256":  "94392cf6a041eba7f40ba1c5a78602ee17cb7a0a0400d61dff640d7346c94b05"
+                     },
+                     {
+                         "scene":  "briefing-npc",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/briefing-npc.png",
+                         "bytes":  565519,
+                         "sha256":  "310286b830d387ebf11da809b813f645998f30966d5fc6fb09c75f8d9ba333dd"
+                     },
+                     {
+                         "scene":  "briefing-npc",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/briefing-npc-small.png",
+                         "bytes":  319173,
+                         "sha256":  "7d38cf3ccc7141eb5075ead408736233b22aef14d73e494f29d1ad7ba771390f"
+                     },
+                     {
+                         "scene":  "campaign",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/campaign.png",
+                         "bytes":  565529,
+                         "sha256":  "e16f88607979a0bf49b6a9460f0df42d2738414bb6e640b830312422ecfbbad1"
+                     },
+                     {
+                         "scene":  "campaign",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/campaign-small.png",
+                         "bytes":  385523,
+                         "sha256":  "3da3d5a3443255bde2b509764fef754664ffbb8cf99cd10db5af9ea4e8b88b25"
+                     },
+                     {
+                         "scene":  "character",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/character.png",
+                         "bytes":  370323,
+                         "sha256":  "681173169bad476a852697056631aa859273ce6558bca879d09a607697dadaa1"
+                     },
+                     {
+                         "scene":  "character",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/character-small.png",
+                         "bytes":  298083,
+                         "sha256":  "dd068a8ebe52d8b97d946ea5f02600e9a2363efb3b9ec4f4ca7d0204bb6d30c0"
+                     },
+                     {
+                         "scene":  "character-max",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/character-max.png",
+                         "bytes":  396640,
+                         "sha256":  "196f76e1dee3025a9201b6ec6a002446645f3e62212d0f9aa58a8b58f5e95aa4"
+                     },
+                     {
+                         "scene":  "character-max",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/character-max-small.png",
+                         "bytes":  290669,
+                         "sha256":  "16f2df770bd61fda236847d4b3932ed910525316704738acb58559fbe97e57b1"
+                     },
+                     {
+                         "scene":  "construction",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/construction.png",
+                         "bytes":  4879484,
+                         "sha256":  "69aeae033f089f0ebd11a95130f477eea0197a8cf1afa03c30ad3465a18a46dc"
+                     },
+                     {
+                         "scene":  "construction",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/construction-small.png",
+                         "bytes":  2498874,
+                         "sha256":  "ff14ae4b53d2e681892506593472e9521c43361ba8640905d353a492172a60b9"
+                     },
+                     {
+                         "scene":  "critical-npc",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/critical-npc.png",
+                         "bytes":  5023556,
+                         "sha256":  "769a61850b6f3a9988ebf8c4953721ed138c9aabd75aebb2beb377b8f862a8e2"
+                     },
+                     {
+                         "scene":  "critical-npc",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/critical-npc-small.png",
+                         "bytes":  2623232,
+                         "sha256":  "56de8c52fb0a7a92436f3418ca8fe165812e08ebe78ad6d3142f6f5bace55a12"
+                     },
+                     {
+                         "scene":  "damage",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/damage.png",
+                         "bytes":  4968520,
+                         "sha256":  "0a33b6de8949c14dbab6c34dc1f236c8f877ad1b3e7789b326a26e3bf698ea22"
+                     },
+                     {
+                         "scene":  "damage",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/damage-small.png",
+                         "bytes":  2570934,
+                         "sha256":  "0e847d155bb7e1eef8ee5e07b498f1294d50f335286f9ff4763210f2a5b16447"
+                     },
+                     {
+                         "scene":  "damage-4x",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/damage-4x.png",
+                         "bytes":  5014900,
+                         "sha256":  "fedb46a5315b1bffd1c63c93ca0d75a05a1425122baaf0821ebb92d0ceaa438f"
+                     },
+                     {
+                         "scene":  "damage-4x",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/damage-4x-small.png",
+                         "bytes":  2615542,
+                         "sha256":  "13a3adf9470f32e2f1ca66f74158ba50d672349a668492b8bf3cb0b0fbb0fb4e"
+                     },
+                     {
+                         "scene":  "engineering",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/engineering.png",
+                         "bytes":  364011,
+                         "sha256":  "0b2323983625bb8f21bf0d849580b5d70b196f7db3c6b4d6a12e4cf40484498c"
+                     },
+                     {
+                         "scene":  "engineering",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/engineering-small.png",
+                         "bytes":  314911,
+                         "sha256":  "8861d782061fbde6aa36fe7b997f7274240c071ef4332e74753662af8ee22988"
+                     },
+                     {
+                         "scene":  "history",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/history.png",
+                         "bytes":  435311,
+                         "sha256":  "dfd2d422cc47d39c4e76590a27471dfcaca31301d3d1de67d34c91981b1315af"
+                     },
+                     {
+                         "scene":  "history",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/history-small.png",
+                         "bytes":  273195,
+                         "sha256":  "88170b23555afd124d09826bdf1fd1aad3013f1eb3cf60aa93dd5b2347822a4e"
+                     },
+                     {
+                         "scene":  "history-empty",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/history-empty.png",
+                         "bytes":  193249,
+                         "sha256":  "a3f0b6ca02235af2986f2d3c0b7d7a2232ba6825b7003e23f0079eb370c15d30"
+                     },
+                     {
+                         "scene":  "history-empty",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/history-empty-small.png",
+                         "bytes":  203377,
+                         "sha256":  "18cc93eb794a8285cb1b5513a8dc45a1bd83b081abc452f25023ef8e5546b320"
+                     },
+                     {
+                         "scene":  "intro",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/intro.png",
+                         "bytes":  4786796,
+                         "sha256":  "68af53647bcf56151c1b1523d7234300543f9d13a701d1b8da5134bb7fd85d73"
+                     },
+                     {
+                         "scene":  "intro",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/intro-small.png",
+                         "bytes":  2452387,
+                         "sha256":  "177acea9b7a9b53a466e47b9b9ce7f43e246f1da766e4af8bb3ed3ed1dcc6147"
+                     },
+                     {
+                         "scene":  "journey-liberated",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/journey-liberated.png",
+                         "bytes":  414978,
+                         "sha256":  "743c11773db0c666709521d238e85aff2d622f0d33438fc6c1d342380699edfd"
+                     },
+                     {
+                         "scene":  "journey-liberated",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/journey-liberated-small.png",
+                         "bytes":  329554,
+                         "sha256":  "6ab5e301ebcd4e652520c80bd090c21597a220f8ce71866c7b0600c34f49d171"
+                     },
+                     {
+                         "scene":  "journey-upgrades",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/journey-upgrades.png",
+                         "bytes":  385407,
+                         "sha256":  "bf2c07d867186fa1be87a8246a7d37d04eee2fca2d449a4706740fbc347572ea"
+                     },
+                     {
+                         "scene":  "journey-upgrades",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/journey-upgrades-small.png",
+                         "bytes":  295202,
+                         "sha256":  "22742667212c8acade65e0d942fb605cfbfac6006d57bee6ac2e9c2ff07539e6"
+                     },
+                     {
+                         "scene":  "journey-victory",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/journey-victory.png",
+                         "bytes":  384488,
+                         "sha256":  "e0c97fd928e94428f502c898cd9ffab7a8eba1edd52301cdc9070b6fc080c2cc"
+                     },
+                     {
+                         "scene":  "journey-victory",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/journey-victory-small.png",
+                         "bytes":  284664,
+                         "sha256":  "99627ae8930e92b7f38b54b1539a12cf0adf8bd291cbbd0caf31a031c253daf8"
+                     },
+                     {
+                         "scene":  "leveled-armory",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/leveled-armory.png",
+                         "bytes":  572535,
+                         "sha256":  "77047bd1986339edbf3ebf6c6c94c189feddbcce75416cf1c0511d6f60641893"
+                     },
+                     {
+                         "scene":  "leveled-armory",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/leveled-armory-small.png",
+                         "bytes":  308667,
+                         "sha256":  "961eb0db88bbf646f311a6d4abd3990f6b80aa4f4d8a787e219cb247bb56e4dd"
+                     },
+                     {
+                         "scene":  "max-lanes",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/max-lanes.png",
+                         "bytes":  5567069,
+                         "sha256":  "dbd4f8e2ec22c605104ab3b1f1295efa5028f41e39da0b3a623c651c5a92923b"
+                     },
+                     {
+                         "scene":  "max-lanes",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/max-lanes-small.png",
+                         "bytes":  2889867,
+                         "sha256":  "2ac7123ce1528604e05ff3f6fddd941e50146397274df63e028a18be2d1b996d"
+                     },
+                     {
+                         "scene":  "menu",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/menu.png",
+                         "bytes":  2096225,
+                         "sha256":  "77ef70d4c88c42f67df414c1ae00f5740278dae46d92bf9d8eac8e8b52210ebf"
+                     },
+                     {
+                         "scene":  "menu",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/menu-small.png",
+                         "bytes":  1634289,
+                         "sha256":  "bacfbff23dfc509aadda2cf7276384b9b615cac8c732877d963654b28458859b"
+                     },
+                     {
+                         "scene":  "menu-female",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/menu-female.png",
+                         "bytes":  2107904,
+                         "sha256":  "1320c1edb4fcf902ca87d379fb1da2933b57dda60992a1658905c8ed7c79d2eb"
+                     },
+                     {
+                         "scene":  "menu-female",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/menu-female-small.png",
+                         "bytes":  1637445,
+                         "sha256":  "41029981a84b617cb9b5fcd5bd58dcd6ab1cce36df57569e4c6837fed2535cc4"
+                     },
+                     {
+                         "scene":  "npc",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/npc.png",
+                         "bytes":  5015086,
+                         "sha256":  "35d314c71966d5a1fb553670adafd3be1f6b5455a8b5a4788037bf6fa3488bd4"
+                     },
+                     {
+                         "scene":  "npc",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/npc-small.png",
+                         "bytes":  2616287,
+                         "sha256":  "1df7979cf0587961eae3e12f4b2b086deb38b7d538da281d455e0a64e20a8e15"
+                     },
+                     {
+                         "scene":  "npc-expanded",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/npc-expanded.png",
+                         "bytes":  4677446,
+                         "sha256":  "f4027a6caf493b54f0ee839e9f9afbb0f4addcfe30dbf0ce621dab9ed99d9826"
+                     },
+                     {
+                         "scene":  "npc-expanded",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/npc-expanded-small.png",
+                         "bytes":  1995155,
+                         "sha256":  "a92770f1bcd82f1a235932afeceea01e318470fb7db0c96103df18c600072e80"
+                     },
+                     {
+                         "scene":  "operations",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/operations.png",
+                         "bytes":  444301,
+                         "sha256":  "d7821a00d06714cf0f1de7f257990496416bc6078d5f03a6e3afb6be82a98716"
+                     },
+                     {
+                         "scene":  "operations",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/operations-small.png",
+                         "bytes":  331338,
+                         "sha256":  "094af4195d0ecce3482b9fc29dc79131b93b68f16c8fb0cbe77d24473327956e"
+                     },
+                     {
+                         "scene":  "ordnance",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/ordnance.png",
+                         "bytes":  4960068,
+                         "sha256":  "ae333b3240d7920d1b91cbcdc5a4fbe6a4f0e3f53605c7e9e08a7d3fc907011a"
+                     },
+                     {
+                         "scene":  "ordnance",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/ordnance-small.png",
+                         "bytes":  2578686,
+                         "sha256":  "67f6b4f33d6cb4c38eb81270da77714d19af4c278e0d59682ecc391347a7f655"
+                     },
+                     {
+                         "scene":  "peak",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/peak.png",
+                         "bytes":  5190675,
+                         "sha256":  "6188544ff32fed17ffdde268b04708187979b9d8cc69c77aca39aa2f9ced4655"
+                     },
+                     {
+                         "scene":  "peak",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/peak-small.png",
+                         "bytes":  2724514,
+                         "sha256":  "82e14d9f49d3b501d86de5de56295b77548023ce3cb335af98894197fe3eba7b"
+                     },
+                     {
+                         "scene":  "progressed-battle",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/progressed-battle.png",
+                         "bytes":  4917207,
+                         "sha256":  "b703b479f94ae496fe77f44fa96adfd1f04eb8a354f1bc8f5a24b9ee72573193"
+                     },
+                     {
+                         "scene":  "progressed-battle",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/progressed-battle-small.png",
+                         "bytes":  2555182,
+                         "sha256":  "a8a37402e3123ba55db1aebffe1cd02a74d75592dbd55121fb8c38d317d3a755"
+                     },
+                     {
+                         "scene":  "progressed-peak",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/progressed-peak.png",
+                         "bytes":  5565495,
+                         "sha256":  "28762c34ca3e904c856d2d79656dfdddff3607085da87ea3896f5a6163862f05"
+                     },
+                     {
+                         "scene":  "progressed-peak",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/progressed-peak-small.png",
+                         "bytes":  2889867,
+                         "sha256":  "2ac7123ce1528604e05ff3f6fddd941e50146397274df63e028a18be2d1b996d"
+                     },
+                     {
+                         "scene":  "quality-armory",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/quality-armory.png",
+                         "bytes":  554357,
+                         "sha256":  "531b8a40748e89b1ae66fbaceeaf77dcee69a022887b7db272d8576814f4b40b"
+                     },
+                     {
+                         "scene":  "quality-armory",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/quality-armory-small.png",
+                         "bytes":  318710,
+                         "sha256":  "d9f73f4cab9fc0bdf2d49cc80f4b3cbcacd42c76e44482526aa232364b4805be"
+                     },
+                     {
+                         "scene":  "quality-loot",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/quality-loot.png",
+                         "bytes":  4960687,
+                         "sha256":  "d287ad77ff626e10cc1ea1b34a02f291bbbb176f33c0c56ed8684fd1bdee73f1"
+                     },
+                     {
+                         "scene":  "quality-loot",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/quality-loot-small.png",
+                         "bytes":  2568489,
+                         "sha256":  "09f9f3ff7fc365afec75076b7acae2e452d816e7aef4b963ff5432c3455f8205"
+                     },
+                     {
+                         "scene":  "results",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/results.png",
+                         "bytes":  482762,
+                         "sha256":  "ae1ec0f89bf360af6612e76bee24c34d7a951ee05efc9a955462a7313fc4bf0b"
+                     },
+                     {
+                         "scene":  "results",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/results-small.png",
+                         "bytes":  298851,
+                         "sha256":  "9525a80c6572243534b37617785ebd2a6fc3f42a28365b92d1d80b54e0b7ba8e"
+                     },
+                     {
+                         "scene":  "reticle-reload",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/reticle-reload.png",
+                         "bytes":  4965843,
+                         "sha256":  "8493d60dee61ded6a491ca642a55f2e6510d00949f10e71dbc5d1c24ee2c9d32"
+                     },
+                     {
+                         "scene":  "reticle-reload",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/reticle-reload-small.png",
+                         "bytes":  2562713,
+                         "sha256":  "ce264fcae77ad3e8ebb7e22e8febef8775bcb10438c32818d3199025e8398284"
+                     },
+                     {
+                         "scene":  "settings",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/settings.png",
+                         "bytes":  382614,
+                         "sha256":  "f768f2b04ef9a82647aa29d5b889b684d0d49050e72d339089e6fc02f29db91d"
+                     },
+                     {
+                         "scene":  "settings",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/settings-small.png",
+                         "bytes":  266382,
+                         "sha256":  "6370e0bff7312f34d696547afa9d77ae826db776a26fa86cd070f7ba67dde3e9"
+                     },
+                     {
+                         "scene":  "skills",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/skills.png",
+                         "bytes":  469673,
+                         "sha256":  "ab37e3d9bbdf485dc2c8d17793167532cd859449050e9b49c160f872bdd38f96"
+                     },
+                     {
+                         "scene":  "skills",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/skills-small.png",
+                         "bytes":  316592,
+                         "sha256":  "a8584b3ac7856b8e67e28478e0350fc526a80c0d2a40368c059a968e2f60df6d"
+                     },
+                     {
+                         "scene":  "skills-ordnance",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/skills-ordnance.png",
+                         "bytes":  385319,
+                         "sha256":  "723248593396f61fd0843701b53dfd0813737a265ef788ece97ee103a7bf52a2"
+                     },
+                     {
+                         "scene":  "skills-ordnance",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/skills-ordnance-small.png",
+                         "bytes":  316703,
+                         "sha256":  "9be79e5665301e94d2471833b18c7dbc408a619923a53849c747867ff1b37ebc"
+                     },
+                     {
+                         "scene":  "skills-search",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/supplement/reduced/skills-search.png",
+                         "bytes":  413437,
+                         "sha256":  "579f35076d5bdd463a9fb33c36645ac84c1c80c215da315367cd14beda593e4a"
+                     },
+                     {
+                         "scene":  "skills-search",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/supplement/reduced/skills-search-small.png",
+                         "bytes":  316768,
+                         "sha256":  "2ea5c55df4c20c7dccc35f3954dfb9c3748f905ec690e9778c7c3b24c4af6323"
+                     },
+                     {
+                         "scene":  "skills-survival",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/skills-survival.png",
+                         "bytes":  378662,
+                         "sha256":  "1560dbc7b7aa5c2f995d0d461eecd4d8c55cc595b1400ec045765b5e7f94ac40"
+                     },
+                     {
+                         "scene":  "skills-survival",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/skills-survival-small.png",
+                         "bytes":  286658,
+                         "sha256":  "3aa9213039d0e018553f030ddaa6d583b392371ee8126d51f6b3be13e1276369"
+                     },
+                     {
+                         "scene":  "survivor",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/survivor.png",
+                         "bytes":  370239,
+                         "sha256":  "73c969d8a8f37faedf7ba98e63f83ffdee834ef28e537b4ea79815cc5062a6be"
+                     },
+                     {
+                         "scene":  "survivor",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/survivor-small.png",
+                         "bytes":  329713,
+                         "sha256":  "61d866b5d01f12f10bb96120bf06b098414192d4f77a5dd063e97fed9f42b0db"
+                     },
+                     {
+                         "scene":  "survivor-select",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/survivor-select.png",
+                         "bytes":  2217816,
+                         "sha256":  "dce35c955f30155255216530eff391887e10a5e58b4921ef83f20f815293fd6c"
+                     },
+                     {
+                         "scene":  "survivor-select",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/survivor-select-small.png",
+                         "bytes":  1729791,
+                         "sha256":  "a81a3e6db5da6ca4d2970062d4cec5ef17d8041ae2aa93f425f26eae361c46fd"
+                     },
+                     {
+                         "scene":  "tropical",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/tropical.png",
+                         "bytes":  5145400,
+                         "sha256":  "b022e89c0938c390a7d1446fa49ef75795f342a0097591c92840ba10fc064d1a"
+                     },
+                     {
+                         "scene":  "tropical",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/tropical-small.png",
+                         "bytes":  2676444,
+                         "sha256":  "2c2cebf91602102f649d7aea238a128a5a7cbdbbe5efc117fb617967d602c094"
+                     },
+                     {
+                         "scene":  "world",
+                         "mode":  "reduced",
+                         "size":  "large",
+                         "file":  "target/production-before/reduced/world.png",
+                         "bytes":  589776,
+                         "sha256":  "7cc71c0fa3b50d8e3a3e123909f1775c566281e88e5b68f07918d95ab315a8bb"
+                     },
+                     {
+                         "scene":  "world",
+                         "mode":  "reduced",
+                         "size":  "small",
+                         "file":  "target/production-before/reduced/world-small.png",
+                         "bytes":  395776,
+                         "sha256":  "b39fbb3b47db63216be8adbf69b0d293ab0a4622dc28d9ee71fbde2411c628d3"
+                     }
+                 ]
+}

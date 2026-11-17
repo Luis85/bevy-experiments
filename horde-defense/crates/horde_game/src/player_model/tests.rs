@@ -368,6 +368,70 @@ fn egui_adapter_submits_only_selected_cached_parts_with_white_tint_and_shared_tr
     }
 }
 
+/// Closing phase (G1.10): a packet whose inputs repeat on the next pass
+/// submits the mesh it posed then, not a new one, and a moved packet is
+/// posed afresh at its new place. The battle redraws the survivor every
+/// pass, and reposing its ~21k vertices each time was a fifth of the
+/// progressed-peak interface draw.
+#[test]
+fn egui_adapter_reuses_a_posed_mesh_while_its_packet_repeats() {
+    use bevy_egui::egui;
+    let catalogue = builtin().unwrap();
+    let model = catalogue.model("rook").unwrap();
+    let placement = |x: f32| ModelPlacement {
+        source_origin: [x, 300.],
+        scale: 0.25,
+    };
+    let still = resolve_model(catalogue, "rook", placement(250.)).unwrap();
+    let moved = resolve_model(catalogue, "rook", placement(262.)).unwrap();
+    let texture = egui::TextureId::User(816);
+    let bindings =
+        std::collections::BTreeMap::from([(model.definition.source.id.clone(), texture)]);
+    let ctx = egui::Context::default();
+    let pass = |pose: &ResolvedPlayerPose| {
+        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            draw_egui(ui.painter(), pose, &bindings).unwrap();
+        });
+        let meshes: Vec<std::sync::Arc<egui::Mesh>> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Mesh(mesh) => Some(mesh.clone()),
+                _ => None,
+            })
+            .collect();
+        output.drop_without_applying_deltas();
+        meshes
+    };
+    let first = pass(&still);
+    let again = pass(&still);
+    assert!(!first.is_empty());
+    assert_eq!(first.len(), again.len());
+    for (a, b) in first.iter().zip(&again) {
+        assert!(
+            std::sync::Arc::ptr_eq(a, b),
+            "a repeated packet submits the mesh posed on the previous pass"
+        );
+    }
+    let shifted = pass(&moved);
+    let drawable: Vec<_> = moved
+        .packets
+        .iter()
+        .filter(|packet| !packet.local_mesh.vertices.is_empty())
+        .collect();
+    assert_eq!(shifted.len(), drawable.len());
+    for ((mesh, before), packet) in shifted.iter().zip(&first).zip(drawable) {
+        assert!(
+            !std::sync::Arc::ptr_eq(mesh, before),
+            "a moved packet is reposed"
+        );
+        for (actual, source) in mesh.vertices.iter().zip(&packet.local_mesh.vertices) {
+            let expected = verification::packet_point(packet, source.position);
+            assert_eq!(actual.pos, egui::pos2(expected[0], expected[1]));
+        }
+    }
+}
+
 #[test]
 fn selected_real_starter_equipment_keeps_the_original_bind_exact_with_no_generated_visible_fill() {
     use horde_core::weapons::WeaponClass;

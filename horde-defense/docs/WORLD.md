@@ -47,9 +47,38 @@ real-world prosperity, conflict, safety, or assessments of national populations.
 
 Modifiers have concrete gameplay fields: enemy health, enemy speed, reward
 multiplier, additive build supply, personal weapon damage and NPC attack skill.
-The starting country does not change these values. Entry difficulty therefore
-remains visible before committing. Encounter templates provide the five
-battlefield roles; a country can contain more local stages than templates.
+The starting country does not change these authored values, but the start clamp
+below changes its effective difficulty, and with it the enemy health, enemy
+speed and reward multipliers its deployments play (Austria 0.85 plays 0.95,
+Bangladesh 1.60 plays 1.05). Encounter templates provide the five battlefield
+roles; a country can contain more local stages than templates.
+
+### Country difficulty band
+
+Country difficulty spans 0.85-1.60 in whole hundredths. The band follows the
+country's size alone, through the stage count that population already sets,
+never national traits: up to 3 stages 0.85-1.15, 4-9 stages 1.00-1.35, and 10
+or more 1.20-1.60. Within its band a stable hash picks the value,
+`(lo + fnv1a64("difficulty:" + id) % (hi - lo + 1)) / 100`, so Luxembourg is
+0.92, Germany 1.04, Austria 0.85 and Bangladesh 1.60 (242 countries, 50
+distinct values, mean 1.049). A deployment multiplies enemy health and reward
+by the difficulty and enemy speed by its square root. The campaign's start
+country plays clamped to 0.95-1.05 (`Country::effective_difficulty`, shown by
+`Game::effective_country_difficulty` on the map and the briefing), so no first
+defense opens far easier or harder than the rest; before a start is chosen
+every country shows its clamped value. Every other country plays its raw value,
+and the front order (`fronts_opened_by`), the recommended next front
+(`Campaign::recommendation`, the easiest enterable uncleared country) and
+pacing's routes read the raw value too. Nothing recommends a starting country.
+The clamp is derived, never saved.
+
+Stage count also places a country's boss checkpoints, again from size alone:
+every sixth stage short of the last is a Regional checkpoint and the last
+stage is the Capstone, so only countries of 7 or more stages have a
+checkpoint (23 of 242). Like the difficulty band, the checkpoints follow the
+stage count, never national traits, and say nothing about the place.
+PROGRESSION_SCALING.md ("Regional checkpoints
+and the Capstone", "Country difficulty band") has the encounter terms.
 
 ## Unlock and clear contract
 
@@ -70,14 +99,30 @@ they are not claims about international borders or maritime jurisdiction.
 To reproduce the catalogue with only Python's standard library:
 
 ```powershell
-python scripts/generate_world.py
+python -I -B scripts/generate_world.py --check
+python -I -B scripts/generate_world.py
+python -I -B scripts/generate_world.py --rebuild --download
 ```
 
-Or supply downloaded 110m and 50m source files as the two positional arguments.
-The generator computes adjacency before simplifying display coordinates, checks
-connectivity during generation, and emits stable sorted IDs and neighbors.
-Do not rerun it to discard intentional hand-authored content changes without
-reviewing the resulting diff.
+The default (`--from-existing`) is offline: it loads the committed
+`world.json`, recomputes only each country's `difficulty` and writes the file
+back as indented UTF-8 JSON; every other key, `stage_themes` and
+`strategy_config` included, is carried over unchanged. `--check` writes nothing
+and exits 1 when the output differs from the committed bytes. `--rebuild`
+rebuilds the countries from the Natural Earth 110m and 50m files, given as two
+positional paths or fetched with `--download`. It refuses source bytes that do
+not match the sha256 pins in `sources` (exit 3; `--allow-source-drift` accepts
+and re-pins them), a committed country id that vanishes or is renamed (exit 5;
+ids are saved, so no flag accepts it) and any change to a country's stage
+count (exit 4; `--allow-stage-count-change`). Committed countries keep their
+order and a new one is appended after them. It keeps the top-level
+configuration and each country's `level_override`, `stage_theme_ids` and any
+other key the generator does not build. `--self-test` exercises every mode on
+throwaway files. The rebuild computes adjacency before simplifying display
+coordinates, checks connectivity during generation, and emits stable IDs and
+sorted neighbors.
+Change `difficulty` only through the generator, and review the diff of any
+regeneration before committing it.
 
 Tests cover source catalogue completeness, microstate presence, configuration
 and overrides, arbitrary starting countries, neighbor gating, replay safety,
@@ -88,8 +133,9 @@ connected island routes, malformed content rejection, and save round trips.
 `strategy_config` in the same JSON defines the progressive control expansion:
 recruitment after one liberated country, parallel deployments after two, grand
 strategy after four. Defaults permit four parallel battles, twelve roster
-members and three guards per country, with a 100-coin recruitment cost. Outbreak
-checks occur every 600 simulated seconds with a 35% configured chance and a
+members and three guards per country, with a 100-coin recruitment base cost
+that scales with the threat rank (see STRATEGY.md). Outbreak checks occur every
+600 simulated seconds with a 35% configured chance and a
 420-second response window. Guard suppression is configured at 30 percentage
 points per assigned guard; the strategy module resolves staffing and threats.
 All thresholds, timing, costs, limits and probabilities are editable data.

@@ -28,6 +28,8 @@ The original nine audio files were not rewritten. Five new loops and four source
 
 All eighteen WAVs pass mono, 16-bit, 22,050 Hz uncompressed PCM checks, nonempty sample and below-clipping checks. The generator was run twice; all eighteen WAV hashes were identical between runs, and the original nine hashes stayed unchanged. `assets/audio/PROVENANCE.json` records exact frame counts, RMS levels, seeds, generators and SHA-256 values.
 
+Archived on 6 November 2026: the eighteen WAVs above no longer all ship. W1-57 (production-pass decision 10) moved twelve of them unchanged to `archive/audio/`: the eight original effect clips (shot, reload, melee, damage, boss, incoming, ready, structure) and the four new source cues (NPC shot, turret shot, trap trigger, armor impact), see `archive/README.md` and `assets/CREDITS.md` ("Archived (not shipped)"). `assets/audio/` keeps the six beds this review describes: the original quiet base `ambience.wav` and the five new loops. `assets/audio/PROVENANCE.json` now records only those six; the twelve archived records, with the fields listed above, are in `archive/audio/PROVENANCE.json`. Combat effects now come from the survival library in [AUDIO_SURVIVAL.md](AUDIO_SURVIVAL.md). The table and hash results above record the eighteen files as they were measured.
+
 New loop boundary changes are checked against the larger of 0.004 full scale and that clip's 99th-percentile ordinary adjacent-sample change. This checks that wrapping does not introduce a special impulse above the existing noise texture; it does not pretend a rain waveform must end at zero. The five loops pass. This is a waveform check, not evidence that a listener cannot notice repetition.
 
 ## Read-only flow findings sent for runner integration

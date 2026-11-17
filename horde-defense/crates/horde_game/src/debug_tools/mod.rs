@@ -165,6 +165,7 @@ fn draw_overlays(
     session: Res<GameSession>,
     runtime: Res<Runtime>,
     config: Res<LaunchConfig>,
+    music: Option<Res<crate::music::MusicDirection>>,
 ) -> Result {
     if !overlays.frame_time && !overlays.sim_panel {
         return Ok(());
@@ -185,7 +186,12 @@ fn draw_overlays(
             });
     }
     if overlays.sim_panel {
-        let lines = sim_panel_lines(&session.game, &runtime, config.record.is_some());
+        let lines = sim_panel_lines(
+            &session.game,
+            &runtime,
+            config.record.is_some(),
+            music.as_deref(),
+        );
         egui::Window::new("Simulation")
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, [-8.0, 8.0])
@@ -199,7 +205,12 @@ fn draw_overlays(
 }
 
 /// The F3 panel text, separate from egui so it is testable.
-fn sim_panel_lines(game: &Game, runtime: &Runtime, record_flag: bool) -> Vec<String> {
+fn sim_panel_lines(
+    game: &Game,
+    runtime: &Runtime,
+    record_flag: bool,
+    music: Option<&crate::music::MusicDirection>,
+) -> Vec<String> {
     let debug = runtime.debug_snapshot();
     let mut lines = vec![format!("seed          {}", game.seed())];
     match game.attempt() {
@@ -258,6 +269,9 @@ fn sim_panel_lines(game: &Game, runtime: &Runtime, record_flag: bool) -> Vec<Str
         None if record_flag => "recording     stopped".to_owned(),
         None => "recording     off (F7)".to_owned(),
     });
+    if let Some(music) = music {
+        lines.push(format!("music         {}", music.report()));
+    }
     lines.push("F2 fps  F5 step  F6 dump  F7 record".to_owned());
     lines
 }

@@ -13,7 +13,7 @@ use support::legacy_game;
 fn entire_catalog_is_one_connected_globally_positioned_dag_and_preserves_stable_unlock_ids() {
     let catalog = skills();
     catalog.validate().unwrap();
-    assert_eq!(catalog.nodes.len(), 169);
+    assert_eq!(catalog.nodes.len(), 177);
     assert_eq!(
         catalog
             .nodes

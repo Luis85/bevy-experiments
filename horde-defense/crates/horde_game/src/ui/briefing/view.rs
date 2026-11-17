@@ -1,19 +1,77 @@
 //! Pure briefing view model: the selected defense and the deployment forecast.
 use horde_core::{
     content::{LevelDefinition, Mode, Slot, content},
-    progression::ProgressionSnapshot,
+    defenders::DefenderId,
+    progression::{BossRank, BossRankScaling, ProgressionSnapshot},
     sim::Game,
     world::Country,
 };
 
-/// Threat pressure for this deployment and after the next victory.
+/// What a stage's boss rank adds to its boss for a `mode` defender, from the
+/// catalogue's `scaling` (`progression.json` `boss_ranks`), in the order
+/// health, armor, damage, reward, e.g. "+40% health, +25% armor, +10%
+/// damage, +40% reward". A personal boss's armor and damage are the `armor`
+/// and `damage` multipliers. An Npc boss's armor is the armor
+/// `npc_armor_add` adds ("+2 armor") and its damage the `npc_damage_add`
+/// the rank adds to its blows at the previewed threat
+/// (`ProgressionCatalog::npc_boss_rank_damage_add`, "+1 damage"), which a
+/// Capstone's ×1.10 leaves at 0 at low ranks. The rank itself is named
+/// once, by the badge beside the boss line; a neutral term is left out, and
+/// a Sector boss or a neutral scaling has no terms.
+pub(super) fn boss_rank_terms(
+    rank: BossRank,
+    scaling: BossRankScaling,
+    mode: Mode,
+    npc_damage_add: i32,
+) -> Option<String> {
+    if rank == BossRank::Sector {
+        return None;
+    }
+    let percent = |factor: f32, what: &str| {
+        let percent = ((factor - 1.0) * 100.0).round() as i32;
+        (percent > 0).then(|| format!("+{percent}% {what}"))
+    };
+    let add = |add: i32, what: &str| (add > 0).then(|| format!("+{add} {what}"));
+    let (armor, damage) = match mode {
+        Mode::Personal => (
+            percent(scaling.armor, "armor"),
+            percent(scaling.damage, "damage"),
+        ),
+        Mode::Npc => (
+            add(scaling.npc_armor_add, "armor"),
+            add(npc_damage_add, "damage"),
+        ),
+    };
+    let added: Vec<String> = [
+        percent(scaling.health, "health"),
+        armor,
+        damage,
+        percent(scaling.reward, "reward"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    (!added.is_empty()).then(|| added.join(", "))
+}
+
+/// Threat pressure for this deployment and after the next victory, from
+/// `Game::stage_preview` of the selected defense.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct Forecast {
+    /// What a deploy of this stage stamps: rank, extras and the front ramp.
     pub pressure: ProgressionSnapshot,
-    /// Falls back to `pressure` when the next victory cannot be previewed.
+    /// The same stage one victory later. Falls back to `pressure` when the
+    /// next victory cannot be previewed.
     pub next: ProgressionSnapshot,
     pub boss_seconds: f32,
     pub supply: i64,
+    /// The difficulty the country plays at (the start clamp included).
+    pub difficulty: f32,
+    /// The rank of this stage's boss.
+    pub boss_rank: BossRank,
+    /// The boss phases that rank adds at this threat
+    /// (`StagePreview::rank_phases`), after the phase cap.
+    pub rank_phases: u8,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -32,6 +90,10 @@ pub(super) struct BriefingView {
     /// The requested stage clamped to `max_stage`.
     pub stage: usize,
     pub level: &'static LevelDefinition,
+    /// What the rank of `stage`'s boss adds against this defender, drawn
+    /// beside its badge ([`boss_rank_terms`] of `Game::stage_boss_rank` in
+    /// the defender's mode, an Npc damage term from the forecast).
+    pub boss_rank_terms: Option<String>,
     pub forecast: Result<Forecast, String>,
     pub lanes: u8,
     pub path_yards: f32,
@@ -46,24 +108,33 @@ pub(super) struct BriefingView {
     pub loadout: Vec<LoadoutLine>,
     pub heal_ready: bool,
     pub character_points: u32,
-    pub npc_name: String,
-    pub npc_unspent: u32,
+    /// Who the briefing is for: the next defender.
+    pub defender: DefenderId,
+    /// The defender's card name.
+    pub defender_name: String,
+    /// A survivor defender's unspent training points (0 for the player).
+    pub training_unspent: u32,
     pub blueprints: usize,
 }
 
-/// The briefing for `stage` of the active country, or `None` before a front
-/// is chosen.
-pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<BriefingView> {
+/// The briefing for `defender` on `stage` of the active country, or `None`
+/// before a front is chosen. The loadout and the training line read the
+/// defender's own records; a recruit no longer on the roster reads as Mara.
+pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Option<BriefingView> {
     let campaign = game.campaign();
+    let mode = defender.mode();
+    let recruit = defender
+        .recruit()
+        .and_then(|id| game.strategy().roster.iter().find(|r| r.id == id));
     let country = campaign.world.active_country()?;
     let levels = country.level_count();
     let max_stage = campaign.world.completed(&country.id).min(levels - 1);
     let stage = stage.min(max_stage);
     let level = &content().levels[stage % 5];
-    let forecast = campaign.deployment_progression(mode).map(|pressure| {
-        let next = campaign
-            .next_victory_progression(mode)
-            .unwrap_or_else(|_| pressure.clone());
+    // Core's preview of this stage: what a deploy here would stamp, the
+    // front ramp and the boss rank included.
+    let forecast = game.stage_preview(&country.id, stage, mode).map(|preview| {
+        let pressure = preview.pressure;
         let balance = &campaign.balance_settings;
         Forecast {
             boss_seconds: level.boss_time.max(pressure.boss_time_floor) * balance.boss_time,
@@ -73,20 +144,33 @@ pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<Briefi
                 + i64::from(balance.supply))
             .max(0),
             pressure,
-            next,
+            next: preview.next,
+            difficulty: preview.difficulty,
+            boss_rank: preview.boss_rank,
+            rank_phases: preview.rank_phases,
         }
     });
     let lanes = campaign.lane_count();
-    let loadout = match mode {
+    let loadout = game.defender_loadout(defender).unwrap_or(match mode {
         Mode::Personal => campaign.player.loadout,
         Mode::Npc => campaign.npc.loadout,
-    };
+    });
+    let npc = recruit.map_or(&campaign.npc, |r| &r.npc);
+    let catalog = horde_core::progression::catalog();
+    // What the rank adds to an Npc boss's blows at the previewed threat;
+    // none when the stage cannot be previewed.
+    let npc_damage_add = forecast
+        .as_ref()
+        .map_or(0, |f| catalog.npc_boss_rank_damage_add(&f.pressure));
     Some(BriefingView {
         country,
         levels,
         max_stage,
         stage,
         level,
+        boss_rank_terms: game.stage_boss_rank(&country.id, stage).and_then(|rank| {
+            boss_rank_terms(rank, catalog.boss_ranks.of(rank), mode, npc_damage_add)
+        }),
         forecast,
         lanes,
         path_yards: campaign.arena_geometry().1,
@@ -108,19 +192,27 @@ pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<Briefi
             (Slot::Accessory, "Accessory"),
         ]
         .into_iter()
-        .map(|(slot, label)| LoadoutLine {
-            label,
-            name: campaign.equipped(mode, slot).name.clone(),
-            level: campaign
+        .map(|(slot, label)| {
+            let item = campaign
                 .item(loadout[slot.index()])
-                .expect("equipped item exists")
-                .level,
+                .expect("equipped item exists");
+            LoadoutLine {
+                label,
+                name: item.definition().name.clone(),
+                level: item.level,
+            }
         })
         .collect(),
         heal_ready: campaign.profile(mode).heal,
         character_points: campaign.player.points,
-        npc_name: campaign.npc.name.clone(),
-        npc_unspent: campaign.npc.unspent,
+        defender,
+        defender_name: game
+            .defender_card(defender)
+            .map_or_else(|| npc.name.clone(), |card| card.name),
+        training_unspent: match mode {
+            Mode::Personal => 0,
+            Mode::Npc => npc.unspent,
+        },
         blueprints: campaign.blueprints.iter().filter(|v| **v).count(),
     })
 }
@@ -142,18 +234,18 @@ mod tests {
 
     #[test]
     fn no_briefing_before_a_front_is_chosen() {
-        assert_eq!(view_model(&Game::default(), Mode::Personal, 0), None);
+        assert_eq!(view_model(&Game::default(), DefenderId::Player, 0), None);
     }
 
     #[test]
     fn stage_is_clamped_to_the_next_unplayed_defense() {
         let mut game = started();
-        let view = view_model(&game, Mode::Personal, 7).unwrap();
+        let view = view_model(&game, DefenderId::Player, 7).unwrap();
         assert_eq!((view.max_stage, view.stage), (0, 0));
         assert_eq!(view.country.id, "DEU");
         assert_eq!(view.levels, world().country("DEU").unwrap().level_count());
         game.campaign_mut().record_country_stage_clear(0).unwrap();
-        let view = view_model(&game, Mode::Personal, 7).unwrap();
+        let view = view_model(&game, DefenderId::Player, 7).unwrap();
         assert_eq!((view.max_stage, view.stage), (1, 1));
         assert_eq!(view.level.name, content().levels[1].name);
     }
@@ -162,7 +254,7 @@ mod tests {
     fn forecast_and_deployment_facts_match_the_campaign() {
         let game = started();
         let c = game.campaign();
-        let view = view_model(&game, Mode::Personal, 0).unwrap();
+        let view = view_model(&game, DefenderId::Player, 0).unwrap();
         let forecast = view.forecast.as_ref().unwrap();
         let pressure = c.deployment_progression(Mode::Personal).unwrap();
         assert_eq!(forecast.pressure, pressure);
@@ -188,14 +280,188 @@ mod tests {
         assert_eq!(view.blueprints, c.blueprints.iter().filter(|v| **v).count());
     }
 
+    /// W4-02: the terms are every catalogue addition the defender meets, in
+    /// the order health, armor, damage, reward: the Capstone's authored
+    /// armor 1.25 and damage 1.1 included. A personal defense names the
+    /// armor and damage multipliers; an Npc one the armor `npc_armor_add`
+    /// adds and the damage the rank adds to the boss's blows (closing: the
+    /// Npc rule adds `floor((m - 1) × 6)`, which a Capstone's ×1.10 moves
+    /// only from rank 11). A neutral term is left out, and a Sector boss or
+    /// a neutral scaling has none. They never name the rank: the badge does.
+    #[test]
+    fn boss_rank_terms_read_the_catalogue_terms() {
+        let ranks = &horde_core::progression::catalog().boss_ranks;
+        for mode in [Mode::Personal, Mode::Npc] {
+            assert_eq!(
+                boss_rank_terms(BossRank::Sector, ranks.sector, mode, 0),
+                None
+            );
+            assert_eq!(
+                boss_rank_terms(BossRank::Regional, ranks.regional, mode, 0).as_deref(),
+                Some("+20% health, +20% reward")
+            );
+        }
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, ranks.capstone, Mode::Personal, 0).as_deref(),
+            Some("+40% health, +25% armor, +10% damage, +40% reward")
+        );
+        // The Npc add is the only damage an Npc defender meets: none below
+        // the rank where it moves the floor, "+1 damage" once it does. A
+        // personal defense ignores it.
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, ranks.capstone, Mode::Npc, 0).as_deref(),
+            Some("+40% health, +2 armor, +40% reward")
+        );
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, ranks.capstone, Mode::Npc, 1).as_deref(),
+            Some("+40% health, +2 armor, +1 damage, +40% reward")
+        );
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, ranks.capstone, Mode::Personal, 1).as_deref(),
+            Some("+40% health, +25% armor, +10% damage, +40% reward")
+        );
+        let neutral = BossRankScaling::default();
+        for mode in [Mode::Personal, Mode::Npc] {
+            assert_eq!(boss_rank_terms(BossRank::Regional, neutral, mode, 0), None);
+            assert_eq!(boss_rank_terms(BossRank::Capstone, neutral, mode, 0), None);
+        }
+        assert_eq!(
+            boss_rank_terms(
+                BossRank::Regional,
+                BossRankScaling {
+                    health: 1.35,
+                    ..neutral
+                },
+                Mode::Personal,
+                0
+            )
+            .as_deref(),
+            Some("+35% health")
+        );
+        // The armor term follows the defender: a multiplier alone is a
+        // personal term, an addition alone an Npc one.
+        let armored = BossRankScaling {
+            armor: 1.5,
+            ..neutral
+        };
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, armored, Mode::Personal, 0).as_deref(),
+            Some("+50% armor")
+        );
+        assert_eq!(
+            boss_rank_terms(BossRank::Capstone, armored, Mode::Npc, 0),
+            None
+        );
+    }
+
+    /// The briefing's terms are those of its defender's mode.
+    #[test]
+    fn briefing_terms_follow_the_defender_mode() {
+        let mut game = started();
+        let country = game.campaign().world.active_country().unwrap().id.clone();
+        let last = game
+            .campaign()
+            .world
+            .active_country()
+            .unwrap()
+            .level_count()
+            - 1;
+        game.campaign_mut()
+            .world
+            .country_levels
+            .insert(country, last);
+        let personal = view_model(&game, DefenderId::Player, last).unwrap();
+        let npc = view_model(&game, DefenderId::Mara, last).unwrap();
+        assert_eq!(
+            personal.boss_rank_terms.as_deref(),
+            Some("+40% health, +25% armor, +10% damage, +40% reward")
+        );
+        assert_eq!(
+            npc.boss_rank_terms.as_deref(),
+            Some("+40% health, +2 armor, +40% reward")
+        );
+    }
+
+    /// Closing: an Npc briefing's damage term is what the Npc rule adds at
+    /// the previewed rank, core's `npc_boss_rank_damage_add` of the
+    /// forecast: none on a Capstone at rank 0, where an Npc Capstone hits
+    /// like a Sector boss, and "+1 damage" once the rank moves the floor.
+    #[test]
+    fn npc_capstone_damage_term_follows_the_previewed_rank() {
+        let cfg = horde_core::progression::catalog();
+        let mut game = started();
+        let last = world().country("DEU").unwrap().level_count() - 1;
+        game.campaign_mut()
+            .world
+            .country_levels
+            .insert("DEU".into(), last);
+        assert_eq!(game.campaign().progression_rank(), 0);
+        let npc = view_model(&game, DefenderId::Mara, last).unwrap();
+        let pressure = &npc.forecast.as_ref().unwrap().pressure;
+        assert_eq!(cfg.npc_boss_rank_damage_add(pressure), 0);
+        let terms = npc.boss_rank_terms.unwrap();
+        assert!(!terms.contains("damage"), "{terms}");
+        let rank = (0..=cfg.threat_guard_rank)
+            .find(|&rank| {
+                let mut snapshot = cfg.snapshot(rank);
+                snapshot.fold_boss_rank(BossRank::Capstone, cfg.boss_ranks.capstone);
+                cfg.npc_boss_rank_damage_add(&snapshot) > 0
+            })
+            .expect("a rank where the Capstone factor adds Npc damage");
+        game.campaign_mut().victories = u64::from(rank);
+        assert_eq!(game.campaign().progression_rank(), rank);
+        let npc = view_model(&game, DefenderId::Mara, last).unwrap();
+        assert_eq!(
+            npc.boss_rank_terms.as_deref(),
+            Some("+40% health, +2 armor, +1 damage, +40% reward")
+        );
+        let personal = view_model(&game, DefenderId::Player, last).unwrap();
+        assert_eq!(
+            personal.boss_rank_terms.as_deref(),
+            Some("+40% health, +25% armor, +10% damage, +40% reward")
+        );
+    }
+
     #[test]
     fn npc_briefing_reads_the_npc_loadout() {
         let game = started();
-        let view = view_model(&game, Mode::Npc, 0).unwrap();
+        let view = view_model(&game, DefenderId::Mara, 0).unwrap();
         assert_eq!(
             view.loadout[1].name,
             game.campaign().equipped(Mode::Npc, Slot::Melee).name
         );
-        assert_eq!(view.npc_name, game.campaign().npc.name);
+        assert_eq!(view.defender_name, game.campaign().npc.name);
+        assert_eq!(view.training_unspent, game.campaign().npc.unspent);
+        let player = view_model(&game, DefenderId::Player, 0).unwrap();
+        assert_eq!(player.training_unspent, 0);
+        assert_eq!(
+            player.defender_name,
+            game.defender_card(DefenderId::Player).unwrap().name
+        );
+    }
+
+    /// W3-23 (W2 review): the forecast is core's `Game::stage_preview` of
+    /// the selected defense, so a later stage shows W2-26's front ramp and
+    /// its boss rank; the rank-only reading left both out.
+    #[test]
+    fn forecast_reads_the_stage_preview_of_the_selected_defense() {
+        let mut game = started();
+        let last = world().country("DEU").unwrap().level_count() - 1;
+        for stage in 0..last {
+            game.campaign_mut()
+                .record_country_stage_clear(stage)
+                .unwrap();
+        }
+        for defender in [DefenderId::Player, DefenderId::Mara] {
+            for stage in [0, last] {
+                let view = view_model(&game, defender, stage).unwrap();
+                let preview = game.stage_preview("DEU", stage, defender.mode()).unwrap();
+                let forecast = view.forecast.unwrap();
+                assert_eq!(forecast.pressure, preview.pressure, "stage {stage}");
+                assert_eq!(forecast.next, preview.next, "stage {stage}");
+            }
+        }
+        let deep = view_model(&game, DefenderId::Player, last).unwrap();
+        assert!(deep.forecast.unwrap().pressure.front_ramp > 1.0);
     }
 }

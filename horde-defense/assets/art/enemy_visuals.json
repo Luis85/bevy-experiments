@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "boss_height": 1.08,
   "default_height": 0.78,
   "sheets": {
@@ -92,5 +92,15 @@
       "height": 0.78,
       "standing": { "bounds": [10, 447, 428, 877], "hip_x": 204, "feet_y": 874, "height": 424 }
     }
-  ]
+  ],
+  "elite_tells": {
+    "default": { "outline_rgb": [239, 181, 82], "marker": "Chevron", "ring_px": 2, "glow": 0.15, "pulse_hz": 1.2 },
+    "affixes": [
+      { "affix": "hardened", "tell": { "outline_rgb": [86, 180, 233], "marker": "Pips3", "ring_px": 3, "glow": 0.15, "pulse_hz": 0.6 } },
+      { "affix": "frenzied", "tell": { "outline_rgb": [240, 228, 66], "marker": "Pips1", "ring_px": 2, "glow": 0.2, "pulse_hz": 2.0 } },
+      { "affix": "vicious", "tell": { "outline_rgb": [204, 121, 167], "marker": "Crown", "ring_px": 2, "glow": 0.2, "pulse_hz": 1.2 } },
+      { "affix": "shielded", "tell": { "outline_rgb": [0, 158, 115], "marker": "Shield", "ring_px": 3, "glow": 0.15, "pulse_hz": 0.8 } },
+      { "affix": "volatile", "tell": { "outline_rgb": [213, 94, 0], "marker": "Spark", "ring_px": 2, "glow": 0.25, "pulse_hz": 1.6 } }
+    ]
+  }
 }

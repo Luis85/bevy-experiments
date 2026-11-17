@@ -1,11 +1,10 @@
 //! Operations presentation. Game changes are queued typed intents.
-use super::{UiCtx, battle, chrome, damage, loot, muted, reticle};
+use super::{UiCtx, chrome, coins::grouped, damage, loot, muted, reticle};
 use crate::art::{self, AMBER, RED};
 use bevy_egui::egui::{self, Sense, vec2};
 use view::country_name;
 mod view;
 use horde_core::{
-    campaign::NpcTraining,
     command::Command,
     content::{Policy, Slot, StructureKind},
     world::world,
@@ -43,17 +42,17 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         outbreak.country, outbreak.strength, outbreak.seconds_left
                     ),
                 );
-                // Entering the country deploys at once; the label says so.
+                // Planning never deploys (CD6): core selects the country,
+                // then its Briefing opens on the final stage (notices.rs).
                 if ui
-                    .button("Defend now")
-                    .on_hover_text("Starts a live defense in this country to contain the outbreak.")
+                    .button("Plan response")
+                    .on_hover_text(
+                        "Selects the country and opens its briefing. Nothing deploys until you begin.",
+                    )
                     .clicked()
                 {
                     f.campaign.selected_country = outbreak.country_id.clone();
-                    f.dispatch(
-                        Command::EnterCountry(outbreak.country_id.clone()),
-                        "Outbreak defense started.",
-                    );
+                    f.dispatch(Command::SelectCountry(outbreak.country_id.clone()), "");
                 }
             });
         }
@@ -74,10 +73,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                 line.country,
                 line.stage + 1
             ));
-            ui.label(format!(
-                "HP {}/{} · {:.0}s · {} kills",
-                line.hp, line.max_hp, line.elapsed, line.kills
-            ));
+            ui.label(line.stats());
             if ui.button(format!("Observe #{id}")).clicked() {
                 f.campaign.observed = Some(id);
             }
@@ -94,15 +90,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     if view.any_settled {
         egui::CollapsingHeader::new("Completed expedition reports").show(ui, |ui| {
             for report in &view.reports {
-                ui.label(format!(
-                    "Expedition #{} · {} · defense {} · {} · {} kills · {} coins",
-                    report.id,
-                    report.country,
-                    report.stage + 1,
-                    report.outcome.label(),
-                    report.kills,
-                    report.coins
-                ));
+                ui.label(report.summary());
             }
         });
     }
@@ -146,18 +134,16 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         }
                     }
                 });
-            let liberated = f
-                .game
-                .campaign()
-                .world
-                .cleared
-                .contains(&f.campaign.selected_country);
-            let space = f.game.strategy().roster.len() < config.max_roster;
-            let can_recruit = liberated
-                && space
-                && f.game.campaign().coins >= config.recruit_cost
-                && f.game.campaign().reserved.is_none();
-            if ui.add_enabled(can_recruit, egui::Button::new(format!("Recruit survivor · {} coins", config.recruit_cost))).on_disabled_hover_text("Choose a liberated country, keep space in the roster and enough coins, and return the active defender to camp.").clicked() { f.dispatch(Command::Recruit(f.campaign.selected_country.clone()), "Survivor recruited with independent protected equipment."); }
+            let hire = super::camp_prices::recruit(f.game, &f.campaign.selected_country);
+            if ui
+                .add_enabled(hire.enabled, egui::Button::new(hire.label))
+                .on_disabled_hover_text(hire.disabled_hover)
+                .clicked()
+            {
+                // The Recruit modal offers the two archetypes and recruits.
+                let country = f.campaign.selected_country.clone();
+                f.status.open_recruit(&country);
+            }
         });
         muted(
             ui,
@@ -186,11 +172,14 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.push_id(recruit.id, |ui| {
             chrome::row(ui, |ui| {
                 ui.strong(&recruit.name);
-                ui.label(format!("{:?} · from {}", recruit.status, country_name(&recruit.origin)));
+                ui.label(format!("{} · from {}", recruit.status.label(), country_name(&recruit.origin)));
                 if let Some(guard) = f.game.strategy().guards.iter().find(|g| g.recruit_id == recruit.id) { ui.colored_label(AMBER, format!("Guarding {}", country_name(&guard.country_id))); }
                 if recruit.status == RecruitStatus::Guarding && ui.button("Release guard").clicked() { f.dispatch(Command::ReleaseGuard(recruit.id), "Guard recalled and recovered."); }
             });
             if let Ok(readiness) = f.game.strategy().readiness(f.game.campaign(), recruit.id) { muted(ui, &readiness.summary); }
+            if let Ok(record) = f.game.service_record(recruit.id) {
+                service_record(ui, &record);
+            }
             if recruit.status == RecruitStatus::Ready {
                 ui.horizontal_wrapped(|ui| {
                     let stage = f.game.campaign().world.completed(&f.campaign.selected_country).min(world().country(&f.campaign.selected_country).map(|c| c.level_count().saturating_sub(1)).unwrap_or(0));
@@ -203,13 +192,15 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                 egui::CollapsingHeader::new(format!("Equipment, training & policy · {} CP available", recruit.npc.unspent)).show(ui, |ui| {
                     ui.label(format!("{} / {} advancement awarded · Guns {} · Melee {} · HT {}", recruit.npc.awarded, f.game.campaign().allowance(), recruit.npc.guns, recruit.npc.melee, recruit.npc.ht));
                     ui.horizontal_wrapped(|ui| {
-                        if ui.add_enabled(f.game.campaign().coins >= 25 && recruit.npc.awarded < f.game.campaign().allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyRecruitPoint(recruit.id), "Training point awarded to the selected survivor."); }
-                        for training in [NpcTraining::Guns, NpcTraining::Melee, NpcTraining::Health, NpcTraining::Strength, NpcTraining::Dexterity] {
-                            if ui.add_enabled(recruit.npc.unspent >= training.cost() && (training != NpcTraining::Strength || recruit.npc.st < 20), egui::Button::new(format!("{} · {} CP", training.name(), training.cost()))).on_disabled_hover_text(if training == NpcTraining::Strength && recruit.npc.st >= 20 { "Supported Strength maximum is 20." } else { "Earn or buy enough training CP first." }).clicked() { f.dispatch(Command::TrainRecruit { id: recruit.id, training }, "Selected survivor trained."); }
+                        let buy = super::camp_prices::training_point(f.game.campaign(), &recruit.npc);
+                        if ui.add_enabled(buy.enabled, egui::Button::new(buy.label)).on_disabled_hover_text(buy.disabled_hover).clicked() { f.dispatch(Command::BuyRecruitPoint(recruit.id), "Training point awarded to the selected survivor."); }
+                        // The same rows as Mara's page (core's trainable list).
+                        for row in super::character::training_rows(&recruit.npc) {
+                            if ui.add_enabled(row.enabled, egui::Button::new(format!("{} · {} CP", row.label, row.cost))).on_disabled_hover_text(row.disabled_hover).clicked() { f.dispatch(Command::TrainRecruit { id: recruit.id, training: row.training }, "Selected survivor trained."); }
                         }
                     });
                     for slot in Slot::ALL {
-                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{:?}: {}", slot, f.game.campaign().item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
+                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{}: {}", slot.label(), f.game.campaign().item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
                             for item in f.game.campaign().items.clone().iter().filter(|i| i.definition().slot == slot) {
                                 let reserved = f.game.campaign().item_reserved(item.id);
                                 if ui.add_enabled(!reserved, egui::Button::selectable(recruit.npc.loadout.contains(&item.id), format!("{} #{} · Lv {}{}", item.definition().name, item.id, item.level, if reserved { " · reserved" } else { "" }))).clicked() { f.dispatch(Command::EquipRecruit { id: recruit.id, item: item.id }, "Survivor equipment updated."); }
@@ -217,7 +208,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         });
                     }
                     let mut proposed = recruit.npc.policy;
-                    egui::ComboBox::from_id_salt(("recruit_policy", recruit.id)).selected_text(format!("{proposed:?}")).show_ui(ui, |ui| { for policy in Policy::ALL { ui.selectable_value(&mut proposed, policy, format!("{policy:?}")); } });
+                    egui::ComboBox::from_id_salt(("recruit_policy", recruit.id)).selected_text(proposed.label()).show_ui(ui, |ui| { for policy in Policy::ALL { ui.selectable_value(&mut proposed, policy, policy.label()); } });
                     if proposed != recruit.npc.policy { f.dispatch(Command::SetRecruitPolicy { id: recruit.id, policy: proposed }, "Survivor policy updated."); }
                 });
             }
@@ -226,7 +217,11 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     if let Some(id) = f.campaign.observed {
         let mut open = true;
-        egui::Window::new(format!("Live battlefield #{id}"))
+        // Only a pass that draws the field records it: a collapsed window or
+        // a settled deployment leaves no stale rect behind.
+        f.battle.observer_arena_rect = None;
+        egui::Window::new(observer_title(f.game, id))
+            .id(observer_window_id(id))
             .default_size(vec2(
                 900.0_f32.min(ui.ctx().content_rect().width() - 32.0),
                 540.0,
@@ -250,7 +245,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     if ui.button("Clear country plan").clicked() { f.dispatch(Command::ClearExpeditionLayout(id), "Country plan cleared; deployed structures remain."); }
                     muted(ui, "Build live: left click places, right click salvages. Pause all is optional.");
                     for kind in StructureKind::ALL {
-                        ui.selectable_value(&mut f.battle.build_kind, kind, format!("{kind:?}"));
+                        ui.selectable_value(&mut f.battle.build_kind, kind, kind.label());
                     }
                 });
                 if let Some(b) = f.game.battles().iter().find(|b| b.id == id)
@@ -273,8 +268,11 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         ),
                         Sense::click(),
                     );
+                    // Uniform zoom-to-fit in the observer box: no hint band or
+                    // headroom, the effects clip is the box itself.
                     let effects_clip=r;
-                    let r=battle::clearing_rect(r,a.lane_count,a.width_yards);
+                    let r=art::fit_field(r,r,a.lane_count,a.width_yards).rect;
+                    f.battle.observer_arena_rect=Some(r);
                     let projection=art::ArenaProjection::for_attempt(r,a).with_effects_clip(effects_clip);
                     let response=ui.interact(r,ui.id().with(("observer-arena",id)),Sense::click());
                     let aim = response
@@ -282,25 +280,44 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .filter(|p| r.contains(*p))
                         .map(|p| projection.inverse(p))
                         .unwrap_or([a.width_yards*0.5,a.defender_position()[1]]);
-                    art::world_backdrop(ui.painter(),effects_clip,projection,a.level,f.textures);
-                    art::battlefield(
+                    // Every view of a worker's battle takes its country's
+                    // biome theme and its stage's grade, not the level's.
+                    let scene=art::scene_look(a);
+                    art::world_backdrop(ui.painter(),effects_clip,projection,scene.theme_index,f.textures,effects_clip.height()/art::camera::REFERENCE_LANES);
+                    art::battlefield_for_attempt(
                         &ui.painter_at(effects_clip),
                         r,
                         a,
                         aim,
+                        f.battle.interpolation.scene(Some(id), a),
                         art::RenderOptions {
                             construction: true,
                             outlines: f.settings.outlines,
                             numbers: f.settings.numbers,
                             reduced: f.settings.reduced_effects,
                             blood: f.settings.blood,
-                            theme: a.level,
+                            scene,
+                            sky: f.battle.sky_clock(),
+                            canvas: effects_clip,
                             textures: f.textures,
-                            blend: f.battle.interpolation.scene(Some(id), a),
+                            occluder: None,
                         },
                     );
-                    damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode());
-                    if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode()) { f.notify_rare_loot(); }
+                    damage::draw_for(ui,a,projection,f.battle.interpolation.scene(Some(id), a),id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode(),&[]);
+                    loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode(),&[],f.settings.palette,f.settings.numbers,f.settings.reduced_effects);
+                    // The observed expedition's boss sounds are audible in
+                    // camp: their banner is the same wall-clock one, keyed
+                    // by the battle (worker attempts share ids).
+                    let boss = crate::battle_view::BossNotice { attempt: id, ..crate::battle_view::BossNotice::of(a) };
+                    super::battle::boss_banner(
+                        ui,
+                        effects_clip,
+                        super::battle::observer_banner_rect(effects_clip),
+                        &mut f.battle.observer_boss_banner,
+                        &boss,
+                        !f.game.global_paused() && !a.paused,
+                        f.settings.reduced_effects,
+                    );
                     if response.hover_pos().is_some_and(|p| r.contains(p)) && ui.input(|i|i.raw.focused) && !ui.ctx().any_popup_open() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
                         reticle::paint(ui,&crate::battle_view::ReticleReadout::build(a,None),projection,aim,reticle::Marks{cross:false,building:false,reduced:f.settings.reduced_effects});
@@ -351,6 +368,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             });
         if !open {
             f.campaign.observed = None;
+            f.battle.observer_arena_rect = None;
         }
     }
     egui::CollapsingHeader::new("Strategic event log").show(ui, |ui| {
@@ -358,4 +376,66 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             muted(ui, line);
         }
     });
+}
+
+/// The observer window's title (ruling D17): the expedition and the recruit
+/// fighting it, named from the roster through `Game::battle_defender_card`.
+/// Inside the worker the companion slot is the recruit, so its own attempt
+/// would name Mara. A battle whose recruit left the roster keeps the number.
+fn observer_title(game: &horde_core::sim::Game, battle: u64) -> String {
+    match game.battle_defender_card(battle) {
+        Some(card) => format!("Live battlefield #{battle} · {}", card.name),
+        None => format!("Live battlefield #{battle}"),
+    }
+}
+
+/// The observer window's egui id: per expedition, independent of the title,
+/// so naming the recruit does not move or reset the window.
+pub(in crate::ui) fn observer_window_id(battle: u64) -> egui::Id {
+    egui::Id::new(("lastlight.observer_window", battle))
+}
+
+/// A recruit's service record (`Game::service_record`, design 1.10): one
+/// summary line, the detail once it has served, and "(since records began)"
+/// when its runs predate the history (`ServiceRecord::since_records_began`).
+fn service_record(ui: &mut egui::Ui, record: &horde_core::defenders::ServiceRecord) {
+    chrome::row(ui, |ui| {
+        muted(
+            ui,
+            format!(
+                "Service record · {} · {} · {}",
+                chrome::count_noun(record.deployments as usize, "deployment", "deployments"),
+                chrome::count_noun(record.victories as usize, "victory", "victories"),
+                chrome::count_noun(record.kills as usize, "kill", "kills"),
+            ),
+        );
+        if record.since_records_began() {
+            ui.label(egui::RichText::new("(since records began)").color(art::MUTED))
+                .on_hover_text("This survivor fought before the run history named its defenders; earlier runs are not counted.");
+        }
+    });
+    if record.deployments > 0 || record.containments > 0 {
+        muted(
+            ui,
+            format!(
+                "{} · {} · {} · {} · {} · {} · {} · {} coins",
+                chrome::count_noun(record.takeovers as usize, "takeover", "takeovers"),
+                chrome::count_noun(record.expeditions as usize, "expedition", "expeditions"),
+                chrome::count_noun(record.defeats as usize, "defeat", "defeats"),
+                chrome::count_noun(record.withdrawals as usize, "withdrawal", "withdrawals"),
+                chrome::count_noun(
+                    record.stages_cleared as usize,
+                    "stage cleared",
+                    "stages cleared"
+                ),
+                chrome::count_noun(record.liberations as usize, "liberation", "liberations"),
+                chrome::count_noun(
+                    record.containments as usize,
+                    "outbreak contained",
+                    "outbreaks contained"
+                ),
+                grouped(record.coins),
+            ),
+        );
+    }
 }

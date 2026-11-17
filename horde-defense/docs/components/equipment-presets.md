@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/armory.rs::armory"
 
 Save and reapply references to owned equipment.
 
-- **Entry, exit and actions:** Expand Loadout presets, name and save the current loadout, or Use a listed preset; collapse to leave.
+- **Entry, exit and actions:** Expand Loadout presets, name and save the current loadout, Use a listed preset, or Delete a listed preset (`Command::DeletePreset`; its items stay in the armory and become sellable unless something else holds them); collapse to leave.
 - **State boundary:** Presets reference unique instances; applying one cannot duplicate items or bypass reservations. Name input is presentation state.
 - **Responsiveness and accessibility:** Controls wrap, and help text explains why referenced items survive bulk sales.
 

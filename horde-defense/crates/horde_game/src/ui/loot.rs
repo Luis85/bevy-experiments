@@ -1,12 +1,16 @@
 //! Bounded, real-time feedback for already-banked model receipts. No rewards
 //! or authoritative random state are produced by this presentation cache.
-use super::{UiCtx, armory, review};
+use super::{
+    UiCtx, armory,
+    battle::{KEEP_CLEAR_GAP, keep_clear_shift},
+    chrome, review,
+};
 use crate::art;
 use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
 use horde_core::quality::{LootEvent, Quality};
 use std::collections::{BTreeMap, BTreeSet};
 const LIFETIME: f64 = 1.5;
-const LIMIT: usize = 12;
+pub(crate) const LIMIT: usize = 12;
 #[derive(Clone)]
 struct Flyup {
     receipt: LootEvent,
@@ -138,7 +142,8 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     let projection = art::ArenaProjection::for_attempt(arena, attempt)
         .with_effects_clip(f.battle.effects_rect.unwrap_or(arena));
     let capture = f.launch.loot_capture_mode();
-    if draw_for(
+    // The drop's sound is the runner's (`horde_audio::loot::LootTracker`).
+    draw_for(
         ui,
         projection,
         attempt,
@@ -146,10 +151,153 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         f.textures,
         &mut f.battle.loot_feedback,
         capture,
-    ) {
-        f.notify_rare_loot();
-    }
+        &f.battle.effects_keep_clear,
+        f.settings.palette,
+        f.settings.numbers,
+        f.settings.reduced_effects,
+    );
 }
+/// The centre of a drop's icon `age` (0..=1) into its rise (reduced effects
+/// hold it at 0): 12 + 78 * age pt
+/// above the feet at world `at`, drifting sideways by item id. The rise stops
+/// where the quality label, 29 pt above the centre, meets the top of the
+/// effects clip, so a top-lane drop is never cut off while it still shows.
+pub(super) fn drop_icon_center(
+    projection: art::ArenaProjection,
+    at: [f32; 2],
+    item_id: u64,
+    age: f32,
+) -> egui::Pos2 {
+    let drift = ((item_id % 3) as f32 - 1.0) * age * 8.0;
+    let center = projection.world(at[0], at[1]) + vec2(drift, -12.0 - age * 78.0);
+    pos2(
+        center.x,
+        center
+            .y
+            .max(projection.effects_clip.top() + LABEL_RISE + 4.0),
+    )
+}
+/// Where a drop's rise starts: the drawn body of the kill that dropped it,
+/// the core kill point plus that hostile's [`crowd_stagger`], so the drop
+/// rises beside its kill coin (W1 review). The receipt names no enemy, but
+/// the body recorded the same tick at the same point is the one; with no
+/// such body (a legacy receipt) the rise keeps the core point.
+///
+/// [`crowd_stagger`]: crate::battle_view::crowd_stagger
+fn drop_origin(attempt: &horde_core::sim::Attempt, receipt: &LootEvent) -> [f32; 2] {
+    let since = attempt
+        .corpses
+        .partition_point(|corpse| corpse.tick < receipt.tick);
+    attempt.corpses[since..]
+        .iter()
+        .take_while(|corpse| corpse.tick == receipt.tick)
+        .find(|corpse| corpse.at == receipt.at)
+        .map_or(receipt.at, |corpse| {
+            let [dx, dy] = crate::battle_view::crowd_stagger(corpse.id);
+            [receipt.at[0] + dx, receipt.at[1] + dy]
+        })
+}
+/// How far above the icon centre the quality label starts.
+const LABEL_RISE: f32 = 29.0;
+/// The seconds of a fly-up's life its glint sweeps the icon.
+const GLINT: std::ops::Range<f64> = 0.15..0.55;
+/// How far across the icon (0..=1) the glint of a `quality` drop is `seconds`
+/// into its fly-up: Rare and better only, inside [`GLINT`], never in reduced
+/// effects.
+fn glint_phase(quality: Quality, seconds: f64, reduced: bool) -> Option<f32> {
+    (!reduced && quality >= Quality::Rare && GLINT.contains(&seconds))
+        .then(|| ((seconds - GLINT.start) / (GLINT.end - GLINT.start)) as f32)
+}
+/// The glint: one additive diagonal band, a third of the icon wide and
+/// leaning 45 degrees, `phase` of the way from clear of the icon's left edge
+/// to clear of its right. `color` is the unfaded quality colour: the band
+/// lifts it halfway to white at 0.6 and fades that once by `fade`. The
+/// caller clips it to the icon.
+fn glint_band(icon: Rect, phase: f32, color: Color32, fade: f32) -> egui::Mesh {
+    let half = icon.width() / 6.0;
+    let lean = icon.height() * 0.5;
+    let reach = half + lean;
+    let x = egui::lerp((icon.left() - reach)..=(icon.right() + reach), phase);
+    let lit = |c: u8| ((f32::from(c) * 0.5 + 127.5) * 0.6 * fade).round() as u8;
+    let color = Color32::from_rgb_additive(lit(color.r()), lit(color.g()), lit(color.b()));
+    let mut mesh = egui::Mesh::default();
+    for at in [
+        pos2(x + lean - half, icon.top()),
+        pos2(x + lean + half, icon.top()),
+        pos2(x - lean + half, icon.bottom()),
+        pos2(x - lean - half, icon.bottom()),
+    ] {
+        mesh.colored_vertex(at, color);
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    mesh
+}
+/// Half the side of a tier marker's square, and the radius of the INK disc
+/// under it. The marker is chrome's quality shape, so quality never rests
+/// on colour alone.
+const MARKER_HALF: f32 = 3.0;
+const MARKER_DISC: f32 = 4.5;
+/// The marker sits inside the icon's top-right corner, its disc 1 pt clear
+/// of both edges.
+fn marker_center(icon: Rect) -> egui::Pos2 {
+    icon.right_top() + vec2(-MARKER_DISC - 1.0, MARKER_DISC + 1.0)
+}
+/// How far a drop's quality `label` moves so it meets no banked-coin pop-up
+/// of `coins` (CF-3-05): up over the coins it meets, the way the fly-up
+/// rises, `KEEP_CLEAR_GAP` clear of them; where that leaves `clip`'s top
+/// margin or meets a rect of `keep_clear`, down under them instead. 0 when
+/// it meets none, or when neither move clears it.
+fn coin_clear_shift(label: Rect, coins: &[Rect], clip: Rect, keep_clear: &[Rect]) -> f32 {
+    let met = |rect: Rect| -> Vec<Rect> {
+        let apart = rect.expand(KEEP_CLEAR_GAP * 0.5);
+        coins
+            .iter()
+            .copied()
+            .filter(|coin| coin.intersects(apart))
+            .collect()
+    };
+    if met(label).is_empty() {
+        return 0.0;
+    }
+    let settle = |up: bool| {
+        let mut moved = label;
+        for _ in 0..=coins.len() {
+            let hit = met(moved);
+            if hit.is_empty() {
+                return Some(moved);
+            }
+            let dy = if up {
+                hit.iter()
+                    .map(|coin| coin.top())
+                    .fold(f32::INFINITY, f32::min)
+                    - KEEP_CLEAR_GAP
+                    - moved.bottom()
+            } else {
+                hit.iter()
+                    .map(|coin| coin.bottom())
+                    .fold(f32::NEG_INFINITY, f32::max)
+                    + KEEP_CLEAR_GAP
+                    - moved.top()
+            };
+            moved = moved.translate(vec2(0.0, dy));
+        }
+        met(moved).is_empty().then_some(moved)
+    };
+    [true, false]
+        .into_iter()
+        .filter_map(settle)
+        .find(|moved| {
+            moved.top() >= clip.top() + 4.0
+                && moved.bottom() <= clip.bottom()
+                && !keep_clear.iter().any(|rect| rect.intersects(*moved))
+        })
+        .map_or(0.0, |moved| moved.top() - label.top())
+}
+/// Draws `battle`'s fly-ups; none meets a rect of `keep_clear` (CF-1-09),
+/// and no quality label meets a banked-coin pop-up painted with `numbers`
+/// on (CF-3-05).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
     ui: &egui::Ui,
     projection: art::ArenaProjection,
@@ -158,6 +306,10 @@ pub(super) fn draw_for(
     textures: crate::visual_assets::ArtTextures,
     state: &mut Feedback,
     capture: review::LootCaptureMode,
+    keep_clear: &[Rect],
+    palette: crate::settings::Palette,
+    numbers: bool,
+    reduced: bool,
 ) -> bool {
     let ready = textures.actors.is_some()
         && textures.props.is_some()
@@ -175,14 +327,62 @@ pub(super) fn draw_for(
         ready,
     );
     let painter = ui.painter_at(projection.effects_clip);
+    // The banked-coin pop-ups the field's cue pass painted this frame.
+    let coins = if numbers {
+        art::coin_rects(&painter, projection, attempt, reduced)
+    } else {
+        Vec::new()
+    };
     for entry in &state.streams[&battle].active {
-        let age = ((now - entry.started) / LIFETIME).clamp(0.0, 1.0) as f32;
+        let seconds = now - entry.started;
+        let age = (seconds / LIFETIME).clamp(0.0, 1.0) as f32;
         let fade = (1.0 - age).powf(0.65);
-        let drift = ((entry.receipt.item_id % 3) as f32 - 1.0) * age * 8.0;
-        let at = projection.world(entry.receipt.at[0], entry.receipt.at[1])
-            + vec2(drift, -12.0 - age * 78.0);
+        let origin = drop_origin(attempt, &entry.receipt);
+        // Reduced effects: no rise and no drift. The fly-up holds where it
+        // appears, 12 pt over the kill, and only fades.
+        let rise = if reduced { 0.0 } else { age };
+        let at = drop_icon_center(projection, origin, entry.receipt.item_id, rise);
+        // The glint fades the quality colour itself, so it gets it unfaded.
+        let quality = chrome::quality_colour(entry.receipt.quality, palette);
+        let color = quality.gamma_multiply(fade);
+        let text = if entry.receipt.quality >= Quality::Rare {
+            format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
+        } else {
+            entry.receipt.quality.name().to_owned()
+        };
+        let mut job = egui::text::LayoutJob::simple(text, FontId::proportional(10.0), color, 180.0);
+        job.wrap.max_rows = 1;
+        job.wrap.break_anywhere = true;
+        let galley = painter.layout_job(job);
+        let text_at = pos2(
+            (at.x - galley.size().x * 0.5).clamp(
+                projection.effects_clip.left() + 4.0,
+                projection.effects_clip.right() - galley.size().x - 4.0,
+            ),
+            (at.y - LABEL_RISE).max(projection.effects_clip.top() + 4.0),
+        );
         let icon = Rect::from_center_size(at, vec2(25.0, 25.0));
-        let color = armory::quality_color(entry.receipt.quality).gamma_multiply(fade);
+        // The headroom is the HUD band's too: a fly-up whose icon or label
+        // would meet a HUD rect drops under it as one (CF-1-09).
+        let drop = vec2(
+            0.0,
+            keep_clear_shift(
+                icon.union(Rect::from_min_size(text_at, galley.size())),
+                keep_clear,
+            ),
+        );
+        let (icon, text_at) = (icon.translate(drop), text_at + drop);
+        // The label keeps clear of every coin pop-up too (CF-3-05).
+        let text_at = text_at
+            + vec2(
+                0.0,
+                coin_clear_shift(
+                    Rect::from_min_size(text_at, galley.size()),
+                    &coins,
+                    projection.effects_clip,
+                    keep_clear,
+                ),
+            );
         painter.rect_filled(icon, 0.0, Color32::from_black_alpha((180.0 * fade) as u8));
         armory::paint_item_icon(
             &painter,
@@ -208,22 +408,23 @@ pub(super) fn draw_for(
             ),
             egui::StrokeKind::Inside,
         );
-        let text = if entry.receipt.quality >= Quality::Rare {
-            format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
-        } else {
-            entry.receipt.quality.name().to_owned()
-        };
-        let mut job = egui::text::LayoutJob::simple(text, FontId::proportional(10.0), color, 180.0);
-        job.wrap.max_rows = 1;
-        job.wrap.break_anywhere = true;
-        let galley = painter.layout_job(job);
-        let text_at = pos2(
-            (at.x - galley.size().x * 0.5).clamp(
-                projection.effects_clip.left() + 4.0,
-                projection.effects_clip.right() - galley.size().x - 4.0,
-            ),
-            (at.y - 29.0).max(projection.effects_clip.top() + 4.0),
+        if let Some(phase) = glint_phase(entry.receipt.quality, seconds, reduced) {
+            painter
+                .with_clip_rect(icon.intersect(projection.effects_clip))
+                .add(glint_band(icon, phase, quality, fade));
+        }
+        // The tier marker and its disc: static, the same in reduced effects.
+        let marker = marker_center(icon);
+        painter.circle_filled(marker, MARKER_DISC, art::INK.gamma_multiply(fade));
+        chrome::paint_quality_shape(
+            &painter,
+            entry.receipt.quality,
+            marker,
+            2.0 * MARKER_HALF,
+            color,
         );
+        // Quality and name only: no auto-sell or sale status is ever shown
+        // on the battlefield (G4.9, `flyup_never_shows_sale_status`).
         painter.galley(text_at, galley, color);
     }
     rare
@@ -337,6 +538,48 @@ mod tests {
         );
         assert!(feedback.streams[&0].active.is_empty());
     }
+    /// W1 review: a drop rises from the drawn, crowd-staggered body of the
+    /// kill that dropped it, beside its kill coin; a receipt whose body is
+    /// gone (or never recorded) keeps the core point.
+    #[test]
+    fn a_drop_from_a_staggered_kill_starts_over_the_drawn_body() {
+        use crate::battle_view::crowd_stagger;
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let a = game.attempt_mut().unwrap();
+        let dead = a.next_id + 10;
+        let neighbour = a.next_id + 11;
+        let event = receipt(6, Quality::Rare);
+        let body = |id, at| horde_core::sim::CorpseRecord {
+            id,
+            kind: horde_core::content::EnemyKind::Runner,
+            boss_kind: None,
+            at,
+            visual: None,
+            tick: event.tick,
+        };
+        // A neighbour fell the same tick a yard off; only the body under the
+        // receipt's point owns the drop.
+        a.corpses = vec![body(neighbour, [19.0, 5.5]), body(dead, event.at)];
+        let a = game.attempt().unwrap();
+        let [dx, dy] = crowd_stagger(dead);
+        let drawn = [event.at[0] + dx, event.at[1] + dy];
+        assert_ne!(drawn, event.at, "the fixture body is staggered");
+        let projection = art::ArenaProjection::for_attempt(
+            Rect::from_min_size(pos2(0., 0.), vec2(800., 400.)),
+            a,
+        );
+        assert_eq!(
+            drop_icon_center(projection, drop_origin(a, &event), 6, 0.0),
+            drop_icon_center(projection, drawn, 6, 0.0),
+        );
+        let stray = LootEvent {
+            tick: event.tick + 1,
+            ..event.clone()
+        };
+        assert_eq!(drop_origin(a, &stray), stray.at, "no body, core point");
+    }
     #[test]
     fn independent_workers_with_equal_attempt_and_item_ids_do_not_share_feedback_identity() {
         let mut feedback = Feedback::default();
@@ -374,5 +617,276 @@ mod tests {
         state.observe(2, 100, &[], 0.1);
         assert!(state.active.is_empty());
         assert!(state.seen.is_empty());
+    }
+    /// One fly-up of `quality` drawn `seconds` after it appeared, in normal
+    /// or reduced effects: every shape of that egui pass, and where its rise
+    /// starts (the icon centre at age 0).
+    fn drawn(quality: Quality, reduced: bool, seconds: f64) -> (Vec<egui::Shape>, egui::Pos2) {
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let a = game.attempt_mut().unwrap();
+        let mut event = receipt(6, quality);
+        event.tick = a.tick;
+        event.at = [a.width_yards * 0.5, a.lane_count as f32 * 0.5];
+        a.loot_events.push(event.clone());
+        let a = game.attempt().unwrap();
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 600.0));
+        let projection = art::ArenaProjection::for_attempt(canvas, a);
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, 1.0);
+        let mut feedback = Feedback::default();
+        let mut shapes = Vec::new();
+        for time in [0.0, seconds] {
+            let input = egui::RawInput {
+                time: Some(time),
+                screen_rect: Some(canvas),
+                ..Default::default()
+            };
+            let mut output = ctx.run_ui(input, |ui| {
+                draw_for(
+                    ui,
+                    projection,
+                    a,
+                    0,
+                    Default::default(),
+                    &mut feedback,
+                    review::LootCaptureMode::Disabled,
+                    &[],
+                    crate::settings::Palette::Standard,
+                    true,
+                    reduced,
+                );
+            });
+            output.textures_delta.clear();
+            shapes = output.shapes.into_iter().map(|c| c.shape).collect();
+        }
+        (shapes, drop_icon_center(projection, event.at, 6, 0.0))
+    }
+    /// Meshes with an additive vertex (alpha 0, colour not transparent).
+    fn glints(shapes: &[egui::Shape]) -> usize {
+        shapes
+            .iter()
+            .filter(|shape| match shape {
+                egui::Shape::Mesh(mesh) => mesh
+                    .vertices
+                    .iter()
+                    .any(|v| v.color.a() == 0 && v.color != Color32::TRANSPARENT),
+                _ => false,
+            })
+            .count()
+    }
+    /// The 25 pt icon plate of the one fly-up drawn: its rect and fill.
+    fn plate(shapes: &[egui::Shape]) -> (Rect, Color32) {
+        let plates: Vec<_> = shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                egui::Shape::Rect(r)
+                    if r.fill != Color32::TRANSPARENT && r.rect.size() == vec2(25.0, 25.0) =>
+                {
+                    Some((r.rect, r.fill))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(plates.len(), 1, "one fly-up, one icon plate");
+        plates[0]
+    }
+    fn texts(shapes: &[egui::Shape]) -> Vec<String> {
+        shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                egui::Shape::Text(text) => Some(text.galley.job.text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+    /// G7 (FX-7): a Rare or better drop gets exactly one additive band sweep
+    /// across its icon between 0.15 and 0.55 s; lesser tiers never do, and
+    /// nothing glints outside that window.
+    #[test]
+    fn rare_or_better_flyup_paints_one_glint_common_none() {
+        for quality in Quality::ALL {
+            let expected = usize::from(quality >= Quality::Rare);
+            for seconds in [0.16, 0.3, 0.54] {
+                assert_eq!(
+                    glints(&drawn(quality, false, seconds).0),
+                    expected,
+                    "{quality:?} at {seconds} s"
+                );
+            }
+            for seconds in [0.0, 0.14, 0.56, 1.2] {
+                assert_eq!(
+                    glints(&drawn(quality, false, seconds).0),
+                    0,
+                    "{quality:?} outside the sweep at {seconds} s"
+                );
+            }
+        }
+        // The band crosses the icon left to right.
+        let band = |seconds| {
+            let (shapes, _) = drawn(Quality::Epic, false, seconds);
+            shapes
+                .iter()
+                .find_map(|shape| match shape {
+                    egui::Shape::Mesh(mesh) if glints(std::slice::from_ref(shape)) == 1 => {
+                        Some(mesh.calc_bounds().center().x - plate(&shapes).0.center().x)
+                    }
+                    _ => None,
+                })
+                .expect("a glint")
+        };
+        assert!(band(0.2) < band(0.35) && band(0.35) < band(0.5));
+        assert!(band(0.2) < 0.0 && band(0.5) > 0.0);
+        // Its colour is the quality colour lifted halfway to white at 0.6,
+        // times the fade, faded once (design-vfx-lighting §8).
+        let (shapes, _) = drawn(Quality::Epic, false, 0.5);
+        let mesh = shapes
+            .iter()
+            .find_map(|shape| match shape {
+                egui::Shape::Mesh(mesh) if glints(std::slice::from_ref(shape)) == 1 => Some(mesh),
+                _ => None,
+            })
+            .expect("a glint");
+        let fade = (1.0 - (0.5 / LIFETIME) as f32).powf(0.65);
+        let quality = chrome::quality_colour(Quality::Epic, crate::settings::Palette::Standard);
+        let lit = |c: u8| ((f32::from(c) * 0.5 + 127.5) * 0.6 * fade).round() as u8;
+        let expected =
+            Color32::from_rgb_additive(lit(quality.r()), lit(quality.g()), lit(quality.b()));
+        for vertex in &mesh.vertices {
+            assert_eq!(vertex.color, expected, "the band is faded once");
+        }
+    }
+    /// G7 (FX-7, the reduced half): in reduced effects a fly-up holds 12 pt
+    /// above the kill, neither rising nor drifting, never glints and only
+    /// fades; normal effects still rise.
+    #[test]
+    fn reduced_flyup_is_static_and_glintless() {
+        for quality in Quality::ALL {
+            let mut alphas = Vec::new();
+            for seconds in [0.0, 0.3, 0.75, 1.2] {
+                let (shapes, start) = drawn(quality, true, seconds);
+                let (icon, fill) = plate(&shapes);
+                assert_eq!(icon.center(), start, "{quality:?} holds at {seconds} s");
+                assert_eq!(glints(&shapes), 0, "{quality:?} glintless at {seconds} s");
+                alphas.push(fill.a());
+            }
+            assert!(
+                alphas.windows(2).all(|pair| pair[0] > pair[1]),
+                "{quality:?} only fades: {alphas:?}"
+            );
+        }
+        let (shapes, start) = drawn(Quality::Rare, false, 0.75);
+        assert!(plate(&shapes).0.center().y < start.y - 30.0, "normal rises");
+    }
+    /// Every tier carries its own corner marker shape on an INK disc inside
+    /// the icon's top-right corner, the same in reduced effects.
+    #[test]
+    fn every_tier_flyup_paints_its_own_corner_marker() {
+        let at = pos2(40.0, 40.0);
+        let markers: Vec<_> = Quality::ALL
+            .iter()
+            .map(|&quality| {
+                chrome::quality_shape_at(quality, at, 2.0 * MARKER_HALF, Color32::WHITE)
+            })
+            .collect();
+        for (i, a) in markers.iter().enumerate() {
+            assert!(
+                Rect::from_center_size(at, vec2(2.0, 2.0) * MARKER_HALF)
+                    .expand(0.6)
+                    .contains_rect(a.visual_bounding_rect()),
+                "{:?} fits its disc",
+                Quality::ALL[i]
+            );
+            for b in &markers[i + 1..] {
+                assert_ne!(a, b, "tier markers differ in shape");
+            }
+        }
+        for reduced in [false, true] {
+            for quality in Quality::ALL {
+                let (shapes, _) = drawn(quality, reduced, 0.3);
+                let (icon, _) = plate(&shapes);
+                let disc = shapes
+                    .iter()
+                    .position(|shape| {
+                        matches!(shape, egui::Shape::Circle(c)
+                        if c.radius == MARKER_DISC
+                            && c.fill.to_opaque() == art::INK
+                            && c.center == marker_center(icon))
+                    })
+                    .unwrap_or_else(|| panic!("{quality:?} marker disc, reduced {reduced}"));
+                let marker = &shapes[disc + 1];
+                assert!(
+                    icon.contains_rect(marker.visual_bounding_rect()),
+                    "{quality:?} marker inside the icon"
+                );
+                assert!(
+                    Rect::from_center_size(marker_center(icon), vec2(2.0, 2.0) * MARKER_DISC)
+                        .contains_rect(marker.visual_bounding_rect()),
+                    "{quality:?} marker on its disc"
+                );
+            }
+        }
+    }
+    /// Closing (one shape table): the corner marker a fly-up paints on its
+    /// disc is chrome's quality shape, the one Armory, History and Results
+    /// draw, at the marker's size and in the fly-up's colour.
+    #[test]
+    fn flyup_marker_is_the_chrome_quality_shape() {
+        for reduced in [false, true] {
+            for quality in Quality::ALL {
+                let (shapes, _) = drawn(quality, reduced, 0.3);
+                let (icon, _) = plate(&shapes);
+                let colour = shapes
+                    .iter()
+                    .find_map(|shape| match shape {
+                        egui::Shape::Text(text) => Some(text.fallback_color),
+                        _ => None,
+                    })
+                    .expect("the fly-up's text");
+                let disc = shapes
+                    .iter()
+                    .position(
+                        |shape| matches!(shape, egui::Shape::Circle(c) if c.radius == MARKER_DISC),
+                    )
+                    .unwrap_or_else(|| panic!("{quality:?} marker disc"));
+                assert_eq!(
+                    shapes[disc + 1],
+                    chrome::quality_shape_at(
+                        quality,
+                        marker_center(icon),
+                        2.0 * MARKER_HALF,
+                        colour
+                    ),
+                    "{quality:?} reduced {reduced}"
+                );
+            }
+        }
+    }
+    /// Acceptance G4.9 pin: a fly-up says the drop's quality (and, Rare or
+    /// better, its name) and nothing else. No auto-sell or sale status ever
+    /// shows on the battlefield, in normal or reduced effects.
+    #[test]
+    fn flyup_never_shows_sale_status() {
+        for reduced in [false, true] {
+            for quality in Quality::ALL {
+                for seconds in [0.0, 0.3, 1.2] {
+                    let said = texts(&drawn(quality, reduced, seconds).0);
+                    let expected = if quality >= Quality::Rare {
+                        format!("{} \u{b7} Rifle", quality.name())
+                    } else {
+                        quality.name().to_owned()
+                    };
+                    assert_eq!(said, [expected], "{quality:?} reduced {reduced}");
+                    for word in ["sell", "sold", "sale", "auto", "coin", "+"] {
+                        assert!(
+                            !said[0].to_lowercase().contains(word),
+                            "{quality:?} fly-up says {word:?}: {said:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

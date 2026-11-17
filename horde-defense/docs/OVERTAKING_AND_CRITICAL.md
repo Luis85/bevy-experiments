@@ -1,5 +1,7 @@
 # Overtaking and critical-hostile state
 
+**Superseded (W1-69, user decision 2026-11-06): enemies never block each other.** There is no lane queue and no side-step passing; bodies in a lane overlap, and every enemy walks to the defense line or a live non-trap structure and attacks there. `EnemyPhase::Queued` is kept only so older saves load (it resolves on the next tick), and a saved `pass_offset` eases back to 0 at the rate below. The overtaking text that follows describes the pre-W1-69 rule. `tests/overtaking.rs` pins the new rule.
+
 The user's later instruction permits fast enemies to overtake slower approaching enemies. This supersedes the old rule that every moving body blocks the next body in its lane. The battlefield retains its deployment-frozen lane count (3-17 with shipped settings), and no enemy changes its assigned lane.
 
 Approaching enemies advance at their own effective movement speed. A faster peer within 1.4 yards begins a deterministic side step. Interior-lane peers move to opposite sides; outer-lane passing moves inward. The saved `Enemy.pass_offset` is bounded to ±.32 yard and eases at up to two yards/second, including existing injury/fatigue movement reductions. It introduces no RNG draws. The displacement stays inside its assigned lane, and outer lanes retain the valid corpse/feedback vertical bounds.

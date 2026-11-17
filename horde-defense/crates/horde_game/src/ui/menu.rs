@@ -3,13 +3,33 @@ use super::{Screen, UiCtx, muted, primary, status};
 use crate::{
     art::{self, AMBER, INK, MUTED, RED, TEXT},
     runner::{AppCommand, SaveIntent},
-    settings::Action,
+    settings::{self, BindingId, Settings},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Sense, pos2, vec2};
 use horde_core::{
     command::Command,
     survivors::{Appearance, SurvivorId},
 };
+
+const FOOTER_LINE: &str = "A BEVY EXPERIMENT  /  LOCAL CAMPAIGN  /  NO OFFLINE EARNINGS";
+/// A secondary menu button: the primary's 190 pt column, 36 pt tall. Every
+/// button under the primary fills the column (Settings and History split
+/// it), so the stack reads as one edge.
+const MENU_BUTTON: egui::Vec2 = vec2(super::primary_action::PRIMARY_MIN_SIZE.x, 36.0);
+
+/// The menu's Controls list: every binding, core rows first, with the
+/// Settings rebind table's label and its key (`settings::binding_text`, so
+/// an unbound action reads "Unbound").
+fn controls_rows(settings: &Settings) -> Vec<(&'static str, &str)> {
+    BindingId::all()
+        .map(|id| {
+            (
+                super::preferences::binding_label(id),
+                settings::binding_text(settings.binding(id)),
+            )
+        })
+        .collect()
+}
 
 fn title_galley(ui: &egui::Ui, width: f32) -> std::sync::Arc<egui::Galley> {
     let mut size = (width * 0.205).clamp(52.0, 88.0);
@@ -117,14 +137,20 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                             } else {
                                 "New game"
                             },
-                        ) {
+                        )
+                        .clicked()
+                        {
                             if has_journey {
                                 f.resume();
                             } else {
                                 f.request_new_game();
                             }
                         }
-                        if has_journey && ui.button("New game").clicked() {
+                        if has_journey
+                            && ui
+                                .add_sized(MENU_BUTTON, egui::Button::new("New game"))
+                                .clicked()
+                        {
                             f.request_new_game();
                         }
                         if let Some(identity) = f.game.campaign().selected_survivor {
@@ -133,7 +159,9 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                                 format!("{} · checkpoint · {} lanes", identity.name(), lanes),
                             );
                             if f.game.campaign().world.start.is_none()
-                                && ui.small_button("Change survivor").clicked()
+                                && ui
+                                    .add_sized(MENU_BUTTON, egui::Button::new("Change survivor"))
+                                    .clicked()
                             {
                                 f.open_survivor_selection();
                             }
@@ -160,56 +188,67 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                         }
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
-                            if ui
-                                .add_sized([92.0, 36.0], egui::Button::new("Settings"))
-                                .clicked()
-                            {
+                            // The pair splits the column, gap included.
+                            let half = vec2(
+                                (MENU_BUTTON.x - ui.spacing().item_spacing.x) * 0.5,
+                                MENU_BUTTON.y,
+                            );
+                            if ui.add_sized(half, egui::Button::new("Settings")).clicked() {
                                 f.open_settings();
                             }
-                            if ui
-                                .add_sized([92.0, 36.0], egui::Button::new("History"))
-                                .clicked()
-                            {
+                            if ui.add_sized(half, egui::Button::new("History")).clicked() {
                                 f.open_history();
                             }
                         });
                         if ui
-                            .add_sized([190.0, 36.0], egui::Button::new("Save and exit"))
+                            .add_sized(MENU_BUTTON, egui::Button::new("Save and quit"))
                             .clicked()
                         {
                             f.request_save(SaveIntent::Quit);
                         }
                         ui.add_space(10.0);
                         egui::CollapsingHeader::new("Controls").show(ui, |ui| {
-                            muted(
-                                ui,
-                                format!(
-                                    "{} fires. {} strikes a contact lane.\n{} reloads. {} pauses.",
-                                    f.settings.bindings[Action::Fire as usize],
-                                    f.settings.bindings[Action::Melee as usize],
-                                    f.settings.bindings[Action::Reload as usize],
-                                    f.settings.bindings[Action::Pause as usize]
-                                ),
-                            );
+                            egui::Grid::new("menu_controls")
+                                .num_columns(2)
+                                .spacing([16.0, 2.0])
+                                .show(ui, |ui| {
+                                    for (label, key) in controls_rows(f.settings) {
+                                        muted(ui, label);
+                                        muted(ui, key);
+                                        ui.end_row();
+                                    }
+                                });
                         });
-                        if !f.status.message.is_empty()
-                            && (!f.status.practice_profile || f.status.message_error)
-                        {
+                        let message = !f.status.message.is_empty()
+                            && (!f.status.practice_profile || f.status.message_error);
+                        if message {
                             ui.add_space(8.0);
                             ui.colored_label(
                                 if f.status.message_error { RED } else { MUTED },
                                 &f.status.message,
                             );
                         }
-                        if f.status.save_pending {
-                            muted(ui, "Saving your campaign...");
+                        // The pending text, once: the status message is
+                        // "Saving…" itself while a save it requested runs.
+                        if f.status.save_pending
+                            && !(message && f.status.message == super::context::SAVING)
+                        {
+                            muted(ui, super::context::SAVING);
                         }
                     });
             });
             ui.painter().text(
                 all.left_bottom() + vec2(24.0, -20.0),
                 Align2::LEFT_BOTTOM,
-                "A BEVY EXPERIMENT  /  LOCAL CAMPAIGN  /  NO OFFLINE EARNINGS",
+                FOOTER_LINE,
+                FontId::proportional(10.0),
+                MUTED,
+            );
+            // The build stamp a playtester quotes with feedback.
+            ui.painter().text(
+                all.right_bottom() + vec2(-24.0, -20.0),
+                Align2::RIGHT_BOTTOM,
+                crate::build_info::stamp(),
                 FontId::proportional(10.0),
                 MUTED,
             );
@@ -425,7 +464,9 @@ pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut UiCtx, time: f32) 
                         if primary(
                             ui,
                             &format!("Continue as {}", f.campaign.preview_survivor.name()),
-                        ) {
+                        )
+                        .clicked()
+                        {
                             f.dispatch(
                                 Command::ChooseSurvivor(f.campaign.preview_survivor),
                                 "Survivor chosen. Select your starting country.",
@@ -479,6 +520,32 @@ mod tests {
                 "Menu content must not cover the survivor"
             );
         }
+    }
+    /// Closing: the menu's Controls list names all eight core bindings and
+    /// the two W3-10 extra ones (world clock, cycle attack) with the labels
+    /// and order of the Settings rebind table, and an unbound action reads
+    /// "Unbound".
+    #[test]
+    fn menu_controls_list_every_binding() {
+        let mut settings = settings::Settings::default();
+        assert_eq!(
+            controls_rows(&settings),
+            [
+                ("Fire", "Mouse1"),
+                ("Contact melee", "Mouse2"),
+                ("Reload", "R"),
+                ("Emergency aid", "1"),
+                ("Brace", "2"),
+                ("Construction", "B"),
+                ("Pause (battle)", "Escape"),
+                ("Toggle firing", "F"),
+                ("World clock (camp home)", "P"),
+                ("Cycle attack", "Q"),
+            ]
+        );
+        let cycle = settings::BindingId::Extra(settings::ExtraAction::CycleAttack);
+        settings.set_binding(cycle, String::new());
+        assert!(controls_rows(&settings).contains(&("Cycle attack", "Unbound")));
     }
     #[test]
     fn checkpoint_motion_changes_only_in_normal_mode_and_reduced_effects_are_static() {
@@ -545,7 +612,52 @@ mod tests {
                 } else {
                     "New game"
                 };
-                for label in ["LASTLIGHT", launch, "Settings", "Save and exit"] {
+                // The footer: the build stamp sits right-aligned inside the
+                // window and clear of the left-aligned footer line.
+                let footer_rect = |label: &str| {
+                    output
+                        .shapes
+                        .iter()
+                        .find_map(|clipped| {
+                            text_shape(&clipped.shape, label).map(|text| {
+                                (
+                                    clipped.clip_rect,
+                                    text.galley.rect.translate(text.pos.to_vec2()),
+                                )
+                            })
+                        })
+                        .unwrap_or_else(|| panic!("Missing menu footer text: {label}"))
+                };
+                let stamp = crate::build_info::stamp();
+                let (stamp_clip, stamp_rect) = footer_rect(&stamp);
+                let (_, line_rect) = footer_rect(FOOTER_LINE);
+                assert!(
+                    stamp_clip.intersect(viewport).contains_rect(stamp_rect),
+                    "Clipped stamp: {stamp_rect:?} / {stamp_clip:?}"
+                );
+                assert!((stamp_rect.right() - (viewport.right() - 24.0)).abs() < 1.0);
+                assert!((stamp_rect.bottom() - (viewport.bottom() - 20.0)).abs() < 1.0);
+                assert!(
+                    !stamp_rect.expand(8.0).intersects(line_rect),
+                    "Stamp {stamp_rect:?} overlaps the footer line {line_rect:?}"
+                );
+                // The longest stamp a package can carry still clears the line.
+                let longest = crate::build_info::stamp_from(
+                    env!("CARGO_PKG_VERSION"),
+                    Some("0123456789abcdef0123+dirty"),
+                );
+                assert!(longest.ends_with("+dirty)"), "{longest}");
+                let longest_width = ctx.fonts_mut(|fonts| {
+                    fonts
+                        .layout_no_wrap(longest, FontId::proportional(10.0), MUTED)
+                        .size()
+                        .x
+                });
+                assert!(
+                    viewport.right() - 24.0 - longest_width > line_rect.right() + 8.0,
+                    "Longest stamp ({longest_width}) overlaps the footer line {line_rect:?}"
+                );
+                for label in ["LASTLIGHT", launch, "Settings", "Save and quit"] {
                     let (clip, text) = output
                         .shapes
                         .iter()

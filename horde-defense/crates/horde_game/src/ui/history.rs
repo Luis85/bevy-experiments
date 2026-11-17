@@ -1,5 +1,5 @@
 //! Read-only run analysis from the authoritative, persistent settlement ledger.
-use super::{UiCtx, armory, chrome, muted};
+use super::{UiCtx, chrome, coins::grouped, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, PANEL, RED};
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke, pos2, vec2};
 use horde_core::stats::RunRecord;
@@ -81,11 +81,11 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
             if ui.available_width() >= 760.0 {
                 ui.columns(2, |cols| {
                     run_list(&mut cols[0], &rows, &mut state.selected);
-                    if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(&mut cols[1], run); }
+                    if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(&mut cols[1], run, f.settings); }
                 });
             } else {
                 run_list(ui, &rows, &mut state.selected);
-                if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(ui, run); }
+                if let Some(run) = rows.iter().find(|r| Some(r.id) == state.selected) { detail(ui, run, f.settings); }
             }
             chrome::section(ui, "Run trends");
             muted(ui, "Last 40 matching runs · oldest to newest · simulation seconds, including at 4× playback");
@@ -98,11 +98,8 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
             } else { trend(ui, "Average DPS", &dps, RED); trend(ui, "Banked coins", &coins, AMBER); trend(ui, "Deployment threat", &threat, GREEN); }
         });
     });
-    if close
-        || (root.input(|i| i.key_pressed(egui::Key::Escape))
-            && !root.ctx().text_edit_focused()
-            && !root.ctx().any_popup_open())
-    {
+    // Escape closes the page through the router (ui/escape.rs).
+    if close {
         f.close_history();
     }
 }
@@ -147,7 +144,11 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
             }
         });
 }
-fn detail(ui: &mut egui::Ui, r: &RunRecord) {
+/// "1 kill", "9 kills".
+fn kills(r: &RunRecord) -> String {
+    chrome::count_noun(r.kills as usize, "kill", "kills")
+}
+fn detail(ui: &mut egui::Ui, r: &RunRecord, settings: &crate::settings::Settings) {
     chrome::section(ui, &format!("Run #{} · {}", r.id, r.outcome.label()));
     ui.label(format!(
         "{} · {} · defense {} · template {}",
@@ -171,13 +172,13 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
         muted(ui, format!("Parallel field #{worker}"));
     }
     if r.legacy {
-        ui.label(format!("{} kills · full-run DPS not recorded", r.kills));
+        ui.label(format!("{} · full-run DPS not recorded", kills(r)));
     } else {
         ui.label(format!(
-            "DPS {:.1} average · {:.1} peak (5s) · {} kills",
+            "DPS {:.1} average · {:.1} peak (5s) · {}",
             super::hud::shown_dps(r.average_dps),
             super::hud::shown_dps(r.peak_dps),
-            r.kills
+            kills(r)
         ));
     }
     muted(
@@ -188,9 +189,21 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
         ),
     );
     ui.label(format!(
-        "{} coins · {} kill XP + {} completion XP · {} items",
-        r.coins, r.kill_xp, r.completion_xp, r.loot
+        "{} coins · {} kill XP + {} completion XP · {}",
+        grouped(r.coins),
+        r.kill_xp,
+        r.completion_xp,
+        chrome::count_noun(r.loot as usize, "item", "items")
     ));
+    // What settlement auto-sold from this run's drops; nothing for a run
+    // that sold nothing.
+    if r.auto_sold_count > 0 {
+        ui.label(format!(
+            "Auto-sold {} · +{} coins",
+            r.auto_sold_count,
+            grouped(r.auto_sold_coins)
+        ));
+    }
     muted(
         ui,
         format!(
@@ -233,16 +246,18 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
         .default_open(true)
         .show(ui, |ui| {
             for gear in &r.gear {
-                ui.colored_label(
-                    armory::quality_color(gear.quality),
-                    format!(
-                        "{} · {} · Lv{} · {:?}",
-                        gear.name,
-                        gear.quality.name(),
-                        gear.level,
-                        gear.slot
-                    ),
-                );
+                chrome::with_quality_shape(ui, gear.quality, settings, |ui| {
+                    ui.colored_label(
+                        chrome::quality_colour(gear.quality, settings.palette),
+                        format!(
+                            "{} · {} · Lv{} · {}",
+                            gear.name,
+                            gear.quality.name(),
+                            gear.level,
+                            gear.slot.label()
+                        ),
+                    );
+                });
                 if let Some(class) = gear.weapon_class {
                     muted(ui, format!("{} proficiency", class.name()));
                 }
@@ -254,8 +269,9 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
     ui.horizontal_wrapped(|ui| {
         for quality in horde_core::quality::Quality::ALL {
             if r.loot_by_quality[quality] > 0 {
+                chrome::quality_shape_icon(ui, quality, settings);
                 ui.colored_label(
-                    armory::quality_color(quality),
+                    chrome::quality_colour(quality, settings.palette),
                     format!("{} {}", r.loot_by_quality[quality], quality.name()),
                 );
             }

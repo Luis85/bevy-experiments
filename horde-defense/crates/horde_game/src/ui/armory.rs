@@ -1,12 +1,13 @@
 //! Armory presentation. Game changes are queued typed intents.
-use super::{Tab, UiCtx, chrome, mode_selector, muted};
+use super::{Tab, UiCtx, chrome, coins::grouped, mode_selector, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, Color32, Layout, Rect, RichText, Sense, Stroke, vec2};
 use horde_core::{
-    campaign::UpgradeFocus,
+    campaign::{SaleBlock, SaleResolution, UpgradeFocus},
     command::Command,
-    content::{Mode, Slot, content},
+    content::{LOOT_ONLY_REASON, Mode, Slot, content},
 };
+mod auto_sell;
 mod view;
 use view::{ArmoryOffer, OfferTraining};
 /// Right-aligned item-row column holding `Equip` or the `Equipped` status.
@@ -45,27 +46,30 @@ impl ArmorySort {
     }
 }
 
-pub(super) fn quality_color(quality: horde_core::quality::Quality) -> Color32 {
-    let [r, g, b, a] = quality.color();
-    Color32::from_rgba_unmultiplied(
-        (r * 255.0).round() as u8,
-        (g * 255.0).round() as u8,
-        (b * 255.0).round() as u8,
-        (a * 255.0).round() as u8,
-    )
-}
-pub(super) fn loot_receipt(ui: &mut egui::Ui, receipt: &horde_core::quality::LootEvent) {
+pub(super) fn loot_receipt(
+    ui: &mut egui::Ui,
+    receipt: &horde_core::quality::LootEvent,
+    settings: &crate::settings::Settings,
+) {
     let text = format!(
         "{} · {} · Lv {}",
         receipt.quality.name(),
         receipt.name,
         receipt.level
     );
-    ui.add(egui::Label::new(RichText::new(&text).color(quality_color(receipt.quality))).truncate())
+    chrome::with_quality_shape(ui, receipt.quality, settings, |ui| {
+        ui.add(
+            egui::Label::new(
+                RichText::new(&text)
+                    .color(chrome::quality_colour(receipt.quality, settings.palette)),
+            )
+            .truncate(),
+        )
         .on_hover_text(format!(
             "{text} · owned #{} · already banked",
             receipt.item_id
         ));
+    });
 }
 pub(super) fn paint_item_icon(
     p: &egui::Painter,
@@ -109,12 +113,21 @@ fn slot_art(
         rect.shrink(3.0),
         Color32::WHITE,
     );
+    let colour = chrome::quality_colour(quality, f.settings.palette);
     ui.painter().rect_stroke(
         rect,
         0.0,
-        Stroke::new(1.5, quality_color(quality)),
+        Stroke::new(1.5, colour),
         egui::StrokeKind::Inside,
     );
+    if f.settings.quality_markers.shape() {
+        // The frame's colour alone carried the quality: its shape sits in
+        // the corner on an ink backing, clear of the icon.
+        let side = chrome::QUALITY_SHAPE_SIDE;
+        let corner = Rect::from_min_size(rect.right_bottom() - vec2(side, side), vec2(side, side));
+        ui.painter().rect_filled(corner, 0.0, INK);
+        chrome::paint_quality_shape(ui.painter(), quality, corner.center(), side - 2.0, colour);
+    }
 }
 fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
     let Some(item) = f.game.campaign().item(id) else {
@@ -131,17 +144,26 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
         slot_art(ui, f, item.definition_index(), quality);
         ui.vertical(|ui| {
             ui.label(
-                RichText::new(format!("{} #{} · Lv {}", definition.name, id, item.level))
-                    .strong()
-                    .color(quality_color(quality)),
+                chrome::quality_item_text(
+                    format!("{} #{} · Lv {}", definition.name, id, item.level),
+                    quality,
+                    f.settings,
+                )
+                .strong(),
             );
+            // A loot-only definition is never unlocked or bought: core's
+            // reason stands where the unlock tier would.
+            let source = if definition.loot_only {
+                LOOT_ONLY_REASON.to_owned()
+            } else {
+                format!("unlock tier {}", definition.tier)
+            };
             muted(
                 ui,
                 format!(
-                    "{} quality · {:?} · unlock tier {}",
+                    "{} quality · {} · {source}",
                     quality.name(),
-                    definition.slot,
-                    definition.tier
+                    definition.slot.label()
                 ),
             );
         });
@@ -222,20 +244,34 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
             } else {
                 row(
                     "Ranged profile",
-                    format!("{}d{:+} {:?}", before.dice, before.adds, before.damage_kind),
-                    format!("{}d{:+} {:?}", after.dice, after.adds, after.damage_kind),
+                    format!(
+                        "{}d{:+} {}",
+                        before.dice,
+                        before.adds,
+                        before.damage_kind.label()
+                    ),
+                    format!(
+                        "{}d{:+} {}",
+                        after.dice,
+                        after.adds,
+                        after.damage_kind.label()
+                    ),
                     after.expected_basic_damage > before.expected_basic_damage,
                     after.expected_basic_damage < before.expected_basic_damage,
                 );
                 row(
                     "Melee profile",
                     format!(
-                        "{}d{:+} {:?}",
-                        before.melee_dice, before.melee_adds, before.melee_kind
+                        "{}d{:+} {}",
+                        before.melee_dice,
+                        before.melee_adds,
+                        before.melee_kind.label()
                     ),
                     format!(
-                        "{}d{:+} {:?}",
-                        after.melee_dice, after.melee_adds, after.melee_kind
+                        "{}d{:+} {}",
+                        after.melee_dice,
+                        after.melee_adds,
+                        after.melee_kind.label()
                     ),
                     false,
                     false,
@@ -335,9 +371,9 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
         muted(
             ui,
             format!(
-                "{} · {} projectile(s) per shot · {:.0}° spread",
+                "{} · {} per shot · {:.0}° spread",
                 weapon.class.name(),
-                weapon.pellets,
+                chrome::count_noun(weapon.pellets as usize, "projectile", "projectiles"),
                 weapon.spread_radians.to_degrees()
             ),
         );
@@ -411,7 +447,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 if ui
                     .add_enabled(
                         offer.tier_unlocked && offer.affordable,
-                        egui::Button::new(format!("Buy · {} coins", offer.price)),
+                        egui::Button::new(format!("Buy · {} coins", grouped(offer.price))),
                     )
                     .on_disabled_hover_text(if offer.tier_unlocked {
                         NEED_COINS_REASON
@@ -447,22 +483,20 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 .vertical_align(Align::Center),
         );
         egui::ComboBox::from_id_salt("armory_slot")
-            .selected_text(
-                f.armory
-                    .slot
-                    .map(|s| format!("{s:?}"))
-                    .unwrap_or_else(|| "All slots".into()),
-            )
+            .selected_text(f.armory.slot.map_or("All slots", Slot::label))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.armory.slot, None, "All slots");
                 for slot in Slot::ALL {
-                    ui.selectable_value(&mut f.armory.slot, Some(slot), format!("{slot:?}"));
+                    ui.selectable_value(&mut f.armory.slot, Some(slot), slot.label());
                 }
             });
         egui::ComboBox::from_id_salt("armory_quality")
             .selected_text(f.armory.quality.map_or_else(
                 || RichText::new("All qualities"),
-                |quality| RichText::new(quality.name()).color(quality_color(quality)),
+                |quality| {
+                    RichText::new(quality.name())
+                        .color(chrome::quality_colour(quality, f.settings.palette))
+                },
             ))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.armory.quality, None, "All qualities");
@@ -470,7 +504,8 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     ui.selectable_value(
                         &mut f.armory.quality,
                         Some(quality),
-                        RichText::new(quality.name()).color(quality_color(quality)),
+                        RichText::new(quality.name())
+                            .color(chrome::quality_colour(quality, f.settings.palette)),
                     );
                 }
             });
@@ -558,7 +593,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             ui.label(
                 RichText::new(format!("Selected: {name} #{id} · {}", quality.name()))
                     .strong()
-                    .color(quality_color(quality)),
+                    .color(chrome::quality_colour(quality, f.settings.palette)),
             );
             selected_actions(ui, f);
             egui::CollapsingHeader::new("Compare complete loadout")
@@ -568,6 +603,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     chrome::section(ui, "Manage equipment");
     sale_confirmation(ui, f);
+    auto_sell::panel(ui, f);
     egui::CollapsingHeader::new("Loadout presets").show(ui, |ui| {
         muted(ui, "Save references to your current equipment. Referenced items are retained by bulk sales.");
         ui.horizontal_wrapped(|ui| {
@@ -575,6 +611,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             if ui.button("Save loadout preset").clicked() { f.dispatch(Command::SavePreset { name: f.armory.preset_name.clone(), mode: f.campaign.mode }, "Loadout saved by reference."); }
             for (index, preset) in f.game.campaign().presets.clone().iter().enumerate() {
                 if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(Command::ApplyPreset { index, mode: f.campaign.mode }, "Loadout equipped."); }
+                if ui.button(format!("Delete {}", preset.name)).on_hover_text("Removes this preset only; its items stay in the armory.").clicked() { f.dispatch(Command::DeletePreset { index }, "Preset deleted."); }
             }
         });
     });
@@ -584,14 +621,14 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         let item = &offer.item;
         ui.horizontal(|ui| {
             slot_art(ui, f, offer.definition, item.base_quality);
-            ui.label(RichText::new(format!("{} · {} · {:?} · Lv {}", item.name, item.base_quality.name(), item.slot, offer.level)).color(quality_color(item.base_quality))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", item.personal.damage, item.personal.armor, item.personal.health, item.npc.damage_dice, item.npc.damage_add, item.npc.armor));
+            ui.label(RichText::new(format!("{} · {} · {} · Lv {}", item.name, item.base_quality.name(), item.slot.label(), offer.level)).color(chrome::quality_colour(item.base_quality, f.settings.palette))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", item.personal.damage, item.personal.armor, item.personal.health, item.npc.damage_dice, item.npc.damage_add, item.npc.armor));
             if let Some((class, training)) = weapon {
                 ui.label(format!("{} · {}", class.name(), match training { OfferTraining::NpcIssued => "NPC issued gear", OfferTraining::Trained => "trained", OfferTraining::TrainingRequired => "training required" }));
             }
             if ui
                 .add_enabled(
                     offer.affordable,
-                    egui::Button::new(format!("Buy · {} coins", offer.price)),
+                    egui::Button::new(format!("Buy · {} coins", grouped(offer.price))),
                 )
                 .on_disabled_hover_text(NEED_COINS_REASON)
                 .clicked()
@@ -701,11 +738,14 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize], viewport:
                                 if ui
                                     .selectable_label(
                                         f.armory.selected_item == Some(item.id),
-                                        RichText::new(format!(
-                                            "{} #{} · Lv {}",
-                                            definition.name, item.id, item.level
-                                        ))
-                                        .color(quality_color(quality)),
+                                        chrome::quality_item_text(
+                                            format!(
+                                                "{} #{} · Lv {}",
+                                                definition.name, item.id, item.level
+                                            ),
+                                            quality,
+                                            f.settings,
+                                        ),
                                     )
                                     .clicked()
                                 {
@@ -714,9 +754,9 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize], viewport:
                                 muted(
                                     ui,
                                     format!(
-                                        "{} · {:?} · {}{}{}{}",
+                                        "{} · {} · {}{}{}{}",
                                         quality.name(),
-                                        definition.slot,
+                                        definition.slot.label(),
                                         if reserved {
                                             "Reserved"
                                         } else if equipped {
@@ -817,6 +857,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     };
     let equipped = mode_loadout_contains(f, item.id);
     let reserved = f.game.campaign().item_reserved(item.id);
+    let sale = f.game.sale_eligibility(item.id);
     ui.horizontal_wrapped(|ui| {
         if ui
             .add_enabled(
@@ -872,7 +913,8 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                 "Favorite updated.",
             );
         }
-        let sale = f.game.sale_preview(item.id);
+        // Strict SellItem (ruleset 2): a blocked item cannot be reviewed for
+        // sale, and the disabled button says why in the core's words.
         if ui
             .add_enabled(
                 sale.is_ok(),
@@ -884,12 +926,20 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .expect("owned equipment")
                 )),
             )
-            .on_disabled_hover_text(sale.err().unwrap_or_default())
+            .on_disabled_hover_text(
+                sale.as_ref()
+                    .err()
+                    .map(SaleBlock::label)
+                    .unwrap_or_default(),
+            )
             .clicked()
         {
             f.armory.pending_sale = Some(item.id);
         }
     });
+    if let Err(block) = &sale {
+        blocked_sale(ui, f, item.id, block);
+    }
     let definition = item.definition();
     let npc_restricted = definition.npc_only
         && f.campaign.mode == Mode::Personal
@@ -957,12 +1007,78 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
 }
 
+/// Why the selected item cannot be sold, in core's words
+/// (`SaleBlock::label`), and the shortcut core names for that guard
+/// (`Game::sale_resolution`): its command, or the way to Operations for a
+/// recruit's gear. A guard with no way out shows the reason alone.
+fn blocked_sale(ui: &mut egui::Ui, f: &mut UiCtx, id: u64, block: &SaleBlock) {
+    ui.horizontal_wrapped(|ui| {
+        muted(ui, format!("Sale blocked: {}", block.label()));
+        let (label, hover, done) = match f.game.sale_resolution(id) {
+            SaleResolution::None => return,
+            SaleResolution::OpenRecruit { .. } => {
+                if f.operations_available()
+                    && ui
+                        .button("Operations ›")
+                        .on_hover_text("A recruit's equipment is changed on Operations.")
+                        .clicked()
+                {
+                    f.open_preparation(Tab::Operations);
+                }
+                return;
+            }
+            SaleResolution::Unlock => (
+                "Unlock item".to_owned(),
+                "Unlocked items can be sold.",
+                "Item unlocked.",
+            ),
+            SaleResolution::Unfavourite => (
+                "Remove favorite mark".to_owned(),
+                "Items without the mark can be sold.",
+                "Favorite mark removed.",
+            ),
+            SaleResolution::EquipStarter { mode, slot } => (
+                match mode {
+                    Mode::Personal => format!("Equip starter {}", slot.label()),
+                    Mode::Npc => format!(
+                        "Equip {}'s starter {}",
+                        f.game.campaign().npc.name,
+                        slot.label()
+                    ),
+                },
+                "Puts the protected starter back on, so this item is free.",
+                "Starter equipped.",
+            ),
+            SaleResolution::OpenPreset { index } => (
+                format!(
+                    "Delete preset {}",
+                    f.game
+                        .campaign()
+                        .presets
+                        .get(index)
+                        .map_or("", |preset| preset.name.as_str())
+                ),
+                "Removes this preset only; its items stay in the armory.",
+                "Preset deleted.",
+            ),
+        };
+        if let Some(command) = f.game.sale_resolution_command(id)
+            && ui.button(label).on_hover_text(hover).clicked()
+        {
+            f.dispatch(command, done);
+        }
+    });
+}
+
 fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
     let quote = f.game.sell_extras_quote();
     if ui
         .add_enabled(
             quote > 0,
-            egui::Button::new(format!("Sell unprotected extras · {quote} coins")),
+            egui::Button::new(format!(
+                "Sell unprotected extras · {} coins",
+                grouped(quote)
+            )),
         )
         .on_disabled_hover_text(
             "Nothing to sell. Equipped, protected, locked, favorite and preset items are kept, and sales wait while a defender is deployed.",
@@ -975,7 +1091,10 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.horizontal_wrapped(|ui| {
             ui.colored_label(
                 AMBER,
-                format!("Sell unused, unprotected extras for {quote} coins?"),
+                format!(
+                    "Sell unused, unprotected extras for {} coins?",
+                    grouped(quote)
+                ),
             );
             if ui.button("Confirm sale").clicked() {
                 f.dispatch(
@@ -994,7 +1113,13 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
 fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
     if let Some(id) = f.armory.pending_sale {
         ui.add_space(8.0);
-        match f.game.sale_preview(id) {
+        match f.game.sale_eligibility(id) {
+            Err(block) => {
+                ui.colored_label(RED, block.label());
+                if ui.button("Dismiss sale").clicked() {
+                    f.armory.pending_sale = None;
+                }
+            }
             Ok(quote) => {
                 let name = f
                     .game
@@ -1004,37 +1129,16 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .unwrap_or("Equipment");
                 ui.colored_label(
                     AMBER,
-                    format!("Sell {name} #{id} for {} coins?", quote.coins),
+                    format!("Sell {name} #{id} for {} coins?", grouped(quote.coins)),
                 );
-                if !quote.affected_presets.is_empty() {
-                    ui.label(format!(
-                        "These presets will be incomplete: {}",
-                        quote.affected_presets.join(", ")
-                    ));
-                }
-                if !quote.affected_survivors.is_empty() {
-                    ui.label(format!(
-                        "These survivors will use protected starter equipment: {}",
-                        quote.affected_survivors.join(", ")
-                    ));
-                }
                 ui.horizontal(|ui| {
                     if ui.button("Confirm item sale").clicked() {
-                        f.dispatch(
-                            Command::SellItem(id),
-                            "Item sold. Affected loadouts use protected equipment.",
-                        );
+                        f.dispatch(Command::SellItem(id), "Item sold.");
                     }
                     if ui.button("Keep item").clicked() {
                         f.armory.pending_sale = None;
                     }
                 });
-            }
-            Err(reason) => {
-                ui.colored_label(RED, reason);
-                if ui.button("Dismiss sale").clicked() {
-                    f.armory.pending_sale = None;
-                }
             }
         }
     }

@@ -1,6 +1,9 @@
 //! Owned items, presets, equipment reservations and weapon access.
 
 use super::*;
+/// The refusal for an item another deployment already holds.
+pub(crate) const ITEM_HELD_ELSEWHERE: &str =
+    "A unique item is already reserved by another deployment";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
@@ -41,13 +44,15 @@ impl Campaign {
     pub fn can_use_weapon(&self, mode: Mode, definition: usize) -> bool {
         self.weapon_access(mode, definition).is_ok()
     }
+    /// The shop price of `definition` at the shop item level. A loot-only
+    /// definition has none: it is never sold.
     pub fn buy_price(&self, definition: usize) -> Result<u64, String> {
+        let def = content().items.get(definition).ok_or("Unknown equipment")?;
+        if def.loot_only {
+            return Err(crate::content::LOOT_ONLY_REASON.into());
+        }
         Ok(crate::progression::price(
-            content()
-                .items
-                .get(definition)
-                .ok_or("Unknown equipment")?
-                .buy_value,
+            def.buy_value,
             self.shop_item_level(),
         ))
     }
@@ -201,6 +206,17 @@ impl Campaign {
         }
         Ok(())
     }
+    /// Removes the preset at `index` (`Command::DeletePreset`). Presets hold
+    /// references only, so no item or loadout changes; the items it held
+    /// stop reporting `SaleBlock::Preset`.
+    pub fn delete_preset(&mut self, index: usize) -> Result<(), String> {
+        self.preparation()?;
+        if index >= self.presets.len() {
+            return Err("Unknown preset".into());
+        }
+        self.presets.remove(index);
+        Ok(())
+    }
     pub fn apply_preset(&mut self, index: usize, mode: Mode) -> Result<(), String> {
         self.preparation()?;
         let loadout = self.presets.get(index).ok_or("Unknown preset")?.loadout;
@@ -218,19 +234,6 @@ impl Campaign {
             Mode::Npc => self.npc.loadout = loadout,
         };
         Ok(())
-    }
-    pub(super) fn personal_starter_id(&self, slot: usize) -> u64 {
-        if slot == 0
-            && self.items.iter().any(|i| {
-                i.id == 5
-                    && i.protected
-                    && WeaponSpec::from_item(i.definition()).class == WeaponClass::Pistol
-            })
-        {
-            5
-        } else {
-            slot as u64 + 1
-        }
     }
     pub fn validate_loadout(&self, loadout: [u64; 4]) -> Result<(), String> {
         for (slot, id) in loadout.into_iter().enumerate() {
@@ -292,30 +295,74 @@ impl Campaign {
         }
         Ok(loadout)
     }
+    /// The mode owner's loadout the main run holds. A recruit takeover
+    /// (`reserved_recruit` Some) reserves the recruit's items through
+    /// `reserved_items` instead, so Mara's idle loadout stays free.
+    fn main_run_loadout(&self) -> Option<[u64; 4]> {
+        match self.reserved {
+            Some(Mode::Personal) => Some(self.player.loadout),
+            Some(Mode::Npc) if self.reserved_recruit.is_none() => Some(self.npc.loadout),
+            Some(Mode::Npc) | None => None,
+        }
+    }
     pub fn item_reserved(&self, id: u64) -> bool {
         self.reserved_items.contains(&id)
-            || match self.reserved {
-                Some(Mode::Personal) => self.player.loadout.contains(&id),
-                Some(Mode::Npc) => self.npc.loadout.contains(&id),
-                None => false,
-            }
+            || self
+                .main_run_loadout()
+                .is_some_and(|loadout| loadout.contains(&id))
     }
     pub fn reserve_external(&mut self, loadout: [u64; 4]) -> Result<(), String> {
-        self.validate_loadout(loadout)?;
-        let main = match self.reserved {
-            Some(Mode::Personal) => Some(self.player.loadout),
-            Some(Mode::Npc) => Some(self.npc.loadout),
-            None => None,
-        };
-        if loadout.iter().any(|id| {
-            self.reserved_items.contains(id) || main.is_some_and(|items| items.contains(id))
-        }) {
-            return Err("A unique item is already reserved by another deployment".into());
-        }
+        self.check_external(loadout)?;
         self.reserved_items.extend(loadout);
+        Ok(())
+    }
+    /// Whether one of `loadout`'s items sits in `reserved_items`, held by a
+    /// deployment other than the main run: a guard, an expedition, or the
+    /// main run's takeover recruit unless its loadout is `main_run`.
+    pub(crate) fn held_elsewhere(&self, loadout: [u64; 4], main_run: Option<[u64; 4]>) -> bool {
+        loadout.iter().any(|id| {
+            self.reserved_items.contains(id) && !main_run.is_some_and(|items| items.contains(id))
+        })
+    }
+    /// `reserve_external`'s verdict without the reservation: the loadout is
+    /// valid and none of its items is held by another deployment.
+    pub(crate) fn check_external(&self, loadout: [u64; 4]) -> Result<(), String> {
+        self.validate_loadout(loadout)?;
+        let main = self.main_run_loadout();
+        if self.held_elsewhere(loadout, None)
+            || main.is_some_and(|items| loadout.iter().any(|id| items.contains(id)))
+        {
+            return Err(ITEM_HELD_ELSEWHERE.into());
+        }
         Ok(())
     }
     pub fn release_external(&mut self, loadout: [u64; 4]) {
         self.reserved_items.retain(|id| !loadout.contains(id));
+    }
+    /// Reserves the main run for recruit `recruit_id` defending it with
+    /// `loadout` (ruling D8): the items join `reserved_items`, the run is an
+    /// Npc run and `reserved_recruit` names the recruit, so Mara's idle
+    /// loadout stays free. Nothing changes on an error.
+    pub(crate) fn reserve_takeover(
+        &mut self,
+        recruit_id: u64,
+        loadout: [u64; 4],
+    ) -> Result<(), String> {
+        self.preparation()?;
+        for id in loadout {
+            let item = self.item(id).ok_or("Missing equipment")?;
+            self.weapon_access(Mode::Npc, item.definition_index())
+                .map_err(str::to_owned)?;
+        }
+        self.reserve_external(loadout)?;
+        self.reserved = Some(Mode::Npc);
+        self.reserved_recruit = Some(recruit_id);
+        Ok(())
+    }
+    /// Frees a takeover's items and its recruit marker. The run reservation
+    /// itself ends in `finish_attempt`.
+    pub(crate) fn release_takeover(&mut self, loadout: [u64; 4]) {
+        self.release_external(loadout);
+        self.reserved_recruit = None;
     }
 }

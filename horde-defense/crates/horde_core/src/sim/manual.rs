@@ -33,7 +33,12 @@ impl Game {
             );
         }
         let lane = input.aim[1].floor().clamp(0.0, f32::from(a.lane_count - 1)) as u8;
-        let target = a.enemies.iter().position(|e| e.lane == lane && e.contact());
+        // A hostile a death burst defeated waits on the field for its reap
+        // (W2-29); a strike never lands on it.
+        let target = a
+            .enemies
+            .iter()
+            .position(|e| e.lane == lane && e.contact() && !enemy_defeated(a, e));
         if input.melee
             && a.melee_cooldown == 0
             && a.melee_commit == 0
@@ -45,7 +50,9 @@ impl Game {
             a.stamina -= 25.0;
             a.melee_cooldown = 72;
             a.melee_commit = 30;
-            let damage = (a.profile.personal.melee_damage - enemy_armor(a, &a.enemies[n])).max(0);
+            let damage = (a.profile.personal.melee_damage
+                - enemy_armor_vs(a, &a.enemies[n], HitSource::Melee))
+            .max(0);
             let point = [a.enemies[n].x, a.enemies[n].y()];
             a.enemies[n].apply_damage(damage, a.mode);
             a.active_damage += damage as u64;
@@ -71,12 +78,14 @@ impl Game {
                     .enemies
                     .iter()
                     .enumerate()
-                    .filter(|(_, e)| e.contact() && e.lane.abs_diff(lane) == 1)
+                    .filter(|(_, e)| {
+                        e.contact() && e.lane.abs_diff(lane) == 1 && !enemy_defeated(a, e)
+                    })
                     .map(|(n, _)| n)
                     .collect();
                 for n in targets {
                     let secondary = (a.profile.personal.melee_damage / 2
-                        - enemy_armor(a, &a.enemies[n]))
+                        - enemy_armor_vs(a, &a.enemies[n], HitSource::Melee))
                     .max(0);
                     let e = &mut a.enemies[n];
                     if e.contact() && e.lane.abs_diff(lane) == 1 {
@@ -171,7 +180,13 @@ impl Game {
                         1.0
                     })
                 .round() as i32;
-                let damage = (raw - enemy_armor(a, &a.enemies[n])).max(0);
+                // Penetration lowers the armor of personal shots only, ranged
+                // armor included, never below zero (melee, ordnance and
+                // turrets ignore it).
+                let armor = (enemy_armor_vs(a, &a.enemies[n], HitSource::Shot)
+                    - a.profile.modifiers.armor_penetration)
+                    .max(0);
+                let damage = (raw - armor).max(0);
                 let impact = impacts.entry(a.enemies[n].id).or_insert((n, 0, false));
                 impact.1 = impact.1.saturating_add(damage);
                 impact.2 |= weak;
@@ -336,7 +351,14 @@ impl Game {
         }
         a.ordnance.fire_zones.retain(|z| z.ticks_left > 0);
         for (id, cell, radius, damage) in pulses {
-            self.ordnance_area_damage(a, (id, OrdnanceKind::Molotov), cell, radius, damage, 1.0);
+            self.ordnance_area_damage(
+                a,
+                (id, OrdnanceKind::Molotov, HitSource::Fire),
+                cell,
+                radius,
+                damage,
+                1.0,
+            );
         }
         let mut impacts = Vec::new();
         for projectile in &mut a.ordnance.projectiles {
@@ -365,7 +387,7 @@ impl Game {
             );
             self.ordnance_area_damage(
                 a,
-                (projectile.id, projectile.kind),
+                (projectile.id, projectile.kind, HitSource::Area),
                 projectile.cell,
                 projectile.radius,
                 projectile.damage,
@@ -400,7 +422,7 @@ impl Game {
     fn ordnance_area_damage(
         &mut self,
         a: &mut Attempt,
-        (source, ordnance): (u64, OrdnanceKind),
+        (source, ordnance, hit): (u64, OrdnanceKind, HitSource),
         cell: [u8; 2],
         radius: f32,
         raw_damage: i32,
@@ -425,7 +447,7 @@ impl Game {
             let distance = (point[0] - center[0]).hypot(point[1] - center[1]);
             let raw = (raw_damage as f32 * (1.0 - (1.0 - edge_fraction) * (distance / radius)))
                 .round() as i32;
-            let damage = (raw - enemy_armor(a, enemy)).max(0);
+            let damage = (raw - enemy_armor_vs(a, enemy, hit)).max(0);
             let meta = EventMetadata {
                 actor_id: Some(source),
                 target_id: Some(enemy.id),

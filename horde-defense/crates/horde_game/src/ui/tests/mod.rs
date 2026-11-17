@@ -30,6 +30,17 @@ struct IsolatedFrontend {
     directory: PathBuf,
 }
 impl IsolatedFrontend {
+    /// A first launch: the default game and settings on the main menu, with
+    /// no survivor, no country and no saved profile. Nothing is preset, so a
+    /// test can walk the game from "New game" (W3-28).
+    fn first_launch() -> Self {
+        let frontend = test_support::test_frontend();
+        let directory = frontend.paths.campaign().parent().unwrap().to_path_buf();
+        Self {
+            frontend,
+            directory,
+        }
+    }
     fn new() -> Self {
         let mut frontend = test_support::test_frontend();
         let directory = frontend.paths.campaign().parent().unwrap().to_path_buf();
@@ -124,6 +135,8 @@ impl Drop for IsolatedFrontend {
             "campaign.bak",
             "campaign.tmp",
             "settings.json",
+            "settings.tmp",
+            crate::profile::UNREADABLE_SETTINGS,
         ] {
             let _ = std::fs::remove_file(self.directory.join(file));
         }
@@ -142,26 +155,91 @@ enum View {
     WorldWithChrome,
     Armory,
     Results,
-    /// The upgrade home with the global header and field strip, as drawn.
+    /// Results with the global header and field strip, as drawn.
     ResultsWithChrome,
+    Upgrades,
+    /// Upgrades with the global header and field strip, as drawn.
+    UpgradesWithChrome,
     History,
     Feedback,
+    /// The whole App frame as `draw_screen` draws it: the current screen with
+    /// its header and controls, and the primary registry cleared first. The
+    /// harness sets `settings.scale` to its target's scale before drawing,
+    /// since `draw_screen` applies that scale.
+    Full,
 }
+
+/// A target window, the one harness size convention: `pixels` is the window
+/// in physical pixels and `scale` the UI scale, so a frame is `pixels /
+/// scale` points. `RawInput::screen_rect` is in points and egui's zoom does
+/// not divide it, so the harness frames pass `points()` as the screen rect
+/// (as the App's window backend does) and the context's zoom is `scale`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Target {
+    pixels: Vec2,
+    scale: f32,
+}
+impl Target {
+    /// 1440x900 at scale 1.0.
+    const LARGE: Self = Self {
+        pixels: vec2(1440.0, 900.0),
+        scale: 1.0,
+    };
+    /// 1050x700 at scale 1.35 (777.8x518.5 points).
+    const SMALL: Self = Self {
+        pixels: vec2(1050.0, 700.0),
+        scale: 1.35,
+    };
+    /// Both target sizes, large first.
+    const BOTH: [Self; 2] = [Self::LARGE, Self::SMALL];
+    /// The target's canvas in points: `pixels / scale`.
+    fn points(self) -> Vec2 {
+        self.pixels / self.scale
+    }
+}
+
 struct Harness {
     ctx: egui::Context,
+    target: Target,
 }
 impl Harness {
+    /// The large target (1440x900 at 1.0), as every older test assumed.
     fn new() -> Self {
+        Self::at(Target::LARGE)
+    }
+    /// 1440x900 at scale 1.0.
+    fn large() -> Self {
+        Self::at(Target::LARGE)
+    }
+    /// 1050x700 at scale 1.35.
+    fn small() -> Self {
+        Self::at(Target::SMALL)
+    }
+    /// A harness whose frames run at `target`.
+    fn at(target: Target) -> Self {
         let ctx = egui::Context::default();
         settings::install_font(&ctx);
-        settings::configure(&ctx, 1.0);
+        settings::configure(&ctx, target.scale);
         let mut warmup = ctx.run_ui(RawInput::default(), |_| {});
         // This headless event backend deliberately has no GPU texture uploader.
         warmup.textures_delta.clear();
-        Self { ctx }
+        Self { ctx, target }
+    }
+    /// The primaries of the last frame (see `View::Full`; a partial view's
+    /// frame clears the registry itself).
+    fn primaries(&self) -> Vec<PrimaryRecord> {
+        frame_primaries(&self.ctx)
+    }
+    /// The labels of the last frame's screen primaries.
+    fn screen_primaries(&self) -> Vec<String> {
+        self.primaries()
+            .into_iter()
+            .filter(|record| record.surface == Surface::Screen)
+            .map(|record| record.label)
+            .collect()
     }
     fn frame(&self, f: &mut FrontendParts, view: View, events: Vec<Event>) -> FullOutput {
-        self.frame_size(f, view, events, vec2(1440.0, 900.0))
+        self.frame_size(f, view, events, self.target.points())
     }
     fn frame_size(
         &self,
@@ -170,7 +248,31 @@ impl Harness {
         events: Vec<Event>,
         size: Vec2,
     ) -> FullOutput {
+        self.frame_timed(f, view, events, size, None)
+    }
+    /// One frame at the harness target with the input clock at `time`
+    /// (seconds): the wall clock a hold or a toast reads.
+    fn frame_at(
+        &self,
+        f: &mut FrontendParts,
+        view: View,
+        events: Vec<Event>,
+        time: f64,
+    ) -> FullOutput {
+        self.frame_timed(f, view, events, self.target.points(), Some(time))
+    }
+    fn frame_timed(
+        &self,
+        f: &mut FrontendParts,
+        view: View,
+        events: Vec<Event>,
+        size: Vec2,
+        time: Option<f64>,
+    ) -> FullOutput {
         f.runtime.begin_frame(self.ctx.cumulative_frame_nr() as u32);
+        if matches!(view, View::Full) {
+            f.settings.scale = self.target.scale;
+        }
         let mut output = {
             let mut c = f.ctx();
             let f = &mut c;
@@ -178,41 +280,17 @@ impl Harness {
                 RawInput {
                     screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
                     events,
+                    time,
                     ..RawInput::default()
                 },
                 |ui| match view {
-                    View::Menu => menu(ui, f, 0.0),
-                    View::SurvivorSelection => menu::survivor_selection(ui, f, 0.0),
-                    View::Header => navigation::header(ui, f, 1.0),
-                    View::Dossier => {
-                        egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
-                    }
-                    View::Battle => {
-                        controls(ui.ctx(), f);
-                        battle(ui, f);
-                    }
-                    View::Settings => settings_ui(ui, f),
-                    View::WorldWithChrome => {
-                        navigation::header(ui, f, 1.0);
-                        navigation::field_status(ui, f);
-                        camp(ui, f);
-                    }
-                    View::Camp => {
-                        navigation::field_status(ui, f);
-                        camp(ui, f);
-                    }
-                    View::Armory => {
-                        egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
-                    }
-                    View::Results => results(ui, f),
-                    View::ResultsWithChrome => {
-                        navigation::header(ui, f, 1.0);
-                        navigation::field_status(ui, f);
-                        results(ui, f);
-                    }
-                    View::History => history::show(ui, f),
-                    View::Feedback => {
-                        egui::CentralPanel::default().show(ui, |ui| status(ui, f));
+                    // draw_screen clears the primary registry itself.
+                    View::Full => draw_screen(ui.ctx(), f, 0.0),
+                    view => {
+                        // A partial view clears it as draw_screen would, once
+                        // per pass, so its registry holds this frame only.
+                        primary_action::clear_frame_primaries(ui.ctx());
+                        partial_view(ui, f, view);
                     }
                 },
             )
@@ -222,7 +300,7 @@ impl Harness {
         output
     }
     fn click(&self, f: &mut FrontendParts, view: View, label: &str) {
-        self.click_size(f, view, label, vec2(1440.0, 900.0));
+        self.click_size(f, view, label, self.target.points());
     }
     fn click_size(&self, f: &mut FrontendParts, view: View, label: &str, size: Vec2) {
         let output = self.frame_size(f, view, vec![], size);
@@ -231,6 +309,23 @@ impl Harness {
             .iter()
             .find_map(|clipped| text_position(&clipped.shape, label))
             .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+        self.press_at(f, view, position, size);
+    }
+    /// Clicks the topmost text run reading `label`: the last one painted, so
+    /// a modal's button wins over the same label on the screen under it.
+    fn click_topmost(&self, f: &mut FrontendParts, view: View, label: &str) {
+        let size = self.target.points();
+        let output = self.frame_size(f, view, vec![], size);
+        let position = output
+            .shapes
+            .iter()
+            .rev()
+            .find_map(|clipped| text_position(&clipped.shape, label))
+            .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+        self.press_at(f, view, position, size);
+    }
+    /// A primary press and release at `position`, one frame each.
+    fn press_at(&self, f: &mut FrontendParts, view: View, position: Pos2, size: Vec2) {
         self.frame_size(
             f,
             view,
@@ -260,6 +355,62 @@ impl Harness {
             size,
         );
     }
+    /// Presses the primary button on the text run reading `label` and keeps
+    /// it down for `secs` of the input clock, a frame every 0.05 s, without
+    /// releasing: how the battle bar's hold-to-retreat is driven (W3-13).
+    fn hold(&self, f: &mut FrontendParts, view: View, label: &str, secs: f64) {
+        let output = self.frame(f, view, vec![]);
+        let position = output
+            .shapes
+            .iter()
+            .find_map(|clipped| text_position(&clipped.shape, label))
+            .unwrap_or_else(|| panic!("Rendered action not found: {label}"));
+        let start = self.ctx.input(|input| input.time) + 1.0;
+        self.frame_at(f, view, pointer_at(position, true), start);
+        let frames = (secs / 0.05).ceil() as u32;
+        for frame in 1..=frames {
+            self.frame_at(
+                f,
+                view,
+                vec![Event::PointerMoved(position)],
+                start + 0.05 * f64::from(frame),
+            );
+        }
+    }
+    /// Wheels the scroll area under `at` down, 40 pt a frame, until `done`
+    /// holds for a frame, and returns that frame: how a player at the small
+    /// target reaches content below the fold (Camp home's roster at
+    /// 1050x700). `at` is a point in the scroll viewport, which does not move
+    /// as its content scrolls (see `viewport_of`). Panics when `done` never
+    /// holds within 60 frames.
+    fn scroll_until(
+        &self,
+        f: &mut FrontendParts,
+        view: View,
+        at: Pos2,
+        done: impl Fn(&FullOutput) -> bool,
+    ) -> FullOutput {
+        let mut output = self.frame(f, view, vec![]);
+        for _ in 0..60 {
+            if done(&output) {
+                return output;
+            }
+            output = self.frame(
+                f,
+                view,
+                vec![
+                    Event::PointerMoved(at),
+                    Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Point,
+                        delta: vec2(0.0, -40.0),
+                        phase: egui::TouchPhase::Move,
+                        modifiers: Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        panic!("{:?}: scrolling under {at:?} never got there", self.target);
+    }
     fn key(&self, f: &mut FrontendParts, view: View, key: Key) {
         self.frame(f, view, vec![key_event(key, true)]);
         self.frame(f, view, vec![key_event(key, false)]);
@@ -286,7 +437,11 @@ impl Harness {
                 events,
                 ..RawInput::default()
             },
-            |ui| publish_controls(ui.ctx(), &mut f.ctx(), true, false),
+            |ui| {
+                let mut c = f.ctx();
+                let views = BattleFrame::build(ui.ctx(), &c);
+                publish_controls(ui.ctx(), &mut c, views.as_ref(), true, false);
+            },
         );
         output.textures_delta.clear();
     }
@@ -298,12 +453,79 @@ impl Harness {
                 ..RawInput::default()
             },
             |ui| {
-                input = gather_combat_input(ui.ctx(), &mut f.ctx());
+                let mut c = f.ctx();
+                let views = BattleFrame::build(ui.ctx(), &c);
+                input = gather_combat_input(ui.ctx(), &mut c, views.as_ref());
             },
         );
         output.textures_delta.clear();
         input
     }
+    /// Combat input gathered outside a pass, from the last pass's input state.
+    fn combat_input_after_pass(&self, f: &mut FrontendParts) -> Input {
+        let mut c = f.ctx();
+        let views = BattleFrame::build(&self.ctx, &c);
+        gather_combat_input(&self.ctx, &mut c, views.as_ref())
+    }
+}
+/// One frame of a partial `view` (every view but `View::Full`).
+fn partial_view(ui: &mut egui::Ui, f: &mut UiCtx, view: View) {
+    match view {
+        View::Full => unreachable!("draw_screen draws the full frame"),
+        View::Menu => menu(ui, f, 0.0),
+        View::SurvivorSelection => menu::survivor_selection(ui, f, 0.0),
+        View::Header => navigation::header(ui, f, 1.0),
+        View::Dossier => {
+            egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
+        }
+        View::Battle => {
+            let views = BattleFrame::build(ui.ctx(), f);
+            controls(ui.ctx(), f, views.as_ref());
+            battle(ui, f, views.as_ref());
+        }
+        View::Settings => settings_ui(ui, f),
+        View::WorldWithChrome => {
+            navigation::header(ui, f, 1.0);
+            navigation::field_status(ui, f);
+            camp(ui, f);
+        }
+        View::Camp => {
+            navigation::field_status(ui, f);
+            camp(ui, f);
+        }
+        View::Armory => {
+            egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
+        }
+        View::Results => results(ui, f),
+        View::ResultsWithChrome => {
+            navigation::header(ui, f, 1.0);
+            navigation::field_status(ui, f);
+            results(ui, f);
+        }
+        View::Upgrades => upgrades(ui, f),
+        View::UpgradesWithChrome => {
+            navigation::header(ui, f, 1.0);
+            navigation::field_status(ui, f);
+            upgrades(ui, f);
+        }
+        View::History => history::show(ui, f),
+        View::Feedback => {
+            egui::CentralPanel::default().show(ui, |ui| status(ui, f));
+        }
+    }
+}
+/// The pointer moving to `position` with the primary button pressed or
+/// released there.
+fn pointer_at(position: Pos2, pressed: bool) -> Vec<Event> {
+    vec![
+        Event::PointerMoved(position),
+        Event::PointerButton {
+            pos: position,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        },
+    ]
 }
 fn key_event(key: Key, pressed: bool) -> Event {
     Event::Key {
@@ -334,7 +556,7 @@ fn shape_has_text(shape: &egui::epaint::Shape, label: &str) -> bool {
     }
 }
 /// How many painted text runs read exactly `label`.
-fn text_count(output: &FullOutput, label: &str) -> usize {
+pub(super) fn text_count(output: &FullOutput, label: &str) -> usize {
     fn count(shape: &egui::epaint::Shape, label: &str) -> usize {
         match shape {
             egui::epaint::Shape::Text(text) => usize::from(text.galley.text() == label),
@@ -371,7 +593,7 @@ fn attack_pointer(pos: Pos2, button: PointerButton, pressed: bool) -> Event {
         modifiers: Modifiers::NONE,
     }
 }
-fn text_color(shape: &egui::epaint::Shape, label: &str) -> Option<Color32> {
+pub(super) fn text_color(shape: &egui::epaint::Shape, label: &str) -> Option<Color32> {
     match shape {
         egui::epaint::Shape::Text(text) if text.galley.text() == label => text
             .galley
@@ -425,18 +647,121 @@ fn clipped_bounds(output: &FullOutput, label: &str) -> Option<(Rect, Rect)> {
 fn fully_visible(output: &FullOutput, label: &str) -> bool {
     clipped_bounds(output, label).is_some_and(|(rect, clip)| clip.contains_rect(rect))
 }
+/// A painted text run: its text, its painted bounds and the clip rect it was
+/// painted under.
+struct TextRun {
+    text: String,
+    rect: Rect,
+    clip: Rect,
+}
+impl TextRun {
+    /// Whether the run lies fully inside its clip rect.
+    fn visible(&self) -> bool {
+        self.clip.contains_rect(self.rect)
+    }
+}
+/// Every text run of `output`, in paint order.
+fn text_runs(output: &FullOutput) -> Vec<TextRun> {
+    fn collect(shape: &egui::epaint::Shape, clip: Rect, found: &mut Vec<TextRun>) {
+        match shape {
+            egui::epaint::Shape::Text(t) => found.push(TextRun {
+                text: t.galley.text().to_owned(),
+                rect: t.galley.rect.translate(t.pos.to_vec2()),
+                clip,
+            }),
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| collect(s, clip, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        collect(&clipped.shape, clipped.clip_rect, &mut found);
+    }
+    found
+}
+/// The painted bounds of every text run reading exactly `label` that lies
+/// fully inside its clip rect, in paint order.
+fn visible_runs(output: &FullOutput, label: &str) -> Vec<Rect> {
+    text_runs(output)
+        .into_iter()
+        .filter(|run| run.text == label && run.visible())
+        .map(|run| run.rect)
+        .collect()
+}
+/// Every painted rectangle of `output` with its fill, in paint order.
+fn painted_rects(output: &FullOutput) -> Vec<egui::epaint::RectShape> {
+    fn collect(shape: &egui::epaint::Shape, found: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::epaint::Shape::Rect(rect) => found.push(rect.clone()),
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| collect(s, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        collect(&clipped.shape, &mut found);
+    }
+    found
+}
+/// The frame of the button reading exactly `label`: the smallest painted
+/// rectangle around its text run.
+fn button_frame(output: &FullOutput, label: &str) -> Option<Rect> {
+    let text = clipped_bounds(output, label)?.0;
+    painted_rects(output)
+        .into_iter()
+        .map(|shape| shape.rect)
+        .filter(|rect| rect.expand(0.5).contains_rect(text) && *rect != text)
+        .min_by(|a, b| a.area().total_cmp(&b.area()))
+}
+/// The clip rect the text run reading exactly `anchor` is painted under: a
+/// scroll area's viewport when the run is in one.
+fn viewport_of(output: &FullOutput, anchor: &str) -> Rect {
+    clipped_bounds(output, anchor)
+        .unwrap_or_else(|| panic!("{anchor} painted"))
+        .1
+}
+/// The action reading `label` on the row of `row`: the first run reading
+/// `label` painted after the last run reading `row`. A row paints its runs
+/// in order, so this holds however its runs wrap (Camp home's roster rows
+/// take two lines at the small target), and the last `row` run is the row
+/// even when the name also reads earlier (Camp home's picker chip).
+fn row_action(output: &FullOutput, row: &str, label: &str) -> Option<(TextRun, TextRun)> {
+    let mut runs = text_runs(output);
+    let at = runs.iter().rposition(|run| run.text == row)?;
+    let action = at + 1 + runs[at + 1..].iter().position(|run| run.text == label)?;
+    let action = runs.swap_remove(action);
+    Some((runs.swap_remove(at), action))
+}
 
 mod armory_tests;
+mod autosell_tests;
 mod battle_tests;
+mod boss_banner_tests;
 mod briefing_tests;
 mod camp_tests;
 mod character_tests;
 mod chrome_tests;
+mod defender_tests;
+mod escape_tests;
+mod expedition_notice_tests;
 mod feedback_tests;
+mod frame_tests;
 mod history_tests;
+mod home_tests;
+mod loop_tests;
+mod loot_audio_tests;
+mod loot_block_tests;
+mod low_hp_tests;
 mod menu_tests;
 mod navigation_tests;
+mod onboarding_tests;
 mod operations_tests;
+mod primary_tests;
 mod progression_tests;
+mod recruit_tests;
 mod results_tests;
+mod retreat_tests;
 mod settings_tests;
+mod storage_tests;
+mod toast_tests;
+mod upgrades_tests;

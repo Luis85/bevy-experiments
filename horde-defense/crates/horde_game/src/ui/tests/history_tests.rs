@@ -77,6 +77,56 @@ fn one_run(fixture: &mut IsolatedFrontend) -> &mut FrontendParts {
     f
 }
 
+/// CF-3-07 (closing): the run detail pluralises its counts: a run with one
+/// kill and one item reads "1 kill" and "1 item", never "1 kills" or
+/// "1 items"; the legacy line too.
+#[test]
+fn history_detail_pluralises_kills_and_items() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = one_run(&mut fixture);
+    for legacy in [false, true] {
+        let history = std::sync::Arc::make_mut(&mut f.game.campaign_mut().run_history);
+        let record = history.last_mut().unwrap();
+        record.kills = 1;
+        record.loot = 1;
+        record.legacy = legacy;
+        let record = record.clone();
+        f.history = history::HistoryUi::default();
+        let output = h.frame(f, View::History, vec![]);
+        let texts = super::loot_block_tests::painted_text(&output);
+        let items = format!(
+            "{} coins · {} kill XP + {} completion XP · 1 item",
+            crate::ui::coins::grouped(record.coins),
+            record.kill_xp,
+            record.completion_xp
+        );
+        assert!(
+            texts.contains(&items),
+            "legacy {legacy}: {items} in {texts:?}"
+        );
+        let kills = if legacy {
+            "1 kill · full-run DPS not recorded".to_owned()
+        } else {
+            format!(
+                "DPS {:.1} average · {:.1} peak (5s) · 1 kill",
+                crate::ui::hud::shown_dps(record.average_dps),
+                crate::ui::hud::shown_dps(record.peak_dps)
+            )
+        };
+        assert!(
+            texts.contains(&kills),
+            "legacy {legacy}: {kills} in {texts:?}"
+        );
+        assert!(
+            texts
+                .iter()
+                .all(|text| !text.contains("1 kills") && !text.contains("1 items")),
+            "legacy {legacy}: {texts:?}"
+        );
+    }
+}
+
 #[test]
 fn history_filters_share_one_centre_line_with_the_run_count() {
     let mut fixture = IsolatedFrontend::new();
@@ -178,3 +228,83 @@ fn empty_history_offers_one_next_step_without_idle_filters() {
 }
 
 const EMPTY_NEXT_STEP_TEXT: &str = "Finish or retreat from a defense to record your first run.";
+
+/// W3-20: the run detail lists what settlement auto-sold (design-loot-
+/// economy §9 "History"), from the record's own count and coins, and says
+/// nothing for a run that sold nothing.
+#[test]
+fn history_lists_auto_sold_count_and_coins() {
+    use horde_core::{campaign::AutoSellRule, quality::Quality};
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    // Run 1 sells nothing: the rule is off.
+    f.game.apply(&Command::Withdraw).unwrap();
+    // Run 2 banks three Common drops and a Rare one; the rule sells the
+    // Common ones at settlement.
+    f.game.deploy_country_stage(0, Mode::Personal).unwrap();
+    f.game
+        .apply(&Command::SetAutoSell(AutoSellRule {
+            enabled: true,
+            keep_upgrades: false,
+            ..AutoSellRule::default()
+        }))
+        .unwrap();
+    for (definition, quality) in [
+        (4, Quality::Common),
+        (5, Quality::Common),
+        (6, Quality::Common),
+        (7, Quality::Rare),
+    ] {
+        let id = f
+            .game
+            .campaign_mut()
+            .add_item_with_quality(definition, 1, Some(quality))
+            .unwrap();
+        let a = f.game.attempt_mut().unwrap();
+        a.drop_ids.push(id);
+        a.loot += 1;
+        a.loot_quality_counts[quality] += 1;
+    }
+    f.game.apply(&Command::Withdraw).unwrap();
+    f.game.set_paused(true);
+    let records = &f.game.campaign().run_history;
+    assert_eq!(records.len(), 2);
+    let (quiet, sold) = (records[0].id, records[1].clone());
+    assert_eq!((records[0].auto_sold_count, sold.auto_sold_count), (0, 3));
+    assert!(sold.auto_sold_coins > 0);
+    let line = format!("Auto-sold 3 · +{} coins", sold.auto_sold_coins);
+    f.screen = Screen::History;
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        // The newest run is selected: its detail names the sale.
+        f.history = history::HistoryUi::default();
+        h.frame_size(f, View::History, vec![], size);
+        let output = h.frame_size(f, View::History, vec![], size);
+        assert_eq!(text_count(&output, &line), 1, "{size:?}: {line}");
+        assert!(fully_visible(&output, &line), "{size:?}");
+        // The run that sold nothing has no auto-sold line.
+        let row = super::loot_block_tests::painted_text(&output)
+            .into_iter()
+            .find(|text| text.starts_with(&format!("#{quiet} · ")))
+            .expect("the older run is listed");
+        h.click_size(f, View::History, &row, size);
+        let output = h.frame_size(f, View::History, vec![], size);
+        assert!(
+            output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, &format!("Run #{quiet} · Retreated"))),
+            "{size:?}: run #{quiet} is selected"
+        );
+        assert!(
+            !output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, "Auto-sold")),
+            "{size:?}: a run that sold nothing lists no sale"
+        );
+    }
+}

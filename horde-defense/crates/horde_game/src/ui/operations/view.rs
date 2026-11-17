@@ -52,6 +52,39 @@ pub(super) struct OperationsView {
     pub strategy_unlocked: bool,
 }
 
+impl ExpeditionLine {
+    /// "HP 15/15 · 20s · 1 kill", beside the survivor's name.
+    pub(super) fn stats(&self) -> String {
+        format!(
+            "HP {}/{} · {:.0}s · {}",
+            self.hp,
+            self.max_hp,
+            self.elapsed,
+            kills(self.kills)
+        )
+    }
+}
+
+/// "1 kill", "9 kills".
+fn kills(count: u32) -> String {
+    crate::ui::chrome::count_noun(count as usize, "kill", "kills")
+}
+
+impl ExpeditionReport {
+    /// One completed expedition's report line.
+    pub(super) fn summary(&self) -> String {
+        format!(
+            "Expedition #{} · {} · defense {} · {} · {} · {} coins",
+            self.id,
+            self.country,
+            self.stage + 1,
+            self.outcome.label(),
+            kills(self.kills),
+            super::grouped(self.coins)
+        )
+    }
+}
+
 pub(super) fn country_name(id: &str) -> &str {
     world()
         .country(id)
@@ -175,6 +208,41 @@ mod tests {
                 seconds_left: 10.0,
             }]
         );
+    }
+
+    /// CF-3-07 (closing): the live line and the report line pluralise
+    /// their kill count: "1 kill", "9 kills", never "1 kills".
+    #[test]
+    fn expedition_lines_pluralise_kills() {
+        for (kills, noun) in [(1, "1 kill"), (9, "9 kills")] {
+            let line = ExpeditionLine {
+                id: 3,
+                recruit: "Sam Okoro".into(),
+                country: "Poland".into(),
+                stage: 0,
+                hp: 15,
+                max_hp: 15,
+                elapsed: 20.0,
+                kills,
+                decision: String::new(),
+            };
+            assert_eq!(line.stats(), format!("HP 15/15 · 20s · {noun}"));
+            let report = ExpeditionReport {
+                id: 3,
+                country: "Poland".into(),
+                stage: 0,
+                outcome: Outcome::Victory,
+                kills,
+                coins: 1200,
+            };
+            assert_eq!(
+                report.summary(),
+                format!(
+                    "Expedition #3 · Poland · defense 1 · {} · {noun} · 1,200 coins",
+                    Outcome::Victory.label()
+                )
+            );
+        }
     }
 
     #[test]

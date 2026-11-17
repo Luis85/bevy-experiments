@@ -7,7 +7,8 @@ use bevy::{
 };
 use horde_core::{content::Mode, world::StageTheme};
 
-pub const CROSSFADE_SECONDS: f32 = 1.2;
+/// Shared with the offline renderer, which models this crossfade.
+pub const CROSSFADE_SECONDS: f32 = horde_audio::render::CROSSFADE_SECONDS;
 pub const CHANNEL_COUNT: usize = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,15 +32,9 @@ impl AmbienceChannel {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// The channel's loop, from the bank table the offline renderer reads.
     pub fn path(self) -> &'static str {
-        match self {
-            Self::Base => "audio/ambience.wav",
-            Self::Wind => "audio/ambient_wind.wav",
-            Self::Urban => "audio/ambient_urban.wav",
-            Self::Nature => "audio/ambient_nature.wav",
-            Self::Rain => "audio/ambient_rain.wav",
-            Self::Cold => "audio/ambient_cold.wav",
-        }
+        horde_audio::bank::AMBIENCE_FILES[self.index()]
     }
 }
 
@@ -52,12 +47,14 @@ pub enum AudioContext {
     Paused,
 }
 impl AudioContext {
-    fn gain(self) -> f32 {
+    /// The context's share of the ambience bus, from the mix table.
+    fn level(self) -> f32 {
+        let table = horde_audio::mix::CONTEXT_GAIN;
         match self {
-            Self::Menu => 0.55,
-            Self::Camp => 0.75,
-            Self::Battle => 1.0,
-            Self::Paused => 0.35,
+            Self::Menu => table.menu,
+            Self::Camp => table.camp,
+            Self::Battle => table.battle,
+            Self::Paused => table.paused,
         }
     }
 }
@@ -121,7 +118,7 @@ impl SceneAmbience {
             } else {
                 0.0
             },
-            if rain { 0.38 } else { 0.0 },
+            if rain { 0.10 } else { 0.0 },
             if cold { 0.26 } else { 0.0 },
         ];
         normalize(&mut weights);
@@ -138,12 +135,13 @@ pub struct SceneAudioTarget {
     pub ambience: f32,
     pub context: AudioContext,
 }
+/// Before the frontend's first publish: the menu at the sliders' defaults.
 impl Default for SceneAudioTarget {
     fn default() -> Self {
         Self {
             scene: SceneAmbience::default(),
-            master: 0.6,
-            ambience: 0.15,
+            master: crate::settings::defaults::MASTER,
+            ambience: crate::settings::defaults::AMBIENCE,
             context: AudioContext::Menu,
         }
     }
@@ -166,7 +164,7 @@ impl SceneAudioTarget {
     pub fn gains(self) -> [f32; CHANNEL_COUNT] {
         let mut weights = self.scene.weights;
         normalize(&mut weights);
-        let gain = safe_gain(self.master) * safe_gain(self.ambience) * self.context.gain();
+        let gain = safe_gain(self.master) * safe_gain(self.ambience) * self.context.level();
         weights.map(|weight| weight * gain)
     }
     fn muted(self) -> bool {
@@ -244,10 +242,13 @@ impl Plugin for AtmosphereAudioPlugin {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // a Bevy system: each parameter is a world access
 fn update_ambience(
     mut commands: Commands,
     assets: Res<AssetServer>,
     target: Res<SceneAudioTarget>,
+    ducking: Option<Res<crate::sfx::Ducking>>,
+    recorder: Option<ResMut<crate::sfx::CueLogRecorder>>,
     time: Res<Time>,
     mut layers: Query<(
         &AtmosphereLayer,
@@ -268,8 +269,21 @@ fn update_ambience(
         *started = true;
     }
     let gains = envelope.advance(*target, time.delta_secs());
+    // The duck multiplies the crossfaded gains, so it never restarts the
+    // crossfade. A stinger, a boss arrival, a wave warning, an explosion and a
+    // crowd of effect voices pull the loops down (`horde_audio::duck`).
+    let duck = ducking.map_or(1.0, |ducking| {
+        ducking.gains.duck[horde_audio::mix::Bus::Atmosphere as usize]
+    });
+    // The mix's ambience calibration (`horde_audio::mix`, set by the loudness
+    // gate): the loops play at the level the offline render meters.
+    let calibration = horde_audio::mix::ambience_calibration_gain();
+    // The review cue log takes the gains the loops are set to.
+    if let Some(mut recorder) = recorder {
+        recorder.ambience = gains.map(|gain| gain * calibration * duck);
+    }
     for (layer, mut playback, sink) in &mut layers {
-        let volume = Volume::Linear(gains[layer.channel.index()]);
+        let volume = Volume::Linear(gains[layer.channel.index()] * calibration * duck);
         // The component covers asynchronous asset/sink creation; the sink covers
         // already playing loops. No entity or decoder is recreated on a change.
         playback.volume = volume;
@@ -290,6 +304,36 @@ mod tests {
             lighting: lighting.into(),
             ..StageTheme::default()
         }
+    }
+    /// The offline loudness gate renders its reference scene on these beds:
+    /// the first stage of the country a new journey starts in, and the same
+    /// stage in rain. They must be what the game plays there.
+    #[test]
+    fn reference_weights_match_scene_ambience() {
+        let stage1 = horde_core::world::world()
+            .country("DEU")
+            .expect("the start country exists")
+            .stage_theme(0);
+        assert_eq!(
+            SceneAmbience::from_theme(Some(&stage1), Some(Mode::Personal)).weights,
+            horde_audio::render::REFERENCE_WEIGHTS,
+            "{stage1:?}"
+        );
+        let rain = StageTheme {
+            weather: "rain".into(),
+            ..stage1
+        };
+        assert_eq!(
+            SceneAmbience::from_theme(Some(&rain), Some(Mode::Personal)).weights,
+            horde_audio::render::RAIN_WEIGHTS
+        );
+        // The renderer reads the loops in channel order.
+        assert_eq!(
+            AmbienceChannel::ALL.map(AmbienceChannel::index),
+            [0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(AmbienceChannel::Rain.path(), "audio/ambient_rain.wav");
+        assert_eq!(horde_audio::bank::AMBIENCE_FILES.len(), CHANNEL_COUNT);
     }
     #[test]
     fn authored_scene_selects_layers_and_respects_clear_night() {
@@ -332,6 +376,18 @@ mod tests {
                 assert!(gains.iter().sum::<f32>() <= 1.00001);
             }
         }
+    }
+    /// Before the frontend first publishes, the beds play at the sliders'
+    /// defaults (the calibrated mix), not the wave-1 values.
+    #[test]
+    fn default_target_plays_at_the_settings_defaults() {
+        let settings = crate::settings::Settings::default();
+        let target = SceneAudioTarget::default();
+        assert_eq!(
+            (target.master, target.ambience),
+            (settings.master, settings.ambience)
+        );
+        assert_eq!(target.context, AudioContext::Menu);
     }
     #[test]
     fn mute_is_immediate_even_during_crossfade() {
@@ -376,6 +432,58 @@ mod tests {
         for (a, b) in slow.current.into_iter().zip(fast.current) {
             assert!((a - b).abs() < 0.00001);
         }
+    }
+    /// The Atmosphere duck multiplies the loops' crossfaded gains; without
+    /// the effects plugin the loops play unducked.
+    #[test]
+    fn loops_follow_the_atmosphere_duck() {
+        use horde_audio::{duck::DuckGains, mix::Bus};
+        let target = SceneAudioTarget {
+            master: 1.0,
+            ambience: 1.0,
+            context: AudioContext::Battle,
+            ..Default::default()
+        };
+        let volumes = |duck: Option<f32>| {
+            let mut app = App::new();
+            app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
+                .init_asset::<AudioSource>()
+                .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                    std::time::Duration::from_millis(100),
+                ))
+                .insert_resource(target)
+                .add_systems(Update, update_ambience);
+            if let Some(duck) = duck {
+                let mut gains = DuckGains::NONE;
+                gains.duck[Bus::Atmosphere as usize] = duck;
+                let mut ducking = crate::sfx::Ducking::default();
+                ducking.gains = gains;
+                app.insert_resource(ducking);
+            }
+            // Past the 1.2 s crossfade.
+            for _ in 0..20 {
+                app.update();
+            }
+            let mut layers = app
+                .world_mut()
+                .query::<(&AtmosphereLayer, &PlaybackSettings)>();
+            let mut volumes = [0.0; CHANNEL_COUNT];
+            for (layer, playback) in layers.iter(app.world()) {
+                volumes[layer.channel.index()] = match playback.volume {
+                    Volume::Linear(gain) => gain,
+                    other => panic!("{other:?}"),
+                };
+            }
+            volumes
+        };
+        // The loops play at the mix's ambience calibration, as the offline
+        // loudness gate renders them (`Sliders::bus_gain(Bus::Atmosphere)`).
+        let calibration = horde_audio::mix::ambience_calibration_gain();
+        assert_ne!(calibration, 1.0);
+        let played = |duck: f32| target.gains().map(|gain| gain * calibration * duck);
+        assert_eq!(volumes(None), played(1.0));
+        assert_eq!(volumes(Some(1.0)), played(1.0));
+        assert_eq!(volumes(Some(0.5)), played(0.5));
     }
     #[test]
     fn paused_and_menu_profiles_duck_without_changing_settings() {

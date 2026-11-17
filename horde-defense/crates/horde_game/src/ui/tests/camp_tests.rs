@@ -24,7 +24,7 @@ fn first_country_selection_starts_and_saves_a_personal_defense_waiting_to_begin(
 }
 
 #[test]
-fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
+fn camp_pause_key_and_footer_control_pause_and_resume_all_parallel_work() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
@@ -49,7 +49,14 @@ fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
         .with_strategy(|strategy, campaign| strategy.recruit(campaign, "DEU"))
         .unwrap();
     f.game.deploy_survivor(recruit, "POL", 0).unwrap();
-    h.key(f, View::Camp, Key::Escape);
+    // W3-02 rewrite: Camp home owns the clock and its key (decision 6).
+    // W3-04 rewrite: Escape on Camp home now goes back (to Results or the
+    // return-to-menu confirmation, ui/escape.rs).
+    // W3-10 rewrite: the clock key is the `world_clock` extra binding (P),
+    // not the battle's Pause binding.
+    f.nav.tab = Tab::Home;
+    assert_eq!(f.settings.bindings[Action::Pause as usize], "Escape");
+    h.key(f, View::Full, Key::P);
     assert!(f.game.global_paused());
     let frozen = serde_json::to_value(&f.game).unwrap();
     for _ in 0..60 {
@@ -67,7 +74,9 @@ fn camp_pause_binding_does_not_steal_text_from_country_search() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
+    // Both the battle's Pause and the world clock sit on P.
     f.settings.bindings[Action::Pause as usize] = "P".into();
+    assert_eq!(f.settings.extra_bindings.world_clock, "P");
     h.frame(f, View::Camp, vec![]);
     h.ctx
         .memory_mut(|memory| memory.request_focus(egui::Id::new("country_search")));
@@ -109,6 +118,8 @@ fn camp_observation_speed_never_offers_a_hidden_speedup_to_personal_combat() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.screen = Screen::Camp;
+    // W3-02 rewrite: the clock's speed controls live on Camp home only.
+    f.nav.tab = Tab::Home;
     f.game.set_paused(true);
     f.game.strategy_mut().peak_freed = 4;
     let before = serde_json::to_value(&f.game).unwrap();
@@ -195,4 +206,95 @@ fn reselecting_the_current_camp_screen_keeps_strategy_ticks_running() {
     f.step();
     assert_eq!(f.runtime.simulated_ticks, before + 1);
     assert!(f.screen == Screen::Camp);
+}
+
+/// W3-18 (CD6): for a non-first country the World footer chooses the country
+/// through `SelectCountry` and opens its Briefing. It never deploys.
+#[test]
+fn world_footer_never_creates_attempt() {
+    for (liberated, label) in [(false, "Plan defense"), (true, "Manage country")] {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.campaign_mut().attempts = 1;
+        f.game.campaign_mut().world.unlocked.push("FRA".into());
+        let levels = world().country("FRA").unwrap().level_count();
+        if liberated {
+            f.game.campaign_mut().world.cleared.push("FRA".into());
+            f.game
+                .campaign_mut()
+                .world
+                .country_levels
+                .insert("FRA".into(), levels);
+        }
+        f.screen = Screen::Camp;
+        f.nav.tab = Tab::World;
+        f.campaign.selected_country = "FRA".into();
+        f.campaign.stage = 3;
+        let ids = f.game.campaign().next_attempt_id;
+        let output = h.frame(f, View::Dossier, vec![]);
+        assert_eq!(text_count(&output, label), 1, "{label}");
+        assert_eq!(text_count(&output, "Start journey"), 0, "{label}");
+        h.click(f, View::Dossier, label);
+        assert!(f.game.attempt().is_none(), "{label}: nothing deploys");
+        assert_eq!(f.game.campaign().next_attempt_id, ids, "{label}");
+        assert_eq!(f.game.campaign().world.active.as_deref(), Some("FRA"));
+        assert!(
+            f.screen == Screen::Camp && f.nav.tab == Tab::Briefing,
+            "{label}: the Briefing opens"
+        );
+        assert_eq!(f.campaign.selected_country, "FRA", "{label}");
+        assert_eq!(
+            f.campaign.stage,
+            if liberated { levels - 1 } else { 0 },
+            "{label}: the planned stage is the country's next stage"
+        );
+        assert!(!f.status.message_error, "{label}");
+    }
+}
+
+/// CF-3 (closing): the camp footer is as tall as what it draws. W3-05 moved
+/// Save to the header and the world clock row is Camp home's alone, so a
+/// Prepare page's footer holds one primary row; the old 118 pt floor left
+/// about 50 pt empty under it and took that from the page at 1050x700@1.35.
+#[test]
+fn camp_footer_fits_its_one_row_on_prepare_pages() {
+    for target in Target::BOTH {
+        for (tab, label) in [
+            (Tab::Armory, "Go to briefing"),
+            (Tab::Character, "Go to briefing"),
+            (Tab::Briefing, "Deploy personally"),
+        ] {
+            let mut fixture = IsolatedFrontend::new();
+            let h = Harness::at(target);
+            let f = &mut fixture.frontend;
+            f.game.campaign_mut().choose_start_country("DEU").unwrap();
+            f.game.campaign_mut().journey_active = true;
+            f.act(|c| c.open_preparation(tab));
+            // Two frames: a panel sizes from its previous frame.
+            h.frame(f, View::Camp, vec![]);
+            let output = h.frame(f, View::Camp, vec![]);
+            let screen = Rect::from_min_size(Pos2::ZERO, target.points());
+            let panel = painted_rects(&output)
+                .into_iter()
+                .filter(|shape| shape.fill == art::PANEL)
+                .map(|shape| shape.rect)
+                .find(|rect| {
+                    (rect.bottom() - screen.bottom()).abs() < 1.0
+                        && (rect.width() - screen.width()).abs() < 1.0
+                })
+                .unwrap_or_else(|| panic!("{target:?} {tab:?}: no footer panel"));
+            let button = button_frame(&output, label)
+                .unwrap_or_else(|| panic!("{target:?} {tab:?}: {label} has no frame"));
+            assert!(panel.contains_rect(button), "{target:?} {tab:?}");
+            // The frame's 10 pt margins and the row's 5 pt trailing space,
+            // with a few points of item spacing: nothing like a second row.
+            let below = panel.bottom() - button.bottom();
+            assert!(
+                below <= 24.0,
+                "{target:?} {tab:?}: {below} pt under {label} in the footer {panel:?}"
+            );
+        }
+    }
 }

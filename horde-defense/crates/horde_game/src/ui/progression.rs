@@ -1,10 +1,12 @@
 //! One connected personal progression catalogue. Every rule (state, path,
 //! preview, recommendation, search) is a core query; this screen only renders
 //! them, and purchases go through `Command::BuySkillNode`.
-use super::{UiCtx, muted};
+use super::{UiCtx, coins::grouped, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, TEXT};
 use bevy_egui::egui::{self, Align, Key, Layout, Modifiers, Rect, RichText, Sense, Stroke, vec2};
-use horde_core::campaign::{Campaign, NodePayment, NodeState, PreviewStat, StatDelta};
+use horde_core::campaign::{
+    Campaign, NodePayment, NodeState, PreviewStat, StatDelta, counter_names,
+};
 use horde_core::command::Command;
 use horde_core::skill_catalog::{SkillEffect, SkillNode, search_nodes, skills, upgrade_goals};
 use std::collections::BTreeSet;
@@ -28,6 +30,10 @@ struct TreeState {
     pending: Option<Pending>,
     pulse: Option<(usize, f64)>,
     learned: Option<(usize, String)>,
+    /// The branch the compact chip row last scrolled to (CF-3-20).
+    chip_branch: Option<String>,
+    /// The compact detail's head column as last drawn, in points (CF-3-30).
+    head_height: f32,
 }
 /// A purchase sent this session that has not yet shown up as owned.
 #[derive(Clone)]
@@ -51,6 +57,11 @@ pub(super) fn selected_node_for_test(ctx: &egui::Context) -> Option<String> {
     ctx.data(|d| d.get_temp::<TreeState>(egui::Id::new(TREE_ID)))
         .map(|state| skills().nodes[state.view.selected].id.clone())
 }
+/// The canvas hover text of node `id` in `campaign`.
+#[cfg(test)]
+pub(super) fn tooltip_for_test(campaign: &Campaign, id: &str) -> String {
+    catalogue_nodes_for(campaign)[index_of(id).expect("catalogue node")].tooltip()
+}
 #[cfg(test)]
 pub(super) fn layout_for_test(ctx: &egui::Context) -> Option<TreeLayout> {
     ctx.data(|d| d.get_temp::<TreeLayout>(egui::Id::new(TREE_ID).with("layout")))
@@ -59,7 +70,7 @@ pub(super) fn layout_for_test(ctx: &egui::Context) -> Option<TreeLayout> {
 fn short_price(payment: NodePayment) -> String {
     match payment {
         NodePayment::LegacyBodyPoints(points) => format!("{points} CP"),
-        NodePayment::Coins(price) => format!("{price} c"),
+        NodePayment::Coins(price) => format!("{} c", grouped(price)),
     }
 }
 /// The canvas caption and tone for a core node state.
@@ -68,7 +79,7 @@ fn badge(state: &NodeState) -> (String, Tone) {
         NodeState::Owned => ("OWNED".into(), Tone::Owned),
         NodeState::Buyable(payment) => (short_price(*payment), Tone::Buyable),
         NodeState::NeedsCoins { payment, short } => (
-            format!("{} · need {short}", short_price(*payment)),
+            format!("{} · need {}", short_price(*payment), grouped(*short)),
             Tone::NeedsCoins,
         ),
         NodeState::NeedsPrerequisites { .. } => ("Locked".into(), Tone::Prerequisite),
@@ -94,7 +105,9 @@ fn state_chip(state: &NodeState) -> (String, egui::Color32) {
     match state {
         NodeState::Owned => ("Owned".into(), AMBER),
         NodeState::Buyable(_) => ("Ready to learn".into(), TEXT),
-        NodeState::NeedsCoins { short, .. } => (format!("Short {short} coins"), MUTED_RED),
+        NodeState::NeedsCoins { short, .. } => {
+            (format!("Short {} coins", grouped(*short)), MUTED_RED)
+        }
         NodeState::NeedsPrerequisites { missing } => (
             match missing.as_slice() {
                 [] => "Locked".into(),
@@ -142,9 +155,16 @@ fn catalogue_nodes_for(campaign: &Campaign) -> Vec<Node> {
                     .iter()
                     .filter_map(|id| catalog.nodes.iter().position(|p| p.id == *id))
                     .collect(),
+                counters: counters_line(node).unwrap_or_default(),
             }
         })
         .collect()
+}
+/// "Counters: Shield-bearer, Juggernaut": the enemy archetypes the node is
+/// authored against, by their core catalogue names. None without counters.
+fn counters_line(node: &SkillNode) -> Option<String> {
+    let names = counter_names(node);
+    (!names.is_empty()).then(|| format!("Counters: {}", names.join(", ")))
 }
 fn index_of(id: &str) -> Option<usize> {
     skills().nodes.iter().position(|n| n.id == id)
@@ -237,8 +257,87 @@ pub(super) fn learned_line(campaign: &Campaign, node: &SkillNode) -> String {
     }
 }
 /// A small painted arrow for before/after rows.
+/// The "What changes" rows, laid out to the detail column's width (CF-3-17).
+/// While every row fits, one aligned grid (stat, before, arrow, after). A
+/// stat label too long for that (Pump drill's "Shotgun time between shots")
+/// grew the grid past the column and cut the after-value off at the window
+/// edge, so the rows then stack: the stat on its own wrapping line, and
+/// "before → after" indented under it.
+fn what_changes(ui: &mut egui::Ui, id: &str, preview: &[StatDelta]) {
+    const SPACING: egui::Vec2 = vec2(8.0, 3.0);
+    let font = egui::TextStyle::Body.resolve(ui.style());
+    let width = |text: &str| {
+        ui.painter()
+            .layout_no_wrap(text.to_owned(), font.clone(), egui::Color32::PLACEHOLDER)
+            .size()
+            .x
+    };
+    // The grid's column widths: stat, before (or the unlocked name), after.
+    let mut columns = [0.0f32; 3];
+    for delta in preview {
+        let cells = match &delta.stat {
+            PreviewStat::Unlock(name) => [width("Unlocks"), width(name), 0.0],
+            stat => [
+                width(&stat.label()),
+                width(&stat.format(delta.before)),
+                width(&stat.format(delta.after)),
+            ],
+        };
+        for (column, cell) in columns.iter_mut().zip(cells) {
+            *column = column.max(cell);
+        }
+    }
+    let row = columns.iter().sum::<f32>() + ARROW_WIDTH + 3.0 * SPACING.x;
+    if row <= ui.available_width() {
+        egui::Grid::new(("skill-changes", id))
+            .num_columns(4)
+            .min_col_width(0.0)
+            .spacing(SPACING)
+            .show(ui, |ui| {
+                for delta in preview {
+                    match &delta.stat {
+                        PreviewStat::Unlock(name) => {
+                            ui.label("Unlocks");
+                            ui.colored_label(AMBER, name);
+                        }
+                        stat => {
+                            ui.label(stat.label());
+                            ui.colored_label(MUTED, stat.format(delta.before));
+                            arrow(ui);
+                            ui.colored_label(AMBER, stat.format(delta.after));
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+        return;
+    }
+    for delta in preview {
+        match &delta.stat {
+            PreviewStat::Unlock(name) => {
+                ui.label("Unlocks");
+                ui.horizontal(|ui| {
+                    ui.add_space(12.0);
+                    ui.add(egui::Label::new(RichText::new(name).color(AMBER)).wrap());
+                });
+            }
+            stat => {
+                ui.add(egui::Label::new(stat.label()).wrap());
+                ui.horizontal(|ui| {
+                    ui.add_space(12.0);
+                    ui.colored_label(MUTED, stat.format(delta.before));
+                    arrow(ui);
+                    ui.colored_label(AMBER, stat.format(delta.after));
+                });
+            }
+        }
+        ui.add_space(SPACING.y);
+    }
+}
+/// The drawn width of [`arrow`].
+const ARROW_WIDTH: f32 = 16.0;
 fn arrow(ui: &mut egui::Ui) {
-    let (rect, _) = ui.allocate_exact_size(vec2(16.0, 12.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(vec2(ARROW_WIDTH, 12.0), Sense::hover());
     let stroke = Stroke::new(1.5, MUTED);
     let (a, b) = (
         rect.left_center() + vec2(2.0, 0.0),
@@ -277,6 +376,9 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
             state.view.focus(index);
         }
         state.focus_key = focus;
+    }
+    if let Some([x, y]) = f.campaign.tree_centre_seed.take() {
+        state.view.focus_on_point(vec2(x, y));
     }
     state.view.selected = state.view.selected.min(catalog.nodes.len() - 1);
     if let Some(pending) = state.pending.take() {
@@ -341,8 +443,18 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
     let body_height = (region.bottom() - ui.cursor().top()).max(150.0);
     let mut action = None;
     let canvas = if compact {
-        // The detail goes below so the canvas keeps more than half the height.
-        let canvas_height = (body_height * 0.62).max(120.0);
+        // The detail goes below so the canvas keeps more than half the height,
+        // but never the head column's: a short window (the status row and a
+        // callout band over 1050x700@1.35) gives the canvas only what the
+        // head leaves, so the Learn button and its disabled reason stay whole
+        // (CF-3-30). The reserve is a not-owned head (name row, Learn, one
+        // reason line), or the head last drawn when that was taller, so the
+        // canvas does not jump as the selection moves between nodes.
+        let spacing = ui.spacing().item_spacing.y;
+        let head = state.head_height.max(COMPACT_HEAD_ROWS + 2.0 * spacing);
+        let canvas_height = (body_height * 0.62)
+            .min(body_height - 8.0 - head)
+            .max(COMPACT_CANVAS_MIN);
         let canvas = graph.show(
             ui,
             id,
@@ -352,13 +464,12 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
         );
         ui.add_space(4.0);
         let detail_height = (body_height - canvas_height - 8.0).max(60.0);
-        ui.allocate_ui_with_layout(
+        let detail = ui.allocate_ui_with_layout(
             vec2(width, detail_height),
             Layout::top_down(Align::Min),
-            |ui| {
-                action = skill_detail(ui, f, &state, selected, true, detail_height);
-            },
+            |ui| skill_detail(ui, f, &state, selected, true, detail_height),
         );
+        (action, state.head_height) = detail.inner;
         canvas
     } else {
         let detail_width = if width >= 1000.0 { 310.0 } else { 260.0 };
@@ -377,7 +488,7 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
                 Layout::top_down(Align::Min),
                 |ui| {
                     ui.set_width(detail_width);
-                    action = skill_detail(ui, f, &state, selected, false, body_height);
+                    action = skill_detail(ui, f, &state, selected, false, body_height).0;
                 },
             );
             canvas
@@ -409,7 +520,7 @@ struct SearchInput {
 }
 
 /// Recommended jump, zoom, search, goals and branch chips. Compact layouts
-/// keep it to one (horizontally scrolling) row.
+/// keep one row whose branch chips scroll horizontally beside the controls.
 fn toolbar(
     ui: &mut egui::Ui,
     f: &mut UiCtx,
@@ -477,15 +588,54 @@ fn toolbar(
         .on_hover_text("Select a goal; its path lights up on the tree");
     };
     if compact {
-        egui::ScrollArea::horizontal()
-            .id_salt("skill_tree_toolbar")
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    controls(ui, state);
-                    ui.separator();
-                    branch_chips(ui, state, nodes);
+        // One row: the controls stay put and only the branch chips scroll,
+        // in the width the controls leave (CF-3-20). When the controls
+        // scrolled with the chips, only the first chip was in view, rarely
+        // the selected node's branch; a second row would cost the canvas
+        // its half of the compact tree.
+        // Top-aligned, starting one control high like ui.horizontal (whose
+        // centring would drop the controls by half the bar strip); the
+        // controls centre among themselves, as the match count and the
+        // small Clear button did on the shared row.
+        let row = vec2(ui.available_width(), ui.spacing().interact_size.y);
+        ui.allocate_ui_with_layout(row, Layout::left_to_right(Align::Min), |ui| {
+            ui.horizontal(|ui| controls(ui, state));
+            ui.separator();
+            // A solid bar in its own strip under the chips (CF-3-16): egui's
+            // floating bar was drawn over their lower half. It also shows
+            // the row scrolls while chips are off-screen.
+            ui.spacing_mut().scroll = egui::style::ScrollStyle {
+                bar_inner_margin: 2.0,
+                ..egui::style::ScrollStyle::solid()
+            };
+            egui::ScrollArea::horizontal()
+                .id_salt("skill_tree_toolbar")
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let chip = branch_chips(ui, state, nodes);
+                        // Bring the selected branch's chip into view when the
+                        // selection enters another branch (or the tree
+                        // opens), until it is in view; then the row is the
+                        // player's to scroll.
+                        let branch = &skills().nodes[state.view.selected].branch;
+                        if state.chip_branch.as_ref() != Some(branch)
+                            && let Some(chip) = chip
+                        {
+                            if ui.clip_rect().contains_rect(chip.rect) {
+                                state.chip_branch = Some(branch.clone());
+                            } else {
+                                // A jump, not egui's eased scroll: the row
+                                // moves the same in both effects modes and
+                                // in stills.
+                                chip.scroll_to_me_animation(
+                                    Some(Align::Center),
+                                    egui::style::ScrollAnimation::none(),
+                                );
+                            }
+                        }
+                    });
                 });
-            });
+        });
     } else {
         ui.horizontal_wrapped(|ui| {
             controls(ui, state);
@@ -497,10 +647,16 @@ fn toolbar(
 }
 
 /// One chip per branch with owned/total; a click frames the branch and
-/// selects its most useful node.
-fn branch_chips(ui: &mut egui::Ui, state: &mut TreeState, nodes: &[Node]) {
+/// selects its most useful node. Returns the chip of the selected node's
+/// branch (as it was when the row was drawn).
+fn branch_chips(
+    ui: &mut egui::Ui,
+    state: &mut TreeState,
+    nodes: &[Node],
+) -> Option<egui::Response> {
     let catalog = skills();
     let current = catalog.nodes[state.view.selected].branch.as_str();
+    let mut selected = None;
     for branch in branches() {
         let members: Vec<usize> = (0..catalog.nodes.len())
             .filter(|&i| catalog.nodes[i].branch == branch)
@@ -521,7 +677,11 @@ fn branch_chips(ui: &mut egui::Ui, state: &mut TreeState, nodes: &[Node]) {
             }
             state.view.frame_world(branch_rect(branch));
         }
+        if current == branch {
+            selected = Some(response);
+        }
     }
+    selected
 }
 
 /// Arrows move to the nearest node in that direction, Home jumps to the
@@ -570,7 +730,7 @@ enum DetailAction {
 fn price_label(payment: NodePayment) -> String {
     match payment {
         NodePayment::LegacyBodyPoints(points) => format!("{points} legacy CP"),
-        NodePayment::Coins(price) => format!("{price} coins"),
+        NodePayment::Coins(price) => format!("{} coins", grouped(price)),
     }
 }
 fn chip(ui: &mut egui::Ui, text: &str, color: egui::Color32, filled: bool) {
@@ -591,8 +751,15 @@ fn chip(ui: &mut egui::Ui, text: &str, color: egui::Color32, filled: bool) {
         });
 }
 
+/// The compact head's rows without their spacing: the 28-pt name row, the
+/// 34-pt Learn button and one 12-pt reason line (CF-3-30).
+const COMPACT_HEAD_ROWS: f32 = 28.0 + 34.0 + 17.0;
+/// The compact canvas's least height: a row of nodes with their labels.
+const COMPACT_CANVAS_MIN: f32 = 96.0;
+
 /// Name, state chip, the one Learn action with its disabled reason, then
-/// what changes, the requirement checklist and the path summary.
+/// what changes, the requirement checklist and the path summary. Returns the
+/// action and, in the compact layout, the height the head column drew.
 fn skill_detail(
     ui: &mut egui::Ui,
     f: &mut UiCtx,
@@ -600,7 +767,7 @@ fn skill_detail(
     index: usize,
     compact: bool,
     height: f32,
-) -> Option<DetailAction> {
+) -> (Option<DetailAction>, f32) {
     let node = &skills().nodes[index];
     let mut action = None;
     let head = |ui: &mut egui::Ui, action: &mut Option<DetailAction>| {
@@ -669,31 +836,14 @@ fn skill_detail(
     let body = |ui: &mut egui::Ui, f: &mut UiCtx, action: &mut Option<DetailAction>| {
         let campaign = f.game.campaign();
         ui.label(&node.description);
+        if let Some(counters) = counters_line(node) {
+            ui.colored_label(AMBER, counters);
+        }
         let preview = campaign.node_stat_preview(&node.id);
         if !preview.is_empty() {
             ui.add_space(6.0);
             ui.strong("What changes");
-            egui::Grid::new(("skill-changes", &node.id))
-                .num_columns(4)
-                .min_col_width(0.0)
-                .spacing(vec2(8.0, 3.0))
-                .show(ui, |ui| {
-                    for delta in &preview {
-                        match &delta.stat {
-                            PreviewStat::Unlock(name) => {
-                                ui.label("Unlocks");
-                                ui.colored_label(AMBER, name);
-                            }
-                            stat => {
-                                ui.label(stat.label());
-                                ui.colored_label(MUTED, stat.format(delta.before));
-                                arrow(ui);
-                                ui.colored_label(AMBER, stat.format(delta.after));
-                            }
-                        }
-                        ui.end_row();
-                    }
-                });
+            what_changes(ui, &node.id, &preview);
         }
         let requirements = campaign.node_requirements(&node.id);
         ui.add_space(6.0);
@@ -719,7 +869,7 @@ fn skill_detail(
             ui.label(format!(
                 "{} steps · {} coins",
                 path.steps.len(),
-                path.total_coins
+                grouped(path.total_coins)
             ));
             if let Some(blocking) = &path.blocking {
                 muted(ui, format!("Blocked until: {blocking}"));
@@ -767,13 +917,18 @@ fn skill_detail(
             );
         }
     };
+    let mut head_height = 0.0;
     if compact {
         ui.horizontal_top(|ui| {
             let left = (ui.available_width() * 0.5).clamp(220.0, 420.0);
-            ui.allocate_ui_with_layout(vec2(left, height), Layout::top_down(Align::Min), |ui| {
-                ui.set_width(left);
-                head(ui, &mut action);
-            });
+            head_height = ui
+                .allocate_ui_with_layout(vec2(left, height), Layout::top_down(Align::Min), |ui| {
+                    ui.set_width(left);
+                    head(ui, &mut action);
+                })
+                .response
+                .rect
+                .height();
             ui.separator();
             ui.allocate_ui_with_layout(
                 vec2(ui.available_width(), height),
@@ -796,7 +951,7 @@ fn skill_detail(
             .max_height((height - used).max(60.0))
             .show(ui, |ui| body(ui, f, &mut action));
     }
-    action
+    (action, head_height)
 }
 
 fn is_body_node(node: &SkillNode) -> bool {
@@ -855,11 +1010,11 @@ mod tests {
                 acquire_requirements(&mut campaign, &node.id);
                 let affordable = actual_node(&campaign, &node.id);
                 assert_eq!(affordable.tone, Tone::Buyable);
-                assert_eq!(affordable.badge, format!("{} c", node.price));
+                assert_eq!(affordable.badge, format!("{} c", grouped(node.price)));
                 campaign.coins = node.price - 1;
                 let poor = actual_node(&campaign, &node.id);
                 assert_eq!(poor.tone, Tone::NeedsCoins);
-                assert_eq!(poor.badge, format!("{} c · need 1", node.price));
+                assert_eq!(poor.badge, format!("{} c · need 1", grouped(node.price)));
                 assert!(campaign.can_purchase_node(&node.id).is_err());
                 campaign.coins = 100_000;
                 let before = campaign.coins;

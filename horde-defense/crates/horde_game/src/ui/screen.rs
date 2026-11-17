@@ -11,7 +11,10 @@ pub enum Screen {
     SurvivorSelection,
     Camp,
     Battle,
+    /// The debrief of the settled round: outcome, loot and three actions.
     Results,
+    /// The upgrade tree, with the way back to the battle and to the camp.
+    Upgrades,
     History,
     Settings,
 }
@@ -26,21 +29,26 @@ pub enum ScreenAmbience {
 }
 
 impl Screen {
-    pub const ALL: [Screen; 7] = [
+    pub const ALL: [Screen; 8] = [
         Screen::Menu,
         Screen::SurvivorSelection,
         Screen::Camp,
         Screen::Battle,
         Screen::Results,
+        Screen::Upgrades,
         Screen::History,
         Screen::Settings,
     ];
     /// Whether the persistent LASTLIGHT header (wallet, Menu, History,
-    /// Settings) is drawn. Camp and the Journey upgrades home share it.
+    /// Settings) is drawn. Camp, Results and Upgrades share it.
     pub fn shows_header(self) -> bool {
         match self {
             Screen::Menu | Screen::SurvivorSelection | Screen::Battle => false,
-            Screen::Camp | Screen::Results | Screen::History | Screen::Settings => true,
+            Screen::Camp
+            | Screen::Results
+            | Screen::Upgrades
+            | Screen::History
+            | Screen::Settings => true,
         }
     }
     /// Label of the settings screen's save-and-return action.
@@ -50,14 +58,30 @@ impl Screen {
             Screen::SurvivorSelection => "Save and return to survivor selection",
             Screen::Camp => "Save and return to camp",
             Screen::Battle => "Save and return to defense",
-            Screen::Results => "Save and return to journey upgrades",
+            Screen::Results => "Save and return to results",
+            Screen::Upgrades => "Save and return to upgrades",
             Screen::History => "Save and return to run history",
+        }
+    }
+    /// What the music director scores on this screen and camp tab. The
+    /// briefing is its own entry (scored as the camp); Settings and History
+    /// lie over what was playing.
+    pub fn music(self, tab: Tab) -> horde_audio::music::MusicScreen {
+        use horde_audio::music::MusicScreen;
+        match self {
+            Screen::Menu | Screen::SurvivorSelection => MusicScreen::Menu,
+            Screen::Camp if tab == Tab::Briefing => MusicScreen::Briefing,
+            Screen::Camp => MusicScreen::Camp,
+            Screen::Battle => MusicScreen::Battle,
+            Screen::Results => MusicScreen::Results,
+            Screen::Upgrades => MusicScreen::Upgrades,
+            Screen::History | Screen::Settings => MusicScreen::Overlay,
         }
     }
     pub fn ambience(self) -> ScreenAmbience {
         match self {
             Screen::Menu | Screen::SurvivorSelection => ScreenAmbience::Menu,
-            Screen::Settings | Screen::Results => ScreenAmbience::Paused,
+            Screen::Settings | Screen::Results | Screen::Upgrades => ScreenAmbience::Paused,
             Screen::Camp | Screen::Battle | Screen::History => ScreenAmbience::Live,
         }
     }
@@ -66,15 +90,35 @@ impl Screen {
 #[derive(SubStates, Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[source(Screen = Screen::Camp)]
 pub enum Tab {
+    /// Camp home: the next defense, the roster, alerts and the world clock
+    /// (design-ux-flow decision 5). The default camp tab.
     #[default]
+    Home,
     World,
     Briefing,
     Character,
+    /// Mara's training: a drill-down from Camp home, not a row entry.
     Survivor,
     Armory,
     Skills,
     Engineering,
+    /// Expeditions, outbreaks and roster orders: a drill-down from Camp home.
     Operations,
+}
+impl Tab {
+    /// Whether the tab is a drill-down under Camp home: it renders the
+    /// "‹ Camp home" breadcrumb and the row keeps Camp selected.
+    pub fn is_home_drill_down(self) -> bool {
+        matches!(self, Tab::Survivor | Tab::Operations)
+    }
+    /// The drill-down's name in its breadcrumb.
+    pub fn drill_down_name(self) -> Option<&'static str> {
+        match self {
+            Tab::Survivor => Some(horde_core::skill_catalog::CampaignFeature::Companion.label()),
+            Tab::Operations => Some("Operations"),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -93,6 +137,17 @@ mod tests {
         assert!(Screen::History.shows_header());
         assert!(Screen::Camp.shows_header());
         assert!(Screen::Results.shows_header());
+        assert!(Screen::Upgrades.shows_header());
+        assert_eq!(Screen::ALL.len(), 8);
+        assert_eq!(Screen::Upgrades.ambience(), ScreenAmbience::Paused);
+        assert_eq!(
+            Screen::Upgrades.settings_return_label(),
+            "Save and return to upgrades"
+        );
+        assert_eq!(
+            Screen::Results.settings_return_label(),
+            "Save and return to results"
+        );
         assert!(!Screen::Battle.shows_header());
     }
 }

@@ -8,7 +8,51 @@ const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Revision of the gameplay rules. Bump when the same saved state and inputs
 /// would produce different outcomes; a mismatch on load is logged, not fatal.
-pub const RULESET_VERSION: u32 = 1;
+///
+/// - 2 (W1-20): `SellItem` is strict. An equipped, preset, recruit-equipped
+///   or NPC-issue item is refused with `SaleBlocked` instead of being sold
+///   with its loadout slots replaced by starter equipment, so ruleset 1
+///   recordings that sold such an item diverge. No seeded run sells, so
+///   `GAMEPLAY_TRACE` and `GOLDEN` are unchanged.
+/// - 3 (W2-49, the wave-2 re-bless): names two changes (ruling R15). W1-69:
+///   enemies no longer queue behind each other in a lane, so every enemy at
+///   the line or a structure attacks (ruleset 2 was kept through wave 1).
+///   Wave 2: auto-sell, takeover, the weighted drop table, the relative
+///   quality roll and loot-only drops, threat-scaled camp prices, the
+///   in-country front ramp, the late growth slopes and floors, elites from
+///   rank 3, boss phases past rank 4, the new archetypes, the country
+///   difficulty bands, the weapon-mastery nodes and the authored level grant
+///   and rank milestones. A recording made under ruleset 2 (from W1-20 on)
+///   can diverge on replay and now warns. `GAMEPLAY_TRACE` is
+///   unchanged by wave 2 (the traced runs are rank 0 with no country);
+///   `GOLDEN` moved for format, telemetry and the drop pick
+///   (tests/determinism.rs).
+/// - 4 (W4-08, the wave-4 re-bless): names the rule changes since ruleset 3.
+///   The wave-2 review fixes after W2-49 (the opening tier-1 guarantee skips
+///   NPC issue, the stationed spitter's windup guard and aim, the defender
+///   verdicts for an item held elsewhere, the operation-chain ledger copy,
+///   the level-10 advancement cap). Wave 4: Regional and Capstone boss
+///   multipliers (W4-01); the steady_hands, hardened, quick_throw and
+///   combat_reload retunes and one shrapnel-trap charge per mastery rank
+///   (W4-03); the repriced skill tree, the tier cost and the blueprint price
+///   (W4-p); an expedition's threat rank follows its recruit (W4-12). Wave 3
+///   changed presentation only. A recording or save made under ruleset 3
+///   can diverge on replay and now warns. No `GOLDEN` or `GAMEPLAY_TRACE`
+///   digest moved in waves 3 and 4 up to W4-08 (the traced runs are rank 0
+///   with no country, no skill bought and no expedition;
+///   tests/determinism.rs). W4-14 and W4-15 came after it; see ruleset 5.
+/// - 5 (the closing re-bless of the production pass): names the rule
+///   changes since ruleset 4. An Npc aims only when the aim raises its
+///   expected hits per turn (W4-14 aim; an attempt deployed before save
+///   format 7 keeps the old aim test); the Npc arrival factor 0.9 -> 0.5
+///   (W4-14 arrival); Survivor network 1,700 -> 1,500 coins (W4-15).
+///   W4-15's `train_companions` is pacing-bot code and W4-16's power
+///   readout is never saved and decides no command, so neither is a rule.
+///   A recording or save made under ruleset 4 can diverge on replay and now
+///   warns. `GOLDEN` and `GAMEPLAY_TRACE` moved for the three Npc runs, and
+///   the four progressed runs and the v7 continuation moved too
+///   (tests/determinism.rs, tests/save_migration.rs).
+pub const RULESET_VERSION: u32 = 5;
 
 /// A save or load failure. `Display` keeps the player-facing wording.
 #[derive(Debug)]
@@ -88,6 +132,31 @@ impl Game {
     pub fn decode_save_generation(bytes: &[u8]) -> Result<Self, SaveError> {
         decode_generation(bytes)
     }
+    /// Decode a save payload written at envelope `version`, exactly as a save
+    /// generation would load: an older payload is migrated on raw JSON, then
+    /// every game is reconciled and validated. Debug replay uses this for
+    /// recordings made by an older build. Versions 0 and above
+    /// [`SAVE_VERSION`] are [`SaveError::UnsupportedVersion`].
+    pub fn from_payload(value: serde_json::Value, version: u32) -> Result<Self, SaveError> {
+        let value = if version == SAVE_VERSION {
+            value
+        } else {
+            // Legacy formats are upgraded on raw JSON before any typed decode;
+            // `migrate` rejects version 0 and anything newer than this build.
+            migrate(value, version)?
+        };
+        settle_decoded(serde_json::from_value(value)?)
+    }
+    /// Test-support: the raw JSON the migrations make of a payload saved at
+    /// envelope `version`, before any typed decode, reconcile or validation
+    /// (the schema guards compare it with what the current types keep).
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn migrate_payload(
+        value: serde_json::Value,
+        version: u32,
+    ) -> Result<serde_json::Value, SaveError> {
+        migrate(value, version)
+    }
     /// Determinism/replay digest: the stable FNV-1a hash (the save checksum
     /// function) of the canonical serialized save payload. Two games with equal
     /// digests have identical authoritative state, including RNG streams, so
@@ -105,9 +174,15 @@ impl Game {
         }
         result
     }
-    fn save_inner(&self, path: &Path) -> Result<(), SaveError> {
+    /// The validated save payload [`Game::save`] writes, without touching
+    /// disk. Fails with [`SaveError::Invalid`] when the game breaks a save
+    /// rule, as every review-staged stress game does.
+    pub fn to_save_json(&self) -> Result<String, SaveError> {
         validate_game(self, usize::from(self.worker)).map_err(SaveError::Invalid)?;
-        let payload = serde_json::to_string(self)?;
+        Ok(serde_json::to_string(self)?)
+    }
+    fn save_inner(&self, path: &Path) -> Result<(), SaveError> {
+        let payload = self.to_save_json()?;
         let envelope = SaveEnvelope {
             version: SAVE_VERSION,
             checksum: checksum(payload.as_bytes()),
@@ -193,13 +268,15 @@ fn decode_generation(bytes: &[u8]) -> Result<Game, SaveError> {
         return Err(SaveError::ChecksumMismatch);
     }
     warn_on_catalog_drift(&envelope);
-    let mut game: Game = if envelope.version == SAVE_VERSION {
-        serde_json::from_str(&envelope.payload)?
+    if envelope.version == SAVE_VERSION {
+        // The current format skips the intermediate JSON tree.
+        settle_decoded(serde_json::from_str(&envelope.payload)?)
     } else {
-        // Legacy formats are upgraded on raw JSON before any typed decode.
-        let value = serde_json::from_str(&envelope.payload)?;
-        serde_json::from_value(migrate(value, envelope.version)?)?
-    };
+        Game::from_payload(serde_json::from_str(&envelope.payload)?, envelope.version)
+    }
+}
+/// Catalogue-aware fills, then the invariants every loaded game must hold.
+fn settle_decoded(mut game: Game) -> Result<Game, SaveError> {
     reconcile_saved_game(&mut game);
     validate_game(&game, 0).map_err(SaveError::Invalid)?;
     Ok(game)
@@ -298,9 +375,232 @@ fn reconcile_saved_game(game: &mut Game) {
         reconcile_saved_game(&mut battle.game);
     }
 }
+/// D7 seat and takeover rules (schema-v7 §5, rules 1-4, 6 and 7; rule 5 is
+/// in the parent battle loop and rule 8 in `RunRecord::validate`). Returns
+/// the recruit holding the live depth-0 seat, whose duties and loadout
+/// `validate_game` checks with the other reservations.
+fn validate_defender_seats(game: &Game, depth: usize) -> Result<Option<u64>, String> {
+    use crate::strategy::RecruitStatus;
+    let on_roster = |id: u64| game.strategy.roster.iter().any(|r| r.id == id);
+    let defending: Vec<u64> = game
+        .strategy
+        .roster
+        .iter()
+        .filter(|r| r.status == RecruitStatus::Defending)
+        .map(|r| r.id)
+        .collect();
+    let attempt_seat = game.attempt.as_ref().map(|a| (a.mode, a.seat));
+    let report_seat = game.last_result.as_ref().map(|r| (r.mode, r.seat));
+    if [attempt_seat, report_seat]
+        .into_iter()
+        .flatten()
+        .any(|(mode, seat)| mode == Mode::Personal && !seat.is_mode_owner())
+    {
+        return Err("A personal defense names a recruit defender".into());
+    }
+    if let Some(DefenderId::Recruit(id)) = game.campaign.next_defender
+        && !on_roster(id)
+    {
+        return Err("The next defender is not on the roster".into());
+    }
+    if depth > 0 {
+        // A worker game is one expedition; main-run defender state stays
+        // with the parent.
+        if game.campaign.reserved_recruit.is_some()
+            || game.campaign.next_defender.is_some()
+            || !defending.is_empty()
+        {
+            return Err("An expedition holds main-run defender state".into());
+        }
+        return Ok(None);
+    }
+    if let Some((_, DefenderSeat::Recruit(id))) = report_seat
+        && !on_roster(id)
+    {
+        return Err("Saved report names a survivor missing from the roster".into());
+    }
+    match attempt_seat {
+        Some((_, DefenderSeat::Recruit(id))) => {
+            if defending != [id]
+                || game.campaign.reserved != Some(Mode::Npc)
+                || game.campaign.reserved_recruit != Some(id)
+            {
+                return Err("Recruit takeover does not match its Defending survivor".into());
+            }
+            Ok(Some(id))
+        }
+        _ => {
+            if !defending.is_empty() || game.campaign.reserved_recruit.is_some() {
+                return Err("A survivor is Defending without a recruit takeover".into());
+            }
+            Ok(None)
+        }
+    }
+}
+/// A report's drop ids (unique, at most its loot and [`MAX_RUN_DROPS`], each
+/// an id the owning game issued), quality counts and auto-sold receipt
+/// (schema v7 §3.4).
+fn validate_report_loot(report: &Report, next_item_id: u64) -> Result<(), String> {
+    let mut ids = BTreeSet::new();
+    if report.drop_ids.len() > MAX_RUN_DROPS
+        || report.drop_ids.len() > report.loot as usize
+        || report
+            .drop_ids
+            .iter()
+            .any(|id| *id == 0 || *id >= next_item_id || !ids.insert(*id))
+        || report
+            .loot_by_quality
+            .values()
+            .map(|n| u64::from(*n))
+            .sum::<u64>()
+            > u64::from(report.loot)
+    {
+        return Err("Invalid saved report drop tracking".into());
+    }
+    report.auto_sold.validate(report.loot)
+}
+/// An attempt's drop ids (strictly ascending, at most its loot and
+/// [`MAX_RUN_DROPS`], each an issued id), quality counts (summing to at most
+/// its loot, the bound `finish` hands to the report) and frozen drop tier
+/// (schema v7 §3.3). Drops are recorded only at depth 0 on the `drop_tier`
+/// Some path (rulings E5 and E11): a legacy or worker attempt never holds any.
+fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result<(), String> {
+    if (!a.drop_ids.is_empty() && (a.drop_tier.is_none() || depth > 0))
+        || a.drop_ids.len() > MAX_RUN_DROPS
+        || a.drop_ids.len() > a.loot as usize
+        || a.loot_quality_counts
+            .values()
+            .map(|n| u64::from(*n))
+            .sum::<u64>()
+            > u64::from(a.loot)
+        || a.drop_ids.first().is_some_and(|id| *id == 0)
+        || a.drop_ids.last().is_some_and(|id| *id >= next_item_id)
+        || a.drop_ids.windows(2).any(|pair| pair[0] >= pair[1])
+        || a.drop_tier
+            .is_some_and(|tier| !(1..=crate::loot::max_drop_tier()).contains(&tier))
+    {
+        return Err("Invalid saved attempt drop tracking".into());
+    }
+    Ok(())
+}
+/// A report's progression receipt (schema v7 §3.4): at most
+/// [`MAX_RECEIPT_MILESTONES`] milestones at strictly increasing ranks, each
+/// granted item carrying both its id and a resolving definition (or neither,
+/// when the item was lost), and `level_from <= level_to <= cap`.
+fn validate_progression_rewards(rewards: &ProgressionRewards) -> Result<(), String> {
+    if rewards.milestones.len() > MAX_RECEIPT_MILESTONES
+        || rewards
+            .milestones
+            .windows(2)
+            .any(|pair| pair[0].rank >= pair[1].rank)
+        || rewards.milestones.iter().any(|m| {
+            m.item_id.is_some() != m.item_definition.is_some()
+                || m.item_definition
+                    .as_ref()
+                    .is_some_and(|definition| definition.index().is_none())
+        })
+        || rewards.level_from > rewards.level_to
+        || rewards.level_to > crate::campaign::Player::level_cap()
+    {
+        return Err("Invalid saved progression receipt".into());
+    }
+    Ok(())
+}
+/// The most milestone claims a campaign may hold (schema v7 §3.1).
+const MAX_MILESTONES_CLAIMED: usize = 64;
+
+/// Progression ledger bounds (schema v7 §3.1-3.2), in every game: the grant
+/// is paid at most to the player's level, and a milestone is claimed only at
+/// or below the campaign's rank.
+fn validate_progression_ledgers(campaign: &crate::campaign::Campaign) -> Result<(), String> {
+    if campaign.player.level_grant_paid > campaign.player.level {
+        return Err("Level-up grant ledger exceeds the player level".into());
+    }
+    if campaign.milestones_claimed.len() > MAX_MILESTONES_CLAIMED
+        || campaign
+            .milestones_claimed
+            .last()
+            .is_some_and(|rank| *rank > campaign.progression_rank())
+    {
+        return Err("Milestone claims exceed the progression rank".into());
+    }
+    Ok(())
+}
+/// A defeated hostile a save may hold (W2-29): one a death burst defeated on
+/// the save's tick, which the next tick's first reap removes. Every other
+/// defeated hostile is reaped before the tick ends, so it never reaches a
+/// save.
+///
+/// A burst's source was reaped on that tick, so it left a corpse there; a
+/// fuse leaves none. The victim lies within the radius of the source's
+/// death-burst `Detonation` (published `at, at`, the radius in hundredths),
+/// which tells it from a defender fuse (also untargeted, but `to` is the
+/// defender). The window is a ring of [`MAX_EVENTS`]: when it is full and its
+/// oldest event is from the save's tick, that tick may have evicted the
+/// Detonation, and the bound falls back to the source's corpse: any corpse of
+/// that tick within the schema's largest radius.
+fn burst_victim(a: &Attempt, e: &Enemy) -> bool {
+    let within = |at: [f32; 2], radius: f32| (e.x - at[0]).hypot(e.y() - at[1]) <= radius + 0.01;
+    let corpse_now = |id: u64| a.corpses.iter().any(|c| c.id == id && c.tick == a.tick);
+    let burst = a.events.iter().any(|ev| {
+        ev.kind == EventKind::Detonation
+            && ev.tick == a.tick
+            && ev.target_id.is_none()
+            && ev.from == ev.to
+            && ev.actor_id.is_some_and(corpse_now)
+            && within(ev.from, ev.value as f32 / 100.0)
+    });
+    let evicted =
+        a.events.len() == MAX_EVENTS && a.events.front().is_some_and(|ev| ev.tick == a.tick);
+    let near_corpse = || {
+        a.corpses
+            .iter()
+            .any(|c| c.tick == a.tick && within(c.at, crate::enemy_catalog::MAX_BURST_RADIUS))
+    };
+    burst || (evicted && near_corpse())
+}
+/// Combat telemetry bounds (schema v7 §3.12) for an attempt or report with
+/// `kills` kills: each per-archetype map holds at most 256 catalogue-id keys,
+/// the archetype kills sum to at most `kills`, no archetype has more kills
+/// than spawns, and at most two boss phase ticks are recorded.
+fn validate_telemetry(telemetry: &CombatTelemetry, kills: u32) -> Result<(), String> {
+    use super::telemetry::{MAX_BOSS_PHASE_TICKS, MAX_TELEMETRY_ARCHETYPES};
+    fn keys_valid<V>(map: &std::collections::BTreeMap<String, V>) -> bool {
+        map.len() <= MAX_TELEMETRY_ARCHETYPES
+            && map.keys().all(|key| crate::enemy_catalog::valid_id(key))
+    }
+    if !keys_valid(&telemetry.spawned_by_archetype)
+        || !keys_valid(&telemetry.kills_by_archetype)
+        || !keys_valid(&telemetry.damage_taken_by_archetype)
+        || telemetry.boss_phase_ticks.len() > MAX_BOSS_PHASE_TICKS
+    {
+        return Err("Invalid saved combat telemetry archetype keys or boss phases".into());
+    }
+    let archetype_kills: u64 = telemetry
+        .kills_by_archetype
+        .values()
+        .map(|k| u64::from(*k))
+        .sum();
+    if archetype_kills > u64::from(kills)
+        || telemetry.kills_by_archetype.iter().any(|(id, killed)| {
+            *killed > telemetry.spawned_by_archetype.get(id).copied().unwrap_or(0)
+        })
+    {
+        return Err("Saved combat telemetry kills exceed kills or spawns".into());
+    }
+    Ok(())
+}
 pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     game.campaign.validate()?;
+    validate_progression_ledgers(&game.campaign)?;
+    if depth > 0 && !game.campaign.auto_sell.is_default() {
+        // The parent pays an expedition's sales; a worker rule would pay twice.
+        return Err("An expedition carries an auto-sell rule".into());
+    }
     if let Some(report) = &game.last_result {
+        validate_report_loot(report, game.campaign.next_item_id)?;
+        validate_progression_rewards(&report.progression_rewards)?;
+        validate_telemetry(&report.telemetry, report.kills)?;
         if !(MIN_LANES..=MAX_LANES).contains(&report.lane_count)
             || report.lane_count.is_multiple_of(2)
             || report.telemetry.damage_by_lane.len() != usize::from(report.lane_count)
@@ -330,12 +630,15 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     }
     if depth > 1
         || game.worker != (depth == 1)
-        || game.battles.len() > 32
+        || game.battles.len() > super::parallel::MAX_BATTLES
         || (depth == 1 && !game.battles.is_empty())
     {
         return Err("Invalid expedition tree".into());
     }
+    let takeover = validate_defender_seats(game, depth)?;
     if let Some(a) = &game.attempt {
+        validate_attempt_loot(a, game.campaign.next_item_id, depth)?;
+        validate_telemetry(&a.telemetry, a.kills)?;
         crate::quality::validate_loot_events(
             &a.loot_events,
             game.campaign.next_item_id,
@@ -357,14 +660,8 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         }
         a.progression.validate()?;
         let level = content().levels.get(a.level).ok_or("Invalid saved level")?;
-        let boss_base = if a.mode == Mode::Npc {
-            level.boss_npc_hp.max(a.progression.npc_boss_health_floor)
-        } else {
-            level.boss_health.max(a.progression.boss_health_floor)
-        };
-        if boss_base.max(crate::enemy_catalog::enemy_catalog().maximum_health(a.mode)) as f32
-            * a.modifiers.enemy_health
-            > 10_000_000.0
+        if encounter_health_bound(level, a.mode, &a.progression, &a.modifiers)
+            > MAX_ENCOUNTER_HEALTH
         {
             return Err("Saved encounter exceeds supported health numerical bounds".into());
         }
@@ -486,6 +783,23 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
                     return Err("Saved hostile profile category is inconsistent".into());
                 }
             }
+            let splits = |profile: &crate::enemy_catalog::ResolvedEnemy| {
+                matches!(
+                    profile.death_effect,
+                    Some(crate::enemy_catalog::DeathEffect::Split { .. })
+                )
+            };
+            if (e.split_child
+                && (e.boss
+                    || e.resolved
+                        .as_ref()
+                        .is_some_and(|r| r.elite.is_some() || splits(r))))
+                || e.boss_state
+                    .as_ref()
+                    .is_some_and(|state| !e.boss || !state.valid(a.tick))
+            {
+                return Err("Saved split child or boss phase state is invalid".into());
+            }
             if !e.arena_width.is_finite()
                 || e.arena_width != a.width_yards
                 || e.max_hp <= 0
@@ -501,7 +815,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
                     .validate(&[(StatusId::HitStop, ENEMY_HIT_STOP_TICKS)])
                     .is_err()
                 || !e.boss_timing.validate()
-                || enemy_defeated(a, e)
+                || (enemy_defeated(a, e) && !burst_victim(a, e))
                 || (a.mode == Mode::Npc && e.hp != e.injury.hp)
                 || e.target_structure.is_some_and(|id| {
                     !a.structures
@@ -569,6 +883,8 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         return Err("Duplicate global equipment reservation".into());
     }
     let mut expected_reservations = BTreeSet::new();
+    let root_drops: &[u64] = game.attempt.as_ref().map_or(&[], |a| &a.drop_ids);
+    let mut pending_sales = BTreeSet::new();
     for guard in &game.strategy.guards {
         let recruit = game
             .strategy
@@ -586,7 +902,34 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         {
             return Err("Invalid expedition settlement cursor".into());
         }
+        // Parent-side ids awaiting this expedition's auto-sale: issued, owned
+        // by no other pending sale, reserved by no duty, not a main-run drop.
+        if (b.settled && !b.pending_auto_sell.is_empty())
+            || b.pending_auto_sell.iter().any(|id| {
+                *id == 0
+                    || *id >= game.campaign.next_item_id
+                    || !pending_sales.insert(*id)
+                    || actual_reservations.contains(id)
+                    || root_drops.contains(id)
+            })
+        {
+            return Err("Invalid expedition pending auto-sale".into());
+        }
+        if b.summary.as_ref().is_some_and(|s| {
+            ((s.acknowledged || s.outcome.is_some()) && !b.settled)
+                || s.fronts.len() > ExpeditionSummary::MAX_FRONTS
+        }) {
+            return Err("Invalid expedition outcome notice".into());
+        }
         validate_game(&b.game, depth + 1)?;
+        // A worker game carries exactly one recruit: its attempt and report
+        // seats name that recruit (v7 stamping, v6_to_v7 (a) for old saves).
+        let seat = DefenderSeat::Recruit(b.recruit_id);
+        if b.game.attempt.as_ref().is_some_and(|a| a.seat != seat)
+            || b.game.last_result.as_ref().is_some_and(|r| r.seat != seat)
+        {
+            return Err("Expedition defender seat does not name its survivor".into());
+        }
         if !b.settled {
             expected_reservations.extend(b.loadout);
             let r = game
@@ -604,6 +947,25 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
             {
                 return Err("Expedition reservation is inconsistent".into());
             }
+        }
+    }
+    if let Some(id) = takeover {
+        // D7 rule 2: the takeover recruit's loadout is reserved for the main
+        // run alone. It holds no other duty by construction: a garrison
+        // needs a Guarding recruit (`StrategyState::validate`) and an
+        // unsettled battle a Deployed one (the loop above), never Defending.
+        let r = game
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .ok_or("Defending survivor missing from roster")?;
+        if r.npc
+            .loadout
+            .iter()
+            .any(|item| !expected_reservations.insert(*item))
+        {
+            return Err("Defending survivor shares equipment with another duty".into());
         }
     }
     if actual_reservations != expected_reservations {
@@ -804,6 +1166,9 @@ mod tests {
         std::fs::remove_dir(root).unwrap();
     }
 
+    /// The envelope names the current ruleset. Ruleset 3 (W2-49, the wave-2
+    /// re-bless) covers W1-69 (no lane queue, R15) and the wave-2 rules, so a
+    /// save or recording written under ruleset 2 warns on load or replay.
     #[test]
     fn envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions() {
         static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -819,6 +1184,11 @@ mod tests {
         let envelope: SaveEnvelope = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(envelope.version, SAVE_VERSION);
         assert_eq!(envelope.ruleset_version, Some(RULESET_VERSION));
+        assert_eq!(
+            envelope.ruleset_version,
+            Some(5),
+            "ruleset 5 since the closing re-bless"
+        );
         assert_eq!(
             envelope.content_fingerprint,
             Some(crate::catalog::content_fingerprint())

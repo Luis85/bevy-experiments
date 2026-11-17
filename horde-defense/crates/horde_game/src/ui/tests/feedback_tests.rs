@@ -61,3 +61,89 @@ fn dismissing_an_error_restores_neutral_feedback_without_claiming_success() {
         "Dismissal must not pretend the failed operation succeeded"
     );
 }
+
+/// The painted rect of the small button labelled `label`: the smallest filled
+/// frame that holds the label's galley (the galley itself if none does).
+fn button_rect(output: &FullOutput, label: &str) -> Rect {
+    fn texts(shape: &egui::epaint::Shape, label: &str, out: &mut Vec<Rect>) {
+        match shape {
+            egui::epaint::Shape::Text(text) if text.galley.text() == label => {
+                out.push(text.galley.rect.translate(text.pos.to_vec2()));
+            }
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| texts(s, label, out)),
+            _ => {}
+        }
+    }
+    fn frames(shape: &egui::epaint::Shape, out: &mut Vec<Rect>) {
+        match shape {
+            egui::epaint::Shape::Rect(rect) => out.push(rect.rect),
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| frames(s, out)),
+            _ => {}
+        }
+    }
+    let mut labels = Vec::new();
+    let mut rects = Vec::new();
+    for clipped in &output.shapes {
+        texts(&clipped.shape, label, &mut labels);
+        frames(&clipped.shape, &mut rects);
+    }
+    let [text] = labels[..] else {
+        panic!("expected one painted {label:?}, found {labels:?}");
+    };
+    rects
+        .into_iter()
+        .filter(|rect| rect.contains_rect(text) && rect.height() < 40.0)
+        .min_by(|a, b| a.area().total_cmp(&b.area()))
+        .unwrap_or(text)
+}
+
+/// CF-1-10: the critical save-failure notice reserved a fixed 120 pt for its
+/// two small buttons, less than they draw, so "Dismiss" ran off the window.
+#[test]
+fn save_failure_notice_keeps_details_and_dismiss_inside_the_window_at_both_sizes() {
+    use crate::runner::RuntimeNotice;
+    for (scale, pixels) in [(1.0, vec2(1440.0, 900.0)), (1.35, vec2(1050.0, 700.0))] {
+        let mut fixture = IsolatedFrontend::new();
+        let f = &mut fixture.frontend;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.settings.scale = scale;
+        f.notices.push(RuntimeNotice::Saved {
+            intent: SaveIntent::Manual,
+            result: Err("Access is denied. (os error 5)".into()),
+        });
+        f.apply_notices();
+        assert!(f.status.message_error, "{:?}", f.status.message);
+        // W3-06: the failure also opens the storage modal, with a "Dismiss"
+        // of its own. This pins the status-line notice that stays once the
+        // modal is closed.
+        assert!(f.status.modal.is_some());
+        f.status.modal = None;
+        let ctx = egui::Context::default();
+        settings::install_font(&ctx);
+        settings::configure(&ctx, scale);
+        let mut warmup = ctx.run_ui(RawInput::default(), |_| {});
+        warmup.textures_delta.clear();
+        // Egui's raw screen rect is in points: the window's pixels over the scale.
+        let screen = Rect::from_min_size(Pos2::ZERO, pixels / scale);
+        let mut last = None;
+        for _ in 0..3 {
+            let mut output = ctx.run_ui(
+                RawInput {
+                    screen_rect: Some(screen),
+                    ..RawInput::default()
+                },
+                |ui| draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+            );
+            output.textures_delta.clear();
+            last = Some(output);
+        }
+        let output = last.unwrap();
+        for label in ["Details", "Dismiss"] {
+            let rect = button_rect(&output, label);
+            assert!(
+                screen.contains_rect(rect),
+                "{label} at {rect:?} leaves the {pixels:?}@{scale} window {screen:?}"
+            );
+        }
+    }
+}

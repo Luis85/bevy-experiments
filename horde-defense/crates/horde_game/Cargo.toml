@@ -9,6 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+horde_audio = { path = "../horde_audio" }
 horde_core = { path = "../horde_core" }
 # No picking: the frontend is egui-only and never uses Bevy pointer picking, so
 # both Bevy's picking plugins and bevy_egui's picking integration are left out.
@@ -26,8 +27,9 @@ horde_core = { path = "../horde_core", features = ["test-support"] }
 default = ["review"]
 # Isolated review tooling: model workshop, review fixtures and screens, capture
 # sequence, automated screenshots and performance reports. Playtest packages
-# build without it (`--no-default-features`).
-review = []
+# build without it (`--no-default-features`), and so without the core's
+# unsaveable 400-enemy stress seam.
+review = ["horde_core/review"]
 # Developer conveniences: asset hot reload, change-location tracking and system
 # information diagnostics. (`bevy_dev_tools` is left out: no release matches the
 # locked `bevy_internal` 0.20.1.)

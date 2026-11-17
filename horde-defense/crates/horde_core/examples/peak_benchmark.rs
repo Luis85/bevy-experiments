@@ -77,7 +77,7 @@ fn best_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
             .items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.slot == slot && item.tier > 0)
+            .filter(|(_, item)| item.slot == slot && item.purchasable())
             .max_by_key(|(_, item)| item.tier)
             .map(|(n, _)| n)
             .ok_or("Missing market gear")?;
@@ -142,7 +142,7 @@ fn parallel() -> Result<Game, String> {
                 .items
                 .iter()
                 .enumerate()
-                .filter(|(_, item)| item.slot == slot && item.tier > 0)
+                .filter(|(_, item)| item.slot == slot && item.purchasable())
                 .max_by_key(|(_, item)| item.tier)
                 .map(|(n, _)| n)
                 .ok_or("Missing market gear")?;

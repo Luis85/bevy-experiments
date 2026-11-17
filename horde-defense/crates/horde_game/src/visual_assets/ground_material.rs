@@ -1,20 +1,109 @@
 //! Read-only terrain material composition. Original atlas pixels and simulation
 //! coordinates are immutable; sparse edge blending keeps the ground continuous.
+//!
+//! Both ground meshes of a battle (the canvas around the field and the field
+//! itself) are built once and painted again from a small cache of
+//! `Arc<Mesh>` in egui temp data, keyed by [`GroundKey`]: the patches depend
+//! only on the rectangle, the hidden field, the theme and the texture, so a
+//! pass that changes none of them paints the very same mesh.
 use super::{ArtTextures, GROUND_SIZE};
-use bevy_egui::egui::{self, Color32, Painter, Rect, Vec2, pos2, vec2};
+use bevy_egui::egui::{self, Color32, Painter, Rect, TextureId, Vec2, epaint::Mesh, pos2, vec2};
+use std::sync::Arc;
 
-pub(super) fn ground(p: &Painter, rect: Rect, textures: ArtTextures, theme: usize) -> bool {
+/// How far inside a hidden field a canvas ground patch must lie to be left
+/// out. The field's opaque soil is rounded to whole pixels and feathered by
+/// one, so its fully opaque interior can sit up to a pixel inside its rect:
+/// four points cover that down to a quarter pixel per point.
+pub(crate) const HIDDEN_GROUND_MARGIN: f32 = 4.0;
+
+/// What a ground mesh was built for. Any change builds another one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct GroundKey {
+    rect_bits: [u32; 4],
+    /// The field the caller paints over this ground afterwards, if any.
+    hidden_bits: Option<[u32; 4]>,
+    theme: usize,
+    texture: TextureId,
+}
+
+/// The most recently painted ground meshes, newest first. Eight covers the
+/// canvas and field grounds of the main battle and of a few observer views
+/// in one pass; a window resize builds new meshes and the old ones age out.
+#[derive(Clone, Default)]
+struct GroundMeshes(Vec<(GroundKey, Arc<Mesh>)>);
+const GROUND_CACHE_SLOTS: usize = 8;
+
+fn bits(rect: Rect) -> [u32; 4] {
+    [rect.min.x, rect.min.y, rect.max.x, rect.max.y].map(f32::to_bits)
+}
+
+fn cache_id() -> egui::Id {
+    egui::Id::new("lastlight_ground_meshes")
+}
+
+/// Paints the soil and material patches of `rect`. `hidden` is a field the
+/// caller covers afterwards with its own opaque ground: patches lying
+/// [`HIDDEN_GROUND_MARGIN`] inside it are never seen and are left out.
+pub(super) fn ground(
+    p: &Painter,
+    rect: Rect,
+    hidden: Option<Rect>,
+    textures: ArtTextures,
+    theme: usize,
+) -> bool {
     let Some(texture) = textures.ground else {
         return false;
     };
-    let (biome, soil) = match theme % 5 {
-        2 => (2, Color32::from_rgb(76, 53, 31)),
-        3 => (1, Color32::from_rgb(36, 49, 55)),
-        4 => (3, Color32::from_rgb(15, 41, 20)),
-        _ => (0, Color32::from_rgb(22, 38, 27)),
+    p.rect_filled(rect, 0., soil(theme));
+    let key = GroundKey {
+        rect_bits: bits(rect),
+        hidden_bits: hidden.map(bits),
+        theme,
+        texture,
     };
-    p.rect_filled(rect, 0., soil);
-    let clipped = p.with_clip_rect(rect.intersect(p.clip_rect()));
+    let id = cache_id();
+    let cached = p.ctx().data_mut(|data| {
+        let cache = data.get_temp_mut_or_default::<GroundMeshes>(id);
+        let n = cache.0.iter().position(|(k, _)| *k == key)?;
+        let entry = cache.0.remove(n);
+        let mesh = Arc::clone(&entry.1);
+        cache.0.insert(0, entry);
+        Some(mesh)
+    });
+    let mesh = cached.unwrap_or_else(|| {
+        let mesh = Arc::new(build(rect, hidden, texture, theme));
+        p.ctx().data_mut(|data| {
+            let cache = data.get_temp_mut_or_default::<GroundMeshes>(id);
+            cache.0.insert(0, (key, Arc::clone(&mesh)));
+            cache.0.truncate(GROUND_CACHE_SLOTS);
+        });
+        mesh
+    });
+    if !mesh.is_empty() {
+        p.with_clip_rect(rect.intersect(p.clip_rect()))
+            .add(egui::Shape::Mesh(mesh));
+    }
+    true
+}
+
+fn soil(theme: usize) -> Color32 {
+    match theme % 5 {
+        2 => Color32::from_rgb(76, 53, 31),
+        3 => Color32::from_rgb(36, 49, 55),
+        4 => Color32::from_rgb(15, 41, 20),
+        _ => Color32::from_rgb(22, 38, 27),
+    }
+}
+
+/// The material patches of `rect`, minus those `hidden` covers.
+fn build(rect: Rect, hidden: Option<Rect>, texture: TextureId, theme: usize) -> Mesh {
+    let biome = match theme % 5 {
+        2 => 2,
+        3 => 1,
+        4 => 3,
+        _ => 0,
+    };
+    let covered = hidden.map(|field| field.shrink(HIDDEN_GROUND_MARGIN));
     // The source swatch is enlarged pixel art. Sample it at the same cluster
     // density as the actors rather than stretching each motif across a lane.
     const MATERIAL_SCALE: f32 = 0.2;
@@ -26,7 +115,7 @@ pub(super) fn ground(p: &Painter, rect: Rect, textures: ArtTextures, theme: usiz
     let bottom = (rect.bottom() / STEP.y).ceil() as i32 + 1;
     // All patches share one material/clip, so submit one bounded mesh instead
     // of allocating hundreds of independent terrain shapes every frame.
-    let mut mesh = egui::epaint::Mesh::with_texture(texture);
+    let mut mesh = Mesh::with_texture(texture);
     for row in top..bottom.min(top + 32) {
         for column in left..right.min(left + 48) {
             let seed = (column.wrapping_mul(73_856_093) ^ row.wrapping_mul(19_349_663)) as u32;
@@ -36,7 +125,7 @@ pub(super) fn ground(p: &Painter, rect: Rect, textures: ArtTextures, theme: usiz
                 vec2(column as f32 * STEP.x, row as f32 * STEP.y).to_pos2() + offset,
                 SIZE,
             );
-            if !patch.intersects(rect) {
+            if !patch.intersects(rect) || covered.is_some_and(|field| field.contains_rect(patch)) {
                 continue;
             }
             let source_x = biome as f32 * (GROUND_SIZE[0] / 4.) + (seed % 42) as f32;
@@ -71,10 +160,7 @@ pub(super) fn ground(p: &Painter, rect: Rect, textures: ArtTextures, theme: usiz
             }
         }
     }
-    if !mesh.is_empty() {
-        clipped.add(egui::Shape::mesh(mesh));
-    }
-    true
+    mesh
 }
 
 #[cfg(test)]
@@ -111,6 +197,95 @@ mod tests {
             .fold(0., f32::max)
     }
 
+    fn ground_meshes(
+        output: &egui::FullOutput,
+        texture: egui::TextureId,
+    ) -> Vec<std::sync::Arc<egui::epaint::Mesh>> {
+        output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Mesh(mesh) if mesh.texture_id == texture => Some(mesh.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// One pass painting the canvas ground around `field`, then the field's
+    /// own ground: their two meshes.
+    fn ground_pass(
+        ctx: &egui::Context,
+        canvas: Rect,
+        field: Rect,
+        theme: usize,
+        texture: u64,
+    ) -> [std::sync::Arc<egui::epaint::Mesh>; 2] {
+        let textures = ArtTextures {
+            ground: Some(egui::TextureId::User(texture)),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            assert!(ground(ui.painter(), canvas, Some(field), textures, theme));
+            assert!(ground(ui.painter(), field, None, textures, theme));
+        });
+        output.textures_delta.clear();
+        let meshes = ground_meshes(&output, egui::TextureId::User(texture));
+        assert_eq!(meshes.len(), 2, "one canvas and one field mesh");
+        [meshes[0].clone(), meshes[1].clone()]
+    }
+
+    #[test]
+    fn ground_mesh_is_reused_across_passes() {
+        use std::sync::Arc;
+        let ctx = egui::Context::default();
+        let canvas = Rect::from_min_size(pos2(0., 0.), vec2(1440., 900.));
+        let field = Rect::from_min_max(pos2(24., 124.), pos2(1416., 816.));
+        let first = ground_pass(&ctx, canvas, field, 0, 7);
+        let second = ground_pass(&ctx, canvas, field, 0, 7);
+        for (which, (a, b)) in ["canvas", "field"]
+            .into_iter()
+            .zip(first.iter().zip(&second))
+        {
+            assert!(
+                Arc::ptr_eq(a, b),
+                "an unchanged {which} ground must paint its cached mesh"
+            );
+        }
+        let narrower = Rect::from_min_max(pos2(260., 124.), pos2(1180., 816.));
+        // (canvas, field, theme, texture) and which of the two meshes change.
+        let cases = [
+            (canvas, field, 2, 7, [true, true]),
+            (canvas.shrink(40.), field, 0, 7, [true, false]),
+            (canvas, narrower, 0, 7, [true, true]),
+            (canvas, field, 0, 8, [true, true]),
+        ];
+        for (canvas_rect, field_rect, theme, texture, rebuilt) in cases {
+            let label = format!("{canvas_rect:?} around {field_rect:?}, theme {theme}");
+            let changed = ground_pass(&ctx, canvas_rect, field_rect, theme, texture);
+            let fresh = ground_pass(
+                &egui::Context::default(),
+                canvas_rect,
+                field_rect,
+                theme,
+                texture,
+            );
+            for n in 0..2 {
+                assert_eq!(changed[n], fresh[n], "{label}: a stale ground was painted");
+                if !rebuilt[n] {
+                    assert!(
+                        Arc::ptr_eq(&changed[n], &first[n]),
+                        "{label}: an unchanged ground went back to its cached mesh"
+                    );
+                } else {
+                    assert!(
+                        !Arc::ptr_eq(&changed[n], &first[n]),
+                        "{label}: the ground was not rebuilt"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn original_material_is_visible_across_the_viewport_and_stays_in_its_biome_swatch() {
         let ctx = egui::Context::default();
@@ -121,6 +296,7 @@ mod tests {
                 assert!(ground(
                     ui.painter(),
                     viewport,
+                    None,
                     ArtTextures {
                         ground: Some(texture),
                         ..Default::default()

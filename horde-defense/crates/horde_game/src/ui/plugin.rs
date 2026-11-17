@@ -6,6 +6,7 @@ use super::{CampaignUi, Screen, Tab, notices};
 use crate::{
     atmosphere_audio,
     launch::LaunchConfig,
+    music,
     runner::{AppCommand, GameSession, Runtime, RuntimeSet, SaveIntent},
     settings::Settings,
     visual_assets,
@@ -35,6 +36,7 @@ impl Plugin for UiPlugin {
                     publish_scene_audio
                         .run_if(scene_audio_inputs_changed)
                         .before(atmosphere_audio::AmbienceUpdate),
+                    publish_music.before(music::MusicUpdate),
                 ),
             );
     }
@@ -49,7 +51,9 @@ impl Plugin for NavigationPlugin {
         // Notices from this frame's Apply pass (and the previous frame's
         // Advance/Persist passes) become NextState before StateTransition.
         app.add_systems(PreUpdate, notices::handle_notices.after(RuntimeSet::Apply))
-            .add_systems(OnEnter(Screen::Battle), notices::enter_battle);
+            .add_systems(OnEnter(Screen::Battle), notices::enter_battle)
+            // The Results screen's loot reveal and coin batch (A6-14).
+            .add_systems(Update, notices::results_audio);
     }
 }
 
@@ -117,7 +121,7 @@ fn scene_audio_inputs_changed(
 ) -> bool {
     let key = (
         *screen.get(),
-        tab.map_or(Tab::World, |tab| *tab.get()),
+        tab.map_or(Tab::default(), |tab| *tab.get()),
         campaign.observed,
         campaign.selected_country.clone(),
         campaign.stage,
@@ -127,6 +131,23 @@ fn scene_audio_inputs_changed(
     let changed = last.as_ref() != Some(&key);
     *last = Some(key);
     changed || session.is_changed()
+}
+/// The music director's input, next to the ambience target. It follows
+/// the battle tick by tick, so it is published every frame.
+fn publish_music(
+    session: Res<GameSession>,
+    screen: Res<State<Screen>>,
+    tab: Option<Res<State<Tab>>>,
+    mut target: ResMut<music::MusicTarget>,
+) {
+    let input = super::music_input(
+        &session.game,
+        *screen.get(),
+        tab.map_or(Tab::default(), |tab| *tab.get()),
+    );
+    if target.0 != input {
+        target.0 = input;
+    }
 }
 fn publish_scene_audio(
     session: Res<GameSession>,
@@ -139,7 +160,7 @@ fn publish_scene_audio(
     *target = super::ambience_target(
         &session.game,
         *screen.get(),
-        tab.map_or(Tab::World, |tab| *tab.get()),
+        tab.map_or(Tab::default(), |tab| *tab.get()),
         &campaign,
         &settings,
     );

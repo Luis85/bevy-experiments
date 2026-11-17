@@ -42,13 +42,65 @@ pub fn resolve_player_model(
     size: Vec2,
 ) -> Result<crate::player_model::ResolvedPlayerPose, String> {
     let catalogue = crate::player_model::startup::active_or_bundled()?;
-    crate::player_model::resolve_equipped_model(
+    let appearance = player_appearance(catalogue, model_id, equipment)?;
+    crate::player_model::resolve_equipped_pose(
         catalogue,
         model_id,
-        equipment,
+        &appearance,
         sample,
         player_model_placement(model_id, center, size)?,
     )
+}
+/// How many resolved appearances [`player_appearance`] keeps per thread.
+const RECENT_APPEARANCES: usize = 8;
+/// One remembered appearance: the catalogue's address (a `'static`
+/// catalogue is never freed, so the address cannot be reused), the model and
+/// the equipment it was resolved for.
+type RecentAppearance = (
+    usize,
+    String,
+    horde_core::survivors::EquipmentVisual,
+    std::sync::Arc<crate::player_model::ResolvedAppearance>,
+);
+/// The appearance `catalogue` resolves for `model_id` in `equipment`. The
+/// battle resolves its survivor every pass from frozen gear, so the last few
+/// combinations are kept (the most recent first) and handed back; an error
+/// is never kept.
+fn player_appearance(
+    catalogue: &'static crate::player_model::CompiledCatalogue,
+    model_id: &str,
+    equipment: &horde_core::survivors::EquipmentVisual,
+) -> Result<std::sync::Arc<crate::player_model::ResolvedAppearance>, String> {
+    thread_local! {
+        static RECENT: std::cell::RefCell<Vec<RecentAppearance>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    }
+    let identity = std::ptr::from_ref(catalogue) as usize;
+    RECENT.with_borrow_mut(|recent| {
+        if let Some(index) = recent
+            .iter()
+            .position(|(c, m, e, _)| *c == identity && m == model_id && e == equipment)
+        {
+            let entry = recent.remove(index);
+            let appearance = entry.3.clone();
+            recent.insert(0, entry);
+            return Ok(appearance);
+        }
+        let appearance = std::sync::Arc::new(crate::player_model::resolve_appearance(
+            catalogue, model_id, equipment,
+        )?);
+        recent.truncate(RECENT_APPEARANCES - 1);
+        recent.insert(
+            0,
+            (
+                identity,
+                model_id.to_owned(),
+                equipment.clone(),
+                appearance.clone(),
+            ),
+        );
+        Ok(appearance)
+    })
 }
 pub fn draw_player_model(
     painter: &Painter,
@@ -84,6 +136,8 @@ mod atlas;
 pub mod enemy_visuals;
 mod flash;
 mod ground_material;
+#[cfg(test)]
+pub(crate) use ground_material::HIDDEN_GROUND_MARGIN;
 mod loading;
 #[cfg(test)]
 mod tests;
@@ -93,10 +147,14 @@ pub use atlas::{RigAtlas, RigSheet, WalkSheet};
 use enemy_visuals::{EnemySprite, SpriteArt, WalkArt};
 #[cfg(test)]
 use flash::{FlashMask, hit_flash_color};
-pub use flash::{FlashMasks, HitFlash, actor_hit_flash};
+pub use flash::{FlashMasks, HitFlash, actor_hit_flash, hit_flash_quad, hit_flash_runs};
+#[cfg(test)]
+pub(crate) use loading::PATHS;
 #[cfg(feature = "review")]
 pub use loading::VisualAssets;
-pub use loading::{load_assets, refresh_art};
+#[cfg(test)]
+pub(crate) use loading::publish_source_flash_masks;
+pub use loading::{flash_masks, load_assets, refresh_art};
 use validation::*;
 
 /// Egui texture ids and derived data for the loaded art, republished each
@@ -115,6 +173,139 @@ pub struct ArtTextures {
     /// Weapon and ordnance icon atlas (legacy defender rig sheet; no bodies are drawn from it).
     pub rig: Option<RigSheet>,
     pub menu_idle: Option<TextureId>,
+    /// The actor and walker sheets plus a white block packed into one texture,
+    /// so every hostile and hit flash shares one battlefield mesh. `None`
+    /// while loading or when the packed size exceeds the device's texture
+    /// limit: the battlefield then draws a walker mesh and an actor mesh.
+    pub battle_atlas: Option<BattleAtlas>,
+    /// The procedural soft shadow ([`soft_shadow_image`]), linearly sampled.
+    pub shadow: Option<TextureId>,
+}
+/// Which source sheet an actor quad samples.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActorSheet {
+    Actors,
+    Walkers,
+}
+/// Where the packed battle atlas keeps each sheet: repacked existing pixels,
+/// never a new asset file. Beside the sheets it holds a white block and the
+/// hit-flash silhouettes, both derived at load (the silhouettes from the
+/// enemy frames' own alpha, see [`FlashMasks`]). Sizes are the loaded sheets'
+/// own pixel sizes, so the normalised source UVs of a uniformly rescaled
+/// sheet stay valid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BattleAtlas {
+    pub texture: TextureId,
+    pub actors_origin: [u32; 2],
+    pub actors_size: [u32; 2],
+    pub walkers_origin: [u32; 2],
+    pub walkers_size: [u32; 2],
+    /// The centre of the opaque white block: untextured runs (hit flashes)
+    /// sample it inside the atlas mesh.
+    pub white_uv: Pos2,
+    pub size: [u32; 2],
+}
+impl BattleAtlas {
+    /// Transparent texels between the packed regions.
+    pub const GUTTER: u32 = 2;
+    /// Side of the opaque white block.
+    pub const WHITE_SIDE: u32 = 4;
+    /// Actors at the origin, walkers to their right and the white block below
+    /// the actors, each `GUTTER` texels apart.
+    pub fn layout(texture: TextureId, actors_size: [u32; 2], walkers_size: [u32; 2]) -> Self {
+        Self::layout_with_silhouettes(texture, actors_size, walkers_size, 0)
+    }
+    /// [`Self::layout`], at least tall enough for `silhouette_rows` rows of
+    /// hit-flash silhouettes from [`Self::silhouette_origin`] (W1-66).
+    pub fn layout_with_silhouettes(
+        texture: TextureId,
+        actors_size: [u32; 2],
+        walkers_size: [u32; 2],
+        silhouette_rows: u32,
+    ) -> Self {
+        let walkers_origin = [actors_size[0] + Self::GUTTER, 0];
+        let white = [0, actors_size[1] + Self::GUTTER];
+        let silhouettes = white[1] + Self::WHITE_SIDE + Self::GUTTER;
+        let size = [
+            walkers_origin[0] + walkers_size[0],
+            walkers_size[1]
+                .max(actors_size[1])
+                .max(white[1] + Self::WHITE_SIDE)
+                .max(silhouettes + silhouette_rows),
+        ];
+        let half = Self::WHITE_SIDE as f32 * 0.5;
+        Self {
+            texture,
+            actors_origin: [0, 0],
+            actors_size,
+            walkers_origin,
+            walkers_size,
+            white_uv: pos2(
+                (white[0] as f32 + half) / size[0] as f32,
+                (white[1] as f32 + half) / size[1] as f32,
+            ),
+            size,
+        }
+    }
+    /// The top-left texel of the white block.
+    pub fn white_origin(&self) -> [u32; 2] {
+        [0, self.actors_size[1] + Self::GUTTER]
+    }
+    /// The top-left texel of the hit-flash silhouettes: the free column under
+    /// the actor sheet (as wide as it), `GUTTER` texels below the white block.
+    pub fn silhouette_origin(&self) -> [u32; 2] {
+        [0, self.white_origin()[1] + Self::WHITE_SIDE + Self::GUTTER]
+    }
+    /// `uv`, normalised to `sheet`, in normalised atlas coordinates.
+    pub fn uv(&self, sheet: ActorSheet, uv: Rect) -> Rect {
+        let (origin, size) = match sheet {
+            ActorSheet::Actors => (self.actors_origin, self.actors_size),
+            ActorSheet::Walkers => (self.walkers_origin, self.walkers_size),
+        };
+        let map = |point: Pos2| {
+            pos2(
+                (origin[0] as f32 + point.x * size[0] as f32) / self.size[0] as f32,
+                (origin[1] as f32 + point.y * size[1] as f32) / self.size[1] as f32,
+            )
+        };
+        Rect::from_min_max(map(uv.min), map(uv.max))
+    }
+}
+/// Pixel size of the procedural soft-shadow texture.
+pub const SOFT_SHADOW_SIZE: [usize; 2] = [128, 64];
+/// The legacy soft shadow's three stacked ellipses: (spread of the shadow
+/// size, alpha at full shadow strength).
+pub const SOFT_SHADOW_RINGS: [(f32, u8); 3] = [(1.35, 10), (1.12, 15), (0.9, 23)];
+/// A soft ground shadow as premultiplied black whose alpha reproduces the
+/// legacy three rings (spreads 1.35, 1.12 and 0.9 with alphas 10, 15 and 23,
+/// so 48 at the centre). The image spans the outer ring, so the quad of
+/// [`soft_shadow_quad`] draws the shadow `art::soft_shadow` drew.
+pub fn soft_shadow_image() -> bevy_egui::egui::ColorImage {
+    let [width, height] = SOFT_SHADOW_SIZE;
+    let outer = SOFT_SHADOW_RINGS[0].0;
+    let mut pixels = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let u = ((x as f32 + 0.5) / width as f32 * 2.0 - 1.0) * outer;
+            let v = ((y as f32 + 0.5) / height as f32 * 2.0 - 1.0) * outer;
+            let distance = (u * u + v * v).sqrt();
+            let alpha: u8 = SOFT_SHADOW_RINGS
+                .iter()
+                .filter(|(spread, _)| distance <= *spread)
+                .map(|(_, alpha)| *alpha)
+                .sum();
+            pixels.push(Color32::from_rgba_premultiplied(0, 0, 0, alpha));
+        }
+    }
+    bevy_egui::egui::ColorImage::new([width, height], pixels)
+}
+/// The quad and tint that draw, from [`soft_shadow_image`], the soft shadow
+/// `art::soft_shadow(at, size, alpha)` draws as three ellipses.
+pub fn soft_shadow_quad(at: Pos2, size: Vec2, alpha: f32) -> (Rect, Color32) {
+    (
+        Rect::from_center_size(at, size * (2.0 * SOFT_SHADOW_RINGS[0].0)),
+        Color32::from_black_alpha((alpha.clamp(0.0, 1.0) * 255.0).round() as u8),
+    )
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PropMotion {
@@ -122,7 +313,6 @@ pub struct PropMotion {
     pub target: Option<Pos2>,
     pub recoil: f32,
     pub trigger: f32,
-    pub hit: f32,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Actor {
@@ -289,14 +479,36 @@ pub fn ordnance_effect(
     size: Vec2,
     tint: Color32,
 ) -> bool {
+    ordnance_effect_flipped(p, textures, flame, center, size, tint, false)
+}
+/// [`ordnance_effect`], mirrored left to right when `mirror`.
+pub fn ordnance_effect_flipped(
+    p: &Painter,
+    textures: ArtTextures,
+    flame: bool,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+    mirror: bool,
+) -> bool {
     let Some(sheet) = textures.rig else {
         return false;
     };
     let source = sheet.atlas.cells[if flame { 13 } else { 12 }];
     rig_region(p, sheet, source, fit(center, size, source), tint, |point| {
-        point
+        if mirror {
+            pos2(2.0 * center.x - point.x, point.y)
+        } else {
+            point
+        }
     });
     true
+}
+/// The source size in texels of the flame (cell 13) or explosion (cell 12)
+/// icon; `None` without the rig sheet.
+pub fn ordnance_effect_texels(textures: ArtTextures, flame: bool) -> Option<Vec2> {
+    let [left, top, right, bottom] = textures.rig?.atlas.cells[if flame { 13 } else { 12 }];
+    Some(vec2(right - left, bottom - top))
 }
 pub fn actor(
     p: &Painter,
@@ -317,13 +529,53 @@ pub fn actor_animated(
     tint: Color32,
     pose: &ActorPose,
 ) -> bool {
-    let (texture, rect, uv, pivot) = match kind {
-        Actor::Enemy(_) if textures.enemy_art_rejected => return false,
+    let Some(quad) = actor_quad(textures, kind, center, size, tint, pose) else {
+        return false;
+    };
+    let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(quad.texture);
+    quad.push(&mut mesh, quad.uv);
+    p.add(bevy_egui::egui::Shape::mesh(mesh));
+    true
+}
+/// One posed actor sprite: the pure layout that both the legacy per-actor
+/// painter and the batched battlefield meshes draw, so their geometry is
+/// identical.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActorQuad {
+    pub sheet: ActorSheet,
+    /// The sheet's own egui texture.
+    pub texture: TextureId,
+    pub rect: Rect,
+    /// Normalised to `sheet`.
+    pub uv: Rect,
+    pub pivot: Pos2,
+    pub tint: Color32,
+    pub pose: ActorPose,
+}
+impl ActorQuad {
+    /// Appends the quad to `mesh`, sampling `uv` (its own, or remapped into
+    /// the packed atlas), and poses only the four vertices it added.
+    pub fn push(&self, mesh: &mut bevy_egui::egui::epaint::Mesh, uv: Rect) {
+        let start = mesh.vertices.len();
+        mesh.add_rect_with_uv(self.rect, uv, self.tint);
+        pose_vertices(&mut mesh.vertices[start..], &self.pose, self.pivot);
+    }
+}
+/// The sprite `kind` draws at `center` within `size`, or `None` when its art
+/// is rejected or its sheet has not loaded.
+pub fn actor_quad(
+    textures: ArtTextures,
+    kind: Actor,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+    pose: &ActorPose,
+) -> Option<ActorQuad> {
+    let (sheet, texture, rect, uv, pivot) = match kind {
+        Actor::Enemy(_) if textures.enemy_art_rejected => return None,
         Actor::Enemy(sprite) => match &sprite.art {
             SpriteArt::Walk(walk) => {
-                let Some(sheet) = textures.walkers else {
-                    return false;
-                };
+                let sheet = textures.walkers?;
                 let (rect, uv, pivot) = walk_frame_layout(
                     walk,
                     sprite.source_size,
@@ -332,7 +584,7 @@ pub fn actor_animated(
                     center,
                     size,
                 );
-                (Some(sheet.texture), rect, uv, pivot)
+                (ActorSheet::Walkers, Some(sheet.texture), rect, uv, pivot)
             }
             SpriteArt::Standing(art) => {
                 let (rect, pivot) = standing_actor_layout(
@@ -342,6 +594,7 @@ pub fn actor_animated(
                     size,
                 );
                 (
+                    ActorSheet::Actors,
                     textures.actors,
                     rect,
                     region_for(art.bounds, sprite.source_size),
@@ -349,26 +602,35 @@ pub fn actor_animated(
                 )
             }
         },
-        Actor::Player | Actor::Mara if textures.survivor_art_rejected => return false,
+        Actor::Player | Actor::Mara if textures.survivor_art_rejected => return None,
         Actor::Player | Actor::Mara => {
             let index = kind.survivor_index().unwrap_or_default();
             let source = SURVIVOR_RECTS[index];
             let (rect, pivot) =
                 standing_actor_layout(source, SURVIVOR_ANCHORS[index], center, size);
-            (textures.actors, rect, region_for(source, ACTOR_SIZE), pivot)
+            (
+                ActorSheet::Actors,
+                textures.actors,
+                rect,
+                region_for(source, ACTOR_SIZE),
+                pivot,
+            )
         }
     };
-    let Some(texture) = texture else {
-        return false;
-    };
-    let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(texture);
-    mesh.add_rect_with_uv(rect, uv, tint);
-    apply_actor_pose(&mut mesh, pose, pivot);
-    p.add(bevy_egui::egui::Shape::mesh(mesh));
-    true
+    Some(ActorQuad {
+        sheet,
+        texture: texture?,
+        rect,
+        uv,
+        pivot,
+        tint,
+        pose: *pose,
+    })
 }
-fn apply_actor_pose(mesh: &mut bevy_egui::egui::epaint::Mesh, pose: &ActorPose, pivot: Pos2) {
-    for vertex in &mut mesh.vertices {
+/// Leans, squashes and turns `vertices` about `pivot` exactly as the former
+/// whole-mesh pose did: shear and scale, then `Mesh::rotate`'s formula.
+fn pose_vertices(vertices: &mut [bevy_egui::egui::epaint::Vertex], pose: &ActorPose, pivot: Pos2) {
+    for vertex in vertices.iter_mut() {
         let relative = vertex.pos - pivot;
         vertex.pos = pivot
             + vec2(
@@ -376,10 +638,10 @@ fn apply_actor_pose(mesh: &mut bevy_egui::egui::epaint::Mesh, pose: &ActorPose, 
                 relative.y * pose.scale[1],
             );
     }
-    mesh.rotate(
-        bevy_egui::egui::emath::Rot2::from_angle(pose.lean * 0.5),
-        pivot,
-    );
+    let rotation = bevy_egui::egui::emath::Rot2::from_angle(pose.lean * 0.5);
+    for vertex in vertices.iter_mut() {
+        vertex.pos = pivot + rotation * (vertex.pos - pivot);
+    }
 }
 
 fn standing_actor_layout(
@@ -405,12 +667,7 @@ fn walk_frame_layout(
     available: Vec2,
 ) -> (Rect, Rect, Pos2) {
     let frame = walk.frames[frame as usize % walk.frames.len()];
-    let max_width = walk
-        .frames
-        .iter()
-        .map(|frame| frame.bounds[2] - frame.bounds[0])
-        .fold(0., f32::max);
-    let scale = (available.y / walk.height).min(available.x / max_width);
+    let scale = (available.y / walk.height).min(available.x / walk.max_width());
     let foot = center + vec2(0., available.y * 0.5);
     let rect = Rect::from_min_max(
         foot + vec2(
@@ -437,21 +694,63 @@ fn walk_frame_layout(
     );
     (rect, uv, foot)
 }
-/// Every settled body shares one draw mesh. Count and lifetime come from the
-/// saved attempt; only the short collapse animation is rendered separately.
+/// One settled body: the corpse cell of the actor sheet fitted into a box.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CorpseQuad {
+    pub texture: TextureId,
+    pub rect: Rect,
+    pub uv: Rect,
+    pub tint: Color32,
+}
+impl CorpseQuad {
+    pub fn push(&self, mesh: &mut bevy_egui::egui::epaint::Mesh) {
+        mesh.add_rect_with_uv(self.rect, self.uv, self.tint);
+    }
+}
+/// The texture and UV of the corpse cell: the packed battle atlas when it is
+/// loaded (so settled bodies share the hostiles' texture), else the actor
+/// sheet. `None` while the actor sheet is missing or rejected.
+pub fn settled_corpse_texture(textures: ArtTextures) -> Option<(TextureId, Rect)> {
+    let actors = textures
+        .actors
+        .filter(|_| !textures.survivor_art_rejected)?;
+    let uv = region_for(CORPSE_RECT, ACTOR_SIZE);
+    Some(match textures.battle_atlas {
+        Some(atlas) => (atlas.texture, atlas.uv(ActorSheet::Actors, uv)),
+        None => (actors, uv),
+    })
+}
+/// The settled body centred at `center` in the box `size`: pure geometry,
+/// shared by the cached settled-corpse mesh and [`corpse_batch`].
+pub fn settled_corpse_quad(
+    textures: ArtTextures,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+) -> Option<CorpseQuad> {
+    let (texture, uv) = settled_corpse_texture(textures)?;
+    Some(CorpseQuad {
+        texture,
+        rect: fit(center, size, CORPSE_RECT),
+        uv,
+        tint,
+    })
+}
+/// Settled bodies as one draw mesh. Count and lifetime come from the saved
+/// attempt; only the short collapse animation is rendered separately.
 pub fn corpse_batch(
     p: &Painter,
     textures: ArtTextures,
     bodies: impl IntoIterator<Item = (Pos2, Vec2, Color32)>,
 ) -> bool {
-    let Some(texture) = textures.actors.filter(|_| !textures.survivor_art_rejected) else {
+    let Some((texture, _)) = settled_corpse_texture(textures) else {
         return false;
     };
-    let source = CORPSE_RECT;
-    let uv = region_for(source, ACTOR_SIZE);
     let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(texture);
     for (center, size, tint) in bodies {
-        mesh.add_rect_with_uv(fit(center, size, source), uv, tint);
+        if let Some(quad) = settled_corpse_quad(textures, center, size, tint) {
+            quad.push(&mut mesh);
+        }
     }
     if !mesh.vertices.is_empty() {
         p.add(bevy_egui::egui::Shape::mesh(mesh));
@@ -496,12 +795,28 @@ pub fn prop(
     size: Vec2,
     tint: Color32,
 ) -> bool {
-    let Some(texture) = textures.props else {
+    let Some(shape) = prop_shape(textures, kind, center, size, tint) else {
         return false;
     };
-    let source = PROP_RECTS[kind as usize];
-    p.image(texture, fit(center, size, source), region(source), tint);
+    p.add(shape);
     true
+}
+/// The image [`prop`] paints, as a shape; `None` without the prop sheet.
+pub fn prop_shape(
+    textures: ArtTextures,
+    kind: Prop,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+) -> Option<bevy_egui::egui::Shape> {
+    let texture = textures.props?;
+    let source = PROP_RECTS[kind as usize];
+    Some(bevy_egui::egui::Shape::image(
+        texture,
+        fit(center, size, source),
+        region(source),
+        tint,
+    ))
 }
 /// Full fitted source bounds, including transparent padding. Placement checks
 /// use this same rectangle as rendering rather than only a trunk/center point.
@@ -509,16 +824,17 @@ pub fn prop_ground_rect(kind: Prop, foot: Pos2, size: Vec2) -> Rect {
     let fitted = fit(Pos2::ZERO, size, PROP_RECTS[kind as usize]);
     Rect::from_center_size(foot - vec2(0.0, fitted.height() * 0.5), fitted.size())
 }
-pub fn prop_grounded(
-    p: &Painter,
+/// A prop standing with its fitted source bounds on `foot`, as a shape;
+/// `None` without the prop sheet.
+pub fn prop_grounded_shape(
     textures: ArtTextures,
     kind: Prop,
     foot: Pos2,
     size: Vec2,
     tint: Color32,
-) -> bool {
+) -> Option<bevy_egui::egui::Shape> {
     let rect = prop_ground_rect(kind, foot, size);
-    prop(p, textures, kind, rect.center(), size, tint)
+    prop_shape(textures, kind, rect.center(), size, tint)
 }
 pub fn prop_animated(
     p: &Painter,
@@ -566,18 +882,37 @@ pub fn prop_animated(
             p.image(texture, rect, region(source), tint);
         }
     }
-    if motion.hit > 0. {
-        p.rect_stroke(
-            rect,
-            1.,
-            bevy_egui::egui::Stroke::new(
-                1.,
-                Color32::from_rgba_unmultiplied(227, 164, 108, (motion.hit * 180.) as u8),
-            ),
-            bevy_egui::egui::StrokeKind::Outside,
-        );
-    }
     true
+}
+/// The struck outline of a prop drawn by [`prop_animated`] at the same
+/// `center` and `size`, `hit` in 0..=1. Drawn by the caller after every prop
+/// (W1-69), so struck props never split the props pass into alternating
+/// texture runs. Draws nothing without the props sheet, like the prop.
+/// The rect a prop of `kind` centred on `center` is drawn in when fitted into
+/// `size`: the one `prop_animated` paints and `prop_hit_outline` strokes.
+pub fn prop_rect(kind: Prop, center: Pos2, size: Vec2) -> Rect {
+    fit(center, size, PROP_RECTS[kind as usize])
+}
+pub fn prop_hit_outline(
+    p: &Painter,
+    textures: ArtTextures,
+    kind: Prop,
+    center: Pos2,
+    size: Vec2,
+    hit: f32,
+) {
+    if hit <= 0. || textures.props.is_none() {
+        return;
+    }
+    p.rect_stroke(
+        prop_rect(kind, center, size),
+        1.,
+        bevy_egui::egui::Stroke::new(
+            1.,
+            Color32::from_rgba_unmultiplied(227, 164, 108, (hit * 180.) as u8),
+        ),
+        bevy_egui::egui::StrokeKind::Outside,
+    );
 }
 // Source-space spindle, breech and barrel end from the pixel turret. These
 // presentation-only calibration points share the head's rigid transform.
@@ -688,8 +1023,17 @@ pub fn keyart(p: &Painter, r: Rect, textures: ArtTextures) -> bool {
     p.image(texture, r, uv, Color32::WHITE);
     true
 }
-pub fn ground(p: &Painter, r: Rect, textures: ArtTextures, theme: usize) -> bool {
-    ground_material::ground(p, r, textures, theme)
+/// Paints the pixel-art ground of `r`; `false` without the ground texture.
+/// `hidden` is a field the caller paints over afterwards with its own opaque
+/// ground (`art::battlefield` does): patches that field covers are left out.
+pub fn ground(
+    p: &Painter,
+    r: Rect,
+    hidden: Option<Rect>,
+    textures: ArtTextures,
+    theme: usize,
+) -> bool {
+    ground_material::ground(p, r, hidden, textures, theme)
 }
 
 pub fn panorama(p: &Painter, r: Rect, textures: ArtTextures, _biome: &str) -> bool {

@@ -1,7 +1,8 @@
 mod support;
 use horde_core::{
     campaign::Campaign,
-    content::{EnemyKind, Mode, content},
+    content::{EnemyKind, ItemDefId, Mode, content},
+    loot::{DropTable, ELITE_QUALITY_FLOOR, drop_quality},
     quality::{Quality, QualityCatalog, catalog},
     rules::Rng,
     sim::{Game, Input},
@@ -121,18 +122,201 @@ fn rolled_quality_improves_actual_personal_npc_stats_and_sale_value_but_keeps_pi
 }
 
 fn guaranteed_drop_game() -> Game {
+    let seed = (1..10000)
+        .find(|seed| Rng::new(*seed).below(100) < 3)
+        .unwrap();
+    guaranteed_drop_game_with(seed)
+}
+
+/// A fresh level-0 Personal attempt (so `drop_tier` is Some) whose only
+/// hostile dies on the next tick, with the combat RNG reseeded to `rng_seed`.
+fn guaranteed_drop_game_with(rng_seed: u64) -> Game {
     let mut g = legacy_game();
     g.deploy(0, Mode::Personal).unwrap();
     let mut a = g.attempt_slot_mut().take().unwrap();
     g.spawn_enemy(&mut a, EnemyKind::Shambler, 5, false);
     a.enemies[0].x = 10.0;
     a.enemies[0].hp = 0;
-    let seed = (1..10000)
-        .find(|seed| Rng::new(*seed).below(100) < 3)
-        .unwrap();
-    a.rng = Rng::new(seed);
+    a.rng = Rng::new(rng_seed);
     *g.attempt_slot_mut() = Some(a);
     g
+}
+
+/// The weighted drop table of a fresh level-0 Personal attempt (drop tier
+/// 1). W2-09: the Some path picks from it with one `below(total)` draw; this
+/// helper replaced the uniform tier-1 pool these tests drew from before.
+fn tier_one_table() -> DropTable {
+    let g = guaranteed_drop_game_with(1);
+    let table = DropTable::for_attempt(g.attempt().unwrap());
+    assert!(table.total() > 0);
+    table
+}
+
+/// The relative outcome by hand: the absolute tier read as a step from
+/// Common, added to `base` and clamped to Poor..=Legendary.
+fn shifted_by_hand(base: Quality, absolute: Quality) -> Quality {
+    let index = (base as i32 + absolute as i32 - Quality::Common as i32).clamp(0, 5);
+    Quality::ALL[index as usize]
+}
+
+#[test]
+fn relative_roll_never_drops_a_tier4_below_epic() {
+    // Decision 7 / LE-3: the absolute roll downgrades most tier-4 drops
+    // (Legendary base) to Common; read relative to the base, the worst step
+    // (Poor, -1) still leaves an Epic.
+    let tier4: Vec<_> = content()
+        .items
+        .iter()
+        .filter(|item| item.tier == 4)
+        .collect();
+    assert!(!tier4.is_empty());
+    let mut absolute_below_epic = 0u32;
+    for item in &tier4 {
+        for rank in [0, 1, 2, 3, 5, 10, 23, 50, 1000] {
+            for enemy in 1..=1500 {
+                for elite in [false, true] {
+                    let quality = drop_quality(item.base_quality, 2026, 7, enemy, rank, elite);
+                    assert!(
+                        quality >= Quality::Epic,
+                        "{} rank {rank} enemy {enemy} elite {elite}: {quality:?}",
+                        item.name
+                    );
+                }
+                let relative =
+                    catalog().roll_relative(item.base_quality, None, 0xA11CE, enemy, 3, rank);
+                assert!(relative >= Quality::Epic, "{} rank {rank}", item.name);
+                if catalog().roll(2026, 7, enemy, rank) < Quality::Epic {
+                    absolute_below_epic += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        absolute_below_epic > 0,
+        "the absolute roll does downgrade tier-4 drops"
+    );
+}
+
+#[test]
+fn floor_zeroing_distribution_matches_table() {
+    const SAMPLES: u64 = 200_000;
+    let shares = |base: Quality, floor: Option<Quality>, rank: u32| {
+        let mut counts = [0u64; 6];
+        for enemy in 0..SAMPLES {
+            counts[catalog().roll_relative(base, floor, 0x5EED_2026, 11, enemy, rank) as usize] +=
+                1;
+        }
+        counts
+    };
+    let percent = |count: u64| count as f64 * 100.0 / SAMPLES as f64;
+    // design-loot-economy §4, measured by B at rank 3 with the Uncommon
+    // floor: tiers whose outcome lies below the floor weigh 0 and the rest
+    // renormalise (no pile-up on the floor, as max() would give).
+    let table: [(Quality, [f64; 6]); 2] = [
+        (Quality::Common, [0.0, 0.0, 80.1, 17.0, 2.8, 0.0]),
+        (Quality::Uncommon, [0.0, 0.0, 69.7, 24.2, 5.2, 0.9]),
+    ];
+    for (base, expected) in table {
+        let counts = shares(base, Some(Quality::Uncommon), 3);
+        assert_eq!(
+            (counts[0], counts[1]),
+            (0, 0),
+            "{base:?}: nothing below the floor"
+        );
+        for (tier, want) in Quality::ALL.iter().zip(expected) {
+            let got = percent(counts[*tier as usize]);
+            assert!(
+                (got - want).abs() < 0.5,
+                "{base:?} base, {tier:?}: {got:.2}% against the table's {want}%"
+            );
+        }
+    }
+    // When every tier at or above the floor weighs 0 the result is
+    // max(base, floor): at rank 0 no step reaches Legendary from Common
+    // (Legendary needs rank 5) or from Poor.
+    for (base, floor) in [
+        (Quality::Common, Quality::Legendary),
+        (Quality::Poor, Quality::Legendary),
+    ] {
+        for enemy in 0..64 {
+            assert_eq!(
+                catalog().roll_relative(base, Some(floor), 9, 9, enemy, 0),
+                base.max(floor)
+            );
+        }
+    }
+    // The elite flag selects exactly this floor.
+    assert_eq!(ELITE_QUALITY_FLOOR, Quality::Uncommon);
+    for enemy in 0..2000 {
+        for base in Quality::ALL {
+            assert_eq!(
+                drop_quality(base, 41, 5, enemy, 3, true),
+                catalog().roll_relative(base, Some(ELITE_QUALITY_FLOOR), 41, 5, enemy, 3)
+            );
+            assert_eq!(
+                drop_quality(base, 41, 5, enemy, 3, false),
+                catalog().roll_relative(base, None, 41, 5, enemy, 3)
+            );
+        }
+    }
+}
+
+#[test]
+fn roll_relative_with_common_base_and_no_floor_equals_roll() {
+    let mut tuples = Rng::new(0x5245_4C41_5449_5645);
+    for n in 0..20_000u32 {
+        let seed = tuples.next_u64();
+        let attempt = tuples.next_u64() % 4096;
+        let enemy = tuples.next_u64() % 4096;
+        let rank = if n % 100 == 99 { 1000 + n % 7 } else { n % 41 };
+        assert_eq!(
+            catalog().roll_relative(Quality::Common, None, seed, attempt, enemy, rank),
+            catalog().roll(seed, attempt, enemy, rank),
+            "tuple {n}"
+        );
+    }
+}
+
+#[test]
+fn drop_quality_consumes_no_combat_rng() {
+    // A wave-2 (drop_tier Some) drop of an Uncommon-base tier-1 item, so the
+    // relative outcome differs from the absolute roll.
+    let table = tier_one_table();
+    let rng_seed = (1..100_000u64)
+        .find(|seed| {
+            let mut rng = Rng::new(*seed);
+            rng.below(100) < 3
+                && content().items[table.pick(rng.below(table.total()))].base_quality
+                    == Quality::Uncommon
+        })
+        .unwrap();
+    let mut g = guaranteed_drop_game_with(rng_seed);
+    let a = g.attempt().unwrap();
+    assert!(a.drop_tier.is_some());
+    let (seed, attempt, enemy, rank) = (g.seed(), a.id, a.enemies[0].id, a.progression.rank);
+    let mut expected_rng = a.rng;
+    assert!(expected_rng.below(100) < 3);
+    let definition = table.pick(expected_rng.below(table.total()));
+    let base = content().items[definition].base_quality;
+    let expected = shifted_by_hand(base, catalog().roll(seed, attempt, enemy, rank));
+    assert_eq!(
+        drop_quality(base, seed, attempt, enemy, rank, false),
+        expected
+    );
+    g.tick(Input::default());
+    let a = g.attempt().unwrap();
+    assert_eq!(
+        a.rng.state, expected_rng.state,
+        "the kill draws the drop chance and the pick, and nothing for its quality"
+    );
+    assert_eq!(a.loot_events.len(), 1);
+    let receipt = &a.loot_events[0];
+    assert_eq!(receipt.definition, ItemDefId::at(definition));
+    assert_eq!(receipt.quality, expected, "{base:?} base");
+    assert_eq!(
+        g.campaign().item_quality(receipt.item_id).unwrap(),
+        expected
+    );
 }
 
 #[test]
@@ -141,16 +325,22 @@ fn drop_quality_uses_a_purpose_counter_without_extra_combat_rng_and_checkpoint_r
     let mut g = guaranteed_drop_game();
     let a = g.attempt().unwrap();
     let enemy = a.enemies[0].id;
-    let expected_quality = catalog().roll(g.seed(), a.id, enemy, a.progression.rank);
     let mut expected_rng = a.rng;
     assert!(expected_rng.below(100) < 3);
-    let available = content()
-        .items
-        .iter()
-        .enumerate()
-        .filter(|(n, item)| *n >= 4 && item.tier > 0 && item.tier <= 1)
-        .count();
-    expected_rng.below(available as u64);
+    // W2-09: the pick is the weighted DropTable's, one below(total) draw.
+    let table = tier_one_table();
+    let definition = table.pick(expected_rng.below(table.total()));
+    // W2-07: a fresh deploy takes the drop_tier Some path, whose quality is
+    // the relative roll on the picked item's base (decision 7), not the
+    // absolute roll this test pinned before.
+    let expected_quality = drop_quality(
+        content().items[definition].base_quality,
+        g.seed(),
+        a.id,
+        enemy,
+        a.progression.rank,
+        false,
+    );
     g.tick(Input::default());
     let a = g.attempt().unwrap();
     assert_eq!(a.rng.state, expected_rng.state);

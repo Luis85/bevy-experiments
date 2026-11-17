@@ -285,9 +285,14 @@ pub fn init_catalogs() -> Result<CatalogReport, ContentError> {
     crate::content::install()?;
     crate::world::install()?;
     crate::skill_catalog::install()?;
-    crate::enemy_catalog::install()?;
+    let enemies = crate::enemy_catalog::install()?;
     crate::ordnance::install()?;
-    crate::progression::install()?;
+    crate::progression::install()?
+        .check_wave_tiers(enemies)
+        .map_err(|message| ContentError::Invalid {
+            catalog: "progression",
+            message,
+        })?;
     crate::quality::install()?;
     crate::balance::install()?;
     Ok(CatalogReport {
@@ -315,10 +320,15 @@ mod tests {
     fn content_fingerprint_is_deterministic_and_covers_item_ids() {
         assert_eq!(content_fingerprint(), content_fingerprint());
         assert_ne!(content_fingerprint(), 0xcbf29ce484222325);
-        // Pinned: equals the fingerprint inside the checked-in v2/v3 save
-        // fixtures. Changing authored ids changes it on purpose; update this
+        // Pinned. Changing authored ids changes it on purpose; update this
         // (and review save compatibility) only when the ids really change.
-        assert_eq!(content_fingerprint(), 13_545_676_443_720_933_061);
+        // The checked-in v2/v3 save fixtures hold the value before W2-08
+        // appended the 39 loot-only item ids (13_545_676_443_720_933_061);
+        // they still load and only log the catalogue drift. W2-31 appended
+        // the 7 composition archetype ids (10_534_622_978_645_713_211
+        // before it). W2-41 appended the 8 decision-19 skill ids
+        // (12_142_090_777_039_725_619 before it).
+        assert_eq!(content_fingerprint(), 14_783_571_662_001_117_631);
     }
 
     #[test]

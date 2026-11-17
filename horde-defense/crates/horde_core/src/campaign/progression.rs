@@ -114,6 +114,20 @@ impl NpcTraining {
         Self::HitPoints,
         Self::Fatigue,
     ];
+    /// The rows a survivor can train, in display order. IQ, HP and FP keep
+    /// their variants and serde names (old saves name them), but
+    /// `Game::apply` rejects them with `CommandError::TrainingUnsupported`.
+    pub const TRAINABLE: [Self; 5] = [
+        Self::Strength,
+        Self::Dexterity,
+        Self::Health,
+        Self::Guns,
+        Self::Melee,
+    ];
+    /// Whether this row is in [`Self::TRAINABLE`].
+    pub fn is_trainable(self) -> bool {
+        Self::TRAINABLE.contains(&self)
+    }
 }
 
 impl StableKind for NpcTraining {
@@ -153,6 +167,12 @@ pub struct Player {
     pub points: u32,
     pub body: KindMap<BodyAttribute, u32>,
     pub loadout: [u64; 4],
+    /// The highest level whose level-up coin grant has been paid (0 and 1
+    /// both mean none). A ledger, at most `level`: settlement pays the levels
+    /// above it, at the root only and never in a worker. v6 saves are marked
+    /// paid up to their level, so nothing is owed retroactively.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub level_grant_paid: u32,
 }
 
 impl Player {
@@ -163,7 +183,7 @@ impl Player {
         self.level >= Self::level_cap()
     }
     pub fn next_level_xp(&self) -> u64 {
-        (20.0 + 15.0 * ((self.level.saturating_sub(1)) as f64).powf(1.3)).round() as u64
+        crate::progression::xp_to_advance_from(self.level)
     }
 }
 
@@ -303,6 +323,14 @@ pub struct Npc {
 }
 
 impl Npc {
+    /// The advancement level the awarded points reach: the smallest level
+    /// `n` in 1..=10 whose allowance `12 + 8(n - 1)` covers `awarded`.
+    pub fn advancement_level(&self) -> u8 {
+        let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
+        (1..=max)
+            .find(|n| 12 + 8 * (u32::from(*n) - 1) >= self.awarded)
+            .unwrap_or(max)
+    }
     pub fn claim_objectives(&mut self, allowance: u32) -> u32 {
         let before = self.awarded;
         let award = |npc: &mut Self, points: u32| {
@@ -364,12 +392,64 @@ pub enum NodePayment {
     LegacyBodyPoints(u32),
 }
 
+/// The advancement cap level (CD5) for `clears` first clears and the
+/// high-water liberation count `liberations`:
+/// `min(10, max(1 + clears, 1 + ceil(3L/2)))`.
+fn cap_level_for(clears: u32, liberations: u32) -> u32 {
+    let max = u32::from(crate::defenders::MAX_ADVANCEMENT_LEVEL);
+    let by_liberation = (1 + (3 * liberations).div_ceil(2)).min(max);
+    let by_clears = (1 + clears).min(max);
+    by_clears.max(by_liberation)
+}
+
 impl Campaign {
     pub fn npc_available(&self) -> bool {
         self.has_feature(crate::skill_catalog::CampaignFeature::Companion)
     }
+    /// The highest advancement level the campaign allows its survivor
+    /// defenders (CD5): `min(10, max(1 + first_clears, 1 + ceil(3L/2)))`
+    /// with `L` the high-water liberation count. Never below the legacy level
+    /// `1 + first_clears` up to the max level 10 (a catalogue of 10 or more
+    /// levels stops there too), and equal to it with nothing liberated.
+    pub fn advancement_cap_level(&self) -> u8 {
+        self.cap_level().min(u32::from(u8::MAX)) as u8
+    }
+    /// What raises the advancement allowance now, as player text, naming
+    /// only what would raise the cap level from here: a new stage clear
+    /// while the first-clear term carries the cap, a liberation while the
+    /// liberation term does (W2-10), both when they tie; nothing at the max
+    /// level. A new clear counts only while some catalogue level is still
+    /// uncleared: country stages map onto the catalogue levels, so once all
+    /// of them are first-cleared only liberations raise the cap.
+    pub fn allowance_raise_hint(&self) -> String {
+        let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
+        let cap = self.cap_level();
+        if cap >= u32::from(max) {
+            return format!("The allowance is at its highest, advancement level {max}.");
+        }
+        let clears = self.first_clears.len() as u32;
+        let liberations = self.liberated_count();
+        let new_clear_possible = content()
+            .levels
+            .iter()
+            .any(|level| !self.first_clears.contains(&level.id));
+        let clear_raises = new_clear_possible && cap_level_for(clears + 1, liberations) > cap;
+        let liberation_raises = cap_level_for(clears, liberations + 1) > cap;
+        match (liberation_raises, clear_raises) {
+            (true, true) => "Liberate a country or clear a new stage to raise the allowance.",
+            (true, false) => "Liberate a country to raise the allowance.",
+            (false, true) => "Clear a new stage to raise the allowance.",
+            (false, false) => "Liberate more countries to raise the allowance.",
+        }
+        .to_owned()
+    }
+    fn cap_level(&self) -> u32 {
+        cap_level_for(self.first_clears.len() as u32, self.liberated_count())
+    }
+    /// Advancement points the campaign allows each survivor defender:
+    /// 12 at level 1 and 8 more per level up to the cap level.
     pub fn allowance(&self) -> u32 {
-        12 + 8 * self.first_clears.len() as u32
+        12 + 8 * (self.cap_level() - 1)
     }
     pub fn body_cap(&self) -> u32 {
         5 + 3 * self.first_clears.len() as u32
@@ -404,21 +484,26 @@ impl Campaign {
             .node(id)
             .is_some_and(|node| self.owns_node_definition(node))
     }
+    /// Catalogue countries currently liberated or whose unique-clear high
+    /// water reached every stage (an outbreak reopening keeps the count).
+    /// Looks up only the ids the ledgers name, through the country index, so
+    /// the per-tick `allowance()` no longer scans the whole world; each
+    /// catalogue country counts once, unknown ids never.
     pub fn liberated_count(&self) -> u32 {
-        crate::world::world()
-            .countries
+        use crate::world::country_stage_count;
+        let cleared = &self.world.cleared;
+        let freed = cleared
             .iter()
-            .filter(|country| {
-                self.world.cleared.contains(&country.id)
-                    || self
-                        .world
-                        .clear_high_water
-                        .get(&country.id)
-                        .copied()
-                        .unwrap_or(0)
-                        == country.level_count()
-            })
-            .count() as u32
+            .enumerate()
+            .filter(|(i, id)| country_stage_count(id).is_some() && !cleared[..*i].contains(id))
+            .count();
+        let by_high_water = self
+            .world
+            .clear_high_water
+            .iter()
+            .filter(|(id, count)| country_stage_count(id) == Some(**count) && !cleared.contains(id))
+            .count();
+        (freed + by_high_water) as u32
     }
     pub fn has_feature(&self, feature: crate::skill_catalog::CampaignFeature) -> bool {
         if self.legacy_features
@@ -453,6 +538,50 @@ impl Campaign {
             self.victories
         };
         u32::try_from(victories).unwrap_or(u32::MAX)
+    }
+    /// The threat rank an expedition by `npc` plays at (W4-12, ruling R57):
+    /// [`crate::defenders::expedition_threat_rank`] of its advancement level
+    /// and the levels of its loadout items in this campaign's stash (a slot
+    /// this stash does not hold counts as level 1). It is never above
+    /// [`Self::progression_rank`], so an expedition is never harder than
+    /// the main run and a saved expedition attempt keeps its rank within
+    /// the campaign's clears.
+    pub fn expedition_threat_rank(&self, npc: &Npc) -> u32 {
+        let levels = npc
+            .loadout
+            .map(|id| self.item(id).map_or(1, |item| item.level));
+        crate::defenders::expedition_threat_rank(npc.advancement_level(), levels)
+            .min(self.progression_rank())
+    }
+    /// The item definition a rank `rank` milestone grants in a game with
+    /// `seed` (design-progression-tree §7, ruling E7): a Ranged definition
+    /// that is not NPC-only, of a weapon class the campaign is trained in
+    /// (Pistol when it is trained in none), at tier `min(unlocked(), 4)`, or
+    /// the highest lower tier from 1 up that has one. The pick is
+    /// `keyed(seed, rank, 0, MILESTONE)` over the candidates in catalogue
+    /// order, so it draws no RNG. None when no tier has a candidate.
+    pub fn milestone_item_definition(&self, seed: u64, rank: u32) -> Option<usize> {
+        let mut classes = self.modifiers().weapon_classes;
+        if classes.is_empty() {
+            classes.insert(WeaponClass::Pistol);
+        }
+        let items = &content().items;
+        let key = crate::hash::keyed(seed, u64::from(rank), 0, crate::hash::tags::MILESTONE);
+        let top = self.unlocked().min(4);
+        (1..=top).rev().find_map(|tier| {
+            let candidates: Vec<usize> = items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| {
+                    item.tier == tier
+                        && item.slot == Slot::Ranged
+                        && !item.npc_only
+                        && classes.contains(&WeaponSpec::from_item(item).class)
+                })
+                .map(|(index, _)| index)
+                .collect();
+            (!candidates.is_empty()).then(|| candidates[(key % candidates.len() as u64) as usize])
+        })
     }
     fn legacy_clear_rank(&self) -> u32 {
         let mut cleared = self.world.clear_high_water.clone();
@@ -511,11 +640,20 @@ impl Campaign {
     pub fn lane_count_after_victory(&self) -> u8 {
         self.balance_settings.geometry(self.level_after_victory()).0
     }
-    fn progression_for(
+    /// The two-axis encounter snapshot a deploy freezes (design
+    /// enemy-balance §1 and §3): threat `rank` scaled by the balance
+    /// settings for `lanes` in `mode`, with the preset's extras folded in
+    /// and, on a country stage at `front`, the front ramp folded into enemy
+    /// health and arrival and the stage's boss rank stamped with its
+    /// `boss_ranks` terms folded. `front` None
+    /// (no country: GOLDEN and smoke) keeps the literal neutral ramp and a
+    /// Sector boss. Pure.
+    pub fn progression_for(
         &self,
         mode: Mode,
         rank: u32,
         lanes: u8,
+        front: Option<crate::progression::FrontPosition>,
     ) -> Result<crate::progression::ProgressionSnapshot, String> {
         let cfg = crate::progression::catalog();
         if rank > cfg.threat_guard_rank {
@@ -530,15 +668,35 @@ impl Campaign {
         if mode == Mode::Npc {
             result.arrival_multiplier *= cfg.npc_arrival_factor;
         }
+        let extras = self.balance_extras();
+        result.fold_extras(extras);
+        // The neutral ramp writes nothing and multiplies nothing, so a stage
+        // without one is the rank's snapshot bit for bit.
+        if let Some(ramp) = cfg.front_ramp(extras.front_ramp_pct, front) {
+            result.front_ramp = ramp;
+            result.enemy_health = (result.enemy_health * ramp).min(4096.0);
+            result.arrival_multiplier = (result.arrival_multiplier * ramp).min(8.0);
+        }
+        // The stage's boss rank and its catalogue terms (rulings W-6 and
+        // W-9): Regional health and reward; Capstone health, armor, reward,
+        // damage and a transition. Without a country the boss is a Sector
+        // boss and nothing is folded.
+        if let Some(front) = front {
+            let boss_rank = front.boss_rank();
+            result.fold_boss_rank(boss_rank, cfg.boss_ranks.of(boss_rank));
+        }
         Ok(result)
     }
+    /// The next deploy's rank snapshot, before any front position (the
+    /// briefing's rank-only forecast).
     pub fn deployment_progression(
         &self,
         mode: Mode,
     ) -> Result<crate::progression::ProgressionSnapshot, String> {
-        self.progression_for(mode, self.progression_rank(), self.lane_count())
+        self.progression_for(mode, self.progression_rank(), self.lane_count(), None)
     }
     /// Preview includes known completion XP only, not unearned future kill XP.
+    /// Rank-only, like [`Self::deployment_progression`].
     pub fn next_victory_progression(
         &self,
         mode: Mode,
@@ -547,6 +705,7 @@ impl Campaign {
             mode,
             self.progression_rank().saturating_add(1),
             self.lane_count_after_victory(),
+            None,
         )
     }
     pub fn shop_item_level(&self) -> u32 {
@@ -626,7 +785,7 @@ impl Campaign {
         if let NodePayment::Coins(price) = self.node_payment(id)?
             && self.coins < price
         {
-            return Err(format!("Need {} more coins", price - self.coins));
+            return Err(crate::coins::need_more(price - self.coins));
         }
         Ok(())
     }
@@ -679,7 +838,25 @@ impl Campaign {
         Ok(())
     }
     pub(super) fn award_player_xp(&mut self, xp: u64) -> u64 {
-        Self::award_xp_to(&mut self.player, xp, self.legacy_features)
+        let credited = Self::award_xp_to(&mut self.player, xp, self.legacy_features);
+        self.pay_neutral_level_grants();
+        credited
+    }
+    /// Shim (W2-52, R16), inert once a grant is authored: a level-up whose
+    /// grant is 0 coins owes nothing, so the ledger follows the level and a
+    /// native v7 save owes no backlog (as migration step (c); level 1 writes
+    /// nothing). `Game::settle_progression_rewards` (W2-22) pays the ledger
+    /// at settlement; this shim keeps it current mid-battle and in workers
+    /// while no grant is authored. The shipped grant is non-zero from level 2
+    /// on (W2-54), so GOLDEN no longer exercises it; only
+    /// `neutral_level_ups_keep_the_grant_ledger_paid` (a neutral rewards
+    /// block) covers it.
+    fn pay_neutral_level_grants(&mut self) {
+        let player = &mut self.player;
+        let mut owed = player.level_grant_paid.max(1).saturating_add(1)..=player.level;
+        if !owed.is_empty() && owed.all(|level| crate::progression::level_grant(level) == 0) {
+            player.level_grant_paid = player.level;
+        }
     }
     fn award_xp_to(player: &mut Player, mut xp: u64, legacy_points: bool) -> u64 {
         let mut credited = 0;
@@ -717,13 +894,30 @@ impl Campaign {
         let allowance = self.allowance();
         self.npc.claim_objectives(allowance);
     }
+    /// Coins for one paid NPC training point (Mara or a recruit), scaled by
+    /// threat: `camp_price(camp_prices.npc_training_base, progression_rank)`,
+    /// 25 / 30 / 50 / 75 / 150 at rank 0 / 1 / 10 / 20 / 50+.
+    pub fn npc_training_price(&self) -> u64 {
+        let base = crate::progression::rewards().camp_prices.npc_training_base;
+        crate::progression::camp_price(base, self.progression_rank())
+    }
+    /// Coins to recruit one survivor, scaled by threat from the world's
+    /// `recruit_cost` base: 100 / 110 / 200 / 300 / 600 at rank 0 / 1 / 10 /
+    /// 20 / 50+.
+    pub fn recruit_price(&self) -> u64 {
+        let base = crate::world::world().strategy_config.recruit_cost;
+        crate::progression::camp_price(base, self.progression_rank())
+    }
     pub fn buy_training_point(&mut self) -> Result<(), String> {
         self.preparation()?;
         self.claim_objectives();
         if self.npc.awarded >= self.allowance() {
-            return Err("Advancement allowance reached; clear a new stage".into());
+            return Err(format!(
+                "Advancement allowance reached. {}",
+                self.allowance_raise_hint()
+            ));
         }
-        self.spend(25)?;
+        self.spend(self.npc_training_price())?;
         self.award_npc_points(1);
         Ok(())
     }

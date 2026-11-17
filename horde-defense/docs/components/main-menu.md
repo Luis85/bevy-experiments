@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/menu.rs::menu"
 
 Resume the local campaign or choose a personal survivor before its first country.
 
-- **Entry, exit and actions:** Launch or saved return enters; a fresh New game route opens survivor confirmation, then the world-country choice. Continue opens the campaign or active battle. Change survivor is available before the first country; Settings and Save and exit remain explicit actions.
+- **Entry, exit and actions:** Launch or saved return enters; a fresh New game route opens survivor confirmation, then the world-country choice. Resume journey (the amber primary of an existing profile; New game is it for a fresh one) opens the active field, Results for a settled round, or Camp home. Change survivor is available before the first country; Settings, History and Save and quit remain explicit actions. Escape opens the quit confirmation. The footer carries the build stamp.
 - **State boundary:** Committed identity, profile existence and active attempt come from Game. The preview identity, measured title, keyart-v2 checkpoint layering and animation are presentation; menu motion consumes no simulation RNG or ticks.
 - **Responsiveness and accessibility:** The title and actions use compact spacing and a scrollable content area on short windows; reduced effects freezes the checkpoint scene and save errors remain visible.
 
@@ -22,4 +22,4 @@ The runtime preview uses the original source-image cabin foot anchor (0.400, 0.8
 
 The selected menu figure uses menu-survivors-v1.png as one coherent low-ready-pistol pose: hands/arms/pistol breathe together above planted boots. The original background anchor/21% height remains; battle and Character preview resolve the actual frozen loadout through the source-owned player_model facade.
 
-Existing-profile New game uses a protective confirmation/archive service. Resume routes to the active field, the settled journey upgrade home or incomplete selection. Leaving and New game are distinct actions.
+Existing-profile New game uses a protective confirmation/archive service. Resume routes to the active field, Results for an active journey with a settled round, Camp home for a started journey without one, or incomplete selection. Leaving and New game are distinct actions.

@@ -5,7 +5,8 @@ use crate::{
     settings::Settings,
 };
 use horde_core::{
-    command::Command,
+    campaign::SaleBlock,
+    command::{Command, CommandError, CommandOutcome},
     content::{Mode, StructureKind},
     sim::Input,
 };
@@ -54,6 +55,7 @@ fn scripted_session(game: &mut Game, runtime: &mut Runtime, scratch: &Scratch) -
             notices: &mut notices,
             cues: &mut cues,
             game_changed: false,
+            perf: None,
         };
         flush(&mut ctx);
         step(&mut ctx);
@@ -251,6 +253,7 @@ fn an_unusable_step_request_is_dropped_and_the_ordinary_tick_still_runs() {
         notices: &mut notices,
         cues: &mut cues,
         game_changed: false,
+        perf: None,
     };
     step(&mut ctx);
     assert_eq!(
@@ -270,7 +273,7 @@ fn an_unusable_step_request_is_dropped_and_the_ordinary_tick_still_runs() {
 fn panel_reports_the_live_attempt() {
     let mut game = camp_game();
     game.deploy_country_stage(0, Mode::Personal).unwrap();
-    let text = sim_panel_lines(&game, &Runtime::default(), false).join("\n");
+    let text = sim_panel_lines(&game, &Runtime::default(), false, None).join("\n");
     for needle in [
         "seed",
         "attempt",
@@ -281,6 +284,33 @@ fn panel_reports_the_live_attempt() {
     ] {
         assert!(text.contains(needle), "{needle} in {text}");
     }
+    assert!(!text.contains("music"), "{text}");
+}
+
+/// A6-15: the panel shows the music director's state.
+#[test]
+fn panel_reports_the_music_director() {
+    use horde_audio::music::{BattleInput, MusicInput, MusicScreen};
+    let game = camp_game();
+    let mut music = crate::music::MusicDirection::default();
+    music.advance(
+        &MusicInput {
+            screen: MusicScreen::Battle,
+            battle: Some(BattleInput {
+                enemies_alive: 20,
+                nearest_x_frac: 0.5,
+                hp_frac: 0.5,
+                boss_alive: false,
+                paused: false,
+            }),
+        },
+        16,
+    );
+    let lines = sim_panel_lines(&game, &Runtime::default(), false, Some(&music));
+    assert!(
+        lines.contains(&"music         BattleLow, intensity 0.50, track deferred".to_owned()),
+        "{lines:?}"
+    );
 }
 
 #[test]
@@ -292,4 +322,328 @@ fn dump_writes_the_save_payload() {
     assert!(path.starts_with(scratch.0.join("dumps")));
     let bytes = std::fs::read(path).unwrap();
     assert_eq!(bytes, serde_json::to_vec(&game).unwrap());
+}
+
+/// `tests/fixtures/recording_v6_equipped_sale.jsonl`: a fresh new game
+/// recorded through the runner on the v6 build (parent commit 3d492cd). Rook
+/// starts in Germany and fights with aim quantised to whole yards until the
+/// banked coins buy the cheapest outfit, retreats, buys it, equips it and
+/// sells the equipped item (accepted under ruleset 1), then the recording
+/// ends with its digest.
+const EQUIPPED_SALE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/recording_v6_equipped_sale.jsonl"
+);
+
+/// The cheapest tier-1 outfit a fresh campaign may buy.
+fn cheapest_outfit(game: &Game) -> (horde_core::content::ItemDefId, u64) {
+    horde_core::content::content()
+        .items
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| {
+            item.tier == 1 && item.purchasable() && item.slot == horde_core::content::Slot::Outfit
+        })
+        .map(|(n, item)| (item.id.clone(), game.campaign().buy_price(n).unwrap()))
+        .min_by_key(|(id, price)| (*price, id.as_str().to_owned()))
+        .unwrap()
+}
+
+#[test]
+#[ignore = "writes tests/fixtures/recording_v6_equipped_sale.jsonl; set LASTLIGHT_WRITE_RECORDING_FIXTURE"]
+fn write_equipped_sale_recording() {
+    let Some(path) = std::env::var_os("LASTLIGHT_WRITE_RECORDING_FIXTURE").map(PathBuf::from)
+    else {
+        return;
+    };
+    assert!(!path.exists(), "refusing to overwrite {}", path.display());
+    assert_eq!(
+        horde_core::sim::SAVE_VERSION,
+        6,
+        "this recording is cut on v6"
+    );
+    horde_core::catalog::init_catalogs().unwrap();
+    let scratch = Scratch::new("record-equipped-sale");
+    let mut game = Game::default();
+    let mut runtime = Runtime::default();
+    runtime.start_recording(Recorder::create(&path, &game, 0).unwrap());
+    let settings = Settings::default();
+    let paths = ProfilePaths::in_directory(scratch.0.clone());
+    let (mut notices, mut cues) = (Vec::new(), Vec::new());
+    let mut frame = 0;
+    let mut pass = |game: &mut Game, runtime: &mut Runtime, held: Input| {
+        frame += 1;
+        runtime.begin_frame(frame);
+        runtime.publish(ControlFrame {
+            enabled: true,
+            held,
+            ..ControlFrame::default()
+        });
+        let mut ctx = RuntimeCtx {
+            game,
+            runtime,
+            settings: &settings,
+            paths: &paths,
+            notices: &mut notices,
+            cues: &mut cues,
+            game_changed: false,
+            perf: None,
+        };
+        flush(&mut ctx);
+        step(&mut ctx);
+    };
+    let (outfit, price) = cheapest_outfit(&game);
+    for command in [
+        Command::ChooseSurvivor(horde_core::survivors::SurvivorId::Rook),
+        Command::ChooseStart("DEU".into()),
+        Command::SetPaused(false),
+    ] {
+        runtime.enqueue(command, "");
+    }
+    pass(&mut game, &mut runtime, Input::default());
+    while game.campaign().coins < price {
+        assert!(
+            game.attempt().is_some(),
+            "the defense ended before the outfit was affordable"
+        );
+        let mut held = horde_core::sim::smoke_input(&game);
+        held.aim = [held.aim[0].round(), held.aim[1].floor() + 0.5];
+        pass(&mut game, &mut runtime, held);
+    }
+    runtime.enqueue(Command::Withdraw, "");
+    runtime.enqueue(Command::BuyItem(outfit), "");
+    pass(&mut game, &mut runtime, Input::default());
+    let item = game.campaign().items.last().unwrap().id;
+    runtime.enqueue(
+        Command::Equip {
+            mode: Mode::Personal,
+            id: item,
+        },
+        "",
+    );
+    pass(&mut game, &mut runtime, Input::default());
+    assert_eq!(
+        game.campaign().player.loadout[2],
+        item,
+        "the outfit is equipped"
+    );
+    runtime.enqueue(Command::SellItem(item), "");
+    pass(&mut game, &mut runtime, Input::default());
+    assert!(
+        game.campaign().item(item).is_none(),
+        "ruleset 1 sells the equipped outfit"
+    );
+    assert!(runtime.stop_recording(&game, "fixture"));
+    runtime.finish_storage_for_test();
+}
+
+/// A recording made by an older build loads its initial state the way that
+/// build's save would load here: migrated, reconciled and validated through
+/// `Game::from_payload`. A current-version initial state is taken as recorded.
+#[test]
+fn v6_recording_initial_state_goes_through_from_payload() {
+    use horde_core::sim::{RULESET_VERSION, SAVE_VERSION};
+    horde_core::catalog::init_catalogs().unwrap();
+    let game = Game::default();
+    let header = |version: u32, initial: serde_json::Value| {
+        Line::Header(Header {
+            format: FORMAT,
+            seed: game.seed(),
+            version,
+            ruleset: RULESET_VERSION,
+            content_fingerprint: hex(horde_core::catalog::content_fingerprint()),
+            start_tick: 0,
+            initial,
+        })
+    };
+    // A pre-journey save: reconciling it on load derives the journey flags,
+    // so the loaded and the raw state differ.
+    let mut initial = serde_json::to_value(&game).unwrap();
+    initial["campaign"]["journey_revision"] = 0.into();
+    let loaded = Game::from_payload(initial.clone(), 6).unwrap();
+    let raw: Game = serde_json::from_value(initial.clone()).unwrap();
+    assert_ne!(loaded.state_digest(), raw.state_digest());
+    let old = replay(vec![header(6, initial.clone())]).unwrap();
+    assert_eq!((old.ticks, old.digest), (0, loaded.state_digest()));
+    let current = replay(vec![header(SAVE_VERSION, initial)]).unwrap();
+    assert_eq!(current.digest, raw.state_digest());
+    // An old initial state that cannot be migrated is an error.
+    let mut broken = serde_json::to_value(&game).unwrap();
+    broken["battles"] = serde_json::json!([{"game": {}}]);
+    let error = replay(vec![header(6, broken)]).unwrap_err();
+    assert!(error.contains("recorded initial state"), "{error}");
+}
+
+/// Replaces `v6_fresh_recording_reproduces_before_strict_sale` (W1-20): a
+/// ruleset 1 recording that sells an equipped item is not expected to
+/// reproduce under ruleset 2. Replay still loads the v6 initial state,
+/// applies every command and reaches the end line, and the warnings name
+/// both the older ruleset and the older save version. Since W2-39 the digest
+/// differs before the sale is reached: the replayed defender falls early, the
+/// recorded buy is refused for want of coins, and the recorded sale names an
+/// item never bought (`SaleBlocked(Unknown)`). The strict equipped-sale rule
+/// (`SaleBlocked(EquippedPersonal)`) is checked separately on that state,
+/// with the coins the buy needs.
+#[test]
+fn pre_strict_recording_diverges_with_ruleset_warning() {
+    horde_core::catalog::init_catalogs().unwrap();
+    let lines = read_lines(Path::new(EQUIPPED_SALE)).unwrap();
+    let Some(Line::Header(header)) = lines.first() else {
+        panic!("header first");
+    };
+    assert_eq!((header.format, header.version, header.ruleset), (1, 6, 1));
+    let commands: Vec<_> = lines
+        .iter()
+        .filter_map(|line| match line {
+            Line::Command { command, .. } => Some(command.clone()),
+            _ => None,
+        })
+        .collect();
+    let [
+        ..,
+        Command::BuyItem(bought),
+        Command::Equip {
+            mode: equip_mode,
+            id: equipped,
+        },
+        Command::SellItem(sold),
+    ] = commands.as_slice()
+    else {
+        panic!("the recording ends buy, equip, sell: {commands:?}");
+    };
+    assert_eq!(equipped, sold, "the sold item is the equipped one");
+    let Some(Line::End { digest, .. }) = lines.last() else {
+        panic!("the recording ends with its digest");
+    };
+    let recorded = digest.clone();
+    let sold = *sold;
+    let mut without_sale = lines.clone();
+    let sale = without_sale
+        .iter()
+        .rposition(|line| {
+            matches!(
+                line,
+                Line::Command {
+                    command: Command::SellItem(_),
+                    ..
+                }
+            )
+        })
+        .unwrap();
+    without_sale.remove(sale);
+    let (game, report) = replay_game(lines).unwrap();
+    assert_eq!(
+        report.commands,
+        commands.len(),
+        "replay applies every command"
+    );
+    assert_eq!(report.recorded_digest.as_ref(), Some(&recorded));
+    assert_ne!(
+        hex(report.digest),
+        recorded,
+        "the replay diverges: the recorded buy is refused for coins and the sale is SaleBlocked(Unknown)"
+    );
+    assert!(!report.matches_recording());
+    // Ruleset 2 refuses a sale as a typed SaleBlocked rejection that changes
+    // nothing. Since W2-39 the replayed defender falls before the recorded
+    // withdrawal: Germany, the recording's start, plays difficulty 1.04
+    // instead of 1.06 (the stage-count bands of design-enemy-balance §8,
+    // content), so the defeat pays 23 coins, the recorded buy of a 60-coin
+    // padded vest is refused for want of coins, and the recorded Equip and
+    // SellItem name an item that was never bought.
+    let mut again = game.clone();
+    assert_eq!(
+        again.apply(&Command::SellItem(sold)),
+        Err(CommandError::SaleBlocked(SaleBlock::Unknown))
+    );
+    assert_eq!(again.state_digest(), report.digest);
+    assert!(
+        game.campaign().item(sold).is_none(),
+        "the recorded buy was refused"
+    );
+    // The recorded buy, equip and sale on that state, with the coins the
+    // buy needs: ruleset 2 refuses the equipped sale and keeps the item.
+    again.campaign_mut().coins += 1_000;
+    let Ok(CommandOutcome::Id(vest)) = again.apply(&Command::BuyItem(bought.clone())) else {
+        panic!("the recorded {bought} can be bought with coins in hand");
+    };
+    again
+        .apply(&Command::Equip {
+            mode: *equip_mode,
+            id: vest,
+        })
+        .unwrap();
+    let before = again.state_digest();
+    assert_eq!(
+        again.apply(&Command::SellItem(vest)),
+        Err(CommandError::SaleBlocked(SaleBlock::EquippedPersonal))
+    );
+    assert_eq!(again.state_digest(), before);
+    assert!(
+        again.campaign().item(vest).is_some(),
+        "the equipped item is kept"
+    );
+    // The play before the sale is pinned here, because the recorded End
+    // digest cannot vouch for it. Rebuilding the ruleset 1 sale legally
+    // (equip the personal starter outfit, then sell) reaches
+    // 107ff7ceb7fde8d3, the same state as redoing the old unequip-and-replace
+    // sale by hand, and not the recorded 9308db57c71cb2f0. So the 2,592
+    // recorded combat ticks no longer replay as they did on v6. The expected
+    // cause is W1-69 (enemies never block each other), whose re-bless clause
+    // names this replay. With this pin, any further drift in the replayed
+    // combat, retreat, buy or equip fails the test, not only the sale.
+    // W2-05 (per-archetype telemetry, class T) moved the pin from
+    // 81559980e3a904d7: the report now carries the archetype maps. With those
+    // three maps removed the replayed state digests to 81559980e3a904d7
+    // again, so no combat moved. W2-06 (drop tracking, class F) moved it from
+    // 0da44f5dc0a31d2c: attempts save their frozen drop_tier and drop_ids,
+    // and reports their drop_ids and loot_by_quality. With those four keys
+    // left unserialized the replayed state digests to 0da44f5dc0a31d2c again.
+    // W2-07 (relative drop quality) moved it from dfcb186697a88f45: the
+    // replayed deploys take the drop_tier Some path, so a drop of an
+    // Uncommon-base item rolls its quality relative to that base. With
+    // drop_quality returning the absolute roll the replayed state digests to
+    // dfcb186697a88f45 again, so no combat moved. W2-08 (39 loot-only items,
+    // class C) moved it from 3894ac12174eb3f7: the replayed deploys' drops
+    // pick from the larger catalogue. With the Some path limited to the 29
+    // v1 definitions the replayed state digests to 3894ac12174eb3f7 again.
+    // W2-39 (difficulty bands and the start clamp, class C) moved it from
+    // fa528d88f6639802: the replayed Germany start plays difficulty 1.04
+    // instead of 1.06, so the combat, its defeat and the refused buy differ.
+    // With the parent world.json and the raw difficulty in the deploy terms
+    // the replayed state digests to fa528d88f6639802 again. W2-09 (the
+    // weighted DropTable, class G) moved it from 711acf17d72357c2: the
+    // replayed deploys' drops are picked by drop-tier and trained-class
+    // weight with the same one draw. With neutral weights (DROP_TIER_WEIGHTS
+    // and TRAINED_CLASS_WEIGHT all 1) the replayed state digests to
+    // 711acf17d72357c2 again.
+    assert_eq!(
+        hex(replay(without_sale).unwrap().digest),
+        "0e558e53029c6c41",
+        "the replay of the recording up to its sale is pinned"
+    );
+    // Only compatibility warnings, never a format or seed mismatch. A content
+    // fingerprint warning is allowed: the fixture's fingerprint covers item
+    // ids, and appending content moves it without changing this property.
+    let unexpected: Vec<&String> = report
+        .warnings
+        .iter()
+        .filter(|w| {
+            !(w.contains("ruleset 1") || w.contains("save version 6") || w.contains("fingerprint"))
+        })
+        .collect();
+    assert!(unexpected.is_empty(), "{:?}", report.warnings);
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|w| w.contains("ruleset 1") && w.contains("may diverge")),
+        "{:?}",
+        report.warnings
+    );
+    assert!(
+        report.warnings.iter().any(|w| w.contains("save version 6")),
+        "{:?}",
+        report.warnings
+    );
 }

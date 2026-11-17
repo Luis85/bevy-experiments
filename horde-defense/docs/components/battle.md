@@ -4,18 +4,18 @@ id: battle
 title: "Active defense battlefield"
 parent: game
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::battle"
+source: "crates/horde_game/src/ui/battle/field.rs::battle"
 ---
 
 # Active defense battlefield
 
 Present the fixed survivor and deployment-frozen lanes as an atmospheric pixel battlefield.
 
-- **Entry, exit and actions:** Enter on deployment/retry or resume an active defense; aim/fire/reload/melee in personal mode, manage construction or policy on demand, retreat to debrief.
+- **Entry, exit and actions:** Enter on deployment/retry or resume an active defense; aim/fire/reload/melee in personal mode, manage construction or tactics on demand, hold Retreat & train (Recall & train) to settle on Results. The battle's one amber primary is Begin defense or Resume defense, and only while paused. Escape cancels a retreat hold, else closes construction, else passes to the Pause binding only when Pause is bound to Escape (decision 18). The layout is `battle-layout`; the boss banner, the low-HP warning and the retreat hold are their own Views.
 - **State boundary:** Attempt state and fixed ticks own outcomes. Pointer aim, construction visibility and effects are presentation; visuals cannot alter combat geometry.
 - **Responsiveness and accessibility:** All deployment-frozen lanes remain visible. Compact corner HUD replaces a permanent sidebar; settings expose outlines, reduced effects and visual cues for important audio.
 
-**Current increment contract:** Deployment/retry start immediately. Failure describes retreat, rest and training with earned rewards retained. Fallen hostile records persist for the attempt and save/resume; settled corpses render in batches without remaining active hostiles or paying twice. Ordinary enemies and skill nodes use authored catalogs.
+**Current increment contract:** The first defense of a journey opens paused; Briefing deploys and retries start live. Failure describes retreat, rest and training with earned rewards retained. Fallen hostile records persist for the attempt and save/resume; settled corpses render in batches without remaining active hostiles or paying twice. Ordinary enemies and skill nodes use authored catalogs.
 
 Parent IDs express view containment, not an exclusive navigation route. Implementation status records the existing surface; it does not claim native GUI validation.
 

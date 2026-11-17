@@ -1,8 +1,13 @@
 mod animation;
+#[cfg(test)]
+mod architecture_tests;
 mod art;
+#[cfg(test)]
+mod asset_audit;
 mod atmosphere_audio;
 mod audio;
 mod battle_view;
+mod build_info;
 #[cfg(feature = "review")]
 mod capture_sequence;
 #[cfg(feature = "dev")]
@@ -13,18 +18,26 @@ mod gear_appearance;
 mod inspector;
 mod launch;
 mod logging;
+mod music;
+mod perf_budget;
 mod player_model;
 mod profile;
+mod render_plan;
+#[cfg(test)]
+mod repo_checks;
+mod review_scenes;
 #[cfg(feature = "review")]
 mod review_tools;
 mod runner;
 mod settings;
 mod sfx;
+#[cfg(test)]
+mod source_scan;
 mod ui;
 mod visual_assets;
 mod worldmap;
 
-use bevy::{app::AppExit, prelude::*, window::WindowResolution};
+use bevy::{app::AppExit, prelude::*};
 
 fn validate_startup_catalogs(config: &launch::LaunchConfig) -> Result<(), String> {
     // Loads, validates and installs every catalogue; a bad override is a clean error.
@@ -58,6 +71,17 @@ fn main() -> AppExit {
         print!("{}", launch::HELP);
         return AppExit::Success;
     }
+    if config.action == launch::LaunchAction::Version {
+        println!("{}", build_info::version_line());
+        return AppExit::Success;
+    }
+    if config.action == launch::LaunchAction::ListScenes {
+        // The capture scripts read scene names only from this listing.
+        for line in review_scenes::list_lines(cfg!(feature = "review")) {
+            println!("{line}");
+        }
+        return AppExit::Success;
+    }
     logging::install_panic_hook(config.log_directory());
     if let Err(error) = validate_startup_catalogs(&config) {
         eprintln!("Invalid startup content: {error}");
@@ -83,54 +107,32 @@ fn main() -> AppExit {
             code => AppExit::from_code(code as u8),
         };
     }
-    let (width, height) = config.window;
-    diagnostics::enable_work_timing(config.perf().is_some());
+    // The one read of settings.json for this process, before the App: the
+    // present mode and pipelined rendering are fixed from it (or a perf
+    // override), and the frontend reuses it instead of reading again.
+    let startup_settings =
+        profile::startup_settings(&config, &profile::ProfilePaths::from_config(&config));
+    let plan = render_plan::render_plan(&startup_settings.settings, config.perf());
     let mut app = App::new();
     if config.sequence_path().is_some() {
         // LaunchConfig already rejected exports outside an isolated motion review.
         app.insert_resource(bevy::time::TimeUpdateStrategy::FixedTimesteps(1));
         app.insert_resource(bevy::winit::WinitSettings::continuous());
     }
-    let asset_directory = asset_directory(&config);
+    let plugins = render_plan::default_plugins(&config, &asset_directory(&config), &plan);
     // Inserted before LogPlugin so the file layer can find the save directory.
     app.insert_resource(config);
     // Performance sampling keeps ordinary window scheduling. Only deterministic
     // visual export above overrides time and redraw cadence.
     app.insert_resource(ClearColor(Color::srgb(0.067, 0.09, 0.094)))
-        .add_plugins(
-            DefaultPlugins
-                // `RUST_LOG`, when set, overrides this filter entirely.
-                .set(bevy::log::LogPlugin {
-                    filter: logging::DEFAULT_FILTER.into(),
-                    custom_layer: logging::file_layer,
-                    ..default()
-                })
-                .set(AssetPlugin {
-                    file_path: asset_directory.to_string_lossy().into_owned(),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Lastlight · Horde Defense".into(),
-                        visible: false,
-                        resolution: WindowResolution::new(width, height),
-                        // One queued frame instead of Bevy's two: the arena
-                        // aims at the pointer, so presentation latency is felt.
-                        desired_maximum_frame_latency: std::num::NonZero::new(1),
-                        resize_constraints: bevy::window::WindowResizeConstraints {
-                            min_width: 1050.0,
-                            min_height: 700.0,
-                            ..default()
-                        },
-                        ..default()
-                    }),
-                    close_when_requested: false,
-                    ..default()
-                }),
-        );
+        .add_plugins(plugins)
+        .add_plugins(render_plan::DisplayPlugin(plan));
     let config = app.world().resource::<launch::LaunchConfig>().clone();
-    // After LogPlugin so Game::load startup events reach the console and log file.
-    ui::FrontendParts::load(&config).insert_into(&mut app);
+    // Perf launches only: the probe, its span systems and the GPU span.
+    diagnostics::install(&mut app, &config);
+    // After LogPlugin so the stamp and the Game::load startup events reach the
+    // console and log file.
+    load_frontend(&config, startup_settings).insert_into(&mut app);
     let review = config.review().is_some();
     app.add_systems(Startup, log_launch_warnings).add_plugins((
         runner::SimRuntimePlugin,
@@ -138,6 +140,7 @@ fn main() -> AppExit {
         sfx::SfxPlugin,
         ui::UiPlugin,
         atmosphere_audio::AtmosphereAudioPlugin,
+        music::MusicPlugin,
     ));
     #[cfg(feature = "review")]
     if review {
@@ -147,14 +150,28 @@ fn main() -> AppExit {
     let _ = review;
     #[cfg(feature = "dev")]
     app.add_plugins(debug_tools::DebugPlugin);
+    // Last, so no plugin replaces a frame schedule after it.
+    app.add_plugins(render_plan::SingleThreadedFramePlugin);
     app.run()
 }
 
-/// Parse warnings are collected before logging exists; report them once it does.
+/// Logs the parse warnings collected before logging existed.
 fn log_launch_warnings(config: Res<launch::LaunchConfig>) {
     for warning in &config.warnings {
         warn!("{warning}");
     }
+}
+
+/// Logs the build stamp, then loads the frontend. The settings warning and
+/// the save load are logged as the frontend loads, before any `Startup`
+/// system runs, so the stamp is logged here: every log names the build it
+/// came from on its first line.
+fn load_frontend(
+    config: &launch::LaunchConfig,
+    startup_settings: profile::SettingsLoad,
+) -> ui::FrontendParts {
+    info!("Lastlight {}", build_info::stamp());
+    ui::FrontendParts::load(config, startup_settings)
 }
 
 fn asset_directory(config: &launch::LaunchConfig) -> std::path::PathBuf {
@@ -170,4 +187,69 @@ fn asset_directory(config: &launch::LaunchConfig) -> std::path::PathBuf {
         }
     }
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets"))
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::log::{tracing, tracing_subscriber};
+    use std::sync::{Arc, Mutex};
+
+    /// A `MakeWriter` that appends every log line to one shared buffer.
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn the_build_stamp_is_the_first_line_of_a_startup_log() {
+        let directory =
+            std::env::temp_dir().join(format!("lastlight-stamp-first-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        let config = crate::launch::LaunchConfig {
+            save_directory: directory.clone(),
+            ..Default::default()
+        };
+        let paths = crate::profile::ProfilePaths::from_config(&config);
+        std::fs::create_dir_all(paths.directory()).unwrap();
+        // A returning player: an existing campaign and an unreadable settings file.
+        horde_core::sim::Game::default()
+            .save(&paths.campaign())
+            .unwrap();
+        std::fs::write(paths.settings(), b"not json").unwrap();
+        let settings = crate::profile::read_settings(&paths.settings());
+        assert!(settings.warning.is_some(), "the settings read must warn");
+
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            drop(super::load_frontend(&config, settings));
+        });
+        let _ = std::fs::remove_dir_all(&directory);
+
+        let log = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        let lines: Vec<&str> = log.lines().collect();
+        let stamp = format!("Lastlight {}", crate::build_info::stamp());
+        assert!(
+            lines.first().is_some_and(|line| line.ends_with(&stamp)),
+            "the first log line must be {stamp:?}:
+{log}"
+        );
+        assert!(
+            lines.iter().any(|line| line.contains("load started")),
+            "the save load is logged after the stamp:
+{log}"
+        );
+    }
 }

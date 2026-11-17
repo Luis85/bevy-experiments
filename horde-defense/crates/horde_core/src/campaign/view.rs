@@ -2,7 +2,7 @@
 //! labels; the rules themselves (gates, prices, focus targets) live here.
 use super::{Campaign, NodePayment, Recommendation, RecommendationAction};
 use crate::content::{ItemDefId, ItemDefinition, Mode, content};
-use crate::skill_catalog::{SkillEffect, SkillNode, skills};
+use crate::skill_catalog::{CampaignFeature, SkillEffect, SkillNode, skills};
 use crate::weapons::WeaponClass;
 
 /// Purchase state of one skill-graph node, consistent with `can_purchase_node`.
@@ -50,7 +50,39 @@ pub struct OfferPreview {
     pub affordable: bool,
 }
 
+/// The catalogue node that opens one campaign feature, for screens that
+/// name the feature before it is bought ("Liberating it opens Mara (75
+/// coins)"). A label accessor: buying the node is the unlock event.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FeatureUnlock {
+    /// Stable ID of the node; what `Command::BuySkillNode` takes.
+    pub node_id: String,
+    /// The node's player-facing name (for example "Meet Mara").
+    pub name: String,
+    /// The node's coin price.
+    pub cost: u64,
+    /// Countries that must have been liberated before the node is buyable.
+    pub liberations_required: u32,
+}
+
 impl Campaign {
+    /// The first catalogue node granting `feature`, or `None` when no node
+    /// does. Pure and read-only: the answer depends only on the skill
+    /// catalogue, never on ownership, coins or liberations.
+    pub fn feature_unlock(&self, feature: CampaignFeature) -> Option<FeatureUnlock> {
+        let grant = SkillEffect::FeatureUnlock(feature);
+        skills()
+            .nodes
+            .iter()
+            .find(|node| node.effects.contains(&grant))
+            .map(|node| FeatureUnlock {
+                node_id: node.id.clone(),
+                name: node.name.clone(),
+                cost: node.price,
+                liberations_required: node.minimum_liberated,
+            })
+    }
+
     pub fn node_status(&self, id: &str) -> NodeStatus {
         let Some(node) = skills().node(id) else {
             return NodeStatus::Locked {
@@ -147,13 +179,14 @@ impl Campaign {
         })
     }
 
-    /// Every purchasable (non-starter, unlocked tier) catalogue offer in order.
+    /// Every purchasable (non-starter, not loot-only, unlocked tier)
+    /// catalogue offer in order.
     pub fn shop_offers(&self) -> Vec<OfferPreview> {
         content()
             .items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.tier > 0 && item.tier <= self.unlocked())
+            .filter(|(_, item)| item.purchasable() && item.tier <= self.unlocked())
             .map(|(index, _)| self.shop_offer(index).expect("catalogue definition exists"))
             .collect()
     }
@@ -266,7 +299,7 @@ mod tests {
             c.node_status(&open.id),
             NodeStatus::Blocked {
                 payment: Some(NodePayment::Coins(open.price)),
-                reason: format!("Need {} more coins", open.price - c.coins),
+                reason: crate::coins::need_more(open.price - c.coins),
             }
         );
         c.coins = open.price;
@@ -414,7 +447,7 @@ mod tests {
         assert!(!offers.is_empty());
         for offer in &offers {
             let authored = &content().items[offer.definition];
-            assert!(authored.tier > 0 && authored.tier <= c.unlocked());
+            assert!(authored.purchasable() && authored.tier <= c.unlocked());
             assert_eq!(Ok(offer.price), c.buy_price(offer.definition));
             assert_eq!(offer.level, c.shop_item_level());
             assert_eq!(
@@ -437,5 +470,128 @@ mod tests {
         c.first_clears.clear();
         assert!(!c.shop_offer(later).unwrap().tier_unlocked);
         assert!(c.shop_offer(usize::MAX).is_err());
+    }
+
+    #[test]
+    fn loot_only_items_are_never_offered_bought_or_recommended() {
+        let loot_only: Vec<usize> = (0..content().items.len())
+            .filter(|&n| content().items[n].loot_only)
+            .collect();
+        assert_eq!(loot_only, (29..68).collect::<Vec<_>>());
+        let mut c = started();
+        c.first_clears = content().levels[..3].iter().map(|l| l.id.clone()).collect();
+        assert_eq!(c.unlocked(), 4);
+        c.coins = 1_000_000;
+        // The shop keeps its 24 rows: every unlocked purchasable definition.
+        let offers = c.shop_offers();
+        assert_eq!(offers.len(), 24);
+        assert!(
+            offers
+                .iter()
+                .all(|o| content().items[o.definition].purchasable())
+        );
+        let loot = "This equipment is only recovered as loot";
+        for &n in &loot_only {
+            assert_eq!(c.shop_offer(n).map(|o| o.definition), Err(loot.into()));
+            assert_eq!(c.buy_price(n), Err(loot.into()));
+            let (coins, owned) = (c.coins, c.items.len());
+            assert_eq!(c.buy_item(n), Err(loot.into()));
+            assert_eq!((c.coins, c.items.len()), (coins, owned));
+        }
+        // Mara wears a padded vest and a shop-level Marksman rifle (tier 1),
+        // so the recommender looks for the cheapest better ranged weapon:
+        // the loot-only Duty pistol (60) would undercut the Patrol rifle
+        // (120).
+        for kind in crate::content::StructureKind::ALL {
+            c.blueprints[kind] = true;
+        }
+        let level = c.shop_item_level();
+        for definition in [6, 4] {
+            let id = c.add_item_at_level(definition, level).unwrap();
+            c.equip(Mode::Npc, id).unwrap();
+        }
+        assert_eq!(
+            c.recommendation(Mode::Npc).action,
+            RecommendationAction::BuyEquipment(8)
+        );
+    }
+
+    #[test]
+    fn feature_unlock_companion_quotes_its_node_price_after_1_liberation() {
+        let c = started();
+        assert_eq!(
+            c.feature_unlock(CampaignFeature::Companion),
+            Some(FeatureUnlock {
+                node_id: "companion_contact".into(),
+                name: "Meet Mara".into(),
+                cost: 400,
+                liberations_required: 1,
+            })
+        );
+        let recruitment = c.feature_unlock(CampaignFeature::Recruitment).unwrap();
+        assert_eq!(
+            (recruitment.node_id.as_str(), recruitment.cost),
+            ("recruitment_network", 1_500)
+        );
+        assert_eq!(recruitment.liberations_required, 1);
+        // Every feature is granted by exactly one catalogue node (a second
+        // FeatureUnlock node appended to skills.json fails here), so the
+        // answer always agrees with the node the purchase preflight gates.
+        for feature in CampaignFeature::ALL {
+            let grant = SkillEffect::FeatureUnlock(feature);
+            let granting: Vec<&str> = skills()
+                .nodes
+                .iter()
+                .filter(|node| node.effects.contains(&grant))
+                .map(|node| node.id.as_str())
+                .collect();
+            let unlock = c.feature_unlock(feature).unwrap();
+            assert_eq!(granting, [unlock.node_id.as_str()], "{feature:?}");
+            let node = skills().node(&unlock.node_id).unwrap();
+            assert!(node.effects.contains(&SkillEffect::FeatureUnlock(feature)));
+            assert_eq!(
+                (
+                    unlock.name.as_str(),
+                    unlock.cost,
+                    unlock.liberations_required
+                ),
+                (node.name.as_str(), node.price, node.minimum_liberated)
+            );
+        }
+    }
+
+    #[test]
+    fn feature_unlock_is_pure() {
+        let fresh = started();
+        let mut liberated = started();
+        let count = world().country("DEU").unwrap().level_count();
+        for stage in 0..count {
+            liberated.record_country_stage_clear(stage).unwrap();
+        }
+        liberated.coins = 1000;
+        liberated.purchase_node("field_fitness").unwrap();
+        liberated.purchase_node("companion_contact").unwrap();
+        assert_eq!(liberated.liberated_count(), 1);
+        assert!(liberated.has_feature(CampaignFeature::Companion));
+        for c in [Campaign::default(), fresh.clone(), liberated] {
+            let before = c.clone();
+            let first: Vec<_> = CampaignFeature::ALL
+                .iter()
+                .map(|f| c.feature_unlock(*f))
+                .collect();
+            let again: Vec<_> = CampaignFeature::ALL
+                .iter()
+                .map(|f| c.feature_unlock(*f))
+                .collect();
+            assert_eq!(c, before, "feature_unlock changed the campaign");
+            assert_eq!(first, again);
+            // A label accessor, not the unlock event: ownership, liberations
+            // and coins never change the answer.
+            let fresh_answers: Vec<_> = CampaignFeature::ALL
+                .iter()
+                .map(|f| fresh.feature_unlock(*f))
+                .collect();
+            assert_eq!(first, fresh_answers);
+        }
     }
 }

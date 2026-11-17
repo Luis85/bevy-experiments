@@ -5,7 +5,7 @@ use super::persistence::SaveError;
 use serde_json::{Map, Value};
 
 /// Envelope version written by this build.
-pub const SAVE_VERSION: u32 = 6;
+pub const SAVE_VERSION: u32 = 7;
 
 /// Upgrade a payload saved at envelope `from` to [`SAVE_VERSION`].
 pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
@@ -19,6 +19,7 @@ pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
             3 => v3_to_v4(value)?,
             4 => v4_to_v5(value)?,
             5 => v5_to_v6(value)?,
+            6 => v6_to_v7(value)?,
             _ => unreachable!("every version below SAVE_VERSION has a step"),
         };
     }
@@ -450,6 +451,308 @@ fn rewrite_v5(value: &mut Value) -> Result<(), SaveError> {
     Ok(())
 }
 
+/// v6 -> v7: path-based, idempotent (`or_insert` only) and catalogue-free.
+/// The sub-steps run in this fixed order; later steps land in their owners'
+/// commits at the marked slots and never reorder the earlier ones.
+fn v6_to_v7(mut value: Value) -> Result<Value, SaveError> {
+    v7_worker_seats(&mut value)?; // (a) defender seats
+    v7_npc_appearance(&mut value); // (e) defensive appearance back-fill
+    v7_report_drops(&mut value)?; // (b) report drop tracking
+    v7_level_grant_paid(&mut value)?; // (c) level-grant ledger
+    v7_milestones_claimed(&mut value)?; // (d) milestones
+    Ok(value)
+}
+
+/// The root campaign and every expedition game's campaign.
+type V6Campaigns<'a> = (Option<&'a mut Value>, Vec<&'a mut Value>);
+
+fn v6_campaigns(value: &mut Value) -> Result<V6Campaigns<'_>, SaveError> {
+    let Some(root) = value.as_object_mut() else {
+        return Ok((None, Vec::new()));
+    };
+    let (mut campaign, mut battles) = (None, None);
+    for (key, child) in root.iter_mut() {
+        match key.as_str() {
+            "campaign" => campaign = Some(child),
+            "battles" => battles = Some(child),
+            _ => {}
+        }
+    }
+    let mut workers = Vec::new();
+    for battle in v6_battles(battles)? {
+        if let Some(worker) = battle
+            .get_mut("game")
+            .and_then(|game| game.get_mut("campaign"))
+        {
+            workers.push(worker);
+        }
+    }
+    Ok((campaign, workers))
+}
+
+/// (c) Every player at level 2 or above, the root's and each expedition's,
+/// is marked as already paid the level-up grant for its level: a v6 save is
+/// owed no retroactive grant. Level 1 writes nothing (0 and 1 both mean
+/// none paid).
+fn v7_level_grant_paid(value: &mut Value) -> Result<(), SaveError> {
+    let (root, workers) = v6_campaigns(value)?;
+    for campaign in root.into_iter().chain(workers) {
+        if let Some(Value::Object(player)) = campaign.get_mut("player")
+            && let Some(level) = player.get("level").and_then(Value::as_u64)
+            && level >= 2
+        {
+            player
+                .entry("level_grant_paid")
+                .or_insert_with(|| Value::from(level));
+        }
+    }
+    Ok(())
+}
+
+/// The milestone ranks at save format v7, frozen for sub-step (d): the
+/// milestones a v6 campaign had reached are claimed, whatever the current
+/// catalogue authors. Progression settlement
+/// (`Game::settle_progression_rewards`) claims the same ranks, unpaid, when
+/// the catalogue authors no reward for them.
+pub(crate) const V7_MILESTONE_RANKS: [u32; 4] = [5, 10, 15, 20];
+
+/// A frozen copy of `Campaign::progression_rank` on a v6 campaign as it will
+/// load: a pre-threat campaign (revision 0) counts the larger of its
+/// victories and its legacy clear rank, which `migrate_threat_history` folds
+/// into victories at load; otherwise its victories.
+fn v6_rank(campaign: &Value) -> u32 {
+    let victories = campaign
+        .get("victories")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let threat_revision = campaign
+        .get("threat_revision")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let rank = if threat_revision == 0 {
+        victories.max(u64::from(v6_legacy_clear_rank(campaign)))
+    } else {
+        victories
+    };
+    u32::try_from(rank).unwrap_or(u32::MAX)
+}
+
+/// The frozen `Campaign::legacy_clear_rank`: per country the larger of its
+/// clear high-water and completed levels, summed, and at least the number of
+/// first clears.
+fn v6_legacy_clear_rank(campaign: &Value) -> u32 {
+    let mut cleared: std::collections::BTreeMap<&str, u64> = std::collections::BTreeMap::new();
+    let world = campaign.get("world");
+    for key in ["clear_high_water", "country_levels"] {
+        if let Some(Value::Object(counts)) = world.and_then(|world| world.get(key)) {
+            for (id, count) in counts {
+                let count = count.as_u64().unwrap_or(0);
+                let slot = cleared.entry(id.as_str()).or_insert(count);
+                *slot = (*slot).max(count);
+            }
+        }
+    }
+    let first_clears = campaign
+        .get("first_clears")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len) as u64;
+    cleared
+        .values()
+        .fold(0u64, |sum, count| sum.saturating_add(*count))
+        .max(first_clears) as u32
+}
+
+/// (d) The root campaign claims every frozen milestone its v6 rank reached,
+/// so none is paid retroactively, and every expedition campaign gets the
+/// parent's claims. An expedition cloned at a lower rank keeps only the
+/// claims its own rank reached, so the claims never exceed the rank they are
+/// validated against. Nothing is written below rank 5.
+fn v7_milestones_claimed(value: &mut Value) -> Result<(), SaveError> {
+    let (Some(root), workers) = v6_campaigns(value)? else {
+        return Ok(());
+    };
+    let parent = v6_rank(root);
+    for campaign in std::iter::once(root).chain(workers) {
+        let rank = parent.min(v6_rank(campaign));
+        let claimed: Vec<u32> = V7_MILESTONE_RANKS
+            .into_iter()
+            .filter(|milestone| *milestone <= rank)
+            .collect();
+        if let Value::Object(campaign) = campaign
+            && !claimed.is_empty()
+        {
+            campaign
+                .entry("milestones_claimed")
+                .or_insert_with(|| Value::from(claimed));
+        }
+    }
+    Ok(())
+}
+
+/// The expedition records; a missing array means there are none.
+fn v6_battles(battles: Option<&mut Value>) -> Result<&mut [Value], SaveError> {
+    match battles {
+        None | Some(Value::Null) => Ok(&mut []),
+        Some(Value::Array(battles)) => Ok(battles),
+        Some(_) => Err(SaveError::Migration("v6 battles is not an array".into())),
+    }
+}
+
+/// (a) Every worker game's attempt and report gain `"defender": {"Recruit":
+/// recruit_id}`. The root attempt and report stay keyless: absent means the
+/// mode owner (the player for Personal, Mara for Npc), which is what a v6 root
+/// meant.
+fn v7_worker_seats(value: &mut Value) -> Result<(), SaveError> {
+    for battle in v6_battles(value.get_mut("battles"))? {
+        let recruit = battle
+            .get("recruit_id")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| SaveError::Migration("v6 battle without a u64 recruit_id".into()))?;
+        let Some(game) = battle.get_mut("game").and_then(Value::as_object_mut) else {
+            continue;
+        };
+        for key in ["attempt", "last_result"] {
+            if let Some(Value::Object(record)) = game.get_mut(key) {
+                record
+                    .entry("defender")
+                    .or_insert_with(|| serde_json::json!({ "Recruit": recruit }));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// (e) An Npc attempt profile without an appearance reads as Female, the
+/// appearance every v6 Npc deploy stamped (the serde default is Male). Saved
+/// appearances are kept, and v6 expeditions are not re-stamped with their
+/// recruit's identity. Runs after (a), which rejects malformed battles.
+fn v7_npc_appearance(value: &mut Value) {
+    let Some(root) = value.as_object_mut() else {
+        return;
+    };
+    let mut attempts = Vec::new();
+    for (key, child) in root.iter_mut() {
+        match key.as_str() {
+            "attempt" => attempts.push(child),
+            "battles" => {
+                if let Ok(battles) = v6_battles(Some(child)) {
+                    attempts.extend(
+                        battles
+                            .iter_mut()
+                            .filter_map(|battle| battle.get_mut("game")?.get_mut("attempt")),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    for attempt in attempts {
+        if attempt.get("mode").and_then(Value::as_str) == Some("Npc")
+            && let Some(Value::Object(profile)) = attempt.get_mut("profile")
+        {
+            profile
+                .entry("appearance")
+                .or_insert_with(|| Value::from("Female"));
+        }
+    }
+}
+
+/// (b) The root report and every worker report gain `drop_ids`, the sorted
+/// item ids of their loot receipts, and `loot_by_quality`. The root report
+/// takes the counts of its own run record (`attempt_id` equal, `worker_id`
+/// null), which saw every drop; otherwise the receipts are counted. Keys
+/// are inserted only when absent and only with a drop, so a report without
+/// receipts stays as it was. Every other v7 loot field (the auto-sell rule,
+/// attempt drop tracking, receipts, pending sales) relies on its serde
+/// default: off and empty. Runs after (a), which rejects malformed battles.
+fn v7_report_drops(value: &mut Value) -> Result<(), SaveError> {
+    let Some(root) = value.as_object_mut() else {
+        return Ok(());
+    };
+    let history = root
+        .get("campaign")
+        .and_then(|campaign| campaign.get("run_history"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if let Some(report) = root.get_mut("last_result") {
+        let attempt = report.get("attempt_id").and_then(Value::as_u64);
+        let recorded = history
+            .iter()
+            .find(|record| {
+                attempt.is_some()
+                    && record.get("attempt_id").and_then(Value::as_u64) == attempt
+                    && record.get("worker_id").is_none_or(Value::is_null)
+            })
+            .and_then(|record| record.get("loot_by_quality"));
+        v7_report_drop_keys(report, recorded)?;
+    }
+    if let Some(battles) = root.get_mut("battles") {
+        for battle in v6_battles(Some(battles))? {
+            if let Some(report) = battle
+                .get_mut("game")
+                .and_then(|game| game.get_mut("last_result"))
+            {
+                v7_report_drop_keys(report, None)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn v7_report_drop_keys(report: &mut Value, recorded: Option<&Value>) -> Result<(), SaveError> {
+    let Some(report) = report.as_object_mut() else {
+        return Ok(());
+    };
+    let malformed = || SaveError::Migration("v6 report has a malformed loot receipt".into());
+    let events = match report.get("loot_events") {
+        None | Some(Value::Null) => &Vec::new(),
+        Some(Value::Array(events)) => events,
+        Some(_) => return Err(malformed()),
+    };
+    let mut ids = Vec::with_capacity(events.len());
+    let mut counted = [0u64; V3_QUALITIES.len()];
+    for event in events {
+        ids.push(
+            event
+                .get("item_id")
+                .and_then(Value::as_u64)
+                .ok_or_else(malformed)?,
+        );
+        let quality = event.get("quality").and_then(Value::as_str);
+        let slot = V3_QUALITIES
+            .iter()
+            .position(|name| Some(*name) == quality)
+            .ok_or_else(malformed)?;
+        counted[slot] += 1;
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    if !ids.is_empty() && !report.contains_key("drop_ids") {
+        report.insert("drop_ids".into(), Value::from(ids));
+    }
+    if !report.contains_key("loot_by_quality") {
+        let counts = match recorded {
+            Some(recorded) => recorded.clone(),
+            // v6 quality names are the v3 ones (Quality was never reordered).
+            None => Value::Object(
+                V3_QUALITIES
+                    .iter()
+                    .zip(counted)
+                    .map(|(name, n)| ((*name).to_owned(), Value::from(n)))
+                    .collect(),
+            ),
+        };
+        let any = counts
+            .as_object()
+            .is_some_and(|map| map.values().any(|n| n.as_u64() != Some(0)));
+        if any {
+            report.insert("loot_by_quality".into(), counts);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -502,7 +805,7 @@ mod tests {
                     "equipment_visual": {"outfit": {"definition": 2}}
                 }
             },
-            "battles": [{"game": {"campaign": {"items": [{"definition": 3}]}}}]
+            "battles": [{"recruit_id": 1, "game": {"campaign": {"items": [{"definition": 3}]}}}]
         });
         let v2 = migrate(v1, 1).unwrap();
         assert_eq!(
@@ -605,7 +908,7 @@ mod tests {
                     {"hit_stop_left": 0, "resolved": null}
                 ]
             },
-            "battles": [{"game": {"attempt": {"brace_left": 0, "enemies": []}}}]
+            "battles": [{"recruit_id": 1, "game": {"attempt": {"brace_left": 0, "enemies": []}}}]
         });
         let v3 = migrate(v2, 2).unwrap();
         let a = &v3["attempt"];
@@ -630,7 +933,10 @@ mod tests {
             a["enemies"][1],
             json!({"resolved": {"archetype_id": "x", "kind": "Brute", "npc_damage_dice": 1, "target_urgency": 0.0}})
         );
-        assert_eq!(v3["battles"][0]["game"]["attempt"], json!({"enemies": []}));
+        assert_eq!(
+            v3["battles"][0]["game"]["attempt"],
+            json!({"enemies": [], "defender": {"Recruit": 1}})
+        );
         assert_eq!(v2_to_v3(v3.clone()), v3);
     }
 
@@ -645,7 +951,7 @@ mod tests {
         let v3 = json!({
             "attempt": {"loot_quality_counts": [0, 2, 1, 0, 1, 3]},
             "campaign": {"run_history": [{"loot_by_quality": [1, 0, 0, 0, 0, 5]}]},
-            "battles": [{"game": {"attempt": {"loot_quality_counts": [0, 0, 0, 9, 0, 0]}}}]
+            "battles": [{"recruit_id": 1, "game": {"attempt": {"loot_quality_counts": [0, 0, 0, 9, 0, 0]}}}]
         });
         let v4 = migrate(v3, 3).unwrap();
         assert_eq!(
@@ -681,7 +987,7 @@ mod tests {
                 "projectiles": [], "next_id": 3,
                 "cooldowns": [10, 61], "charges": [1, 4], "issued": [2, 5], "spent": [1, 1]
             }},
-            "battles": [{"game": {"attempt": {"ordnance": {"charges": [0, 7]}}}}]
+            "battles": [{"recruit_id": 1, "game": {"attempt": {"ordnance": {"charges": [0, 7]}}}}]
         });
         let v5 = migrate(v4, 4).unwrap();
         let o = &v5["attempt"]["ordnance"];
@@ -731,7 +1037,7 @@ mod tests {
                 "first_clears": [false, true, false, false, false],
                 "first_clear_claimed": [0, 1, 0, 0, 0]
             }}]},
-            "battles": [{"stage": 2, "game": {"campaign": {
+            "battles": [{"recruit_id": 1, "stage": 2, "game": {"campaign": {
                 "unlocked": 1,
                 "first_clears": [false, false, false, false, false]
             }}}]
@@ -778,5 +1084,294 @@ mod tests {
                 "{bad}"
             );
         }
+    }
+
+    #[test]
+    fn v6_worker_games_gain_their_recruit_seat_root_records_stay_keyless() {
+        let v6 = json!({
+            "attempt": {"mode": "Npc", "profile": {"appearance": "Female"}},
+            "last_result": {"mode": "Npc", "outcome": "Victory"},
+            "battles": [
+                {"recruit_id": 3, "settled": false, "game": {
+                    "attempt": {"mode": "Npc", "profile": {"appearance": "Female"}},
+                    "last_result": {"mode": "Npc", "outcome": "Victory"}
+                }},
+                {"recruit_id": 2, "settled": true, "game": {
+                    "attempt": null,
+                    "last_result": {"mode": "Npc", "outcome": "Defeat"}
+                }},
+                {"recruit_id": 5, "settled": false, "game": {
+                    "attempt": {"mode": "Npc", "profile": {"appearance": "Male"}, "defender": {"Recruit": 9}}
+                }}
+            ]
+        });
+        let v7 = migrate(v6.clone(), 6).unwrap();
+        // The root attempt and report are never touched: absent = mode owner.
+        assert_eq!(v7["attempt"], v6["attempt"]);
+        assert_eq!(v7["last_result"], v6["last_result"]);
+        let seat =
+            |battle: usize, key: &str| v7["battles"][battle]["game"][key]["defender"].clone();
+        assert_eq!(seat(0, "attempt"), json!({"Recruit": 3}));
+        assert_eq!(seat(0, "last_result"), json!({"Recruit": 3}));
+        assert!(v7["battles"][1]["game"]["attempt"].is_null());
+        assert_eq!(seat(1, "last_result"), json!({"Recruit": 2}));
+        // An existing key is kept (or_insert), and a missing report stays missing.
+        assert_eq!(seat(2, "attempt"), json!({"Recruit": 9}));
+        assert!(v7["battles"][2]["game"].get("last_result").is_none());
+        // No acknowledged flag and nothing else on the battle records.
+        for (old, new) in v6["battles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(v7["battles"].as_array().unwrap())
+        {
+            let keys = |b: &Value| b.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+            assert_eq!(keys(old), keys(new));
+        }
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+        // A save without expeditions has nothing to migrate.
+        let idle = json!({"attempt": null, "last_result": null});
+        assert_eq!(migrate(idle.clone(), 6).unwrap(), idle);
+    }
+
+    #[test]
+    fn malformed_v6_battle_without_recruit_id_is_a_typed_migration_error() {
+        for bad in [
+            json!({"battles": [{"game": {"attempt": null}}]}),
+            json!({"battles": [{"recruit_id": "3", "game": {}}]}),
+            json!({"battles": [{"recruit_id": -1, "game": {}}]}),
+            json!({"battles": [{"recruit_id": 1.5, "game": {}}]}),
+            json!({"battles": [7]}),
+            json!({"battles": {"recruit_id": 3}}),
+        ] {
+            assert!(
+                matches!(migrate(bad.clone(), 6), Err(SaveError::Migration(_))),
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn v6_npc_attempt_without_appearance_loads_female() {
+        let v6 = json!({
+            "attempt": {"mode": "Npc", "profile": {"weapon": {}}},
+            "last_result": {"mode": "Npc"},
+            "battles": [
+                {"recruit_id": 1, "game": {"attempt": {"mode": "Npc", "profile": {}}}},
+                {"recruit_id": 2, "game": {"attempt": {"mode": "Npc", "profile": {"appearance": "Male"}}}},
+                {"recruit_id": 3, "game": {"attempt": {"mode": "Personal", "profile": {}}}}
+            ]
+        });
+        let v7 = migrate(v6, 6).unwrap();
+        assert_eq!(
+            v7["attempt"]["profile"],
+            json!({"weapon": {}, "appearance": "Female"})
+        );
+        assert!(v7["last_result"].get("profile").is_none());
+        let appearance = |battle: usize| {
+            v7["battles"][battle]["game"]["attempt"]["profile"]
+                .get("appearance")
+                .cloned()
+        };
+        assert_eq!(appearance(0), Some(json!("Female")));
+        // or_insert: a saved appearance is kept, and Personal profiles are untouched.
+        assert_eq!(appearance(1), Some(json!("Male")));
+        assert_eq!(appearance(2), None);
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+    }
+
+    fn loot_event(item_id: u64, quality: &str) -> Value {
+        json!({"item_id": item_id, "quality": quality, "definition": "fire_axe"})
+    }
+
+    fn counts(
+        poor: u32,
+        common: u32,
+        uncommon: u32,
+        rare: u32,
+        epic: u32,
+        legendary: u32,
+    ) -> Value {
+        json!({"Poor": poor, "Common": common, "Uncommon": uncommon,
+               "Rare": rare, "Epic": epic, "Legendary": legendary})
+    }
+
+    #[test]
+    fn v6_report_drop_ids_and_quality_counts_come_from_loot_events() {
+        let v6 = json!({
+            "campaign": {"run_history": [
+                // Same attempt id, but an expedition's record: never matched.
+                {"attempt_id": 7, "worker_id": 2, "loot_by_quality": counts(0, 0, 0, 0, 0, 9)},
+                // The root report's own record: its counts are complete.
+                {"attempt_id": 7, "worker_id": null, "loot_by_quality": counts(1, 4, 2, 0, 1, 0)},
+                {"attempt_id": 8, "worker_id": null, "loot_by_quality": counts(0, 0, 0, 0, 0, 0)}
+            ]},
+            "last_result": {"attempt_id": 7, "loot_events": [
+                loot_event(41, "Rare"), loot_event(12, "Common"), loot_event(30, "Common")
+            ]},
+            "battles": [
+                // No root record applies inside a worker: count its receipts.
+                {"recruit_id": 1, "game": {"last_result": {"attempt_id": 7, "loot_events": [
+                    loot_event(9, "Epic"), loot_event(3, "Poor"), loot_event(6, "Epic")
+                ]}}},
+                // A report without drops gains no key.
+                {"recruit_id": 2, "game": {"last_result": {"attempt_id": 1, "loot_events": []}}},
+                {"recruit_id": 3, "game": {"attempt": null, "last_result": null}}
+            ]
+        });
+        let v7 = migrate(v6.clone(), 6).unwrap();
+        let root = &v7["last_result"];
+        assert_eq!(root["drop_ids"], json!([12, 30, 41]), "sorted item ids");
+        assert_eq!(root["loot_by_quality"], counts(1, 4, 2, 0, 1, 0));
+        let worker = &v7["battles"][0]["game"]["last_result"];
+        assert_eq!(worker["drop_ids"], json!([3, 6, 9]));
+        assert_eq!(worker["loot_by_quality"], counts(1, 0, 0, 0, 2, 0));
+        let empty = v7["battles"][1]["game"]["last_result"].as_object().unwrap();
+        assert!(!empty.contains_key("drop_ids") && !empty.contains_key("loot_by_quality"));
+        assert!(v7["battles"][2]["game"]["last_result"].is_null());
+        // A root report without a matching record counts its receipts, and
+        // an all-zero record adds no key; saved values are kept (or_insert).
+        let mut unmatched = v6.clone();
+        unmatched["last_result"]["attempt_id"] = json!(5);
+        let v7 = migrate(unmatched, 6).unwrap();
+        assert_eq!(
+            v7["last_result"]["loot_by_quality"],
+            counts(0, 2, 0, 1, 0, 0)
+        );
+        let mut zero = v6.clone();
+        zero["last_result"] = json!({"attempt_id": 8, "loot_events": []});
+        let v7 = migrate(zero, 6).unwrap();
+        assert!(v7["last_result"].get("loot_by_quality").is_none());
+        let mut kept = v6.clone();
+        kept["last_result"]["drop_ids"] = json!([41]);
+        kept["last_result"]["loot_by_quality"] = counts(0, 0, 0, 1, 0, 0);
+        let v7 = migrate(kept.clone(), 6).unwrap();
+        assert_eq!(
+            v7["last_result"]["drop_ids"],
+            kept["last_result"]["drop_ids"]
+        );
+        assert_eq!(
+            v7["last_result"]["loot_by_quality"],
+            kept["last_result"]["loot_by_quality"]
+        );
+        let v7 = migrate(v6, 6).unwrap();
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+        // Malformed receipts are typed errors, not panics.
+        for bad in [
+            json!({"last_result": {"loot_events": [{"item_id": "3", "quality": "Rare"}]}}),
+            json!({"last_result": {"loot_events": [{"item_id": 3, "quality": "Shiny"}]}}),
+            json!({"last_result": {"loot_events": {"item_id": 3}}}),
+        ] {
+            assert!(
+                matches!(migrate(bad.clone(), 6), Err(SaveError::Migration(_))),
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn v7_ledgers_mark_levels_paid_and_claim_reached_milestones_idempotently() {
+        let campaign = |victories: u64, level: u32| json!({"victories": victories, "threat_revision": 1, "first_clears": [], "player": {"level": level}});
+        let v6 = json!({
+            "campaign": campaign(15, 7),
+            "battles": [
+                {"recruit_id": 1, "game": {"campaign": campaign(15, 1)}},
+                {"recruit_id": 2, "game": {"campaign": campaign(9, 4)}},
+                {"recruit_id": 3}
+            ]
+        });
+        let v7 = migrate(v6, 6).unwrap();
+        assert_eq!(v7["campaign"]["player"]["level_grant_paid"], 7);
+        assert_eq!(v7["campaign"]["milestones_claimed"], json!([5, 10, 15]));
+        let worker = |n: usize| &v7["battles"][n]["game"]["campaign"];
+        // Level 1 writes nothing; the parent's claims are copied.
+        assert!(worker(0)["player"].get("level_grant_paid").is_none());
+        assert_eq!(worker(0)["milestones_claimed"], json!([5, 10, 15]));
+        // An expedition cloned below the parent's rank keeps only the claims
+        // its own rank reached, so it still validates.
+        assert_eq!(worker(1)["player"]["level_grant_paid"], 4);
+        assert_eq!(worker(1)["milestones_claimed"], json!([5]));
+        assert!(v7["battles"][2].get("game").is_none());
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+        // Saved values are kept (or_insert).
+        let mut kept = v7.clone();
+        kept["campaign"]["player"]["level_grant_paid"] = json!(3);
+        kept["campaign"]["milestones_claimed"] = json!([5]);
+        assert_eq!(v6_to_v7(kept.clone()).unwrap(), kept);
+        // Below rank 5 at level 1, and with no campaign, nothing is written;
+        // rank 20 and above claims all four.
+        for unchanged in [json!({"campaign": campaign(4, 1)}), json!({})] {
+            assert_eq!(migrate(unchanged.clone(), 6).unwrap(), unchanged);
+        }
+        let v7 = migrate(json!({"campaign": campaign(40, 50)}), 6).unwrap();
+        assert_eq!(
+            v7["campaign"]["milestones_claimed"],
+            json!(V7_MILESTONE_RANKS)
+        );
+    }
+
+    /// Each checked-in fixture as saved, and as a pre-threat (revision 0)
+    /// save with no victories, so the legacy clear rank decides. The v1 root
+    /// keeps its 4 victories: its live attempt is at rank 4, above its three
+    /// clears, and would not validate.
+    fn rank_fixtures() -> Vec<(String, u32, Value)> {
+        let fixtures = [
+            include_str!("../../tests/fixtures/save_v1.json"),
+            include_str!("../../tests/fixtures/save_v2.json"),
+            include_str!("../../tests/fixtures/save_v3.json"),
+            include_str!("../../tests/fixtures/save_v4.json"),
+            include_str!("../../tests/fixtures/save_v5.json"),
+            include_str!("../../tests/fixtures/save_v6.json"),
+        ];
+        let mut out = Vec::new();
+        for (n, text) in fixtures.into_iter().enumerate() {
+            let version = n as u32 + 1;
+            let envelope: Value = serde_json::from_str(text).unwrap();
+            assert_eq!(envelope["version"], version);
+            let payload: Value =
+                serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+            let pre_threat = |campaign: &mut Value, victories: u64| {
+                let campaign = campaign.as_object_mut().unwrap();
+                campaign.remove("threat_revision");
+                campaign.insert("victories".into(), json!(victories));
+            };
+            let mut legacy = payload.clone();
+            pre_threat(&mut legacy["campaign"], if version == 1 { 4 } else { 0 });
+            if let Some(Value::Array(battles)) = legacy.get_mut("battles") {
+                for battle in battles {
+                    pre_threat(&mut battle["game"]["campaign"], 0);
+                }
+            }
+            out.push((format!("v{version}"), version, payload));
+            out.push((format!("v{version} pre-threat"), version, legacy));
+        }
+        out
+    }
+
+    /// Parity pin: the frozen `v6_rank` equals the rank the loaded game
+    /// reports (after `migrate_threat_history`), for every fixture's root and
+    /// expedition campaigns.
+    #[test]
+    fn v6_rank_migration_matches_runtime_progression_rank_on_every_fixture() {
+        let mut legacy_ranks = Vec::new();
+        for (label, version, payload) in rank_fixtures() {
+            let migrated = migrate(payload.clone(), version).unwrap();
+            let game = crate::sim::Game::from_payload(payload, version)
+                .unwrap_or_else(|e| panic!("{label}: {e}"));
+            let rank = v6_rank(&migrated["campaign"]);
+            assert_eq!(rank, game.campaign().progression_rank(), "{label}");
+            if label.ends_with("pre-threat") {
+                legacy_ranks.push(rank);
+            }
+            for (n, battle) in game.battles().iter().enumerate() {
+                assert_eq!(
+                    v6_rank(&migrated["battles"][n]["game"]["campaign"]),
+                    battle.game().campaign().progression_rank(),
+                    "{label} expedition {n}"
+                );
+            }
+        }
+        // The pre-threat v5 and v6 ranks come from their clears alone.
+        assert_eq!(legacy_ranks, [4, 0, 0, 0, 2, 14]);
     }
 }

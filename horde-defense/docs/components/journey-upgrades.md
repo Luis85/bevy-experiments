@@ -4,17 +4,17 @@ id: journey-upgrades
 title: "Journey upgrade home"
 parent: game
 status: Implemented
-source: "crates/horde_game/src/ui/results.rs::results, actions"
+source: "crates/horde_game/src/ui/upgrades.rs::upgrades, actions, upgrades_continue"
 ---
 
 # Journey upgrade home
 
-Every settled main round returns to the same upgrade home.
+The Upgrades screen: the one route to the complete tree.
 
-- **Routes/actions:** Main victory, defeat or withdrawal enters; inspect the already-banked outcome, choose graph upgrades. The camp navigation row (Journey upgrades selected, Briefing, Equipment, Character, Mara, World map, Operations) sits above the page. The action row is the primary Continue/Try again (or Return to active defense when a main attempt is live), Run analysis, More (Plan or replay a defense when applicable, Save journey) and a quiet Leave journey last.
-- **State:** Core settlement owns rewards/history. The whole graph reads actual wallet, ownership and requirements; selecting or browsing buys nothing. Parallel completions retain their separate orchestration.
-- **Layout:** The compact outcome/actions lead one connected node canvas and selected purchase details. There are no separate personal body/skill/fortification purchase tabs.
+- **Routes/actions:** Results' Upgrade, the camp row's Journey upgrades entry, Camp home's upgrade offer and the retired Skills and Fortifications tabs open it. The camp navigation row (Camp, Journey upgrades selected, Briefing, Equipment, Character, World map) sits above the page. The action strip is the amber continuation (Back to battle, Choose next country, or Return to active defense when a main attempt is live) and Back to camp; with no settled round only Back to camp is shown, as the primary. Escape goes back to Results when a round has settled and the journey still runs, otherwise to Camp home (a liberation or Leave journey closes the journey; its last report is no longer a debrief to return to). An unlock callout may sit under the row; Settings returns here with "Save and return to upgrades".
+- **State:** The whole graph reads actual wallet, ownership and requirements; selecting or browsing buys nothing. Back to battle dispatches the same continuation as Results (the lost stage again, or the next defense after a win). Fields stay paused while the screen is open.
+- **Layout:** The strip leads one connected node canvas at full height with the selected purchase details. There are no separate personal body/skill/fortification purchase tabs.
 
 Parent IDs express containment, not exclusive entry routes. Implemented records source presence, not native interaction or performance validation.
 
-This screen uses the same global LASTLIGHT header as the camp (wallet, Menu, History, Settings) with one page heading and no second wallet. Failed-round rest/train wording is shown once. The named continuation action reflects retry/next defense/country choice.
+This screen uses the same global LASTLIGHT header as the camp (wallet, Menu, Save, History, Settings) and no second wallet. The settled outcome, its loot and the Leave journey action are on [Results](results.md).

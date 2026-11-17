@@ -2,8 +2,10 @@
 //! frontends: every domain rule a player intent must satisfy lives here or in
 //! the campaign/strategy/sim methods it calls, never in a frontend.
 use crate::balance::BalanceSettings;
-use crate::campaign::NpcTraining;
+use crate::campaign::{AutoSellRule, Npc, NpcTraining, SaleBlock};
 use crate::content::{ItemDefId, Mode, Policy, StructureKind};
+use crate::defenders::{DefenderBlocker, DefenderId, RecruitBlocker};
+use crate::quality::Quality;
 use crate::sim::{Game, JourneyContinuation};
 use crate::strategy::RecruitStatus;
 use crate::survivors::SurvivorId;
@@ -21,6 +23,16 @@ pub struct NpcTactics {
     pub early_reload: bool,
     pub allow_risk: bool,
     pub recall_percent: u32,
+}
+impl NpcTactics {
+    /// Writes the five tactics fields onto `npc`; nothing else changes.
+    fn write_to(&self, npc: &mut Npc) {
+        npc.policy = self.policy;
+        npc.prefer_aim = self.prefer_aim;
+        npc.early_reload = self.early_reload;
+        npc.allow_risk = self.allow_risk;
+        npc.recall_percent = self.recall_percent;
+    }
 }
 
 /// A player intent against the authoritative game. Pure data so frontends can
@@ -118,6 +130,81 @@ pub enum Command {
         battle: u64,
         structure: u64,
     },
+    /// Removes the saved preset at `index`; its items stop blocking sales.
+    DeletePreset {
+        index: usize,
+    },
+    /// Stores the auto-sell rule; allowed in or out of battle, it acts at
+    /// the next settlement.
+    SetAutoSell(AutoSellRule),
+    /// Sells the stash items the stored rule matches now (ignoring
+    /// `enabled`), but only if that is still `expect_count` items for
+    /// `expect_coins`: the quote the player confirmed.
+    ApplyAutoSellToStash {
+        expect_count: u32,
+        expect_coins: u64,
+    },
+    /// Chooses who defends next (only between defenses). `BeginDefense` and
+    /// `ContinueJourney` deploy the choice; `Deploy` never reads it.
+    SetNextDefender(DefenderId),
+    /// Deploys [`Game::next_defender`] on the active country's `stage`, with
+    /// `Deploy`'s unpause, and clears the choice on success.
+    BeginDefense {
+        stage: usize,
+    },
+    /// Sets a recruit's tactics: a Ready recruit in camp, or the recruit
+    /// Defending the main run, whose next npc turn uses them. `SetNpcPolicy`
+    /// always edits Mara.
+    SetRecruitTactics {
+        id: u64,
+        tactics: NpcTactics,
+    },
+    /// Marks the named settled expeditions' outcome notices seen and takes
+    /// `folded` off the folded-outcome count. Idempotent: unknown, live and
+    /// already acknowledged ids are ignored and the count saturates at 0.
+    AcknowledgeOutcomes {
+        battles: Vec<u64>,
+        folded: u32,
+    },
+    /// Makes the country the active one between defenses, never deploying:
+    /// `BeginDefense` starts its defense. A liberated country (an active
+    /// outbreak's included) answers `CountryLiberated`. `EnterCountry` keeps
+    /// its recorded meaning, select and deploy at once.
+    SelectCountry(String),
+    /// Recruits from a liberated country as one of the two archetypes
+    /// `Game::recruit_offer` names, by its `Archetype::id`. `Recruit` keeps
+    /// taking the first offer.
+    RecruitAs {
+        country: String,
+        archetype: String,
+    },
+}
+
+impl Command {
+    /// The roster recruit this command sends away from camp. Dispatching the
+    /// next defender hands the next defense back to the player.
+    fn dispatched_recruit(&self) -> Option<u64> {
+        match self {
+            Self::AssignGuard { id, .. }
+            | Self::DeploySurvivor { id, .. }
+            | Self::CountryOperation { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
+    /// The roster recruit this command acts on, for the commands a recruit
+    /// defending the main run must refuse (see [`Game::apply`]).
+    fn defender_gated_recruit(&self) -> Option<u64> {
+        match self {
+            Self::AssignGuard { id, .. }
+            | Self::DeploySurvivor { id, .. }
+            | Self::CountryOperation { id, .. }
+            | Self::TrainRecruit { id, .. }
+            | Self::EquipRecruit { id, .. }
+            | Self::BuyRecruitPoint(id)
+            | Self::SetRecruitPolicy { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
 }
 
 /// What an applied command produced.
@@ -129,6 +216,11 @@ pub enum CommandOutcome {
     Id(u64),
     /// Coins or supply returned by the command.
     Amount(u64),
+    /// One batch sale: how many items sold and what they paid together.
+    Sold {
+        count: u32,
+        coins: u64,
+    },
 }
 
 /// Why a command was rejected. `Display` is the user-facing message.
@@ -143,6 +235,39 @@ pub enum CommandError {
     RecruitNotReady,
     /// A campaign, strategy or simulation rule rejected the command.
     Rejected(String),
+    /// The command is only allowed between defenses, with no live attempt.
+    DefenseInProgress,
+    /// The named defender cannot take this command right now.
+    DefenderUnavailable {
+        defender: DefenderId,
+        blocker: DefenderBlocker,
+    },
+    /// The item cannot be sold; the block says why (strict `SellItem`).
+    SaleBlocked(SaleBlock),
+    /// The sale would overflow the wallet; nothing was sold.
+    WalletLimit,
+    /// An auto-sell rule must sell below a quality above Poor.
+    AutoSellRuleInvalid(Quality),
+    /// The auto-sell rule matches no sellable stash item.
+    NothingToSell,
+    /// The stash changed since the quote; this is the current quote and
+    /// nothing was sold.
+    SaleQuoteChanged {
+        count: u32,
+        coins: u64,
+    },
+    /// The campaign has no starting country yet; `ChooseStart` chooses it.
+    StartNotChosen,
+    /// The country cannot be entered yet (or is not on the map).
+    CountryLocked(String),
+    /// `RecruitAs` named an archetype the country does not offer (this
+    /// text, unknown names included); nothing changed.
+    ArchetypeNotOffered(String),
+    /// The country offers no recruit now; the blocker says why.
+    RecruitUnavailable(RecruitBlocker),
+    /// The row is not trainable (IQ, HP or FP; see `NpcTraining::TRAINABLE`);
+    /// nothing changed.
+    TrainingUnsupported(NpcTraining),
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -162,10 +287,49 @@ impl fmt::Display for CommandError {
                 f.write_str("Recall the survivor before changing their preparation policy")
             }
             Self::Rejected(message) => f.write_str(message),
+            Self::DefenseInProgress => f.write_str("Only possible between defenses"),
+            Self::DefenderUnavailable { blocker, .. } => write!(f, "{blocker}"),
+            Self::SaleBlocked(block) => f.write_str(&block.label()),
+            Self::WalletLimit => f.write_str("Sale would exceed the wallet limit"),
+            Self::AutoSellRuleInvalid(_) => f.write_str("Auto-sell threshold must be above Poor"),
+            Self::NothingToSell => f.write_str("Nothing in the stash matches the auto-sell rule"),
+            Self::SaleQuoteChanged { count, coins } => {
+                let items = if *count == 1 { "item" } else { "items" };
+                let unit = if *coins == 1 { "coin" } else { "coins" };
+                write!(
+                    f,
+                    "The stash changed: auto-sell would now sell {count} {items} for {} {unit}",
+                    crate::coins::grouped(*coins)
+                )
+            }
+            Self::StartNotChosen => f.write_str("Choose a starting country first"),
+            Self::CountryLocked(_) => {
+                f.write_str("Liberate a neighboring country to reach this one")
+            }
+            Self::ArchetypeNotOffered(_) => {
+                f.write_str("This country's survivors do not offer that archetype")
+            }
+            Self::RecruitUnavailable(blocker) => write!(f, "{blocker}"),
+            Self::TrainingUnsupported(training) => f.write_str(match training {
+                NpcTraining::Intelligence => "IQ cannot be trained",
+                NpcTraining::HitPoints => "HP cannot be trained on its own; train ST instead",
+                NpcTraining::Fatigue => "FP cannot be trained on its own; train HT instead",
+                _ => "This attribute cannot be trained",
+            }),
         }
     }
 }
 impl std::error::Error for CommandError {}
+
+/// The typed training verdict `TrainNpc` and `TrainRecruit` check before the
+/// campaign is reached.
+fn trainable(training: NpcTraining) -> Result<(), CommandError> {
+    if training.is_trainable() {
+        Ok(())
+    } else {
+        Err(CommandError::TrainingUnsupported(training))
+    }
+}
 impl From<String> for CommandError {
     fn from(message: String) -> Self {
         Self::Rejected(message)
@@ -181,8 +345,14 @@ impl Game {
     /// every other arm relies on the atomicity of the domain method it calls.
     pub fn apply(&mut self, command: &Command) -> Result<CommandOutcome, CommandError> {
         use CommandOutcome::{Amount, Applied, Id};
-        Ok(match command {
-            Command::ContinueJourney => match self.continue_journey()? {
+        if let Some(id) = command.defender_gated_recruit() {
+            self.reject_defending_recruit(id)?;
+        }
+        let leaving = command
+            .dispatched_recruit()
+            .filter(|id| self.next_defender() == DefenderId::Recruit(*id));
+        let outcome = match command {
+            Command::ContinueJourney => match self.continue_next_defense()? {
                 JourneyContinuation::Deployed => Applied,
                 JourneyContinuation::CountryLiberated => CommandOutcome::CountryLiberated,
             },
@@ -230,6 +400,8 @@ impl Game {
                     Applied
                 }
             }
+            // Frozen meaning: Personal is the player and Npc is Mara; the
+            // chosen next defender is neither read nor cleared.
             Command::Deploy { stage, mode } => {
                 self.deploy_country_stage(*stage, *mode)?;
                 self.set_paused(false);
@@ -316,11 +488,27 @@ impl Game {
                 self.campaign.apply_preset(*index, *mode)?;
                 Applied
             }
+            Command::DeletePreset { index } => {
+                self.campaign.delete_preset(*index)?;
+                Applied
+            }
+            Command::SetAutoSell(rule) => {
+                self.set_auto_sell(*rule)?;
+                Applied
+            }
+            Command::ApplyAutoSellToStash {
+                expect_count,
+                expect_coins,
+            } => {
+                let (count, coins) = self.apply_auto_sell_to_stash(*expect_count, *expect_coins)?;
+                CommandOutcome::Sold { count, coins }
+            }
             Command::BuyNpcPoint => {
                 self.campaign.buy_training_point()?;
                 Applied
             }
             Command::TrainNpc(training) => {
+                trainable(*training)?;
                 self.campaign.train_npc(*training)?;
                 Applied
             }
@@ -334,20 +522,16 @@ impl Game {
                         tactics.recall_percent,
                     ));
                 }
-                let npc = &mut self.campaign.npc;
-                npc.policy = tactics.policy;
-                npc.prefer_aim = tactics.prefer_aim;
-                npc.early_reload = tactics.early_reload;
-                npc.allow_risk = tactics.allow_risk;
-                npc.recall_percent = tactics.recall_percent;
+                tactics.write_to(&mut self.campaign.npc);
                 Applied
             }
-            Command::Recruit(country) => Id(self.strategy.recruit(&mut self.campaign, country)?),
+            Command::Recruit(country) => Id(self.recruit_first_offer(country)?),
             Command::EquipRecruit { id, item } => {
                 self.strategy.equip_recruit(&self.campaign, *id, *item)?;
                 Applied
             }
             Command::TrainRecruit { id, training } => {
+                trainable(*training)?;
                 self.strategy
                     .train_recruit(&mut self.campaign, *id, *training)?;
                 Applied
@@ -372,6 +556,10 @@ impl Game {
             Command::AssignGuard { id, country } => {
                 self.strategy
                     .assign_guard(&mut self.campaign, *id, country)?;
+                if let Some(r) = self.strategy.roster.iter().find(|r| r.id == *id) {
+                    let loadout = r.npc.loadout;
+                    self.unqueue_reserved(loadout);
+                }
                 Applied
             }
             Command::ReleaseGuard(id) => {
@@ -407,7 +595,69 @@ impl Game {
                     .game;
                 Amount(u64::from(worker.salvage(*structure)?))
             }
-        })
+            Command::SetNextDefender(defender) => {
+                self.set_next_defender(*defender)?;
+                Applied
+            }
+            Command::BeginDefense { stage } => {
+                self.begin_defense(*stage)?;
+                Applied
+            }
+            // Ruling D12: a Defending recruit's roster npc is the main run's
+            // npc (D6), so the change acts at its next npc turn.
+            Command::SetRecruitTactics { id, tactics } => {
+                if tactics.recall_percent > MAX_RECALL_PERCENT {
+                    return Err(CommandError::RecallThresholdOutOfRange(
+                        tactics.recall_percent,
+                    ));
+                }
+                let recruit = self
+                    .strategy
+                    .roster
+                    .iter_mut()
+                    .find(|r| r.id == *id)
+                    .ok_or(CommandError::UnknownSurvivor)?;
+                if !matches!(
+                    recruit.status,
+                    RecruitStatus::Ready | RecruitStatus::Defending
+                ) {
+                    return Err(CommandError::RecruitNotReady);
+                }
+                tactics.write_to(&mut recruit.npc);
+                Applied
+            }
+            Command::AcknowledgeOutcomes { battles, folded } => {
+                self.acknowledge_outcomes(battles, *folded);
+                Applied
+            }
+            Command::SelectCountry(id) => self.select_country(id)?,
+            Command::RecruitAs { country, archetype } => Id(self.recruit_as(country, archetype)?),
+        };
+        // Only a dispatch that succeeded takes the next defender away.
+        if let Some(id) = leaving {
+            self.next_defender_dispatched(id);
+        }
+        Ok(outcome)
+    }
+}
+
+impl Game {
+    /// The typed pre-check for recruit commands: a recruit defending the main
+    /// run cannot be guarded, dispatched, trained, re-equipped or re-tasked.
+    /// Unknown ids fall through to each command's own `UnknownSurvivor` path.
+    fn reject_defending_recruit(&self, id: u64) -> Result<(), CommandError> {
+        let defending = self
+            .strategy
+            .roster
+            .iter()
+            .any(|r| r.id == id && r.status == RecruitStatus::Defending);
+        if defending {
+            return Err(CommandError::DefenderUnavailable {
+                defender: DefenderId::Recruit(id),
+                blocker: DefenderBlocker::Defending,
+            });
+        }
+        Ok(())
     }
 }
 
@@ -565,6 +815,29 @@ mod tests {
         assert_eq!(game.campaign.coins, price + 7);
     }
     #[test]
+    fn buy_item_command_refuses_every_loot_only_definition() {
+        // The command path horde_game's armory and the debug recordings use:
+        // a loot-only definition (29-67, W2-08) is Rejected with the loot
+        // reason before the tier and coin checks, and nothing changes.
+        let mut game = Game::default();
+        game.campaign.coins = 1_000_000;
+        let before = snapshot(&game);
+        let items = &crate::content::content().items;
+        let loot_only: Vec<usize> = (0..items.len()).filter(|&n| items[n].loot_only).collect();
+        assert_eq!(loot_only, (29..68).collect::<Vec<_>>());
+        for n in loot_only {
+            assert_eq!(
+                game.apply(&Command::BuyItem(crate::content::ItemDefId::at(n))),
+                Err(CommandError::Rejected(
+                    crate::content::LOOT_ONLY_REASON.into()
+                )),
+                "{}",
+                items[n].id
+            );
+            assert_eq!(snapshot(&game), before, "{}", items[n].id);
+        }
+    }
+    #[test]
     fn worker_commands_target_only_active_expeditions() {
         let mut game = strategic_game();
         let country = game.campaign.world.cleared[0].clone();
@@ -614,9 +887,85 @@ mod tests {
             assert_eq!(error.to_string(), "No active expedition with that ID");
         }
     }
+    /// The `Command` variants appended after recording FORMAT 1's 41
+    /// (`tests/recording_vocabulary.rs`), in declaration order.
+    const APPENDED_COMMANDS: [&str; 9] = [
+        "DeletePreset",
+        "SetAutoSell",
+        "ApplyAutoSellToStash",
+        "SetNextDefender",
+        "BeginDefense",
+        "SetRecruitTactics",
+        "AcknowledgeOutcomes",
+        "SelectCountry",
+        "RecruitAs",
+    ];
+    /// The index in [`APPENDED_COMMANDS`] of `command`'s variant, or None for
+    /// one of the 41 FORMAT 1 variants. Exhaustive: an appended variant does
+    /// not compile until it is listed here, and the round-trip test below
+    /// then wants a sample of it.
+    fn appended_index(command: &Command) -> Option<usize> {
+        match command {
+            Command::ContinueJourney
+            | Command::LeaveJourney
+            | Command::SetBalance(_)
+            | Command::ChooseSurvivor(_)
+            | Command::ChooseStart(_)
+            | Command::EnterCountry(_)
+            | Command::Deploy { .. }
+            | Command::Withdraw
+            | Command::SetPaused(_)
+            | Command::Place { .. }
+            | Command::Salvage(_)
+            | Command::SaveStartingLayout
+            | Command::SaveExpeditionLayout(_)
+            | Command::ClearExpeditionLayout(_)
+            | Command::ClearLayout
+            | Command::RespecPlayer
+            | Command::BuySkillNode(_)
+            | Command::BuyItem(_)
+            | Command::Equip { .. }
+            | Command::Lock { .. }
+            | Command::Favorite { .. }
+            | Command::SellItem(_)
+            | Command::SellUnprotected
+            | Command::SavePreset { .. }
+            | Command::ApplyPreset { .. }
+            | Command::BuyNpcPoint
+            | Command::TrainNpc(_)
+            | Command::RespecNpc
+            | Command::SetNpcPolicy(_)
+            | Command::Recruit(_)
+            | Command::EquipRecruit { .. }
+            | Command::TrainRecruit { .. }
+            | Command::BuyRecruitPoint(_)
+            | Command::SetRecruitPolicy { .. }
+            | Command::AssignGuard { .. }
+            | Command::ReleaseGuard(_)
+            | Command::DeploySurvivor { .. }
+            | Command::CountryOperation { .. }
+            | Command::RecallSurvivor(_)
+            | Command::PlaceExpedition { .. }
+            | Command::SalvageExpedition { .. } => None,
+            Command::DeletePreset { .. } => Some(0),
+            Command::SetAutoSell(_) => Some(1),
+            Command::ApplyAutoSellToStash { .. } => Some(2),
+            Command::SetNextDefender(_) => Some(3),
+            Command::BeginDefense { .. } => Some(4),
+            Command::SetRecruitTactics { .. } => Some(5),
+            Command::AcknowledgeOutcomes { .. } => Some(6),
+            Command::SelectCountry(_) => Some(7),
+            Command::RecruitAs { .. } => Some(8),
+        }
+    }
+    /// W2-48 (design-save-determinism §6): a debug recording replays every
+    /// command it holds, so each appended variant, at non-default values,
+    /// parses back to itself and reserializes to the very line it was read
+    /// from, under its own externally tagged name. One sample per appended
+    /// variant, in declaration order, beside three FORMAT 1 variants.
     #[test]
     fn commands_round_trip_through_serde_for_replay() {
-        let commands = [
+        let v1 = [
             Command::SetNpcPolicy(tactics(30)),
             Command::PlaceExpedition {
                 battle: 4,
@@ -626,9 +975,119 @@ mod tests {
             },
             Command::ChooseSurvivor(SurvivorId::June),
         ];
+        let rule = AutoSellRule {
+            enabled: true,
+            sell_below: Quality::Epic,
+            slots: [false, true, true, false],
+            keep_upgrades: false,
+            apply_to_npc_runs: false,
+        };
+        let appended = [
+            Command::DeletePreset { index: 2 },
+            Command::SetAutoSell(rule),
+            Command::ApplyAutoSellToStash {
+                expect_count: 7,
+                expect_coins: 1_234,
+            },
+            Command::SetNextDefender(DefenderId::Recruit(3)),
+            Command::BeginDefense { stage: 4 },
+            Command::SetRecruitTactics {
+                id: 5,
+                tactics: tactics(40),
+            },
+            Command::AcknowledgeOutcomes {
+                battles: vec![9, 12],
+                folded: 3,
+            },
+            Command::SelectCountry("POL".into()),
+            Command::RecruitAs {
+                country: "HUN".into(),
+                archetype: "medic".into(),
+            },
+        ];
+        assert!(v1.iter().all(|c| appended_index(c).is_none()));
+        assert_eq!(
+            appended.iter().map(appended_index).collect::<Vec<_>>(),
+            (0..APPENDED_COMMANDS.len()).map(Some).collect::<Vec<_>>(),
+            "one sample per appended variant, in declaration order"
+        );
+        let defenders = [DefenderId::Player, DefenderId::Mara].map(Command::SetNextDefender);
+        for command in v1.into_iter().chain(appended).chain(defenders) {
+            let line = serde_json::to_string(&command).unwrap();
+            let replayed: Command = serde_json::from_str(&line).unwrap();
+            assert_eq!(replayed, command, "{line}");
+            assert_eq!(serde_json::to_string(&replayed).unwrap(), line);
+            if let Some(index) = appended_index(&command) {
+                let value: serde_json::Value = serde_json::from_str(&line).unwrap();
+                let name = value.as_object().and_then(|map| map.keys().next());
+                assert_eq!(
+                    name.map(String::as_str),
+                    Some(APPENDED_COMMANDS[index]),
+                    "{line}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn command_serde_round_trip_covers_appended_economy_variants() {
+        let rule = crate::campaign::AutoSellRule {
+            enabled: true,
+            sell_below: crate::quality::Quality::Rare,
+            slots: [true, false, true, false],
+            keep_upgrades: false,
+            apply_to_npc_runs: false,
+        };
+        let commands = [
+            Command::DeletePreset { index: 2 },
+            Command::SetAutoSell(rule),
+            Command::ApplyAutoSellToStash {
+                expect_count: 50,
+                expect_coins: 1_234,
+            },
+        ];
         for command in commands {
             let json = serde_json::to_string(&command).unwrap();
             assert_eq!(serde_json::from_str::<Command>(&json).unwrap(), command);
         }
+        let sold = CommandOutcome::Sold {
+            count: 50,
+            coins: 1_234,
+        };
+        let json = serde_json::to_string(&sold).unwrap();
+        assert_eq!(serde_json::from_str::<CommandOutcome>(&json).unwrap(), sold);
+        // The appended errors read as plain sentences.
+        for error in [
+            CommandError::AutoSellRuleInvalid(crate::quality::Quality::Poor),
+            CommandError::NothingToSell,
+            CommandError::SaleQuoteChanged {
+                count: 3,
+                coins: 40,
+            },
+        ] {
+            let text = error.to_string();
+            assert!(!text.is_empty() && !text.contains("::"), "{text}");
+        }
+    }
+
+    #[test]
+    fn sale_quote_changed_picks_nouns_by_count() {
+        let single = CommandError::SaleQuoteChanged { count: 1, coins: 1 };
+        assert_eq!(
+            single.to_string(),
+            "The stash changed: auto-sell would now sell 1 item for 1 coin"
+        );
+        let several = CommandError::SaleQuoteChanged { count: 2, coins: 5 };
+        assert_eq!(
+            several.to_string(),
+            "The stash changed: auto-sell would now sell 2 items for 5 coins"
+        );
+        let many = CommandError::SaleQuoteChanged {
+            count: 40,
+            coins: 2_035,
+        };
+        assert_eq!(
+            many.to_string(),
+            "The stash changed: auto-sell would now sell 40 items for 2,035 coins"
+        );
     }
 }

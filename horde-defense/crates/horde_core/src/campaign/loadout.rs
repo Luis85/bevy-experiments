@@ -1,6 +1,7 @@
 //! Defender profile derivation, item comparison and recommendations.
 
 use super::*;
+use crate::defenders::DefenderId;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LoadoutMetrics {
@@ -57,6 +58,58 @@ pub struct Recommendation {
     pub action: RecommendationAction,
     pub price: u64,
     pub affordable: bool,
+}
+
+/// The least [`slot_score`] gain that makes an item an upgrade. The
+/// recommender, auto-sell's `keep_upgrades` and the Results upgrade offers
+/// share it.
+pub const UPGRADE_MARGIN: f32 = 1.0;
+
+/// The recommender's score of `slot` in metrics `m` under `mode`'s rules;
+/// an item improves a slot when it raises this by more than
+/// [`UPGRADE_MARGIN`].
+pub(crate) fn slot_score(mode: Mode, m: &LoadoutMetrics, slot: Slot) -> f32 {
+    match slot {
+        Slot::Ranged => {
+            if mode == Mode::Personal {
+                m.damage as f32 * m.shots_per_second + 2.0 * m.magazine as f32 - 5.0 * m.reload
+            } else {
+                m.expected_basic_damage * 8.0 + m.guns as f32 * 3.0 + m.magazine as f32
+            }
+        }
+        Slot::Melee => {
+            if mode == Mode::Personal {
+                m.melee as f32
+            } else {
+                (3.5 * m.melee_dice as f32 + m.melee_adds as f32) * 4.0 + m.melee_skill as f32
+            }
+        }
+        Slot::Outfit => m.armor as f32 * 10.0 + m.health as f32,
+        Slot::Accessory => {
+            m.health as f32
+                + m.stamina as f32
+                + m.armor as f32 * 10.0
+                + m.weak_bonus * 40.0
+                + m.accuracy as f32 * 4.0
+        }
+    }
+}
+
+/// Whose loadout an upgrade is judged against.
+#[derive(Clone, Debug, PartialEq)]
+pub enum UpgradeJudge {
+    /// A defender's own loadout: the player (Personal), Mara or a roster
+    /// recruit (both Npc, each with their own NPC record).
+    Defender(DefenderId),
+    /// An explicit loadout and NPC record, such as an expedition's. The
+    /// record is boxed: it is far larger than the other variants.
+    Loadout {
+        mode: Mode,
+        loadout: [u64; 4],
+        npc: Box<Npc>,
+    },
+    /// Any of the player, Mara (when available) and every roster recruit.
+    AnyDefender,
 }
 
 /// Personal reload-duration factor from the Coordination rank (2.5% per rank).
@@ -158,6 +211,17 @@ impl Campaign {
         loadout: [u64; 4],
         character: &Npc,
     ) -> DefenderProfile {
+        self.profile_with_modifiers(mode, loadout, character, self.modifiers())
+    }
+    /// [`Self::profile_for_loadout`] under explicit skill `modifiers` (the
+    /// owned nodes' fold in play; tests inject perks no node authors yet).
+    pub(crate) fn profile_with_modifiers(
+        &self,
+        mode: Mode,
+        loadout: [u64; 4],
+        character: &Npc,
+        modifiers: SkillModifiers,
+    ) -> DefenderProfile {
         let equipment = |slot: Slot| {
             let definition = self
                 .item(loadout[slot.index()])
@@ -172,7 +236,6 @@ impl Campaign {
             )
         };
         let weapon = WeaponSpec::from_item(&equipment(Slot::Ranged));
-        let modifiers = self.modifiers();
         let mut personal = equipment(Slot::Ranged).personal.clone();
         let mut npc = equipment(Slot::Ranged).npc.clone();
         let melee = equipment(Slot::Melee);
@@ -215,6 +278,16 @@ impl Campaign {
             personal.stamina += modifiers.stamina_add;
             personal.armor += modifiers.armor_add;
             personal.melee_damage += modifiers.melee_add;
+            // Class perks fold after the generic modifiers and only for the
+            // equipped weapon's class; without a perk nothing is touched.
+            if let Some(perk) = modifiers.class_modifiers.get(&weapon.class) {
+                personal.damage = (personal.damage as f32 * perk.damage_multiplier)
+                    .round()
+                    .clamp(1.0, 100_000.0) as i32;
+                personal.reload = (personal.reload * perk.reload_multiplier).max(0.65);
+                personal.cadence = (personal.cadence * perk.cadence_multiplier).max(0.08);
+                personal.weak_bonus = (personal.weak_bonus + perk.weak_bonus_add).min(1.0);
+            }
         }
         let is_personal = mode == Mode::Personal;
         DefenderProfile {
@@ -260,6 +333,77 @@ impl Campaign {
             perception: if is_personal { b[4] } else { 0 },
         }
     }
+    /// The comparison metrics of `loadout` worn by `npc` under `mode`'s rules
+    /// (the player's body and skills apply only to Personal). Shared by
+    /// `compare_item`, the recommender and [`Self::upgrade_gain`].
+    pub(crate) fn loadout_metrics(
+        &self,
+        mode: Mode,
+        loadout: [u64; 4],
+        npc: &Npc,
+    ) -> LoadoutMetrics {
+        let p = self.profile_for_loadout(mode, loadout, npc);
+        if mode == Mode::Personal {
+            let health = content().enemy(crate::content::EnemyKind::Shambler).health as u32;
+            let damage = ((p.personal.damage
+                - content().enemy(crate::content::EnemyKind::Shambler).armor)
+                .max(1) as u32
+                * p.weapon.pellets)
+                .min(p.weapon.hit_cap(health as i32) as u32)
+                .max(1);
+            LoadoutMetrics {
+                damage: p.personal.damage,
+                melee: p.personal.melee_damage,
+                armor: p.personal.armor,
+                health: p.personal.health,
+                stamina: p.personal.stamina,
+                magazine: p.personal.magazine,
+                reload: p.personal.reload,
+                shots_per_second: 1.0 / p.personal.cadence.max(0.01),
+                weak_bonus: p.personal.weak_bonus,
+                guns: 0,
+                dice: 0,
+                adds: 0,
+                dodge: 0,
+                expected_basic_damage: p.personal.damage as f32,
+                baseline_shots_to_kill: Some(health.div_ceil(damage)),
+                melee_dice: 0,
+                melee_adds: 0,
+                melee_skill: 0,
+                accuracy: 0,
+                damage_kind: p.npc.damage_kind,
+                melee_kind: p.npc_melee_kind,
+            }
+        } else {
+            LoadoutMetrics {
+                damage: 0,
+                melee: 0,
+                armor: p.npc.armor,
+                health: p.max_hp,
+                stamina: p.max_fp,
+                magazine: p.npc.magazine,
+                reload: p.npc.reload_turns as f32,
+                shots_per_second: 1.0,
+                weak_bonus: 0.0,
+                guns: p.ranged_skill + p.npc.skill_bonus,
+                dice: p.npc.damage_dice,
+                adds: p.npc.damage_add,
+                dodge: p.stats.dodge(),
+                expected_basic_damage: mean_basic_damage(crate::rules::Damage {
+                    dice: p.npc.damage_dice,
+                    adds: p.npc.damage_add,
+                    kind: p.npc.damage_kind,
+                }),
+                baseline_shots_to_kill: None,
+                melee_dice: p.npc_melee_damage_dice,
+                melee_adds: p.npc_melee_damage_add,
+                melee_skill: p.melee_skill,
+                accuracy: p.npc.accuracy,
+                damage_kind: p.npc.damage_kind,
+                melee_kind: p.npc_melee_kind,
+            }
+        }
+    }
     pub fn compare_item(&self, mode: Mode, id: u64) -> Result<ItemComparison, String> {
         let candidate = self.item(id).ok_or("Item is no longer owned")?;
         let slot = candidate
@@ -275,70 +419,79 @@ impl Campaign {
         let mut after = before;
         after[slot.index()] = id;
         self.validate_loadout(after)?;
-        let metrics = |loadout| {
-            let p = self.profile_for_loadout(mode, loadout, &self.npc);
-            if mode == Mode::Personal {
-                let health = content().enemy(crate::content::EnemyKind::Shambler).health as u32;
-                let damage = ((p.personal.damage
-                    - content().enemy(crate::content::EnemyKind::Shambler).armor)
-                    .max(1) as u32
-                    * p.weapon.pellets)
-                    .min(p.weapon.hit_cap(health as i32) as u32)
-                    .max(1);
-                LoadoutMetrics {
-                    damage: p.personal.damage,
-                    melee: p.personal.melee_damage,
-                    armor: p.personal.armor,
-                    health: p.personal.health,
-                    stamina: p.personal.stamina,
-                    magazine: p.personal.magazine,
-                    reload: p.personal.reload,
-                    shots_per_second: 1.0 / p.personal.cadence.max(0.01),
-                    weak_bonus: p.personal.weak_bonus,
-                    guns: 0,
-                    dice: 0,
-                    adds: 0,
-                    dodge: 0,
-                    expected_basic_damage: p.personal.damage as f32,
-                    baseline_shots_to_kill: Some(health.div_ceil(damage)),
-                    melee_dice: 0,
-                    melee_adds: 0,
-                    melee_skill: 0,
-                    accuracy: 0,
-                    damage_kind: p.npc.damage_kind,
-                    melee_kind: p.npc_melee_kind,
-                }
-            } else {
-                LoadoutMetrics {
-                    damage: 0,
-                    melee: 0,
-                    armor: p.npc.armor,
-                    health: p.max_hp,
-                    stamina: p.max_fp,
-                    magazine: p.npc.magazine,
-                    reload: p.npc.reload_turns as f32,
-                    shots_per_second: 1.0,
-                    weak_bonus: 0.0,
-                    guns: p.ranged_skill + p.npc.skill_bonus,
-                    dice: p.npc.damage_dice,
-                    adds: p.npc.damage_add,
-                    dodge: p.stats.dodge(),
-                    expected_basic_damage: mean_basic_damage(crate::rules::Damage {
-                        dice: p.npc.damage_dice,
-                        adds: p.npc.damage_add,
-                        kind: p.npc.damage_kind,
-                    }),
-                    baseline_shots_to_kill: None,
-                    melee_dice: p.npc_melee_damage_dice,
-                    melee_adds: p.npc_melee_damage_add,
-                    melee_skill: p.melee_skill,
-                    accuracy: p.npc.accuracy,
-                    damage_kind: p.npc.damage_kind,
-                    melee_kind: p.npc_melee_kind,
-                }
-            }
-        };
+        let metrics = |loadout| self.loadout_metrics(mode, loadout, &self.npc);
         Ok(ItemComparison{item_id:id,slot,before:metrics(before),after:metrics(after),explanation:if mode==Mode::Personal{"Personal body-hit profile; Shambler breakpoint excludes weak points and country modifiers."}else{"NPC preparation profile before country modifiers. Weapon mean is basic damage before attack rolls, active defense, armor and wounding; not a chance to injure."}.into()})
+    }
+    /// How much owned item `id` would raise its slot's [`slot_score`] if it
+    /// replaced that slot of `loadout` worn by `npc` under `mode`. `Some`
+    /// (the score gain) only when `mode` may use it, the resulting loadout
+    /// is valid and the gain exceeds [`UPGRADE_MARGIN`]; this is exactly
+    /// the recommender's "improvement already in your armory" test.
+    pub fn upgrade_gain(&self, mode: Mode, loadout: [u64; 4], npc: &Npc, id: u64) -> Option<f32> {
+        let item = self.item(id)?;
+        let slot = item.definition.definition()?.slot;
+        if !self.can_use_weapon(mode, item.definition_index()) {
+            return None;
+        }
+        let mut after = loadout;
+        after[slot.index()] = id;
+        self.validate_loadout(after).ok()?;
+        let before = slot_score(mode, &self.loadout_metrics(mode, loadout, npc), slot);
+        let after = slot_score(mode, &self.loadout_metrics(mode, after, npc), slot);
+        (after > before + UPGRADE_MARGIN).then_some(after - before)
+    }
+    /// [`Self::upgrade_gain`] of owned item `id` for `defender`'s own
+    /// loadout: the player under Personal rules, Mara and a roster recruit
+    /// under Npc rules with their own NPC record. None for a recruit missing
+    /// from `strategy`'s roster.
+    pub fn defender_upgrade_gain(
+        &self,
+        id: u64,
+        defender: DefenderId,
+        strategy: &crate::strategy::StrategyState,
+    ) -> Option<f32> {
+        match defender {
+            DefenderId::Player => {
+                self.upgrade_gain(Mode::Personal, self.player.loadout, &self.npc, id)
+            }
+            DefenderId::Mara => self.upgrade_gain(Mode::Npc, self.npc.loadout, &self.npc, id),
+            DefenderId::Recruit(recruit) => {
+                let r = strategy.roster.iter().find(|r| r.id == recruit)?;
+                self.upgrade_gain(Mode::Npc, r.npc.loadout, &r.npc, id)
+            }
+        }
+    }
+    /// Whether owned item `id` is an upgrade for `judge` by
+    /// [`Self::upgrade_gain`]. The player is judged under Personal rules, Mara
+    /// and recruits under Npc rules with their own loadout and NPC record. A
+    /// recruit missing from `strategy`'s roster counts every item as an
+    /// upgrade, so a judge that cannot be resolved keeps everything.
+    pub fn is_upgrade_for(
+        &self,
+        id: u64,
+        judge: &UpgradeJudge,
+        strategy: &crate::strategy::StrategyState,
+    ) -> bool {
+        let defender = |defender: DefenderId| match defender {
+            DefenderId::Recruit(recruit) if !strategy.roster.iter().any(|r| r.id == recruit) => {
+                true
+            }
+            defender => self.defender_upgrade_gain(id, defender, strategy).is_some(),
+        };
+        match judge {
+            UpgradeJudge::Defender(id) => defender(*id),
+            UpgradeJudge::Loadout { mode, loadout, npc } => {
+                self.upgrade_gain(*mode, *loadout, npc, id).is_some()
+            }
+            UpgradeJudge::AnyDefender => {
+                defender(DefenderId::Player)
+                    || (self.npc_available() && defender(DefenderId::Mara))
+                    || strategy
+                        .roster
+                        .iter()
+                        .any(|r| defender(DefenderId::Recruit(r.id)))
+            }
+        }
     }
     pub fn recommendation(&self, mode: Mode) -> Recommendation {
         let make = |title: String, detail: String, action, price| Recommendation {
@@ -395,54 +548,31 @@ impl Campaign {
             return make("Use a retained legacy body point".into(),"Legacy points remain spendable through body nodes in the same skill graph. No coins are charged for this adapter.".into(),RecommendationAction::LearnNode(node.id.clone()),0);
         }
         let current = self.profile(mode);
-        let score = |m: &LoadoutMetrics, slot: Slot| match slot {
-            Slot::Ranged => {
-                if mode == Mode::Personal {
-                    m.damage as f32 * m.shots_per_second + 2.0 * m.magazine as f32 - 5.0 * m.reload
-                } else {
-                    m.expected_basic_damage * 8.0 + m.guns as f32 * 3.0 + m.magazine as f32
-                }
-            }
-            Slot::Melee => {
-                if mode == Mode::Personal {
-                    m.melee as f32
-                } else {
-                    (3.5 * m.melee_dice as f32 + m.melee_adds as f32) * 4.0 + m.melee_skill as f32
-                }
-            }
-            Slot::Outfit => m.armor as f32 * 10.0 + m.health as f32,
-            Slot::Accessory => {
-                m.health as f32
-                    + m.stamina as f32
-                    + m.armor as f32 * 10.0
-                    + m.weak_bonus * 40.0
-                    + m.accuracy as f32 * 4.0
-            }
+        let loadout = match mode {
+            Mode::Personal => self.player.loadout,
+            Mode::Npc => self.npc.loadout,
         };
         let owned = self
             .items
             .iter()
-            .filter(|i| {
-                !self.item_reserved(i.id) && self.can_use_weapon(mode, i.definition_index())
+            .filter(|i| !self.item_reserved(i.id))
+            .filter_map(|item| {
+                self.upgrade_gain(mode, loadout, &self.npc, item.id)
+                    .map(|gain| (item.id, gain))
             })
-            .filter_map(|item| self.compare_item(mode, item.id).ok())
-            .filter(|c| score(&c.after, c.slot) > score(&c.before, c.slot) + 1.0)
-            .max_by(|a, b| {
-                (score(&a.after, a.slot) - score(&a.before, a.slot))
-                    .total_cmp(&(score(&b.after, b.slot) - score(&b.before, b.slot)))
-            });
-        if let Some(item) = owned {
+            .max_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((item_id, _)) = owned {
             return make(
                 "Equip an improvement already in your armory".into(),
                 format!(
                     "{} improves your selected {:?} loadout. Compare the complete profile before equipping.",
-                    self.item(item.item_id)
+                    self.item(item_id)
                         .expect("owned comparison")
                         .definition()
                         .name,
                     mode
                 ),
-                RecommendationAction::Equip(item.item_id),
+                RecommendationAction::Equip(item_id),
                 0,
             );
         }
@@ -465,7 +595,7 @@ impl Campaign {
                     format!("Unlock {}", def.name),
                     format!(
                         "Blueprint ownership is permanent. Placement uses renewed attempt supply, not your wallet. {} coins required.",
-                        def.blueprint_price
+                        self.blueprint_price(kind)
                     ),
                     RecommendationAction::LearnNode(
                         match kind {
@@ -475,7 +605,7 @@ impl Campaign {
                         }
                         .into(),
                     ),
-                    def.blueprint_price,
+                    self.blueprint_price(kind),
                 );
             }
         }
@@ -531,6 +661,7 @@ impl Campaign {
                     && (i.tier > current_item.tier
                         || (i.tier == current_item.tier && self.shop_item_level() > current_level))
                     && i.tier <= self.unlocked()
+                    && i.purchasable()
                     && i.buy_value > 0
             })
             .min_by_key(|(_, i)| i.buy_value);
@@ -548,7 +679,7 @@ impl Campaign {
             );
         }
         if mode == Mode::Npc && self.npc.awarded < self.allowance() {
-            return make("Fund Mara's next training point".into(),"Training is immediate in camp. Four Guns points buy another skill level; earned objectives are claimed first.".into(),RecommendationAction::BuyTraining,25);
+            return make("Fund Mara's next training point".into(),"Training is immediate in camp. Four Guns points buy another skill level; earned objectives are claimed first.".into(),RecommendationAction::BuyTraining,self.npc_training_price());
         }
         let detail=self.world.active_country().map_or_else(||"Choose an unlocked country on the map.".to_owned(),|country|format!("{}: defense {} of {}. Earlier cleared defenses remain replayable; rewards are banked immediately.",country.name,self.world.next_stage()+1,country.level_count()));
         make(

@@ -1,6 +1,7 @@
 //! Read-only inspection of authoritative battlefield state. No rolls or simulation
 //! mutations are performed when an object is hovered or inspected.
 use crate::art::{AMBER, GREEN, MUTED, RED};
+use crate::battle_view::crowd_stagger;
 use bevy_egui::egui::{self, Response, RichText};
 use horde_core::{
     content::{Mode, StructureKind, content},
@@ -19,8 +20,11 @@ pub fn target_at(attempt: &Attempt, aim: [f32; 2]) -> Option<Target<'_>> {
         .enemies
         .iter()
         .filter_map(|enemy| {
-            let dx = (enemy.x - aim[0]) / if enemy.boss { 0.8 } else { 0.55 };
-            let dy = (enemy.y() - aim[1]) / 0.43;
+            // Hit-test where the body is drawn: a crowd shares one sim spot
+            // since W1-69 and only the presentation stagger draws it apart.
+            let [sx, sy] = crowd_stagger(enemy.id);
+            let dx = (enemy.x + sx - aim[0]) / if enemy.boss { 0.8 } else { 0.55 };
+            let dy = (enemy.y() + sy - aim[1]) / 0.43;
             let distance = dx * dx + dy * dy;
             (distance <= 1.0).then_some((enemy, distance))
         })
@@ -34,6 +38,19 @@ pub fn target_at(attempt: &Attempt, aim: [f32; 2]) -> Option<Target<'_>> {
         .filter(|s| (s.x() - aim[0]).abs() <= 1.1 && (s.y() - aim[1]).abs() <= 0.46)
         .min_by_key(|s| s.id)
         .map(Target::Structure)
+}
+/// "protection N": the armor every hit on `enemy` meets
+/// (`Attempt::enemy_protection`), and " · M against shots" when the
+/// defender's gunfire meets more (`Attempt::enemy_shot_protection`: a
+/// shield's ranged armor away from the line).
+fn protection_text(attempt: &Attempt, enemy: &Enemy) -> String {
+    let base = attempt.enemy_protection(enemy);
+    let shots = attempt.enemy_shot_protection(enemy);
+    if shots == base {
+        format!("protection {base}")
+    } else {
+        format!("protection {base} · {shots} against shots")
+    }
 }
 pub fn hover(response: &Response, attempt: &Attempt, aim: [f32; 2]) {
     if target_at(attempt, aim).is_some() {
@@ -61,14 +78,14 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
             };
             ui.strong(format!("{name} · lane {}", enemy.lane + 1));
             ui.label(format!(
-                "HP {} / {} · protection {}",
+                "HP {} / {} · {}",
                 if attempt.mode == Mode::Npc {
                     enemy.injury.hp
                 } else {
                     enemy.hp
                 },
                 enemy.max_hp,
-                attempt.enemy_protection(enemy)
+                protection_text(attempt, enemy)
             ));
             if enemy.critically_wounded(attempt.mode) {
                 ui.colored_label(AMBER, "CRITICAL · still fighting");
@@ -89,8 +106,9 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
                 );
             }
             let state = match enemy.attack_phase {
-                EnemyPhase::Advance => "Approaching",
-                EnemyPhase::Queued => "Queued behind a blocker",
+                // Queued is never assigned since W1-69 (enemies never block
+                // each other); a v6 save may hold it until the next tick.
+                EnemyPhase::Advance | EnemyPhase::Queued => "Approaching",
                 EnemyPhase::Windup => "Winding up an attack",
                 EnemyPhase::Recovery => "Recovering after an attack",
             };
@@ -188,34 +206,40 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
         }
     }
 }
+/// `name` is the defender's card name (Mara, or a recruit taking over);
 /// `expanded` opens the latest resolution (the `npc-expanded` review fixture).
-pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, expanded: bool) {
+pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, name: &str, expanded: bool) {
     if attempt.mode != Mode::Npc {
         return;
     }
-    ui.strong("Current survivor decision");
-    ui.label(&attempt.decision);
-    ui.colored_label(
-        MUTED,
-        format!(
-            "Next legal decision in {:.1}s",
-            attempt.next_decision_seconds()
-        ),
-    );
-    if let Some(id) = attempt.decision_target {
-        ui.label(format!("Committed target #{id}"));
-    }
-    if let Some(line) = attempt.latest_resolution.as_deref() {
-        egui::CollapsingHeader::new("Latest resolution")
-            .default_open(expanded)
-            .show(ui, |ui| {
-                ui.label(RichText::new(line).size(12.0));
-                ui.colored_label(
-                    MUTED,
-                    "This is a resolved action, not a prediction of the next roll.",
-                );
-            });
-    }
+    // A left-aligned, unjustified block (CF-3-15): the Tactics popup is a
+    // menu, whose justified layout would stretch each wrapped line of the
+    // decision to the popup width with wide, uneven word gaps.
+    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+        ui.strong(format!("{name} · current decision"));
+        ui.label(&attempt.decision);
+        ui.colored_label(
+            MUTED,
+            format!(
+                "Next legal decision in {:.1}s",
+                attempt.next_decision_seconds()
+            ),
+        );
+        if let Some(id) = attempt.decision_target {
+            ui.label(format!("Committed target #{id}"));
+        }
+        if let Some(line) = attempt.latest_resolution.as_deref() {
+            egui::CollapsingHeader::new("Latest resolution")
+                .default_open(expanded)
+                .show(ui, |ui| {
+                    ui.label(RichText::new(line).size(12.0));
+                    ui.colored_label(
+                        MUTED,
+                        "This is a resolved action, not a prediction of the next roll.",
+                    );
+                });
+        }
+    });
 }
 
 #[cfg(test)]
@@ -238,5 +262,121 @@ mod tests {
         assert!(target_at(&attempt, [7.0, 1.5]).is_none());
         assert!(target_at(&attempt, [f32::NAN, 0.5]).is_none());
         assert_eq!(serde_json::to_value(&attempt).unwrap(), before);
+    }
+
+    /// W3-23 (W2 review): a shield-bearer's ranged armor (W2-30/W2-31),
+    /// which the defender's shots meet, is shown beside the base armor; a
+    /// hostile without one, and a shield-bearer at the line, show one number.
+    #[test]
+    fn protection_names_the_armor_shots_meet() {
+        use horde_core::sim::DEFENSE_LINE;
+        for mode in [Mode::Personal, Mode::Npc] {
+            let mut game = Game::default();
+            game.campaign_mut().legacy_features = true;
+            game.campaign_mut().attempts = 1;
+            game.campaign_mut().choose_start_country("DEU").unwrap();
+            game.deploy_country_stage(0, mode).unwrap();
+            let mut attempt = game.attempt_slot_mut().take().unwrap();
+            game.spawn_archetype(&mut attempt, "shield-bearer", 0)
+                .unwrap();
+            game.spawn_enemy(&mut attempt, EnemyKind::Runner, 1, false);
+            attempt.enemies[0].x = 7.0;
+            attempt.enemies[1].x = 7.0;
+            let before = serde_json::to_value(&attempt).unwrap();
+            let shield = &attempt.enemies[0];
+            let base = attempt.enemy_protection(shield);
+            let shots = attempt.enemy_shot_protection(shield);
+            assert!(shots > base, "{mode:?}: the shield stops shots");
+            assert_eq!(
+                protection_text(&attempt, shield),
+                format!("protection {base} · {shots} against shots"),
+                "{mode:?}"
+            );
+            let runner = &attempt.enemies[1];
+            assert_eq!(
+                protection_text(&attempt, runner),
+                format!("protection {}", attempt.enemy_protection(runner)),
+                "{mode:?}"
+            );
+            assert_eq!(serde_json::to_value(&attempt).unwrap(), before);
+            attempt.enemies[0].x = DEFENSE_LINE;
+            let shield = &attempt.enemies[0];
+            assert_eq!(
+                protection_text(&attempt, shield),
+                format!("protection {}", attempt.enemy_protection(shield)),
+                "{mode:?}: the shield is down at the line"
+            );
+        }
+    }
+
+    /// Since W1-69 a crowd at the line shares one sim spot and only the
+    /// presentation stagger draws it apart; hovering each drawn body must
+    /// inspect that body, not always the lowest id (W1 review).
+    #[test]
+    fn hovering_a_staggered_crowd_inspects_the_drawn_body() {
+        use horde_core::sim::DEFENSE_LINE;
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
+        for _ in 0..3 {
+            game.spawn_enemy(&mut attempt, EnemyKind::Runner, 0, false);
+        }
+        for enemy in &mut attempt.enemies {
+            enemy.x = DEFENSE_LINE;
+            enemy.pass_offset = 0.0;
+        }
+        let ids: Vec<u64> = attempt.enemies.iter().map(|e| e.id).collect();
+        assert_eq!(ids.len(), 3);
+        for enemy in &attempt.enemies {
+            let [sx, sy] = crowd_stagger(enemy.id);
+            let aim = [enemy.x + sx, enemy.y() + sy];
+            let Some(Target::Enemy(hit)) = target_at(&attempt, aim) else {
+                panic!("no hostile under the drawn body of #{}", enemy.id);
+            };
+            assert_eq!(hit.id, enemy.id, "hovered the drawn body of #{}", enemy.id);
+        }
+    }
+
+    /// Since W1-69 enemies never block each other: a v6 save may still hold
+    /// a Queued phase until the next tick, and the dossier must not describe
+    /// a lane queue the game no longer has (W1 review).
+    #[test]
+    fn a_saved_queued_enemy_is_shown_approaching() {
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
+        game.spawn_enemy(&mut attempt, EnemyKind::Runner, 0, false);
+        attempt.enemies[0].x = 7.0;
+        attempt.enemies[0].attack_phase = EnemyPhase::Queued;
+        let attempt: Attempt =
+            serde_json::from_value(serde_json::to_value(&attempt).unwrap()).unwrap();
+        assert_eq!(attempt.enemies[0].attack_phase, EnemyPhase::Queued);
+        let [sx, sy] = crowd_stagger(attempt.enemies[0].id);
+        let aim = [attempt.enemies[0].x + sx, attempt.enemies[0].y() + sy];
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| dossier(ui, &attempt, aim));
+        output.textures_delta.clear();
+        fn texts(shape: &egui::epaint::Shape, out: &mut Vec<String>) {
+            match shape {
+                egui::epaint::Shape::Text(text) => out.push(text.galley.text().to_owned()),
+                egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| texts(s, out)),
+                _ => {}
+            }
+        }
+        let mut shown = Vec::new();
+        output
+            .shapes
+            .iter()
+            .for_each(|c| texts(&c.shape, &mut shown));
+        assert!(
+            shown.iter().any(|t| t == "Approaching"),
+            "no 'Approaching' in {shown:?}"
+        );
+        assert!(
+            !shown.iter().any(|t| t.contains("Queued")),
+            "a lane queue is described in {shown:?}"
+        );
     }
 }

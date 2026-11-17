@@ -4,7 +4,7 @@ id: player-model-parity
 title: "Original source parity"
 parent: player-model-review
 status: Implemented
-source: "crates/horde_game/src/ui/review/mod.rs::model_parity,paint_model_parity"
+source: "crates/horde_game/src/ui/review/workshop.rs::model_parity, paint_model_parity"
 ---
 
 # Original source parity

@@ -18,6 +18,10 @@ pub enum LaunchAction {
     Smoke,
     /// `--help`: print `HELP` and exit.
     Help,
+    /// `--list-scenes`: print the review scene registry as TSV and exit.
+    ListScenes,
+    /// `--version`: print `Lastlight: Horde Defense <stamp>` and exit.
+    Version,
     /// `--replay <path>` (`dev` feature): headless replay of a recording.
     #[cfg(feature = "dev")]
     Replay,
@@ -41,6 +45,10 @@ pub struct ReviewOptions {
     pub scale: Option<f32>,
     /// `LASTLIGHT_REVIEW_INPUT_SAVE`: copied generation for the `npc-stutter` fixture.
     pub input_save: Option<PathBuf>,
+    /// `LASTLIGHT_REVIEW_CUE_LOG`: JSON-lines log of the sounds the session
+    /// plays (`horde_audio::cue_log`), by convention
+    /// `target/review/<run>/cues.jsonl`.
+    pub cue_log: Option<PathBuf>,
     /// `LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT` (or the older `..._PARITY_REPORT`).
     pub model_report: Option<PathBuf>,
     pub perf: PerfOptions,
@@ -54,8 +62,16 @@ pub struct PerfOptions {
     pub frames: u32,
     pub active_only: bool,
     pub cpu: Option<String>,
+    /// `LASTLIGHT_PERF_PROFILE`: build profile label recorded in the report.
+    pub profile_label: Option<String>,
     pub audio: bool,
     pub npc_speed: Option<u32>,
+    /// `LASTLIGHT_PERF_PRESENT_MODE`: wins over the VSync and Low latency
+    /// settings in a perf launch; without a report it is ignored with a warning.
+    pub present_mode: Option<PresentModeOverride>,
+    /// `LASTLIGHT_PERF_PIPELINED` (0|1): wins over Low latency and the default
+    /// in a perf launch; without a report it is ignored with a warning.
+    pub pipelined: Option<bool>,
 }
 impl Default for PerfOptions {
     fn default() -> Self {
@@ -65,8 +81,43 @@ impl Default for PerfOptions {
             frames: 300,
             active_only: false,
             cpu: None,
+            profile_label: None,
             audio: false,
             npc_speed: None,
+            present_mode: None,
+            pipelined: None,
+        }
+    }
+}
+
+/// `LASTLIGHT_PERF_PRESENT_MODE` values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PresentModeOverride {
+    Fifo,
+    Mailbox,
+    Immediate,
+    AutoNoVsync,
+}
+impl PresentModeOverride {
+    fn parse(raw: &str) -> Result<Self, String> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "fifo" => Ok(Self::Fifo),
+            "mailbox" => Ok(Self::Mailbox),
+            "immediate" => Ok(Self::Immediate),
+            "autonovsync" => Ok(Self::AutoNoVsync),
+            _ => Err(
+                "LASTLIGHT_PERF_PRESENT_MODE must be fifo, mailbox, immediate or autonovsync"
+                    .into(),
+            ),
+        }
+    }
+    pub fn present_mode(self) -> bevy::window::PresentMode {
+        use bevy::window::PresentMode;
+        match self {
+            Self::Fifo => PresentMode::Fifo,
+            Self::Mailbox => PresentMode::Mailbox,
+            Self::Immediate => PresentMode::Immediate,
+            Self::AutoNoVsync => PresentMode::AutoNoVsync,
         }
     }
 }
@@ -85,6 +136,10 @@ pub struct LaunchConfig {
     pub asset_dir: Option<PathBuf>,
     /// `LASTLIGHT_SAVE_DIR`, else `%LOCALAPPDATA%/LastlightHordeDefense`, else `saves`.
     pub save_directory: PathBuf,
+    /// Where an isolated review logs when `LASTLIGHT_SAVE_DIR` is absent: the
+    /// per-process temp review profile, so review launches never write or prune
+    /// logs in the player's profile. `None` for play, practice and explicit saves.
+    pub log_directory_override: Option<PathBuf>,
     /// `LASTLIGHT_CAPTURE_DIR`: F12 screenshot folder.
     pub capture_dir: Option<PathBuf>,
     /// Catalogue name and override file, as `horde_core::catalog` resolves them.
@@ -110,6 +165,7 @@ impl Default for LaunchConfig {
             window: DEFAULT_WINDOW,
             asset_dir: None,
             save_directory: PathBuf::from("saves"),
+            log_directory_override: None,
             capture_dir: None,
             catalogs: Vec::new(),
             warnings: Vec::new(),
@@ -125,19 +181,24 @@ pub const HELP: &str = "\
 Lastlight: Horde Defense
 
 USAGE:
-    horde-defense [--smoke | --help]
+    horde-defense [--smoke | --help | --version | --list-scenes]
     horde-defense [--record <file>]        (`dev` feature)
     horde-defense --replay <file>          (`dev` feature)
 
 OPTIONS:
     --smoke    Validate catalogues, run a headless campaign self-check and exit
     -h, --help Print this help and exit
+    -V, --version  Print the version and build stamp and exit
+    --list-scenes  Print every LASTLIGHT_REVIEW_SCREEN name as TSV and exit
+                   (a build without `review` lists only practice scenes)
     --record <file>  Record commands and per-tick input to a JSONL file (F7 toggles in game)
     --replay <file>  Replay a recording headless, print the final state digest and exit
 
 ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
   Play
-    LASTLIGHT_SAVE_DIR            Profile folder (default %LOCALAPPDATA%/LastlightHordeDefense)
+    LASTLIGHT_SAVE_DIR            Profile folder, logging to <save dir>/logs (default
+                                  %LOCALAPPDATA%/LastlightHordeDefense). Unset, an isolated
+                                  review logs to <temp>/lastlight-review-<pid>/logs
     LASTLIGHT_ASSET_DIR           Asset folder (default ./assets beside the executable)
     LASTLIGHT_CAPTURE_DIR         F12 screenshot folder (default <save dir>/screenshots)
     LASTLIGHT_REVIEW_SCREEN       Staged scenario name (practice scene or review fixture)
@@ -153,6 +214,8 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_REVIEW_EXIT         Flag: exit after the automated screenshot
     LASTLIGHT_REVIEW_SCALE        UI scale for the fixture
     LASTLIGHT_REVIEW_INPUT_SAVE   Copied save generation (npc-stutter fixture)
+    LASTLIGHT_REVIEW_CUE_LOG      Cue log path (JSON lines of every started and faded
+                                  voice; replay with the horde_audio replay_cue_log example)
     LASTLIGHT_CAPTURE_SEQUENCE    Fresh folder for a fixed-step motion export
                                   (needs a motion review scene; no practice or perf)
     LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT  Player-model review manifest path
@@ -161,8 +224,14 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_PERF_FRAMES         300..=3600 (default 300)
     LASTLIGHT_PERF_ACTIVE_ONLY    Flag: sample only unpaused battle frames
     LASTLIGHT_PERF_CPU            CPU label recorded in the report
-    LASTLIGHT_PERF_AUDIO          Flag: keep audio in the perf-audio fixture
+    LASTLIGHT_PERF_PROFILE        Build profile label recorded in the report
+    LASTLIGHT_PERF_AUDIO          Flag: keep audio in a perf run of any review scene
     LASTLIGHT_PERF_NPC_SPEED      Observation speed 1, 2 or 4 for perf fixtures
+    LASTLIGHT_PERF_PRESENT_MODE   fifo, mailbox, immediate or autonovsync; with
+                                  LASTLIGHT_PERF_REPORT, wins over the VSync and Low
+                                  latency settings (ignored with a warning without it)
+    LASTLIGHT_PERF_PIPELINED      0 or 1: pipelined rendering; with LASTLIGHT_PERF_REPORT,
+                                  wins over Low latency (ignored with a warning without it)
   Developer tools (builds with the `dev` feature; otherwise rejected or ignored)
     LASTLIGHT_RECORD              Same as --record
   Logging
@@ -177,6 +246,7 @@ const REVIEW_VARIABLES: &[&str] = &[
     "LASTLIGHT_REVIEW_EXIT",
     "LASTLIGHT_REVIEW_SCALE",
     "LASTLIGHT_REVIEW_INPUT_SAVE",
+    "LASTLIGHT_REVIEW_CUE_LOG",
     "LASTLIGHT_CAPTURE_SEQUENCE",
     "LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT",
     "LASTLIGHT_PLAYER_MODEL_PARITY_REPORT",
@@ -185,8 +255,11 @@ const REVIEW_VARIABLES: &[&str] = &[
     "LASTLIGHT_PERF_FRAMES",
     "LASTLIGHT_PERF_ACTIVE_ONLY",
     "LASTLIGHT_PERF_CPU",
+    "LASTLIGHT_PERF_PROFILE",
     "LASTLIGHT_PERF_AUDIO",
     "LASTLIGHT_PERF_NPC_SPEED",
+    "LASTLIGHT_PERF_PRESENT_MODE",
+    "LASTLIGHT_PERF_PIPELINED",
 ];
 
 /// Typed reads over one variable source. Empty Windows values are unset.
@@ -261,6 +334,18 @@ impl LaunchConfig {
             match arg.to_str() {
                 Some("--smoke") => action = LaunchAction::Smoke,
                 Some("--help" | "-h") => return Ok(Self::help()),
+                Some("--version" | "-V") => {
+                    return Ok(Self {
+                        action: LaunchAction::Version,
+                        ..Self::default()
+                    });
+                }
+                Some("--list-scenes") => {
+                    return Ok(Self {
+                        action: LaunchAction::ListScenes,
+                        ..Self::default()
+                    });
+                }
                 Some(flag @ ("--record" | "--replay")) => {
                     #[cfg(feature = "dev")]
                     {
@@ -297,7 +382,8 @@ impl LaunchConfig {
             }),
             None => DEFAULT_WINDOW,
         };
-        let save_directory = env.path("LASTLIGHT_SAVE_DIR").unwrap_or_else(|| {
+        let explicit_save_directory = env.path("LASTLIGHT_SAVE_DIR");
+        let save_directory = explicit_save_directory.clone().unwrap_or_else(|| {
             env.path("LOCALAPPDATA")
                 .map(|p| p.join("LastlightHordeDefense"))
                 .unwrap_or_else(|| PathBuf::from("saves"))
@@ -329,6 +415,7 @@ impl LaunchConfig {
                 .string("LASTLIGHT_REVIEW_SCALE")
                 .and_then(|s| s.trim().parse().ok()),
             input_save: env.path("LASTLIGHT_REVIEW_INPUT_SAVE"),
+            cue_log: env.path("LASTLIGHT_REVIEW_CUE_LOG"),
             model_report: env
                 .path("LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT")
                 .or_else(|| env.path("LASTLIGHT_PLAYER_MODEL_PARITY_REPORT")),
@@ -350,8 +437,11 @@ impl LaunchConfig {
                 ),
                 active_only: env.flag("LASTLIGHT_PERF_ACTIVE_ONLY"),
                 cpu: env.string("LASTLIGHT_PERF_CPU"),
+                profile_label: env.string("LASTLIGHT_PERF_PROFILE"),
                 audio: env.flag("LASTLIGHT_PERF_AUDIO"),
                 npc_speed: None,
+                present_mode: None,
+                pipelined: None,
             },
         });
         if let (Some(review), Some(raw)) = (&mut review, env.string("LASTLIGHT_PERF_NPC_SPEED")) {
@@ -360,6 +450,43 @@ impl LaunchConfig {
                 _ => return Err("LASTLIGHT_PERF_NPC_SPEED must be 1, 2 or 4".into()),
             });
         }
+        if let (Some(review), Some(raw)) = (&mut review, env.string("LASTLIGHT_PERF_PRESENT_MODE"))
+        {
+            review.perf.present_mode = Some(PresentModeOverride::parse(&raw)?);
+        }
+        if let (Some(review), Some(raw)) = (&mut review, env.string("LASTLIGHT_PERF_PIPELINED")) {
+            review.perf.pipelined = Some(match raw.trim() {
+                "0" => false,
+                "1" => true,
+                _ => return Err("LASTLIGHT_PERF_PIPELINED must be 0 or 1".into()),
+            });
+        }
+        // The render plan reads them only from a perf launch (`Self::perf`).
+        if let Some(review) = review.as_ref().filter(|r| r.perf.report.is_none()) {
+            for (name, set) in [
+                (
+                    "LASTLIGHT_PERF_PRESENT_MODE",
+                    review.perf.present_mode.is_some(),
+                ),
+                ("LASTLIGHT_PERF_PIPELINED", review.perf.pipelined.is_some()),
+            ] {
+                if set {
+                    warnings.push(format!(
+                        "Ignoring {name}: it applies only with LASTLIGHT_PERF_REPORT"
+                    ));
+                }
+            }
+        }
+        // An isolated review stages a throwaway profile; without an explicit save
+        // directory its logs go there too, never into the player's profile.
+        let log_directory_override = (review.is_some()
+            && !practice
+            && scenario.is_some()
+            && explicit_save_directory.is_none())
+        .then(|| {
+            crate::profile::profile_directory(save_directory.clone(), scenario.as_deref(), false)
+                .join("logs")
+        });
         #[cfg(feature = "dev")]
         let record = record.or_else(|| env.path("LASTLIGHT_RECORD"));
         #[cfg(not(feature = "dev"))]
@@ -374,6 +501,7 @@ impl LaunchConfig {
             window,
             asset_dir: env.path("LASTLIGHT_ASSET_DIR"),
             save_directory,
+            log_directory_override,
             capture_dir: env.path("LASTLIGHT_CAPTURE_DIR"),
             catalogs: horde_core::catalog::CATALOG_OVERRIDES
                 .iter()
@@ -396,8 +524,24 @@ impl LaunchConfig {
         }
     }
 
-    /// Rejects combinations that would silently produce misleading evidence.
+    /// Rejects unknown scenes and combinations that would silently produce
+    /// misleading evidence.
     fn validate(&self) -> Result<(), String> {
+        // A build accepts exactly the scenes its --list-scenes lists.
+        if let Some(scene) = &self.scenario
+            && !crate::review_scenes::accepts(scene, cfg!(feature = "review"))
+        {
+            return Err(format!(
+                "Unknown review scene \"{scene}\"; run --list-scenes"
+            ));
+        }
+        // A practice campaign saves; the staged stress game (also staged as
+        // the fx-stress still) never can.
+        if self.practice && matches!(self.scenario.as_deref(), Some("stress" | "fx-stress")) {
+            return Err(
+                "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE".into(),
+            );
+        }
         if let Some(review) = &self.review
             && review.sequence.is_some()
             && (review.perf.report.is_some()
@@ -430,6 +574,11 @@ impl LaunchConfig {
     pub fn capture_path(&self) -> Option<&PathBuf> {
         self.review().and_then(|r| r.capture.as_ref())
     }
+    /// The review cue log's file; read by `ReviewToolsPlugin` only.
+    #[cfg_attr(not(feature = "review"), allow(dead_code))]
+    pub fn cue_log_path(&self) -> Option<&PathBuf> {
+        self.review().and_then(|r| r.cue_log.as_ref())
+    }
     pub fn sequence_path(&self) -> Option<&PathBuf> {
         self.review().and_then(|r| r.sequence.as_ref())
     }
@@ -438,8 +587,11 @@ impl LaunchConfig {
             .map(|r| &r.perf)
             .filter(|perf| perf.report.is_some())
     }
+    /// The review override when one is set, otherwise `<save directory>/logs`.
     pub fn log_directory(&self) -> PathBuf {
-        self.save_directory.join("logs")
+        self.log_directory_override
+            .clone()
+            .unwrap_or_else(|| self.save_directory.join("logs"))
     }
     /// Every catalogue's source, for the startup diagnostic console.
     pub fn catalog_sources(&self) -> Vec<(&'static str, String)> {
@@ -567,6 +719,147 @@ mod tests {
         assert!(parse(&["--bogus"], &[]).is_err());
         assert!(HELP.contains("LASTLIGHT_REVIEW_SCREEN"));
     }
+    #[test]
+    fn version_flag_selects_version_action() {
+        assert_eq!(
+            parse(&["--version"], &[]).unwrap().action,
+            LaunchAction::Version
+        );
+        assert_eq!(parse(&["-V"], &[]).unwrap().action, LaunchAction::Version);
+        // Like --help and --list-scenes it never validates the rest of the launch.
+        assert_eq!(
+            parse(&["--version"], &[("LASTLIGHT_REVIEW_SCREEN", "camp-hmoe")])
+                .unwrap()
+                .action,
+            LaunchAction::Version
+        );
+        assert!(HELP.contains("--version"));
+    }
+    #[test]
+    fn list_scenes_is_a_launch_action() {
+        assert_eq!(
+            parse(&["--list-scenes"], &[]).unwrap().action,
+            LaunchAction::ListScenes
+        );
+        // Listing never depends on (or validates) the scene being launched.
+        assert_eq!(
+            parse(
+                &["--list-scenes"],
+                &[("LASTLIGHT_REVIEW_SCREEN", "camp-hmoe")]
+            )
+            .unwrap()
+            .action,
+            LaunchAction::ListScenes
+        );
+        assert!(HELP.contains("--list-scenes"));
+    }
+    /// The help names where logs go, including the isolated review's temp
+    /// profile when LASTLIGHT_SAVE_DIR is absent (d5e16bd).
+    #[cfg(feature = "review")]
+    #[test]
+    fn help_names_the_log_folders() {
+        assert!(HELP.contains("<save dir>/logs"), "{HELP}");
+        assert!(
+            HELP.contains("<temp>/lastlight-review-<pid>/logs"),
+            "{HELP}"
+        );
+        let c = parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", "menu")]).unwrap();
+        let review = std::env::temp_dir()
+            .join(format!("lastlight-review-{}", std::process::id()))
+            .join("logs");
+        assert_eq!(c.log_directory(), review, "the help's review folder");
+    }
+    #[test]
+    fn unknown_practice_scene_is_rejected() {
+        let practice = |scene| {
+            parse(
+                &[],
+                &[
+                    ("LASTLIGHT_PRACTICE", "1"),
+                    ("LASTLIGHT_REVIEW_SCREEN", scene),
+                ],
+            )
+        };
+        assert!(practice("construction").is_ok());
+        assert_eq!(
+            practice("camp-hmoe").unwrap_err(),
+            "Unknown review scene \"camp-hmoe\"; run --list-scenes"
+        );
+    }
+    /// The stress fixture cannot be saved, so it is never a practice campaign.
+    #[test]
+    fn practice_flag_with_stress_screen_is_rejected() {
+        let stress = |practice: bool| {
+            let mut vars = vec![("LASTLIGHT_REVIEW_SCREEN", "stress")];
+            if practice {
+                vars.push(("LASTLIGHT_PRACTICE", "1"));
+            }
+            parse(&[], &vars)
+        };
+        let error = stress(true).unwrap_err();
+        if cfg!(feature = "review") {
+            assert_eq!(
+                error,
+                "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE"
+            );
+            assert!(stress(false).is_ok());
+        } else {
+            assert_eq!(error, "Unknown review scene \"stress\"; run --list-scenes");
+        }
+    }
+    /// fx-stress stages the same unsaveable fixture, so it is refused alike.
+    #[test]
+    fn practice_flag_with_fx_stress_screen_is_rejected() {
+        let error = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "fx-stress"),
+                ("LASTLIGHT_PRACTICE", "1"),
+            ],
+        )
+        .unwrap_err();
+        if cfg!(feature = "review") {
+            assert_eq!(
+                error,
+                "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE"
+            );
+            assert!(parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", "fx-stress")]).is_ok());
+        } else {
+            assert_eq!(
+                error,
+                "Unknown review scene \"fx-stress\"; run --list-scenes"
+            );
+        }
+    }
+    /// A build without `review` accepts exactly the scenes `--list-scenes`
+    /// lists there: the practice scenes.
+    #[cfg(not(feature = "review"))]
+    #[test]
+    fn plain_builds_accept_only_listed_practice_scenes() {
+        let practice = |scene| {
+            parse(
+                &[],
+                &[
+                    ("LASTLIGHT_PRACTICE", "1"),
+                    ("LASTLIGHT_REVIEW_SCREEN", scene),
+                ],
+            )
+        };
+        for scene in ["construction", "operations"] {
+            assert!(practice(scene).is_ok(), "{scene}");
+        }
+        for scene in [
+            "model-parity-rook",
+            "model-workshop",
+            "npc-stutter",
+            "battle",
+        ] {
+            assert_eq!(
+                practice(scene).unwrap_err(),
+                format!("Unknown review scene \"{scene}\"; run --list-scenes"),
+            );
+        }
+    }
     #[cfg(feature = "dev")]
     #[test]
     fn record_and_replay_flags_take_a_path() {
@@ -615,6 +908,119 @@ mod tests {
     }
     #[cfg(feature = "review")]
     #[test]
+    fn unknown_review_scene_is_rejected() {
+        let review = |scene| parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", scene)]);
+        assert_eq!(
+            review("camp-hmoe").unwrap_err(),
+            "Unknown review scene \"camp-hmoe\"; run --list-scenes"
+        );
+        assert!(
+            review("model-parity-").is_err(),
+            "a workshop prefix needs an id"
+        );
+        assert!(review("camp").is_err(), "a screen name is not a scene");
+        for known in [
+            "battle",
+            "npc-stutter",
+            "gesture-melee",
+            "model-parity-rook",
+        ] {
+            assert!(review(known).is_ok(), "{known}");
+        }
+    }
+    #[cfg(feature = "review")]
+    #[test]
+    fn review_without_save_dir_never_logs_into_the_player_profile() {
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "menu"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        let player_profile = PathBuf::from("C:/x").join("LastlightHordeDefense");
+        assert_eq!(c.save_directory, player_profile);
+        assert!(
+            !c.log_directory().starts_with(&player_profile),
+            "review logs landed in the player profile: {}",
+            c.log_directory().display()
+        );
+        assert_eq!(
+            c.log_directory(),
+            crate::profile::profile_directory(player_profile, Some("menu"), false).join("logs"),
+            "review logs live in the per-process temp review profile"
+        );
+    }
+    #[cfg(feature = "review")]
+    #[test]
+    fn explicit_save_dir_keeps_review_logs_beside_the_evidence() {
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "menu"),
+                ("LASTLIGHT_SAVE_DIR", "D:/evidence/saves/normal-menu"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            c.log_directory(),
+            PathBuf::from("D:/evidence/saves/normal-menu").join("logs")
+        );
+    }
+    #[test]
+    fn practice_and_ordinary_play_log_into_the_profile() {
+        let profile = PathBuf::from("C:/x").join("LastlightHordeDefense");
+        let ordinary = parse(&[], &[("LOCALAPPDATA", "C:/x")]).unwrap();
+        assert_eq!(ordinary.log_directory(), profile.join("logs"));
+        let practice = parse(
+            &[],
+            &[
+                ("LASTLIGHT_PRACTICE", "1"),
+                ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(practice.log_directory(), profile.join("logs"));
+        // A review without a staged scenario plays the real profile, so its
+        // logs stay there too.
+        let unstaged = parse(
+            &[],
+            &[("LASTLIGHT_PERF_CPU", "test"), ("LOCALAPPDATA", "C:/x")],
+        )
+        .unwrap();
+        assert_eq!(unstaged.log_directory(), profile.join("logs"));
+    }
+    /// A practice campaign captured or measured in a review build is still the
+    /// player's campaign: review and performance variables never move its
+    /// logs out of the profile.
+    #[cfg(feature = "review")]
+    #[test]
+    fn reviewed_practice_logs_into_the_profile() {
+        let profile = PathBuf::from("C:/x").join("LastlightHordeDefense");
+        for extra in [
+            ("LASTLIGHT_REVIEW_CAPTURE", "practice.png"),
+            ("LASTLIGHT_PERF_REPORT", "practice.json"),
+        ] {
+            let c = parse(
+                &[],
+                &[
+                    ("LASTLIGHT_PRACTICE", "1"),
+                    ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+                    extra,
+                    ("LOCALAPPDATA", "C:/x"),
+                ],
+            )
+            .unwrap();
+            assert!(c.practice && c.review().is_some(), "{extra:?}");
+            assert_eq!(c.log_directory_override, None, "{extra:?}");
+            assert_eq!(c.log_directory(), profile.join("logs"), "{extra:?}");
+        }
+    }
+    #[cfg(feature = "review")]
+    #[test]
     fn animation_export_requires_isolated_motion_review() {
         let base = [
             ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
@@ -634,6 +1040,132 @@ mod tests {
         }
         assert!(parse(&[], &base[..2]).is_err(), "motion flag required");
         assert!(parse(&[], &[base[0], base[2]]).is_err(), "scene required");
+    }
+    /// A6-18: `LASTLIGHT_REVIEW_CUE_LOG` is a review variable that names the
+    /// cue log's file; ordinary play has none.
+    #[test]
+    fn cue_log_variable_names_the_review_cue_log() {
+        let name = "LASTLIGHT_REVIEW_CUE_LOG";
+        assert!(REVIEW_VARIABLES.contains(&name));
+        assert!(HELP.contains(name));
+        assert!(parse(&[], &[]).unwrap().cue_log_path().is_none());
+        if cfg!(feature = "review") {
+            let c = parse(&[], &[(name, "target/review/run-1/cues.jsonl")]).unwrap();
+            assert_eq!(
+                c.cue_log_path(),
+                Some(&PathBuf::from("target/review/run-1/cues.jsonl"))
+            );
+        }
+    }
+    /// W1 review: a playtest launcher (package_playtest.ps1 -Review) blanks
+    /// every review variable, so a value left in the player's environment
+    /// never turns an ordinary launch into an isolated review session.
+    #[test]
+    fn playtest_launchers_blank_every_review_variable() {
+        let script = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../scripts/package_playtest.ps1"),
+        )
+        .unwrap();
+        let missing: Vec<&str> = REVIEW_VARIABLES
+            .iter()
+            .copied()
+            .filter(|name| !script.contains(&format!("'set \"{name}=\"'")))
+            .collect();
+        assert!(missing.is_empty(), "launchers keep {missing:?}");
+    }
+    #[test]
+    fn perf_present_mode_and_pipelined_parse_and_are_review_variables() {
+        for name in [
+            "LASTLIGHT_PERF_PRESENT_MODE",
+            "LASTLIGHT_PERF_PIPELINED",
+            "LASTLIGHT_PERF_PROFILE",
+        ] {
+            assert!(REVIEW_VARIABLES.contains(&name), "{name}");
+            assert!(HELP.contains(name), "{name}");
+        }
+        let perf = |vars: &[(&str, &str)]| {
+            let mut vars = vars.to_vec();
+            vars.push(("LASTLIGHT_PERF_REPORT", "perf.json"));
+            parse(&[], &vars).map(|c| c.perf().cloned())
+        };
+        if !cfg!(feature = "review") {
+            // Without review tooling every perf variable is ignored with a warning.
+            let c = parse(&[], &[("LASTLIGHT_PERF_PRESENT_MODE", "bogus")]).unwrap();
+            assert!(c.review.is_none());
+            assert_eq!(c.warnings.len(), 1);
+            return;
+        }
+        let defaults = perf(&[]).unwrap().unwrap();
+        assert_eq!((defaults.present_mode, defaults.pipelined), (None, None));
+        for (raw, expected) in [
+            ("fifo", PresentModeOverride::Fifo),
+            ("Mailbox", PresentModeOverride::Mailbox),
+            (" immediate ", PresentModeOverride::Immediate),
+            ("autonovsync", PresentModeOverride::AutoNoVsync),
+        ] {
+            let options = perf(&[("LASTLIGHT_PERF_PRESENT_MODE", raw)])
+                .unwrap()
+                .unwrap();
+            assert_eq!(options.present_mode, Some(expected), "{raw}");
+        }
+        for (raw, expected) in [("0", false), ("1", true)] {
+            let options = perf(&[("LASTLIGHT_PERF_PIPELINED", raw)]).unwrap().unwrap();
+            assert_eq!(options.pipelined, Some(expected), "{raw}");
+        }
+        let options = perf(&[("LASTLIGHT_PERF_PROFILE", "playtest")])
+            .unwrap()
+            .unwrap();
+        assert_eq!(options.profile_label.as_deref(), Some("playtest"));
+        // Invalid values are typed launch errors.
+        assert_eq!(
+            perf(&[("LASTLIGHT_PERF_PRESENT_MODE", "vsync")]).unwrap_err(),
+            "LASTLIGHT_PERF_PRESENT_MODE must be fifo, mailbox, immediate or autonovsync"
+        );
+        for raw in ["2", "on", "true"] {
+            assert_eq!(
+                perf(&[("LASTLIGHT_PERF_PIPELINED", raw)]).unwrap_err(),
+                "LASTLIGHT_PERF_PIPELINED must be 0 or 1",
+                "{raw}"
+            );
+        }
+        // Each is a review variable on its own: it activates review options.
+        let c = parse(&[], &[("LASTLIGHT_PERF_PIPELINED", "0")]).unwrap();
+        assert_eq!(c.review().map(|r| r.perf.pipelined), Some(Some(false)));
+        assert_eq!(
+            PresentModeOverride::AutoNoVsync.present_mode(),
+            bevy::window::PresentMode::AutoNoVsync
+        );
+    }
+    /// W1-34 review: the render plan reads the overrides only from a perf
+    /// launch (`LaunchConfig::perf`), so without LASTLIGHT_PERF_REPORT each one
+    /// is named in a warning instead of being dropped silently.
+    #[cfg(feature = "review")]
+    #[test]
+    fn perf_render_overrides_without_a_report_warn_that_they_are_ignored() {
+        let override_vars = [
+            ("LASTLIGHT_PERF_PRESENT_MODE", "immediate"),
+            ("LASTLIGHT_PERF_PIPELINED", "0"),
+        ];
+        let c = parse(&[], &override_vars).unwrap();
+        assert!(c.perf().is_none());
+        for (name, _) in override_vars {
+            assert_eq!(
+                c.warnings
+                    .iter()
+                    .filter(|w| w.contains(name) && w.contains("LASTLIGHT_PERF_REPORT"))
+                    .count(),
+                1,
+                "{name}: {:?}",
+                c.warnings
+            );
+        }
+        let mut with_report = override_vars.to_vec();
+        with_report.push(("LASTLIGHT_PERF_REPORT", "perf.json"));
+        let c = parse(&[], &with_report).unwrap();
+        assert!(c.warnings.is_empty(), "{:?}", c.warnings);
+        assert_eq!(c.perf().and_then(|p| p.pipelined), Some(false));
+        assert!(HELP.contains("with LASTLIGHT_PERF_REPORT"));
     }
     #[cfg(not(feature = "review"))]
     #[test]
@@ -659,5 +1191,15 @@ mod tests {
         .unwrap();
         assert_eq!(c.scenario.as_deref(), Some("construction"));
         assert!(c.practice && c.review.is_none());
+        // An ignored review scene is ordinary play, which logs into the profile.
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "menu"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(c.log_directory(), c.save_directory.join("logs"));
     }
 }

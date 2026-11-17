@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/operations.rs::operations"
 
 Show active plague pressure, remaining response time and the affected front.
 
-- **Entry, exit and actions:** Enter via alerts or Operations; Plan outbreak response selects/enters that country for a defense or survivor order.
+- **Entry, exit and actions:** Enter via Camp home's alerts or Operations; "Plan response" dispatches `SelectCountry` and opens the Briefing on the outbreak's final stage. Nothing deploys until Deploy (`BeginDefense`); survivor orders stay available.
 - **State boundary:** Outbreak strength, deadline and resolution use the strategy clock. Merely viewing the alert does not contain an outbreak.
 - **Responsiveness and accessibility:** Country, group count and seconds remaining accompany warning color; global pause freezes the deadline.
 

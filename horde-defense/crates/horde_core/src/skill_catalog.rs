@@ -24,6 +24,11 @@ pub struct SkillNode {
     pub position: [f32; 2],
     pub icon: String,
     pub effects: Vec<SkillEffect>,
+    /// Enemy archetype ids this node is authored to answer (for example
+    /// `"shield-bearer"`). Descriptive only: no rule reads it. At most 8
+    /// distinct ids of lowercase ASCII letters, digits, `-` or `_`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub counters: Vec<String>,
 }
 /// A data-keyed capability a skill grants (`Unlock("grenade")`). Unlocks carry
 /// no value; the simulation asks `SkillModifiers::unlocked` for the IDs it
@@ -64,9 +69,15 @@ pub mod unlocks {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value")]
 pub enum SkillEffect {
-    BodyDevelopment { attribute: BodyAttribute, rank: u32 },
+    BodyDevelopment {
+        attribute: BodyAttribute,
+        rank: u32,
+    },
     Blueprint(StructureKind),
-    StructureRank { kind: StructureKind, rank: u32 },
+    StructureRank {
+        kind: StructureKind,
+        rank: u32,
+    },
     FeatureUnlock(CampaignFeature),
     DamageAdd(i32),
     DamageMultiplier(f32),
@@ -85,6 +96,70 @@ pub enum SkillEffect {
     OrdnanceRadiusMultiplier(f32),
     BurnDurationMultiplier(f32),
     OrdnanceCooldownMultiplier(f32),
+    /// A personal perk for one weapon class: Damage 1–2, Reload and Cadence
+    /// 0.5–1 (multipliers), WeakBonus 0.01–1 (added to the weak-spot bonus).
+    ClassModifier {
+        class: WeaponClass,
+        stat: ClassStat,
+        value: f32,
+    },
+    /// Enemy armor ignored by personal shots, 1–20.
+    ArmorPenetration(i32),
+    /// Multiplier on hazard (blast and spit) damage taken, 0.5–1.
+    HazardDamageMultiplier(f32),
+}
+/// The per-class stat a [`SkillEffect::ClassModifier`] changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ClassStat {
+    Damage,
+    Reload,
+    Cadence,
+    WeakBonus,
+}
+impl ClassStat {
+    pub const ALL: [Self; 4] = [Self::Damage, Self::Reload, Self::Cadence, Self::WeakBonus];
+}
+/// Folded per-class perks for one weapon class. Multipliers default to 1.0
+/// and the weak-spot addition to 0.0; every field is always written.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClassModifiers {
+    pub damage_multiplier: f32,
+    pub reload_multiplier: f32,
+    pub cadence_multiplier: f32,
+    pub weak_bonus_add: f32,
+}
+impl Default for ClassModifiers {
+    fn default() -> Self {
+        Self {
+            damage_multiplier: 1.0,
+            reload_multiplier: 1.0,
+            cadence_multiplier: 1.0,
+            weak_bonus_add: 0.0,
+        }
+    }
+}
+impl ClassModifiers {
+    /// The folded value of `stat`.
+    pub fn get(&self, stat: ClassStat) -> f32 {
+        match stat {
+            ClassStat::Damage => self.damage_multiplier,
+            ClassStat::Reload => self.reload_multiplier,
+            ClassStat::Cadence => self.cadence_multiplier,
+            ClassStat::WeakBonus => self.weak_bonus_add,
+        }
+    }
+    fn within_bounds(&self) -> bool {
+        [
+            self.damage_multiplier,
+            self.reload_multiplier,
+            self.cadence_multiplier,
+        ]
+        .into_iter()
+        .all(|v| v.is_finite() && (0.01..=100.0).contains(&v))
+            && self.weak_bonus_add.is_finite()
+            && (0.0..=1.0).contains(&self.weak_bonus_add)
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CampaignFeature {
@@ -110,6 +185,18 @@ impl CampaignFeature {
             Self::Recruitment => "Recruitment",
             Self::Parallel => "Parallel defenses",
             Self::Operations => "Country operations",
+        }
+    }
+    /// The feature's stable id. Presentation saves it (settings.json
+    /// `seen_callouts` holds "feature:<id>"), so an id never changes and
+    /// the list is append-only.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Construction => "construction",
+            Self::Companion => "companion",
+            Self::Recruitment => "recruitment",
+            Self::Parallel => "parallel",
+            Self::Operations => "operations",
         }
     }
 }
@@ -190,8 +277,13 @@ impl SkillEffect {
             Self::DamageAdd(_)
             | Self::DamageMultiplier(_)
             | Self::ReloadMultiplier(_)
-            | Self::CadenceMultiplier(_) => C::Firearms,
-            Self::HealthAdd(_) | Self::StaminaAdd(_) | Self::ArmorAdd(_) => C::Survival,
+            | Self::CadenceMultiplier(_)
+            | Self::ClassModifier { .. }
+            | Self::ArmorPenetration(_) => C::Firearms,
+            Self::HealthAdd(_)
+            | Self::StaminaAdd(_)
+            | Self::ArmorAdd(_)
+            | Self::HazardDamageMultiplier(_) => C::Survival,
             Self::MeleeAdd(_) => C::Melee,
             Self::WeaponTraining(_) => C::WeaponClass,
             Self::Unlock(id) => match id.as_str() {
@@ -241,18 +333,19 @@ impl SkillEffect {
             Self::ArmorAdd(_) => vec!["armor"],
             Self::MeleeAdd(_) => vec!["melee", "damage"],
             Self::EngineeringMultiplier(_) => vec!["engineering", "structure"],
-            Self::WeaponTraining(class) => vec![
-                match class {
-                    WeaponClass::Pistol => "pistol",
-                    WeaponClass::Smg => "smg",
-                    WeaponClass::Shotgun => "shotgun",
-                    WeaponClass::Rifle => "rifle",
-                    WeaponClass::Marksman => "marksman",
-                    WeaponClass::MachineGun => "machine gun",
+            Self::WeaponTraining(class) => vec![class_keyword(*class), "weapon", "proficiency"],
+            Self::ClassModifier { class, stat, .. } => vec![
+                class_keyword(*class),
+                "perk",
+                match stat {
+                    ClassStat::Damage => "damage",
+                    ClassStat::Reload => "reload",
+                    ClassStat::Cadence => "fire rate",
+                    ClassStat::WeakBonus => "weak spot",
                 },
-                "weapon",
-                "proficiency",
             ],
+            Self::ArmorPenetration(_) => vec!["armor", "shield", "penetration", "perk"],
+            Self::HazardDamageMultiplier(_) => vec!["blast", "spit", "hazard", "perk"],
             Self::Unlock(id) => match id.as_str() {
                 unlocks::PIERCING => vec!["piercing", "penetration"],
                 unlocks::SWEEP => vec!["sweep", "melee"],
@@ -269,6 +362,18 @@ impl SkillEffect {
             | Self::OrdnanceCooldownMultiplier(_) => vec!["grenade", "molotov", "ordnance"],
             Self::BurnDurationMultiplier(_) => vec!["molotov", "burn", "incendiary"],
         }
+    }
+}
+
+/// Lowercase search keyword for a weapon class.
+fn class_keyword(class: WeaponClass) -> &'static str {
+    match class {
+        WeaponClass::Pistol => "pistol",
+        WeaponClass::Smg => "smg",
+        WeaponClass::Shotgun => "shotgun",
+        WeaponClass::Rifle => "rifle",
+        WeaponClass::Marksman => "marksman",
+        WeaponClass::MachineGun => "machine gun",
     }
 }
 
@@ -330,6 +435,16 @@ pub struct SkillModifiers {
     pub ordnance_radius_multiplier: f32,
     pub burn_duration_multiplier: f32,
     pub ordnance_cooldown_multiplier: f32,
+    /// Folded [`SkillEffect::ClassModifier`] perks; a class without a perk
+    /// has no entry. Absent when empty.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub class_modifiers: BTreeMap<WeaponClass, ClassModifiers>,
+    /// Enemy armor ignored by personal shots (0–1000). Absent at 0.
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub armor_penetration: i32,
+    /// Multiplier on hazard damage taken (0.01–1). Absent at exactly 1.0.
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub hazard_damage_multiplier: f32,
 }
 impl Default for SkillModifiers {
     fn default() -> Self {
@@ -356,6 +471,9 @@ impl Default for SkillModifiers {
             ordnance_radius_multiplier: 1.0,
             burn_duration_multiplier: 1.0,
             ordnance_cooldown_multiplier: 1.0,
+            class_modifiers: BTreeMap::new(),
+            armor_penetration: 0,
+            hazard_damage_multiplier: 1.0,
         }
     }
 }
@@ -392,6 +510,11 @@ impl SkillModifiers {
             ]
             .into_iter()
             .any(|v| !v.is_finite() || !(0.01..=100.0).contains(&v))
+            || self.class_modifiers.len() > WeaponClass::ALL.len()
+            || self.class_modifiers.values().any(|c| !c.within_bounds())
+            || !(0..=1000).contains(&self.armor_penetration)
+            || !self.hazard_damage_multiplier.is_finite()
+            || !(0.01..=1.0).contains(&self.hazard_damage_multiplier)
         {
             return Err("Saved skill modifiers exceed supported finite bounds".into());
         }
@@ -433,6 +556,17 @@ impl SkillModifiers {
             SkillEffect::OrdnanceRadiusMultiplier(n) => self.ordnance_radius_multiplier *= n,
             SkillEffect::BurnDurationMultiplier(n) => self.burn_duration_multiplier *= n,
             SkillEffect::OrdnanceCooldownMultiplier(n) => self.ordnance_cooldown_multiplier *= n,
+            SkillEffect::ClassModifier { class, stat, value } => {
+                let perk = self.class_modifiers.entry(class).or_default();
+                match stat {
+                    ClassStat::Damage => perk.damage_multiplier *= value,
+                    ClassStat::Reload => perk.reload_multiplier *= value,
+                    ClassStat::Cadence => perk.cadence_multiplier *= value,
+                    ClassStat::WeakBonus => perk.weak_bonus_add += value,
+                }
+            }
+            SkillEffect::ArmorPenetration(n) => self.armor_penetration += n,
+            SkillEffect::HazardDamageMultiplier(n) => self.hazard_damage_multiplier *= n,
         }
     }
 }
@@ -569,11 +703,36 @@ impl SkillCatalog {
                         (1..=5).contains(v)
                     }
                     SkillEffect::Unlock(id) => valid_unlock(id),
+                    SkillEffect::ClassModifier { stat, value, .. } => {
+                        let range = match stat {
+                            ClassStat::Damage => 1.0..=2.0,
+                            ClassStat::Reload | ClassStat::Cadence => 0.5..=1.0,
+                            ClassStat::WeakBonus => 0.01..=1.0,
+                        };
+                        value.is_finite() && range.contains(value)
+                    }
+                    SkillEffect::ArmorPenetration(v) => (1..=20).contains(v),
+                    SkillEffect::HazardDamageMultiplier(v) => {
+                        v.is_finite() && (0.5..=1.0).contains(v)
+                    }
                     _ => true,
                 };
                 if !valid {
                     return Err(format!("Invalid effect in skill {}", n.id));
                 }
+            }
+            let mut counters = BTreeSet::new();
+            if n.counters.len() > 8
+                || !n.counters.iter().all(|id| {
+                    !id.is_empty()
+                        && id.len() <= 48
+                        && id.bytes().all(|b| {
+                            b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_'
+                        })
+                        && counters.insert(id.as_str())
+                })
+            {
+                return Err(format!("Invalid skill counters: {}", n.id));
             }
         }
         let mut indegree = BTreeMap::new();
@@ -656,7 +815,16 @@ impl SkillCatalog {
             aggregate.ordnance_radius_multiplier,
             aggregate.burn_duration_multiplier,
             aggregate.ordnance_cooldown_multiplier,
-        ] {
+            aggregate.hazard_damage_multiplier,
+        ]
+        .into_iter()
+        .chain(aggregate.class_modifiers.values().flat_map(|c| {
+            [
+                c.damage_multiplier,
+                c.reload_multiplier,
+                c.cadence_multiplier,
+            ]
+        })) {
             if !factor.is_finite() || !(0.01..=100.0).contains(&factor) {
                 return Err("Combined skill multipliers exceed supported bounds".into());
             }
@@ -710,6 +878,151 @@ mod tests {
         node.position[0] += 200.0;
         extended.nodes.push(node);
         extended.validate().unwrap();
+    }
+
+    /// The shipped catalogue plus one probe node under shotgun_training.
+    fn with_probe(effects: Vec<SkillEffect>, counters: Vec<&str>) -> SkillCatalog {
+        let mut catalog = skills().clone();
+        let mut node = catalog.node("shotgun_training").unwrap().clone();
+        node.id = "perk_probe".into();
+        node.prerequisites = vec!["shotgun_training".into()];
+        node.position = [9_000.0, 9_000.0];
+        node.effects = effects;
+        node.counters = counters.into_iter().map(str::to_owned).collect();
+        catalog.nodes.push(node);
+        catalog
+    }
+
+    #[test]
+    fn accepts_class_modifier_and_rejects_out_of_range() {
+        use ClassStat::{Cadence, Damage, Reload, WeakBonus};
+        use WeaponClass::{Marksman, Pistol, Rifle, Shotgun, Smg};
+        let perk = |class, stat, value| SkillEffect::ClassModifier { class, stat, value };
+        // The decision-19 shapes at their authored values validate and
+        // round-trip through the tagged JSON form.
+        let accepted = with_probe(
+            vec![
+                perk(Shotgun, Cadence, 0.8),
+                perk(Shotgun, Reload, 0.8),
+                perk(Marksman, Damage, 1.15),
+                perk(Marksman, WeakBonus, 0.15),
+                SkillEffect::ArmorPenetration(4),
+                SkillEffect::HazardDamageMultiplier(0.6),
+            ],
+            vec!["shield-bearer", "sprinter-swarm"],
+        );
+        accepted.validate().unwrap();
+        let text = serde_json::to_string(&accepted).unwrap();
+        assert!(text.contains(
+            r#"{"kind":"ClassModifier","value":{"class":"Shotgun","stat":"Cadence","value":0.8}}"#
+        ));
+        assert!(text.contains(r#"{"kind":"ArmorPenetration","value":4}"#));
+        assert!(text.contains(r#"{"kind":"HazardDamageMultiplier","value":0.6}"#));
+        assert!(text.contains(r#""counters":["shield-bearer","sprinter-swarm"]"#));
+        assert_eq!(SkillCatalog::from_json(&text).unwrap(), accepted);
+        // Folding: per-class multipliers multiply, the weak-spot bonus adds;
+        // classes without a perk get no entry.
+        let mut modifiers = SkillModifiers::default();
+        for effect in &accepted.node("perk_probe").unwrap().effects {
+            modifiers.apply(effect);
+        }
+        assert_eq!(
+            modifiers.class_modifiers[&Shotgun],
+            ClassModifiers {
+                reload_multiplier: 0.8,
+                cadence_multiplier: 0.8,
+                ..ClassModifiers::default()
+            }
+        );
+        assert_eq!(
+            modifiers.class_modifiers[&Marksman],
+            ClassModifiers {
+                damage_multiplier: 1.15,
+                weak_bonus_add: 0.15,
+                ..ClassModifiers::default()
+            }
+        );
+        assert_eq!(modifiers.class_modifiers.len(), 2);
+        assert_eq!(modifiers.armor_penetration, 4);
+        assert_eq!(modifiers.hazard_damage_multiplier, 0.6);
+        modifiers.validate().unwrap();
+        let neutral = ClassModifiers::default();
+        assert_eq!(
+            [
+                neutral.damage_multiplier.to_bits(),
+                neutral.reload_multiplier.to_bits(),
+                neutral.cadence_multiplier.to_bits(),
+                neutral.weak_bonus_add.to_bits(),
+            ],
+            [1.0f32.to_bits(), 1.0f32.to_bits(), 1.0f32.to_bits(), 0]
+        );
+        // Every out-of-range value fails on the effect rule itself.
+        let rejected = [
+            ("damage below 1", perk(Rifle, Damage, 0.99)),
+            ("damage above 2", perk(Rifle, Damage, 2.01)),
+            ("damage infinite", perk(Rifle, Damage, f32::INFINITY)),
+            ("reload below 0.5", perk(Smg, Reload, 0.49)),
+            ("reload above 1", perk(Smg, Reload, 1.01)),
+            ("cadence NaN", perk(Pistol, Cadence, f32::NAN)),
+            ("cadence below 0.5", perk(Pistol, Cadence, 0.4)),
+            ("weak bonus 0", perk(Marksman, WeakBonus, 0.0)),
+            ("weak bonus above 1", perk(Marksman, WeakBonus, 1.01)),
+            ("weak bonus NaN", perk(Marksman, WeakBonus, f32::NAN)),
+            ("penetration 0", SkillEffect::ArmorPenetration(0)),
+            ("penetration negative", SkillEffect::ArmorPenetration(-1)),
+            ("penetration 21", SkillEffect::ArmorPenetration(21)),
+            (
+                "hazard below 0.5",
+                SkillEffect::HazardDamageMultiplier(0.49),
+            ),
+            ("hazard above 1", SkillEffect::HazardDamageMultiplier(1.01)),
+            ("hazard NaN", SkillEffect::HazardDamageMultiplier(f32::NAN)),
+        ];
+        let passed: Vec<String> = rejected
+            .into_iter()
+            .filter_map(
+                |(row, effect)| match with_probe(vec![effect], vec![]).validate() {
+                    Err(error) if error == "Invalid effect in skill perk_probe" => None,
+                    Err(error) => Some(format!("{row}: {error}")),
+                    Ok(()) => Some(format!("{row}: validated")),
+                },
+            )
+            .collect();
+        assert_eq!(passed, Vec::<String>::new(), "rows that did not fail");
+        // Counters name archetype ids: at most 8 distinct lowercase ids of
+        // 1-48 bytes.
+        let longest = "a".repeat(48);
+        let too_long = "a".repeat(49);
+        with_probe(vec![perk(Shotgun, Damage, 1.1)], vec![longest.as_str()])
+            .validate()
+            .unwrap();
+        let counters = [
+            ("empty", vec![""]),
+            ("49 bytes", vec![too_long.as_str()]),
+            ("uppercase", vec!["Shield-bearer"]),
+            ("space", vec!["shield bearer"]),
+            ("duplicate", vec!["exploder", "exploder"]),
+            ("nine", vec!["a", "b", "c", "d", "e", "f", "g", "h", "i"]),
+        ];
+        for (row, counters) in counters {
+            let catalog = with_probe(vec![perk(Shotgun, Damage, 1.1)], counters);
+            assert_eq!(
+                catalog.validate(),
+                Err("Invalid skill counters: perk_probe".into()),
+                "{row}"
+            );
+        }
+        // The shipped catalogue authors each of them since the decision-19
+        // nodes (W2-41, tests/progression_tree.rs).
+        let shipped = serde_json::to_string(skills()).unwrap();
+        for key in [
+            "ClassModifier",
+            "ArmorPenetration",
+            "HazardDamage",
+            "counters",
+        ] {
+            assert!(shipped.contains(key), "{key}");
+        }
     }
 
     #[test]
@@ -848,5 +1161,29 @@ mod tests {
                 .iter()
                 .all(|g| g.label != "Molotovs")
         );
+    }
+    /// The feature ids are saved in settings.json (`seen_callouts`, as
+    /// "feature:<id>"), so each is pinned here; the list is append-only.
+    #[test]
+    fn campaign_feature_ids_are_stable_and_unique() {
+        let ids: Vec<&str> = CampaignFeature::ALL.iter().map(|f| f.id()).collect();
+        assert_eq!(
+            ids,
+            [
+                "construction",
+                "companion",
+                "recruitment",
+                "parallel",
+                "operations"
+            ]
+        );
+        let unique: BTreeSet<&str> = ids.iter().copied().collect();
+        assert_eq!(unique.len(), CampaignFeature::ALL.len());
+        for id in ids {
+            assert!(
+                !id.is_empty() && id.bytes().all(|b| b.is_ascii_lowercase()),
+                "{id}"
+            );
+        }
     }
 }

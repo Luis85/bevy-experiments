@@ -1,4 +1,6 @@
 //! Staged campaign and battle fixtures the scenario matrix builds on.
+pub(super) mod production;
+
 use crate::settings::Settings;
 use crate::ui::{FrontendParts, Screen, Tab, battle};
 use horde_core::{
@@ -8,6 +10,14 @@ use horde_core::{
     sim::{Game, Input, Outcome},
     world::world,
 };
+
+/// Whether an isolated review scene keeps its audio: only a perf run that
+/// asks for it (`LASTLIGHT_PERF_AUDIO` with `LASTLIGHT_PERF_REPORT`), so a
+/// live battle's `LASTLIGHT_REVIEW_CUE_LOG` records real starts for
+/// `replay_cue_log` (A6-18). Every other review scene is muted.
+pub(super) fn keeps_audio(launch: &crate::launch::LaunchConfig) -> bool {
+    launch.perf().is_some_and(|perf| perf.audio)
+}
 
 /// Strict opt-in copied checkpoint; production and source files are never targets.
 pub(super) fn prepare_copied_npc(f: &mut FrontendParts) {
@@ -52,7 +62,7 @@ pub(super) fn prepare_copied_npc(f: &mut FrontendParts) {
         "Copied checkpoint must contain the active NPC battle"
     );
     f.settings = Settings::load(&copied_settings);
-    if !launch.perf().is_some_and(|perf| perf.audio) {
+    if !keeps_audio(&launch) {
         f.settings.master = 0.0;
     }
     if let Some(scale) = launch.review().and_then(|r| r.scale) {
@@ -116,13 +126,21 @@ pub(super) fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
     f.screen = Screen::Results;
 }
 
+/// These pre-existing advanced view fixtures explicitly retain legacy ledgers
+/// (character points, body ranks). Idempotent; it must run before any staged
+/// clear whose levels should grant those points.
+pub(super) fn enable_legacy_ledgers(game: &mut Game) {
+    game.staging().campaign().legacy_features = true;
+}
+
 pub(super) fn prepare_progression(game: &mut Game) {
     // Explicit screenshot entitlements; use model methods for every owned item,
     // skill and point investment. This does not represent earned campaign income.
+    enable_legacy_ledgers(game);
     let campaign = game.staging().campaign();
-    // These pre-existing advanced view fixtures explicitly retain legacy ledgers.
-    campaign.legacy_features = true;
-    campaign.coins = 1800;
+    // 600 more than before the W4-p repricing, which is what the six nodes
+    // bought below cost more, so the fixture ends with the same wallet.
+    campaign.coins = 2400;
     for stage in 0..5 {
         campaign.first_clear(stage, Mode::Personal);
     }
@@ -319,7 +337,7 @@ pub(super) fn prepare_battle(f: &mut FrontendParts, screen: &str) {
         f.screen = Screen::Battle;
     }
     f.campaign.mode = mode;
-    f.battle.construction = screen == "construction";
+    f.battle.set_construction(screen == "construction");
     if let Some(enemy) = f.game.attempt().and_then(|a| {
         a.enemies
             .iter()

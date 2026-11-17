@@ -9,22 +9,31 @@ use crate::weapons::{WeaponClass, WeaponSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 mod armory;
+mod auto_sell;
 mod ledger;
 mod loadout;
 mod progression;
+mod sale;
+pub mod tree_value;
 mod tree_view;
 mod view;
 mod world;
+pub(crate) use armory::ITEM_HELD_ELSEWHERE;
 pub use armory::{Item, Preset};
-pub use ledger::SaleQuote;
+pub use auto_sell::{AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_LINES};
 pub(crate) use loadout::mean_basic_damage;
 pub use loadout::{
     DefenderProfile, ItemComparison, LoadoutMetrics, Recommendation, RecommendationAction,
+    UPGRADE_MARGIN, UpgradeJudge,
 };
 use progression::legacy_training_default;
 pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining, Player, Skill};
-pub use tree_view::{NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta};
-pub use view::{NodeStatus, OfferPreview, UpgradeFocus};
+pub(crate) use sale::SalePlan;
+pub use sale::{SaleBlock, SaleOrigin, SaleQuote, SaleRefs, SaleResolution};
+pub use tree_view::{
+    NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta, counter_names,
+};
+pub use view::{FeatureUnlock, NodeStatus, OfferPreview, UpgradeFocus};
 pub use world::Placement;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -37,8 +46,11 @@ pub struct Campaign {
     pub legacy_features: bool,
     #[serde(default)]
     pub balance_settings: crate::balance::BalanceSettings,
+    /// Shared copy-on-write (W1-50): a save snapshot shares it with the live
+    /// game. Recording a run appends in place, and copies the records only
+    /// while a snapshot still holds them. Serialized as a plain sequence.
     #[serde(default)]
-    pub run_history: Vec<crate::stats::RunRecord>,
+    pub run_history: std::sync::Arc<Vec<crate::stats::RunRecord>>,
     #[serde(default = "crate::stats::first_run_id")]
     pub next_run_id: u64,
     /// Zero denotes pre-victory-threat saves; migrate their clear high-water once.
@@ -79,6 +91,33 @@ pub struct Campaign {
     pub kills_since_loot: u32,
     #[serde(default)]
     pub world: crate::world::WorldProgress,
+    /// The defender chosen for the next defense. None means the defender of
+    /// the last report. A recruit must be on the roster; always None in a
+    /// worker game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_defender: Option<crate::defenders::DefenderId>,
+    /// The recruit defending the main run, only while `reserved` is
+    /// `Some(Npc)` for that takeover. While it is Some, Mara's loadout is not
+    /// reserved (the recruit's items are in `reserved_items`). Always None in
+    /// a worker game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserved_recruit: Option<u64>,
+    /// Which of a run's drops settlement sells; off by default. Always the
+    /// default in a worker game, so an expedition's sales are paid once, by
+    /// the parent.
+    #[serde(default, skip_serializing_if = "AutoSellRule::is_default")]
+    pub auto_sell: AutoSellRule,
+    /// Progression ranks whose milestone reward has been paid; each at most
+    /// [`Campaign::progression_rank`], at most 64. Copied into workers and on
+    /// the operation-chain sync; v6 saves claim the milestones they reached.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub milestones_claimed: BTreeSet<u32>,
+    /// The named preset whose catalogue extras a Custom `balance_settings`
+    /// keeps (a Hard player who edits lanes keeps the Hard rules). Normal
+    /// whenever the preset is named, never Custom; copied into workers and
+    /// on the operation-chain sync. v6 saves load as Normal.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub balance_extras_basis: crate::balance::BalancePreset,
 }
 impl Default for Campaign {
     fn default() -> Self {
@@ -100,7 +139,7 @@ impl Default for Campaign {
             journey_revision: 1,
             legacy_features: false,
             balance_settings: Default::default(),
-            run_history: Vec::new(),
+            run_history: Default::default(),
             next_run_id: 1,
             threat_revision: 1,
             selected_survivor: None,
@@ -114,6 +153,7 @@ impl Default for Campaign {
                 points: 0,
                 body: KindMap::default(),
                 loadout: personal_loadout,
+                level_grant_paid: 0,
             },
             npc: Npc {
                 name: "Mara Vale".into(),
@@ -182,11 +222,60 @@ impl Default for Campaign {
             reserved_items: vec![],
             kills_since_loot: 0,
             world: crate::world::WorldProgress::default(),
+            next_defender: None,
+            reserved_recruit: None,
+            auto_sell: AutoSellRule::default(),
+            milestones_claimed: BTreeSet::new(),
+            balance_extras_basis: crate::balance::BalancePreset::Normal,
         }
     }
 }
+/// [`Campaign::balance_outcome`] after a campaign whose stored preset is
+/// `previous` and whose extras basis is `old_basis`.
+fn balance_outcome_after(
+    previous: crate::balance::BalancePreset,
+    old_basis: crate::balance::BalancePreset,
+    mut settings: crate::balance::BalanceSettings,
+) -> Result<
+    (
+        crate::balance::BalanceSettings,
+        crate::balance::BalancePreset,
+    ),
+    String,
+> {
+    use crate::balance::{BalancePreset, BalanceSettings};
+    settings.validate()?;
+    let requested = settings.preset;
+    if requested != BalancePreset::Custom && settings != BalanceSettings::for_preset(requested) {
+        settings.preset = BalancePreset::Custom;
+    }
+    let basis = if settings.preset != BalancePreset::Custom {
+        BalancePreset::Normal
+    } else if requested != BalancePreset::Custom {
+        requested
+    } else if previous != BalancePreset::Custom {
+        previous
+    } else {
+        old_basis
+    };
+    Ok((settings, basis))
+}
+
+/// The Custom settings that the Custom chip stores for `draft` when it is an
+/// unedited named preset, which `SetBalance` alone would store as that preset.
+fn unedited_custom_choice(
+    draft: &crate::balance::BalanceSettings,
+) -> Option<crate::balance::BalanceSettings> {
+    use crate::balance::{BalancePreset, BalanceSettings};
+    (draft.preset != BalancePreset::Custom && *draft == BalanceSettings::for_preset(draft.preset))
+        .then(|| BalanceSettings {
+            preset: BalancePreset::Custom,
+            ..draft.clone()
+        })
+}
+
 impl Campaign {
-    fn preparation(&self) -> Result<(), String> {
+    pub(crate) fn preparation(&self) -> Result<(), String> {
         if self.reserved.is_some() {
             Err("Return to camp before changing equipment or progression".into())
         } else {
@@ -195,16 +284,92 @@ impl Campaign {
     }
     pub fn set_balance_settings(
         &mut self,
-        mut settings: crate::balance::BalanceSettings,
+        settings: crate::balance::BalanceSettings,
     ) -> Result<(), String> {
-        settings.validate()?;
-        if settings.preset != crate::balance::BalancePreset::Custom
-            && settings != crate::balance::BalanceSettings::for_preset(settings.preset)
-        {
-            settings.preset = crate::balance::BalancePreset::Custom;
-        }
+        let (settings, basis) = self.balance_outcome(settings)?;
         self.balance_settings = settings;
+        self.balance_extras_basis = basis;
         Ok(())
+    }
+    /// What [`Self::set_balance_settings`] would store, without storing it:
+    /// the settings normalised to Custom when a named preset was edited, and
+    /// the extras basis (Normal under a named preset; on Custom the requested
+    /// named preset, else the previous named preset, else the old basis).
+    pub fn balance_outcome(
+        &self,
+        settings: crate::balance::BalanceSettings,
+    ) -> Result<
+        (
+            crate::balance::BalanceSettings,
+            crate::balance::BalancePreset,
+        ),
+        String,
+    > {
+        balance_outcome_after(
+            self.balance_settings.preset,
+            self.balance_extras_basis,
+            settings,
+        )
+    }
+    /// R21 (wave-1 close): the `SetBalance` settings, in order, that store
+    /// `draft` as the player's Custom choice on the settings screen. An
+    /// unedited named draft would store that preset itself, so it is sent as
+    /// the preset first (so the preset is the previous one) and then as
+    /// Custom with the same values. Any other draft is sent as it is: an
+    /// edited named draft already normalises to Custom on its own preset.
+    pub fn custom_balance_steps(
+        draft: &crate::balance::BalanceSettings,
+    ) -> Vec<crate::balance::BalanceSettings> {
+        match unedited_custom_choice(draft) {
+            Some(custom) => vec![draft.clone(), custom],
+            None => vec![draft.clone()],
+        }
+    }
+    /// What applying [`Self::custom_balance_steps`] of `draft` in order would
+    /// store, without storing it.
+    pub fn custom_balance_outcome(
+        &self,
+        draft: crate::balance::BalanceSettings,
+    ) -> Result<
+        (
+            crate::balance::BalanceSettings,
+            crate::balance::BalancePreset,
+        ),
+        String,
+    > {
+        let Some(custom) = unedited_custom_choice(&draft) else {
+            return self.balance_outcome(draft);
+        };
+        let (named, basis) = self.balance_outcome(draft)?;
+        balance_outcome_after(named.preset, basis, custom)
+    }
+    /// The named preset whose catalogue extras apply: the preset itself, or
+    /// for Custom the preset the edit came from.
+    pub fn balance_extras_preset(&self) -> crate::balance::BalancePreset {
+        if self.balance_settings.preset == crate::balance::BalancePreset::Custom {
+            self.balance_extras_basis
+        } else {
+            self.balance_settings.preset
+        }
+    }
+    /// The player-facing name of the next deployment's difficulty: the
+    /// preset's name, or for Custom the preset whose catalogue extras (elite
+    /// rate, front ramp, boss phases) still apply, "Custom (Hard rules)".
+    pub fn balance_rules_label(&self) -> String {
+        let preset = self.balance_settings.preset;
+        if preset == crate::balance::BalancePreset::Custom {
+            format!(
+                "{} ({} rules)",
+                preset.name(),
+                self.balance_extras_preset().name()
+            )
+        } else {
+            preset.name().to_owned()
+        }
+    }
+    /// The catalogue extras the next deployment uses.
+    pub fn balance_extras(&self) -> crate::balance::PresetExtras {
+        crate::balance::PresetExtras::for_preset(self.balance_extras_preset())
     }
     pub fn arena_geometry(&self) -> (u8, f32) {
         self.balance_settings.geometry(self.player.level)
@@ -215,7 +380,7 @@ impl Campaign {
             journey_revision: 1,
             legacy_features: self.legacy_features,
             balance_settings: self.balance_settings.clone(),
-            run_history: Vec::new(),
+            run_history: Default::default(),
             next_run_id: 1,
             threat_revision: self.threat_revision,
             selected_survivor: self.selected_survivor,
@@ -241,6 +406,11 @@ impl Campaign {
             reserved_items: self.reserved_items.clone(),
             kills_since_loot: self.kills_since_loot,
             world: self.world.clone(),
+            next_defender: None,
+            reserved_recruit: None,
+            auto_sell: AutoSellRule::default(),
+            milestones_claimed: self.milestones_claimed.clone(),
+            balance_extras_basis: self.balance_extras_basis,
         }
     }
     pub fn choose_survivor(&mut self, id: crate::survivors::SurvivorId) -> Result<(), String> {
@@ -253,10 +423,17 @@ impl Campaign {
     }
     pub fn validate(&self) -> Result<(), String> {
         self.balance_settings.validate()?;
+        if self.balance_extras_basis == crate::balance::BalancePreset::Custom
+            || (self.balance_settings.preset != crate::balance::BalancePreset::Custom
+                && self.balance_extras_basis != crate::balance::BalancePreset::Normal)
+        {
+            return Err("Invalid balance extras basis".into());
+        }
+        self.auto_sell.validate()?;
         if self.next_run_id == 0 || self.run_history.windows(2).any(|p| p[0].id >= p[1].id) {
             return Err("Invalid run history sequence".into());
         }
-        for record in &self.run_history {
+        for record in self.run_history.iter() {
             record.validate()?;
             if record.id == 0 || record.id >= self.next_run_id {
                 return Err("Invalid persistent run identity".into());
@@ -410,6 +587,51 @@ mod tests {
         ids.iter().map(|id| skills().node(id).unwrap().price).sum()
     }
     #[test]
+    fn clone_for_worker_clears_next_defender_and_reserved_recruit() {
+        let c = Campaign {
+            next_defender: Some(crate::defenders::DefenderId::Recruit(2)),
+            reserved_recruit: Some(2),
+            ..Campaign::default()
+        };
+        let worker = c.clone_for_worker();
+        assert_eq!(worker.next_defender, None);
+        assert_eq!(worker.reserved_recruit, None);
+    }
+    #[test]
+    fn clone_for_worker_copies_the_progression_ledgers() {
+        let mut c = Campaign {
+            victories: 12,
+            milestones_claimed: BTreeSet::from([5, 10]),
+            ..Campaign::default()
+        };
+        c.player.level = 9;
+        c.player.level_grant_paid = 9;
+        let worker = c.clone_for_worker();
+        assert_eq!(worker.milestones_claimed, c.milestones_claimed);
+        assert_eq!(worker.player.level_grant_paid, 9);
+    }
+    #[test]
+    fn clone_for_worker_resets_the_auto_sell_rule() {
+        let c = Campaign {
+            auto_sell: AutoSellRule {
+                enabled: true,
+                sell_below: crate::quality::Quality::Rare,
+                ..AutoSellRule::default()
+            },
+            ..Campaign::default()
+        };
+        c.validate().unwrap();
+        assert!(c.clone_for_worker().auto_sell.is_default());
+        let poor = Campaign {
+            auto_sell: AutoSellRule {
+                sell_below: crate::quality::Quality::Poor,
+                ..AutoSellRule::default()
+            },
+            ..Campaign::default()
+        };
+        assert!(poor.validate().is_err());
+    }
+    #[test]
     fn authored_purchases_stack_and_reject_unmet_prerequisites_without_spending() {
         let mut c = Campaign {
             coins: price(&[
@@ -434,9 +656,9 @@ mod tests {
         c.purchase_node("combat_reload").unwrap();
         c.purchase_node("field_fitness").unwrap();
         let p = c.profile(Mode::Personal);
-        assert_eq!(p.personal.damage, 25);
+        assert_eq!(p.personal.damage, 20);
         assert_eq!(p.personal.health, 135);
-        assert!((p.personal.reload - 2.1 * 0.8 * 0.85).abs() < 0.001);
+        assert!((p.personal.reload - 2.1 * 0.8 * 0.75).abs() < 0.001);
         assert!((p.personal.cadence - 0.42 * 0.85).abs() < 0.001);
         let before = c.clone();
         assert!(c.purchase_node("steady_hands").is_err());
@@ -546,6 +768,92 @@ mod tests {
         assert!(c.validate().is_ok());
     }
     #[test]
+    fn full_allowance_names_liberation_until_the_max_level() {
+        // W2-10: liberations raise the cap too (max(1 + first clears,
+        // 1 + ceil(3L/2))), so the rejection names them, and at the max
+        // level nothing raises it.
+        let mut c = Campaign {
+            coins: 1000,
+            ..Campaign::default()
+        };
+        for _ in 0..12 {
+            c.buy_training_point().unwrap();
+        }
+        let err = c.buy_training_point().unwrap_err();
+        assert!(err.contains("Liberate a country"), "{err}");
+        assert_eq!(
+            err,
+            format!(
+                "Advancement allowance reached. {}",
+                c.allowance_raise_hint()
+            )
+        );
+        let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
+        c.first_clears = (1..max).map(|i| format!("level_{i}")).collect();
+        assert_eq!(c.advancement_cap_level(), max);
+        c.npc.awarded = c.allowance();
+        let err = c.buy_training_point().unwrap_err();
+        assert!(err.contains("highest"), "{err}");
+        assert!(!err.contains("Liberate"), "{err}");
+    }
+    #[test]
+    fn allowance_hint_names_only_what_raises_the_cap_now() {
+        // The cap is max(1 + first clears, 1 + ceil(3L/2)) (W2-10): past
+        // the first-clear floor only a liberation raises it, and past the
+        // liberation floor only a new clear does.
+        let mut c = Campaign::default();
+        c.choose_start_country("VAT").unwrap();
+        for stage in 0..3 {
+            c.record_country_stage_clear(stage).unwrap();
+        }
+        assert_eq!(c.liberated_count(), 1);
+        assert_eq!(c.advancement_cap_level(), 3);
+        assert_eq!(
+            c.allowance_raise_hint(),
+            "Liberate a country to raise the allowance."
+        );
+        c.first_clears = (1..=2).map(|i| format!("level_{i}")).collect();
+        assert_eq!(
+            c.allowance_raise_hint(),
+            "Liberate a country or clear a new stage to raise the allowance."
+        );
+        c.first_clears = (1..=4).map(|i| format!("level_{i}")).collect();
+        assert_eq!(c.advancement_cap_level(), 5);
+        assert_eq!(
+            c.allowance_raise_hint(),
+            "Clear a new stage to raise the allowance."
+        );
+    }
+    #[test]
+    fn allowance_hint_never_offers_a_clear_once_every_catalogue_level_is_cleared() {
+        // A 9-stage start country maps its stages onto the 5 catalogue
+        // levels, so its liberation first-clears all of them: no new first
+        // clear can happen, and only liberations can raise the cap.
+        let mut c = Campaign::default();
+        c.choose_start_country("DEU").unwrap();
+        let stages = crate::world::country_stage_count("DEU").unwrap();
+        assert!(stages > content().levels.len(), "{stages}");
+        for stage in 0..stages {
+            c.record_country_stage_clear(stage).unwrap();
+        }
+        c.first_clears = content().levels.iter().map(|l| l.id.clone()).collect();
+        assert_eq!(c.liberated_count(), 1);
+        assert_eq!(c.advancement_cap_level(), 6);
+        let hint = c.allowance_raise_hint();
+        assert!(!hint.to_lowercase().contains("clear a new stage"), "{hint}");
+        assert!(hint.contains("Liberate"), "{hint}");
+        // L = 3 ties the terms (6 vs 6); still only liberation is a lever.
+        for id in ["VAT", "LUX"] {
+            let count = crate::world::country_stage_count(id).unwrap();
+            c.world.clear_high_water.insert(id.to_owned(), count);
+        }
+        assert_eq!(c.liberated_count(), 3);
+        assert_eq!(c.advancement_cap_level(), 6);
+        let hint = c.allowance_raise_hint();
+        assert!(!hint.to_lowercase().contains("clear a new stage"), "{hint}");
+        assert_eq!(hint, "Liberate a country to raise the allowance.");
+    }
+    #[test]
     fn earned_objectives_precede_paid_training() {
         let mut c = Campaign {
             coins: 1000,
@@ -560,8 +868,13 @@ mod tests {
         assert_eq!(c.npc.objectives_claimed, [true, true]);
         assert_eq!(c.npc.awarded, 14);
     }
+    /// Rewritten in W1-20 (was `reserved_equipment_cannot_be_sold_or_changed`,
+    /// whose second half sold the equipped rifle and checked that the starter
+    /// pistol replaced it): strict SellItem refuses equipped items with a
+    /// typed block and never rewrites a loadout. Unequipping is the way out.
     #[test]
-    fn reserved_equipment_cannot_be_sold_or_changed() {
+    fn sell_item_rejects_equipped_personal_item_with_typed_block_and_no_replacement() {
+        use crate::command::CommandError::SaleBlocked;
         let mut c = Campaign::default();
         c.reward(
             price(&["quick_reload", "rifle_training"]),
@@ -570,23 +883,39 @@ mod tests {
         );
         c.purchase_node("quick_reload").unwrap();
         c.purchase_node("rifle_training").unwrap();
+        let refs = SaleRefs::empty();
         let id = c.add_item(4).unwrap();
         c.equip(Mode::Personal, id).unwrap();
+        let mara = c.add_item(4).unwrap();
+        c.equip(Mode::Npc, mara).unwrap();
         c.reserve(Mode::Personal).unwrap();
-        assert!(c.sell(id).is_err());
+        assert_eq!(c.sell(id, &refs), Err(SaleBlocked(SaleBlock::InBattle)));
         assert!(c.equip(Mode::Personal, 1).is_err());
         c.finish_attempt();
-        assert_eq!(c.sell(id).unwrap(), 22);
+        let before = c.clone();
+        assert_eq!(
+            c.sell(id, &refs),
+            Err(SaleBlocked(SaleBlock::EquippedPersonal))
+        );
+        assert_eq!(
+            c.sell(mara, &refs),
+            Err(SaleBlocked(SaleBlock::EquippedMara))
+        );
+        assert_eq!(c, before, "a refused sale changes nothing");
+        assert_eq!(c.player.loadout[0], id);
+        c.equip(Mode::Personal, 5).unwrap();
+        assert_eq!(c.sell(id, &refs), Ok(22));
         assert_eq!(c.player.loadout[0], 5);
+        assert_eq!(c.npc.loadout[0], mara);
     }
     #[test]
     fn starter_set_survives_every_sale() {
         let mut c = Campaign::default();
         c.add_item(4).unwrap();
-        assert_eq!(c.sell_unprotected().unwrap(), 22);
+        assert_eq!(c.sell_unprotected(&SaleRefs::empty()).unwrap(), 22);
         assert_eq!(c.items.len(), 5);
         for id in 1..=5 {
-            assert!(c.sell(id).is_err());
+            assert!(c.sell(id, &SaleRefs::empty()).is_err());
         }
         assert!(c.validate().is_ok());
     }
@@ -605,9 +934,39 @@ mod tests {
         c.save_preset("Rifle".into(), Mode::Personal).unwrap();
         c.apply_preset(1, Mode::Npc).unwrap();
         assert_eq!(c.items.len(), 6);
-        assert_eq!(c.sale_preview(id).unwrap().affected_presets, vec!["Rifle"]);
-        c.sell(id).unwrap();
-        assert!(c.apply_preset(1, Mode::Personal).is_err());
+        // The first matching guard wins: the rifle is equipped and in "Rifle".
+        assert_eq!(
+            c.sale_eligibility_for(id, SaleOrigin::Player, &SaleRefs::empty()),
+            Err(SaleBlock::EquippedPersonal)
+        );
+        // Rewritten in W1-20 (SellItem used to sell through both blocks and
+        // leave "Rifle" incomplete): the sale is refused while the rifle is
+        // equipped, then while "Rifle" holds it, and deleting the preset is
+        // the way out. No preset is ever left pointing at a sold item.
+        c.equip(Mode::Personal, 5).unwrap();
+        c.equip(Mode::Npc, 1).unwrap();
+        assert_eq!(
+            c.sell(id, &SaleRefs::empty()),
+            Err(crate::command::CommandError::SaleBlocked(
+                SaleBlock::Preset {
+                    names: vec!["Rifle".into()]
+                }
+            ))
+        );
+        assert!(c.delete_preset(2).is_err(), "unknown preset index");
+        c.delete_preset(1).unwrap();
+        assert_eq!(c.sell(id, &SaleRefs::empty()), Ok(22));
+        // Only the starter preset is left, it never held the sold rifle, and
+        // it still applies; "Rifle" is gone rather than pointing at nothing.
+        assert_eq!(c.presets.len(), 1);
+        assert!(c.presets.iter().all(|p| !p.loadout.contains(&id)));
+        c.apply_preset(0, Mode::Personal).unwrap();
+        assert_eq!(c.player.loadout, c.presets[0].loadout);
+        assert_eq!(
+            c.apply_preset(1, Mode::Personal),
+            Err("Unknown preset".into())
+        );
+        assert!(c.validate().is_ok());
     }
     #[test]
     fn invalid_layout_spends_nothing() {
@@ -731,7 +1090,7 @@ mod tests {
         for frontier in 1..=5 {
             for slot in Slot::ALL {
                 assert!(content().items.iter().any(|i| i.slot == slot
-                    && i.tier > 0
+                    && i.purchasable()
                     && i.tier <= frontier
                     && i.buy_value <= 350));
             }
@@ -743,7 +1102,7 @@ mod tests {
         let loadout = c.grant_recruit_starters().unwrap();
         c.reserve_external(loadout).unwrap();
         assert!(c.reserve_external(loadout).is_err());
-        assert!(c.sell(loadout[0]).is_err());
+        assert!(c.sell(loadout[0], &SaleRefs::empty()).is_err());
         assert!(c.equip(Mode::Personal, loadout[0]).is_err());
         c.reserve(Mode::Personal).unwrap();
         assert!(c.reserve_external(c.player.loadout).is_err());
@@ -874,7 +1233,7 @@ mod tests {
         let id = c.add_item(4).unwrap();
         c.coins = u64::MAX;
         let before = c.clone();
-        assert!(c.sell(id).is_err());
+        assert!(c.sell(id, &SaleRefs::empty()).is_err());
         assert_eq!(c, before);
     }
     #[test]
@@ -937,10 +1296,29 @@ mod tests {
         c.add_item(4).unwrap();
         c.add_item(4).unwrap();
         let before = c.clone();
-        assert!(c.sell_unprotected().is_err());
+        assert!(c.sell_unprotected(&SaleRefs::empty()).is_err());
         assert_eq!(c, before);
         let mut strategy = crate::strategy::StrategyState::default();
         assert!(strategy.sell_extras(&mut c).is_err());
+        assert_eq!(c, before);
+    }
+    /// LE section 1: the Campaign-level bulk sale keeps its in-battle `Err`,
+    /// typed `SaleBlocked(InBattle)`; the strategy wrapper keeps `Ok(0)`.
+    #[test]
+    fn sell_unprotected_in_battle_is_typed_sale_blocked_in_battle() {
+        let mut c = Campaign::default();
+        c.add_item(4).unwrap();
+        c.reserve(Mode::Personal).unwrap();
+        let before = c.clone();
+        assert_eq!(
+            c.sell_unprotected(&SaleRefs::empty()),
+            Err(crate::command::CommandError::SaleBlocked(
+                SaleBlock::InBattle
+            ))
+        );
+        assert_eq!(c, before, "a refused bulk sale changes nothing");
+        let mut strategy = crate::strategy::StrategyState::default();
+        assert_eq!(strategy.sell_extras(&mut c), Ok(0));
         assert_eq!(c, before);
     }
 }

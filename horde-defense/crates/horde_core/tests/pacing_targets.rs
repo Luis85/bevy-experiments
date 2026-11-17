@@ -1,0 +1,354 @@
+//! Pacing acceptance: goal 5 (W2-03), goal 6 (W2-04), goal 3 (W2-43) and
+//! the goal-4 auto-sell rows (W4-l).
+//! Release only: every test is `#[ignore = "release-only"]`. From
+//! horde-defense/, after the debug builds:
+//!
+//! ```text
+//! cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture
+//! ```
+//!
+//! The acceptance sweep is expert-deu (Normal, 60 runs) over 20 seeds; the
+//! other two legacy profiles (novice-deu, novice-gear-lux) are reported by
+//! the `pacing` example, not here (design-progression-tree "As built"). The
+//! goal-6 rows (lux-easy, lux-normal, lux-hard, start-aut, start-bgd) are a
+//! second sweep over the same 20 seeds. G6.11 and G6.12 assert on the goal-6
+//! measurement profile (goal6-novice, W4-13, ruling R56), swept over the same
+//! 20 seeds and 60 runs, and print the expert-deu verdicts beside it as
+//! information. The strategy rows (strategy, neighbours-solo,
+//! neighbours-parallel) are a third sweep. The auto-sell gate
+//! (G4.13) sweeps auto-sell over the same 20 seeds and 60 runs, and the
+//! stash-growth report (R39) sweeps it again at 150 runs, which takes
+//! several minutes; name a test to run only its sweeps. Each sweep runs once per
+//! test binary (a `OnceLock` cache) and every test reads it. Each test
+//! prints its summary line (PASS or FAIL) and fails with the reasons. The
+//! evaluators are pinned on synthetic reports in `tests/pacing_harness.rs`
+//! and `tests/strategy_pacing.rs`, which run in the normal suite.
+#![allow(clippy::print_stdout)] // the acceptance prints its summary lines
+use horde_core::balance::BalancePreset;
+use horde_core::sim::{
+    AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, DEFAULT_PROFILE_ID, GOAL4_AUTO_SELL_SLACK_RUNS,
+    GOAL4_AUTO_SELL_TIERS, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, GOAL6_CLAMPED_FIRST_VICTORY,
+    GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
+    GOAL6_MEASUREMENT_PROFILE_ID, GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN,
+    GOAL6_WINDOW_RUNS, Milestone, PacingProfile, PacingReport, RunsToLiberate, STASH_GROWTH_RUNS,
+    STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyReport, archetype_coverage,
+    auto_sell_within_default, boss_ttk_median_s, by_id, clamped_start_first_victory,
+    defeat_rate_windows, liberations_and_coins_per_minute, max_win_streak, median_run_within,
+    outbreak_reopens, pacing_archetype_ids, pacing_sweep, parallel_frees_neighbours,
+    runs_to_liberate, stash_growth, strategy_sweep, tier_affordable_runs, tree_outlasts_liberation,
+    unlock_order,
+};
+use std::sync::OnceLock;
+
+/// Seeds of the goal-5 and goal-6 acceptance sweeps (ruling W-1).
+const SEEDS: usize = 20;
+
+/// The expert-deu sweep, played once and shared by every test.
+fn expert_sweep() -> &'static [PacingReport] {
+    static SWEEP: OnceLock<Vec<PacingReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        let profile = by_id(DEFAULT_PROFILE_ID).expect("the acceptance profile is registered");
+        assert_eq!(profile.difficulty, BalancePreset::Normal);
+        assert_eq!(profile.max_runs, 60);
+        pacing_sweep(&[profile], SEEDS).expect("the expert-deu sweep runs")
+    })
+}
+
+/// The goal-6 measurement profile's sweep (W4-13, ruling R56), played once
+/// and shared by G6.11 and G6.12.
+fn measurement_sweep() -> &'static [PacingReport] {
+    static SWEEP: OnceLock<Vec<PacingReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        let profile = by_id(GOAL6_MEASUREMENT_PROFILE_ID)
+            .expect("the goal-6 measurement profile is registered");
+        assert_eq!(profile.difficulty, BalancePreset::Normal);
+        assert_eq!(profile.max_runs, 60);
+        pacing_sweep(&[profile], SEEDS).expect("the goal-6 measurement sweep runs")
+    })
+}
+
+/// The goal-6 rows' sweep (ruling W-4), played once and shared.
+fn goal6_sweep() -> &'static [PacingReport] {
+    static SWEEP: OnceLock<Vec<PacingReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        let profiles: Vec<PacingProfile> = GOAL6_LUX_PROFILE_IDS
+            .iter()
+            .chain(&GOAL6_START_PROFILE_IDS)
+            .map(|id| by_id(id).unwrap_or_else(|| panic!("{id} is registered")))
+            .collect();
+        pacing_sweep(&profiles, SEEDS).expect("the goal-6 sweep runs")
+    })
+}
+
+/// The reports of one goal-6 row.
+fn row(id: &str) -> Vec<PacingReport> {
+    let reports: Vec<PacingReport> = goal6_sweep()
+        .iter()
+        .filter(|r| r.profile.id == id)
+        .cloned()
+        .collect();
+    assert_eq!(reports.len(), SEEDS, "{id}");
+    reports
+}
+
+fn lux() -> RunsToLiberate {
+    let [easy, normal, hard] = GOAL6_LUX_PROFILE_IDS.map(row);
+    runs_to_liberate(&easy, &normal, &hard).expect("three LUX sweeps")
+}
+
+/// Prints the evaluator's verdict and fails on `Err`.
+fn check(name: &str, verdict: Result<String, String>) {
+    check_all(name, [verdict]);
+}
+
+/// Prints the verdict of an informational row (R56: expert-deu on G6.11 and
+/// G6.12), which never fails the test.
+fn inform(name: &str, verdict: Result<String, String>) {
+    match verdict {
+        Ok(summary) => println!("{name}: PASS {summary}"),
+        Err(reason) => println!("{name}: FAIL {reason}"),
+    }
+}
+
+/// Prints every verdict, then fails if any is `Err`.
+fn check_all<const N: usize>(name: &str, verdicts: [Result<String, String>; N]) {
+    let mut failures = Vec::new();
+    for verdict in verdicts {
+        match verdict {
+            Ok(summary) => println!("{name}: PASS {summary}"),
+            Err(reason) => {
+                println!("{name}: FAIL {reason}");
+                failures.push(reason);
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{name}: {}", failures.join(" | "));
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal5_first_victory_run_2_to_4() {
+    check(
+        "goal5_first_victory_run_2_to_4",
+        median_run_within(
+            expert_sweep(),
+            "First victory",
+            Milestone::FirstVictory,
+            GOAL5_FIRST_VICTORY,
+        ),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal5_tiers_affordable_3_5_7_9_11_13() {
+    check(
+        "goal5_tiers_affordable_3_5_7_9_11_13",
+        tier_affordable_runs(expert_sweep(), &GOAL5_TIER_WINDOWS),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal5_tree_outlasts_second_liberation() {
+    check(
+        "goal5_tree_outlasts_second_liberation",
+        tree_outlasts_liberation(expert_sweep(), 2),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal5_unlock_order_fortifications_mara_operations() {
+    check(
+        "goal5_unlock_order_fortifications_mara_operations",
+        unlock_order(expert_sweep()),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_defeat_rate_windows() {
+    inform(
+        "goal6_defeat_rate_windows (expert-deu, information)",
+        defeat_rate_windows(expert_sweep(), GOAL6_WINDOW_RUNS),
+    );
+    check(
+        "goal6_defeat_rate_windows",
+        defeat_rate_windows(measurement_sweep(), GOAL6_WINDOW_RUNS),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_no_15_streak_after_run_10() {
+    inform(
+        "goal6_no_15_streak_after_run_10 (expert-deu, information)",
+        max_win_streak(expert_sweep(), GOAL6_STREAK_FROM_RUN),
+    );
+    check(
+        "goal6_no_15_streak_after_run_10",
+        max_win_streak(measurement_sweep(), GOAL6_STREAK_FROM_RUN),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_lux_easy_at_most_6_runs() {
+    check(
+        "goal6_lux_easy_at_most_6_runs",
+        lux().easy_within(GOAL6_LUX_EASY_MAX_RUNS),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_lux_hard_at_most_1_5x_normal() {
+    check(
+        "goal6_lux_hard_at_most_1_5x_normal",
+        lux().hard_within_ratio(GOAL6_LUX_HARD_OVER_NORMAL),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_archetype_coverage() {
+    check(
+        "goal6_archetype_coverage",
+        archetype_coverage(expert_sweep(), &pacing_archetype_ids()),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_boss_ttk_median_20_60_s() {
+    check(
+        "goal6_boss_ttk_median_20_60_s",
+        boss_ttk_median_s(expert_sweep()),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn goal6_clamped_starts_first_victory_runs_2_to_4() {
+    check_all(
+        "goal6_clamped_starts_first_victory_runs_2_to_4",
+        GOAL6_START_PROFILE_IDS
+            .map(|id| clamped_start_first_victory(&row(id), GOAL6_CLAMPED_FIRST_VICTORY)),
+    );
+}
+
+// Goal 3 (W2-43, design-campaign-defenders 1.13): the strategy rows, a third
+// sweep over the same 20 seeds. W4-c makes them pass.
+
+/// The strategy rows' sweep, played once and shared.
+fn strategy() -> &'static [StrategyReport] {
+    static SWEEP: OnceLock<Vec<StrategyReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        let profiles: Vec<PacingProfile> = STRATEGY_PROFILE_IDS
+            .iter()
+            .map(|id| by_id(id).unwrap_or_else(|| panic!("{id} is registered")))
+            .collect();
+        strategy_sweep(&profiles, SEEDS).expect("the strategy sweep runs")
+    })
+}
+
+/// The reports of one strategy row.
+fn strategy_row(id: &str) -> Vec<StrategyReport> {
+    let reports: Vec<StrategyReport> = strategy()
+        .iter()
+        .filter(|r| r.pacing.profile.id == id)
+        .cloned()
+        .collect();
+    assert_eq!(reports.len(), SEEDS, "{id}");
+    reports
+}
+
+#[test]
+#[ignore = "release-only"]
+fn strategy_profile_reports_liberations_2_4_10_and_coins_per_minute() {
+    check(
+        "strategy_profile_reports_liberations_2_4_10_and_coins_per_minute",
+        liberations_and_coins_per_minute(&strategy_row(STRATEGY_PROFILE_ID)),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs() {
+    check(
+        "parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs",
+        parallel_frees_neighbours(
+            &strategy_row(STRATEGY_PROFILE_IDS[1]),
+            &strategy_row(STRATEGY_PROFILE_IDS[2]),
+        ),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn fewer_than_five_outbreak_reopens_over_ten_liberations() {
+    check(
+        "fewer_than_five_outbreak_reopens_over_ten_liberations",
+        outbreak_reopens(&strategy_row(STRATEGY_PROFILE_ID)),
+    );
+}
+
+// Goal 4 (W4-l, design-loot-economy "Numbers to measure"): the auto-sell
+// rows. The gate compares the auto-sell profile with the expert-deu sweep
+// of the same build; the stash report plays it to 150 runs (ruling R39).
+
+/// The auto-sell profile, optionally with another run limit.
+fn auto_sell_profile(max_runs: Option<usize>) -> PacingProfile {
+    let profile = by_id(AUTO_SELL_PROFILE_ID).expect("the auto-sell profile is registered");
+    // It is the acceptance profile but for the sale plan.
+    let default = by_id(DEFAULT_PROFILE_ID).expect("the acceptance profile is registered");
+    assert_eq!(
+        PacingProfile {
+            id: default.id,
+            name: default.name,
+            plan: default.plan,
+            ..profile
+        },
+        default
+    );
+    PacingProfile {
+        max_runs: max_runs.unwrap_or(profile.max_runs),
+        ..profile
+    }
+}
+
+/// The auto-sell sweep at the acceptance length (60 runs), played once.
+fn auto_sell_sweep() -> &'static [PacingReport] {
+    static SWEEP: OnceLock<Vec<PacingReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        pacing_sweep(&[auto_sell_profile(None)], SEEDS).expect("the auto-sell sweep runs")
+    })
+}
+
+#[test]
+#[ignore = "release-only"]
+fn auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3() {
+    check(
+        "auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3",
+        auto_sell_within_default(
+            expert_sweep(),
+            auto_sell_sweep(),
+            &GOAL4_AUTO_SELL_TIERS,
+            GOAL4_AUTO_SELL_SLACK_RUNS,
+        ),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn stash_growth_reported_for_150_runs() {
+    let last = *STASH_GROWTH_RUNS.iter().max().expect("runs to report");
+    assert_eq!(last, 150);
+    let sweep = pacing_sweep(&[auto_sell_profile(Some(last))], SEEDS)
+        .expect("the 150-run auto-sell sweep runs");
+    check(
+        "stash_growth_reported_for_150_runs",
+        stash_growth(&sweep, &STASH_GROWTH_RUNS, AUTO_SOLD_EARLY_RUNS),
+    );
+}

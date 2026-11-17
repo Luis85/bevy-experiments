@@ -36,15 +36,19 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
     );
     let critical = f.status.message_error
         || f.status.message.starts_with("Save could not be read:")
-        || f.status.message.contains("Recovery copies:")
+        || f.status.message.contains(super::toast::RECOVERY_COPIES)
         || f.status.message.starts_with("Original unreadable");
     let applying = f.runtime.pending_commands() > 0;
     let working = f.status.save_pending || applying;
+    // A review capture pins the line (CF-3-13): its message stays at full
+    // strength for the whole launch, so a still never depends on how long
+    // the launch took to reach its capture frame.
+    let pinned = f.launch.review_capture();
     let visible = working
         || !f.status.message.is_empty()
             && f.status
                 .feedback
-                .visible(now, critical || f.status.save_pending);
+                .visible(now, critical || f.status.save_pending || pinned);
     let text = if applying && !f.status.save_pending {
         "Applying changes…".into()
     } else if visible {
@@ -54,7 +58,7 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
     } else {
         "Coins and equipment bank as they are earned.".into()
     };
-    let alpha = if !visible || critical || working || f.settings.reduced_effects {
+    let alpha = if !visible || critical || working || pinned || f.settings.reduced_effects {
         1.0
     } else {
         ((5.0 - (now - f.status.feedback.started)) / 0.25).clamp(0.0, 1.0) as f32
@@ -63,12 +67,14 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
         if working {
             ui.spinner();
         }
+        let details = visible && !working && (critical || text.chars().count() > 95);
         let buttons = if visible && !working {
-            if critical || text.chars().count() > 95 {
-                120.0
+            let labels: &[&str] = if details {
+                &["Details", "Dismiss"]
             } else {
-                65.0
-            }
+                &["Dismiss"]
+            };
+            small_buttons_width(ui, labels)
         } else {
             0.0
         };
@@ -95,7 +101,7 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
             .on_hover_text(&text);
         });
         if visible && !working {
-            if (critical || text.chars().count() > 95) && ui.small_button("Details").clicked() {
+            if details && ui.small_button("Details").clicked() {
                 f.status.feedback.details = text.clone();
                 f.status.feedback.details_open = true;
             }
@@ -122,14 +128,20 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     f.status.feedback.details_open = open;
 }
-pub(super) fn overlay_owns_keyboard(ctx: &egui::Context, f: &mut UiCtx) -> bool {
-    if f.status.feedback.details_open {
-        if ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
-            f.status.feedback.details_open = false;
-        }
-        return true;
+/// The drawn width of a row of small buttons, spacing included, measured by
+/// laying them out in an invisible, disabled probe beside the row: no fixed
+/// reservation can follow the font, the UI scale and the button style.
+fn small_buttons_width(ui: &mut egui::Ui, labels: &[&str]) -> f32 {
+    let mut probe = ui.new_child(
+        egui::UiBuilder::new()
+            .id_salt("feedback_button_probe")
+            .layout(egui::Layout::left_to_right(egui::Align::Center))
+            .invisible(),
+    );
+    for label in labels {
+        let _ = probe.small_button(*label);
     }
-    ctx.text_edit_focused() || ctx.any_popup_open()
+    probe.min_rect().width()
 }
 pub(super) fn tab_marker(
     ui: &egui::Ui,

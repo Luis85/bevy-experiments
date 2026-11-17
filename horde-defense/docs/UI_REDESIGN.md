@@ -11,7 +11,7 @@ explains the encounter and chooses its defender; preparation changes that
 defender; deployment creates a paused battlefield; debrief leads to the next
 useful action. This replaces the former flat seven-tab information hierarchy.
 
-Camp has one navigation row (revised 4 November, below): Journey upgrades,
+Camp has one navigation row (revised 4 November and 14 November, below): Journey upgrades,
 Briefing, Equipment, Character, Mara, World map and Operations. The planned
 country/defense/defender and a "Go to briefing" footer persist across the
 Prepare pages. The active personal field and live expeditions have direct
@@ -19,7 +19,7 @@ return/observe routes. The global clock remains explicit.
 
 Campaign uses a bounded country browser/map and a compact actionable dossier.
 Selecting a starting country leads to briefing; planning another front first
-uses the existing EnterCountry command. Detailed regional facts collapse below
+uses SelectCountry, which never deploys (W3-18). Detailed regional facts collapse below
 the primary action. Briefing collects stage, defender, loadout, boss timing,
 conditions and supply before creating an attempt. No automatic purchases.
 
@@ -106,7 +106,9 @@ Plan, findings, pacing table and outcome: [plans/2026-11-04-foundation-pass.md](
   only. Outcomes have one name on every screen: Victory, Defeat, Retreated.
 - **Escape.** Escape cancels a key rebind and closes the new-journey prompt. In
   camp it drives the world clock only where the clock is shown, and it never
-  resumes a waiting defense.
+  resumes a waiting defense. (Superseded on 14 November 2026: one router decides
+  every Escape, and the world clock has its own key; see "Escape and decision
+  18" below.)
 - **Smaller fixes.**
   - History's "Clear filters" is as tall as the dropdowns and idle without a
     filter.
@@ -117,3 +119,37 @@ Plan, findings, pacing table and outcome: [plans/2026-11-04-foundation-pass.md](
     draw trap, wall and turret pictograms.
 
 Before/after: `docs/screenshots/foundation/before-*.png` and `after-*.png` (plus `after-skills-search.png`).
+
+## Production pass — 14 November 2026
+
+Plan, findings, loop map and outcome: [plans/2026-11-05-production-pass.md](plans/2026-11-05-production-pass.md); the ux-flow design is [plans/production-pass/design-ux-flow.md](plans/production-pass/design-ux-flow.md), whose integration rulings win over its spec text. The as-built loop (every screen's amber primary and Escape target) is [JOURNEYS.md](JOURNEYS.md), "Loop map", and every new View is listed in [VIEW_HIERARCHY.md](VIEW_HIERARCHY.md), "Production pass views". This section supersedes the earlier sections where they disagree: the field is no longer a fixed eleven-lane clearing, Results is no longer the tree's page, and Escape no longer drives the world clock.
+
+### Escape and decision 18
+
+One pure function, `ui::escape::escape_action`, decides what an Escape press means, and `escape_router` applies it before any screen reads the keyboard; nothing else reads the key (`escape_is_read_only_by_the_router`). The topmost overlay answers first, in this order: a rebind prompt, a focused text field (left to egui), an application modal, the new-journey confirmation, the operation details window, an open popup (left to egui), the Operations observer window and an armory sale confirmation. With no overlay the screen answers: the menu asks to quit, survivor selection and the world map before the first start go to the menu, a camp tab goes to Camp home, Camp home goes to a settled Results or asks to return to the menu, Results asks to return to the menu, Upgrades goes to Results while the journey runs (or Camp home), History closes, and Settings saves and returns unless the difficulty draft is unapplied.
+
+In battle Escape cancels a retreat hold, else closes construction without pausing, else passes the press to the Pause binding only when Pause is bound to Escape (decision 18, literally: the default bindings do bind it); with Pause on another key Escape does nothing in battle. Every action but the ones left to egui, to Pause or ignored consumes the key, and `keyboard_owner` keeps the battle and camp bindings silent while a modal, a rebind prompt or the details window owns the keyboard. While a save, a reset or another durable transition is pending, Escape navigates nowhere. `matrix_table` pins every row and `properties` checks the router over every context. The foundation pass's camp Escape (the world clock) is retired: the clock has its own key, P by default, on Camp home only.
+
+### One amber primary
+
+`ui::primary` draws the one primary of a screen: amber fill (239, 181, 82), ink strong text, at least 190 by 40 points where the column allows, a lighter amber under the pointer, amber at 0.4 with muted text when disabled and a 1-point ink stroke when focused. `primary_in_bar` is the battle bar's paused Begin defense or Resume defense at the bar's size, and `primary_in_modal` a modal's own primary. Each records itself in a per-frame registry that `draw_screen` clears first, and the headless tests read it: `at_most_one_screen_primary_matrix` holds every screen to one, and the full loop test asserts exactly one at each of its steps. A running battle has no primary.
+
+Labels come from core: `label()` on Slot, Policy, DamageKind and RecruitStatus, defender names from core cards (no hard-coded "Mara"), and prices from the core price functions; `no_debug_format_in_player_text` keeps `{:?}` output off the screen.
+
+### Camp home, Results and Upgrades
+
+Camp home (`Tab::Home`) is the camp's default tab: the next defense with the defender picker, the defender roster with core status, readiness and power, alerts with "Plan response", expeditions, offers and recent reports, and a footer with its `home_primary` and the world clock, which only Home shows. The camp row has six entries (Camp, Journey upgrades, Briefing, Equipment, Character, World map); Mara and Operations are drill-downs under Home with a "‹ Camp home" breadcrumb. Later countries are chosen with `SelectCountry` ("Plan defense", "Manage country", "Plan response"), which never deploys; the Briefing's "Deploy personally" or "Deploy <name>" dispatches `BeginDefense`. One callout at a time announces a newly unlocked feature under the camp row ("Show me", "Got it"), remembered per profile in `settings.json`.
+
+Results and Upgrades are two screens (`Screen::Upgrades`, so `Screen::ALL` has 8). Results is the outcome strip and inline content (the loot block, the liberation recruit block, the defender picker and the affordable-upgrade count) above a bar of exactly three buttons in fixed places: Upgrade, the continuation and Leave journey; the amber one is Upgrade only after a defeat or withdrawal whose recommended node can be bought now. Upgrades is the camp row, the amber continuation (Back to battle, Choose next country or Return to active defense) beside Back to camp, and the tree at full height. Liberation leads to the Recruit modal, which ends on the amber "Back to camp".
+
+### Modals and toasts
+
+One modal slot, `StatusUi.modal`, holds the quit and return-to-menu confirmations that Escape opens, the storage modal (save, load and settings failures, with Retry, Open folder, Copy path and the right way on; it replaces any other modal), the unapplied-draft warning, the Recruit modal and the stash-apply confirmation. Escape and a backdrop click close the open modal. The manual save is one "Save" (header and battle Management), compound actions are "Save and quit" and "Save and return to main menu", and a save answers with a "Saved" toast.
+
+Toasts never block and never take focus: up to three top-right under the header on every screen without a field, one in the battle's receipt slot. Info and Success last 3 s and Error 6 s on the wall clock, except the expedition outcomes, the folded-outcomes toast and "Saved · recovery copies kept", which last 6 s (`TOAST_LONG_SECS`), and the early-release retreat hint ("Hold to retreat" / "Hold to recall"), an Info toast that lasts 1.5 s (`RETREAT_HINT_SECS`); repeated text restarts, hover holds, reduced effects drops the fade. Expedition outcomes arrive as one toast each, acknowledged in the same frame, and wait while a main defense runs.
+
+### Battle layout and the two-row bar
+
+`BattleLayout` builds every battle rect once per frame from the canvas: the 124-point top band (both HUD corners, the attack selector and the receipt slot), the arena and the bar. The field is `art::fit_field`: a uniform zoom-to-fit of the geometry's reference clearing that keeps the lane:yard proportion (user decision U6, ruling R1), so a three-lane opening fills the arena width while every field of 11 lanes or more is unchanged bit for bit; a first personal defense keeps a 92-point hint band above the field. Construction is an overlay panel over the field's right side and never rescales it; an INCOMING chevron marks spawns it covers.
+
+The bar stays within two rows at 1050x700 and 135% scale (`battle_bar_stays_within_two_rows_at_small_size`): Reload, Strike contact lane and Toggle firing moved to Management › Field actions (their keys and the legend stay), the status line became the battle toast, and Retreat & train is a 0.8 s hold with a growing fill (stepped in reduced effects) instead of a click. The boss banner shows "BOSS APPROACHING" for 2 s and "<BOSS> HAS ARRIVED" for 1.5 s of running wall time, the same at 1×, 2× and 4×; at 30% HP or less an 8-point red band frames the screen and the HP text reads "LOW" until HP is back above 35%. Both are the visual twins of their sounds, both have a static reduced form, and nothing in the battle shakes the screen.

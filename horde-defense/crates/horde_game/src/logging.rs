@@ -1,7 +1,10 @@
 //! Log file output and crash reports.
 //!
 //! Bevy's `LogPlugin` owns the subscriber; this module only supplies the extra
-//! file layer and a panic hook. Logs live in `<save dir>/logs/`.
+//! file layer and a panic hook. Logs live in `<save dir>/logs/`, except that
+//! an isolated review (a `review`-build launch with a staged scenario, not
+//! practice, and no `LASTLIGHT_SAVE_DIR`) logs to its throwaway profile,
+//! `<temp>/lastlight-review-<pid>/logs/` (`LaunchConfig::log_directory`).
 //!
 //! The file layer also feeds a bounded in-memory ring of the newest lines, so
 //! the panic hook can append them to the crash report without re-reading the
@@ -268,8 +271,9 @@ fn crash_report(
     tail: &Result<Vec<String>, TailUnavailable>,
 ) -> String {
     let mut report = format!(
-        "Lastlight crash report\nversion: {}\nos: {} {}\npanic: {panic}\n\nbacktrace:\n{backtrace}\n",
+        "Lastlight crash report\nversion: {}\nbuild: {}\nos: {} {}\npanic: {panic}\n\nbacktrace:\n{backtrace}\n",
         env!("CARGO_PKG_VERSION"),
+        crate::build_info::stamp(),
         std::env::consts::OS,
         std::env::consts::ARCH,
     );
@@ -320,6 +324,20 @@ mod tests {
         assert!(report.contains(std::env::consts::OS));
         assert!(report.contains("boom at x.rs:1"));
         assert!(report.contains("frame 0"));
+    }
+
+    #[test]
+    fn crash_report_names_build_stamp() {
+        let report = crash_report("boom at x.rs:1", "frame 0", &Ok(Vec::new()));
+        let line = format!("build: {}", crate::build_info::stamp());
+        assert!(
+            report.lines().any(|l| l == line),
+            "missing {line:?} in:\n{report}"
+        );
+        // The header order is version, build, os, panic.
+        let at = |key: &str| report.find(key).unwrap_or_else(|| panic!("{key}"));
+        assert!(at("\nversion: ") < at("\nbuild: "));
+        assert!(at("\nbuild: ") < at("\nos: "));
     }
 
     #[test]

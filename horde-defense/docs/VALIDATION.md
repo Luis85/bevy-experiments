@@ -172,7 +172,7 @@ The initial neutral-template NPC defeat banked 181 coins after 208 seconds. A se
 ## Native presentation
 
 ```powershell
-pwsh -NoProfile -File scripts/capture_review.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_review.ps1
 ```
 
 Actual Bevy framebuffers are generated under `target/playtest-review/screenshots/` (ignored review artifacts). The 25-view matrix covers menu, map, personal/NPC combat, boss, construction, character, survivor, inventory, skills, engineering, results, operations, settings, arid/tropical regions and peak pressure, plus minimum-window variants. Normal resolution is 1440 by 900 logical pixels; minimum is 1050 by 700 with UI scale 1.35. Windows pixel density on this machine is 2x. Fixtures are labeled and isolated; their supplied resources are not balance evidence. Original prototype captures in `docs/screenshots/` remain historical evidence rather than regression oracles.
@@ -214,7 +214,7 @@ All six painted PNGs have exact prompt provenance embedded and recorded in `asse
 
 Country records retain source years (mainly 2019), attribution, symmetric travel links, actual boundaries and validated connectivity. Content validation rejects unsupported/missing profiles, bad ordering, nonfinite/overflow values and unsafe geometry. Culture/architecture is original regional dressing, not bespoke research or art for every country.
 
-Save generations retain RNG, actions, equipment reservations, pending boss mechanics, workers and settlement cursors coherently. Corrupt primary/backup bytes are preserved before replacement; failed writes never acknowledge quit. The save format (envelope v6; the limit is version-independent) has an inclusive **64 MiB encoded-generation ceiling**. Oversized saves fail before touching any existing generation or temporary file. Inventory has no gameplay capacity limit and collected items are never discarded, but a future storage format is needed for persistence beyond that technical ceiling.
+Save generations retain RNG, actions, equipment reservations, pending boss mechanics, workers and settlement cursors coherently. Corrupt primary/backup bytes are preserved before replacement; failed writes never acknowledge quit. The save format (envelope v7, frozen by `save_v7.json`; the limit is version-independent) has an inclusive **64 MiB encoded-generation ceiling**. Oversized saves fail before touching any existing generation or temporary file. Inventory has no gameplay capacity limit and collected items are never discarded, but a future storage format is needed for persistence beyond that technical ceiling.
 
 ## Remaining playtest questions
 
@@ -232,7 +232,7 @@ The [playtest guide](PLAYTEST_GUIDE.md) provides ordinary and isolated practice 
 `scripts/package_playtest.ps1` created `target/playtest/Lastlight-playtest-20261101-225239.zip` and its unpacked folder. ZIP SHA-256: `f6056ba47d91285c453c10c6b203000ec112a6ea1a7d06b8acea2296613fa3f6`.
 
 ```powershell
-pwsh -NoProfile -File scripts/verify_playtest.ps1 -Package target/playtest/Lastlight-playtest-20261101-225239.zip -NativeCapture
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_playtest.ps1 -Package target/playtest/Lastlight-playtest-20261101-225239.zip -NativeCapture
 ```
 
 Verification **passed** all 41 manifest hashes and sizes from a fresh extraction, rejected unexpected/path-escaping entries by construction, ran the copied executable's full campaign smoke using the bundled editable content and assets, and captured its actual peak-render framebuffer. Evidence is under `target/playtest-verification/5da55c154535430498dd52e583e8089f/`. The portable copy is a Windows x64 development-profile playtest, not a claim of compatibility with every PC. No ordinary campaign was used for verification.
@@ -288,7 +288,11 @@ This is the latest frozen source record for the pass spanning 2–3 November. Ea
 
 The source now has six named quality tiers independent of item level and definition unlock tier. Effective stats/value use the rolled/base quality ratio after level scaling; None or explicit base quality retains old numerical identity. Quality rolls use a separate keyed counter and consume no additional combat RNG. Model receipts acknowledge loot already inserted into inventory; a quality-outlined class icon/name rises from actual death position for 1.5 real UI seconds, with at most twelve active flyups per stream, never another award. The user explicitly retained GURPS injury rules: conscious zero/negative-HP NPC enemies can fight and are labeled CRIT · FIGHTING with signed inspection. Actual terminals stop/reap/pay in their resolving fixed tick. Saved within-lane overtaking displacement drives rendering, targeting, AoE, corpses and loot; walls/contact still block and traps cover the full lane.
 
+Amended 8 November 2026 (W2-29 review): one exception to "actual terminals stop/reap/pay in their resolving fixed tick" now exists. A hostile a death burst defeats (ruling W-7) stops acting and cannot be targeted, but it stays on the field until the next tick's first reap, which removes and pays it. A save between the burst and that reap holds it defeated. Every other terminal still reaps and pays in its resolving tick.
+
 Every committed victory—including replay, outbreak and parallel/worker success—raises future threat once and grants up to 120 once-only Personal completion XP in either mode; NPC kills still grant no Personal kill XP. Character MAX is 50. New deployments unlock 11/13/15/17 lanes at levels 1/11/21/31, while active difficulty/geometry and old eleven-lane checkpoints stay frozen. Threat 50 is a growth knee, not the health/damage ceiling; the explicit numerical support guard is 10,000. Independent population bounds allow 224 ordinary actors plus one boss; item level 27 is available at victory 52 and cap 30 at victory 58. The 225-actor/17-lane maximum scene is staged, not earned progression.
+
+Amended 14 November 2026 (W7-06): the rule above holds for every defender, and the production pass tests it rather than re-implementing it. A recruit's takeover of the main run is a committed victory like Mara's: `Campaign::commit_victory` raises the campaign rank once and pays the player the same completion XP, and `credit_npc_victory` credits the recruit's own roster entry (victory, first clear, objective claims), never Mara (STRATEGY.md, "Recruit takeover"). An expedition victory still raises the campaign rank once at settlement; since W4-12 an expedition plays a threat rank that follows its recruit, never above the campaign rank, while the survivor, Mara and a takeover keep the campaign rank (PROGRESSION_SCALING.md, "Expedition threat"). Defeats and withdrawals raise nothing. The pins are `every_replay_and_outbreak_victory_increases_future_threat_but_losses_do_not` and `parallel_worker_victories_award_completion_xp_and_difficulty_once_per_settlement` (tests/victory_arenas.rs), `threat_rank_equals_committed_victories` (tests/properties.rs), and `takeover_victory_raises_future_threat_once_and_a_loss_does_not` and `takeover_victory_credits_recruit_not_mara` (tests/defenders.rs).
 
 The final root gate `target/increment-review/ship-gate.log` passed **324 tests (184 core, 140 application), zero failures and one intentionally ignored offline sound exporter**, plus workspace formatting and strict all-target Clippy. The native build passed. The independent rules/source audit found no actionable issue in quality, overtaking, critical/terminal state, victory/XP/parallel settlement, persistence or frozen projection. Diagnostic loot replay tests verify cache-only behavior without Game coins/items/RNG mutation. The opening 15 country/seed purchase routes still clear on attempt three without equipping loot. The refreshed earned USA eight-stage route clears its first defense on personal attempt two/NPC attempt five, then later stages on their first attempts; final clear times are 253.1 and 284.0 seconds respectively. These are scoped deterministic proofs, not universal player or country balance.
 
@@ -329,7 +333,7 @@ DESIGN preserves the original seventeen color values and legitimately extends it
 
 This is the latest prebundle record for all current requests. Earlier 329/324/288 gates, fixed-eleven fresh defaults, capture sets and archives—including the 230624 build—remain earlier revisions, not this delivery. Current source guidance is DESIGN, the 62-View inventory and [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md).
 
-Normal now starts at **3 lanes / 12 yards**, with 1.25× authored movement and 1.25× defender health. Every three character levels adds two lanes/two yards, capped at 17/30. The clearing grows physically from the small opening; model input/collision remain its actual projected bounds while a separate bounded effects region permits readable feedback. Validated Easy/Normal/Hard/Custom drafts commit only through Apply to next run. Active main/worker settings and geometry remain copied; old active 11/30 saves keep their dimensions and multipliers. Every-victory threat, character MAX 50, completion XP, quality, overtaking and the user-retained GURPS critical-state rules remain separate and intact.
+Normal now starts at **3 lanes / 12 yards**, with 1.25× authored movement and 1.25× defender health. Every three character levels adds two lanes/two yards, capped at 17/30. The clearing grew physically from the small opening at that revision; since the production pass (W1-43 to W1-46) the battle camera instead zooms the clearing uniformly to fit the arena area, keeping the lane:yard proportion, and a field that already fills an axis is unchanged (see ARCHITECTURE.md, `art/camera.rs`). Model input/collision remain its actual projected bounds while a separate bounded effects region permits readable feedback. Validated Easy/Normal/Hard/Custom drafts commit only through Apply to next run. Active main/worker settings and geometry remain copied; old active 11/30 saves keep their dimensions and multipliers. Every-victory threat, character MAX 50, completion XP, quality, overtaking and the user-retained GURPS critical-state rules remain separate and intact.
 
 Actual DPS is positive post-protection resolved injury over the last 300 simulation ticks, divided by five, with a zero-padded opening, run average/peak and defender/structure/ordnance totals. It includes logged overkill; missed/absorbed/defended attacks and presentation add nothing. Pause/save/4× retain the model clock. Saved run history retains every newly settled victory/defeat/withdrawal, with no record-count truncation; parent-owned worker outboxes settle once without cloning the parent's ledger. Records capture applied context/gear/balance/rewards/XP/damage/DPS, and old finalized runs are not fabricated. The 64MiB generation ceiling stays explicit. History filters/details/trends are read-only, with a last forty display window rather than deletion, and restore prior pause on Back.
 
@@ -428,3 +432,1204 @@ The current focused renderer timing/equality results above remain applicable: 1x
 Final documentation checks passed **69 source-backed Views**, retaining all 64 prior IDs plus five developer review tasks: unique IDs, one root, valid parents, no cycles and actual files/symbols. Sidecar count/source paths, current local links, UTF-8, canonical DESIGN headings and all 23 exact normative colors passed. The original seventeen values, six authorized quality roles and Pixelify Sans identity remain preserved. Fifteen pixel-provenance SHA256 values and the 26-PNG inventory passed; Root's prompt scan also passed. Detailed model authoring/validation documents remain with their owning verification stream.
 
 **Source documentation is now frozen before packaging.** Final archive path/hash, copied-executable smoke/native verification and any later Windows OS journey belong only in Root's external delivery record and delivery report. No package-integrity result is claimed before that verification. No complete current human OS campaign, human listening, long-session or universal balance/performance claim is made. No further source amendment cycle is required for immutable delivery hashes.
+
+## Strict sale and ruleset 2 — 5 November 2026
+
+`SellItem` is strict from ruleset 2 (`RULESET_VERSION` 2). An equipped, preset-referenced, recruit-equipped, reserved or NPC-issue item is refused with a typed `SaleBlocked` reason instead of being sold with its loadout slots replaced by starter equipment; `DeletePreset` removes a preset so its items can be sold. Seeded runs never sell, so `GOLDEN` and `GAMEPLAY_TRACE` are unchanged and `TRACE_RULESET` moved to 2 with them.
+
+**Debug recordings made under ruleset 1 are not expected to reproduce across the strict-sale change.** Replay still loads their initial state through the save migration, applies every recorded command and reaches the end line, but a recorded sale of an equipped, preset or recruit-equipped item is now a typed rejection, so the final digest can differ. Replay warns that the recording was made under ruleset 1 (and, for v6 headers, save version 6). `pre_strict_recording_diverges_with_ruleset_warning` pins this with the v6 equipped-sale fixture. The sale is not that fixture's only divergence: its 2,592 combat ticks no longer replay as on v6 either (expected cause: W1-69, enemies never block each other), so rebuilding the old sale legally still misses the recorded End digest. The test therefore also pins the current digest of the replay up to the sale, so any further drift fails it. Since W2-39 (country difficulty bands) the replayed Germany start plays difficulty 1.04 instead of 1.06 and its defender falls before the recorded withdrawal, so the recorded buy is refused for want of coins and the recorded equip and sale name an item that was never bought (`SaleBlocked(Unknown)`); the test then replays the recorded buy, equip and sale on that state with the coins in hand and checks that the equipped sale is refused (`SaleBlocked(EquippedPersonal)`) and the item kept. The pinned replay digest moved from fa528d88f6639802 to 711acf17d72357c2 at W2-39 and from 711acf17d72357c2 to 0e558e53029c6c41 at W2-09 (the weighted DropTable: the replayed deploys' drops are picked by drop-tier and trained-class weight with the same one draw; with neutral weights the replay digests to 711acf17d72357c2 again). Recording FORMAT stays 1.
+
+**W1-69 does not bump the ruleset (R15, wave-1 close).** Enemies stopped queueing in W1-69, so a debug recording made before W1-69 can diverge in combat on replay. It still carries ruleset 2, so replay prints no ruleset warning for it. The W2-49 bump (2 -> 3) names both W1-69 (no lane queue) and the wave-2 change. From then on these recordings warn like any older ruleset.
+
+**Ruleset 3 (W2-49, 10 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 3. The bump names W1-69 (no lane queue) and the wave-2 rules ("Wave-2 re-bless and ruleset 3" below). A debug recording made under ruleset 2 (from W1-20 up to W2-49) now replays with the warning "recorded under ruleset 2, this build uses 3; the replay may diverge", and a save written under ruleset 2 (among them the frozen `save_v7.json`) loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
+
+**Ruleset 4 (W4-08, 14 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 4. The bump names the wave-2 review rule fixes after W2-49 and the wave-4 rules ("Wave-3/4 re-bless and ruleset 4" below). A debug recording made under ruleset 3 (from W2-49 up to W4-08) now replays with the warning "recorded under ruleset 3, this build uses 4; the replay may diverge", and a save written under ruleset 3 loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
+
+**Ruleset 5 (the closing re-bless, 14 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 5. The bump names the rule changes since ruleset 4: W4-14's Npc aim test and arrival factor and W4-15's Survivor network price ("Closing re-bless and ruleset 5" below). A debug recording made under ruleset 4 (from W4-08 up to the closing re-bless) now replays with the warning "recorded under ruleset 4, this build uses 5; the replay may diverge", and a save written under ruleset 4 loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
+
+## save_v6.json as cut — 5 November 2026 (W1-01, recorded 7 November in the W1 review)
+
+`crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed. Ruling R12 (wave-1 close, 7 November 2026) accepts the differences: the fixture is frozen evidence and the §11 numbers were estimates. schema-v7.md §11 carries the ruling as a note.
+
+- **Size:** 120,842 bytes, against the planned "at most 64 KB". No test bounds the v6 fixture size; only `save_v7.json` has a byte bound (`V7_FIXTURE_MAX_BYTES`, 96 KB).
+- **Player level:** `campaign.player.level` is 33, not the planned 12. The live Personal attempt is at rank 14 and tick 423, which meets "≥ 10" and "about tick 420".
+- **Run history:** `campaign.run_history` holds 14 records, not 1 main and 1 worker: 13 main records (one Custom and twelve Hard; 12 Personal and 1 Npc) and 1 Normal worker record. All 14 are victories, and `campaign.victories` is 14.
+- **Parent:** it was cut on parent `3d492cd`, not `7bd5de8`. `3d492cd` adds only wave-0 documents on top of `7bd5de8` and changes nothing under `crates/`, so the fixture is still a generation of untouched v6 code (SAVE_VERSION 6, RULESET 1).
+
+These differences come from the `--smoke` bot driving the writer through `Game::apply` (b82658a). The v6 pins and load tests were recorded on this file, and v6 saves can never be generated again ("v6 fixture timing" in design-save-determinism.md), so it stays as cut.
+
+## Save clone — 6 November 2026 (W1-50)
+
+Every save copies the game on the main thread and hands the copy to the storage worker. That copy is now `Game::save_snapshot`, used at `runner/apply.rs` instead of `Game::clone`. It leaves out the never-saved state: the typed event outbox, the live attempt's queued records and the settlement issues, in the root game and in every expedition's worker game. It serializes to exactly the game's bytes (`save_snapshot_skips_transient_outbox_and_equals_serialized_state`).
+
+```powershell
+cargo run --locked -p horde_core --example save_clone -- --out target/perf/save-clone/dev.json
+cargo run --locked -p horde_core --example save_clone --profile playtest -- --profile-name playtest --out target/perf/save-clone/playtest.json
+cargo run --locked -p horde_core --example save_clone --release -- --out target/perf/save-clone/release.json
+```
+
+`scripts/measure_performance.ps1 -SaveClone` runs the same example in the run's profile and adds its gate to the budget checks. The fixture is `save_clone_fixture(1000 | 2500 | 5000)`: the synthetic review-only stress game (three unsettled expeditions, 150 run records, 1,500 corpses, a 400-drawn main field) with its stash sized to that many items. Each series is 50 untimed and 1,000 timed iterations. Fixture creation is excluded. The gate (`PERF_BUDGET.json` `save_clone`) is `save_snapshot` p99 ≤ 1.0 ms at 1,000 items with 3 workers, in dev and playtest. Release is informational. `to_vec` is the storage worker's `serde_json::to_vec`, off the main thread, for scale.
+
+Before any remedy, three runs per profile, Intel Core Ultra 9 185H with other desktop work running (about 28% CPU load), medians of the three:
+
+| Profile | Items | `save_snapshot` p99 per run (ms) | p99 median | mean | `to_vec` p99 | Bytes |
+|---|---:|---|---:|---:|---:|---:|
+| dev | 1,000 | 1.140, 0.956, 0.981 | 0.981 | 0.526 | 6.60 | 1,408,714 |
+| dev | 2,500 | 1.266, 1.106, 1.054 | 1.106 | 0.553 | 7.12 | 1,586,397 |
+| dev | 5,000 | 1.604, 1.323, 1.410 | 1.410 | 0.724 | 9.81 | 1,882,516 |
+| playtest | 1,000 | 1.049, 1.159, 2.445 | **1.159** | 0.501 | 5.57 | 1,408,714 |
+| playtest | 2,500 | 0.994, 0.953, 1.491 | 0.994 | 0.493 | 6.58 | 1,586,397 |
+| playtest | 5,000 | 1.317, 1.215, 2.345 | 1.317 | 0.640 | 7.62 | 1,882,516 |
+| release | 1,000 | 1.735, 5.219, 0.979 | 1.735 | 0.767 | 11.04 | 1,408,714 |
+| release | 2,500 | 1.825, 1.923, 1.127 | 1.825 | 0.738 | 11.22 | 1,586,397 |
+| release | 5,000 | 3.010, 2.064, 1.551 | 2.064 | 1.014 | 10.77 | 1,882,516 |
+
+Component means at 1,000 items in playtest: run history 0.109 ms, attempt 0.086 ms, expeditions 0.078 ms, stash items 0.052 ms. From 2,500 items the stash is the largest. **The gate fails in playtest (p99 above 1.0 ms in every run) and is marginal in dev (one run of three above).** So the conditional remedy applies, aimed at the run history, the largest component at the gated 1,000 items. The timings are wall-clock on a shared desktop, so single runs vary by up to 5x at p99, release included. The means are stable to about 10%.
+
+### Remedy: the run history is shared copy-on-write
+
+`Campaign.run_history` is now an `Arc<Vec<RunRecord>>` (serde `rc`). A save snapshot shares it with the live game. Recording a run appends through `Arc::make_mut`: in place while no snapshot holds the history (`recording_a_run_without_a_snapshot_appends_in_place`), and as a copy while one does, so snapshots still in flight keep the old records (`consecutive_snapshots_share_unchanged_component`). (The measurements below were taken with the first form, an `Arc<[RunRecord]>` rebuilt on every recorded run; a snapshot clones either form as one reference count, and the W1 review switched to `make_mut` so that a settlement no longer copies the whole unbounded history.) It serializes as the same plain sequence. The v6 fixture payload is pinned by an FNV-1a hash cut before the change, and the checked-in `save_v7.json` (W1-63) re-saves to the payload its own envelope holds; both round-trip byte-identical (`save_v6_and_v7_fixtures_round_trip_byte_identical`). The synthetic stress fixture is in no digest. The benchmark's byte counts are unchanged, and `GOLDEN` and `GAMEPLAY_TRACE` are unchanged.
+
+Re-run, three runs per profile, same machine (about 53% CPU load from other work):
+
+| Profile | Items | `save_snapshot` p99 per run (ms) | p99 median | mean | `to_vec` p99 | Bytes |
+|---|---:|---|---:|---:|---:|---:|
+| dev | 1,000 | 0.649, 0.654, 0.764 | **0.654** | 0.339 | 7.47 | 1,408,714 |
+| dev | 2,500 | 0.706, 1.003, 0.900 | 0.900 | 0.427 | 7.76 | 1,586,397 |
+| dev | 5,000 | 1.272, 1.011, 1.144 | 1.144 | 0.562 | 9.47 | 1,882,516 |
+| playtest | 1,000 | 0.552, 0.692, 0.672 | **0.672** | 0.303 | 6.02 | 1,408,714 |
+| playtest | 2,500 | 0.739, 0.657, 0.806 | 0.739 | 0.333 | 6.99 | 1,586,397 |
+| playtest | 5,000 | 1.187, 1.133, 1.157 | 1.157 | 0.538 | 7.40 | 1,882,516 |
+| release | 1,000 | 0.469, 0.604, 0.690 | 0.604 | 0.303 | 5.51 | 1,408,714 |
+| release | 2,500 | 0.910, 0.635, 0.698 | 0.698 | 0.323 | 6.70 | 1,586,397 |
+| release | 5,000 | 0.994, 0.961, 1.070 | 0.994 | 0.479 | 7.44 | 1,882,516 |
+
+**The gate passes in every dev and playtest run (p99 at most 0.764 ms at 1,000 items).** 5,000 items remain above 1.0 ms at p99. That size is informational, and from 2,500 items the stash itself (0.13 to 0.30 ms mean) is the largest component. If it ever becomes gated, the next lever is `ItemDefId(Arc<str>)`. Reports: `target/perf/save-clone/` (before) and `target/perf/save-clone-remedy/` (after).
+
+The `save_clone` example JSON after the remedy, one run per profile: the run with the median `save_snapshot` p99 of its three. Each is quoted verbatim from `target/perf/save-clone-remedy/<run>.json` (git-ignored) up to the end of its gated 1,000-item report; the 2,500- and 5,000-item entries that follow it in `reports` are left out here (the table above gives them), so each excerpt closes the array after the first entry.
+
+Dev (`dev-2.json`):
+
+```json
+{
+  "version": 1,
+  "profile": "dev",
+  "debug_assertions": true,
+  "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "notes": [
+    "CPU-only: Game::save_snapshot on the main thread, fixture creation excluded.",
+    "Synthetic save_clone_fixture: the review-only stress game, never a gameplay claim.",
+    "serialize is the storage worker's serde_json::to_vec, off the main thread."
+  ],
+  "gate": {
+    "items": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": [
+      "dev",
+      "playtest"
+    ],
+    "gated": true,
+    "p99_ms": 0.6541,
+    "pass": true
+  },
+  "reports": [
+    {
+      "items": 1000,
+      "workers": 3,
+      "run_records": 150,
+      "warmup": 50,
+      "iterations": 1000,
+      "save_snapshot": {
+        "samples": 1000,
+        "mean_ms": 0.34606470000000045,
+        "p50_ms": 0.34450000000000003,
+        "p95_ms": 0.5524,
+        "p99_ms": 0.6541,
+        "max_ms": 0.9420999999999999
+      },
+      "components": {
+        "campaign_items": {
+          "samples": 1000,
+          "mean_ms": 0.04656950000000008,
+          "p50_ms": 0.0453,
+          "p95_ms": 0.0519,
+          "p99_ms": 0.0697,
+          "max_ms": 0.11170000000000001
+        },
+        "run_history": {
+          "samples": 1000,
+          "mean_ms": 0.000056000000000000575,
+          "p50_ms": 0.00009999999999999999,
+          "p95_ms": 0.00009999999999999999,
+          "p99_ms": 0.00009999999999999999,
+          "max_ms": 0.00009999999999999999
+        },
+        "attempt": {
+          "samples": 1000,
+          "mean_ms": 0.09423580000000009,
+          "p50_ms": 0.0883,
+          "p95_ms": 0.1282,
+          "p99_ms": 0.1825,
+          "max_ms": 0.4347
+        },
+        "battles": {
+          "samples": 1000,
+          "mean_ms": 0.08204480000000028,
+          "p50_ms": 0.0792,
+          "p95_ms": 0.0917,
+          "p99_ms": 0.134,
+          "max_ms": 0.4729
+        }
+      },
+      "serialize": {
+        "samples": 1000,
+        "mean_ms": 5.077570599999998,
+        "p50_ms": 4.3863,
+        "p95_ms": 7.4043,
+        "p99_ms": 8.086400000000001,
+        "max_ms": 23.5182
+      },
+      "bytes": 1408714
+    }
+  ]
+}
+```
+
+Playtest (`playtest-3.json`):
+
+```json
+{
+  "version": 1,
+  "profile": "playtest",
+  "debug_assertions": false,
+  "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "notes": [
+    "CPU-only: Game::save_snapshot on the main thread, fixture creation excluded.",
+    "Synthetic save_clone_fixture: the review-only stress game, never a gameplay claim.",
+    "serialize is the storage worker's serde_json::to_vec, off the main thread."
+  ],
+  "gate": {
+    "items": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": [
+      "dev",
+      "playtest"
+    ],
+    "gated": true,
+    "p99_ms": 0.6718,
+    "pass": true
+  },
+  "reports": [
+    {
+      "items": 1000,
+      "workers": 3,
+      "run_records": 150,
+      "warmup": 50,
+      "iterations": 1000,
+      "save_snapshot": {
+        "samples": 1000,
+        "mean_ms": 0.30348860000000033,
+        "p50_ms": 0.3244,
+        "p95_ms": 0.448,
+        "p99_ms": 0.6718,
+        "max_ms": 1.0708
+      },
+      "components": {
+        "campaign_items": {
+          "samples": 1000,
+          "mean_ms": 0.04807510000000013,
+          "p50_ms": 0.0458,
+          "p95_ms": 0.0584,
+          "p99_ms": 0.0909,
+          "max_ms": 0.4081
+        },
+        "run_history": {
+          "samples": 1000,
+          "mean_ms": 0.00005580000000000057,
+          "p50_ms": 0.00009999999999999999,
+          "p95_ms": 0.00009999999999999999,
+          "p99_ms": 0.00009999999999999999,
+          "max_ms": 0.00009999999999999999
+        },
+        "attempt": {
+          "samples": 1000,
+          "mean_ms": 0.0794075999999995,
+          "p50_ms": 0.0738,
+          "p95_ms": 0.1067,
+          "p99_ms": 0.1754,
+          "max_ms": 0.36900000000000005
+        },
+        "battles": {
+          "samples": 1000,
+          "mean_ms": 0.07524969999999966,
+          "p50_ms": 0.0707,
+          "p95_ms": 0.0964,
+          "p99_ms": 0.1614,
+          "max_ms": 0.4041
+        }
+      },
+      "serialize": {
+        "samples": 1000,
+        "mean_ms": 3.695138299999995,
+        "p50_ms": 3.3604,
+        "p95_ms": 5.3569,
+        "p99_ms": 6.032,
+        "max_ms": 9.290899999999999
+      },
+      "bytes": 1408714
+    }
+  ]
+}
+```
+
+Release (`release-2.json`):
+
+```json
+{
+  "version": 1,
+  "profile": "release",
+  "debug_assertions": false,
+  "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "notes": [
+    "CPU-only: Game::save_snapshot on the main thread, fixture creation excluded.",
+    "Synthetic save_clone_fixture: the review-only stress game, never a gameplay claim.",
+    "serialize is the storage worker's serde_json::to_vec, off the main thread."
+  ],
+  "gate": {
+    "items": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": [
+      "dev",
+      "playtest"
+    ],
+    "gated": false,
+    "p99_ms": 0.6037,
+    "pass": true
+  },
+  "reports": [
+    {
+      "items": 1000,
+      "workers": 3,
+      "run_records": 150,
+      "warmup": 50,
+      "iterations": 1000,
+      "save_snapshot": {
+        "samples": 1000,
+        "mean_ms": 0.3058237000000003,
+        "p50_ms": 0.31520000000000004,
+        "p95_ms": 0.4398,
+        "p99_ms": 0.6037,
+        "max_ms": 0.7374999999999999
+      },
+      "components": {
+        "campaign_items": {
+          "samples": 1000,
+          "mean_ms": 0.04997120000000006,
+          "p50_ms": 0.0455,
+          "p95_ms": 0.0652,
+          "p99_ms": 0.075,
+          "max_ms": 0.2086
+        },
+        "run_history": {
+          "samples": 1000,
+          "mean_ms": 0.000056000000000000575,
+          "p50_ms": 0.00009999999999999999,
+          "p95_ms": 0.00009999999999999999,
+          "p99_ms": 0.00009999999999999999,
+          "max_ms": 0.00009999999999999999
+        },
+        "attempt": {
+          "samples": 1000,
+          "mean_ms": 0.08144290000000028,
+          "p50_ms": 0.07490000000000001,
+          "p95_ms": 0.1141,
+          "p99_ms": 0.1842,
+          "max_ms": 0.4469
+        },
+        "battles": {
+          "samples": 1000,
+          "mean_ms": 0.0719779,
+          "p50_ms": 0.0697,
+          "p95_ms": 0.07880000000000001,
+          "p99_ms": 0.1211,
+          "max_ms": 0.39609999999999995
+        }
+      },
+      "serialize": {
+        "samples": 1000,
+        "mean_ms": 3.483183499999998,
+        "p50_ms": 3.2752,
+        "p95_ms": 4.522,
+        "p99_ms": 5.6297999999999995,
+        "max_ms": 10.418999999999999
+      },
+      "bytes": 1408714
+    }
+  ]
+}
+```
+
+### R58: the 5,000- and 20,000-item stash — 15 November 2026 (closing phase)
+
+R58 keeps the drop and sale rules, so the default auto-sell stash holds about 5,300 items by run 60 and 19,600 by run 150 (plan §9.7). The closing phase measures those sizes against the same G1.8 gate (`save_snapshot` p99 ≤ 1.0 ms, dev and playtest) and fixes the cost only if it fails. `ITEM_COUNTS` is now `[1000, 2500, 5000, 20_000]`, and the report's new `sizes` list reads every fixture against `p99_ms_max` (informational: the exit code and `measure_performance.ps1 -SaveClone` still gate the 1,000-item fixture). The `save_clone_measures_the_r58_stash_sizes` test pins both.
+
+Before the fix, one run per profile, Intel Core Ultra 9 185H. Another workspace's `cargo test` ran beside every run below, before and after (about 35% CPU load), so these are not quiet-machine numbers; `measure_performance.ps1 -SaveClone` now carries the 20,000-item report and its `sizes` verdict into the closing perf run:
+
+| Profile | Items | `save_snapshot` p99 (ms) | mean | stash copy mean | `to_vec` p99 | Bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| dev | 5,000 | 0.865 | 0.602 | 0.338 | 8.72 | 1,784,121 |
+| dev | 20,000 | **2.665** | 1.550 | 1.186 | 14.57 | 3,570,879 |
+| playtest | 5,000 | 0.938 | 0.639 | 0.339 | 6.51 | 1,784,121 |
+| playtest | 20,000 | **2.680** | 1.588 | 1.264 | 11.81 | 3,570,879 |
+
+**The gate fails at 20,000 items in both profiles.** The stash copy is most of it: every item cloned its definition ID, one `String` allocation per item. 5,000 items passed, narrowly.
+
+### Remedy: item definition IDs are shared
+
+`ItemDefId` is now `ItemDefId(Arc<str>)`, the lever the W1-50 remedy named. Cloning an item counts a reference instead of copying its ID, so a snapshot's items share their IDs with the live stash (`snapshot_items_share_their_definition_ids`). It is `serde(transparent)` over the same string, so saves are byte-identical: v1-v6 and `save_v7.json` load and round-trip unchanged (`save_v6_and_v7_fixtures_round_trip_byte_identical`), the byte counts above do not move, and no digest moves.
+
+Re-run, three runs per profile, same machine and load:
+
+| Profile | Items | `save_snapshot` p99 per run (ms) | p99 median | mean | stash copy mean | `to_vec` p99 |
+|---|---:|---|---:|---:|---:|---:|
+| dev | 1,000 | 0.457, 0.443, 0.467 | 0.457 | 0.280 | 0.010 | 6.80 |
+| dev | 5,000 | 0.649, 0.475, 0.521 | 0.521 | 0.291 | 0.062 | 8.44 |
+| dev | 20,000 | 0.879, 0.893, 0.869 | **0.879** | 0.480 | 0.224 | 15.40 |
+| playtest | 1,000 | 0.461, 0.389, 0.429 | 0.429 | 0.256 | 0.010 | 5.28 |
+| playtest | 5,000 | 0.516, 0.407, 0.511 | 0.511 | 0.261 | 0.063 | 6.68 |
+| playtest | 20,000 | 0.911, 0.965, 0.846 | **0.911** | 0.469 | 0.221 | 11.77 |
+
+**The gate passes at 5,000 and 20,000 items in every dev and playtest run** (worst 0.965 ms, playtest, 20,000 items). The margin at 20,000 is thin. If a later run puts it over, the next lever is a shared copy-on-write stash (`Campaign.items` as `Arc<Vec<Item>>`, the run-history pattern above). It moves the copy to the first stash change while a snapshot is in flight, and during a battle a drop is that change, so it needs its own measurement. Reports (git-ignored): `target/perf/closing-r58-save-clone/` (before) and `target/perf/closing-r58-save-clone-remedy/` (after).
+
+Closing re-measure at HEAD (2026-11-16, three runs per profile; plan §9.6 "Closing pacing" has every run). Another workspace's release `cargo test` ran throughout. In the low-load set, each run started after a 60 s window with mean load under 35% and was sampled every 2 s (no sample at 90%, R30). The `save_snapshot` p99 medians are dev 0.552 / 0.498 / 0.813 ms and playtest 0.430 / 0.435 / 0.720 ms at 1,000 / 5,000 / 20,000 items, worst 0.875 ms (playtest, 20,000): the gate passes. An earlier set, with the load sampled only before and after each run, had three playtest overs: 5,000 items at 1.124 ms, and 20,000 items at 1.078 and 1.225 ms, with 44-75% load around those runs. They are recorded, not discarded. The quiet closing perf run (`measure_performance.ps1 -SaveClone`) decides whether the copy-on-write lever above is needed. Reports: `target/production-after/closing/save-clone/` and `save-clone/low-load/`.
+
+## Save format 7 frozen — 6 November 2026 (W1-63)
+
+**Save format 7 is frozen.** `crates/horde_core/tests/fixtures/save_v7.json` is a real `Game::save` generation: envelope version 7, ruleset 2, 95,266 bytes (budget 96 KB), envelope checksum `8527615155064533385`. It was cut by the `#[ignore]`d writer `write_save_v7_fixture` in `tests/save_fixtures.rs` (`LASTLIGHT_WRITE_SAVE_V7_FIXTURE=<path>`; it refuses to overwrite and asserts `SAVE_VERSION == 7`), re-cut once in the W1-63 review before the freeze closed, and is never re-cut again: its checksum and byte length are pinned. Two cuts from the same tree were byte-identical.
+
+Its scenario (`stage_v7_scenario`, seed `0x5AFE_0007`) is played through `Game::apply` and the smoke bot up to a live Npc defense of Romania stage 1 at tick 1740, beside one settled and one live expedition. The v7 fields that have no wave-1 writer are then staged through the test-support seams: `Staging::stage_takeover` hands the defense to recruit 1, and the staging handle and the `*_mut` accessors (plus the new test-support `Game::pending_runs_mut`) stage drop tracking, receipts, the expedition summary and pending sale, ledgers, a Capstone snapshot on wave tier 11, per-class skill modifiers, the new enemy-side state (an elite, a spitter mid-windup, a splitter and its child, exploders, a phased boss) and per-archetype telemetry. Combat logs are trimmed to their last four lines to fit the budget. Every `V7_SAVED_KEYS` key occurs at a non-default value, and the file loads through `validate_game`.
+
+Guards in `tests/save_migration.rs`:
+
+- `v7_fixture_is_a_real_v7_generation`: the frozen checksum and byte length, the envelope, the size budget and every v7 key at a non-default value (root or worker game).
+- `v7_fixture_holds_every_defender_key_at_non_default`: the defender state by JSON pointer (seat, Defending recruit, reserved loadout, appearance, next defender, expedition seats, the unacknowledged summary, folded outcomes, containments, the main-run takeover record with its receipts and a report naming the same recruit, and each pending record in its worker's country under an attempt id absent from `run_history`).
+- `v7_fixture_loads_validates_and_resaves_byte_identically`: the payload resaves unchanged, a second resave is byte-identical, and one flipped seed digit (still valid JSON) is refused with `ChecksumMismatch`.
+- `v7_fixture_round_trips_every_enemy_balance_field_to_equal_digest`: the 37 enemy and balance keys keep their saved text, and the loaded game digests to the saved checksum.
+
+Proofs recorded at the cut: removing one key (`pending_runs[0].boss_rank`, checksum recomputed) fails `v7_fixture_is_a_real_v7_generation` with `never at a non-default value: ["3.5 RunRecord /pending_runs/boss_rank"]`; flipping one payload byte without the checksum fails the three loading tests with `ChecksumMismatch`. W1-63 review: with the checksum check removed from `decode_generation`, the seed-digit flip is no longer refused with `ChecksumMismatch` and the resave test fails; the re-cut fails the identity pin with `left: (Some(8527615155064533385), 95266)`, `right: (Some(9320268661059722176), 94965)`.
+
+From now on a new saved field must be serde-defaulted, skipped at its default and load `save_v7.json` unchanged; otherwise the work stops and the user is asked (the only pre-approved exception is R5, `SkillModifiers.heavy_target_damage_multiplier`). Later cases use inline JSON or new `save_v7_w2_*.json` / `save_v7_w4_*.json` files. Through W1-68, `GOLDEN` and `GAMEPLAY_TRACE` moved 0/6 each. W1-69 (the user's 2026-11-06 decision that enemies overlap) is the wave-1 re-bless: `GOLDEN` 1/6 and `GAMEPLAY_TRACE` 3/6, class G, logged in `tests/determinism.rs`. `PROVISIONAL` is None, and the V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins did not move.
+
+## The isolated 0.5 s frames (gate 3) — 6 November 2026 (W1-68)
+
+**Finding, in two halves (narrowed by the W1-68 review).**
+- **VSync on (the W1-67 stalls): a swap-chain acquire stall in the graphics driver or compositor of this hybrid-graphics laptop.** In 47 of the 56 stalled W1-67 frames the time sat in `get_current_texture`. These stalls come and go with the machine's state, not with the code.
+- **VSync off (the W1-61 playtest stalls of 446-532 ms, the spec's own observation): not attributed.** They were not in the acquire call: all 16 frames over 50 ms had a present_wait of 0.09-0.20 ms. No span that the v3 report recorded at the time holds them. They did not recur under the W1-68 instrumentation, so the new gap fields have never seen one. Their cause is not named, and W1-68's done_when ("the cause is named with evidence") is not met for this half. **Closed by W1-61 (2026-11-06):** this half is the same swap-chain acquire stall. With `slowest_present`, all 220 VSync-off frames over 50 ms in the W1-61 A/B, pipelined or not, were acquire waits (acquire shares 0.981-0.992, in-process work 7.8-19.2 ms). Pipelined, the render frame that stalled was replaced before the main thread read it; W1-61 gives that as the reason these 16 frames showed a present_wait of 0.09-0.20 ms. See "Goal-1 acceptance" below.
+
+Nothing in process was found to cause either. Gate 3 (`frames_over_50ms` 0) is unchanged. It needs a user ruling on two separate open items: the environmental VSync-on acquire stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe. (Both settled since: the user ruling "Exclude driver stalls" of 2026-11-06 and W1-61 naming the VSync-off half.)
+
+**What the frame report now records (W1-68).** These fields are still report version 3; every earlier key keeps its meaning.
+- `phases.gap_ms`: the main thread from the previous frame's end of `Last` to this frame's First.
+- `phases.handoff_ms`: the first part of the gap, the render hand-off. With pipelining this is the `RenderExtractApp` extract: channel receive, `RenderApp` extract, send. Without pipelining it is the `RenderApp` extract plus the Render schedule.
+- `phases.channel_wait_ms`: the hand-off minus the extract, that is, the pipelined wait for the render thread. The extract wrapper of today's report excludes it.
+- `phases.outside_update_ms`: the rest of the gap (winit event loop, OS).
+- `phases.render_idle_ms`: the render thread from one render frame's end to the next frame's begin.
+- `events`: per-frame counts of winit window messages, `Image` and `AudioSource` asset events, and spawned `AudioPlayer` voices.
+- `longest_frames`:
+  - Wall-clock instants, in ms since the probe epoch: the `Time<Real>` instant that closed the frame, First begin, end of `Last`, and the render sample's begin, present begin and end.
+  - The frame's events and egui texture-upload bytes.
+  - An `attribution` that overlaps the frame's window (`time_ms - frame_ms .. time_ms`) with every sample's main-thread spans: main schedule, channel wait, the rest of the hand-off, and outside update. It does the same with every distinct render sample: present wait, the rest of the render frame, and time with no render frame. `coverage` is the covered share of the window. `outside_update` is a residual (gap minus hand-off). Consecutive samples tile the main thread, so `coverage` is 1.0 by construction for any window inside the recorded range; only missing samples (the first sample, warmup) lower it. `named_coverage` (W1-68 review) leaves the residual out: (main schedule + channel wait + rest of the hand-off) / frame. An unexplained stall shows as a large `outside_update_ms` and a low `named_coverage`.
+- `slow_frames`: how many frames were over 50 ms, how many were timed, and how many of those are covered to at least 95%. `covered_95_named`, `min_named_coverage` and `max_outside_update_ms` give the same over the named spans only.
+
+Pins: `slow_frame_reports_unattributed_time`, `slow_frame_outside_every_named_span_has_low_named_coverage`, `perf_launch_records_the_between_frames_gap_and_events`, `pipelined_handoff_holds_the_channel_wait_and_the_extract` and `unpipelined_handoff_holds_the_extract_and_the_render_schedule`.
+
+**Fresh probes.** Same hardware and power state as before (mains, Balanced). The machine was shared, and a 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (up to 100% load in two passes). Each pass is `measure_performance.ps1 -Repeat 3` at both sizes. Every run was valid, and every pass exited 0.
+
+| Pass (target/perf/w1-68/) | Build | Scene, frames | Present, pipelined, adapter, backend | Runs | Frames > 50 ms | cpu_frame p99 (median, normal / small) | gap p50 / p99 (normal) | channel_wait mean (normal) |
+|---|---|---|---|---|---|---|---|---|
+| playtest-novsync-pipelined-default | W1-68 | progressed-peak, 600 | AutoNoVsync, on, RTX, Vulkan | 6 | 0 | 6.89 / 6.17 | 0.66 / 1.42 | 0.08 |
+| playtest-novsync-pipelined-off | W1-68 | progressed-peak, 600 | AutoNoVsync, off, RTX, Vulkan | 6 | 0 | 7.83 / 6.23 | 2.86 / 5.81 | 0 |
+| playtest-novsync-arc | W1-68 | progressed-peak, 600 | AutoNoVsync, on, Intel Arc (integrated), Vulkan | 6 | 0 | 6.84 / 6.26 | 0.81 / 3.12 | 0.33 |
+| playtest-novsync-dx12 | W1-68 | progressed-peak, 600 | AutoNoVsync, on, RTX, Dx12 (`WGPU_BACKEND=dx12`) | 6 | 0 | 6.57 / 6.31 | 2.81 / 4.92 | 2.17 |
+| playtest-novsync-stress | W1-68 | stress, 1800 | AutoNoVsync, on, RTX, Vulkan | 6 | 0 | 6.72 / 6.55 | 0.60 / 1.16 | 0.04 |
+| playtest-novsync-progressed-peak-3600 | W1-68 | progressed-peak, 3600 | AutoNoVsync, on, RTX, Vulkan | 6 | 0 | 7.75 / 6.55 | 0.64 / 1.34 | 0.05 |
+| dev-vsync-progressed-peak | W1-68 | progressed-peak, 600 | Fifo, on, RTX, Vulkan | 6 | 0 | 9.33 / 7.50 | 13.32 / 14.39 | 12.43 |
+| dev-vsync-stress | W1-68 | stress, 1800 | Fifo, on, RTX, Vulkan | 6 | 0 | 8.27 / 8.63 | 13.05 / 14.19 | 12.33 |
+| playtest-vsync-stress | W1-68 | stress, 1800 | Fifo, on, RTX, Vulkan | 6 | 0 | 7.75 / 7.84 | 13.64 / 14.67 | 12.93 |
+| head-control-dev-vsync-stress | HEAD 99850aa | stress, 1800 | Fifo, on, RTX, Vulkan | 6 | 0 | 8.42 / 8.60 | - | - |
+| dev-vsync-stress-3600 | HEAD 99850aa | stress, 3600 | Fifo, on, RTX, Vulkan | 6 | 0 | 8.38 / 7.96 | - | - |
+
+The last two passes ran the W1-67 binary itself. In the first, the W1-68 files were set aside so the build was HEAD. The second ran an unrebuilt HEAD dev build, because restoring the files with their older timestamps did not trigger a rebuild. Its report has no W1-68 fields, which confirms it was the HEAD build.
+
+**Evidence.** Items 1 and 2 are about the VSync-on stalls only.
+1. **The same code stalls or not depending on the hour.**
+   - At 18:09 the W1-67 binary (this HEAD) had 4-14 frames over 50 ms in every dev VSync-on stress run (`target/perf/w1-67/after-dev-vsync-stress`).
+   - From 18:50 to 19:04 the same binary had 0 in 12 runs (6 x 1,800 and 6 x 3,600 frames).
+   - The W1-68 build had 0 in 54 runs from 18:31 to 19:06.
+   - Scene, window sizes and script were the same throughout. Nothing in the session changed the power plan (mains and Balanced when checked at 18:49).
+2. **The stalls sat in the driver's acquire call.** In the stalled W1-67 frames:
+   - In 47 of the 56 stalled W1-67 frames, the frame's own render sample shows it: present_wait was 497-547 ms or 995-998 ms (two tail frames had 99 and 348 ms). present_wait times `prepare_windows`, where `get_current_texture` blocks on the swap chain.
+   - Main CPU was 5.6-12.9 ms, and render-world CPU was a normal 2.3-3.5 ms.
+   - In the other 9, the frame's render sample was a normal one (Render schedule 2.7-10 ms). The v3 report keeps only the latest render sample per frame, and the stall had landed in a render frame it did not keep. The W1-68 per-sample instants and the attribution now place such a frame.
+   - The 1.0 s frames equal wgpu-core's surface acquire timeout (`FRAME_TIMEOUT_MS = 1000`, wgpu-core 30.0.1 present.rs:32, :178). The render thread waited out that whole timeout in the driver's image acquire, sometimes five frames in a row (stress-small-r3, samples 1024-1028).
+3. **No in-process work was busy in the fresh probes, but they had no stalls.** These counts come from the W1-68 probes, which had 0 frames over 50 ms. They rule nothing out for a stalled frame; they show that none of these sources was busy in the passes run.
+   - egui texture uploads were 0 in every sampled frame of every pass, so the W1-64 churn is gone.
+   - `Image` and `AudioSource` asset events were 0 in every frame.
+   - Window messages were 0, except 2 in one stress run.
+   - No audio voice was ever spawned. The review scenes run with master volume 0 (`ui/review/matrix.rs:21`), so `play_sounds` returns before spawning. Audio voice creation therefore cannot have caused the stalls measured in these scenes. Ordinary play with sound is not covered by this.
+   - OS descheduling cannot be excluded in general. For the VSync-on stalls it would not land, time after time, inside the one swap-chain call, in multiples of about 0.5 s and at the 1.0 s timeout. For the VSync-off stalls it is not excluded.
+4. **The VSync-off stalls (W1-61) were not in the acquire call, and are not attributed.** `target/perf/w1-61/probe-playtest-novsync` and `-stress` (AutoNoVsync, pipelined, RTX, Vulkan) had 16 frames over 50 ms: 4 in stress-normal, 8 in stress-small, 2 in progressed-peak-normal and 2 in progressed-peak-small. All but one (58 ms) were 445.5-510.2 ms. In every one of them:
+   - present_wait was 0.09-0.20 ms;
+   - main CPU was 5.8-11.7 ms and the Render schedule 2.0-7.4 ms.
+
+   The v3 report keeps only the latest render sample per frame, so for any single frame a stall in a render frame it did not keep cannot be excluded. In the VSync-on W1-67 runs that applied to 9 of 56 stalled frames; here it would have to apply to 16 of 16. So the VSync-off stalls sat outside every span that report recorded: in the main-thread gap (winit, the OS) or in render-thread idle. W1-61 predates both the W1-64 egui texture-upload counter and the W1-68 gap and event fields. So egui texture churn (fixed in W1-64), window or asset events, and OS descheduling are all still open for them. Audio voices are not: the review scenes were already muted then (`ui/review/matrix.rs`, since 4 November). Since W1-64, no VSync-off probe has had a frame near 0.5 s. The W1-64 review pass (`target/perf/w1-64/review-playtest-novsync`, 18 runs) and the six W1-68 VSync-off passes (36 runs) had 0 frames over 50 ms. A deliberately unfocused W1-64 stress run (`playtest-novsync-stress-unfocused`) had 1-2 frames of 52-157 ms, with present_wait of 0.06-0.37 ms and 0 texture uploads. That is consistent with W1-64's fix but does not show it, because the VSync-on stall also stopped in the same hours.
+5. **What the new fields show on real frames, and what they cannot.** Over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms), the attribution `coverage` was 100% for 1,077. The other 3 are a run's first samples, whose windows begin before the first kept sample. That 100% is an identity, not evidence: `outside_update` takes whatever the named spans leave, so `coverage` is 1.0 for any window inside the recorded range. These probes were recorded before `named_coverage` existed. With VSync on, the gap of about 13.3 ms is the channel wait (about 12.4 ms) plus 0.8 ms outside the update: the main thread waits on a render thread that is held by the present. If a stall returns, a frame over 50 ms will show whether it was:
+   - the channel wait, with the render thread's present wait (high `named_coverage`);
+   - time outside App::update, winit or the OS (large `outside_update_ms`, low `named_coverage`);
+   - the main schedule.
+6. **The A/B probes cannot tell the arms apart today.** Pipelined off, the integrated Intel Arc adapter and the DX12 backend all had 0 frames over 50 ms. So did the default arm in the same hour. Without pipelining the gap holds the render work (2.9 ms) and the median frame rises from 3.2 to 5.5 ms. DX12 has a longer channel wait (2.2 ms against 0.1 ms on Vulkan) at a similar cpu_frame p99.
+
+**Status: W1-68 is not done for the VSync-off half** (as recorded on 2026-11-06; closed by W1-61, which named it as the same swap-chain acquire stall, see "Goal-1 acceptance" below). Every fresh probe meets the done_when coverage (every frame over 50 ms covered to at least 95%) only trivially, because there were 0 such frames.
+- VSync on: the cause is named, an environmental acquire stall, so no in-process fix follows. The intermittent stall makes gate 3 unreachable on demand on this machine.
+- VSync off: the cause is not named. The W1-61 stalls were not in the acquire call, and none has been seen under the W1-68 probe.
+
+Two open items need a user ruling; the gate was not moved:
+1. the environmental VSync-on acquire stall;
+2. the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe (`named_coverage`, `outside_update_ms`, events).
+
+In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms at progressed-peak and 6.6-6.7 ms in stress, against ≤ 10.0. That is informational for W1-61, which re-runs the gates.
+
+## Gate 3 driver stalls: the user ruling — 6 November 2026 (W1-61)
+
+**The ruling, verbatim (user, in chat, 2026-11-06): "Exclude driver stalls".** Frames over 50 ms in which the swap-chain acquire wait (present_wait, or channel_wait while the render thread is in present) holds at least 80% of the frame are classified as environmental driver stalls and excluded from frames_over_50ms. They must still be attributed (named coverage), the in-process work in that frame (main_cpu and render CPU) must stay below 50 ms, and the excluded stalls are counted and listed in the report and summary (frames_over_50ms_driver_stall). The same exclusion applies to the pipelined rule's frames_over_33ms and VSync-on FPS and p99-interval checks, computed on frames outside stalls.
+
+The gate stays at 0 frames over 50 ms; what it counts changed. The thresholds are in `docs/PERF_BUDGET.json` `driver_stall`: over 50 ms, acquire share at least 0.8, named coverage at least 0.95, in-process work below 50 ms.
+
+In-process work (`in_process_ms`) is main CPU plus render CPU. A frame's window is `time_ms - frame_ms .. time_ms` and closes at First, so the sample's own First..Last runs after it; the main schedule inside the stalled frame is the previous sample's. Main CPU is therefore the larger of `attribution.main_cpu_ms` (the main schedules overlapping the window) and the sample's own `phases.main_cpu_ms` (W1-61 review; before it, only the sample's own was read). Render CPU is the larger of the latest and the stalled render frame's extract + Render schedule − present wait. Re-classified with this rule, every recorded W1-61 report (`target/perf/w1-61/head-*`, 127 reports) keeps exactly its driver stalls: 235 of 235, in-process work at most 19.2 ms.
+
+**Report fields (report version 3; `frames_over_50ms` and every other earlier key keep their meaning).**
+- `longest_frames[].attribution.acquire_wait_ms`: the part of the frame's window where a main-thread render hand-off overlaps a render frame's `prepare_windows`. Not pipelined, the hand-off holds the frame's own Render schedule, so this is its present_wait. Pipelined, it is the channel wait while the render thread is in present.
+- `slowest_present` in the probe: each close also receives the render frame with the longest present wait since the previous close. Pipelined, the render frame that stalled finishes, and the next one replaces it before the main thread closes the frame. The first W1-61 VSync-off A/B runs (before W1-69) showed this in all 94 pipelined frames over 50 ms: the main thread sat 481-625 ms in the channel wait, and no recorded render frame overlapped the window. Their pipelined-off twins had 160 such frames, each with 467-503 ms of present_wait. The attribution now counts that render frame too.
+- `frames_over_50ms_driver_stall` and `driver_stalls`: `rule`, `frames` (every stall: `sample_index`, `frame_ms`, `acquire_wait_ms`, `acquire_share`, `in_process_ms`, `named_coverage`) and `outside` (`sample_frames`, `mean_observed_fps`, `p99_frame_ms`, `frames_over_33ms` and `frames_over_50ms` of every other sampled frame).
+
+**Gate.** `measure_performance.ps1` compares the worst repeat of `driver_stalls.outside.frames_over_50ms` with `frames_over_50ms_max`. A report without that field is invalid evidence (exit 2). summary.json rows add `frames_over_50ms_driver_stall`, `frames_over_50ms_outside_stalls` and `driver_stalls`. summary.md shows every frame over 50 ms with its stalls in brackets.
+
+Pins:
+- `driver_stalls_are_excluded_from_the_gated_frame_counts`: a 500 ms present-wait frame passes; a 500 ms main-schedule frame, a 60 ms frame with 40% present wait, a stall with 60 ms of render CPU and an untimed frame still count.
+- `pipelined_channel_wait_is_a_stall_only_while_the_render_thread_presents`.
+- `a_replaced_render_frame_still_attributes_the_channel_wait` and `close_keeps_the_slowest_present_since_the_previous_close`.
+- `driver_stall_in_process_work_reads_the_main_schedule_inside_the_window` (W1-61 review): a 500 ms frame with a 420 ms acquire and 70 ms of the previous sample's main schedule inside its window stays gated; with 30 ms it is a stall listed at 37.3 ms.
+- `driver_stall_needs_named_coverage_and_the_acquire_share` (W1-61 review): named coverage 0.90 stays gated; acquire share 0.79 is gated, 0.81 is a stall.
+- `driver_stall_needs_a_frame_over_50ms` (W1 review): a 16.7 ms and a 45 ms frame that hold 90% of their window in the acquire are not stalls and stay in `outside`; 50.0 ms is not a stall, 50.1 ms is.
+- `driver_stall_rule_matches_the_ruling`.
+- The `-SelfTest` fixtures `driver-stall` (exit 0) and `missing-driver-stalls` (exit 2).
+
+## Goal-1 acceptance, the pipelined decision and the shipped smoke — 6 November 2026 (W1-61)
+
+**Conditions.**
+- Commit 199d823, which includes W1-69 (enemies no longer queue, so more of them are in contact). The working tree added only tests and docs.
+- Intel Core Ultra 9 185H, NVIDIA RTX 1000 Ada Generation Laptop GPU, Vulkan, mains power, a focused window at 1440x900 @ 1.0 and 1050x700 @ 1.35.
+- A 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (`target/perf/w1-61/<pass>.load.tsv`). During the measured runs the load stayed below 90%, except one A/B pass (`head-ab-dev-novsync/progressed-peak-on-r1`, 93%), whose cells are in line with their repeats.
+- Every run was valid at its first attempt.
+
+**Definitions (frame report v3).**
+- `interface_draw`: `work_mean_ms[2]`, the `ui::draw` wall time; it is v2-compatible and gated against wave 0.
+- `interface_total`: the egui pass loop plus tessellation.
+- `cpu_frame`: per sample, main First..Last plus (extract + Render schedule − present wait) of the latest completed render sample. Quantiles are taken over those sums. It is gated only with `-VsyncOff`.
+- `frames_over_50ms`: the gate counts the frames outside driver stalls (`driver_stalls.outside.frames_over_50ms`, see above), worst repeat.
+- Medians are taken over 3 repeats.
+
+**Span boundaries changed after this acceptance (W1 review, 2026-11-07).** Every number in this section, `PERF_BUDGET.json baseline.v3` (W1-37, `2339a3d`) and every measurement from W1-37 to W1-61 used the probe spans from before review commit `7abb0ab` (2026-11-07 02:30, after `3f48d1a` and `6ddd359`):
+- `egui_pass_ms` opened `.before(EguiPostUpdateSet::EndPass)`, at the start of PostUpdate, so it also held every PostUpdate system unordered against `EndPass` that ran first. From `7abb0ab` it opens in an exclusive system inside `EndPass`, directly before bevy_egui's `run_egui_context_pass_loop_system`. `7abb0ab`'s failing test measured 8.59 ms of egui_pass for a pass that held a sleeping unrelated system.
+- `present_wait_ms` was not ordered against `create_surfaces`, so surface (re)configuration and the `PrepareViews` work before it could count as present wait. That work was then subtracted from render-world CPU. From `7abb0ab` the span opens `.after(create_surfaces)`, so that work counts as render-world CPU.
+
+So `interface_total` (egui_pass + tessellate) and `cpu_frame` (main + extract + Render schedule - present wait) from `7abb0ab` on are not like-for-like with the numbers above or with baseline.v3. Under the new spans, interface_total can only be the same or lower. That makes the `interface_total_not_above_baseline_v3` gate looser than it was at W1-61. cpu_frame can only be the same or higher, so the W1-61 cpu_frame p99 values (6.26-8.85 ms) may leave out work that the gate now counts. The driver-stall acquire wait reads the same present span. The first acceptance measurement on the new spans is "Goal-1 acceptance re-run at HEAD" below; baseline.v3 itself has not been re-measured. Before the next interface_total re-gate (W2-47, W5-11, W7-09), the orchestrator or the user must decide whether baseline.v3 is re-measured on the new spans. Plan §2.5 tracks this. (R29, 2026-11-09: re-measured in W2-47; see "baseline.v3 on the 7abb0ab spans" below.)
+
+**Acceptance passes** (`target/perf/w1-61/head-acc-*`; every pass exited 0, every repeat had 0 frames over 50 ms, and 0 driver stalls were excluded, in a stall-free hour: see "The acceptance passes and the A/B disagree on driver stalls" below):
+
+| Pass | Gate | normal | small | Limit |
+|---|---|---|---|---|
+| dev, VSync on, progressed-peak | interface_draw mean (ms) | 0.990 | 0.952 | ≤ 1.129 / 1.030 |
+| dev, VSync on, progressed-peak | interface_total mean (ms) | 1.952 | 1.805 | ≤ 4.645 / 4.590 (v3) |
+| dev, VSync on, peak | interface_draw mean (ms) | 0.775 | 0.768 | ≤ 1.190 / 1.075 |
+| dev, -VsyncOff | cpu_frame p99 progressed-peak / stress (ms) | 8.85 / 7.50 | 7.01 / 7.84 | ≤ 10.0 |
+| playtest, -VsyncOff | cpu_frame p99 progressed-peak / stress (ms) | 6.26 / 6.48 | 6.44 / 6.54 | ≤ 10.0 |
+
+The dev VSync-on stress pass (frames over 50 ms and texture uploads only) also exited 0. In the playtest pass, the one 100% load sample fell in its shipped cargo build, before the first run; during the runs the load was at most 78%.
+
+**Low latency** (`head-low-latency-playtest`). This was a playtest review launch without a scenario. Its `LASTLIGHT_SAVE_DIR` held `settings.json` `{"version":1,"low_latency":true,"master":0}`, and `LASTLIGHT_PERF_REPORT` was set. The report shows `present {requested_mode Mailbox, source settings, pipelined_rendering false, desired_maximum_frame_latency 1, low_latency true}`: 300 frames on the title screen, median 16.65 ms.
+
+**Shipped smoke.** `-ShippedSmoke` builds `--profile playtest --no-default-features`, copies the exe out and times `--smoke` three times: 2.43, 1.19 and 1.23 s. shipped_smoke_seconds is 1.23 (the median), recorded in `PERF_BUDGET.json` `acceptance`. The first, cold run is the slow one.
+
+**Integrated GPU.** Still pending: `hardware.integrated_gpu.status` is `pending`, with the ACCEPTANCE.md human-check row.
+
+**Pipelined A/B on this commit** (`head-ab-playtest-novsync`, `head-ab-dev-novsync`, `head-ab-playtest-vsync`). The first W1-61 A/B (`ab-*`) predates W1-69 and the driver-stall rule, so it was re-run rather than re-classified. Protocol: interleaved on/off at the run level; playtest and dev; -VsyncOff; progressed-peak and stress at both sizes; 3 repeats per arm; 1,800 frames. Then the playtest VSync-on pair at the budget frame counts. That makes 12 valid runs per arm in each group. Values are medians of 3, frame counts are the worst repeat, and driver stalls are summed over the 3 repeats.
+
+| Profile, VSync off | Scene | Size | cpu_frame p99 on / off | median frame on / off | frames > 33 ms outside stalls on / off | driver stalls on / off |
+|---|---|---|---|---|---|---|
+| playtest | progressed-peak | normal | 6.15 / 6.32 | 2.99 / 4.99 | 0 / 0 | 13 / 13 |
+| playtest | progressed-peak | small | 6.12 / 5.73 | 2.91 / 4.89 | 0 / 0 | 7 / 16 |
+| playtest | stress | normal | 7.30 / 6.09 | 3.06 / 5.15 | 0 / 0 | 17 / 16 |
+| playtest | stress | small | 6.08 / 6.03 | 3.02 / 5.01 | 0 / 0 | 8 / 9 |
+| dev | progressed-peak | normal | 7.11 / 6.93 | 3.52 / 5.84 | 0 / 0 | 9 / 21 |
+| dev | progressed-peak | small | 6.49 / 6.54 | 3.40 / 5.67 | 0 / 0 | 10 / 13 |
+| dev | stress | normal | 7.55 / 6.87 | 3.72 / 6.00 | 0 / 0 | 20 / 21 |
+| dev | stress | small | 7.03 / 6.73 | 3.59 / 5.85 | 0 / 0 | 13 / 14 |
+
+| Playtest, VSync on | Size | mean FPS outside stalls on / off | p99 interval outside stalls on / off | frames > 50 ms outside stalls on / off | driver stalls on / off |
+|---|---|---|---|---|---|
+| progressed-peak | normal | 60.00 / 60.00 | 17.45 / 17.40 | 0 / 0 | 1 / 5 |
+| progressed-peak | small | 60.00 / 59.99 | 19.69 / 19.13 | 0 / 0 | 3 / 3 |
+| stress | normal | 60.00 / 60.00 | 17.82 / 17.35 | 6 / 0 | 3 / 0 |
+| stress | small | 60.00 / 60.00 | 19.60 / 19.66 | 0 / 0 | 0 / 0 |
+
+**Decision: pipelined rendering stays on by default.** The rule is to switch it off only if, with pipelining off:
+- every VSync-off cpu_frame p99 is ≤ 12.0 ms with 0 frames over 33 ms;
+- the VSync-on runs keep a mean FPS ≥ 59.5, a p99 interval ≤ 17.7 ms and 0 frames over 50 ms.
+
+The counts, FPS and p99 interval are taken outside driver stalls. The off arm meets every VSync-off limit, but its VSync-on p99 interval at the small size is 19.13 ms (progressed-peak) and 19.66 ms (stress). The on arm misses that interval too, so the small size has a wider VSync interval tail either way. With VSync off, pipelining roughly halves the median frame at a similar cpu_frame p99. The decision is recorded in `PERF_BUDGET.json` `decisions.pipelined_rendering`, which `pipelined_default_matches_recorded_decision` re-judges against `PIPELINED_DEFAULT`. Mutating the recorded default to false fails that test with "the recorded default does not follow the rule from the recorded off-arm numbers". Low latency still turns pipelining off.
+
+**The VSync-off stall is named.** Every one of the 220 VSync-off frames over 50 ms in this A/B, with pipelining on or off, was a driver stall:
+- frames of 480-623 ms;
+- acquire shares of 0.981-0.992, named coverage of at least 0.95;
+- in-process work of 7.8-19.2 ms.
+
+Pipelined, the stalled render frame finished before the main thread closed its frame, so the earlier reports never saw its present wait. `slowest_present` now keeps it. W1-68's open VSync-off half is therefore the same swap-chain acquire stall as the VSync-on half.
+
+One VSync-on stress repeat with pipelining (`head-ab-playtest-vsync/stress-on-r2`) had a stretch of about 400 frames of 47-67 ms. The six of them over 50 ms were mostly acquire wait (acquire shares 0.78-0.86), but their named coverage was only 0.89-0.94, with 4-6 ms outside App::update. So the rule kept them gated, and that repeat exited 1. It stays visible as evidence, and the gate was not moved.
+
+**Open (W1-61 review, 2026-11-07).** That repeat ran the shipped default configuration (playtest, pipelined on, VSync on). Outside driver stalls it had 6 frames over 50 ms, 407 frames over 33 ms, a p99 interval of 47.1 ms and a mean of 46.3 FPS. That is a sustained 15-20 FPS episode, not an isolated stall. Its twins were clean, it is not attributed (4-6 ms per frame outside App::update), and gate 3 on HEAD is not claimed clean while it stands. It is an open item (W1-68's VSync-off half is closed by W1-61, above; plan 9.4), scheduled as W2-50 (perf-architecture, before the W2-47 re-gate; waves.md) and tracked in plan §2.5.
+
+**The acceptance passes and the A/B disagree on driver stalls (W1-61 review, 2026-11-07).** Both ran the same commit, 1,800 stress frames, pipelining on. The 12 acceptance stress runs with -VsyncOff (dev and playtest) had 0 driver stalls; the 12 pipelined-on A/B stress runs had 58 (0-12 each). The harness differs only in `-Pipelined on` (`LASTLIGHT_PERF_PIPELINED=1`, which sets the same plan value; `present.source` is `launch-override` either way because of -VsyncOff) and `-Repeat 1` per invocation. One discriminating pass ran both, interleaved, on 2026-11-06 23:10-23:16 UTC (`target/perf/w1-61/review/`; playtest, -VsyncOff, stress, both sizes, 1,800 frames):
+
+| Pass | Harness | Runs | Frames > 50 ms | Driver stalls |
+|---|---|---|---|---|
+| `a1-on-r1`, `a2-on-r1` | `-Pipelined on -Repeat 1` (A/B) | 4 | 0 | 0 |
+| `b1-default-r3` | default, `-Repeat 3` (acceptance) | 6 | 0 | 0 |
+| `c1-on-r3` | `-Pipelined on -Repeat 3` | 6 | 0 | 0 |
+| `d1-default-r1` | default, `-Repeat 1` | 2 | 0 | 0 |
+
+No harness variable brings the stalls in. They come and go with time. The last driver stall in the W1-61 evidence fell in the VSync-on A/B at about 22:22 UTC; none followed in the 54 acceptance runs from 22:32 or in these 18 runs. W1-68 saw the same thing: 4-14 per stress run at 18:09, then 0 in 66 probes. So the A/B on arm stands for the default. The acceptance pass's 0 driver stalls shows a stall-free hour, not that the stall is gone; on another hour the same passes would exclude stalls under the ruling. Caveats: the discriminating pass ran the W1-61 review binary (it differs only in the stall rule) and had no CPU-load sampler. (W2-50, 2026-11-08: the stalls come from the display being off, not from the hour; see "Gate 3 in the shipped default configuration" below.)
+
+## Goal-1 acceptance re-run at HEAD — 7 November 2026 (W1 review)
+
+**Conditions.**
+- Commit 867f786, a clean tree. The W1-61 passes with the same harness and gates, on the probe spans from `7abb0ab` (see "Span boundaries changed after this acceptance" above).
+- Intel Core Ultra 9 185H, NVIDIA RTX 1000 Ada Generation Laptop GPU, Vulkan, mains, power plan Balanced, a focused window at 1440x900 @ 1.0 and 1050x700 @ 1.35. 2026-11-07, 17:07-17:30 UTC.
+- Before each pass, `tasklist` showed no horde-defense.exe, and no other cargo command ran. A 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (`target/perf/w1-review/<pass>.load.tsv`). Samples of 97% and 94% fell in cargo builds, before the first run of their pass.
+- Every run was valid at its first attempt. Evidence: `target/perf/w1-review/acc-*`, each with summary.json and summary.md.
+
+| Pass | Command | Exit | Gate | normal | small | Limit | Driver stalls excluded | Load during runs, max / mean of pass |
+|---|---|---|---|---|---|---|---|---|
+| `acc-dev-vsync-progressed-peak` | `-Scene progressed-peak -Profile dev -Repeat 3` | 0 | interface_draw mean (ms) | 1.0386 | 1.0117 | ≤ 1.129 / 1.030 | 0 | 47% / 29% |
+| | | | interface_total mean (ms) | 1.9647 | 1.8655 | ≤ 4.6447 / 4.5895 (v3, old spans) | | |
+| `acc-dev-novsync` | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.80 / 7.58 | 6.47 / 7.13 | ≤ 10.0 | 0 | 67% / 33% |
+| `acc-playtest-novsync` | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 5.91 / 6.48 | 5.61 / 6.09 | ≤ 10.0 | 35 | 59% / 35% |
+| `acc-dev-vsync-peak` (extra) | `-Scene peak -Profile dev -Repeat 3 -NoBuild` | 0 | interface_draw mean (ms) | 0.7837 | 0.7738 | ≤ 1.1904 / 1.0752 | 5 | 51% / 22% |
+| `acc-dev-vsync-stress` (extra) | `-Scene stress -Profile dev -Repeat 3 -NoBuild` | 1 | frames > 50 ms outside stalls (worst) | 1 | 0 | 0 | 40 | 46% / 28% |
+
+No CPU p99 cell missed, so no pass was re-run. Peak cpu_frame p99 with -VsyncOff (not gated) was dev 6.34 / 6.16 and playtest 5.51 / 5.26 ms.
+
+**Gate 3.** The three gate passes had 0 frames over 50 ms outside driver stalls in every repeat. Unlike the W1-61 acceptance hour, the stall was active:
+- The playtest -VsyncOff pass excluded 35 stalls: 494-531 ms, acquire shares 0.987-0.990, in-process work 7.3-13.9 ms, named coverage at least 0.999. The dev -VsyncOff pass, which ran just before it, had none.
+- The extra dev VSync-on passes excluded 5 (peak, 525-567 ms) and 40 (stress, 84-1,001 ms, acquire shares 0.868-0.994). Seven of the stress stalls were about 1,000 ms, wgpu-core's acquire timeout.
+
+**The one gated frame** is in `acc-dev-vsync-stress/stress-normal-r1.json`, sample 932:
+- 54.74 ms, with a present wait of 50.61 ms, a channel wait of 46.76 ms and an acquire wait of 43.46 ms. That is an acquire share of 0.794, under the 0.80 threshold.
+- Named coverage 0.989. In-process work about 11 ms (main 7.05, render 3.92). No window, asset, audio or texture-upload events.
+- It comes directly after the stalls at samples 929-931 (998-1,001 ms each). Outside stalls, that repeat had 9 frames over 33 ms, a p99 interval of 19.4 ms and 59.6 FPS.
+
+Its five twins (normal r2-r3, small r1-r3) were clean. It is the tail of a driver stall, not in-process work. The gate was not moved. With the W1-61 episode (`head-ab-playtest-vsync/stress-on-r2`), it is the second gated VSync-on stress frame set on this branch, so gate 3 on HEAD is still not claimed clean. Both are for W2-50.
+
+**Against W1-61** (`199d823`, old spans):
+- progressed-peak VSync-on interface_draw rose 4.9% / 6.3% (0.990 / 0.952 to 1.039 / 1.012). That leaves 8.0% / 1.8% headroom. The same scene's -VsyncOff twins fell (dev 0.952 / 0.880 to 0.909 / 0.872 ms; playtest 0.738 / 0.739 to 0.671 / 0.671 ms), and peak with VSync on rose 1.2% / 0.7%. So the rise shows only in the VSync-on cell, and is not a draw regression on this evidence. The small size is close to its gate, so W2-47's re-gate should watch it.
+- interface_total (now narrower spans) is 1.965 / 1.866 against 1.952 / 1.805.
+- cpu_frame p99 (now wider spans) is lower in every cell but stress normal: dev 7.50 to 7.58 ms, playtest 6.477 to 6.481 ms.
+
+**Shipped smoke** (`acc-playtest-novsync/shipped`): 2.79, 1.23 and 1.19 s, median 1.23 s, the same as W1-61. The first, cold run is again the slow one. Low latency was not re-run; its W1-61 evidence (`head-low-latency-playtest`) stands. The numbers are in `PERF_BUDGET.json` `acceptance` (the W1-61 ones under `acceptance.w1_61`) and plan 9.1 / 9.4.
+
+## Goal-1 acceptance re-run at HEAD, attempt 2 — 7 November 2026 (W1 review)
+
+**Conditions.**
+- Commit bee4236, a clean tree. The commits since 867f786 change docs only; the dev executable hashed the same as in the first re-run (`77b67433…`). The three W1-61 gate passes, same harness, gates and probe spans (`7abb0ab`).
+- Same hardware and state as the first re-run: RTX 1000 Ada, Vulkan, mains, power plan Balanced, a focused window at 1440x900 @ 1.0 and 1050x700 @ 1.35. 2026-11-07, 17:42-17:56 UTC.
+- Before each pass, `tasklist` showed no horde-defense.exe, and no other cargo command ran. A 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (`target/perf/w1-review2/<pass>.load.tsv`). The 81% and 94% samples of the playtest pass fell before its first measured run (shipped build and smoke, review build).
+- Every run was valid at its first attempt. Evidence: `target/perf/w1-review2/acc-*`, each with summary.json and summary.md.
+
+| Pass | Command | Exit | Gate | normal | small | Limit | Driver stalls excluded | Load during runs, max / mean of pass |
+|---|---|---|---|---|---|---|---|---|
+| `acc-dev-vsync-progressed-peak` | `-Scene progressed-peak -Profile dev -Repeat 3` | 0 | interface_draw mean (ms) | 0.9976 | 0.9889 | ≤ 1.129 / 1.030 | 15 | 55% / 25% |
+| | | | interface_total mean (ms) | 1.8981 | 1.8237 | ≤ 4.6447 / 4.5895 (v3, old spans) | | |
+| `acc-dev-novsync` | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.77 / 7.30 | 6.63 / 7.28 | ≤ 10.0 | 48 | 60% / 28% |
+| `acc-playtest-novsync` | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.25 / 6.43 | 5.92 / 6.28 | ≤ 10.0 | 48 | 52% / 27% |
+
+No CPU p99 cell missed, so no pass was re-run. Peak cpu_frame p99 with -VsyncOff (not gated) was dev 6.54 / 5.89 and playtest 5.79 / 5.23 ms. The extra dev VSync-on peak and stress passes of the first re-run were not repeated.
+
+**Gate 3.** All three passes had 0 frames over 50 ms outside driver stalls in every repeat, with the stall active in every pass:
+- dev VSync on excluded 15: 69-1,000 ms, acquire shares 0.867-0.993, in-process work 8.8-11.3 ms, named coverage at least 0.992. Five were 955-1,000 ms, wgpu-core's acquire timeout. The 85 and 69 ms ones were the frames directly after a 1,000 ms stall (normal r2 sample 596, small r2 sample 328), the same position as the 867f786 sample-932 frame, but with acquire shares of 0.869 and 0.867 they cleared the 0.80 rule.
+- dev and playtest -VsyncOff excluded 48 each: 487-612 ms, acquire shares 0.983-0.991, in-process work 6.7-12.5 ms, named coverage at least 0.999.
+
+This is a pass of the three gates, not a clean gate 3 on HEAD: the 867f786 stress frame (sample 932) and the W1-61 `stress-on-r2` episode stay open for W2-50.
+
+**Against the first re-run** (867f786, same dev executable):
+- progressed-peak VSync-on interface_draw fell 3.9% / 2.3% (1.039 / 1.012 to 0.998 / 0.989), leaving 11.6% / 4.0% headroom. With the executable unchanged, the 867f786 rise over W1-61 was run-to-run spread, as that section suspected; the small size remains the closest cell to its gate.
+- cpu_frame p99 moved by -0.28 to +0.34 ms per cell; the worst cell (dev stress normal, 7.30 ms) is 2.70 ms under the gate.
+
+**Shipped smoke** (`acc-playtest-novsync/shipped`): 2.72, 1.25 and 1.26 s, median 1.26 s. The cold first run is again the slow one. Low latency was not re-run. The numbers are in `PERF_BUDGET.json` `acceptance` (the first re-run under `acceptance.w1_review_867f786`, W1-61 under `acceptance.w1_61`) and plan 9.1 / 9.4.
+
+## Gate 3 in the shipped default configuration — 8 November 2026 (W2-50)
+
+W2-50 owns two open gate-3 items: the W1-61 `head-ab-playtest-vsync/stress-on-r2` episode and the 867f786 sample-932 stall tail (plan §2.5). No gate, threshold or rule was changed. Evidence: `target/perf/w2-50/` (not committed). It holds the reports and summaries, a 5 s CPU-load sampler (`<run>.load.tsv`) and a 1 s `nvidia-smi` sampler (`<run>.gpu.csv`) beside every invocation, the Kernel-Power 506/507 export (`kernel-power-506-507*.tsv`, display-off intervals in `standby-2026-11-06-to-09-b.tsv`), the generated tables (`w2-50-repeats.md`, `w2-50-hold-12.md`, `w1-evidence-display-state*.md`, `w1-67-display-state.md`, `w1-68-display-state.md`) and the driver scripts (`tools/`).
+
+**Conditions.**
+- Commit ddea5a6 (clean tree) for the first 20 invocations; `hold-r5..r12` ran at 8efd9ff with uncommitted review edits to docs only, so on the same playtest executable `2de00a0b…` (built once, `-NoBuild` after). RTX 1000 Ada, Vulkan, mains, power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35.
+- The shipped default configuration: `measure_performance.ps1 -Scene stress -Profile playtest -Pipelined on -Repeat 1`, VSync on (Fifo), stress normal, 180 warmup and 1,800 frames. This is the W1-61 A/B harness, one invocation per repeat.
+- 2026-11-08, 22:32-23:10 and 23:25-23:36 UTC. No other horde-defense.exe and no other cargo command ran. CPU load during the measured runs was at most 61% (100% and 90% samples fell in the first invocation's cargo build).
+- Every run passed the harness's validity checks at its first attempt. Under W2-50's own recommendation below (a run that overlaps a display-off interval is invalid evidence), only the 14 per size that ran with the display on throughout would count.
+
+**Runs.** There were 28 invocations, so 28 repeats per size, 56 reports in all:
+- `stress-on-r1..r12`: 12 plain repeats.
+- `stress-on-pointer-r1..r4`: meant to move the pointer over the window. The lock screen was in front (`GetForegroundWindow` returned LockApp, `SendInput` returned 0), so no move was made. These 4 are plain repeats too.
+- `stress-on-hold-r1..r12`: the same harness with a display-required power request (`SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)`) held by the driver process (`tools/w2-50-hold.ps1`). `r1..r4` ran at 23:04-23:10, `r5..r12` at 23:25-23:36 (added in the W2-50 review, so that at least 12 repeats per size ran with the display on).
+
+The machine was unattended. Windows' Kernel-Power log shows that Modern Standby (display off) was entered on the idle timeout (event 506) and left on input (event 507) several times during the plain runs: 22:37:53-22:39:29, 22:39:59-22:53:06, 22:54:00-22:56:16 and 22:57:08-22:58:28 UTC. Of the 16 plain repeats per size, only `r1` (both sizes), `r2` normal and `pointer-r3` small ran with the display on throughout; `r2` small ended at the 22:37:53 display-off. With the 12 held repeats, 14 repeats per size ran with the display on throughout. `w2-50-repeats.md` places every listed frame on that timeline. Each instant is estimated from the report's file time; "transition" means within 5 s of a 506/507 event.
+
+**Per repeat** (`w2-50-repeats.md`, `w2-50-hold-12.md`; all VSync on). The frame, p99 and FPS columns are outside driver stalls. The last three columns are the report's `slow_frames`, which covers every frame over 50 ms, driver stalls included:
+
+| Runs | Display | Frames > 50 ms (worst) | Frames > 33 ms | p99 interval ms | Mean FPS | Driver stalls | covered_95_named / all frames > 50 ms, stalls included | min named_coverage, stalls included | max_outside_update_ms, stalls included |
+|---|---|---|---|---|---|---|---|---|---|
+| r1-r12 normal | on in r1, r2; off or transition in r3-r12 | 0 | 0-1 | 17.41-18.92 | 59.85-60.03 | 0-6 (34) | all | ≥ 0.998 | 0.85 |
+| r1-r12 small | on in r1; transition in r2; off in r3-r12 | 0 | 0-1 | 19.70-20.18 | 59.93-60.05 | 0-6 (34) | all | ≥ 0.998 | 0.77 |
+| pointer r1-r4 normal | off, with transitions in r1 and r3 | 1 (r1, r3) | 0-2 | 17.64-18.14 | 59.58-60.06 | 3-5 (16) | 3 of 4 (r1), all | 0.932 | 15.81 |
+| pointer r1-r4 small | r1 transition; r2 off; r3 on; r4 off, ending in a transition | 1 (r1) | 0-1 | 19.90-20.11 | 58.42-60.01 | 0-7 (11) | 7 of 8 (r1), all | 0.000 | 818.71 |
+| hold r1-r12 normal | on (held) | 0 | 0 | 17.58-18.14 | 60.00 | 0 | - | - | 0.00 |
+| hold r1-r12 small | on (held) | 0 | 0 | 19.50-20.20 | 59.99-60.00 | 0 | - | - | 0.00 |
+
+Every frame over 33 ms outside driver stalls (all 6 are in `longest_frames`; window events are 0 in every W2-50 frame and run):
+
+| Run | Sample | ms | Acquire share | Named coverage | Outside update ms | Display | Reading |
+|---|---|---|---|---|---|---|---|
+| pointer-r1 normal | 602 | 234.0 | 0.847 | 0.932 | 15.8 | transition (22:53:06, display on) | second frame of a two-frame stall (s601 291.7 ms excluded); the 15.8 ms the main thread spent outside App::update after s601 falls in its window, so named coverage misses 0.95 |
+| pointer-r3 normal | 1481 | 65.9 | 0.660 | 0.951 | 3.2 | transition (22:56:16, display on) | stall tail like sample 932: two frames after a 277 ms stall, present wait 52.9 ms, of which only 43.5 ms overlaps a hand-off, because the main thread ran two schedules (16.2 ms) in the window |
+| pointer-r1 small | 1345 | 819.0 | 0.000 | 0.000 | 818.7 | transition (4 s before the 22:54:00 display-off) | the render thread waited 815 ms in acquire while the main thread sat outside App::update the whole time, never in a hand-off, so the rule sees no acquire wait |
+| r4 normal | 1393 | 37.3 | 0.000 | 0.321 | 25.4 | transition (4 s before 22:39:59) | two frames after a 917 ms stall: the main thread waited outside the update |
+| pointer-r3 normal | 1480 | 39.1 | 0.000 | 0.736 | 10.3 | transition (22:56:16) | between the 277 ms stall and s1481 |
+| r1 small | 628 | 45.2 | 0.855 | 0.989 | 0.4 | on | one three-vblank acquire, the episode's per-frame signature; isolated |
+
+**The driver stall is the display being off.** `w1-evidence-display-state*.md` puts the W1-61 and W1-review evidence on the same Kernel-Power timeline:
+- W1-61's VSync-off A/B ran 21:57-22:15 UTC on 2026-11-06, in a display-off interval (21:33:17-22:17:09). So did the first VSync-on A/B progressed-peak runs (22:15-22:17). Every one of their stalls is display-off.
+- The user woke the laptop by touchpad at 22:17:09. The display then stayed on through 2026-11-07 09:08, which covers the acceptance passes (22:32 onwards) and the discriminating pass (23:10-23:16). That is the "stall-free hour" of "The acceptance passes and the A/B disagree on driver stalls" above.
+- On 2026-11-07 the display went off at 17:18:23, during the 867f786 re-run. The passes before it (dev VSync-on progressed-peak, dev -VsyncOff) had 0 stalls; every pass after it had stalls, and attempt 2 (17:42-17:56) ran with the display off throughout. The extra dev VSync-on peak pass of the first re-run (`w1-review/acc-dev-vsync-peak`, 17:24-17:26, `w1-evidence-display-state-3.md`) ran with the display off; its 5 stalls are display-off.
+- W1-67/W1-68 on 2026-11-06 (`w1-67-display-state.md`, `w1-68-display-state.md`; local 18:06-19:06 is 17:06-18:06 UTC). The W1-67 dev VSync-on passes (`w1-67/after-dev-vsync`, `after-dev-vsync-stress`, 17:06-17:13 UTC) ran in a display-off interval (16:45:29-17:27:58): all 56 of their frames over 50 ms are display-off. These are v3 reports with no driver-stall class, so they are counted as frames over 50 ms, not as classed stalls. All 66 W1-68 probes (17:31-18:06 UTC: 54 on the W1-68 build and 12 on the W1-67 binary itself) ran with the display on throughout and had 0 frames over 50 ms. That is the "4-14 per stress run at 18:09, then 0 in 66 probes" of the W1-61 review.
+
+Across those 186 reports (the W1-61 A/B, the W1-61 playtest acceptance and every pass of both 7 November re-runs) and W2-50's 56, 521 frames were classed as driver stalls:
+- 518 were display-off frames or fell within 5 s of a display power transition.
+- The 3 others are the 116, 52 and 53 ms frames of `stress-on-r2`.
+- No stall of the 500 ms or 1,000 ms class (wgpu's acquire timeout) occurred with the display on. The 56 W1-67 frames over 50 ms add no display-on frame either.
+
+The perturbation proof is the hold arm. Before it, the lock-screen idle timeout turned the display off four times in 7 minutes, and between the two hold batches (23:10-23:25, no request held) it did so 11 more times. With the display-required request held, no 506 event fired from 23:04:46 to 23:10:06 or from 23:25:31 to 23:36:21. The 24 held runs had 0 driver stalls and 0 frames over 33 ms, against 95 stalls in the 32 plain runs. So the excluded stalls are environmental, as the ruling assumed. They come from unattended evidence passes on which Windows turns the panel off, not from the game. Frames still run at a 16.7 ms median then, but the swap-chain acquire stalls for about 500 or 1,000 ms at a time.
+
+**Sample 932 (867f786 re-run).** It fell at about 17:26:44 UTC, with the display off since 17:18:23. It is a display-off stall tail. W2-50 found the same class again (pointer-r3 s1481, share 0.660), plus two other ways a stall escapes the rule at a display power transition:
+- the main thread outside the update for 15.8 ms in a stall's second frame (named coverage 0.932);
+- the main thread outside the update for all of an 819 ms acquire (acquire share 0).
+
+Counting the whole present wait toward the share would catch s1481 (52.9 / 65.9 = 0.80) but neither of the other two. With the display held on, none of these frames occurs. The rule is unchanged and sample 932 stays gated (the §2.5 default). The decision is the user's. W2-50's recommendation is to keep the `driver_stall` rule and instead hold the display on during perf passes and treat a run that overlaps a display-off interval as invalid evidence. That is a harness change to evidence validity and needs its own ruling (plan §2.5).
+
+**The `stress-on-r2` episode is not reproduced.** None of the 28 repeats per size had a stretch of 47-67 ms frames: not the 14 per size with the display on throughout (12 of them held on, 2 plain), nor the 14 per size that were display-off or crossed a transition. The longest run of slow frames outside a stall transition was one isolated 45.2 ms frame (r1 small s628). What the evidence attributes:
+- The time is held by the swap-chain acquire on the render thread. present_wait was 41.8-64.1 ms per frame, so the frame waited about three vblanks. In-process work was 6-8 ms (main 3.2-5.0, render 2.5-3.4), with no asset, audio or texture-upload events.
+- The 4-6 ms outside App::update that kept named coverage at 0.89-0.94 comes only in frames that carry window input events (21-52 per frame). Frames of the episode without events had 0.4 ms outside the update and named coverage 0.99 (s971, s1081, s1288, s1301, s1319, 47.2-48.1 ms). So that residual is winit dispatching input, not the cause of the slow cadence.
+- `stress-on-r2` is the only report on the branch with sustained window input: 4.74 events per frame on average and 52 at most. Every other W1-61 VSync-on stress report has a mean of 0.00-0.01, and every W2-50 report has 0. It ran at 22:22 UTC, 5 minutes after the user woke the laptop (Kernel-Power 507, "Input Touchpad", 22:17:09), with the display on.
+
+The episode therefore coincides with someone using the machine during the run. Input alone is not enough: `progressed-peak-on-r3` (22:18, 7.65 events per frame, 22 at most) stayed at 60 FPS. What made the compositor present on every third vblank for those 400 frames is not named, and the W2-50 runs had no input, because the session was locked. A supervised reproduction, with the session unlocked and pointer movement over the window during `-Scene stress -Profile playtest -Pipelined on` runs, is the remaining step. Until the §2.5 row is answered, the episode stays open (the default). Gate 3 is not claimed clean in the shipped default configuration.
+
+**Rulings (2026-11-09, user decisions R26 and R27; plan §2.4).** Both §2.5 rows are answered:
+- **R26: the `stress-on-r2` episode closes as environmental.** It was user activity during an evidence run: the laptop had been woken 5 minutes before, and the run carried window input. It was not reproduced in 28 repeats per size, 14 of them with the display on throughout. No supervised reproduction is run. Gate 3 in the shipped default configuration can be claimed once the W2-47 re-gate passes; until then it is not claimed.
+- **R27: the 80% driver-stall rule stays unchanged, and sample 932 is closed as display-off.** Instead, `measure_performance.ps1` holds the display on for the whole run (`SetThreadExecutionState` with ES_CONTINUOUS, ES_SYSTEM_REQUIRED and ES_DISPLAY_REQUIRED, the W2-50 hold arm's request, released in a finally block). A run that overlaps a display-off interval, meaning a System log Kernel-Power event 506 or 507 between its start and end, is invalid evidence and is rerun once like the script's other invalid runs (exit 2 if the rerun is invalid too). The summary records the display hold and any 506/507 events per run. W2-50's Done is met once that harness change lands, and the W2-47 re-gate runs on it.
+- **R27 landed (2026-11-09, `feat(horde): measure_performance holds the display on and rejects display-off runs [W2-50]`).** `scripts/lib/DisplayPower.ps1` holds the request and queries the System log (`Get-DisplayPowerEvent`, the function the script tests shim). Each run's window is its process start to exit, and a 506 or 507 inside it, or a log that cannot be read, adds the problem `display off during the run (Kernel-Power <id> at <UTC>)` or `display power unknown (...)`. summary.json gains `display_hold` (request, set and release times, and `released_from`, the state the release replaced: 0x80000003 while held) and per run `display_held` and `display_power_events` (with the attempt); summary.md gains a Display column. `scripts/tests/run_script_tests.ps1` covers it with six cases (37 in all): the hold's flags and single release, the event query and its no-match answer, the problem text, and three end-to-end runs with `Get-WinEvent` shimmed (an overlapping run invalid and rerun, or exit 2 when invalid twice; a run without an event valid; the hold released when a run throws). W2-50's Done is met.
+
+## Machine load in perf evidence — 9 November 2026 (R30, W2-47)
+
+**Ruling (R30, user decision, plan §2.4).** Until now the operator kept the machine quiet, and the W1-61 to W2-50 passes ran a hand-made 5 s CPU-load sampler beside them (`target/perf/<pass>/<run>.load.tsv`). `measure_performance.ps1` now checks both itself. Gates are unchanged.
+
+**R30 landed (2026-11-09, `feat(horde): perf passes wait for a quiet machine and reject loaded runs [W2-47]`).**
+- **Quiet window.** After each build and before what it measures (the runs, the `-ShippedSmoke` timing and the `-SaveClone` example), the script waits for a quiet window. No foreign cargo, rustc, cargo-nextest, clippy, rustdoc, linker or MSBuild process may run; the script's own process tree (its build, the game) is ignored. The mean of the last 13 CPU-load samples (`Win32_Processor.LoadPercentage`, every 5 s, so 60 s) must be under 35%. A sample with a foreign build or an unreadable query restarts the window.
+- **Switches.** The window is on by default (`-WaitQuiet` may be given; `-NoWaitQuiet` skips it). `-QuietTimeoutMinutes` defaults to 240 (1-1440).
+- **Log and timeout.** The script prints a `quiet window:` line whenever what it waits for changes (the foreign processes with their ids, the settling window, the mean load). A window that has not come in time prints `INVALID quiet window timed out ...` and exits 2.
+- **Load validity.** `Invoke-Native -Sample` samples the load right after each run starts and every 5 s until it exits. A run with a sample of 90% or more is invalid evidence (`CPU load <max>% during the run (...; samples ...)`), and so is one with an unreadable sample. It is rerun once like the other invalid runs, and exit 2 follows if the rerun is invalid too.
+- **Summary.** summary.json gains `quiet_window` (the rule, the timeout and every wait: before what, quiet or timed out, samples, seconds, the window's mean and max, what it waited for and the log lines). Each run gains `load_samples`, `load_mean_percent` and `load_max_percent` (the kept attempt) and `load_attempts` (every attempt). summary.md gains a line per wait and a CPU load column.
+- **Tests.** `scripts/lib/MachineLoad.ps1` holds the process and load queries (`Get-ProcessTable` and `Get-CpuLoadPercent`, both `Get-CimInstance` calls), the window (`Wait-QuietMachine`) and the run check (`Test-RunLoad`). `scripts/tests/run_script_tests.ps1` shims `Get-CimInstance` and `Start-Sleep`, the `DisplayPower.ps1` pattern. It adds 12 cases (49 in all): the process-tree filter, the load mean, a quiet start, waiting out a foreign build and a loaded CPU, a timeout, the 90% rule, and the sampler in `Invoke-Native`. The end-to-end runs cover a quiet start, a foreign build waited out while the script's own children are ignored, a timeout exiting 2, a run invalid on a 95% sample and rerun (and exit 2 when every sample is 95%), and the switches. The measure runs of the earlier cases now go through the same shim wrapper, on a quiet machine (load 10%, no foreign build).
+- **The timeout is wall time (W2 review, `fix(horde): the quiet-window timeout is wall time, not a sample count [W2 review]`).** The timeout was a sample count (`-QuietTimeoutMinutes` x 12 + 1), and each sample also pays the two `Get-CimInstance` queries beside its 5 s sleep. On a loaded machine the two W2-close passes in `target/perf/w2-close-e/` (`acc-dev-vsync-progressed-peak`, `acc-dev-novsync`) waited 5 h 44 min and 6 h 02 min on a 240-minute timeout, and their summary.json `seconds` read 14400 (the nominal 5 s steps). `Wait-QuietMachine` now also stops at a wall-clock deadline (`Get-MachineLoadClock`, UTC): no new sample starts once `-QuietTimeoutMinutes` have passed. The sample count stays as an upper bound. A wait's `seconds` (summary.json `quiet_window.waits`, summary.md, the A/B record) is now the elapsed wall time, and the timeout line names it: `timed out after 240 min (<n> samples, <s> s): still ...`. `run_script_tests.ps1` scripts the clock in its shims and adds a case with a slow shimmed `Get-CimInstance` (20 s per query): a 1-minute timeout stops after 2 samples and 85 s, not 13 samples.
+
+## interface_total A/B against the wave-1 executable — 9 November 2026 (R31, W2-47)
+
+**Ruling (R31, user decision, plan §2.4).** The interface_total re-gate is an interleaved A/B against the wave-1-close executable, not the absolute `baseline.v3` (R29 still re-measures and records it). In one sitting A (sources at ab03da9) and B (HEAD) alternate, 5 pairs per size, on progressed-peak, dev, VSync on and the default pipelined state. Per size, B's median interface_total must be at most 1.05 × A's median. This answers W2-47's "interface_total re-gate needs a tolerance" item.
+
+**Landed (2026-11-09, `feat(horde): interleaved A/B interface_total gate against the wave-1 executable [W2-47]`).** No A/B tooling existed under `scripts/` (the W1-61 head-ab passes were run by hand), so it is a new script, `scripts/ab_interface_total.ps1`.
+- **Build.** A is `git archive --format=zip ab03da9 horde-defense`, extracted into `<target>/ab-w1/src` (reused while `.ab-commit` names the same commit). It is built there with the same CARGO_TARGET_DIR, and both builds write `<target>/debug/horde-defense.exe`. (Corrected in W2-47: the workspace crates do not get their own fingerprints by path. Cargo keeps one fingerprint for both arms' packages, so without a clean the second build is fresh and leaves the first arm's exe in place; see "The first A/B measured A twice" below.) So A's exe is copied to `<out>/exe-a/debug/` before B is built and copied to `<out>/exe-b/debug/`. A copied exe has no `assets` folder beside it, so each reads the assets of the tree it was built from. `-NoBuild` with `-ExecutableA` and `-ExecutableB` skips both builds.
+- **Sitting.** One R30 quiet window first (`-NoWaitQuiet` skips it, `-QuietTimeoutMinutes` 240, a timeout exits 2), with the display held for the whole sitting. Then, for each pair, A then B: each arm is one `measure_performance.ps1 -Scene progressed-peak -Profile dev -NoBuild -NoBudget -NoWaitQuiet` pass at both sizes, in this process, with CARGO_TARGET_DIR at the arm's folder. So every run keeps that script's validity (report, window size, the R27 display check, the R30 load sampler) and its one rerun. `Exit-DisplayHold` now restores the state its hold replaced, so a pass's release keeps the sitting's hold.
+- **Decision.** `scripts/lib/AbInterfaceTotal.ps1`. A run counts when measure_performance found it valid and it echoes `baseline.v3`'s present mode (Fifo) and pipelined state (true) with an interface_total mean. Per size: pass when B's median ≤ 1.05 × A's median, over (exit 1) above it, and invalid evidence (exit 2) when any pair has an invalid or missing run. A build or run failure exits 3.
+- **Evidence.** `<out>/ab.json` and `ab.md` record the arms (commit, sha256), the quiet window, the order, every run and each size's A and B values, medians, ratio, limit and status. Each arm's pass keeps its own `pair-<n>-<a|b>/summary.json`.
+- **Tests.** `scripts/tests/run_script_tests.ps1` adds 9 cases (58 in all). Fixture decisions cover a pass (one size at exactly 1.05 × A), a fail and an invalid or missing pair. The summary conversion rejects another present mode or pipelined state. The nested display hold is covered. End to end, with both arms copies of the fake game reporting their own interface_total, a pass, a fail, an invalid pair (B's normal run at 95% CPU twice), the bad arguments and a quiet-window timeout are covered.
+- **Not run here.** The A/B gate itself (a cold build of the ab03da9 tree and 20 runs) runs with the W2-47 re-gate on a quiet machine.
+
+**The first A/B measured A twice (W2-47, 2026-11-09 23:20-23:48 UTC, `target/perf/w2-47/ab-interface-total`).** It exited 0, but `exe-a` and `exe-b` have the same sha256 (`93997478…`), and every B report lacks the battlefield counts HEAD writes (W2-47's live battlefield gates), so both arms ran ab03da9. A's build compiled the ab03da9 tree (5 min 24 s); B's build of HEAD then finished in 3.3 s as fresh and left A's `<target>/debug/horde-defense.exe` in place. Cargo keeps one fingerprint and one uplifted exe for the same workspace package names and profile, whatever tree they come from, so the second arm's build checks the first arm's sources. The result is not evidence and is not used.
+- **Fix** (`fix(horde): ab_interface_total cleans each arm's packages and refuses identical arms [W2-47]`): `Invoke-AbArmBuild` (`scripts/lib/AbInterfaceTotal.ps1`) runs `cargo clean -p horde-defense -p horde_core` in the arm's tree before `cargo build --locked -p horde-defense`, for A and for B, still in the same CARGO_TARGET_DIR (R31). `Assert-AbArmsDiffer` makes an A and B with the same sha256 a run failure (exit 3) before the quiet window and any pair.
+- **Tests.** `scripts/tests/run_script_tests.ps1` adds 3 cases (61 in all): the clean-then-build order in the arm's tree, the guard, and an end-to-end run with one executable for both arms that exits 3 with no pair run. The end-to-end A/B cases now give B a second build of the fake game, so the arms differ.
+- **The workspace target after the sitting (W2-47 review, `fix(horde): ab_interface_total leaves no wave-1 build in the workspace target [W2-47 review]`).** The fix above still left one path where the shared CARGO_TARGET_DIR kept A's fingerprints and exe: A built and B not built after it. That happens with `-ExecutableB` without `-ExecutableA` and without `-NoBuild`, or when B's clean or build throws. The next plain workspace build (`measure_performance.ps1`'s own build, `cargo run --smoke`) would then be fresh and measure ab03da9 as HEAD, the same failure as the first A/B. `-ExecutableB` now needs `-ExecutableA` (exit 3). The finally block calls `Restore-AbWorkspaceBuild`, which runs `cargo clean -p horde-defense -p horde_core` in the workspace when A was built and B's build did not follow; `ab.json` records `workspace_cleaned`, and a clean that fails exits 3 with the manual command in `failure`. `run_script_tests.ps1` adds 1 case (62 in all): the clean call when A was built and B was not, and no call otherwise. The bad-arguments case refuses `-ExecutableB` alone, and the pass case checks `workspace_cleaned` false. The W2-47 measurements are not affected: the first sitting's leftover A build was cleaned before bd12d1c's verify, `ab-interface-total-b` built B after A, and `-c` used `-NoBuild`; every gate rerun's report carries the battlefield counts only HEAD writes.
+- **The baseline.v3 re-measure is not affected.** Its builds compiled the 2339a3d tree (the cargo logs name `target\v3-remeasure\src`), its exes (dev `0026b146…`, playtest `ebf38b01…`) differ from HEAD's, and its reports are the 2339a3d renderer's: none of the fields added after 2339a3d, and 514-515 paint jobs per progressed-peak frame as at W1-37 (HEAD draws 35). The W2-47 gate passes ran the 43184d1 exes (dev `dc17010c…`, playtest `ccd7c287…`) and, for the reruns and the A/B B arm, the bd12d1c exes (dev `79f0cbc8…`, playtest `8076c139…`). All of their reports carry the battlefield counts (corrected in the W2 review).
+
+## baseline.v3 on the 7abb0ab spans — 9 November 2026 (R29, W2-47)
+
+**Ruling (R29, orchestrator, plan §2.4).** `PERF_BUDGET.json baseline.v3` is re-measured on the 7abb0ab egui_pass and present_wait spans before any interface_total re-gate; the old values stay under a previous key, and under R22 a gate the re-measure would loosen keeps its old value.
+
+**What was measured.** baseline.v3 is W1-37's frame report v3 on the unchanged renderer (`2339a3d`). So the re-measure keeps that renderer and changes only the spans: `git archive 2339a3d horde-defense` extracted into `target/v3-remeasure/src` (not committed), with the two 7abb0ab probe edits applied by hand (`egui_probe.rs`: `begin_pass` exclusive, in `EguiPostUpdateSet::EndPass`, before `run_egui_context_pass_loop_system`; `render_probe.rs`: `begin_present_wait` after `create_surfaces`; the diffs are `target/v3-remeasure/applied-*.patch`). It was built dev and playtest with the same CARGO_TARGET_DIR and the exes copied to `target/v3-remeasure/exe/{debug,playtest}` (dev `0026b146…`, playtest `ebf38b01…`). HEAD's `measure_performance.ps1 -Scene all -Repeat 3 -NoBuild -NoBudget` ran each profile and VSync state with CARGO_TARGET_DIR at that folder. A copied exe has no assets folder, so it read the 2339a3d tree's assets.
+
+**Conditions.** 2026-11-09, 19:59-22:00 UTC. RTX 1000 Ada, Vulkan, mains, power plan Balanced, Fifo or AutoNoVsync, pipelined, at 1440x900 @ 1.0 and 1050x700 @ 1.35. Every pass held the display on (R27) and started after an R30 quiet window. Another session's cargo builds and tests and user input ran during the evening, so runs were rejected: an unfocused or 0x0 window, or CPU load samples of 90-100% during a foreign build. Only run validity counts here, since the old reports have no driver-stall, texture-upload or battlefield fields and each pass's own checks are invalid by design (exit 2). Three scene groups still had an invalid run after the one rerun and were re-measured as whole groups, as W1-37 did: dev VSync-on peak (`v3-spans-dev-vsync-peak-b`), dev VSync-on stress (`-stress-b`) and playtest VSync-on stress (`v3-spans-playtest-vsync-stress-c`; `-stress-b` lost two small runs to a foreign build). Mean CPU load over the kept runs was 27-41% per pass, max 74%.
+
+**Result** (medians of 3 valid repeats; plan 9.4 has the full table):
+- interface_total fell in 17 of 24 cells (up to 8.6%) and rose 0.8-3.8% in 7, among them the gated progressed-peak dev VSync-on pair: 4.8218 / 4.7083 ms against W1-37's 4.6447 / 4.5895. The narrower span cannot add work, so this is the measurement's day-to-day spread on this machine, at least as large as the span change itself. That is the case for R31's interleaved A/B, which decides the gate.
+- Under R22 both gated cells would loosen the gate, so `baseline.v3.interface_total_mean_ms.progressed-peak` keeps 4.6447 / 4.5895 (`kept_previous`). Every other cell, and every re-measured median in `measured_interface_total_mean_ms`, is the re-measure. `baseline.v3.spans` is `7abb0ab`, and the W1-37 baseline stays verbatim under `baseline.v3.previous`.
+- interface_draw (same span as before): dev VSync-on progressed-peak 1.7098 / 1.5365 (W1-37 1.655 / 1.518), +6.0% over wave 0 at the normal size. Plan 9.4 records the drift as run-to-run spread; the other progressed-peak normal cells move -1.8% to +6.7% against W1-37 on the same unchanged ui::draw. No gate reads baseline.v3's interface_draw.
+- cpu_frame p99 (wider spans) moved -4.4 to +1.2 ms per cell; informational.
+
+**Test.** `perf_budget_v3_baseline_is_re_measured_on_the_7abb0ab_spans` pins this: the spans marker, the same renderer commit as `previous`, the W1-37 values verbatim under `previous` under the same conditions, W2-47 evidence for the gate run and every `runs` state, and for each cell `interface_total_mean_ms` = the measured median, except a gated cell above the previous value, which keeps it and is listed in `kept_previous`.
+
+## W2-47 re-gate on the wave-2 stress fixture — 9-10 November 2026
+
+W2-47's Done is `-Scene stress -VsyncOff` (dev and playtest) exiting 0 on the new stress fixture (every catalogue archetype, elites, the last wave tier and the boss's phase state). The re-gate also covers the W1-61 gate passes, the R31 interface_total A/B and the R18 items. No gate, threshold or rule was changed. Evidence: `target/perf/w2-47/gate-*` and `ab-interface-total-*` (not committed); the numbers are in `PERF_BUDGET.json acceptance.w2_47`, which `perf_budget_records_the_w2_47_regate` pins.
+
+**Conditions.**
+- The bd12d1c / 43184d1 sources (the bin was unchanged from 0213760 to bd12d1c; 43184d1 and bd12d1c change only tests, docs and scripts). Later wave-2 commits change the binary, among them presentation (3d4e881, 1cb775a), core simulation and campaign rules (759cf49, aa21781, 95c239f, 83d533e, a86c5a4, 4b4dc4a, bf7cfd3, ec09c1d) and the ruleset constant (e3f52fa), so these are not HEAD's executables, and the wave-2 close perf acceptance at HEAD (R34) is a new measurement (corrected in the W2 review). The first four invocations (`gate-dev-novsync`, `gate-playtest-novsync`, `gate-dev-vsync`, `gate-playtest-vsync`, 22:15-23:16 UTC) ran at 43184d1; the three reruns and the A/B `-b` and `-c` sittings (00:36-02:27 UTC) ran at bd12d1c. `acceptance.w2_47` records the commit, start and executable per invocation.
+- RTX 1000 Ada, Vulkan, mains, power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35. 2026-11-09 22:15 to 2026-11-10 02:27 UTC (corrected in the W2-47 review: `gate-dev-novsync` started at 22:15:11).
+- Every pass held the display on (R27; no Kernel-Power 506/507 event fell in a kept run) and started after an R30 quiet window. Another session ran cargo builds, tests and cargo-nextest on this machine all night, so windows took up to 19 minutes and some runs were rejected on CPU load samples of 90-100% (or an unreadable sample). A scene group with an invalid run after the one rerun was re-measured as a whole group, as W1-37 did; the kept runs' load maxima were 69-83% per pass. The one exception is dev -VsyncOff, which was re-measured as a whole pass although one of its groups was valid and over (below).
+- The dev and playtest exes were rebuilt once, after the A/B fix's `cargo clean`: dev `dc17010c…` (43184d1) then `79f0cbc8…` (bd12d1c), playtest `ccd7c287…` (43184d1) then `8076c139…` (bd12d1c), from the same sources.
+
+| Pass | Command | Exit | Invocations | Gate | normal | small | Limit |
+|---|---|---|---|---|---|---|---|
+| dev -VsyncOff | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 (rerun; not clean, see below) | `gate-dev-novsync` 2 (three invalid groups, and progressed-peak small valid and over: 12.7565 ms), `gate-dev-novsync-b` 0 | cpu_frame p99 progressed-peak / stress (ms) | 7.16 / 8.46 | 7.21 / 9.65 | ≤ 10.0 |
+| playtest -VsyncOff | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | `gate-playtest-novsync` 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.80 / 7.68 | 6.98 / 7.17 | ≤ 10.0 |
+| dev VSync on | `-Scene all -Profile dev -Repeat 3` | 0 | `gate-dev-vsync` 2 (one stress run with an unreadable load sample), `gate-dev-vsync-stress-b` 0 | progressed-peak interface_draw mean (ms) | 1.0264 | 0.9917 | ≤ 1.129 / 1.030 |
+| | | | | peak interface_draw mean (ms) | 0.8162 | 0.7825 | ≤ 1.1904 / 1.0752 |
+| | | | | progressed-peak interface_total mean (ms) | 1.9663 | 1.7993 | ≤ 4.6447 / 4.5895 (baseline.v3, R22) |
+| playtest VSync on | `-Scene all -Profile playtest -Repeat 3` | 0 | `gate-playtest-vsync` 2 (progressed-peak small, 100% load three times), `gate-playtest-vsync-progressed-peak-b` 0 | frames over 50 ms, all scenes (worst) | 0 | 0 | 0 |
+
+- **Done is met.** `-Scene stress -VsyncOff` exits 0 in dev and playtest: dev stress 8.46 / 9.65 ms, playtest 7.68 / 7.17 ms. No invocation had a stress cell over the gate: in `gate-dev-novsync`, stress normal was valid at a median of 9.23 ms and stress small was invalid.
+- **A valid over in the first dev -VsyncOff pass (corrected in the W2-47 review).** `gate-dev-novsync` (22:15-22:25 UTC, 43184d1, `dc17010c…`) exited 2: four runs in three groups (peak normal r2 and r3, progressed-peak normal r2, stress small r2) had CPU load samples of 90-100% during a foreign build. Its progressed-peak small group was valid under R30: repeats 24.55, 12.76 and 10.51 ms at load maxima of 72, 52 and 44% (no sample at 90% or more). Its median cpu_frame p99 was 12.7565 ms against the 10.0 ms gate, status `over`. The exit was 2 only because measure_performance ranks invalid evidence above an over budget. The whole pass was then rerun (`gate-dev-novsync-b`, 01:15-01:27 UTC, bd12d1c), where progressed-peak small is 7.21 ms. The reason given at the time, a mean load of 44-49% and a wide repeat spread, is not an R30 validity criterion: R30 and the W1-37 method re-measure groups with an invalid run, not a valid group that was over. The 338919b commit body describes the first invocation as invalid only, and the record it pinned listed it as `gate-dev-novsync: 2` with no over. `acceptance.w2_47.passes.dev-novsync` now lists the over with its cell, repeats and loads, and `gate_clean` is false. Plan §2.5 has the row "A valid over in a pass masked by invalid runs (W2-47 review)". Until it is answered, by its default the dev -VsyncOff progressed-peak gate is not claimed clean at W2-47, and W5-11 re-gates it. W2-47's Done (stress) is not affected. **R34 (2026-11-10, plan §2.4) keeps that default:** the over stands and a valid gated over may not be re-measured away, whatever the machine load below the R30 threshold; the wave-2 close perf acceptance at HEAD is a new measurement. From R34 on, measure_performance prints `VALID OVER: <scene> <size> <metric> <value> > <gate>` for every valid gated over and lists them in summary.json `valid_overs`, so an over can no longer hide behind exit 2.
+- Every pass had 0 frames over 50 ms and 0 over 33 ms outside driver stalls in every kept repeat, and 0 driver stalls: with the display held on, the stall class W2-50 attributed to display-off is gone.
+- The battlefield egui gates (live, W2-47) held in every pass: 18 / 19 / 21 primitives (peak / progressed-peak / stress) of 24, at most 38,524 progressed-peak vertices of 40,000 and 50,614 stress vertices of 61,098 (46,702 with VSync off).
+- **The headless egui evidence on the new fixture (W2 review, perf-diagnostics).** `PERF_BUDGET.json` `evidence.egui_measured` still held the 4d599a5 maxima from the wave-1 stress fixture. `measure_battlefield_egui_load -- --ignored` at 776075c (normal arena): 19 primitives in every scene; vertices peak 32,624, progressed-peak 38,524, stress 51,014, stress-5000-corpses 52,325. No gate moves (19 x 1.25 -> 24; 40,000 ceiling; 52,325 x 1.25 is above 61,098, which stays). The stress vertex maxima now fall at ticks 1980 and 1700, so "every maximum by tick 420" no longer held, and `live_battlefield_runs_stay_within_the_egui_gates` missed them. It now also paints each recorded maximum tick, running to the latest of them, and `live_battlefield_gate_paints_every_recorded_maximum_tick` pins that. The 4d599a5 figures are kept under `egui_measured.w1_69`. W2 review (tests): that pin held by construction (the plan is built from the ticks it checks), so it could not catch stale evidence; `live_battlefield_runs_stay_within_the_egui_gates` now also requires its (primitives, tick, vertices, tick) to equal `battlefield_*_by_scene` and `max_tick_by_scene` per scene, and the pin is reworded to cover only the plan builder. Mutation proof: stress `max_tick_by_scene.vertices` set back to the w1_69 tick 300 leaves the pin green and fails the live gate with `left: (19, 2, 47154, 120)` / `right: (19, 2, 51014, 300)`.
+- Against the W1 review attempt 2 (bee4236, wave-1 content): cpu_frame p99 dev stress rose from 7.30 / 7.28 to 8.46 / 9.65 ms and playtest from 6.43 / 6.28 to 7.68 / 7.17 ms; progressed-peak is about the same (dev 6.77 / 6.63 to 7.16 / 7.21). The new fixture draws 18 archetypes and 69 elites at the last wave tier. Dev stress small is 0.35 ms under the gate; W5-11 should watch it.
+- progressed-peak dev VSync-on interface_draw is 1.026 / 0.992 ms (W1 review 0.998 / 0.989), 9.1% / 3.7% under the gates.
+- Shipped smoke (`gate-playtest-novsync/shipped`): 2.61, 0.91 and 0.93 s, median 0.93 s (W1 review 1.26). The first, cold run is again the slow one.
+
+**interface_total A/B (R31).** `ab-interface-total-c` (2026-11-10 02:19-02:27 UTC), A `5ce1c87a…` (ab03da9) and B `79f0cbc8…` (bd12d1c), 5 pairs per size, every run valid:
+
+| Size | A median | B median | B / A | Limit |
+|---|---|---|---|---|
+| normal | 2.133 | 2.052 | 0.962 | ≤ 1.05 |
+| small | 2.067 | 1.992 | 0.963 | ≤ 1.05 |
+
+The two earlier sittings are not evidence: `ab-interface-total` measured A twice (the build bug in "The first A/B measured A twice" above), and `ab-interface-total-b` (the fixed script, its own builds) lost pairs 4 and 5 to 100% CPU load samples. `-c` reused `-b`'s two executables with `-NoBuild`. B's reports carry the battlefield counts and A's do not, so the arms are the ones named. interface_total at bd12d1c is 4% under the wave-1 close at both sizes, so the wave-2 content up to bd12d1c added no interface_total cost on the gate's scene. The A/B result holds for bd12d1c; later wave-2 commits change the binary after it (presentation, core simulation and campaign rules and the ruleset constant; see Conditions above), so the wave-2 close acceptance at HEAD (R34) is a new measurement.
+
+**Gate 3 in the shipped default configuration (R26).** R26 lets gate 3 be claimed in the shipped default configuration once this re-gate passes. It passes: `gate-playtest-vsync` stress (playtest, pipelined on, VSync on, the shipped default) ran at 60.00 FPS at both sizes with 0 frames over 50 ms and 0 over 33 ms outside driver stalls, 0 driver stalls, p99 intervals 18.00 / 19.53 ms. Every other VSync-on and VSync-off pass above also had 0 frames over 50 ms. Gate 3 is claimed for bd12d1c (the executables measured here) in dev and playtest, VSync on and off. It is not claimed for HEAD: later wave-2 commits change the binary after bd12d1c (presentation, core simulation and campaign rules and the ruleset constant; see Conditions above), so the wave-2 close perf acceptance at HEAD (R34) is a new measurement.
+
+**The R18 items.**
+- The sustained 15-20 FPS VSync-on stress episode: closed by R26 (environmental). None of the 17 valid VSync-on stress repeats here showed it.
+- The 1050x700@1.35 VSync-on p99 interval of 19.1-19.7 ms: measured, and it is not a property of the small size. In the 22:48-23:16 UTC passes the small size had 19.53-19.95 ms against the normal size's 17.61-18.72 ms. In the 01:27-02:18 UTC reruns it was 17.56 ms (dev stress) and 17.70 ms (playtest progressed-peak), against 17.54 / 17.48 ms at the normal size. The extra tail is in the swap-chain acquire, not in the process: dev stress small present_wait p99 16.2-16.6 ms in the wide runs and 13.4-13.5 ms in the narrow ones, while main and render-world CPU p99 stayed at 4.3-5.6 ms. Mean FPS was 60.00 throughout. What makes the presentation of the smaller-than-the-panel window wider at some hours is not named. It gates nothing: 17.7 ms is only the pipelined decision's threshold, and that decision stays as recorded.
+- The script-level battlefield primitive and vertex gates: landed earlier in W2-47 and held live in every pass (above).
+- The egui_probe/present_wait span ordering, including baseline.v3: re-measured (see "baseline.v3 on the 7abb0ab spans" above). No other span-ordering item is open.
+
+## Legacy guards and fixture behaviour — 10 November 2026 (W2-48)
+
+The save-determinism guards that keep the wave-2 systems away from encounters saved before them (design-save-determinism §5 and §11, plan EB14 and SD6), and behaviour tests that play the v6 fixture forward through the wave-2 rules. Each guards behaviour an earlier wave-2 commit landed, so each passed on the parent (ad61a22); the proof is a mutation of the production code, run against the named test and reverted:
+
+| Test | Where | Mutation | Failure |
+|---|---|---|---|
+| `elite_roll_consumes_no_combat_rng` (rates 1, 200, 850, 1275, 5000, 9999 and 10000 bp against rate 0, both modes; the reseeded verdicts and affixes match the keyed hashes) | `src/sim/elite_tests.rs` | an elite spawn draws `a.rng.below(2)`; separately, the ELITE key mixes in `a.rng.state` | `Personal 200: the combat RNG moved at pass` `Some(9)`; `Personal 200: enemy 42 (brute)` `None` vs `Some("hardened")` |
+| `rank_zero_deploy_spawns_no_elites_and_has_no_new_archetypes` (Easy/Normal/Hard, both modes, 3 seeds, 3 minutes) | `tests/legacy_guards.rs` | the director's rate floored at 850 bp; separately, its wave pool tier raised by 6 | `Easy Personal 0x1: elite enemy 32`; `Easy Personal 0x1: new archetype exploder` |
+| `legacy_attempt_snapshots_have_zero_elite_rate_and_no_boss_phases` (v1-v6 roots and the v6 expedition; the v7 freeze shows both marks) | same | load gives an attempt at rank 3 or more one boss transition | `v1 root` `(0, 1, 0, 0, 0, 0)` vs `(0, 0, 0, 0, 0, 0)` |
+| `v6_active_attempt_spawns_no_elites_for_3600_ticks` | same | the 850 bp floor | `expedition 16` (telemetry counts elites) |
+| `v6_legacy_boss_has_no_phases` (a frozen-0 boss under both thresholds; the same boss on a 2-transition snapshot phases) | same | the load mutation above, on the root attempt only (W2 review: the precondition reads the root, where the boss spawns) | `the v6 root snapshot froze no boss transitions` `(Personal, 14, 1)` vs `(Personal, 14, 0)` |
+| `continue_journey_after_migrated_companion_report_redeploys_companion` (inline JSON: the v6 payload without its live defense, its keyless Mara report a Belarus stage 1 loss) | same | `next_defender` ignores the report | `Player` vs `Mara` |
+| `v6_fixture_recruit_can_take_over_the_next_defense` | same | `ContinueJourney` keeps the choice; separately, the takeover finish never releases the recruit | `Continue clears the choice`; `Defending` vs `Ready` |
+| `worker_level_up_does_not_pay_the_level_grant_twice` (the live Polish expedition levels 33 -> 34) | same | a worker settles its own ledger | `a worker never settles` `(34, 34)` vs `(34, 33)` |
+| `migrated_threat_jump_pays_no_milestone` (the v6 payload pre-threat: victories 0 jump to its clear rank 14 at load) | same | step (d) claims by the saved victories | claims `{}` vs `{5, 10}` |
+| `commands_round_trip_through_serde_for_replay` (the 9 appended variants at non-default values) | `src/command.rs` | `AcknowledgeOutcomes.folded` `#[serde(default, skip_serializing)]` | `{"AcknowledgeOutcomes":{"battles":[9,12]}}` reads `folded: 0`, not 3 |
+
+No production code changed and no digest moved.
+
+## Wave-2 re-bless and ruleset 3 — 10 November 2026 (W2-49)
+
+This is the wave's one save-determinism re-bless (rulings P3, R7). Six wave-2 commits had moved `GOLDEN` provisionally, each with a cause in `PROVISIONAL_CAUSES`. W2-49 folds those digests into `GOLDEN`, then resets `PROVISIONAL` to None and `PROVISIONAL_CAUSES` to empty. The reasons now sit in the re-bless log of `crates/horde_core/tests/determinism.rs`. `GOLDEN` moved 6/6 and `GAMEPLAY_TRACE` 0/6. These did not move: the V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins, the frozen-catalogue pin and `SAVE_VERSION` 7.
+
+| Seed / mode | GOLDEN, wave-1 close → W2-49 | Causes in commit order (class) | Net (`support::classify`) |
+|---|---|---|---|
+| 0x1 Personal | 0x303ea36fac6a070b → 0xbed5e2714b6590fe | W2-05 T, W2-06 F, W2-52 F, W2-54 F | F |
+| 0x1 Npc | 0xeede2391290bb381 → 0xcffe0be4463d46d6 | W2-05 T, W2-06 F | F |
+| 0x1a571167 Personal | 0x2902d75f0238e1a3 → 0x3368f18097f7fb5e | W2-05 T, W2-06 F, W2-08 C, W2-52 F, W2-09 G (R33; `support::classify` labels it C), W2-54 F | F |
+| 0x1a571167 Npc | 0x6a2ba00f7e4018d8 → 0x97d93e67bd2bed2f | W2-05 T, W2-06 F | F |
+| 0xdeadbeef2026 Personal | 0x5aaf1f080eb1da92 → 0x7be5c84d229d8d71 | W2-05 T, W2-06 F, W2-52 F, W2-54 F | F |
+| 0xdeadbeef2026 Npc | 0xc1bb9ef207925afc → 0x6dcebbedcc7582c9 | W2-05 T, W2-06 F | F |
+
+What each cause changed:
+- **W2-05 (T):** the attempt telemetry carries the per-archetype spawned, killed and damage-taken maps.
+- **W2-06 (F):** every attempt saves its frozen `drop_tier` (Some(1) in all six runs), and a root attempt lists its drops in `drop_ids`.
+- **W2-08 (C):** the 39 `loot_only` items grow the tier-1 pool from 12 to 18 definitions, so the one drop of 0x1a571167 Personal picks another definition.
+- **W2-52 (F):** a Personal level-up from 1 to 2 under the neutral grant saves `level_grant_paid` 2.
+- **W2-09:** the weighted single draw moves that drop again. It is class G under R33, because the pick is a gameplay mechanic, although `support::classify` labels the move C (items only).
+- **W2-54 (F):** the authored 0.25 grant makes the W2-52 shim inert, so `level_grant_paid` is no longer saved.
+
+**Anatomy.** Before is `determinism_anatomy` on the wave-1 close tree ab03da9, built from an exported tree with its own target directory (`target/production-after-wave2/anatomy_before_w1close_ab03da9.txt`). After is W2-49 (`anatomy_after.txt`, identical to W2-54's `anatomy_after.txt`).
+- In all six runs the key paths and the telemetry-stripped payload move. The items hash, the outcome summary (kills, coins, hp, loot, spawned and `rng.state` at ticks 600, 1200 and 1800) and the trace do not, so each run nets F.
+- The keys hash of the five runs without a drop goes 0x8a4c8226e2df0f7a → 0xbdf9c3b221052103, and 0x1a571167 Personal's goes 0x4bbabacd6a590564 → 0x72f5e366ed803b2a.
+- 0x1a571167 Personal keeps its items hash 0x48f43caeb9493765. W2-08 and W2-09 each moved its one drop, and the weighted draw lands on the wave-1 definition again.
+
+**Ruleset 3.** `RULESET_VERSION` and `TRACE_RULESET` go from 2 to 3 (rulings P4 and R15). The bump names both changes since ruleset 2:
+- W1-69: no lane queue. Every enemy at the line or a structure attacks.
+- The wave-2 rules: auto-sell, takeover, the weighted drop table, the relative quality roll and loot-only drops, threat-scaled camp prices, the in-country front ramp, the late growth slopes and floors, elites from rank 3, boss phases past rank 4, the new archetypes, the country difficulty bands, the weapon-mastery nodes, and the authored level grant and rank milestones.
+
+`GAMEPLAY_TRACE` keeps W1-69's three wave-1 re-blesses, and wave 2 moves none of the six traces. The traced runs are rank 0 with no country, and the weighted pick still makes one draw. Replay and load behaviour are in "Strict sale and ruleset 2" above.
+
+Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` now asserts the literal ruleset 3 and failed on the parent with `left: Some(2)` `right: Some(3)`. It replaces the removed `ruleset_version_is_2`.
+
+**Smoke and pacing after wave 2** (`target/production-after-wave2/`, not committed). The bump changes no rule, so both outputs equal the last recorded ones:
+- `--smoke` (`smoke.txt`, PASS, exit 0) is byte-identical to `w2-54/smoke.txt` (sha256 846f0b4c...3425fe50).
+- `pacing 60 --runs` (`pacing.txt`) is byte-identical to `w2-54/pacing.txt` (sha256 902cd895...c7f7d738).
+- The 20-seed release acceptance (`pacing_targets.txt`) is in plan §9.2 and §9.6.
+
+## Wave-3/4 re-bless and ruleset 4 — 14 November 2026 (W4-08)
+
+W4-08 is the single save-determinism re-bless for waves 3 and 4 (rulings P3, R7, R36; W4-12 and W4-13 come before it, R56 and R57). No commit since W2-49 set `PROVISIONAL`, so there is nothing to fold: `PROVISIONAL` is None, `PROVISIONAL_CAUSES` is empty, `GOLDEN` moved 0/6 and `GAMEPLAY_TRACE` 0/6, and the re-bless log in `crates/horde_core/tests/determinism.rs` gains no row. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins, the frozen-catalogue pin and `SAVE_VERSION` 7 did not move either.
+
+Why each wave-4 rule leaves the six traced runs alone (each is one rank-0 deploy with no country, no camp action and no worker game):
+
+| Commit | Rule | Why no digest moves |
+|---|---|---|
+| W4-01 | Regional and Capstone boss multipliers | folded only with a country front position; without a country the boss is a Sector boss |
+| W4-03 | steady_hands, hardened, quick_throw and combat_reload retunes; shrapnel_trap `charges_per_rank` 1 | the nodes are never bought and every structure mastery rank is 0 |
+| W4-p | repriced skill tree, tier cost, blueprint price | read only by camp purchases, which the runs never make |
+| W4-l | auto-sell pacing gate, stash-growth report, validator reads `loot::max_drop_tier` | measurement code and a value-equal refactor |
+| W4-12 | expedition threat rank follows the recruit | read only by a worker-game Npc deploy; the runs create no expedition, so R57's expected Npc `GOLDEN` move does not happen |
+| W4-13 | goal-6 measurement profile | acceptance bot only (R56) |
+
+W4-02 and W4-04..n changed no rule, W4-c shipped only its record, and wave 3 changed presentation only. No continuation pin moved for W4-03's trap charge (R38), so no charges re-bless reason is owed.
+
+**No `follow_named_preset`.** Wave 4 changed no named preset's `BalanceSettings` (`balance.json` is unchanged since W2-49), so the conditional `Campaign::follow_named_preset` reconcile of design-save-determinism §4 is not added. `v6_hard_campaign_deploys_with_current_hard_threat_but_in_flight_snapshot_stays_legacy` (`tests/balance_extras.rs`) pins the behaviour that holds without it: the v6 Hard campaign loads with the catalogue's Hard settings, its in-flight attempt and expedition keep their legacy snapshot (`elite_rate_bp` 0, no boss phase) through play and a save round trip, and its next deployment freezes the current Hard threat (the Hard-scaled elite rate, 1,372 bp at the fixture's rank, and the Hard boss-phase bonus). Mutation proofs: skipping `fold_extras` in `Campaign::progression_for` fails it with `left: 915` `right: 1372`, and a v6_to_v7 arm that writes an elite rate into the in-flight snapshot fails it with `left: 1372` `right: 0`.
+
+**Ruleset 4.** `RULESET_VERSION` and `TRACE_RULESET` go from 3 to 4 (ruling P4). The bump names the rule changes since ruleset 3:
+- The wave-2 review fixes after W2-49: the opening tier-1 guarantee skips NPC issue, the stationed spitter's windup guard and aim, the defender verdicts for an item held elsewhere, the operation-chain ledger copy and the level-10 advancement cap.
+- Wave 4: the Regional and Capstone boss multipliers (W4-01), the four effect retunes and one shrapnel-trap charge per mastery rank (W4-03), the repriced skill tree, tier cost and blueprint price (W4-p) and the expedition threat rank that follows the recruit (W4-12).
+
+Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` now asserts the literal ruleset 4 and failed on the parent with `left: Some(3)` `right: Some(4)`.
+
+Smoke, pacing and the plan §9.2 "After W4" column are re-run in the closing phase (R36); the bump itself changes no rule.
+
+## Progressed determinism pins and the v7 continuation — 14 November 2026 (W4-09)
+
+The wave-4 close adds three pins that guard waves 5-7, on ruleset 4 after W4-08 (design-save-determinism §9 "Extra coverage" and §10; schema-v7.md §12):
+
+- **`PROGRESSED_GOLDEN` and `PROGRESSED_TRACE`** (`crates/horde_core/tests/determinism.rs`): the state digest and the per-tick gameplay trace of four runs, seeds 1 and 0xDEAD_BEEF_2026, each as `HardCapstone` (the player on the Hard preset, Capstone stage 3 of 3 of Anguilla) and `RecruitTakeover` (a trained recruit in bought gear holding the main run in Npc mode on Anguilla's first stage, default preset), at threat rank 12 for 3600 ticks of the smoke bot. `support::progressed_determinism_game` builds them, not the review render fixtures. It stages the world (four liberated three-stage countries and the front), the victories, the attempt count, a 400,000-coin purse and, after the deploy, the attempt clock (1800 ticks before the boss). It plays the rest through `Game::apply`: the preset, every skill node the purse buys in catalogue order, the best gear, the recruit's recruitment, gear and training, `SetNextDefender`, `BeginDefense` and the walls, turrets and traps supply allows. All four windows end in a victory, so the digests also hold the settlement (the Capstone liberates the front, the takeover releases its recruit). They follow the P3 ledger through `PROGRESSED_PROVISIONAL` and `PROGRESSED_PROVISIONAL_CAUSES`; waves 5-7 expect 0/4.
+- **`progressed_golden_runs_exercise_elites_boss_phases_and_new_archetypes`**: every start is the campaign it names (mode, rank 12, the Capstone or Sector boss, the player or the recruit, Hard) and a valid save, and every window spawns an elite, enters a boss phase and kills one of the seven wave-2 archetypes. Measured: HardCapstone 21 and 14 elites, phases at ticks 16705/17137 and 16752/17184, seven new archetypes killed; RecruitTakeover 2 and 1 elites, one phase each (14640, 14700), five and six new archetypes killed. The end states differ and save validly. The same campaigns at rank 2 (below the elite rank 3 and wave tier 5) fail the check, which proves it is not vacuous: both report no elite spawned and no new archetype killed. Only the takeover (a Sector boss, below the rank-4 phases) also reports no boss phase entered, which proves the phase clause; the Hard Capstone keeps its Capstone transition at rank 2 and enters a phase there (closing: the test asserts which clauses fail, not only that one does).
+- **`V7_CONTINUATION_FNV`** (`crates/horde_core/tests/save_migration.rs`, `v7_fixture_continues_exactly_as_the_wave4_close_did`): `save_v7.json` continued for 600 idle ticks, sampled every 50, in the v6 continuation line format (the root takeover attempt and each expedition). The root defense and the live Hungarian expedition outlast the window.
+
+Perturbation proofs: each pin plus one fails (`expected 0x1725164d48e78d13, got 0x1725164d48e78d12`; `expected 0x6a779762dcfd6ad0, got 0x6a779762dcfd6acf`; `left: 16521645470565049038` `right: 16521645470565049039`). Threat rank 11 instead of 12 moves all eight progressed digests, and one flipped bit of the loaded v7 game's root attempt RNG moves the continuation (`left: 5659490391580026304`). `GOLDEN`, `GAMEPLAY_TRACE`, the V1-V6 continuation pins and the `save_v7.json` pins are unchanged; `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None.
+
+## Closing re-bless and ruleset 5 — 14 November 2026 (closing)
+
+The closing phase of the production pass runs the one save-determinism re-bless for every pin moved after W4-08 (rulings P3, R36, R59, R61). W4-14 and W4-15 had set `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL`, each with its causes. The re-bless folds them into `GOLDEN`, `GAMEPLAY_TRACE`, `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` and `V7_CONTINUATION_FNV`, resets the three provisional pins to None and their causes to empty, and moves the reasons into the `crates/horde_core/tests/determinism.rs` header (the "closing" rows of the re-bless log, the progressed re-bless log and the anatomy table) and into `V7_CONTINUATION_FNV`'s doc comment in `tests/save_migration.rs`. Before the fold the provisional pins matched HEAD exactly (13 of 13 determinism tests green, `determinism_anatomy` included).
+
+| Family | Moved | Causes (class) | Net (`support::classify`) |
+|---|---|---|---|
+| `GOLDEN` | 3/6: the three Npc runs | W4-14 aim G, W4-14 arrival G | G |
+| `GAMEPLAY_TRACE` | 3/6: the three Npc runs | W4-14 aim G, W4-14 arrival G | G |
+| `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` | 4/4 each | the takeovers: W4-14 aim G, W4-14 arrival G, W4-15 price G; the Hard Capstones: W4-15 price G | G |
+| `V7_CONTINUATION_FNV` | 0xe548ad0521f8a2ce → 0x4998700c0fb61012 | W4-14 aim G | G |
+
+What each cause changed:
+- **W4-14 aim (fbedee2):** an Npc aims only when the aim raises its expected hits per turn. It reaches Mara's three `GOLDEN` runs, the two recruit takeovers and `save_v7.json`'s live root defense (Mara's, deployed in v7). An attempt deployed before save format 7 keeps the old aim test, so V1-V6 do not move.
+- **W4-14 arrival (93321b8):** `npc_arrival_factor` 0.9 → 0.5 halves the Npc arrivals: the three Npc `GOLDEN` runs spawn 4 hostiles by tick 1800 instead of 8 and kill 4 instead of 7, and the takeover windows start 3000 ticks before the boss (`PROGRESSED_TAKEOVER_BOSS_LEAD`; 1800 for the Hard Capstones) so an elite, the new archetypes and a boss phase stay in them (59 → 48 and 62 → 52 spawned). The in-flight v7 fixture keeps its frozen snapshot, so the continuation moves for the aim alone.
+- **W4-15 price (63283a9):** Survivor network 1,700 → 1,500 coins. The progressed staging buys, in catalogue order, every node the gates allow; its 400,000-coin purse covers them all (the catalogue's prices sum to 96,720), so no node, gear or recruit-training buy is refused for coins at either price, and the price changes no run's node set, gear or in-window play. The 200 coins Survivor network no longer costs stay in the campaign purse, which the core hash and the settled trace lines (`progressed_trace_line` prints the campaign's coins) carry. All four still win; the Hard Capstones keep their keys, items and outcome summary (spawned, elites, phase ticks).
+
+**Anatomy.** Before is `determinism_anatomy` on the W4-09 tree fa616e9, exported with `git archive` to `target/closing-rebless/w4-09-src` and built with its own target directory (`target/closing-rebless/anatomy_before_w4-09_fa616e9.txt`). After is HEAD (`target/closing-rebless/determinism_before.out`, run with the provisional pins still set). The three Personal runs are identical in every hash. The three Npc runs move keys (0xbdf9c3b221052103 → 0x3ce0e643620df24d: a sampled hostile holds its hit-stop, `/attempt/enemies/statuses`, registered as W4-14 in `WRITTEN_V7_KEYS`), core, outcome and trace, and keep their items hash 0x9148a6bf065cdfaa. The Hard Capstones move core and trace only. The takeovers move core, items, outcome and trace, and keep their keys. Every moved run's trace moves, so each nets G.
+
+W4-15's `train_companions` (62f90d3) and W4-16 (9f18943) moved no pin, and no wave-5, wave-6 or wave-7 commit set one. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins, the frozen-catalogue pin and `SAVE_VERSION` 7 did not move.
+
+**Ruleset 5.** `RULESET_VERSION` and `TRACE_RULESET` go from 4 to 5 (ruling P4). The bump names the rule changes since ruleset 4: the Npc aim test and the Npc arrival factor (W4-14) and the Survivor network price (W4-15). W4-15's `train_companions` is pacing-bot code, and W4-16's power readout is never saved and decides no command (it feeds the defender cards, `OutbreakPlan::recommended_defender` and the strategy pacing bot's recruit choice, bot code and never a `Game::apply` rule), so neither is a rule. The traced `GAMEPLAY_TRACE` moves are the three Npc rows above; W4-15 moves none of the six (the traced runs buy no node).
+
+Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` now asserts the literal ruleset 5 and failed on the parent with `left: Some(4)` `right: Some(5)`; `gameplay_trace_is_recorded_under_the_current_ruleset` failed with `left: 5` `right: 4` until `RULESET_VERSION` moved.
+
+## Settled corpses in stress — 7 November 2026 (W1-49)
+
+W1-49 is done when `battlefield_paint` does not grow over the stress run, and the perf design asks for `settled_corpses_drawn` in stress. Neither number had been written down: the W1-49 commits had only headless cache tests.
+
+**Conditions.** Commit `fa4c6f9` (W1-49 landed in `e208c55` and `5f733c4`). `measure_performance.ps1 -Scene stress -Profile dev -VsyncOff -NoBudget`, pipelining at its default (on), 180 warmup frames, one repeat per size. The runs used three windows: `-Frames 300` twice and `-Frames 3600` once. Intel Core Ultra 9 185H, mains, Balanced, 2026-11-07 01:47-01:49 UTC. Evidence is in `target/perf/w1-49-review/{frames-300,frames-300-b,frames-3600}`. Every run had 1 attempt, 0 frames over 50 ms, `present.source` `launch-override` (from -VsyncOff) and `present.pipelined_source` `settings`.
+
+**Scene.** The stress run starts with 1,500 corpses and keeps up to 400 enemies on the field. It gains about 3 corpses in a 300-frame window and 13-14 in the 3,600-frame window.
+
+| Window | Size | `battlefield_paint` mean ms | `settled_corpses_drawn` mean / max | `collapsing_corpses_drawn` mean / max | `scene_load.corpses` mean / max |
+|---|---|---|---|---|---|
+| 300 (`frames-300`) | normal | 0.557 | 1,501.1 / 1,503 | 0.69 / 3 | 1,501.8 / 1,503 |
+| 300 (`frames-300`) | small | 0.503 | 1,500.4 / 1,503 | 0.77 / 3 | 1,501.2 / 1,503 |
+| 300 (`frames-300-b`) | normal | 0.505 | 1,500.4 / 1,503 | 0.75 / 3 | 1,501.1 / 1,503 |
+| 300 (`frames-300-b`) | small | 0.492 | 1,500.4 / 1,503 | 0.76 / 3 | 1,501.2 / 1,503 |
+| 3,600 (`frames-3600`) | normal | 0.516 | 1,507.9 / 1,513 | 0.28 / 3 | 1,508.2 / 1,514 |
+| 3,600 (`frames-3600`) | small | 0.477 | 1,507.3 / 1,513 | 0.29 / 3 | 1,507.6 / 1,513 |
+
+**`battlefield_paint` does not grow over the stress run.** The 3,600-frame mean includes 3,300 later frames and 13-14 more corpses. It is 0.516 ms at the normal size and 0.477 ms at the small size, inside the 300-frame range at each size (0.505-0.557 and 0.492-0.503). The W1-61 acceptance stress runs (1,800 frames, dev, VSync off, `target/perf/w1-61/acceptance-dev-novsync` and `head-acc-dev-novsync`) agree, at 0.480-0.510 ms. The report gives only a mean for each window, not a per-frame series, so this compares windows of different lengths that start at the same frame.
+
+**`settled_corpses_drawn` in stress.** Every corpse is drawn: about 1,500-1,508 on average, up to 1,513, from the cached settled mesh. The sampled collapsing set is at most 3 per frame. The difference between corpses and drawn corpses is the collapsing bodies (0.3-0.8 on average).
+
+For context, the last stress runs before W1-48 and W1-49 (`target/perf/w1-37/dev-novsync`, dev, VSync off, about 1,514 corpses) painted the battlefield in 1.22-1.33 ms. Both commits landed between those runs and these, so the drop is not W1-49's alone.
+
+## Save format 7 docs and the pins at the wave-7 build — 14 November 2026 (W7-10)
+
+SIMULATION.md now describes save format 7 as built: "Save format 7" (the v1→v2 to v6→v7 chain, the seven fixtures, the freeze rule and the separate settings version), "Determinism pins" (every pin constant of `tests/determinism.rs` and `tests/save_migration.rs`, its test, what it hashes and who may move it, the provisional-pin protocol and the re-bless history) and "Keyed rolls and RNG streams" (the two saved streams, the six `hash::tags` purposes and the presentation RNG guard). ARCHITECTURE.md's `settings.rs` row and "Persistence" state `SETTINGS_VERSION` 2 and the freeze rule. This closes plan finding SD20 for the docs W7-10 owns.
+
+The gate is `repo_checks::save_docs_name_the_v7_format_every_migration_step_pin_and_tag`. It reads the facts from the code, not from a list: every `fn v<a>_to_v<b>` step in `sim/migrations.rs` (and that the chain ends at `SAVE_VERSION`), every `save_v*.json` under `tests/fixtures/`, every top-level pin constant of the two test files (a name ending in `GOLDEN`, `TRACE`, `CONTINUATION`, `_FNV`, `FIXTURE_CHECKSUM` or `FIXTURE_BYTES`) and every tag in `hash.rs`'s `mod tags`. SIMULATION.md must say "the envelope is currently v7" and name each fact in its section; ARCHITECTURE.md must state the envelope, `RULESET_VERSION` and `SETTINGS_VERSION` values the code defines. A later migration step, fixture, pin, tag or version bump therefore fails it until the docs follow. `save_doc_check_reads_steps_pins_and_tags_and_reports_each_gap` exercises the readers and each kind of gap on planted text.
+
+**Pins at this commit (source state, not a run).** No commit after W4-09 (`fa616e99`) changes `tests/determinism.rs`, `tests/save_migration.rs` or `tests/fixtures/`: the waves 5-7 builds set no provisional pin, `PROVISIONAL` and `PROGRESSED_PROVISIONAL` are None and both cause lists are empty. Whether the pins still hold at the release candidate is the final zero-move record (W5-12, A6-19 and W7-10's record: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6, the V1-V6 continuations, `V7_CONTINUATION_FNV` and the `save_v7.json` identity unchanged). Under ruling R36 that run belongs to the closing phase and is recorded there (see "Zero-move records and the pins at the release candidate" below).
+
+Amended 14 November 2026 (W4-14, R59): the Npc combat balance pass landed after W4-09 and moves Npc runs on purpose, so the pins above are no longer all at their tables. `PROVISIONAL` holds the three Npc `GOLDEN` and `GAMEPLAY_TRACE` digests and `PROGRESSED_PROVISIONAL` the two recruit-takeover runs, each with the cause rows "W4-14 aim" and "W4-14 arrival" (class G); the takeovers start `PROGRESSED_TAKEOVER_BOSS_LEAD` (3000) ticks before the boss. The v7 continuation moved with the aim fix (the fixture's root defense is Mara's) and is held in `V7_CONTINUATION_PROVISIONAL` with `V7_CONTINUATION_CAUSES`, the same ledger shape. The V1-V6 continuations, `V6_DROP_TRACE_FNV`, the `save_v7.json` identity and the frozen-catalogue pin do not move: pre-v7 attempts keep the old aim test and their frozen snapshots. The closing phase folds the provisional pins (plan §9.6, "W4-14 Npc combat balance").
+
+## Zero-move records and the pins at the release candidate — 17 November 2026 (W5-12, A6-19, W7-10)
+
+The save-determinism rows W5-12, A6-19 and W7-10 record whether waves 5, 6 and 7 moved a pin. The record comes from git history (`a9fc30a..HEAD`) and from the pin tests at HEAD. Under ruling R36 it is written once, in the closing phase.
+
+**What moved after the wave-2 close.** `git log -G` over the pin lines of `tests/determinism.rs` and `tests/save_migration.rs` from a9fc30a to HEAD finds five commits:
+- W4-09 (fa616e99) cut `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` and `V7_CONTINUATION_FNV`.
+- W4-14 aim (fbedee29) and W4-14 arrival (93321b8a) set `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL`.
+- W4-15 price (63283a9b) set `PROGRESSED_PROVISIONAL`.
+- The closing re-bless (8787675c) folded all of them ("Closing re-bless and ruleset 5" above).
+
+No wave-5, wave-6 or wave-7 commit is among them, and `tests/fixtures/` is unchanged since a9fc30a. No pin value has changed since the closing re-bless. The later commits to `tests/determinism.rs` rewrite only its doc rows.
+
+**W5-12, wave 5: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6.** Wave 5 is W5-01..W5-11 (0512735a..b60ef556) and the integration fixes after it (9ea8a5a1, 35e4b964, f461c72d). None of these commits touches a file under `crates/horde_core`. The `horde_core` tree object is the same, 055c8219, at 5098a066 and at f461c72d. 5098a066 is W3-28, the last commit before W7-01, W7-02 and the wave-6 and wave-5 picks; f461c72d is the last wave-5 integration commit. Presentation reaches no core state: `shot_fx_never_mutates_attempt` (ISO-8) and `sky_flash_never_reads_core_rng` pin that.
+
+W4-08 (4498e26c) has every wave-5 commit as an ancestor. It ran the full verify green (1,826 passed) with `GOLDEN` and `GAMEPLAY_TRACE` at their W2-49 values and `PROVISIONAL` None: 0/6 and 0/6. W4-09 cut the progressed pair on a tree that already held wave 5, so wave 5 is inside their baseline. With no core change, wave 5 cannot move them, and the run at HEAD below confirms 0/4. The V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity did not move.
+
+**A6-19, wave 6: `GOLDEN` 0/6, `GAMEPLAY_TRACE` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4.** Wave 6 is A6-00..A6-18 (acc1c8e4..aef2c788) and the integration fixes 40361897 and b258ce29. A6-00..A6-18 and 40361897 lie in the same 5098a066..f461c72d range, where the `horde_core` tree does not change. b258ce29 (the cue log names cues through `horde_audio::cue_log::cue_name`) comes after wave 4's W4-l and before W4-12, and touches only `horde_game` and `horde_audio`.
+
+`crates/horde_audio` is a new path crate that depends on `horde_core`, not the reverse. The Cargo.lock diff adds only the `horde_audio` package and one `horde_audio` entry in `horde-defense`'s dependencies, so `horde_core`'s own dependency set does not change. Audio reads `SimEvent`s and never draws the core RNG (`horde_audio_never_reads_core_rng`). `SETTINGS_VERSION` 2 (A6-16) belongs to the settings file, which never enters the state digest.
+
+The W4-08 run above also has every wave-6 commit as an ancestor: 0/6 and 0/6 on the W2-49 pins. The progressed pair and the v7 continuation were cut at W4-09 on a tree that already held wave 6. No pin moved, and the V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity did not move.
+
+**W7-10, wave 7: no pin moved.** Wave 7 covers W7-01..W7-11 and W7-09's records. Only two of its commits touch `crates/horde_core`:
+- W7-05 (39225d69): the `charges_at_rank` doc comment in `content.rs`, a test in `tests/progression_tree.rs` and one in `examples/pacing.rs`.
+- W7-06 (c61efe1a): tests in `tests/defenders.rs`.
+
+Neither changes a rule or a pin. W7-11's two capture fixes (c3eb0aa8, d53cfe0f) are `horde_game` presentation. No W7 commit sets or changes a pin.
+
+**The pins at the release candidate (HEAD 387e7f7b, 17 November 2026; the record commits after it are docs only and leave the `horde_core` tree at ddbb4f51).**
+- `cargo test --locked -p horde_core --test determinism -- --include-ignored --nocapture --test-threads 1`: 13 passed, `determinism_anatomy` included (`target/zero-move/determinism.out`). Its 44 printed hash lines (golden, trace, keys, items, core and outcome for the six runs and the four progressed runs, and their digest and summary lines) equal the closing re-bless's after-run (`target/closing-rebless/determinism_before.out`) line for line. So the closing-phase core commits after the re-bless moved no hash either: the 20,000-item save clone (764dc4f3, 11778f21), the briefing and hover text fixes (cb825361, 54b27970, 9994bafb) and the bot's expedition-rank recruit rating (8d569d23).
+- `cargo test --locked -p horde_core --test save_migration --test save_snapshot --test schema_v7 --test balance_extras`: 11, 48, 5 and 7 passed (`target/zero-move/pins.out`). They include every continuation, drop-trace, stash, quality-roll, frozen-catalogue and `save_v7.json` pin.
+- `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None, and their cause lists are empty.
+
+Final digest table at HEAD (`SAVE_VERSION` 7, `RULESET_VERSION` and `TRACE_RULESET` 5, `SETTINGS_VERSION` 2):
+
+| Run (1800 ticks) | `GOLDEN` | `GAMEPLAY_TRACE` | Last moved |
+|---|---|---|---|
+| 0x1 Personal | 0xbed5e2714b6590fe | 0xa6caa6de7fd92b1a | golden W2-49; trace since the v4 build (c6f518d) |
+| 0x1 Npc | 0x61341ecf1c422fd8 | 0x77cec20196014f8d | closing re-bless (W4-14) |
+| 0x1a571167 Personal | 0x3368f18097f7fb5e | 0x5cc8bde4faf09763 | golden W2-49; trace W1-69 |
+| 0x1a571167 Npc | 0x0118059a899fb437 | 0x1fb8dfb5f91248c7 | closing re-bless (W4-14) |
+| 0xdeadbeef2026 Personal | 0x7be5c84d229d8d71 | 0x46a2adc6720f8678 | golden W2-49; trace since the v4 build (c6f518d) |
+| 0xdeadbeef2026 Npc | 0x7a662cd4a007adc2 | 0x6fedc1ce190ab8e3 | closing re-bless (W4-14) |
+
+| Run (rank 12, 3600 ticks) | `PROGRESSED_GOLDEN` | `PROGRESSED_TRACE` | Last moved |
+|---|---|---|---|
+| 0x1 HardCapstone | 0xab7276a741312f38 | 0x7aef2a4298a6356a | closing re-bless (W4-15 price) |
+| 0x1 RecruitTakeover | 0x6ffd2abd5ec559b7 | 0x89869eb54e0b06ea | closing re-bless (W4-14, W4-15 price) |
+| 0xdeadbeef2026 HardCapstone | 0x52782b9ffeef7166 | 0xf483cce12e822eaa | closing re-bless (W4-15 price) |
+| 0xdeadbeef2026 RecruitTakeover | 0xa040f93de56591c4 | 0x9e1e5d57ab945f10 | closing re-bless (W4-14, W4-15 price) |
+
+| Save pin | Value | Last moved |
+|---|---|---|
+| `V1_CONTINUATION_FNV` | 0xcceb2db851a07913 | never (recorded on the v2 build) |
+| `V2_CONTINUATION` | six recorded lines (t46 to t942) | never |
+| `V3_CONTINUATION_FNV` | 0x83c6c66877caad9f | never |
+| `V4_CONTINUATION_FNV` | 0x6e4451024b8bcc56 | never |
+| `V5_CONTINUATION_FNV` | 0xbc2af76c324f6287 | never |
+| `V6_CONTINUATION_FNV` | 0x90a013c2877b6b59 | never |
+| `V6_DROP_TRACE_FNV` | 0x2016774bb9f63c67 | never |
+| `V6_STASH_TABLE_FNV` | 0x78686fdb47d02c09 | never |
+| `QUALITY_ROLL_TABLE_FNV` | 0x1f6bc2826f97e583 | never |
+| `FROZEN_CATALOGUE_FNV` | 0x58a8acb754431bad | never (cut at W2-53) |
+| `V6_PAYLOAD_FNV` (`tests/save_snapshot.rs`) | 11732925792674115074 | never |
+| `V7_FIXTURE_CHECKSUM`, `V7_FIXTURE_BYTES` | 8527615155064533385, 95,266 bytes | never (the W1-63 freeze) |
+| `V7_CONTINUATION_FNV` | 0x4998700c0fb61012 | closing re-bless (W4-14 aim; cut at W4-09) |
+
+Across the whole pass after the wave-2 close, the closing re-bless (8787675c) is the only re-bless that moved a pin. It folded W4-14 and W4-15, and no other move happened in waves 5, 6 or 7.
+
+## Closing playtest package at the final HEAD — 17 November 2026 (closing)
+
+This is the current hand-off package. It replaces the 61bced1a package below, which predates the closing commits 400c8efb, b33f03fe, 27d763cb, a0278a08 and ef778e28 (A6-18). Built and verified at HEAD `99d013af` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1` (no `-AllowDirty`; about 145 s with the build) wrote `target/playtest/Lastlight-playtest-v0.1.0-99d013a-20261117-082902.zip`, **52,442,433 bytes**, SHA-256 `94be8f76fde28db8f4813f7a75747ec58b9f8a6a6922433ac3680c50bedce997`, and its unpacked folder: 330 files, 116,311,616 bytes (`Lastlight.exe` 83,170,816 bytes). The manifest is version 2: stamp `v0.1.0 (99d013a)`, commit `99d013afa406c66e9e90fb8b4674bf4853d88606`, `dirty` false, branch `claude/horde-production-pass`, profile `playtest`, no features, curated docs `PLAYTEST_GUIDE.md`, 329 file records.
+
+- **Zip contents.** 330 entries, all with forward slashes. `docs/` holds only `PLAYTEST_GUIDE.md` (37,376 B). No entry is under `archive/` or `docs/audio/`. Top level as before: `Lastlight.exe`, `LICENSE`, `READ ME.txt`, `manifest.json`, the four launchers, `assets/` (313 files; `assets/audio/` 283 files, 20,572,357 B, of which 20,424,084 B are WAVs), `content/` (8 catalogues) and `docs/`.
+- **verify_playtest.** `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_playtest.ps1 -Package <zip>` printed `PASS: 329 manifest hashes; v0.1.0 (99d013a); copied executable smoke; native capture=False` and exited 0 (`target/playtest-verification/e55154be25404c80b0d8486e255a7211/`).
+- **Version stamp.** The packed `Lastlight.exe --version`, run through Start-Process with redirected streams, printed `Lastlight: Horde Defense v0.1.0 (99d013a)` (HEAD's short hash) and exited 0 in 1.71 s.
+- **Packaged smoke time.** The packed `Lastlight.exe --smoke` was run from the package folder through Start-Process, with streams redirected and the launcher's catalogue variables set (stderr names each `content/*.json`). All three runs exited 0 with a first line beginning `PASS: 242 country profiles; 5 encounters; ...`, in 1.50, 1.50 and 1.72 s of wall time. An earlier set of three runs without those variables (the catalogues fell back to the bundled defaults) also passed, in 1.65, 1.73 and 1.70 s.
+- **Not re-run here.** The review package with `-NativeCapture` and the dirty-tree refusal were not repeated; their record at 61bced1a stands below.
+
+## Closing playtest package — 16 November 2026 (W7-02, closing)
+
+Superseded as the current package by "Closing playtest package at the final HEAD" above. Built and verified at HEAD `61bced1a` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1` (184 s with the build) wrote `target/playtest/Lastlight-playtest-v0.1.0-61bced1-20261116-175626.zip`, **52,427,602 bytes**, SHA-256 `ef09c5e3bd121bee4217cb46566cb02eadd2293beb7818627c8747fdc9eb9b33`, and its unpacked folder: 330 files, 116,258,368 bytes (`Lastlight.exe` 83,117,568 bytes). The manifest is version 2: stamp `v0.1.0 (61bced1)`, `dirty` false, branch `claude/horde-production-pass`, profile `playtest`, no features, 329 file records.
+
+- **Zip contents.** The name follows `Lastlight-playtest-v<ver>-<sha7>-<utc>.zip`. All 330 entries use forward slashes. `docs/` holds only `PLAYTEST_GUIDE.md` (37,376 B, under the 65,536 B limit). No entry is under `archive/` or `docs/audio/`. Top level: `Lastlight.exe`, `LICENSE`, `READ ME.txt`, `manifest.json`, the four launchers, `assets/` (313 files), `content/` (8 catalogues) and `docs/`.
+- **Audio size.** The wave-6 library ships as `assets/audio/` with 283 files and 20,572,357 B, of which 20,424,084 B are WAVs. The whole zip is 52.4 MB, compared with 9.47 MB of WAVs before wave 6 (design-audio).
+- **Asset JSON.** `package_playtest.ps1` copies `assets/` whole, so these ship: the provenance records `assets/audio/PROVENANCE.json` (2,985 B) and `assets/audio/SURVIVAL_PROVENANCE.json` (145,288 B), which design-audio rules are shipped manifests; `assets/art/PROVENANCE.json` and `assets/art/pixel/PROVENANCE.json`; and the four pixel `*-source.json` part sources (41,334 B in all). This is intended. The source-only exclusion was superseded when the retired art moved to `archive/`, which is outside `assets/`. verify_playtest's manifest check, which fails any `archive/` or `docs/audio/` path, passes.
+- **verify_playtest.** `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_playtest.ps1 -Package <zip>` took 9.1 s, printed `PASS: 329 manifest hashes; v0.1.0 (61bced1); copied executable smoke; native capture=False` and exited 0 (`target/playtest-verification/9b35d41a141f4bfcb0a65bc27e8ca69d/`). The packed `--version` printed `Lastlight: Horde Defense v0.1.0 (61bced1)`. The first stdout line of the packed `--smoke` begins with `PASS: 242 country profiles; 5 encounters; ...`.
+- **Packaged smoke time (for W7-09).** The packed `Lastlight.exe --smoke` was run from the package folder through Start-Process, with streams redirected and the launcher's catalogue variables set. All three runs exited 0 with `^PASS: `, in 1.50, 1.51 and 1.47 s of wall time. `--version` took 1.5 s and exited 0.
+- **Non-review -NativeCapture.** Running `verify_playtest.ps1 -Package <that zip> -NativeCapture` failed in **1.07 s** (exit 1) with "This package has no review feature, so -NativeCapture cannot run (build it with package_playtest.ps1 -Review)". The manifest is now read before anything is unpacked (closing commit `61bced1a`; it took about 7 s before). The verification folder holds no `unpacked/` and no `logs/`.
+- **Review package.** `package_playtest.ps1 -Review` (155 s) wrote `target/playtest/Lastlight-playtest-v0.1.0-61bced1-20261116-180346.zip`, 52,709,990 bytes, SHA-256 `6682b3fd5b3ef444c36d5fd3d1655a2c3d525b5351f06f5eb79aeb447c2a5bf8`, with features `review`. `verify_playtest.ps1 -Package <it> -NativeCapture` took 15.2 s and printed `PASS: 329 manifest hashes; v0.1.0 (61bced1); copied executable smoke; native capture=True` (`target/playtest-verification/f49204de39024560adaa329f7259e549/`). This is the first real run of the capture-pass path. `portable-peak.png` is 2,880x1,800 (1440x900 at Windows scale 2) and shows the paused peak battle. Its sidecar records scene `peak`, screen Battle, 7 lanes and windows_scale 2.
+- **Log stamp.** The capture launch is the packaged run that builds an `App`, because `--smoke` returns before LogPlugin. It ran under the default log filter and wrote `saves/logs/lastlight-1794852398.log`, whose first line is `INFO horde_defense: Lastlight v0.1.0 (61bced1)`. The second line is the isolated review profile line.
+- **Dirty tree.** With an untracked probe file under `scripts/`, `package_playtest.ps1` refused in 2.1 s (exit 1) with "The working tree has uncommitted changes; commit them or pass -AllowDirty (the stamp then ends in +dirty)" and listed the file. With `-AllowDirty` (79 s) it wrote `Lastlight-playtest-v0.1.0-61bced1-20261116-180201.zip`: 52,427,031 bytes, SHA-256 `4b77fba571ef8cd2d28779ce5911a8c8808082772e2203ada8975dd87e62c716`, manifest stamp `v0.1.0 (61bced1+dirty)` with `dirty` true, and the same build line in `READ ME.txt`. The zip name carries no `+dirty`, as the design's name pattern specifies. The probe file was then removed.
+- **Dev build stamp.** `target/debug/horde-defense.exe --version`, built by `cargo build --locked -p horde-defense` without `LASTLIGHT_BUILD_COMMIT` and run through Start-Process with redirected streams, printed `Lastlight: Horde Defense v0.1.0 (dev build)` and exited 0 with empty stderr.
+
+## W7-09 final perf acceptance at the release candidate — 16 November 2026 (W7-09, closing)
+
+Attempt 1 of the W7-09 acceptance (closing phase, R36) at HEAD `30847f90` on the clean tree: the W1-61 / W2-47 matrix with `-Repeat 3`, the shipped-default stress pass for gate 3 (R26), W5-11's stress and fx-stress `-VsyncOff` gates, the R31 A/B and the shipped and packaged smoke times. Evidence: `target/perf/w7-09/` (not committed; `passes.log` and `cargo.log` list every invocation); the numbers are in `PERF_BUDGET.json acceptance.closing`. No gate, threshold, budget or code was changed.
+
+**Verdict: the acceptance is not met.** Four valid gated overs stand (R34): they are reported as closing findings, and nothing was re-measured away.
+
+**Conditions.**
+- dev exe `89d61656…`, playtest exe `47efa4a9…`, shipped smoke exe `5a597fd2…`, all built by `measure_performance.ps1` from HEAD; A/B arms `0df08943…` (ab03da9) and `c976e731…` (HEAD). RTX 1000 Ada, Vulkan, mains (battery 100%, AC), power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35, 2026-11-16 18:58 to 23:10 UTC.
+- Before every pass, tasklist showed no horde-defense.exe, so the driver never waited on a foreign game. Every pass held the display on (R27; no Kernel-Power 506/507 event in a kept run) and waited for an R30 quiet window. Another session ran cargo release soak tests and workspace builds on this machine through the evening, so the first window took 2195 s and later ones up to 1087 s. Some runs were rejected for CPU load samples of 90-100% or for unfocused sample frames, and were retried once. A group still invalid after that retry was re-measured as a whole scene group (the W1-37 method, up to two rounds). No valid group was re-measured. Kept runs reached load maxima of 75-88% per pass.
+
+| Pass | Command | Exit | Invocations | Result |
+|---|---|---|---|---|
+| dev -VsyncOff | `-Scene all -Profile dev -VsyncOff -Repeat 3` | **1** | `acc-dev-novsync` 1 | VALID OVER fx-stress normal cpu_frame p99 10.2157 > 10.0; VALID OVER peak normal egui texture uploads 1 > 0 |
+| playtest -VsyncOff | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 (after re-measures) | `acc-playtest-novsync` 2 (VALID OVER peak normal uploads 1 > 0; progressed-peak small and stress small invalid), `-b-progressed-peak` 0, `-b-stress` 0 | not clean: the upload over stands |
+| dev VSync on | `-Scene all -Profile dev -Repeat 3` | 0 (after re-measures) | `acc-dev-vsync` 2 (VALID OVER progressed-peak interface_draw 1.1395 > 1.129 and 1.1421 > 1.030; stress small and fx-stress small invalid), `-b-stress` 2 (invalid again), `-b-fx-stress` 0, `-c-stress` 0 | not clean: G1.10 over stands |
+| playtest VSync on (shipped default) | `-Scene all -Profile playtest -Pipelined on -Repeat 3` | 0 (after re-measure) | `acc-playtest-vsync` 2 (fx-stress small invalid), `-b-fx-stress` 0 | clean |
+| R31 A/B | `ab_interface_total.ps1 -Pairs 5` | 0 | `ab-interface-total` 2 (A pair 2 small, pair 3 normal at 97-100% load), `ab-interface-total-b` 0 (`-NoBuild`, the same two exes) | B / A 1.0376 (normal), 1.0263 (small) ≤ 1.05 |
+
+Kept cells (median of 3; normal / small):
+
+| Metric | Scene | dev | playtest | Gate | W2-47 (dev / playtest) |
+|---|---|---|---|---|---|
+| cpu_frame p99 (ms, -VsyncOff) | progressed-peak | 9.22 / 8.56 | 6.73 / 8.18 | ≤ 10.0 | 7.16 / 7.21, 6.80 / 6.98 |
+| | stress | 9.80 / 9.44 | 8.78 / 8.25 | ≤ 10.0 | 8.46 / 9.65, 7.68 / 7.17 |
+| | fx-stress | **10.22** / 9.10 | 8.97 / 8.95 | ≤ 10.0 | first measurement |
+| interface_draw mean (ms, dev, VSync on) | progressed-peak | **1.1395 / 1.1421** | | ≤ 1.129 / 1.030 | 1.026 / 0.992 |
+| | peak | 0.876 / 0.876 | | ≤ 1.1904 / 1.0752 | 0.816 / 0.783 |
+| | stress | 1.471 / 1.469 | | not gated | 1.183 / 1.203 |
+| | fx-stress | 1.592 / 1.629 | | not gated (R65: the 1.13 / 1.03 design target is for 225 enemies; fx-stress at 400 is a measured stress scene) | first measurement |
+| interface_total mean (ms, dev, VSync on) | progressed-peak | 2.113 / 2.025 | | R31 A/B | 1.966 / 1.799 |
+| egui texture uploads after warmup (worst, -VsyncOff) | peak normal | **1** (6,420 B, 1 frame, every repeat) | **1** (same) | 0 | 0 (also 0 at the wave-2 close, 41ce143) |
+
+- **fx-stress cpu_frame p99 (dev -VsyncOff, normal).** All three repeats are over the gate: 10.15, 10.22 and 10.33 ms, at load maxima of 72, 42 and 9%. The third repeat ran on a near-idle machine, so load does not explain the over. fx-stress small is 9.10 ms. Playtest fx-stress passes at 8.97 / 8.95 ms. This is the first measurement of the W5-11 fx-stress gate (G7.5, W5-11 Done "stress and fx-stress exit 0 with -VsyncOff"). It fails in dev.
+- **Peak egui texture upload (dev and playtest -VsyncOff, normal only).** Every peak normal repeat uploads one 6,420 B texture delta on one sampled frame. Size small, every VSync-on pass and every other scene upload none. With VSync off, the 180 warmup frames end after about 0.8 s at 215-290 FPS, so something first painted between about 0.8 s and 3 s into the peak fixture still adds glyphs to the font atlas there. At the wave-2 close (41ce143, `target/perf/w2-close/acc-dev-novsync`, `w2-close-c`) the same pass uploaded 0, so the upload came in with waves 3-7. The frame report does not name the texture or the frame (none of the 20 longest frames carry upload bytes). This is not attributed.
+- **progressed-peak interface_draw (G1.10).** dev VSync on reads 1.1395 / 1.1421 ms against 1.129 / 1.030 ms (W2-47: 1.026 / 0.992). In the A/B sitting the same two exes measured interface_draw (work_mean_ms[2]) at a median of 1.044 / 1.031 ms for A (ab03da9) and 1.136 / 1.112 ms for B (HEAD). So HEAD costs about 8-9% more than the wave-1 exe in one sitting, and the machine read A about 4-5% higher than at the wave-1 close (0.998 / 0.989). The small gate (1.030) is marginal even for A today.
+- **CPU headroom.** Against W2-47 (bd12d1c), dev -VsyncOff cpu_frame p99 rose 2.8 ms at peak (6.60 to 9.42), 2.1 / 1.4 ms at progressed-peak and 1.3 ms at stress normal. main_cpu mean rose 2.66 to 3.71 ms at peak normal and render-world mean 2.46 to 3.28 ms, at the same battlefield vertex count (25,580 to 25,944). Dev stress normal is now 0.20 ms under its gate, and progressed-peak 0.78 ms. In the A/B sitting cpu_frame p99 (VSync on) was about 8% higher for B than A. Part of the rise is the machine and part is the code; this acceptance does not split them further.
+- **Frames over 50 ms.** 0 outside driver stalls in every kept repeat of every pass, and 0 driver stalls. One VSync-on stress small run (`acc-dev-vsync`, r3) had one frame over 50 ms, but it was rejected (CPU load 100%) and its group re-measured; `acc-dev-vsync-c-stress` has 0.
+- **Gate 3 in the shipped default configuration (R26).** `acc-playtest-vsync` stress (playtest, pipelined on, VSync on): 60.00 FPS at both sizes, p99 interval 17.63 / 19.95 ms, 0 frames over 33 ms and 0 over 50 ms in every repeat, 0 driver stalls. Every other scene in that pass also ran at 59.99-60.01 FPS with 0 frames over 33 ms. Gate 3 holds at HEAD.
+- **Live battlefield egui gates.** Primitives at most 18 / 19 / 22 / 22 (peak / progressed-peak / stress / fx-stress) of 23. Vertices: progressed-peak at most 38,707 of 40,000 (1,293 of headroom), stress 55,055 of 61,098 (VSync on; 52,285 with VSync off). fx-stress has no vertex gate. It reaches 60,311 with VSync on (54,482 off), 787 under the stress gate. No battlefield gate failed. The fx-stress fixture draws 400 enemies with the rig sheet, live bursts, light pools, decals, sparks and loot fly-ups, so these are the W5-11 fx caps under load.
+- **Headless egui evidence.** `measure_battlefield_egui_load -- --ignored` at HEAD (190.95 s) reproduces `evidence.egui_measured` exactly: 18 primitives in every scene; normal arena vertices peak 32,968, progressed-peak 38,839, stress 57,330, stress-5000-corpses 60,811 (287 under 61,098), at the same maximum ticks. `live_battlefield_runs_stay_within_the_egui_gates` passes. The record stands for HEAD (`egui_measured.w7_09_remeasure`).
+- **R31 A/B.** `ab-interface-total-b` (23:02-23:10 UTC, every run valid): A median 2.0248 / 1.9396 ms, B 2.1010 / 1.9907 ms, B / A 1.0376 / 1.0263 against 1.05. It passes. B's interface_total is 3-4% above the wave-1 exe in one sitting (W2-47: 4% below).
+- **Shipped and packaged smoke.** Shipped `--smoke` (playtest `--no-default-features`, `acc-playtest-novsync/shipped`): 2.296, 1.056 and 0.968 s, median 1.056 s. The first, cold run is the slow one, as before. The packaged `Lastlight.exe --smoke` from the Package phase (61bced1a; see "Closing playtest package" above) took 1.50, 1.51 and 1.47 s.
+- **Loudness (offline_mix, `--include-ignored --nocapture`, 2026-11-16 18:26-18:27 UTC, 14 passed).** `reference_mixed_60s` stage-1 -24.1 LUFS (TP 0.405), rain -22.9 (TP 0.399), `dense_battle_60s` -23.0 (TP 0.885), `max_sliders_60s` -20.3 (TP 0.632, logged). This is identical to the closing record in plan §9.3, so no calibration moves.
+- **Integrated GPU.** Not measured; it stays pending (`PERF_BUDGET.json hardware.integrated_gpu`).
+- **Not measured by these passes.** The perf scenes do not show the BossNotice banner after warmup (the arrival banner lasts 1.5 s and the warmup is 3 s with VSync on), the low-HP band or an open Auto-sell panel. Nor does the frame report have spans for struck_props, the EnemyVoiceIndex sync or W3-24's due check: their cost is inside main_cpu and interface_draw above. A 60 s cue-log loudness check (A6-18) was not run. The capture cue logs are silent (`target/production-after/closing/final/motion/*.logs/cues.jsonl`: 185 frames, no starts, ambience 0, because review scenes are muted). The only unmuted perf path is the `npc-stutter` fixture with `LASTLIGHT_PERF_AUDIO` and a copied save. The closing phase then let `LASTLIGHT_PERF_AUDIO` keep any perf-run scene audible (`a_perf_audio_review_keeps_the_battle_audible`, ef778e28) and ran the check on a 3600-frame `npc` motion run at 27d763c with that change in the working tree: the replay reads 61.3 s, 128 starts, -23.6 LUFS integrated, true peak 0.586, +0.5 LU from the `reference_mixed_60s` stage-1 render (`target/production-after/closing/cue-log/npc-60s`, recipe in AUDIO_SURVIVAL.md). The live-flash luminance gate and the reduced MOTION gate are W7-11's (plan §10, closing capture review): storm max frame delta 0.084 < 0.2 passes, and the fx-stress reduced MOTION gate is CF-3-22.
+
+## Closing perf follow-up: fx-stress over and CPU headroom — 17 November 2026 (closing)
+
+The W7-09 attempt above stands as recorded (R34). This is new evidence at a later HEAD, not a re-measure of it. Evidence: `target/perf/closing-scripts-perf/` (not committed). Exploratory A/B runs (`ab_run.ps1` there: one exe after another, normal size, VSync off, 1800 frames, no quiet-window wait) locate costs and are not acceptance evidence. The `measure_performance.ps1` passes are.
+
+- **The W7-09 over was mostly the machine.** At HEAD `27d763cb` (after the closing posed-mesh and appearance caches), `-Scene fx-stress -Profile dev -VsyncOff -Repeat 3` on a quiet machine (mean load 5%) exited 0: cpu_frame p99 median 7.99 / 7.71 ms, main_cpu mean 3.44 ms, render world 2.55 ms (`base-dev-novsync-fx`). In one A/B sitting, an exe built from the release candidate's sources (`30847f90`) read fx-stress p99 8.15 ms against 8.14 ms for HEAD (3 rounds each, `ab-rc-head-fx`). So the caches cost about 0.2 ms less in ui::draw (1.37 to 1.17 ms) and leave p99 within noise. The W7-09 render world (3.17 ms) and the main-world schedules outside the egui pass read about 0.6 ms higher than on the quiet machine, with no render code changed. That evening's load (other sessions' release soak tests) is the likely cause. It is not split further.
+- **Where main_cpu goes (dev, fx-stress normal).** A local per-schedule probe (marker schedules between the main schedules, not committed) read First 0.07, PreUpdate 0.33, StateTransition 0.21, RunFixedMainLoop 0.15 (the simulation and its audio sync), Update 0.15, SpawnScene 0.03, PostUpdate 2.66 (egui pass 1.38, tessellation 0.79, the rest 0.49) and Last 0.15 ms. A headless draw of the fx-stress fixture (test profile, horde_game at opt-level 1, stand-in texture ids) split ui::draw into the battle frame build 0.27 (field view 0.14, scene sample 0.09), battlefield 0.56 (cue pass 0.18, survivor rig 0.14, blood decals 0.07, hostile bodies 0.065), damage popups 0.10, corner HUD 0.06 and the bar 0.04 ms. The audio sync (EnemyVoiceIndex twice per tick, tick_sounds) sits inside the simulation work, 0.08 ms a frame in all. W3-24's due check is under 0.01 ms, and W3-31's wall-hit placement is part of the 0.10 ms damage pass. Render world is Bevy and bevy_egui work. In both profiles it reads 2.3-2.6 ms on a quiet machine whatever the vertex count.
+- **Fix: the frame schedules run single-threaded** (`a0278a08`, `render_plan::SingleThreadedFramePlugin`, `frame_schedules_run_every_system_on_the_app_thread`). The multi-threaded executor's per-system task hand-off cost more than its parallelism won on these small, mostly ordered systems. In an interleaved A/B, fx-stress main_cpu fell from 3.69 to 3.00 ms and p99 from 8.66 to 7.07 ms. Peak main_cpu fell from 2.66 to 2.00 ms. StateTransition went from 0.21 to 0.05 ms and PreUpdate from 0.33 to 0.13 ms. ui::draw and the render world did not change. Also running the egui pass schedule single-threaded gained nothing, so it keeps its executor.
+- **dev -VsyncOff at `a0278a08`** (`-Scene all -Profile dev -VsyncOff -Repeat 3`, `acc2-dev-novsync`, exit 0, every run valid on the first attempt, quiet window mean load 16%). cpu_frame p99 medians (normal / small): progressed-peak 5.79 / 5.75, stress 6.57 / 6.39 and fx-stress 7.15 / 6.82 ms, against 10.0. At W2-47 these were progressed-peak 7.16 / 7.21 and stress 8.46 / 9.65 ms. main_cpu mean: peak 1.75, progressed-peak 2.10, stress 2.63 and fx-stress 2.81 ms. 0 frames over 50 ms, and 0 egui texture uploads after warmup in every scene, peak normal included (`b33f03fe`). Battlefield vertices: progressed-peak 38,021 of 40,000 and stress 52,285 of 61,098.
+- **playtest -VsyncOff at `a0278a08`** (`acc2-playtest-novsync`, exit 0, quiet window mean 11%). progressed-peak 5.06 / 5.06, stress 6.08 / 5.40 and fx-stress 6.03 / 5.50 ms. Peak uploads 0.
+- **Not re-run here.** The dev VSync-on interface pass (G1.10), the R31 A/B, the shipped-default VSync-on pass (gate 3) and the smoke times. The tree carried another session's uncommitted A6-18 edits (the `LASTLIGHT_PERF_AUDIO` help text and `keeps_audio`, inert without that variable). The perf runs above never set it.
+
+## W7-09 final perf acceptance, attempt 2 — 17 November 2026 (W7-09, closing)
+
+Attempt 2 of the W7-09 acceptance at HEAD `e54faa88`, after the closing perf fixes (`400c8efb` and `27d763cb` posed-mesh and appearance caches, `b33f03fe` cue-label glyph warm-up, `a0278a08` single-threaded frame schedules). It ran the same matrix as attempt 1: the W1-61 / W2-47 passes with `-Repeat 3`, the shipped-default stress pass for gate 3 (R26), W5-11's stress and fx-stress `-VsyncOff` gates, the R31 A/B, the shipped smoke, `measure_battlefield_egui_load --ignored` and the offline loudness tests. Evidence: `target/perf/w7-09-a2/` (not committed; `passes.log` and `cargo.log` list every invocation, `tools/` holds the driver). Attempt 1's overs stand as recorded for `30847f90` (R34). This is a new measurement at a later HEAD, not a re-measure of them. No gate, threshold, budget or code was changed.
+
+**Verdict: the acceptance is met at `e54faa88`.** All four `measure_performance.ps1` passes exit 0 on their first invocation with every group valid, no pass prints a VALID OVER, and the R31 A/B passes.
+
+**Conditions.**
+- dev exe `483ba953…`, playtest exe `0167474a…`, shipped smoke exe `a5e047d0…`, built by `measure_performance.ps1`; A/B arms `b196cbef…` (ab03da9) and `6f6a0d94…` (HEAD). RTX 1000 Ada, Vulkan, mains, power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35. Passes 2026-11-17 03:18 to 06:24 UTC, cargo steps 06:31 to 06:51 UTC.
+- The tree carried another session's uncommitted A6-18 edits (7 files: the `LASTLIGHT_PERF_AUDIO` help text, `fixtures::keeps_audio` and its test, and doc lines). They are inert without `LASTLIGHT_PERF_AUDIO`, which no run set. The A/B records B as dirty for that reason.
+- Before every pass, tasklist showed no horde-defense.exe. Every pass held the display on (R27) and waited for an R30 quiet window (86-245 s, mean load 9-16%). No foreign build ran. The user was at the machine (input idle under a minute after the driver's 30-minute courtesy wait), and every sample frame was focused. Retried runs: dev -VsyncOff stress small r2 (a Kernel-Power 507 during attempt 1), and five runs with one or two unreadable CPU load samples (dev VSync on peak normal r2; playtest VSync on peak small r3, stress small r1, fx-stress normal r3). Each was valid on its retry. Load maxima of kept runs were 54% (dev -VsyncOff), 70% (playtest -VsyncOff), 80% (dev VSync on) and 76% (playtest VSync on).
+
+| Pass | Command | Exit | Result |
+|---|---|---|---|
+| dev -VsyncOff | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | `acc-dev-novsync`, every cell passes |
+| playtest -VsyncOff | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | `acc-playtest-novsync`, every cell passes |
+| dev VSync on | `-Scene all -Profile dev -Repeat 3` | 0 | `acc-dev-vsync`, G1.10 and the peak interface gate pass |
+| playtest VSync on (shipped default) | `-Scene all -Profile playtest -Pipelined on -Repeat 3` | 0 | `acc-playtest-vsync`, gate 3 holds |
+| R31 A/B | `ab_interface_total.ps1 -Pairs 5` | 0 | `ab-interface-total`, all 20 runs valid, B / A 0.913 (normal), 0.912 (small) |
+
+Kept cells (median of 3; normal / small):
+
+| Metric | Scene | dev | playtest | Gate | Attempt 1 (dev / playtest) |
+|---|---|---|---|---|---|
+| cpu_frame p99 (ms, -VsyncOff) | progressed-peak | 5.52 / 6.36 | 5.38 / 4.78 | ≤ 10.0 | 9.22 / 8.56, 6.73 / 8.18 |
+| | stress | 6.32 / 6.70 | 6.41 / 6.19 | ≤ 10.0 | 9.80 / 9.44, 8.78 / 8.25 |
+| | fx-stress | 6.66 / 6.79 | 5.87 / 5.92 | ≤ 10.0 | **10.22** / 9.10, 8.97 / 8.95 |
+| | peak | 4.80 / 4.58 | 4.53 / 4.16 | not gated | 9.42 (normal) |
+| interface_draw mean (ms, dev, VSync on) | progressed-peak | 0.932 / 0.903 | | ≤ 1.129 / 1.030 | **1.1395 / 1.1421** |
+| | peak | 0.714 / 0.712 | | ≤ 1.1904 / 1.0752 | 0.876 / 0.876 |
+| | stress | 1.276 / 1.266 | | not gated | 1.471 / 1.469 |
+| | fx-stress | 1.372 / 1.376 | | not gated (R65: the 1.13 / 1.03 design target is for 225 enemies; fx-stress at 400 is a measured stress scene) | 1.592 / 1.629 |
+| interface_total mean (ms, dev, VSync on) | progressed-peak | 1.750 / 1.657 | | R31 A/B | 2.113 / 2.025 |
+| | fx-stress | 2.285 / 2.228 | | not gated | 2.642 / 2.638 |
+| egui texture uploads after warmup (worst) | every scene | 0 | 0 | 0 | **1** at peak normal (-VsyncOff) |
+
+- **The attempt-1 overs.** fx-stress dev -VsyncOff normal p99 is 6.66 ms (repeats 7.72 / 6.63 / 6.66), 3.3 ms under the gate. Peak normal uploads nothing after warmup in either profile (`b33f03fe`). progressed-peak interface_draw is 0.932 / 0.903 ms, 17% / 12% under G1.10. In the A/B sitting interface_draw read a median of about 0.990 / 0.969 ms for A (ab03da9) and 0.914 / 0.907 ms for B, so HEAD is now about 7-8% under the wave-1 exe in one sitting. In attempt 1 it was 8-9% over.
+- **CPU headroom.** The tightest gated cell is dev fx-stress small at 6.79 ms, 3.2 ms under 10.0. This agrees with the closing follow-up at `a0278a08` (`acc2-dev-novsync`: 5.79 / 5.75, 6.57 / 6.39, 7.15 / 6.82 ms). W2-47's 0.35 ms margin at dev stress small is now 3.3 ms.
+- **Frames over 50 ms.** 0 in every kept repeat of every pass and 0 driver stalls. The R34 W2-47 dev -VsyncOff progressed-peak over (12.7565 ms) is answered by this new measurement: 5.52 / 6.36 ms.
+- **Gate 3 in the shipped default configuration (R26).** `acc-playtest-vsync` stress (playtest, pipelined on, VSync on): 60.00 FPS at both sizes, p99 interval 17.65 / 19.84 ms, 0 frames over 33 ms and 0 over 50 ms in every repeat. Every other scene ran at 59.99-60.00 FPS with 0 frames over 33 ms. Gate 3 holds.
+- **Live battlefield egui gates.** Primitives at most 18 / 19 / 21 / 21 with VSync on (peak / progressed-peak / stress / fx-stress) and 19 / 20 / 22 / 22 with VSync off, against 23. Vertices (VSync on, normal): progressed-peak 38,707 of 40,000 (1,293 of headroom; 38,021 with VSync off), stress 55,055 of 61,098 (52,285 off), fx-stress 60,311 (54,482 off), the same maxima as attempt 1. fx-stress has no vertex gate, and user decision R65 (2026-11-17) keeps it ungated; it is 787 under the stress gate. The fx-stress fixture draws 400 enemies with the rig sheet, live bursts, light pools, blood decals, sparks and loot fly-ups, so these are the W5-11 fx caps under load.
+- **Headless egui evidence.** `measure_battlefield_egui_load -- --ignored` (184.33 s, exit 0) reproduces `evidence.egui_measured` exactly for the third time: 18 primitives in every scene. Normal arena vertices: peak 32,968, progressed-peak 38,839 (1,161 of headroom), stress 57,330 and stress-5000-corpses 60,811 (287 under 61,098), at the same maximum ticks. `live_battlefield_runs_stay_within_the_egui_gates` passes. No gate moves (`egui_measured.w7_09_attempt_2`).
+- **R31 A/B.** `ab-interface-total` (06:11-06:24 UTC, every run valid in the first sitting): A median interface_total 1.8865 / 1.8168 ms, B 1.7221 / 1.6575 ms, B / A 0.9129 / 0.9124 against 1.05. Each A arm still exits 2 alone because the ab03da9 frame report predates the battlefield egui fields, as in attempt 1; the A/B reads only interface_total.
+- **Shipped and packaged smoke.** Shipped `--smoke` (playtest `--no-default-features`, `acc-playtest-novsync/shipped`): 2.131, 0.888 and 0.877 s, median 0.888 s. The first, cold run is the slow one. The packaged `Lastlight.exe --smoke` from the Package phase (61bced1a) took 1.50, 1.51 and 1.47 s. It was not re-packaged here.
+- **Loudness (offline_mix, `--include-ignored --nocapture`, 06:50 UTC, 14 passed).** `reference_mixed_60s` stage-1 -24.1 LUFS (S-max -21.5, M-max -19.1, TP 0.405), rain -22.9 (TP 0.399), `dense_battle_60s` -23.0 (TP 0.885), `max_sliders_60s` -20.3 (TP 0.632, logged). Identical to attempt 1 and to the closing record, so no calibration moves.
+- **Integrated GPU.** Not measured; it stays pending (`PERF_BUDGET.json hardware.integrated_gpu`).
+- **Still not covered by a gated span.** The perf scenes do not show the BossNotice banner after warmup, the low-HP band or an open Auto-sell panel, so those three interface costs stay unmeasured. The user was not asked about them, and the default stands (2026-11-17): no fixture is added, and the aggregate interface_draw and cpu_frame gates cover them. The closing follow-up's per-schedule profile above gives the struck_props pass (inside the 0.10 ms damage pass), the EnemyVoiceIndex sync with tick_sounds (0.08 ms a frame) and W3-24's due check (under 0.01 ms). The A6-18 60 s cue-log replay and the W7-11 live-flash luminance (storm max frame delta 0.084 < 0.2) are recorded above.
+
+## Full verify
+
+From `horde-defense/`, before every production-pass commit:
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked -p horde-defense --all-targets --no-default-features -- -D warnings
+cargo clippy --locked -p horde-defense --all-targets --features dev -- -D warnings
+cargo test --locked --workspace
+cargo test --locked -p horde-defense --no-default-features
+cargo test --locked -p horde-defense --features dev
+cargo run --locked -p horde-defense -- --smoke
+python -I -B scripts/check_views.py
+python -I -B scripts/tests/test_check_views.py
+python -I -B scripts/tests/test_measure_field_luminance.py
+python -I -B scripts/check_capture_findings.py docs/plans/2026-11-05-production-pass.md
+python -I -B scripts/tests/test_check_capture_findings.py
+python -I -B scripts/tests/test_compare_captures.py
+python -I -B scripts/generate_audio.py --check
+python -I -B scripts/generate_atmosphere_audio.py --check
+python -I -B scripts/generate_world.py --check
+python -I -B scripts/generate_world.py --self-test
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/run_script_tests.ps1
+```
+
+`check_views.py` prints `PASS: <n> Views`, `PASS: docs/VIEW_HIERARCHY.md lists all <n> Views under their parents, the <n> production-pass Views included`, `PASS: <n> modules to depth 2 each have an ARCHITECTURE.md ownership row` and `PASS: <n> relative doc links resolve, none into docs/audio/; the loudness gate is recorded in 3 docs` and exits 0; it exits 1 when the VIEW_HIERARCHY.md tree (W7-07) leaves out a View file, lists an id with no file or lists one twice, nests a View under another parent than its front matter names, when that page's "Current inventory: **<n> View files**" count differs from docs/components, or when a production-pass View (`PRODUCTION_VIEWS`) has no file; when a crate module or directory to depth 2 has no row in the ARCHITECTURE.md ownership table, a row names a missing module or file, a row's first cell backticks nothing or a `core`/`game` row names a path outside that crate, or a named guard test is not a Rust `#[test]` fn (a production fn of the same name does not count). Its doc-link check (W7-03) also exits 1 when a relative inline link in `docs/**/*.md` (outside code) names a file or folder that does not exist, when a doc links into `docs/audio/` (the v1 audition reel, kept in the source tree by ruling S19 and never packaged), when a doc the playtest package ships (`$CuratedDocs` in `package_playtest.ps1`) names `docs/audio/` at all, or when ACCEPTANCE.md, AUDIO_SURVIVAL.md or the production-pass plan does not record the "-23 ±2 LUFS integrated" / "true peak ≤ 0.95 FS" gate. `scripts/tests/test_check_views.py` exercises those rules on a throwaway workspace and exits 0 or 1. `run_script_tests.ps1` exercises `scripts/lib/Native.ps1`, `measure_performance.ps1`, `capture_review.ps1` (window-size and sidecar checks) and the `-Executable` resolution of `capture_review.ps1` and `capture_motion.ps1`, the motion flash gate (`Get-MotionFlashProblem`, W5-10), the per-session cue logs of `capture_review.ps1` and `capture_motion.ps1` (A6-18), and the playtest package scripts (`scripts/lib/Playtest.ps1`, `package_playtest.ps1 -NoBuild` and `verify_playtest.ps1`, W7-02) against a fake game executable, and `curate_capture_pairs.ps1` (W7-11) on generated stills, under Windows PowerShell 5.1; it prints PASS or FAIL and exits 0 or 1. Documented `scripts/` commands use the Windows PowerShell 5.1 that ships with Windows (`powershell`, not `pwsh`). The three PowerShell 7 scripts (`capture_player_models.ps1`, `trace_npc.ps1`, `verify_player_models.ps1`) say so where they are documented. `repo_checks::docs_invoke_scripts_with_windows_powershell` enforces both outside `docs/plans/`.
+
+`scripts/tests/test_measure_field_luminance.py` exercises `scripts/measure_field_luminance.py` (W5-09) on generated PNGs and exits 0 or 1. The script reads each still with the `<capture>.json` sidecar that `capture_review.ps1` writes beside it. A `capture_motion.ps1` export has no sidecar: its `manifest.json` records no `arena_rect`. The `motion` (reduced MOTION gate, G7.4) and `storm` commands therefore take `--sidecar <mode>/<scene>[-small].json`, the capture_review sidecar of the same scene, viewport and mode as the export, followed by the export's frame PNGs in order: the reduced small fx-stress export `motion/fx-stress-small-reduced/` pairs with `reduced/fx-stress-small.json`. Passing the export's own `manifest.json` exits 2 with a message naming that sidecar. When the export's `manifest.json` lies beside the first frame, its `scene`, `reduced_effects`, `scale` and `windows_scale` must match the sidecar's `scene`, `reduced_effects`, `ui_scale` and `windows_scale`, or the script exits 2.
+
+The `motion` command still fails on any 32x32 block over 0.1, whatever changed the block. Since user decision R63 (2026-11-17, CF-3-22; acceptance ISO-10), the gate's block criterion covers flash and pulse effects only. A block over 0.1 counts against the gate only when a flash or pulse effect changed it (a flash field above 0 in the frame's manifest: `flash_alpha_max`, `sky_flash` or `muzzle_flash_count`; pulses are covered by the per-feature `reduced_*` tests). Blocks changed by anything else, including reduced-mode damage numbers, MISS labels and static tracers, are accepted. On the W7-11 exports (plan §10.6) every reduced flash field is 0. The closing review's crops (CF-3-22) found only such popups and tracers in the failing blocks of fx-stress, and the plan (§12.5) traces the turret and small-shotgun failures to the same popups and static tracers. The script and its tests are unchanged.
+
+The capture review tools (W7-11, design-qa-captures 1.12) are standard-library Python plus one 5.1 script. `check_capture_findings.py <plan> [--final]` reads the plan §10 ledger between `<!-- capture-findings:begin -->` and `<!-- capture-findings:end -->`: the vocabulary (Size, Mode, Severity, Status), unique `CF-<wave>-<nn>` IDs with an Owner, hex Fix commits that git knows (`--no-git` skips that) and existing After evidence on every fixed row (`target/production-after/...png#<sha12>`, the SHA-256 prefix checked, `target/` read through CARGO_TARGET_DIR too, a bare `frame-NNNN.png` in the folder of the evidence before it; or a committed `docs/screenshots/production/after-*.png`), and `approved by user YYYY-MM-DD` on every deferred row and on no other. It prints `PASS: <n> capture findings (...)` and exits 0, or one `FAIL:` line per problem and exits 1. `--final` (the G10.1 gate) also fails on every open row and needs `docs/screenshots/production/` with `captures-before.json`, `captures-after.json`, both halves of every pair and at most 40,000,000 B. `compare_captures.py target/production-before <after run> [--html sheet.html]` pairs each after capture by mode, scene and size with the before still of the same name, else its `before_proxy` from the run's `scenes.tsv`, with `production-before/supplement` merged in; it prints a changed / unchanged / missing / failed table with `identical_to_normal` for reduced stills, refuses (exit 2) runs at different `windows_scale` (the wave-0 stills record none, so their scale is read from the PNG width), and exits 1 on a failed after capture. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/curate_capture_pairs.ps1 -After <run> -Pairs '<scene>[:large|small[:normal|reduced]],...'` writes the committed pairs `docs/screenshots/production/{before,after}-<scene>[-small][-reduced].png` (2:1 downsampled at `windows_scale` 2) with `captures-before.json` and `captures-after.json`, and exits 1 on a missing still or over the 40,000,000 B budget. `test_check_capture_findings.py`, `test_compare_captures.py` and the curate cases of `run_script_tests.ps1` exercise them on throwaway files.
+
+The two generator checks re-render every clip the Python generators own into a temporary folder outside the workspace and compare SHA-256 hashes with the committed WAVs in `assets/audio/` and `archive/audio/`; the atmosphere check also compares both Python manifests (`assets/audio/PROVENANCE.json` and `archive/audio/PROVENANCE.json`) byte for byte. Each prints `PASS: ...` and exits 0, or prints one `FAIL:` line per mismatch and exits 1; neither writes anything, so `git status` stays clean. `--check` is the default; `--write` regenerates in place.
+
+`generate_world.py --check` regenerates `crates/horde_core/src/world.json` in memory and offline from the committed file (only `difficulty` is recomputed) and prints `PASS: ...` and exits 0 when the bytes match, or prints `FAIL: ...` and exits 1; it writes nothing. `--self-test` exercises the writer, `--check`, the default `--from-existing` mode and the `--rebuild` sha256 (exit 3), stage-count (exit 4) and country-id (exit 5, a vanished or renamed id; new ids are appended) guards and its carry-over of `level_override` and `stage_theme_ids` on throwaway files in the temporary directory, prints `PASS: <n> self-test cases` and exits 0 or 1. See WORLD.md for the modes.

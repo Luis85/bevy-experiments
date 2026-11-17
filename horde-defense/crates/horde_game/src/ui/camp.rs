@@ -1,17 +1,27 @@
 //! Campaign selection and the persistent preparation shell.
 use super::{
-    Screen, Tab, UiCtx, armory, briefing, character, chrome, feedback, muted, navigation,
+    Screen, Tab, UiCtx, armory, briefing, character, chrome, escape, home, muted, navigation,
     operations, primary, progress, status, survivor,
 };
 use crate::{
     art::{AMBER, GREEN, INK, PANEL, RED},
-    runner::SaveIntent,
-    settings::Action,
+    settings::{self, ExtraAction},
 };
 use bevy_egui::egui::{self, Align, Layout, RichText, vec2};
-use horde_core::{command::Command, content::Mode, world::world};
+use horde_core::{
+    command::Command,
+    content::Mode,
+    sim::Game,
+    world::{Country, world},
+};
 
 pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
+    if f.tab == Tab::Home && f.game.campaign().world.start.is_none() {
+        // There is no camp home before the first start: the world map is
+        // where the journey begins. This pass already draws it.
+        f.go_tab(Tab::World);
+        f.tab = Tab::World;
+    }
     camp_controls(root.ctx(), f);
     if matches!(f.tab, Tab::Skills | Tab::Engineering) {
         // The complete tree has one home. Old tab routes (remembered tabs,
@@ -20,33 +30,39 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
         return;
     }
     navigation::camp_navigation(root, f);
+    // The footer is as tall as what it draws (CF-3): its primary row, plus
+    // the "Back to survivor" row before a start or Camp home's world clock
+    // row. Every other page draws the one primary row, and the panel sizes
+    // to it (and to a status line while one shows).
+    let footer_rows = if f.game.campaign().world.start.is_none() {
+        98.0
+    } else if f.tab == Tab::Home && f.operations_available() {
+        118.0
+    } else {
+        0.0
+    };
     egui::Panel::bottom("camp_status")
-        .min_size(if f.game.campaign().world.start.is_none() {
-            98.0
-        } else {
-            118.0
-        })
+        .min_size(footer_rows)
         .frame(
             egui::Frame::new()
                 .fill(PANEL)
                 .inner_margin(egui::Margin::symmetric(18, 10)),
         )
         .show(root, |ui| {
-            if f.tab == Tab::World {
-                country_action(ui, f);
-            } else if f.tab != Tab::Operations || f.game.attempt().is_some() {
-                briefing::mission_actions(ui, f);
+            match f.tab {
+                Tab::World => country_action(ui, f),
+                Tab::Home => home::home_footer(ui, f),
+                // Every other page, the Mara and Operations drill-downs
+                // included, has the Prepare primary (design-ux-flow §1).
+                _ => briefing::mission_actions(ui, f),
             }
             ui.add_space(5.0);
+            // The manual save is the header's "Save" (W3-05).
             if f.game.campaign().world.start.is_some() {
-                chrome::row(ui, |ui| {
-                    if ui.button("Save campaign").clicked() {
-                        f.request_save(SaveIntent::Manual);
-                    }
-                    if f.operations_available() {
-                        time_controls(ui, f);
-                    }
-                });
+                // Camp home owns the world clock (decision 6).
+                if f.tab == Tab::Home && f.operations_available() {
+                    chrome::row(ui, |ui| time_controls(ui, f));
+                }
             } else if ui.button("Back to survivor").clicked() {
                 f.open_survivor_selection();
             }
@@ -64,17 +80,38 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
             egui::ScrollArea::vertical()
                 .id_salt(("camp_page", f.tab as u8))
                 .auto_shrink([false, false])
-                .show(ui, |ui| match f.tab {
-                    Tab::World => world_ui(ui, f),
-                    Tab::Briefing => briefing::briefing(ui, f),
-                    Tab::Character => character(ui, f),
-                    Tab::Survivor => survivor(ui, f),
-                    Tab::Armory => armory(ui, f),
-                    // Redirected to the upgrade home above.
-                    Tab::Skills | Tab::Engineering => {}
-                    Tab::Operations => operations(ui, f),
+                .show(ui, |ui| {
+                    if f.tab.is_home_drill_down() {
+                        breadcrumb(ui, f);
+                    }
+                    match f.tab {
+                        Tab::Home => home::home(ui, f),
+                        Tab::World => world_ui(ui, f),
+                        Tab::Briefing => briefing::briefing(ui, f),
+                        Tab::Character => character(ui, f),
+                        Tab::Survivor => survivor(ui, f),
+                        Tab::Armory => armory(ui, f),
+                        // Redirected to Upgrades above.
+                        Tab::Skills | Tab::Engineering => {}
+                        Tab::Operations => operations(ui, f),
+                    }
                 });
         });
+}
+/// "‹ Camp home · Mara" above a drill-down page; the link opens Home.
+fn breadcrumb(ui: &mut egui::Ui, f: &mut UiCtx) {
+    chrome::row(ui, |ui| {
+        if ui
+            .add(egui::Button::new("‹ Camp home").frame(false))
+            .on_hover_text("Back to Camp home")
+            .clicked()
+        {
+            f.open_camp_home(None);
+        }
+        if let Some(name) = f.tab.drill_down_name() {
+            muted(ui, format!("· {name}"));
+        }
+    });
 }
 fn world_ui(ui: &mut egui::Ui, f: &mut UiCtx) {
     let compact = ui.available_width() < 900.0;
@@ -195,10 +232,10 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
     ui.label(RichText::new(&country.name).size(23.0).strong());
     let levels = country.level_count();
     let cleared = f.game.campaign().world.completed(&country.id);
-    ui.label(format!(
-        "{} defenses · {:.2}× difficulty",
-        levels, country.difficulty
-    ));
+    ui.label(defenses_and_difficulty(f.game, country));
+    if let Some(checkpoints) = checkpoints_label(f.game, &country.id) {
+        muted(ui, checkpoints);
+    }
     if f.game.campaign().world.start.is_some() {
         progress(
             ui,
@@ -206,6 +243,9 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
             format!("{cleared} / {levels} secured"),
             GREEN,
         );
+    }
+    if let Some(line) = mara_timing(f.game, country) {
+        ui.label(line);
     }
     muted(ui, format!("{} · {}", country.biome, country.culture));
     egui::CollapsingHeader::new("Country conditions and population").show(ui, |ui| {
@@ -224,12 +264,45 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
         }
     });
 }
+/// "N defenses · D× difficulty" for `country`, D the difficulty it deploys
+/// at (`Game::effective_country_difficulty`, the start clamp included).
+fn defenses_and_difficulty(game: &Game, country: &Country) -> String {
+    format!(
+        "{} defenses · {:.2}× difficulty",
+        country.level_count(),
+        game.effective_country_difficulty(&country.id)
+            .unwrap_or(country.difficulty)
+    )
+}
+/// When liberating `country` is what lets the player meet Mara, the
+/// dossier says so before the country is chosen. The rule is core's
+/// (`Game::country_choice_preview`).
+fn mara_timing(game: &Game, country: &Country) -> Option<String> {
+    game.country_choice_preview(&country.id)
+        .filter(|preview| preview.companion_after_liberation)
+        .map(|_| {
+            format!(
+                "Liberate {} to unlock Mara in Journey upgrades.",
+                country.name
+            )
+        })
+}
+/// "N checkpoints" for the country `id`, N its regional checkpoints as the
+/// core preview counts them (`CountryChoicePreview.checkpoints`); `None` for
+/// a country without one, or outside the catalogue.
+fn checkpoints_label(game: &Game, id: &str) -> Option<String> {
+    match game.country_choice_preview(id)?.checkpoints {
+        0 => None,
+        1 => Some("1 checkpoint".into()),
+        n => Some(format!("{n} checkpoints")),
+    }
+}
 fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(country) = world().country(&f.campaign.selected_country) else {
         return;
     };
     if f.game.attempt().is_some() {
-        if primary(ui, "Return to active defense") {
+        if primary(ui, "Return to active defense").clicked() {
             f.go(Screen::Battle);
             f.battle.fire_latched = false;
         }
@@ -237,7 +310,7 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     let choosing = f.game.campaign().world.start.is_none();
     if choosing && f.game.campaign().selected_survivor.is_none() {
-        if primary(ui, "Choose survivor first") {
+        if primary(ui, "Choose survivor first").clicked() {
             f.open_survivor_selection();
         }
         return;
@@ -245,16 +318,7 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     ui.horizontal_wrapped(|ui| {
         let allowed = choosing || f.game.campaign().world.can_enter(&country.id);
         ui.add_enabled_ui(allowed, |ui| {
-            if primary(
-                ui,
-                if !choosing
-                    && f.game.campaign().world.completed(&country.id) >= country.level_count()
-                {
-                    "Manage country"
-                } else {
-                    "Start journey"
-                },
-            ) {
+            if primary(ui, country_action_label(f.game, country)).clicked() {
                 if choosing {
                     f.dispatch(
                         Command::ChooseStart(country.id.clone()),
@@ -262,10 +326,9 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
                     );
                     f.campaign.stage = 0;
                 } else {
-                    f.dispatch(
-                        Command::EnterCountry(country.id.clone()),
-                        "Journey started in the selected country.",
-                    );
+                    // Choosing a later country never deploys (CD6): core
+                    // selects it, then its Briefing opens (notices.rs).
+                    f.dispatch(Command::SelectCountry(country.id.clone()), "");
                 }
             }
         });
@@ -280,6 +343,19 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     });
 }
+/// The World footer's label for `country`: "Start journey" deploys the first
+/// country (`ChooseStart`); later countries are only chosen (`SelectCountry`),
+/// as "Manage country" once liberated and "Plan defense" before.
+fn country_action_label(game: &Game, country: &Country) -> &'static str {
+    let world = &game.campaign().world;
+    if world.start.is_none() {
+        "Start journey"
+    } else if world.completed(&country.id) >= country.level_count() {
+        "Manage country"
+    } else {
+        "Plan defense"
+    }
+}
 #[cfg(test)]
 pub(super) fn country_dossier(ui: &mut egui::Ui, f: &mut UiCtx) {
     country_summary(ui, f);
@@ -292,15 +368,18 @@ fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
         return;
     }
     f.battle.last_control_frame = frame;
-    if feedback::overlay_owns_keyboard(ctx, f) || f.prefs.rebind.is_some() {
+    if escape::keyboard_owner(ctx, f) != escape::KeyboardOwner::Free {
         return;
     }
-    // The camp's pause key drives the world clock only where the clock is
-    // shown, and never resumes a waiting main defense from here: that has
-    // its own "Return to active defense".
-    if f.operations_available()
+    // The world-clock key (its own binding, never the battle's Pause) drives
+    // the clock only where the clock is shown (Camp home, decision 6), and
+    // never resumes a waiting main defense from here: that has its own
+    // "Return to active defense".
+    if f.tab == Tab::Home
+        && f.operations_available()
         && f.game.attempt().is_none()
-        && f.settings.pressed(ctx, Action::Pause, false)
+        && f.settings
+            .pressed_extra(ctx, ExtraAction::WorldClock, false)
     {
         toggle_time(f);
     }
@@ -309,7 +388,7 @@ fn toggle_time(f: &mut UiCtx) {
     let paused = f.game.global_paused() || f.game.attempt().is_some_and(|attempt| attempt.paused);
     if paused && f.game.attempt().is_some() {
         f.go(Screen::Battle);
-        f.battle.construction = false;
+        f.battle.set_construction(false);
     }
     f.dispatch(Command::SetPaused(!paused), "");
     f.battle.fire_latched = false;
@@ -330,11 +409,18 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
     } else {
         ""
     };
+    // With a main defense waiting the key is off (`camp_controls`), so the
+    // hover names it only when it works.
+    let key = f.settings.extra_bindings.get(ExtraAction::WorldClock);
+    let key = if key.is_empty() || f.game.attempt().is_some() {
+        String::new()
+    } else {
+        format!(" Key: {}.", settings::binding_text(key))
+    };
     if ui
         .button(label)
         .on_hover_text(format!(
-            "{} pauses every battle and strategic deadline. Personal combat runs at 1×.{returns}",
-            f.settings.bindings[Action::Pause as usize]
+            "Pausing the world clock stops every battle and strategic deadline. Personal combat runs at 1×.{key}{returns}"
         ))
         .clicked()
     {
@@ -376,5 +462,62 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
                 ui.selectable_value(&mut f.battle.speed, speed, format!("{speed}×"));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The world summary shows the difficulty a country deploys at
+    /// (`Game::effective_country_difficulty`): before a start is chosen every
+    /// country is a candidate start, so Bangladesh's raw 1.60 reads as its
+    /// clamped 1.05, and after another start it reads raw (W2 review).
+    #[test]
+    fn country_summary_difficulty_reads_the_effective_value() {
+        let bgd = world().country("BGD").unwrap();
+        assert_eq!(bgd.difficulty, 1.60);
+        let levels = bgd.level_count();
+        let mut game = Game::default();
+        assert_eq!(
+            defenses_and_difficulty(&game, bgd),
+            format!("{levels} defenses · 1.05× difficulty")
+        );
+        game.campaign_mut().choose_start_country("AUT").unwrap();
+        assert_eq!(
+            defenses_and_difficulty(&game, bgd),
+            format!("{levels} defenses · 1.60× difficulty")
+        );
+        let aut = world().country("AUT").unwrap();
+        assert_eq!(
+            defenses_and_difficulty(&game, aut),
+            format!("{} defenses · 0.95× difficulty", aut.level_count())
+        );
+    }
+
+    /// W4-02: the world panel's checkpoint line reads the core preview's
+    /// count: none for a country of at most 6 defenses, the singular for one,
+    /// "N checkpoints" otherwise (at most 3).
+    #[test]
+    fn world_panel_counts_regional_checkpoints() {
+        let game = Game::default();
+        let mut seen = std::collections::BTreeSet::new();
+        for country in &world().countries {
+            let count = country.regional_checkpoints().len();
+            let expected = match count {
+                0 => None,
+                1 => Some("1 checkpoint".to_owned()),
+                n => Some(format!("{n} checkpoints")),
+            };
+            assert_eq!(
+                checkpoints_label(&game, &country.id),
+                expected,
+                "{}",
+                country.id
+            );
+            seen.insert(count);
+        }
+        assert_eq!(seen.into_iter().collect::<Vec<_>>(), [0, 1, 2, 3]);
+        assert_eq!(checkpoints_label(&game, "NOT_A_COUNTRY"), None);
     }
 }

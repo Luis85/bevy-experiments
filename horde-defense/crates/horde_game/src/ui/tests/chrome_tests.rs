@@ -57,14 +57,19 @@ fn the_header_names_each_screen_once() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = unlocked(&mut fixture);
-    // The upgrade home is named by its selected tab, so the header neither
+    // W3-03 rewrite: the tree moved from Results to `Screen::Upgrades`.
+    // Upgrades is named by its selected row entry, so the header neither
     // repeats it nor calls it the camp; the camp keeps its area name.
-    f.screen = Screen::Results;
+    f.screen = Screen::Upgrades;
     let output = h.frame(f, View::Header, vec![]);
     assert_eq!(text_count(&output, "Journey upgrades"), 0);
     assert_eq!(text_count(&output, "Field command"), 0);
-    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    let output = h.frame(f, View::UpgradesWithChrome, vec![]);
     assert_eq!(text_count(&output, "Journey upgrades"), 1);
+    // Results has no subtitle either.
+    f.screen = Screen::Results;
+    let output = h.frame(f, View::Header, vec![]);
+    assert_eq!(text_count(&output, "Field command"), 0);
     f.screen = Screen::Camp;
     let output = h.frame(f, View::Header, vec![]);
     assert_eq!(text_count(&output, "Field command"), 1);
@@ -84,8 +89,12 @@ fn the_header_names_each_screen_once() {
 #[test]
 fn results_reach_history_through_the_header_only() {
     let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
     let h = Harness::new();
-    let f = unlocked(&mut fixture);
+    let f = &mut fixture.frontend;
+    // W3-03 rewrite: Results needs a settled report (without one it hands
+    // over to Camp home).
+    f.game.withdraw();
     f.screen = Screen::Results;
     let output = h.frame(f, View::Results, vec![]);
     assert_eq!(text_count(&output, "Run analysis"), 0);
@@ -111,13 +120,8 @@ fn camp_rows_keep_labels_on_their_buttons_centre_line() {
             &output,
             &context,
             "Journey upgrades",
-            &[
-                "Briefing",
-                "Equipment",
-                "Character",
-                "World map",
-                "Operations",
-            ],
+            // W3-02 rewrite: Camp leads the row; Operations is a drill-down.
+            &["Camp", "Briefing", "Equipment", "Character", "World map"],
         );
 
         // Briefing loadout heading beside its button.

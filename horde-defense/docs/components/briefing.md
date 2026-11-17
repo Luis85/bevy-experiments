@@ -11,7 +11,7 @@ source: "crates/horde_game/src/ui/briefing.rs::briefing, mission_actions"
 
 Review a later defense, defender, item levels, boss timing, supply, threat and readiness.
 
-- **Entry, exit and actions:** Select an accessible local defense and personal/NPC mode, review equipment or training and the Next victory disclosure, then deploy; return through preparation navigation.
+- **Entry, exit and actions:** Select an accessible local defense and the next defender (the defender picker), review equipment or training ("Review <name>'s training") and the Next victory disclosure, then deploy: the amber "Deploy personally" or "Deploy <name>" dispatches `BeginDefense` for `Game::next_defender`. Escape goes to Camp home; return through preparation navigation.
 - **State boundary:** Stage selection is intent; Game validates deployment, access, reservations and current progression. Threat rank, arrival groups, new gear level and effective boss time come from the progression snapshot; the next-victory preview is read-only.
 - **Responsiveness and accessibility:** Loadout and readiness use columns above 820 UI points and stack below that width. Field rules are available as text.
 

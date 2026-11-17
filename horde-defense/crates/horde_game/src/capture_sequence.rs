@@ -15,9 +15,22 @@ fn prepare_directory(directory: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir(directory)
 }
 
-const FIRST: u32 = 60;
-const STEP: u32 = 4;
-const COUNT: u32 = 24;
+/// The native frame of frame-0000: the first 59 frames warm the window up.
+pub(crate) const FIRST: u32 = 60;
+/// Native frames between two captured frames.
+pub(crate) const STEP: u32 = 4;
+/// Captured frames per export.
+pub(crate) const COUNT: u32 = 24;
+/// The native frame of the last captured frame.
+pub(crate) const LAST: u32 = FIRST + STEP * (COUNT - 1);
+/// The captured frame drawn on native frame `frame`, if any.
+pub(crate) fn frame_index(frame: u32) -> Option<u32> {
+    (FIRST..=LAST)
+        .contains(&frame)
+        .then(|| frame - FIRST)
+        .filter(|offset| offset.is_multiple_of(STEP))
+        .map(|offset| offset / STEP)
+}
 #[derive(Default)]
 pub struct SequenceCapture {
     initialized: bool,
@@ -26,7 +39,7 @@ pub struct SequenceCapture {
     records: Vec<SequenceFrame>,
     done: bool,
 }
-#[derive(Serialize)]
+#[derive(Default, Serialize)]
 struct SequenceFrame {
     file: String,
     native_frame: u32,
@@ -45,14 +58,68 @@ struct SequenceFrame {
     reload_left: Option<u32>,
     melee_commit: Option<u32>,
     corpse_count: usize,
+    /// `flash_alpha_max`, `sky_flash` and `muzzle_flash_count` of the frame
+    /// (all zero outside a battle): capture_motion requires zeros in every
+    /// frame of a reduced-effects export and a pulse in a storm export.
+    #[serde(flatten)]
+    flash: crate::art::FlashFacts,
 }
+/// The shortest decimal of an `f32`, so a JSON reader sees `1.35`, not
+/// `1.350000023841858` (a `serde_json::Value` holds every number as `f64`).
+fn decimal(value: f32) -> f64 {
+    value.to_string().parse().unwrap_or(f64::from(value))
+}
+/// The motion `manifest.json`, version 2: version 1 plus the three flash
+/// facts of every frame (W5-10; see [`crate::art::FlashFacts`]), the run's effective
+/// reduced-effects setting, the logical window size in points, the UI scale
+/// egui draws at (`settings::applied_scale` of the live settings, never the
+/// raw saved or requested value) and the Windows display scale (PNG pixels per
+/// point), so capture_motion can prove which mode and viewport produced the
+/// frames.
+fn sequence_manifest(
+    scene: Option<&str>,
+    settings: &crate::settings::Settings,
+    (width, height): (u32, u32),
+    windows_scale: f32,
+    frames: &[SequenceFrame],
+) -> serde_json::Value {
+    serde_json::json!({
+        "version": 2,
+        "scene": scene,
+        "reduced_effects": settings.reduced_effects,
+        "width": width,
+        "height": height,
+        "scale": decimal(crate::settings::applied_scale(settings.scale)),
+        "windows_scale": decimal(windows_scale),
+        "timing": "Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement",
+        "nominal_video_fps": 60 / STEP,
+        "frames": frames,
+    })
+}
+/// The logical window size in points and the Windows display scale, read
+/// from the primary window. Without one nothing was measured, so the export
+/// fails instead of writing the requested size and a display scale of 1.0.
+fn measured_viewport(window: Option<&Window>) -> Result<((u32, u32), f32), &'static str> {
+    let window = window.ok_or("no primary window to measure the viewport and display scale")?;
+    Ok((
+        (
+            window.resolution.width().round() as u32,
+            window.resolution.height().round() as u32,
+        ),
+        window.resolution.scale_factor(),
+    ))
+}
+#[allow(clippy::too_many_arguments)]
 pub fn capture_frames(
     mut commands: Commands,
     session: Res<crate::runner::GameSession>,
+    settings: Res<crate::settings::Settings>,
     mut battle: ResMut<crate::ui::BattleUi>,
+    mut runtime: ResMut<crate::runner::Runtime>,
     mut state: Local<SequenceCapture>,
     config: Res<crate::launch::LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
+    window: Option<Single<&Window, With<bevy::window::PrimaryWindow>>>,
 ) {
     if !state.initialized {
         state.initialized = true;
@@ -72,11 +139,13 @@ pub fn capture_frames(
     state.frame += 1;
     let frame = state.frame;
     crate::ui::schedule_gesture_review(&config, &session.game, &mut battle, frame);
-    if frame >= FIRST && (frame - FIRST).is_multiple_of(STEP) && (frame - FIRST) / STEP < COUNT {
+    crate::ui::schedule_motion_release(&config, &mut runtime, frame);
+    crate::ui::schedule_motion_trigger(&config, &mut battle, frame);
+    if let Some(index) = frame_index(frame) {
         let Some(directory) = state.directory.clone() else {
             return;
         };
-        let file = format!("frame-{:04}.png", (frame - FIRST) / STEP);
+        let file = format!("frame-{index:04}.png");
         commands
             .spawn(Screenshot::primary_window())
             .observe(save_to_disk(directory.join(&file)));
@@ -119,9 +188,12 @@ pub fn capture_frames(
             reload_left: attempt.map(|a| a.reload_left),
             melee_commit: attempt.map(|a| a.melee_commit),
             corpse_count: attempt.map_or(0, |a| a.corpses.len()),
+            flash: attempt.map_or_else(Default::default, |a| {
+                crate::art::flash_facts(a, battle.sky_clock(), settings.reduced_effects)
+            }),
         });
     }
-    if frame >= FIRST + STEP * (COUNT - 1) + 32 {
+    if frame >= LAST + 32 {
         state.done = true;
         let Some(directory) = state.directory.as_ref() else {
             return;
@@ -136,7 +208,21 @@ pub fn capture_frames(
             exit.write(AppExit::error());
             return;
         }
-        let report = serde_json::json!({"version":1,"scene":config.scenario,"timing":"Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement","nominal_video_fps":60/STEP,"frames":state.records});
+        let (viewport, windows_scale) = match measured_viewport(window.as_deref().copied()) {
+            Ok(measured) => measured,
+            Err(problem) => {
+                error!("Animation manifest failed: {problem}");
+                exit.write(AppExit::error());
+                return;
+            }
+        };
+        let report = sequence_manifest(
+            config.scenario.as_deref(),
+            &settings,
+            viewport,
+            windows_scale,
+            &state.records,
+        );
         let result = serde_json::to_vec_pretty(&report)
             .map_err(|e| e.to_string())
             .and_then(|bytes| {
@@ -158,6 +244,91 @@ pub fn capture_frames(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn manifest_records_reduced_effects_and_viewport() {
+        let settings = |scale, reduced_effects| crate::settings::Settings {
+            scale,
+            reduced_effects,
+            ..default()
+        };
+        let manifest =
+            sequence_manifest(Some("peak"), &settings(1.35, true), (1050, 700), 2.0, &[]);
+        assert_eq!(manifest["version"], 2);
+        assert_eq!(manifest["scene"], "peak");
+        assert_eq!(manifest["reduced_effects"], true);
+        assert_eq!(manifest["width"], 1050);
+        assert_eq!(manifest["height"], 700);
+        // The shortest decimal of the f32, so the script compares 1.35, not 1.350000023841858.
+        assert_eq!(manifest["scale"], 1.35);
+        assert_eq!(manifest["windows_scale"], 2.0);
+        assert_eq!(manifest["nominal_video_fps"], 15);
+        assert_eq!(manifest["frames"], serde_json::json!([]));
+        let normal = sequence_manifest(None, &settings(1.0, false), (1440, 900), 1.0, &[]);
+        assert_eq!(normal["reduced_effects"], false);
+        assert_eq!(normal["scene"], serde_json::Value::Null);
+        assert_eq!(
+            (normal["width"].clone(), normal["height"].clone()),
+            (1440.into(), 900.into())
+        );
+        assert_eq!(normal["scale"], 1.0);
+    }
+    /// Design-qa-captures 1.9 (W5): every frame record carries the three
+    /// flash facts of the frame, so capture_motion can prove a reduced
+    /// export never flashed and a storm export did.
+    #[test]
+    fn manifest_v2_records_flash_counters() {
+        let frame = |flash| SequenceFrame {
+            file: "frame-0000.png".into(),
+            flash,
+            ..default()
+        };
+        let frames = [
+            frame(crate::art::FlashFacts {
+                flash_alpha_max: 0.5,
+                sky_flash: 0.125,
+                muzzle_flash_count: 3,
+            }),
+            frame(crate::art::FlashFacts::default()),
+        ];
+        let settings = crate::settings::Settings::default();
+        let manifest = sequence_manifest(Some("storm"), &settings, (1440, 900), 1.0, &frames);
+        assert_eq!(manifest["version"], 2);
+        let lit = &manifest["frames"][0];
+        assert_eq!(lit["flash_alpha_max"], 0.5);
+        assert_eq!(lit["sky_flash"], 0.125);
+        assert_eq!(lit["muzzle_flash_count"], 3);
+        // Flattened beside the version-2 frame fields, not nested.
+        assert_eq!(lit["file"], "frame-0000.png");
+        assert!(lit.get("flash").is_none());
+        let dark = &manifest["frames"][1];
+        assert_eq!(dark["flash_alpha_max"], 0.0);
+        assert_eq!(dark["sky_flash"], 0.0);
+        assert_eq!(dark["muzzle_flash_count"], 0);
+    }
+    #[test]
+    fn manifest_scale_is_the_drawn_scale_not_the_saved_value() {
+        let scale = |scale| {
+            let settings = crate::settings::Settings { scale, ..default() };
+            sequence_manifest(None, &settings, (1440, 900), 1.0, &[])["scale"].clone()
+        };
+        // In range, the saved scale is the drawn one.
+        assert_eq!(scale(1.2), 1.2);
+        // Past the slider's range egui draws at the clamp, so the manifest does too.
+        assert_eq!(scale(1.5), 1.35);
+        assert_eq!(scale(0.5), 0.75);
+    }
+    #[test]
+    fn manifest_viewport_is_measured_from_the_primary_window_or_refused() {
+        let mut window = Window {
+            resolution: bevy::window::WindowResolution::new(2100, 1400),
+            ..default()
+        };
+        window.resolution.set_scale_factor(2.0);
+        assert_eq!(measured_viewport(Some(&window)), Ok(((1050, 700), 2.0)));
+        // Without a window nothing was measured, so the manifest must not
+        // claim the requested size and an invented display scale of 1.0.
+        assert!(measured_viewport(None).is_err());
+    }
     #[test]
     fn interrupted_run_frames_are_never_accepted_or_overwritten() {
         let nonce = std::time::SystemTime::now()

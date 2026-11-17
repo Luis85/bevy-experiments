@@ -138,7 +138,7 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
     if mode == Mode::Npc
         && g.campaign.blueprint_available(StructureKind::Trap)
         && !g.campaign.blueprints[StructureKind::Trap]
-        && g.campaign.coins >= content().structure(StructureKind::Trap).blueprint_price
+        && g.campaign.coins >= g.campaign.blueprint_price(StructureKind::Trap)
     {
         g.campaign.purchase_blueprint(StructureKind::Trap)?;
     }
@@ -168,7 +168,7 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
     smoke_buy_gear(g, mode)?;
     if mode == Mode::Npc {
         while g.campaign.npc.unspent < 4
-            && g.campaign.coins >= 25
+            && g.campaign.coins >= g.campaign.npc_training_price()
             && g.campaign.npc.awarded < g.campaign.allowance()
         {
             g.campaign.buy_training_point()?;
@@ -196,12 +196,25 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
 /// The earned shop half of [`smoke_prepare`]: buy and equip the best
 /// affordable upgrade per slot. Shared with the pacing simulation.
 pub(crate) fn smoke_buy_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
+    smoke_buy_gear_with(g, mode, |g, definition| {
+        let id = g.campaign.buy_item(definition)?;
+        g.campaign.equip(mode, id)
+    })
+}
+/// [`smoke_buy_gear`]'s choice, with `buy` buying and equipping the
+/// catalogue item at index `definition` for `mode`. The pacing strategy bot
+/// (W2-43) passes `BuyItem` and `Equip` commands.
+pub(crate) fn smoke_buy_gear_with(
+    g: &mut Game,
+    mode: Mode,
+    mut buy: impl FnMut(&mut Game, usize) -> Result<(), String>,
+) -> Result<(), String> {
     let mut market: Vec<usize> = content()
         .items
         .iter()
         .enumerate()
         .filter(|(definition, item)| {
-            item.tier > 0
+            item.purchasable()
                 && item.tier <= g.campaign.unlocked()
                 && g.campaign
                     .buy_price(*definition)
@@ -252,8 +265,7 @@ pub(crate) fn smoke_buy_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
                 .buy_price(n)
                 .is_ok_and(|price| price <= g.campaign.coins)
         {
-            let id = g.campaign.buy_item(n)?;
-            g.campaign.equip(mode, id)?;
+            buy(g, n)?;
             bought[slot] = true;
         }
     }

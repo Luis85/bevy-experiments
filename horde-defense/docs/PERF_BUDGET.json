@@ -1,0 +1,692 @@
+{
+  "version": 1,
+  "hardware": {
+    "gpu": "NVIDIA RTX 1000 Ada Laptop",
+    "cpu": "Intel Core Ultra 9 185H",
+    "backend": "Vulkan",
+    "integrated_gpu": {
+      "status": "pending",
+      "adapter": "Intel(R) Arc(TM) Pro Graphics",
+      "report": null
+    }
+  },
+  "sizes": {
+    "normal": { "size": "1440x900", "scale": 1.0 },
+    "small": { "size": "1050x700", "scale": 1.35 }
+  },
+  "definitions": {
+    "interface_draw_ms": "ui::draw wall time (v2 WorkPhase::Interface)",
+    "interface_total_ms": "egui pass loop + tessellation",
+    "cpu_frame_ms": "main First..Last + (extract + Render schedule - present wait) of latest completed render sample; per-sample sum; VsyncOff runs only",
+    "texture_uploads": "egui textures_delta.set entries (and their bytes) per frame, read after EndPass and before bevy_egui's texture update; frame report v3 egui.texture_uploads totals them over the sampled frames (W1-64)"
+  },
+  "profiles": {
+    "dev": { "dir": "debug", "features": ["review"] },
+    "playtest": { "dir": "playtest", "features": ["review"] },
+    "shipped": { "features": [], "measured": "--smoke wall time only" }
+  },
+  "run": {
+    "warmup_frames": 180,
+    "frames": { "peak": 600, "progressed-peak": 600, "stress": 1800, "fx-stress": 1800 },
+    "repeat_acceptance": 3
+  },
+  "baseline": {
+    "wave0": {
+      "commit": "7bd5de8",
+      "profile": "dev",
+      "vsync": true,
+      "frame_report": 2,
+      "interface_mean_ms": {
+        "peak": { "normal": 1.1904, "small": 1.0752 },
+        "progressed-peak": { "normal": 1.6128, "small": 1.4719 }
+      }
+    },
+    "v3": {
+      "note": "W2-47, ruling R29 (2026-11-09): re-measured on the probe spans of review commit 7abb0ab, on the renderer W1-37 measured. The 2339a3d sources (git archive) with only the 7abb0ab egui_probe.rs and render_probe.rs span changes (egui_pass opens in an exclusive system inside EndPass before run_egui_context_pass_loop_system; present_wait opens after create_surfaces), built with the same CARGO_TARGET_DIR (target/v3-remeasure, not committed) and run by HEAD's measure_performance.ps1 -Scene all -Repeat 3 -NoBuild -NoBudget per profile and VSync state, with the R27 display hold and the R30 quiet window and load check. Only run validity counts: the old reports have no driver_stalls, texture_uploads or battlefield counts, so each pass's own checks are invalid by design. A scene group with an invalid run (unfocused, window 0x0 or a CPU load sample of 90% or more, twice) was re-measured as a whole group (evidence_reruns), as W1-37 did. measured_interface_total_mean_ms holds every re-measured median; interface_total_mean_ms, which the script gates progressed-peak on, equals it except where a gated cell would loosen the gate (R22): kept_previous lists those, which keep the W1-37 value. previous holds the W1-37 baseline verbatim. VALIDATION.md 'baseline.v3 on the 7abb0ab spans' and plan 9.4.",
+      "commit": "2339a3d",
+      "spans": "7abb0ab",
+      "profile": "dev",
+      "vsync": true,
+      "present_mode": "Fifo",
+      "pipelined": true,
+      "power_plan": "Balanced",
+      "frame_report": 3,
+      "repeat": 3,
+      "aggregate": "median of repeats",
+      "evidence": "target/perf/w2-47/v3-spans-dev-vsync",
+      "evidence_reruns": ["target/perf/w2-47/v3-spans-dev-vsync-peak-b", "target/perf/w2-47/v3-spans-dev-vsync-stress-b"],
+      "kept_previous": ["interface_total_mean_ms/progressed-peak/normal", "interface_total_mean_ms/progressed-peak/small"],
+      "interface_total_mean_ms": {
+        "peak": { "normal": 2.525, "small": 2.3303 },
+        "progressed-peak": { "normal": 4.6447, "small": 4.5895 },
+        "stress": { "normal": 6.5264, "small": 6.0572 }
+      },
+      "measured_interface_total_mean_ms": {
+        "peak": { "normal": 2.525, "small": 2.3303 },
+        "progressed-peak": { "normal": 4.8218, "small": 4.7083 },
+        "stress": { "normal": 6.5264, "small": 6.0572 }
+      },
+      "interface_draw_mean_ms": {
+        "peak": { "normal": 1.2071, "small": 1.0724 },
+        "progressed-peak": { "normal": 1.7098, "small": 1.5365 },
+        "stress": { "normal": 2.0668, "small": 1.7713 }
+      },
+      "runs": {
+        "dev-vsync-off": {
+          "profile": "dev",
+          "vsync": false,
+          "evidence": ["target/perf/w2-47/v3-spans-dev-novsync"],
+          "interface_total_mean_ms": {
+            "peak": { "normal": 2.4246, "small": 2.1804 },
+            "progressed-peak": { "normal": 4.8187, "small": 4.2665 },
+            "stress": { "normal": 6.8026, "small": 6.1643 }
+          },
+          "interface_draw_mean_ms": {
+            "peak": { "normal": 1.1306, "small": 0.96 },
+            "progressed-peak": { "normal": 1.6879, "small": 1.385 },
+            "stress": { "normal": 2.1359, "small": 1.7799 }
+          },
+          "cpu_frame_p99_ms": {
+            "peak": { "normal": 12.9074, "small": 15.088 },
+            "progressed-peak": { "normal": 19.1654, "small": 19.5704 },
+            "stress": { "normal": 28.9662, "small": 35.4983 }
+          }
+        },
+        "playtest-vsync-on": {
+          "profile": "playtest",
+          "vsync": true,
+          "evidence": ["target/perf/w2-47/v3-spans-playtest-vsync", "target/perf/w2-47/v3-spans-playtest-vsync-stress-c"],
+          "interface_total_mean_ms": {
+            "peak": { "normal": 1.9596, "small": 1.8879 },
+            "progressed-peak": { "normal": 3.4906, "small": 3.4154 },
+            "stress": { "normal": 4.7118, "small": 4.5734 }
+          },
+          "interface_draw_mean_ms": {
+            "peak": { "normal": 0.9264, "small": 0.8721 },
+            "progressed-peak": { "normal": 1.2797, "small": 1.2131 },
+            "stress": { "normal": 1.5564, "small": 1.4499 }
+          }
+        },
+        "playtest-vsync-off": {
+          "profile": "playtest",
+          "vsync": false,
+          "evidence": ["target/perf/w2-47/v3-spans-playtest-novsync"],
+          "interface_total_mean_ms": {
+            "peak": { "normal": 1.912, "small": 1.705 },
+            "progressed-peak": { "normal": 3.5798, "small": 3.315 },
+            "stress": { "normal": 5.0653, "small": 4.6887 }
+          },
+          "interface_draw_mean_ms": {
+            "peak": { "normal": 0.8818, "small": 0.7384 },
+            "progressed-peak": { "normal": 1.295, "small": 1.1303 },
+            "stress": { "normal": 1.64, "small": 1.4775 }
+          },
+          "cpu_frame_p99_ms": {
+            "peak": { "normal": 12.0928, "small": 15.4811 },
+            "progressed-peak": { "normal": 19.5577, "small": 18.1199 },
+            "stress": { "normal": 25.169, "small": 32.1153 }
+          }
+        }
+      },
+      "previous": {
+        "note": "The W1-37 baseline (2026-11-05/06, plan 9.4), measured on the probe spans from before 7abb0ab. It was the gate source until W2-47; under R22 a gated cell of the re-measure is never above it.",
+        "commit": "2339a3d",
+        "profile": "dev",
+        "vsync": true,
+        "present_mode": "Fifo",
+        "pipelined": true,
+        "power_plan": "Balanced",
+        "frame_report": 3,
+        "repeat": 3,
+        "aggregate": "median of repeats",
+        "evidence": "target/perf/w1-37/dev-vsync-b",
+        "interface_total_mean_ms": {
+          "peak": { "normal": 2.548, "small": 2.3833 },
+          "progressed-peak": { "normal": 4.6447, "small": 4.5895 },
+          "stress": { "normal": 6.9694, "small": 6.5248 }
+        },
+        "interface_draw_mean_ms": {
+          "peak": { "normal": 1.2152, "small": 1.0841 },
+          "progressed-peak": { "normal": 1.655, "small": 1.518 },
+          "stress": { "normal": 2.1707, "small": 1.9042 }
+        },
+        "runs": {
+          "dev-vsync-off": {
+            "profile": "dev",
+            "vsync": false,
+            "evidence": ["target/perf/w1-37/dev-novsync", "target/perf/w1-37/dev-novsync-progressed-peak-b"],
+            "interface_total_mean_ms": {
+              "peak": { "normal": 2.6336, "small": 2.3238 },
+              "progressed-peak": { "normal": 4.7391, "small": 4.27 },
+              "stress": { "normal": 6.6075, "small": 6.237 }
+            },
+            "interface_draw_mean_ms": {
+              "peak": { "normal": 1.2099, "small": 1.0167 },
+              "progressed-peak": { "normal": 1.6629, "small": 1.3502 },
+              "stress": { "normal": 2.0471, "small": 1.8273 }
+            },
+            "cpu_frame_p99_ms": {
+              "peak": { "normal": 17.3036, "small": 16.9171 },
+              "progressed-peak": { "normal": 20.6784, "small": 19.108 },
+              "stress": { "normal": 31.8102, "small": 38.0577 }
+            }
+          },
+          "playtest-vsync-on": {
+            "profile": "playtest",
+            "vsync": true,
+            "evidence": ["target/perf/w1-37/playtest-vsync", "target/perf/w1-37/playtest-vsync-stress-b"],
+            "interface_total_mean_ms": {
+              "peak": { "normal": 2.0514, "small": 1.9428 },
+              "progressed-peak": { "normal": 3.6009, "small": 3.493 },
+              "stress": { "normal": 5.1571, "small": 4.9306 }
+            },
+            "interface_draw_mean_ms": {
+              "peak": { "normal": 0.9659, "small": 0.8807 },
+              "progressed-peak": { "normal": 1.3028, "small": 1.2227 },
+              "stress": { "normal": 1.669, "small": 1.53 }
+            }
+          },
+          "playtest-vsync-off": {
+            "profile": "playtest",
+            "vsync": false,
+            "evidence": ["target/perf/w1-37/playtest-novsync", "target/perf/w1-37/playtest-novsync-stress-b"],
+            "interface_total_mean_ms": {
+              "peak": { "normal": 1.9272, "small": 1.7441 },
+              "progressed-peak": { "normal": 3.5239, "small": 3.2134 },
+              "stress": { "normal": 5.0235, "small": 4.6953 }
+            },
+            "interface_draw_mean_ms": {
+              "peak": { "normal": 0.8857, "small": 0.7597 },
+              "progressed-peak": { "normal": 1.2139, "small": 1.0777 },
+              "stress": { "normal": 1.5924, "small": 1.4607 }
+            },
+            "cpu_frame_p99_ms": {
+              "peak": { "normal": 14.517, "small": 15.2177 },
+              "progressed-peak": { "normal": 18.3641, "small": 17.0475 },
+              "stress": { "normal": 27.2865, "small": 33.6668 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scenes": {
+    "peak": {
+      "frames_over_50ms_max": 0,
+      "interface_draw_mean_ms_max": { "normal": 1.1904, "small": 1.0752 }
+    },
+    "progressed-peak": {
+      "frames_over_50ms_max": 0,
+      "interface_draw_mean_ms_max": { "normal": 1.129, "small": 1.030 },
+      "interface_total_not_above_baseline_v3": true,
+      "cpu_frame_p99_ms_max": 10.0
+    },
+    "stress": {
+      "frames_over_50ms_max": 0,
+      "cpu_frame_p99_ms_max": 10.0
+    },
+    "fx-stress": {
+      "frames_over_50ms_max": 0,
+      "cpu_frame_p99_ms_max": 10.0
+    }
+  },
+  "driver_stall": {
+    "ruling": "Exclude driver stalls",
+    "ruled": "2026-11-06, user ruling on gate 3, in chat (W1-61)",
+    "rule": "Frames over 50 ms in which the swap-chain acquire wait (present_wait, or channel_wait while the render thread is in present) holds at least 80% of the frame are classified as environmental driver stalls and excluded from frames_over_50ms. They must still be attributed (named coverage), the in-process work in that frame (main_cpu and render CPU) must stay below 50 ms, and the excluded stalls are counted and listed in the report and summary (frames_over_50ms_driver_stall). The same exclusion applies to the pipelined rule's frames_over_33ms and VSync-on FPS and p99-interval checks, computed on the frames outside stalls.",
+    "frame_ms_over": 50.0,
+    "acquire_share_min": 0.8,
+    "named_coverage_min": 0.95,
+    "in_process_ms_below": 50.0,
+    "report": {
+      "count": "frames_over_50ms_driver_stall",
+      "list": "driver_stalls.frames",
+      "gated": "driver_stalls.outside"
+    }
+  },
+  "caps": {
+    "enemies_ceiling": 225,
+    "enemies_stress": 400,
+    "corpses_settled_drawn": 2048,
+    "corpses_collapsing_drawn": 64,
+    "particles": 128,
+    "particle_events": 64,
+    "scenes": 8,
+    "damage_popups": 24,
+    "loot_flyups": 12,
+    "fx_lifetime_max_seconds": 2.0
+  },
+  "fx": {
+    "lights": 24,
+    "decals": 64,
+    "scorch": 8,
+    "explosions_concurrent": 8,
+    "tracers": 96,
+    "hit_events": 64,
+    "flames_per_zone": 21,
+    "flames_per_zone_reduced": 9,
+    "fire_zones_drawn": 8,
+    "elite_tells": 48,
+    "particles": 128
+  },
+  "egui": {
+    "battlefield_primitives_max": 23,
+    "primitive_growth_52_to_400_max": 2,
+    "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 61098 },
+    "texture_uploads_after_warmup_max": 0
+  },
+  "save_clone": {
+    "items_min": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": ["dev", "playtest"]
+  },
+  "evidence": {
+    "camera_zoom_delta": {
+      "note": "W1-47, informational: the script never reads it and no gate moves; production-pass plan section 9.5",
+      "commit_before": "bbaa01c",
+      "commit": "d74a13e",
+      "profile": "dev",
+      "vsync": true,
+      "repeat": 3,
+      "aggregate": "median of every valid repeat over all passes",
+      "before": ["target/perf/w1-47/before-c2-bbaa01c-peak", "target/perf/w1-47/before-c2-bbaa01c-b-peak", "target/perf/w1-47/before-c2-bbaa01c-progressed-peak", "target/perf/w1-47/before-c2-bbaa01c-b-progressed-peak"],
+      "after": ["target/perf/w1-47/c2-d74a13e-peak", "target/perf/w1-47/c2-d74a13e-b-peak", "target/perf/w1-47/c2-d74a13e-c-peak", "target/perf/w1-47/c2-d74a13e-progressed-peak", "target/perf/w1-47/c2-d74a13e-b-progressed-peak"],
+      "interface_draw_mean_ms": {
+        "peak": { "normal": { "before": 1.1888, "after": 1.2623 }, "small": { "before": 1.0655, "after": 1.1087 } },
+        "progressed-peak": { "normal": { "before": 1.6594, "after": 1.6421 }, "small": { "before": 1.4401, "after": 1.4675 } }
+      },
+      "interface_total_mean_ms": {
+        "peak": { "normal": { "before": 2.5215, "after": 2.6351 }, "small": { "before": 2.3551, "after": 2.4706 } },
+        "progressed-peak": { "normal": { "before": 4.7029, "after": 4.6447 }, "small": { "before": 4.4162, "after": 4.4801 } }
+      }
+    },
+    "egui_measured": {
+      "note": "W1-51, with ruling R22 (wave-1 close, gates only tighten): each egui gate is min(W1-32 ceiling, ceil(measured max x factor), the gate it replaces in previous.gates); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn; that case starts from tick 1,000,000, the tick stage_bodies sets, not from the fixture schedule). W5-01 (render-pass split): re-measured on the W5-01 tree (parent 79b7c0a); the 776075c W2-review maxima are kept verbatim under w2_review. The battlefield now paints world, grade, vignette, construction grid and cue pass; the grade and the vignette carry the canvas clip, so they are outside this count as the vignette always was. Every gauge, ring and stroke cue gained an INK halo in one halo mesh (a bar's halo is its track, so bars cost what they did; a ring or line doubles), which adds 360-3940 vertices per scene (normal arena, was peak 32744, progressed-peak 38604, stress 51174, stress-5000-corpses 52405); the hostile underlay and overlay meshes became the cue pass's halo, fill and marker meshes after the vignette, which takes one primitive off every scene (19 -> 18) and moves the stress primitive maximum from tick 2 to tick 0. No vertex maximum tick moved. W5-04 (additive light pools): re-measured on the W5-04 tree (parent fb9d71c). The light pass is one untextured mesh of 17-vertex fans in the arena clip, after the grade; it adds 51 vertices (three pools) at every scene's maximum tick at both arenas, and no primitive (after W5-01 the normal arena was peak 33104, progressed-peak 39444, stress 54994, stress-5000-corpses 56345; the small arena 28144, 34436, 50594, 51945). No maximum tick moved. The cap of 24 pools bounds the pass at 408 vertices. W5-06 (damage-scaled hits, blood decals): re-measured on the W5-06 tree (parent 8ac1771), blood on as before. Hit sparks and kill bursts are one untextured mesh of 4-vertex quads (they were feathered line shapes, one per spark), and the blood decals are one untextured mesh of 9-vertex fans, at most 64 stains of 5 blobs (2880 vertices), under the structures; neither adds a primitive. The vertex maxima moved by -18 to +689 (after W5-04 the normal arena was peak 33155, progressed-peak 39495, stress 55045, stress-5000-corpses 56396; the small arena 28195, 34487, 50645, 51996). No maximum tick moved. W5-07 (elite and affix tells): re-measured on the W5-07 tree (parent 36506ff). Each of at most 48 elites (ELITE_TELLS_MAX) adds a 12-sided ground ring (24 vertices in the halo mesh, 24 in the fill mesh) and a shape marker of 2 to 6 triangles (3 vertices each in the halo and marker meshes) to the three cue meshes, so no primitive. Only the stress fixture stages elites: its vertex maxima rose by 3396 (stress) and 3402 (stress-5000-corpses) at both arenas (after W5-06 the normal arena was stress 55577, stress-5000-corpses 57085; the small arena 51177, 52685); peak and progressed-peak are unchanged. No maximum tick moved and no gate moves, but stress-5000-corpses is 611 vertices under its 61098 gate. These are the maxima at the normal arena; the small arena is lower in every case (peak 28318, progressed-peak 34469, stress 54573, stress-5000-corpses 56087 vertices; 18 primitives each). Every run simulated all its ticks (780, 780, 1980, 1980) and every maximum was first painted on an even tick (max_tick_by_scene). live_battlefield_runs_stay_within_the_egui_gates gates progressed-peak, stress and stress-5000-corpses at the normal arena, painted every 2nd tick of the first 420 and at each scene's recorded max_tick_by_scene ticks (R22: or the exact maxima ticks), running to the latest of them, and asserts that its maxima and their first ticks equal battlefield_primitives_by_scene, battlefield_vertices_by_scene and max_tick_by_scene exactly (W2 review, tests), so a fixture or painter change that moves a recorded maximum fails it until this evidence is re-measured; live_battlefield_gate_paints_every_recorded_maximum_tick pins only the plan builder, and the re-measure asserts full length and the gates. Re-derived: primitives 18 x 1.25 = 22.5 -> 23, below the 24 it replaces, so the gate tightens to 23; progressed-peak vertices 39477 x 1.25 stays at the 40000 ceiling (523 vertices of headroom at the normal arena: W5-11 re-gates after the graphics wave); stress vertices 60487 x 1.25 = 75609 is above the 61098 it would replace, so the gate stays 61098. W4-14 (Npc combat balance, R59): re-measured on the W4-14 tree (parent fbedee2). The review fixtures fight in Npc mode, and npc_arrival_factor 0.9 -> 0.5 halves their director arrivals, so the crowds build more slowly: at the normal arena peak 33278 -> 32968 vertices (maximum tick 300 -> 180), progressed-peak 39477 -> 38839 (300 -> 246), stress 58973 -> 57330 (1980 -> 1440) and stress-5000-corpses 60487 -> 60811 (1700 -> 1534); the small arena peak 28008, progressed-peak 33863, stress 52905, stress-5000-corpses 56411. Primitives stay 18 at the same ticks. No gate moves (progressed-peak stays at the 40000 ceiling; stress-5000-corpses is 287 vertices under its 61098 gate). The perf scenes are lighter while their crowds grow: the closing-phase perf acceptance re-measures them. Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
+      "commit": "fbedee2+W4-14",
+      "factor": 1.25,
+      "ceilings": {
+        "battlefield_primitives_max": 48,
+        "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 72000 }
+      },
+      "battlefield_primitives_max": 18,
+      "battlefield_primitives_by_scene": { "peak": 18, "progressed-peak": 18, "stress": 18, "stress-5000-corpses": 18 },
+      "battlefield_vertices_max": { "progressed-peak": 38839, "stress": 60811 },
+      "battlefield_vertices_by_scene": { "peak": 32968, "progressed-peak": 38839, "stress": 57330, "stress-5000-corpses": 60811 },
+      "max_tick_by_scene": {
+        "peak": { "primitives": 60, "vertices": 180 },
+        "progressed-peak": { "primitives": 60, "vertices": 246 },
+        "stress": { "primitives": 0, "vertices": 1440 },
+        "stress-5000-corpses": { "primitives": 0, "vertices": 1534 }
+      },
+      "w7_09_remeasure": {
+        "note": "W7-09 (closing phase): measure_battlefield_egui_load -- --ignored re-run once on the integrated tree at HEAD 30847f90 (2026-11-16 18:23-18:26 UTC, 190.95 s, exit 0). Every count and maximum tick above is reproduced exactly at both arenas (normal: peak 32968 at tick 180, progressed-peak 38839 at 246, stress 57330 at 1440, stress-5000-corpses 60811 at 1534; small: 28008, 33863, 52905 at tick 1814, 56411; 18 primitives each), and live_battlefield_runs_stay_within_the_egui_gates passes, so the W4-14 record above stands for HEAD and no gate moves: progressed-peak has 1161 vertices of headroom under 40000 and stress-5000-corpses 287 under 61098. fx-stress is not part of this headless measurement; its live maxima are in acceptance.closing.battlefield_live_worst.",
+        "commit": "30847f90",
+        "evidence": "target/perf/w7-09/egui-load.out.txt"
+      },
+      "w7_09_attempt_2": {
+        "note": "W7-09 attempt 2 (closing phase): measure_battlefield_egui_load -- --ignored at HEAD e54faa88 (2026-11-17 06:31-06:49 UTC, 184.33 s, exit 0) reproduces every count and maximum tick above exactly again (normal: peak 32968, progressed-peak 38839, stress 57330, stress-5000-corpses 60811; small: 28008, 33863, 52905, 56411; 18 primitives each), and live_battlefield_runs_stay_within_the_egui_gates passes. No gate moves: progressed-peak keeps 1161 vertices of headroom under 40000 and stress-5000-corpses 287 under 61098.",
+        "commit": "e54faa88",
+        "evidence": "target/perf/w7-09-a2/egui-load.out.txt"
+      },
+      "w2_review": {
+        "note": "The W2-review measurement at 776075c, which egui_measured held until W5-01, and its gate (24 primitives). Its note, verbatim: W1-51, with ruling R22 (wave-1 close, gates only tighten): each egui gate is min(W1-32 ceiling, ceil(measured max x factor), the gate it replaces in previous.gates); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn; that case starts from tick 1,000,000, the tick stage_bodies sets, not from the fixture schedule). W2 review (perf-diagnostics): re-measured at 776075c, on the W2-47 stress fixture (787929f: every catalogue archetype, elites, the last wave tier); the 4d599a5 post-W1-69 maxima are kept verbatim under w1_69. These are the maxima at the normal arena; the small arena is lower in every case (peak 27784, progressed-peak 33596, stress 46494, stress-5000-corpses 47725 vertices; 19 primitives each). W2 review (ui, CF-2-05): re-measured with the INK backing under every hostile callout, one rect per boss name, EXPOSED, CRIT or phase label, which adds 80-160 vertices per scene (normal arena, was peak 32624, progressed-peak 38524, stress 51014, stress-5000-corpses 52325) and moves no primitive count and no maximum tick. Every run simulated all its ticks (780, 780, 1980, 1980) and every maximum was first painted on an even tick (max_tick_by_scene). On the new fixture the stress vertex maxima fall late (tick 1980, and 1700 with full corpse caps), no longer by tick 420. live_battlefield_runs_stay_within_the_egui_gates gates progressed-peak, stress and stress-5000-corpses at the normal arena, painted every 2nd tick of the first 420 and at each scene's recorded max_tick_by_scene ticks (R22: or the exact maxima ticks), running to the latest of them, and asserts that its maxima and their first ticks equal battlefield_primitives_by_scene, battlefield_vertices_by_scene and max_tick_by_scene exactly (W2 review, tests), so a fixture change that moves a recorded maximum fails it until this evidence is re-measured; live_battlefield_gate_paints_every_recorded_maximum_tick pins only the plan builder, and the re-measure asserts full length and the gates. Re-derived, no gate moves: primitives 19 x 1.25 -> 24; progressed-peak vertices 38604 x 1.25 stays at the 40000 ceiling; stress vertices 52405 x 1.25 = 65507 is above the 61098 it would replace, so the gate stays 61098. Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
+        "commit": "776075c",
+        "battlefield_primitives_max": 19,
+        "battlefield_primitives_by_scene": { "peak": 19, "progressed-peak": 19, "stress": 19, "stress-5000-corpses": 19 },
+        "battlefield_vertices_max": { "progressed-peak": 38604, "stress": 52405 },
+        "battlefield_vertices_by_scene": { "peak": 32744, "progressed-peak": 38604, "stress": 51174, "stress-5000-corpses": 52405 },
+        "max_tick_by_scene": {
+          "peak": { "primitives": 60, "vertices": 300 },
+          "progressed-peak": { "primitives": 60, "vertices": 300 },
+          "stress": { "primitives": 2, "vertices": 1980 },
+          "stress-5000-corpses": { "primitives": 2, "vertices": 1700 }
+        }
+      },
+      "w1_69": {
+        "note": "The post-W1-69 measurement at 4d599a5, on the wave-1 stress fixture, which egui_measured held until the W2 review re-measure. Its every maximum was first painted by tick 420, so the live gate then painted only the first 420 ticks.",
+        "commit": "4d599a5",
+        "battlefield_primitives_max": 19,
+        "battlefield_primitives_by_scene": { "peak": 19, "progressed-peak": 19, "stress": 19, "stress-5000-corpses": 19 },
+        "battlefield_vertices_max": { "progressed-peak": 38819, "stress": 49502 },
+        "battlefield_vertices_by_scene": { "peak": 32675, "progressed-peak": 38819, "stress": 47435, "stress-5000-corpses": 49502 },
+        "max_tick_by_scene": {
+          "peak": { "primitives": 120, "vertices": 120 },
+          "progressed-peak": { "primitives": 60, "vertices": 360 },
+          "stress": { "primitives": 2, "vertices": 300 },
+          "stress-5000-corpses": { "primitives": 2, "vertices": 142 }
+        }
+      },
+      "previous": {
+        "note": "The W1-51 measurement at a93e340, before W1-64 to W1-69, and the gates derived from it, which were live until R22. Every maximum fell on a tick divisible by 20 then, so the live gate painted every 10th tick. Under R22 a re-derived gate is never above these.",
+        "commit": "a93e340",
+        "battlefield_primitives_max": 47,
+        "battlefield_primitives_by_scene": { "peak": 29, "progressed-peak": 45, "stress": 47, "stress-5000-corpses": 41 },
+        "battlefield_vertices_max": { "progressed-peak": 37940, "stress": 48878 },
+        "battlefield_vertices_by_scene": { "peak": 32667, "progressed-peak": 37940, "stress": 46801, "stress-5000-corpses": 48878 },
+        "gates": {
+          "battlefield_primitives_max": 48,
+          "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 61098 }
+        }
+      }
+    }
+  },
+  "acceptance": {
+    "note": "Goal-1 acceptance re-run at HEAD in the W1 review, attempt 2 (commit bee4236, 2026-11-07 17:42-17:56 UTC; the dev executable is byte-identical to 867f786's, the commits between are docs only), with the W1-61 passes and gates; informational: the script never reads it. These numbers use the probe spans from review commit 7abb0ab, so interface_total and cpu_frame are not like-for-like with w1_61 or baseline.v3 (VALIDATION.md 'Span boundaries changed after this acceptance'). The three gate passes (dev VSync on progressed-peak; dev and playtest -VsyncOff, all scenes; each -Repeat 3) exited 0 with 0 frames over 50 ms outside driver stalls in every repeat; the stall was active in all three, which excluded 15, 48 and 48 driver stalls under the user ruling. The extra VSync-on peak and stress passes were not re-run; their 867f786 results are under w1_review_867f786. The open W1-61 episode (target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2) and the 867f786 stress frame (sample 932) mean gate 3 on HEAD is still not claimed clean (W2-50). Production-pass plan 9.1 and 9.4, VALIDATION.md 'Goal-1 acceptance re-run at HEAD, attempt 2'.",
+    "commit": "bee4236",
+    "passes": ["target/perf/w1-review2/acc-dev-vsync-progressed-peak", "target/perf/w1-review2/acc-dev-novsync", "target/perf/w1-review2/acc-playtest-novsync"],
+    "exit_codes": { "acc-dev-vsync-progressed-peak": 0, "acc-dev-novsync": 0, "acc-playtest-novsync": 0 },
+    "load_percent_max_during_runs": { "acc-dev-vsync-progressed-peak": 55, "acc-dev-novsync": 60, "acc-playtest-novsync": 52 },
+    "load_percent_mean_during_runs": { "acc-dev-vsync-progressed-peak": 25, "acc-dev-novsync": 28, "acc-playtest-novsync": 27 },
+    "interface_draw_mean_ms": { "progressed-peak": { "normal": 0.9976, "small": 0.9889 } },
+    "interface_total_mean_ms": { "progressed-peak": { "normal": 1.8981, "small": 1.8237 } },
+    "cpu_frame_p99_ms": {
+      "dev": { "progressed-peak": { "normal": 6.7743, "small": 6.6317 }, "stress": { "normal": 7.2959, "small": 7.2769 } },
+      "playtest": { "progressed-peak": { "normal": 6.2513, "small": 5.9181 }, "stress": { "normal": 6.4303, "small": 6.2772 } }
+    },
+    "frames_over_50ms_worst": 0,
+    "driver_stalls": { "acc-dev-vsync-progressed-peak": 15, "acc-dev-novsync": 48, "acc-playtest-novsync": 48 },
+    "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "commit": "199d823", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
+    "shipped_smoke_seconds": { "median": 1.257, "runs": [2.719, 1.245, 1.257], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-review2/acc-playtest-novsync/shipped" },
+    "closing": {
+      "note": "W7-09 final acceptance at the release candidate, attempt 1 (closing phase, R36), at HEAD 30847f90 on a clean tree, window_utc 2026-11-16 18:58 to 23:10 UTC; informational, the script never reads it and no test pins it yet (RECORDED_CPU_GATED_SCENES still lists progressed-peak and stress only, so these fx-stress cells are not pinned). Every pass held the display on (R27, no Kernel-Power 506/507 event in a kept run) and waited for an R30 quiet window; another session's cargo builds and release soak tests ran on the machine (quiet windows up to 2195 s), and a group with an invalid run (a CPU load sample of 90% or more, or unfocused sample frames) after the one rerun was re-measured as a whole group (W1-37). No valid group was re-measured (R34). gate_clean is false wherever an invocation printed a VALID OVER: those stand. The acceptance is NOT met: dev -VsyncOff exits 1 (fx-stress/normal cpu_frame p99 10.2157 > 10.0 and peak/normal egui texture uploads 1 > 0), playtest -VsyncOff has the same peak/normal upload over, and dev VSync on has progressed-peak interface_draw 1.1395 / 1.1421 over 1.129 / 1.030 (G1.10). The R31 A/B passes, playtest VSync on (the shipped default, pipelined on) passes every cell, and frames over 50 ms outside driver stalls are 0 in every kept repeat with 0 driver stalls. Production-pass plan 9.1, VALIDATION.md 'W7-09 final perf acceptance at the release candidate'.",
+      "commit": "30847f90",
+      "window_utc": ["2026-11-16T18:58:17Z", "2026-11-16T23:10:32Z"],
+      "executables_sha256": { "dev": "89d61656", "playtest": "47efa4a9", "shipped": "5a597fd2", "ab_a": "0df08943", "ab_b": "c976e731" },
+      "passes": {
+        "dev-novsync": {
+          "command": "-Scene all -Profile dev -VsyncOff -Repeat 3", "exit": 1, "evidence": ["target/perf/w7-09/acc-dev-novsync"],
+          "gate_clean": false,
+          "invocations": {
+            "acc-dev-novsync": {
+              "started_utc": "2026-11-16T18:58:17Z", "exit": 1,
+              "over": [
+                { "scene": "fx-stress", "size": "normal", "metric": "cpu_frame_p99_ms", "median": 10.2157, "limit": 10.0, "repeats": [10.1457, 10.2157, 10.3331], "load_max_percent": [72, 42, 9] },
+                { "scene": "peak", "size": "normal", "metric": "egui_texture_uploads", "worst": 1, "limit": 0, "repeats": [1, 1, 1], "bytes": 6420 }
+              ]
+            }
+          }
+        },
+        "playtest-novsync": {
+          "command": "-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke", "exit": 0, "evidence": ["target/perf/w7-09/acc-playtest-novsync", "target/perf/w7-09/acc-playtest-novsync-b-progressed-peak", "target/perf/w7-09/acc-playtest-novsync-b-stress"],
+          "gate_clean": false,
+          "invocations": {
+            "acc-playtest-novsync": {
+              "started_utc": "2026-11-16T19:39:53Z", "exit": 2,
+              "invalid_groups": ["progressed-peak/small", "stress/small"],
+              "over": [{ "scene": "peak", "size": "normal", "metric": "egui_texture_uploads", "worst": 1, "limit": 0, "repeats": [1, 1, 1], "bytes": 6420 }]
+            },
+            "acc-playtest-novsync-b-progressed-peak": { "started_utc": "2026-11-16T19:59:58Z", "exit": 0, "remeasures": ["progressed-peak/normal", "progressed-peak/small"] },
+            "acc-playtest-novsync-b-stress": { "started_utc": "2026-11-16T20:06:50Z", "exit": 0, "remeasures": ["stress/normal", "stress/small"] }
+          }
+        },
+        "dev-vsync": {
+          "command": "-Scene all -Profile dev -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09/acc-dev-vsync", "target/perf/w7-09/acc-dev-vsync-b-stress", "target/perf/w7-09/acc-dev-vsync-b-fx-stress", "target/perf/w7-09/acc-dev-vsync-c-stress"],
+          "gate_clean": false,
+          "invocations": {
+            "acc-dev-vsync": {
+              "started_utc": "2026-11-16T20:09:39Z", "exit": 2,
+              "invalid_groups": ["fx-stress/small", "stress/small"],
+              "over": [
+                { "scene": "progressed-peak", "size": "normal", "metric": "interface_draw_mean_ms", "median": 1.1395, "limit": 1.129, "repeats": [1.1199, 1.1592, 1.1395], "load_max_percent": [46, 55, 66] },
+                { "scene": "progressed-peak", "size": "small", "metric": "interface_draw_mean_ms", "median": 1.1421, "limit": 1.03, "repeats": [1.4464, 1.1421, 1.138], "load_max_percent": [88, 4, 49] }
+              ]
+            },
+            "acc-dev-vsync-b-stress": { "started_utc": "2026-11-16T20:24:50Z", "exit": 2, "invalid_groups": ["stress/normal", "stress/small"], "remeasures": ["stress/normal", "stress/small"] },
+            "acc-dev-vsync-b-fx-stress": { "started_utc": "2026-11-16T20:48:43Z", "exit": 0, "remeasures": ["fx-stress/normal", "fx-stress/small"] },
+            "acc-dev-vsync-c-stress": { "started_utc": "2026-11-16T21:36:49Z", "exit": 0, "remeasures": ["stress/normal", "stress/small"] }
+          }
+        },
+        "playtest-vsync": {
+          "command": "-Scene all -Profile playtest -Pipelined on -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09/acc-playtest-vsync", "target/perf/w7-09/acc-playtest-vsync-b-fx-stress"],
+          "gate_clean": true,
+          "invocations": {
+            "acc-playtest-vsync": { "started_utc": "2026-11-16T21:57:57Z", "exit": 2, "invalid_groups": ["fx-stress/small"] },
+            "acc-playtest-vsync-b-fx-stress": { "started_utc": "2026-11-16T22:11:51Z", "exit": 0, "remeasures": ["fx-stress/normal", "fx-stress/small"] }
+          }
+        }
+      },
+      "load_percent_max_during_runs": { "dev-novsync": 75, "playtest-novsync": 84, "dev-vsync": 88, "playtest-vsync": 85 },
+      "cpu_frame_p99_ms": {
+        "dev": {
+          "progressed-peak": { "normal": 9.2249, "small": 8.5572 },
+          "stress": { "normal": 9.8009, "small": 9.438 },
+          "fx-stress": { "normal": 10.2157, "small": 9.101 }
+        },
+        "playtest": {
+          "progressed-peak": { "normal": 6.733, "small": 8.1823 },
+          "stress": { "normal": 8.7803, "small": 8.2486 },
+          "fx-stress": { "normal": 8.9746, "small": 8.9505 }
+        }
+      },
+      "interface_draw_mean_ms": {
+        "peak": { "normal": 0.8755, "small": 0.8762 },
+        "progressed-peak": { "normal": 1.1395, "small": 1.1421 },
+        "stress": { "normal": 1.471, "small": 1.469 },
+        "fx-stress": { "normal": 1.5921, "small": 1.6287 }
+      },
+      "interface_total_mean_ms": {
+        "peak": { "normal": 1.6838, "small": 1.6206 },
+        "progressed-peak": { "normal": 2.1127, "small": 2.0252 },
+        "stress": { "normal": 2.4693, "small": 2.3927 },
+        "fx-stress": { "normal": 2.6421, "small": 2.6378 }
+      },
+      "interface_total_ab": {
+        "evidence": "target/perf/w7-09/ab-interface-total-b", "started_utc": "2026-11-16T23:02:30Z", "exit": 0, "pairs": 5, "tolerance": 1.05,
+        "a_commit": "ab03da9", "b_commit": "30847f90",
+        "normal": { "a_median": 2.0248, "b_median": 2.101, "ratio": 1.0376 },
+        "small": { "a_median": 1.9396, "b_median": 1.9907, "ratio": 1.0263 },
+        "first_sitting": "target/perf/w7-09/ab-interface-total (exit 2: A pair 2 small and pair 3 normal at 97-100% CPU load)"
+      },
+      "frames_over_50ms_worst": 0,
+      "driver_stalls": 0,
+      "gate3_shipped_default": { "evidence": "target/perf/w7-09/acc-playtest-vsync", "scene": "stress", "profile": "playtest", "pipelined": true, "mean_fps": { "normal": 60.0, "small": 60.0 }, "p99_interval_ms": { "normal": 17.63, "small": 19.95 }, "frames_over_33ms_worst": 0, "frames_over_50ms_worst": 0 },
+      "battlefield_live_worst": {
+        "primitives": { "peak": 18, "progressed-peak": 19, "stress": 22, "fx-stress": 22, "gate": 23 },
+        "vertices": { "progressed-peak": 38707, "stress": 55055, "fx-stress": 60311, "gates": { "progressed-peak": 40000, "stress": 61098 } }
+      },
+      "shipped_smoke_seconds": { "median": 1.056, "runs": [2.296, 1.056, 0.968], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w7-09/acc-playtest-novsync/shipped" },
+      "packaged_smoke_seconds": { "runs": [1.5, 1.51, 1.47], "commit": "61bced1a", "evidence": "VALIDATION.md 'Closing playtest package' (Lastlight.exe --smoke from the unpacked package)" },
+      "integrated_gpu": "pending (not measured; informational only)",
+      "attempt_2": {
+        "note": "W7-09 attempt 2 at HEAD e54faa88 (after 400c8efb, 27d763cb, b33f03fe, a0278a08), window_utc 2026-11-17 03:18 to 06:24 UTC; informational, the script never reads it and no test pins it (RECORDED_CPU_GATED_SCENES still lists progressed-peak and stress only). Attempt 1 above stands as recorded for 30847f90 (R34); this is a new measurement at a later HEAD. The tree carried another session's uncommitted A6-18 edits, inert without LASTLIGHT_PERF_AUDIO, which no run set. Every pass held the display on (R27) and waited for an R30 quiet window (86-245 s, no foreign build); every pass exited 0 on its first invocation with every group valid (6 runs retried once: one Kernel-Power 507, five unreadable CPU load samples), and no invocation printed a VALID OVER. The acceptance is met: CPU p99 at most 6.79 ms in the gated scenes, G1.10 0.932 / 0.903 ms, 0 egui texture uploads after warmup, 0 frames over 50 ms and 0 driver stalls, gate 3 holds in the shipped default, and the R31 A/B passes at B / A 0.913 / 0.912. VALIDATION.md 'W7-09 final perf acceptance, attempt 2'.",
+        "commit": "e54faa88",
+        "window_utc": ["2026-11-17T03:18:10Z", "2026-11-17T06:24:16Z"],
+        "executables_sha256": { "dev": "483ba953", "playtest": "0167474a", "shipped": "a5e047d0", "ab_a": "b196cbef", "ab_b": "6f6a0d94" },
+        "passes": {
+          "dev-novsync": { "command": "-Scene all -Profile dev -VsyncOff -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09-a2/acc-dev-novsync"], "gate_clean": true, "started_utc": "2026-11-17T03:18:10Z" },
+          "playtest-novsync": { "command": "-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke", "exit": 0, "evidence": ["target/perf/w7-09-a2/acc-playtest-novsync"], "gate_clean": true, "started_utc": "2026-11-17T03:55:40Z" },
+          "dev-vsync": { "command": "-Scene all -Profile dev -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09-a2/acc-dev-vsync"], "gate_clean": true, "started_utc": "2026-11-17T04:44:14Z" },
+          "playtest-vsync": { "command": "-Scene all -Profile playtest -Pipelined on -Repeat 3", "exit": 0, "evidence": ["target/perf/w7-09-a2/acc-playtest-vsync"], "gate_clean": true, "started_utc": "2026-11-17T05:27:15Z" }
+        },
+        "load_percent_max_during_runs": { "dev-novsync": 54, "playtest-novsync": 70, "dev-vsync": 80, "playtest-vsync": 76 },
+        "cpu_frame_p99_ms": {
+          "dev": {
+            "progressed-peak": { "normal": 5.5242, "small": 6.3619 },
+            "stress": { "normal": 6.3152, "small": 6.6961 },
+            "fx-stress": { "normal": 6.6627, "small": 6.7943 }
+          },
+          "playtest": {
+            "progressed-peak": { "normal": 5.3816, "small": 4.7781 },
+            "stress": { "normal": 6.407, "small": 6.1865 },
+            "fx-stress": { "normal": 5.8732, "small": 5.9237 }
+          }
+        },
+        "interface_draw_mean_ms": {
+          "peak": { "normal": 0.714, "small": 0.712 },
+          "progressed-peak": { "normal": 0.9319, "small": 0.9029 },
+          "stress": { "normal": 1.276, "small": 1.2656 },
+          "fx-stress": { "normal": 1.3718, "small": 1.3755 }
+        },
+        "interface_total_mean_ms": {
+          "peak": { "normal": 1.4278, "small": 1.3591 },
+          "progressed-peak": { "normal": 1.7497, "small": 1.657 },
+          "stress": { "normal": 2.1743, "small": 2.09 },
+          "fx-stress": { "normal": 2.2847, "small": 2.2279 }
+        },
+        "interface_total_ab": {
+          "evidence": "target/perf/w7-09-a2/ab-interface-total", "started_utc": "2026-11-17T06:11:26Z", "exit": 0, "pairs": 5, "tolerance": 1.05,
+          "a_commit": "ab03da9", "b_commit": "e54faa88",
+          "normal": { "a_median": 1.8865, "b_median": 1.7221, "ratio": 0.9129 },
+          "small": { "a_median": 1.8168, "b_median": 1.6575, "ratio": 0.9124 }
+        },
+        "egui_texture_uploads_worst": 0,
+        "frames_over_50ms_worst": 0,
+        "driver_stalls": 0,
+        "gate3_shipped_default": { "evidence": "target/perf/w7-09-a2/acc-playtest-vsync", "scene": "stress", "profile": "playtest", "pipelined": true, "mean_fps": { "normal": 60.0, "small": 60.0 }, "p99_interval_ms": { "normal": 17.65, "small": 19.84 }, "frames_over_33ms_worst": 0, "frames_over_50ms_worst": 0 },
+        "battlefield_live_worst": {
+          "primitives": { "peak": 19, "progressed-peak": 20, "stress": 22, "fx-stress": 22, "gate": 23 },
+          "vertices": { "progressed-peak": 38707, "stress": 55055, "fx-stress": 60311, "gates": { "progressed-peak": 40000, "stress": 61098 } }
+        },
+        "shipped_smoke_seconds": { "median": 0.888, "runs": [2.131, 0.888, 0.877], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w7-09-a2/acc-playtest-novsync/shipped" },
+        "packaged_smoke_seconds": { "runs": [1.5, 1.51, 1.47], "commit": "61bced1a", "evidence": "not re-packaged in attempt 2; VALIDATION.md 'Closing playtest package'" },
+        "loudness": { "evidence": "target/perf/w7-09-a2/offline-mix.out.txt", "passed": 14, "reference_stage1_lufs": -24.1, "reference_rain_lufs": -22.9, "dense_true_peak": 0.885, "max_sliders_lufs": -20.3 },
+        "integrated_gpu": "pending (not measured; informational only)"
+      }
+    },
+    "w2_47": {
+      "note": "W2-47 re-gate on the wave-2 stress fixture (all 18 catalogue archetypes, elites, the last wave tier, the boss's phase state), window_utc 2026-11-09 22:15 to 2026-11-10 02:27 UTC; informational, the script never reads it, and perf_budget_records_the_w2_47_regate pins it. Every pass ran with the R27 display hold and the R30 quiet window and load check, on a machine shared with another session's cargo builds and tests. Each invocation records its start, the commit it ran at, its executable (sha256 prefix), its exit, its invalid groups (scene/size with an invalid run after the one rerun: a CPU load sample of 90% or more, or an unreadable one), any valid gated cell over its limit (over) and the groups it re-measures. exit is the last invocation's exit, so for dev-vsync and playtest-vsync it is the exit over the kept groups. Invalid groups were re-measured as whole scene groups, as W1-37 did. dev-novsync is the exception: its first invocation also had a valid over (progressed-peak/small cpu_frame p99, exit 2 only because invalid runs rank above an over), and the whole pass was re-measured, which neither R30 nor the W1-37 method allows for a valid group, so gate_clean is false: R34 (plan 2.4) answered the plan 2.5 row (W2-47 review), the valid over stands, may not be re-measured away, and W5-11 re-gates it. The executables are the bd12d1c-era sources (the bin is unchanged from 0213760 to bd12d1c); later wave-2 commits change the binary, among them presentation (3d4e881, 1cb775a), core simulation and campaign rules (759cf49, aa21781, 95c239f, 83d533e, a86c5a4, 4b4dc4a, bf7cfd3, ec09c1d) and the ruleset constant (e3f52fa), so these are not HEAD's executables and the wave-2 close perf acceptance at HEAD (R34) is a new measurement. The first four invocations ran at 43184d1, the reruns and the A/B at bd12d1c after the A/B fix's cargo clean, so two hashes per profile. VALIDATION.md 'W2-47 re-gate on the wave-2 stress fixture'.",
+      "commits": ["43184d1", "bd12d1c"],
+      "window_utc": ["2026-11-09T22:15:11Z", "2026-11-10T02:26:53Z"],
+      "passes": {
+        "dev-novsync": {
+          "command": "-Scene all -Profile dev -VsyncOff -Repeat 3", "exit": 0, "evidence": ["target/perf/w2-47/gate-dev-novsync-b"],
+          "gate_clean": false,
+          "not_clean": "progressed-peak/small cpu_frame p99 was a valid over in gate-dev-novsync (median 12.7565 against 10.0; repeats 24.5503 / 12.7565 / 10.5083 ms at load maxima 72 / 52 / 44%, under R30's 90%). The invocation exited 2 because three other groups were invalid, and the whole pass was re-measured on the writer's judgement of a loaded machine (gate-dev-novsync-b, progressed-peak/small 7.2073). R30 and the W1-37 method re-measure invalid groups only, so the over stands: R34 (plan 2.4) answered the plan 2.5 row 'A valid over in a pass masked by invalid runs (W2-47 review)' by keeping its default, a valid gated over may not be re-measured away, the dev -VsyncOff progressed-peak gate is not claimed clean at W2-47 and W5-11 re-gates it.",
+          "invocations": {
+            "gate-dev-novsync": {
+              "started_utc": "2026-11-09T22:15:11Z", "commit": "43184d1", "executable_sha256": "dc17010c", "exit": 2,
+              "invalid_groups": ["peak/normal", "progressed-peak/normal", "stress/small"],
+              "over": [{ "scene": "progressed-peak", "size": "small", "metric": "cpu_frame_p99_ms", "median": 12.7565, "limit": 10.0, "repeats": [24.5503, 12.7565, 10.5083], "load_max_percent": [72, 52, 44] }]
+            },
+            "gate-dev-novsync-b": {
+              "started_utc": "2026-11-10T01:15:24Z", "commit": "bd12d1c", "executable_sha256": "79f0cbc8", "exit": 0,
+              "remeasures": ["peak/normal", "peak/small", "progressed-peak/normal", "progressed-peak/small", "stress/normal", "stress/small"]
+            }
+          }
+        },
+        "playtest-novsync": {
+          "command": "-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke", "exit": 0, "evidence": ["target/perf/w2-47/gate-playtest-novsync"],
+          "gate_clean": true,
+          "invocations": {
+            "gate-playtest-novsync": { "started_utc": "2026-11-09T22:25:40Z", "commit": "43184d1", "executable_sha256": "ccd7c287", "exit": 0 }
+          }
+        },
+        "dev-vsync": {
+          "command": "-Scene all -Profile dev -Repeat 3", "exit": 0, "evidence": ["target/perf/w2-47/gate-dev-vsync", "target/perf/w2-47/gate-dev-vsync-stress-b"],
+          "gate_clean": true,
+          "invocations": {
+            "gate-dev-vsync": { "started_utc": "2026-11-09T22:48:27Z", "commit": "43184d1", "executable_sha256": "dc17010c", "exit": 2, "invalid_groups": ["stress/normal"] },
+            "gate-dev-vsync-stress-b": { "started_utc": "2026-11-10T01:27:09Z", "commit": "bd12d1c", "executable_sha256": "79f0cbc8", "exit": 0, "remeasures": ["stress/normal", "stress/small"] }
+          }
+        },
+        "playtest-vsync": {
+          "command": "-Scene all -Profile playtest -Repeat 3", "exit": 0, "evidence": ["target/perf/w2-47/gate-playtest-vsync", "target/perf/w2-47/gate-playtest-vsync-progressed-peak-b"],
+          "gate_clean": true,
+          "invocations": {
+            "gate-playtest-vsync": { "started_utc": "2026-11-09T22:58:38Z", "commit": "43184d1", "executable_sha256": "ccd7c287", "exit": 2, "invalid_groups": ["progressed-peak/small"] },
+            "gate-playtest-vsync-progressed-peak-b": { "started_utc": "2026-11-10T02:13:01Z", "commit": "bd12d1c", "executable_sha256": "8076c139", "exit": 0, "remeasures": ["progressed-peak/normal", "progressed-peak/small"] }
+          }
+        }
+      },
+      "executables_sha256": { "dev": ["dc17010c", "79f0cbc8"], "playtest": ["ccd7c287", "8076c139"] },
+      "load_percent_max_during_runs": { "dev-novsync": 83, "playtest-novsync": 73, "dev-vsync": 69, "playtest-vsync": 73 },
+      "cpu_frame_p99_ms": {
+        "dev": { "progressed-peak": { "normal": 7.158, "small": 7.2073 }, "stress": { "normal": 8.4624, "small": 9.6467 } },
+        "playtest": { "progressed-peak": { "normal": 6.798, "small": 6.9808 }, "stress": { "normal": 7.6794, "small": 7.1732 } }
+      },
+      "interface_draw_mean_ms": { "progressed-peak": { "normal": 1.0264, "small": 0.9917 }, "peak": { "normal": 0.8162, "small": 0.7825 } },
+      "interface_total_mean_ms": { "progressed-peak": { "normal": 1.9663, "small": 1.7993 } },
+      "frames_over_50ms_worst": 0,
+      "frames_over_33ms_worst": 0,
+      "driver_stalls": 0,
+      "shipped_default_vsync_stress": { "evidence": "target/perf/w2-47/gate-playtest-vsync", "mean_fps": { "normal": 60.0001, "small": 60.0002 }, "p99_frame_ms": { "normal": 17.9966, "small": 19.5346 }, "frames_over_50ms_worst": 0, "frames_over_33ms_worst": 0 },
+      "interface_total_ab": {
+        "ruling": "R31",
+        "evidence": "target/perf/w2-47/ab-interface-total-c",
+        "invalid_attempts": { "ab-interface-total": "both arms ran ab03da9 (the A/B build bug, fixed in bd12d1c)", "ab-interface-total-b": "pairs 4-5 invalid on CPU load samples of 100%" },
+        "a_commit": "ab03da9",
+        "b_commit": "bd12d1c",
+        "a_sha256": "5ce1c87a3354904dea4244dc72f8e6cd97f27b64427eac997c6d9b34dff6e465",
+        "b_sha256": "79f0cbc8cb5ceb0d8c8e094c4aed577fd2e6ffe300ce6caa4493044c7f77708b",
+        "pairs": 5,
+        "tolerance": 1.05,
+        "normal": { "a_median": 2.133, "b_median": 2.0523, "ratio": 0.9622 },
+        "small": { "a_median": 2.067, "b_median": 1.9915, "ratio": 0.9634 }
+      },
+      "shipped_smoke_seconds": { "median": 0.925, "runs": [2.605, 0.909, 0.925], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w2-47/gate-playtest-novsync/shipped" }
+    },
+    "w1_review_867f786": {
+      "note": "First Goal-1 re-run in the W1 review (867f786, 2026-11-07 17:07-17:30 UTC), with two extra dev VSync-on passes (peak, stress). The stress pass exited 1 on one gated frame (stress normal r1, sample 932, 54.74 ms, acquire share 0.794, directly after three ~1,000 ms stalls; W2-50). VALIDATION.md 'Goal-1 acceptance re-run at HEAD'.",
+      "commit": "867f786",
+      "passes": ["target/perf/w1-review/acc-dev-vsync-progressed-peak", "target/perf/w1-review/acc-dev-novsync", "target/perf/w1-review/acc-playtest-novsync", "target/perf/w1-review/acc-dev-vsync-peak", "target/perf/w1-review/acc-dev-vsync-stress"],
+      "exit_codes": { "acc-dev-vsync-progressed-peak": 0, "acc-dev-novsync": 0, "acc-playtest-novsync": 0, "acc-dev-vsync-peak": 0, "acc-dev-vsync-stress": 1 },
+      "load_percent_max_during_runs": { "acc-dev-vsync-progressed-peak": 47, "acc-dev-novsync": 67, "acc-playtest-novsync": 59, "acc-dev-vsync-peak": 51, "acc-dev-vsync-stress": 46 },
+      "interface_draw_mean_ms": { "progressed-peak": { "normal": 1.0386, "small": 1.0117 }, "peak": { "normal": 0.7837, "small": 0.7738 } },
+      "interface_total_mean_ms": { "progressed-peak": { "normal": 1.9647, "small": 1.8655 } },
+      "cpu_frame_p99_ms": {
+        "dev": { "progressed-peak": { "normal": 6.7953, "small": 6.4726 }, "stress": { "normal": 7.5778, "small": 7.1283 } },
+        "playtest": { "progressed-peak": { "normal": 5.9143, "small": 5.6117 }, "stress": { "normal": 6.4805, "small": 6.0934 } }
+      },
+      "frames_over_50ms_worst": 0,
+      "driver_stalls": { "acc-dev-vsync-progressed-peak": 0, "acc-dev-novsync": 0, "acc-playtest-novsync": 35, "acc-dev-vsync-peak": 5, "acc-dev-vsync-stress": 40 },
+      "dev_vsync_stress_gated_frames_over_50ms_worst": 1,
+      "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "commit": "199d823", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
+      "shipped_smoke_seconds": { "median": 1.23, "runs": [2.793, 1.23, 1.185], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-review/acc-playtest-novsync/shipped" }
+    },
+    "w1_61": {
+      "commit": "199d823",
+      "passes": ["target/perf/w1-61/head-acc-dev-vsync-progressed-peak", "target/perf/w1-61/head-acc-dev-vsync-peak", "target/perf/w1-61/head-acc-dev-vsync-stress", "target/perf/w1-61/head-acc-dev-novsync", "target/perf/w1-61/head-acc-playtest-novsync"],
+      "interface_draw_mean_ms": { "progressed-peak": { "normal": 0.9903, "small": 0.9517 }, "peak": { "normal": 0.7745, "small": 0.7681 } },
+      "cpu_frame_p99_ms": {
+        "dev": { "progressed-peak": { "normal": 8.8481, "small": 7.0104 }, "stress": { "normal": 7.5018, "small": 7.8428 } },
+        "playtest": { "progressed-peak": { "normal": 6.2634, "small": 6.4433 }, "stress": { "normal": 6.4769, "small": 6.5375 } }
+      },
+      "frames_over_50ms_worst": 0,
+      "driver_stalls": 0,
+      "shipped_smoke_seconds": { "median": 1.23, "runs": [2.432, 1.186, 1.23], "evidence": "target/perf/w1-61/head-acc-playtest-novsync/shipped" }
+    }
+  },
+  "decisions": {
+    "pipelined_rendering": {
+      "default": true,
+      "rule": "Switch the default off only if, with pipelining off, every -VsyncOff progressed-peak and stress cpu_frame p99 (median of 3, playtest and dev, both sizes) is at most 12.0 ms with 0 frames over 33 ms (worst repeat), and the playtest VSync-on runs keep a mean FPS of at least 59.5, a p99 frame interval of at most 17.7 ms (medians of 3) and 0 frames over 50 ms (worst repeat); otherwise keep it on. Per the W1-61 user ruling on gate 3 the frame counts, mean FPS and p99 interval are those outside driver stalls (driver_stalls.outside); driver_stalls counts the excluded stalls per cell over its 3 repeats. Low latency always turns pipelining off.",
+      "commit": "199d823",
+      "thresholds": { "cpu_frame_p99_ms_max": 12.0, "frames_over_33ms_max": 0, "vsync_on_mean_fps_min": 59.5, "vsync_on_p99_frame_ms_max": 17.7, "vsync_on_frames_over_50ms_max": 0 },
+      "runs": {"playtest": {"on": 12, "off": 12}, "dev": {"on": 12, "off": 12}, "vsync_on": {"on": 12, "off": 12}},
+      "off": {
+        "vsync_off": {
+          "playtest": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 6.3207, "frames_over_33ms_worst": 0, "driver_stalls": 13}, "small": {"cpu_frame_p99_ms_median": 5.7295, "frames_over_33ms_worst": 0, "driver_stalls": 16}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 6.0891, "frames_over_33ms_worst": 0, "driver_stalls": 16}, "small": {"cpu_frame_p99_ms_median": 6.0313, "frames_over_33ms_worst": 0, "driver_stalls": 9}}
+          },
+          "dev": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 6.9265, "frames_over_33ms_worst": 0, "driver_stalls": 21}, "small": {"cpu_frame_p99_ms_median": 6.5375, "frames_over_33ms_worst": 0, "driver_stalls": 13}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 6.8747, "frames_over_33ms_worst": 0, "driver_stalls": 21}, "small": {"cpu_frame_p99_ms_median": 6.7268, "frames_over_33ms_worst": 0, "driver_stalls": 14}}
+          }
+        },
+        "vsync_on": {
+          "progressed-peak": {"normal": {"mean_fps_median": 59.999, "p99_frame_ms_median": 17.3962, "frames_over_50ms_worst": 0, "driver_stalls": 5}, "small": {"mean_fps_median": 59.9936, "p99_frame_ms_median": 19.1265, "frames_over_50ms_worst": 0, "driver_stalls": 3}},
+          "stress": {"normal": {"mean_fps_median": 59.9993, "p99_frame_ms_median": 17.3545, "frames_over_50ms_worst": 0, "driver_stalls": 0}, "small": {"mean_fps_median": 59.9976, "p99_frame_ms_median": 19.6554, "frames_over_50ms_worst": 0, "driver_stalls": 0}}
+        }
+      },
+      "on": {
+        "vsync_off": {
+          "playtest": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 6.1473, "frames_over_33ms_worst": 0, "driver_stalls": 13}, "small": {"cpu_frame_p99_ms_median": 6.1237, "frames_over_33ms_worst": 0, "driver_stalls": 7}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 7.3011, "frames_over_33ms_worst": 0, "driver_stalls": 17}, "small": {"cpu_frame_p99_ms_median": 6.0757, "frames_over_33ms_worst": 0, "driver_stalls": 8}}
+          },
+          "dev": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 7.1142, "frames_over_33ms_worst": 0, "driver_stalls": 9}, "small": {"cpu_frame_p99_ms_median": 6.4874, "frames_over_33ms_worst": 0, "driver_stalls": 10}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 7.5468, "frames_over_33ms_worst": 0, "driver_stalls": 20}, "small": {"cpu_frame_p99_ms_median": 7.0343, "frames_over_33ms_worst": 0, "driver_stalls": 13}}
+          }
+        },
+        "vsync_on": {
+          "progressed-peak": {"normal": {"mean_fps_median": 59.9972, "p99_frame_ms_median": 17.4479, "frames_over_50ms_worst": 0, "driver_stalls": 1}, "small": {"mean_fps_median": 60.0007, "p99_frame_ms_median": 19.6888, "frames_over_50ms_worst": 0, "driver_stalls": 3}},
+          "stress": {"normal": {"mean_fps_median": 59.999, "p99_frame_ms_median": 17.825, "frames_over_50ms_worst": 6, "driver_stalls": 3}, "small": {"mean_fps_median": 59.9966, "p99_frame_ms_median": 19.6043, "frames_over_50ms_worst": 0, "driver_stalls": 0}}
+        }
+      },
+      "evidence": ["target/perf/w1-61/head-ab-playtest-novsync", "target/perf/w1-61/head-ab-dev-novsync", "target/perf/w1-61/head-ab-playtest-vsync"]
+    }
+  }
+}

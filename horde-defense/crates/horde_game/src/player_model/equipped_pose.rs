@@ -828,6 +828,10 @@ pub fn resolve_pose(
         source_sockets,
     })
 }
+/// The pose of `model_id` in `equipment`: [`resolve_appearance`], then
+/// [`resolve_equipped_pose`]. Play resolves its appearance through the
+/// presentation cache instead (`visual_assets::resolve_player_model`).
+#[cfg(any(test, feature = "review"))]
 pub fn resolve_equipped_model(
     c: &CompiledCatalogue,
     model_id: &str,
@@ -836,7 +840,19 @@ pub fn resolve_equipped_model(
     placement: ModelPlacement,
 ) -> Result<ResolvedPlayerPose, String> {
     let appearance = resolve_appearance(c, model_id, equipment)?;
-    resolve_pose(c, &appearance, sample, placement).map_err(|e| {
+    resolve_equipped_pose(c, model_id, &appearance, sample, placement)
+}
+
+/// The pose of `model_id` in an `appearance` resolved already: the second
+/// half of `resolve_equipped_model`.
+pub fn resolve_equipped_pose(
+    c: &CompiledCatalogue,
+    model_id: &str,
+    appearance: &ResolvedAppearance,
+    sample: PlayerPoseSample,
+    placement: ModelPlacement,
+) -> Result<ResolvedPlayerPose, String> {
+    resolve_pose(c, appearance, sample, placement).map_err(|e| {
         format!(
             "{model_id} {:?} {:?} aim {:?}: {e}",
             appearance

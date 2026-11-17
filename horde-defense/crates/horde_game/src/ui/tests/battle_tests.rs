@@ -97,6 +97,8 @@ fn mouse_reload_button_queues_a_legal_reload_without_firing() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.attempt_mut().unwrap().ammo = 3;
+    // W3-12: the button is under Management > Field actions.
+    h.click(f, View::Battle, "Management");
     h.click(f, View::Battle, "Reload");
     assert!(f.battle.pending.reload);
     f.game.tick(f.battle.pending.clone());
@@ -308,6 +310,8 @@ fn sidebar_strike_button_uses_the_actual_selected_outer_contact_lane() {
     let f = &mut fixture.frontend;
     input_enemy(f, 0, horde_core::sim::DEFENSE_LINE);
     f.battle.aim = [1.5, 0.5];
+    // W3-12: the button is under Management > Field actions.
+    h.click(f, View::Battle, "Management");
     h.click(f, View::Battle, "Strike contact lane");
     assert!(f.battle.pending.melee);
     h.publish_combat(f, vec![]);
@@ -547,7 +551,11 @@ fn locked_throwables_are_disabled_buttons_that_explain_where_to_learn_them() {
 #[test]
 fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_toggle() {
     let mut fixture = IsolatedFrontend::new();
-    fixture.frontend.game.campaign_mut().coins = 100;
+    fixture.frontend.game.campaign_mut().coins = horde_core::skill_catalog::skills()
+        .node("grenade_training")
+        .unwrap()
+        .price
+        + 50;
     fixture
         .frontend
         .game
@@ -605,7 +613,11 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
     f.game.campaign_mut().player.level = f.game.campaign_mut().player_level_cap();
     f.game.campaign_mut().player.points = f.game.campaign_mut().player.level - 1;
     f.game.campaign_mut().player.xp = 0;
-    f.game.campaign_mut().coins = 100;
+    f.game.campaign_mut().coins = horde_core::skill_catalog::skills()
+        .node("grenade_training")
+        .unwrap()
+        .price
+        + 50;
     f.game
         .campaign_mut()
         .purchase_node("grenade_training")
@@ -665,7 +677,7 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
 }
 
 #[test]
-fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_throw() {
+fn fresh_three_lane_battle_fills_the_arena_width_at_small_size() {
     use horde_core::balance::BalanceSettings;
     let mut fixture = IsolatedFrontend::new();
     fixture
@@ -677,12 +689,24 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    h.frame_size(f, View::Battle, vec![], vec2(1050.0 / 1.35, 700.0 / 1.35));
+    let size = vec2(1050.0 / 1.35, 700.0 / 1.35);
+    h.frame_size(f, View::Battle, vec![], size);
     let rect = f.battle.arena_rect.unwrap();
     let a = f.game.attempt().unwrap();
     assert_eq!((a.lane_count, a.width_yards), (3, 12.0));
-    assert!(rect.width() < 400.0 && rect.height() < 150.0);
-    assert!(rect.height() >= 86.0);
+    // Zoomed to fill: the width-limited 3x12 field spans the whole arena
+    // (1050x700@1.35: 729.8 pt) at 2.5x today's 291.9x86 clearing.
+    let canvas = h.ctx.content_rect();
+    let arena_width = canvas.width() - 48.0;
+    assert!(
+        (rect.width() - arena_width).abs() < 1e-3 && (rect.height() - 215.0).abs() < 0.05,
+        "3x12 field {:?}, expected {arena_width} x 215.0",
+        rect.size()
+    );
+    assert_eq!(
+        rect.x_range(),
+        egui::Rangef::new(24.0, canvas.right() - 24.0)
+    );
     let projection = art::ArenaProjection::for_attempt(rect, a);
     let center = projection.inverse(rect.center());
     assert!((center[0] - 6.0).abs() < 0.0001 && (center[1] - 1.5).abs() < 0.0001);
@@ -700,7 +724,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
         }],
         vec2(1050.0 / 1.35, 700.0 / 1.35),
     );
-    battle::gather_combat_input(&h.ctx, &mut f.ctx());
+    h.combat_input_after_pass(f);
     assert!(f.battle.pending.throw.is_none());
     h.frame_size(
         f,
@@ -725,7 +749,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
         }],
         vec2(1050.0 / 1.35, 700.0 / 1.35),
     );
-    battle::gather_combat_input(&h.ctx, &mut f.ctx());
+    h.combat_input_after_pass(f);
     assert_eq!(f.battle.pending.throw.unwrap().cell, [11, 2]);
 }
 
@@ -739,8 +763,9 @@ fn retreat_is_the_one_visible_withdraw_and_management_keeps_its_tools() {
     let output = h.frame(f, View::Battle, vec![]);
     for kept in [
         "Settings",
-        "Save deployment",
-        "Save and return to menu",
+        // W3-05: the one manual-save label and the compound exit's name.
+        "Save",
+        "Save and return to main menu",
         "Combat log",
     ] {
         assert_eq!(text_count(&output, kept), 1, "Management keeps {kept}");
@@ -780,4 +805,1613 @@ fn the_first_defense_teaches_on_the_field_and_always_names_the_keys() {
     assert!(painted(&output, "PAUSED · Escape to resume"));
     h.click(f, View::Battle, "Hide hints");
     assert!(!f.settings.show_guidance);
+}
+
+/// Closing: the key legend names every key through `settings::binding_text`,
+/// the W3-10 cycle-attack key included, so a core action a rebind's swap
+/// (`Settings::set_binding`) leaves without a key reads "Unbound", never an
+/// empty key. With Pause unbound the READY and PAUSED banners and the opening
+/// lesson name the bar's button alone.
+#[test]
+fn legend_and_pause_banner_name_rebound_and_unbound_keys() {
+    use settings::{Action, BindingId, ExtraAction};
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    h.click(f, View::Dossier, "Start journey");
+    let painted = |output: &FullOutput, text: &str| {
+        output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
+    };
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Mouse1 fire · Mouse2 melee · R reload · B build · Escape pause · Q cycle attack"
+        ),
+        1
+    );
+    // Cycle attack is unbound, then takes Escape: Pause takes its empty key.
+    let cycle = BindingId::Extra(ExtraAction::CycleAttack);
+    f.settings.set_binding(cycle, String::new());
+    f.settings.set_binding(cycle, "Escape".into());
+    assert_eq!(f.settings.binding(BindingId::Core(Action::Pause)), "");
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Mouse1 fire · Mouse2 melee · R reload · B build · Unbound pause · Escape cycle attack"
+        ),
+        1
+    );
+    assert_eq!(text_count(&output, "READY · Begin defense"), 1);
+    assert!(painted(&output, "Press Begin defense to start."));
+    assert!(!painted(&output, "Begin defense or "));
+    h.click(f, View::Battle, "Begin defense");
+    f.game.tick(Input::default());
+    h.click(f, View::Battle, "Pause");
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(text_count(&output, "PAUSED · Resume defense"), 1);
+    assert!(!painted(&output, " to resume"));
+}
+
+/// CF-3-31: an observed (Npc) battle's legend names only the keys that act
+/// while observing, build and pause: the core runs fire, melee and reload
+/// only in a personal defense, and the observed bar has no attack selector
+/// to cycle. The personal legend is unchanged.
+#[test]
+fn observed_battle_legend_names_only_build_and_pause() {
+    let h = Harness::new();
+    let mut fixture = fresh_battle(Mode::Npc, true);
+    let f = &mut fixture.frontend;
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(text_count(&output, "B build · Escape pause"), 1);
+    for absent in ["Mouse1 fire", "Mouse2 melee", "R reload", "cycle attack"] {
+        assert!(
+            !output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, absent)),
+            "the observed legend names {absent:?}"
+        );
+    }
+    let mut fixture = fresh_battle(Mode::Personal, true);
+    let f = &mut fixture.frontend;
+    let output = h.frame(f, View::Battle, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Mouse1 fire · Mouse2 melee · R reload · B build · Escape pause · Q cycle attack"
+        ),
+        1
+    );
+}
+
+/// The two target battle sizes in points: 1440x900 and 1050x700@1.35.
+fn target_sizes() -> [Vec2; 2] {
+    [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)]
+}
+
+/// An unpaused fresh-balance battle (a zoomed opening field: the first clear
+/// that unlocks the trap levels it to 5x14) in `mode` with the trap blueprint.
+/// A `veteran` campaign has finished an attempt; otherwise the battle reads as
+/// a first deployment (`BattleScreen::first_deployment` is the campaign's
+/// attempt count, zeroed after the deploy because Mara joins only after the
+/// introductory attempt).
+fn fresh_battle(mode: Mode, veteran: bool) -> IsolatedFrontend {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.unlock_trap();
+    let campaign = fixture.frontend.game.campaign_mut();
+    campaign
+        .set_balance_settings(horde_core::balance::BalanceSettings::default())
+        .unwrap();
+    campaign.choose_start_country("DEU").unwrap();
+    fixture.frontend.game.deploy_country_stage(0, mode).unwrap();
+    fixture.frontend.game.campaign_mut().attempts = u64::from(veteran);
+    fixture.frontend.game.set_paused(false);
+    fixture.frontend.screen = Screen::Battle;
+    fixture
+}
+
+/// The layout the frame drew for the active attempt, without a hint band.
+fn field_layout(h: &Harness, f: &FrontendParts) -> battle::BattleLayout {
+    let a = f.game.attempt().unwrap();
+    assert!(a.lane_count < 11, "the fixture field is zoomed");
+    battle::BattleLayout::new(h.ctx.content_rect(), a.lane_count, a.width_yards, false)
+}
+
+#[test]
+fn construction_toggle_keeps_arena_rect() {
+    for size in target_sizes() {
+        let mut fixture = IsolatedFrontend::new();
+        fixture.unlock_trap();
+        fixture.deploy();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        assert_eq!(f.game.attempt().unwrap().lane_count, 11);
+        h.frame_size(f, View::Battle, vec![], size);
+        let (field, effects) = (f.battle.arena_rect.unwrap(), f.battle.effects_rect);
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(text_count(&output, "Save country plan"), 1);
+        assert_eq!(
+            f.battle.arena_rect.unwrap(),
+            field,
+            "construction rescaled the {size:?} arena"
+        );
+        assert_eq!(f.battle.effects_rect, effects);
+    }
+}
+
+/// The capture sidecar reports the rects the battle frame recorded, as
+/// `[left, top, right, bottom]` points, and the bar rows it counted as
+/// `hud_rows` (C-10).
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_report_arena_rect_and_hud_rows() {
+    let corners = |r: Rect| [r.left(), r.top(), r.right(), r.bottom()];
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        h.frame_size(f, View::Battle, vec![], size);
+        let facts = review::ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            Some(&f.status),
+            f.screen,
+            f.nav.tab,
+            &f.battle,
+        );
+        let a = f.game.attempt().unwrap();
+        assert!(f.battle.arena_rect.is_some(), "{size:?}: no field recorded");
+        assert_eq!(
+            facts.arena_rect,
+            f.battle.arena_rect.map(corners),
+            "{size:?}"
+        );
+        assert!(
+            f.battle.effects_rect.is_some(),
+            "{size:?}: no effects clip recorded"
+        );
+        assert_eq!(facts.effects_rect, f.battle.effects_rect.map(corners));
+        assert_eq!(facts.observer_arena_rect, None, "no observer in a battle");
+        assert_eq!(facts.screen, "Battle");
+        assert_eq!(facts.tab, None, "a battle has no camp tab");
+        assert_eq!(facts.overlays, ["construction"]);
+        assert_eq!(
+            (facts.lanes, facts.width_yards),
+            (Some(a.lane_count), Some(a.width_yards))
+        );
+        assert!(f.battle.bar_rows > 0, "{size:?}: no bar rows counted");
+        assert_eq!(facts.hud_rows, Some(f.battle.bar_rows), "{size:?}");
+        assert_eq!(facts.reduced_effects, f.settings.reduced_effects);
+        assert_eq!(facts.ui_scale, f.settings.scale);
+        // Off the battle screen a stale field is never reported.
+        f.screen = Screen::Results;
+        let facts = review::ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            Some(&f.status),
+            f.screen,
+            f.nav.tab,
+            &f.battle,
+        );
+        assert_eq!((facts.arena_rect, facts.effects_rect), (None, None));
+        assert_eq!((facts.lanes, facts.overlays.len()), (None, 0));
+        assert_eq!(facts.hud_rows, None, "{size:?}: no bar off the battle");
+    }
+}
+
+/// The control bar's row count (UX-14, C-10). W3-11 pinned the bar before
+/// W3-12 at 3 rows at 1050x700@1.35 (777.8 pt wide): 2 button rows and a
+/// status row. Since W3-12 the fullest personal bar (heal, brace and a
+/// blueprint owned, paused before the first tick so the first button reads
+/// "Begin defense") is 2 rows there and 1 at 1440x900: Reload, Strike contact
+/// lane and Toggle firing are Management field actions, and a status message
+/// is the battle toast, not a row. The running bar ("Pause") and the observed
+/// bar fit one row at both sizes.
+#[test]
+fn battle_bar_rows_measure_todays_bar() {
+    let [large, small] = target_sizes();
+    for (h, size, buttons, observed) in [
+        (Harness::small(), small, 2, 1),
+        (Harness::large(), large, 1, 1),
+    ] {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let f = &mut fixture.frontend;
+        assert_eq!(f.battle.bar_rows, 0, "no battle frame has drawn a bar yet");
+        let profile = &mut f.game.attempt_mut().unwrap().profile;
+        (profile.heal, profile.brace) = (true, true);
+        h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.bar_rows, 1, "{size:?}: the running bar");
+        f.game.set_paused(true);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let canvas = h.ctx.content_rect().size();
+        assert!((canvas - size).length() < 0.5, "{canvas:?} is not {size:?}");
+        for label in [
+            "Begin defense",
+            "Emergency aid",
+            "Brace the line",
+            "Build defenses",
+            "Retreat & train",
+            "Management",
+        ] {
+            assert_eq!(text_count(&output, label), 1, "{size:?}: {label}");
+        }
+        assert_eq!(f.battle.bar_rows, buttons, "{size:?}: buttons");
+        f.status.message = "Rewards retained. Rest, train, and retry.".into();
+        h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.bar_rows, buttons, "{size:?}: with status");
+        // The capture sidecar reports the same count.
+        #[cfg(feature = "review")]
+        assert_eq!(
+            review::ReviewFrameFacts::collect(
+                &f.game,
+                &f.launch,
+                &f.settings,
+                Some(&f.status),
+                f.screen,
+                f.nav.tab,
+                &f.battle
+            )
+            .hud_rows,
+            Some(buttons),
+            "{size:?}"
+        );
+        // The observed bar is counted by the same accumulator.
+        let mut fixture = fresh_battle(Mode::Npc, true);
+        let f = &mut fixture.frontend;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        for label in ["Pause", "Observe", "Tactics", "Recall & train"] {
+            assert_eq!(text_count(&output, label), 1, "{size:?}: {label}");
+        }
+        assert_eq!(f.battle.bar_rows, observed, "{size:?}: observed");
+    }
+}
+
+#[test]
+fn battle_frame_records_layout_rects() {
+    use horde_core::balance::BalanceSettings;
+    for size in target_sizes() {
+        for settings in [BalanceSettings::default(), BalanceSettings::legacy()] {
+            for construction in [false, true] {
+                let mut fixture = IsolatedFrontend::new();
+                fixture
+                    .frontend
+                    .game
+                    .campaign_mut()
+                    .set_balance_settings(settings.clone())
+                    .unwrap();
+                fixture.deploy();
+                let h = Harness::new();
+                let f = &mut fixture.frontend;
+                f.battle.construction = construction;
+                h.frame_size(f, View::Battle, vec![], size);
+                let a = f.game.attempt().unwrap();
+                let first = f.game.campaign().attempts == 0;
+                assert!(first, "a fresh fixture is a first deployment");
+                let layout = battle::BattleLayout::new(
+                    h.ctx.content_rect(),
+                    a.lane_count,
+                    a.width_yards,
+                    first,
+                );
+                let label = format!(
+                    "{}x{} construction {construction} at {size:?}",
+                    a.lane_count, a.width_yards
+                );
+                assert_eq!(f.battle.arena_rect, Some(layout.field.rect), "{label}");
+                assert_eq!(f.battle.effects_rect, Some(layout.effects_clip), "{label}");
+                assert_eq!(
+                    f.battle.effects_keep_clear,
+                    layout.effects_keep_clear(),
+                    "{label}"
+                );
+            }
+        }
+    }
+}
+
+/// Pin: "Hide hints" removes the callout but never moves the field; the band
+/// belongs to the whole first attempt.
+#[test]
+fn hide_hints_never_moves_the_field() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, false);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        assert!(f.settings.show_guidance);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(text_count(&output, "Hide hints"), 1);
+        let shown = f.battle.arena_rect.unwrap();
+        assert!(
+            shown.top() >= 124.0 + 92.0,
+            "{size:?}: field {shown:?} under the band"
+        );
+        f.settings.show_guidance = false;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(text_count(&output, "Hide hints"), 0);
+        assert_eq!(
+            f.battle.arena_rect.unwrap(),
+            shown,
+            "{size:?}: hiding hints moved the field"
+        );
+    }
+}
+
+/// Pin: an observed (Npc) first deployment shows no lesson, so it reserves no
+/// band.
+#[test]
+fn npc_first_deployment_has_no_hint_band() {
+    let size = vec2(1050.0 / 1.35, 700.0 / 1.35);
+    let mut fixture = fresh_battle(Mode::Npc, false);
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    assert_eq!(f.game.campaign().attempts, 0);
+    h.frame_size(f, View::Battle, vec![], size);
+    let a = f.game.attempt().unwrap();
+    let (lanes, width) = (a.lane_count, a.width_yards);
+    assert!(lanes < 11, "Mara's opening field is zoomed");
+    let open = battle::BattleLayout::new(h.ctx.content_rect(), lanes, width, false);
+    let banded = battle::BattleLayout::new(h.ctx.content_rect(), lanes, width, true);
+    assert_ne!(
+        open.field.rect, banded.field.rect,
+        "the band moves a {lanes}x{width} field"
+    );
+    assert_eq!(f.battle.arena_rect, Some(open.field.rect));
+}
+
+/// Pin: the plan buttons stay inside the construction overlay at both sizes.
+#[test]
+fn construction_panel_keeps_plan_buttons() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let panel = field_layout(&h, f).construction_panel;
+        for label in ["Save country plan", "Clear country plan"] {
+            let at = output
+                .shapes
+                .iter()
+                .find_map(|shape| text_position(&shape.shape, label))
+                .unwrap_or_else(|| panic!("{label} is not painted at {size:?}"));
+            assert!(
+                panel.contains(at),
+                "{label} at {at:?} leaves the panel {panel:?}"
+            );
+        }
+    }
+}
+
+/// Pin: the painted construction panel fills `layout.construction_panel`, the
+/// rect the INCOMING cues, the callout occluder and the hover refusal all
+/// treat as covered. A frame that shrank to its content left lanes visible
+/// below it at 1440x900 while they were still cued and refused as hidden.
+#[test]
+fn construction_panel_paints_its_whole_layout_rect() {
+    fn panel_fills(shape: &egui::epaint::Shape, out: &mut Vec<Rect>) {
+        match shape {
+            egui::epaint::Shape::Rect(rect)
+                if rect.fill == Color32::from_black_alpha(battle::PANEL_FILL_ALPHA) =>
+            {
+                out.push(rect.rect);
+            }
+            egui::epaint::Shape::Vec(shapes) => {
+                shapes.iter().for_each(|shape| panel_fills(shape, out));
+            }
+            _ => {}
+        }
+    }
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let panel = field_layout(&h, f).construction_panel;
+        let mut fills = Vec::new();
+        for clipped in &output.shapes {
+            panel_fills(&clipped.shape, &mut fills);
+        }
+        let painted = fills
+            .into_iter()
+            .find(|rect| rect.intersects(panel))
+            .unwrap_or_else(|| panic!("{size:?}: no panel fill painted"));
+        assert!(
+            (painted.min - panel.min).length() < 0.5 && (painted.max - panel.max).length() < 0.5,
+            "{size:?}: painted panel {painted:?}, layout rect {panel:?}"
+        );
+        // A bottom-lane enemy under the panel is cued, so the panel must
+        // really cover that lane.
+        let field = field_layout(&h, f).field.rect;
+        let lanes = f32::from(f.game.attempt().unwrap().lane_count);
+        let bottom = field.top() + (lanes - 0.5) * field.height() / lanes;
+        assert!(
+            painted.y_range().contains(bottom),
+            "{size:?}: bottom lane centre {bottom} outside the painted panel {painted:?}"
+        );
+    }
+}
+
+/// Pin: a pointer over the construction overlay neither hovers nor aims the
+/// field under it.
+#[test]
+fn construction_panel_swallows_field_hover() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        h.frame_size(f, View::Battle, vec![], size);
+        let layout = field_layout(&h, f);
+        let (panel, field) = (layout.construction_panel, layout.field.rect);
+        let covered = pos2(panel.left() + 4.0, panel.center().y);
+        assert!(
+            field.contains(covered),
+            "{size:?}: the panel overlaps the field"
+        );
+        let aim = f.battle.aim;
+        for _ in 0..2 {
+            h.frame_size(f, View::Battle, vec![Event::PointerMoved(covered)], size);
+        }
+        assert!(
+            !f.battle.arena_hover,
+            "{size:?}: the panel let the field hover"
+        );
+        assert_eq!(f.battle.aim, aim, "{size:?}: the panel let the field aim");
+        let open = pos2(field.left() + field.width() * 0.25, field.center().y);
+        for _ in 0..2 {
+            h.frame_size(f, View::Battle, vec![Event::PointerMoved(open)], size);
+        }
+        assert!(f.battle.arena_hover, "{size:?}: the open field must hover");
+        assert_ne!(f.battle.aim, aim);
+    }
+}
+
+/// C-7: while construction is open, a lane whose live enemy the panel hides
+/// gets an INCOMING chevron left of the panel; closing construction clears
+/// the lanes and the cue.
+#[test]
+fn construction_frame_draws_incoming_chevron() {
+    use horde_core::content::EnemyKind;
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        let mut a = f.game.attempt_slot_mut().take().unwrap();
+        assert!(a.lane_count >= 2);
+        a.enemies.clear();
+        let width = a.width_yards;
+        for (lane, x) in [(0, 1.5), (1, width - 0.5)] {
+            f.game.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
+            a.enemies.last_mut().unwrap().x = x;
+        }
+        // The spawn events' own field flash also reads INCOMING.
+        a.events.clear();
+        *f.game.attempt_slot_mut() = Some(a);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert!(
+            f.battle.occluded_lanes.is_empty(),
+            "{size:?}: no panel, no cue"
+        );
+        assert_eq!(text_count(&output, "INCOMING"), 0, "{size:?}");
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.occluded_lanes, vec![1], "{size:?}");
+        assert_eq!(text_count(&output, "INCOMING"), 1, "{size:?}");
+        let layout = field_layout(&h, f);
+        let at = output
+            .shapes
+            .iter()
+            .find_map(|shape| text_position(&shape.shape, "INCOMING"))
+            .unwrap();
+        let lane = layout.field.rect.height() / f32::from(f.game.attempt().unwrap().lane_count);
+        let centre = layout.field.rect.top() + 1.5 * lane;
+        assert!(
+            at.x < layout.construction_panel.left() && (at.y - centre).abs() < 1.0,
+            "{size:?}: INCOMING at {at:?}, lane 1 centre {centre}"
+        );
+        h.click_size(f, View::Battle, "Close construction", size);
+        assert!(!f.battle.construction);
+        // The button closes after this frame's cues drew; the close itself
+        // clears the lanes, before any later battle frame.
+        assert!(
+            f.battle.occluded_lanes.is_empty(),
+            "{size:?}: the close button clears"
+        );
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert!(f.battle.occluded_lanes.is_empty(), "{size:?}: close clears");
+        assert_eq!(text_count(&output, "INCOMING"), 0, "{size:?}");
+        // Pausing from the bar closes construction too, and so clears.
+        f.battle.construction = true;
+        h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.occluded_lanes, vec![1], "{size:?}");
+        h.click_size(f, View::Battle, "Pause", size);
+        assert!(!f.battle.construction);
+        assert!(
+            f.battle.occluded_lanes.is_empty(),
+            "{size:?}: the pause button clears"
+        );
+    }
+}
+
+/// Pin: battlefield sprites clip to the arena, never to the taller effects
+/// clip.
+#[test]
+fn battlefield_sprite_clip_stays_the_arena() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let layout = field_layout(&h, f);
+        assert_ne!(layout.arena, layout.effects_clip);
+        let clipped = output
+            .shapes
+            .iter()
+            .filter(|shape| shape.clip_rect == layout.arena)
+            .count();
+        assert!(
+            clipped > 0,
+            "{size:?}: no battlefield shape clips to the arena"
+        );
+    }
+}
+
+/// A deployed personal defense with `nodes` bought first.
+fn battle_with_nodes(nodes: &[&str]) -> IsolatedFrontend {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.frontend.game.campaign_mut().coins = 10_000;
+    for node in nodes {
+        fixture
+            .frontend
+            .game
+            .campaign_mut()
+            .purchase_node(node)
+            .unwrap();
+    }
+    fixture.deploy();
+    fixture
+}
+
+#[test]
+fn cycle_attack_key_cycles_unlocked_attacks() {
+    use battle::AttackSelection::{Grenade, Gun, Molotov};
+    // The pure rule: the next unlocked selection in selector order, wrapping.
+    assert_eq!(Gun.next(|_| true), Grenade);
+    assert_eq!(Grenade.next(|_| true), Molotov);
+    assert_eq!(Molotov.next(|_| true), Gun);
+    assert_eq!(Gun.next(|s| s != Grenade), Molotov);
+    assert_eq!(Molotov.next(|s| s == Molotov), Molotov);
+    assert_eq!(Grenade.next(|_| false), Grenade);
+    let h = Harness::new();
+    // Nothing but the gun: the key keeps it.
+    let mut fixture = battle_with_nodes(&[]);
+    let f = &mut fixture.frontend;
+    assert_eq!(f.settings.extra_bindings.cycle_attack, "Q");
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Gun);
+
+    // Grenades learned: the key skips the locked Molotov.
+    let mut fixture = battle_with_nodes(&["grenade_training"]);
+    let f = &mut fixture.frontend;
+    f.battle.fire_latched = true;
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Grenade);
+    // As a click on the selector: a firing latch never carries over.
+    assert!(!f.battle.fire_latched);
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Gun);
+
+    // Both learned: Gun, Grenade, Molotov and round again.
+    let mut fixture = battle_with_nodes(&["grenade_training", "molotov_training"]);
+    let f = &mut fixture.frontend;
+    let mut seen = Vec::new();
+    for _ in 0..4 {
+        h.key(f, View::Battle, Key::Q);
+        seen.push(f.battle.attack_selection);
+    }
+    assert_eq!(seen, [Grenade, Molotov, Gun, Grenade]);
+    // The rebound key cycles; the old one no longer does.
+    f.settings.set_binding(
+        settings::BindingId::Extra(settings::ExtraAction::CycleAttack),
+        "K".into(),
+    );
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Grenade);
+    h.key(f, View::Battle, Key::K);
+    assert_eq!(f.battle.attack_selection, Molotov);
+    // The construction overlay hides the selector: the key waits.
+    f.battle.set_construction(true);
+    h.key(f, View::Battle, Key::K);
+    assert_eq!(f.battle.attack_selection, Molotov);
+    f.battle.set_construction(false);
+    // An observed defense has no attack selector to cycle.
+    let mut fixture = fresh_battle(Mode::Npc, true);
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().coins = 10_000;
+    h.key(f, View::Battle, Key::Q);
+    assert_eq!(f.battle.attack_selection, Gun);
+}
+
+/// W3-12 (C-10, UX-14, CF-1-08): the control bar takes at most two rows at
+/// 1050x700@1.35 and one at 1440x900 in every bar state: personal and
+/// observed, running, "Begin defense" and "Resume defense", construction open
+/// or closed, firing latched or not, with or without a status message. The
+/// status message is the battle toast in the receipt slot and never a bar
+/// row, Reload, Strike contact lane and Toggle firing are not bar buttons,
+/// and the key legend under the bar is clear of every bar widget.
+#[test]
+fn battle_bar_stays_within_two_rows_at_small_size() {
+    #[derive(Clone, Copy, Debug)]
+    enum Clock {
+        Running,
+        Begin,
+        Resume,
+    }
+    const MESSAGE: &str = "Rest and retry.";
+    let [large, small] = target_sizes();
+    let mut cases = 0;
+    for (h, size, most) in [(Harness::small(), small, 2), (Harness::large(), large, 1)] {
+        for mode in [Mode::Personal, Mode::Npc] {
+            for clock in [Clock::Running, Clock::Begin, Clock::Resume] {
+                for (construction, latched) in [(false, false), (false, true), (true, false)] {
+                    for status in [None, Some(false), Some(true)] {
+                        let label = format!(
+                            "{size:?} {mode:?} {clock:?} construction {construction} \
+                             latched {latched} status {status:?}"
+                        );
+                        let mut fixture = fresh_battle(mode, true);
+                        let f = &mut fixture.frontend;
+                        let profile = &mut f.game.attempt_mut().unwrap().profile;
+                        (profile.heal, profile.brace) = (true, true);
+                        match clock {
+                            Clock::Running => {}
+                            Clock::Begin => f.game.set_paused(true),
+                            Clock::Resume => {
+                                f.game.tick(Input::default());
+                                f.game.set_paused(true);
+                            }
+                        }
+                        f.battle.construction = construction;
+                        f.battle.fire_latched = latched;
+                        if let Some(error) = status {
+                            f.status.message = MESSAGE.into();
+                            f.status.message_error = error;
+                            f.status.feedback_revision += 1;
+                        }
+                        let output = h.frame_size(f, View::Battle, vec![], size);
+                        let canvas = h.ctx.content_rect();
+                        assert!((canvas.size() - size).length() < 0.5, "{label}");
+                        let a = f.game.attempt().unwrap();
+                        let layout =
+                            battle::BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+                        // The bar names its state and keeps every other button.
+                        let pause = match clock {
+                            Clock::Running => "Pause",
+                            Clock::Begin => "Begin defense",
+                            Clock::Resume => "Resume defense",
+                        };
+                        let kept: &[&str] = match (mode, construction) {
+                            (Mode::Personal, false) => &[
+                                "Emergency aid",
+                                "Brace the line",
+                                "Build defenses",
+                                "Retreat & train",
+                                "Management",
+                            ],
+                            (Mode::Personal, true) => {
+                                &["Close construction", "Retreat & train", "Management"]
+                            }
+                            (_, false) => &[
+                                "Build defenses",
+                                "Observe",
+                                "Tactics",
+                                "Recall & train",
+                                "Management",
+                            ],
+                            (_, true) => &[
+                                "Close construction",
+                                "Observe",
+                                "Tactics",
+                                "Recall & train",
+                                "Management",
+                            ],
+                        };
+                        for kept in kept.iter().chain([&pause]) {
+                            assert_eq!(text_count(&output, kept), 1, "{label}: {kept}");
+                        }
+                        for moved in [
+                            "Reload",
+                            "Strike contact lane",
+                            "Toggle firing",
+                            "Stop firing",
+                        ] {
+                            assert_eq!(text_count(&output, moved), 0, "{label}: {moved}");
+                        }
+                        let rows = f.battle.bar_rows;
+                        assert!((1..=most).contains(&rows), "{label}: {rows} bar rows");
+                        let bounds = f.battle.bar_bounds.expect("the bar drew");
+                        assert!(
+                            layout.bar.expand(0.5).contains_rect(bounds),
+                            "{label}: the bar {bounds:?} leaves {:?}",
+                            layout.bar
+                        );
+                        // CF-1-08: the legend is drawn whole and under the bar.
+                        let legend = f.battle.legend_rect.expect("the legend drew");
+                        assert!(
+                            legend.top() >= bounds.bottom() && !legend.intersects(bounds),
+                            "{label}: the legend {legend:?} lies under the bar {bounds:?}"
+                        );
+                        assert!(canvas.contains_rect(legend), "{label}: legend {legend:?}");
+                        // The status message is the toast, never a bar row.
+                        let toast = clipped_bounds(&output, MESSAGE);
+                        assert_eq!(toast.is_some(), status.is_some(), "{label}: toast");
+                        if let Some((text, clip)) = toast {
+                            assert_eq!(text_count(&output, MESSAGE), 1, "{label}");
+                            assert!(
+                                layout.receipt_slot.contains_rect(text) && clip.contains_rect(text),
+                                "{label}: the toast {text:?} leaves the receipt slot"
+                            );
+                            let color = output
+                                .shapes
+                                .iter()
+                                .find_map(|c| text_color(&c.shape, MESSAGE));
+                            let expected = if status == Some(true) {
+                                art::RED
+                            } else {
+                                art::TEXT
+                            };
+                            assert_eq!(color, Some(expected), "{label}: toast colour");
+                        }
+                        // The status line's idle text is gone with its row.
+                        assert_eq!(
+                            text_count(&output, "Coins and equipment bank as they are earned."),
+                            0,
+                            "{label}"
+                        );
+                        // A second frame of the same message adds no toast.
+                        h.frame_size(f, View::Battle, vec![], size);
+                        assert_eq!(
+                            f.status.toasts.len(),
+                            usize::from(status.is_some()),
+                            "{label}"
+                        );
+                        assert_eq!(f.battle.bar_rows, rows, "{label}: second frame");
+                        cases += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(cases, 2 * 2 * 3 * 3 * 3);
+}
+
+/// W3-12: Reload, Strike contact lane and Toggle firing left the bar for
+/// Management > Field actions. Their keys work as before and the legend still
+/// names them; the menu shows each action with its bound key, a click does
+/// what the bar button did and closes the menu so the keys return to the
+/// field. Construction and an observed battle offer no field actions.
+#[test]
+fn field_actions_keep_their_keys() {
+    const ACTIONS: [&str; 3] = ["Reload", "Strike contact lane", "Toggle firing"];
+    let painted = |output: &FullOutput, text: &str| {
+        output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
+    };
+    // The bound key is painted on the action's own menu row.
+    let key_beside = |output: &FullOutput, action: &str, key: &str| {
+        let (action, _) = clipped_bounds(output, action).expect("the action is listed");
+        output.shapes.iter().any(|clipped| {
+            labeled_bounds(&clipped.shape, key).is_some_and(|key| {
+                key.left() > action.right() && action.y_range().contains(key.center().y)
+            })
+        })
+    };
+    let open_menu = |h: &Harness, f: &mut FrontendParts| {
+        let closed = h.frame(f, View::Battle, vec![]);
+        assert_eq!(text_count(&closed, "Field actions"), 0, "the menu is shut");
+        assert_eq!(text_count(&closed, "Settings"), 0, "the menu is shut");
+        h.click(f, View::Battle, "Management");
+        h.frame(f, View::Battle, vec![])
+    };
+    let mut fixture = fresh_battle(Mode::Personal, true);
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    input_enemy(f, 0, horde_core::sim::DEFENSE_LINE);
+
+    // The bar has none of the three; the legend names the keys.
+    let output = h.frame(f, View::Battle, vec![]);
+    for action in ACTIONS {
+        assert_eq!(text_count(&output, action), 0, "{action} left the bar");
+    }
+    assert!(painted(
+        &output,
+        "Mouse1 fire · Mouse2 melee · R reload · B build · Escape pause"
+    ));
+
+    // The keys work with no button on screen.
+    assert!(h.combat_input(f, vec![key_event(Key::R, true)]).reload);
+    h.combat_input(f, vec![key_event(Key::R, false)]);
+    let arena = f.battle.arena_rect.unwrap();
+    f.battle.arena_hover = true;
+    h.combat_input(
+        f,
+        vec![attack_pointer(
+            arena.center(),
+            PointerButton::Secondary,
+            true,
+        )],
+    );
+    assert!(f.battle.pending.melee, "Mouse2 strikes");
+    h.combat_input(
+        f,
+        vec![attack_pointer(
+            arena.center(),
+            PointerButton::Secondary,
+            false,
+        )],
+    );
+    f.battle.arena_hover = false;
+    f.battle.pending = Input::default();
+    f.battle.pending_attack_aims = AttackAims::default();
+    h.key(f, View::Battle, Key::F);
+    assert!(f.battle.fire_latched, "F toggles firing");
+    h.key(f, View::Battle, Key::F);
+    assert!(!f.battle.fire_latched);
+
+    // Management > Field actions lists each with its key.
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Field actions"), 1);
+    for (action, key) in ACTIONS.into_iter().zip(["R", "Mouse2", "F"]) {
+        assert_eq!(text_count(&output, action), 1, "{action}");
+        assert!(key_beside(&output, action, key), "{action} shows {key}");
+    }
+
+    // Each click does what the bar button did, and closes the menu.
+    f.game.attempt_mut().unwrap().ammo = 3;
+    h.click(f, View::Battle, "Reload");
+    assert!(f.battle.pending.reload);
+    assert!(!f.battle.pending.melee && !f.battle.pending.fire);
+    f.battle.pending = Input::default();
+
+    open_menu(&h, f);
+    f.battle.aim = [1.5, 0.5];
+    h.click(f, View::Battle, "Strike contact lane");
+    assert!(f.battle.pending.melee);
+    assert_eq!(f.battle.pending.aim[1], 0.5, "the selected contact lane");
+    assert!(f.battle.pending_attack_aims.melee.is_some());
+    f.battle.pending = Input::default();
+    f.battle.pending_attack_aims = AttackAims::default();
+
+    open_menu(&h, f);
+    h.click(f, View::Battle, "Toggle firing");
+    assert!(f.battle.fire_latched);
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Toggle firing"), 0);
+    assert!(key_beside(&output, "Stop firing", "F"));
+    h.click(f, View::Battle, "Stop firing");
+    assert!(!f.battle.fire_latched);
+
+    // A rebound key follows into the menu and the legend, and it works.
+    f.settings.bindings[Action::Reload as usize] = "Q".into();
+    let output = open_menu(&h, f);
+    assert!(key_beside(&output, "Reload", "Q"));
+    assert!(painted(&output, "Q reload"));
+    h.click(f, View::Battle, "Reload");
+    assert!(f.battle.pending.reload);
+    f.battle.pending = Input::default();
+    let closed = h.frame(f, View::Battle, vec![]);
+    assert_eq!(text_count(&closed, "Field actions"), 0);
+    assert!(!h.combat_input(f, vec![key_event(Key::R, true)]).reload);
+    h.combat_input(f, vec![key_event(Key::R, false)]);
+    assert!(h.combat_input(f, vec![key_event(Key::Q, true)]).reload);
+    h.combat_input(f, vec![key_event(Key::Q, false)]);
+
+    // A throwable has no firing latch to toggle.
+    f.battle.attack_selection = battle::AttackSelection::Grenade;
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Field actions"), 1);
+    assert_eq!(text_count(&output, "Reload"), 1);
+    assert_eq!(text_count(&output, "Strike contact lane"), 1);
+    assert_eq!(text_count(&output, "Toggle firing"), 0);
+    h.click(f, View::Battle, "Reload");
+    f.battle.pending = Input::default();
+    f.battle.attack_selection = battle::AttackSelection::Gun;
+
+    // Construction hides the personal controls, as the bar did.
+    f.battle.construction = true;
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Settings"), 1, "the menu is open");
+    assert_eq!(text_count(&output, "Field actions"), 0);
+    for action in ACTIONS {
+        assert_eq!(text_count(&output, action), 0, "{action} in construction");
+    }
+
+    // An observed battle has no field actions.
+    let mut fixture = fresh_battle(Mode::Npc, true);
+    let f = &mut fixture.frontend;
+    let h = Harness::new();
+    let output = open_menu(&h, f);
+    assert_eq!(text_count(&output, "Settings"), 1, "the menu is open");
+    assert_eq!(text_count(&output, "Field actions"), 0);
+    for action in ACTIONS {
+        assert_eq!(text_count(&output, action), 0, "{action} when observing");
+    }
+}
+
+/// A paused, undeployed-to-running personal battle on a `lanes` x `width`
+/// field (fresh balance otherwise). A `veteran` campaign has finished an
+/// attempt; otherwise the battle is a first deployment with its hint band.
+fn sized_battle(lanes: u8, width: u8, veteran: bool) -> IsolatedFrontend {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.unlock_trap();
+    let campaign = fixture.frontend.game.campaign_mut();
+    campaign
+        .set_balance_settings(horde_core::balance::BalanceSettings {
+            start_lanes: lanes,
+            max_lanes: lanes,
+            start_width: width,
+            max_width: width,
+            ..Default::default()
+        })
+        .unwrap();
+    campaign.choose_start_country("DEU").unwrap();
+    fixture
+        .frontend
+        .game
+        .deploy_country_stage(0, Mode::Personal)
+        .unwrap();
+    fixture.frontend.game.campaign_mut().attempts = u64::from(veteran);
+    fixture.frontend.game.set_paused(true);
+    fixture.frontend.screen = Screen::Battle;
+    let a = fixture.frontend.game.attempt().unwrap();
+    assert!(a.paused && a.tick == 0);
+    assert_eq!((a.lane_count, a.width_yards), (lanes, f32::from(width)));
+    fixture
+}
+
+/// CF-1-01 (W3-29): on the zoomed 7x16 field and the 3x12 first defense, at
+/// both target sizes, the painted READY and PAUSED banners lie inside the
+/// layout's banner slot, whole and unclipped, and share no area with the
+/// field. The open construction overlay still hides the banner.
+#[test]
+fn pause_banner_is_painted_beside_the_field_at_both_sizes() {
+    for size in target_sizes() {
+        for (lanes, width, veteran) in [(7, 16, true), (3, 12, false)] {
+            let mut fixture = sized_battle(lanes, width, veteran);
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            let name = format!("{lanes}x{width} at {size:?}");
+            for text in [
+                "READY · Begin defense or Escape",
+                "PAUSED · Escape to resume",
+            ] {
+                let output = h.frame_size(f, View::Battle, vec![], size);
+                let a = f.game.attempt().unwrap();
+                let layout = battle::BattleLayout::new(
+                    h.ctx.content_rect(),
+                    a.lane_count,
+                    a.width_yards,
+                    !veteran,
+                );
+                assert_eq!(layout.hint_band.is_some(), !veteran, "{name}");
+                assert_eq!(f.battle.arena_rect, Some(layout.field.rect), "{name}");
+                let slot = layout.pause_banner_slot;
+                let banner = f.battle.pause_banner_rect.expect("the banner drew");
+                assert!(
+                    slot.expand(0.01).contains_rect(banner),
+                    "{name}: {text}: the banner {banner:?} leaves its slot {slot:?}"
+                );
+                // The compact tag stays legible: 10 pt type or larger.
+                assert!(banner.height() >= 16.0, "{name}: {text}: {banner:?}");
+                let shared = banner.intersect(layout.field.rect);
+                assert!(
+                    shared.width() <= 0.0 || shared.height() <= 0.0,
+                    "{name}: {text}: the banner {banner:?} lies on the field {:?}",
+                    layout.field.rect
+                );
+                let (drawn, clip) = clipped_bounds(&output, text)
+                    .unwrap_or_else(|| panic!("{name}: {text} is not painted"));
+                assert!(
+                    banner.expand(0.5).contains_rect(drawn) && clip.contains_rect(drawn),
+                    "{name}: {text} at {drawn:?} leaves its backing {banner:?}"
+                );
+                // The second pass: a battle paused after its first tick.
+                f.game.set_paused(false);
+                f.game.tick(Input::default());
+                f.game.set_paused(true);
+            }
+            f.battle.construction = true;
+            h.frame_size(f, View::Battle, vec![], size);
+            assert_eq!(f.battle.pause_banner_rect, None, "{name}: construction");
+        }
+    }
+}
+
+/// CF-1-02 (W3-29): with construction open on the 7x16 field, the painted
+/// "NO BUILDING BEYOND MIDPOINT" label and `construction_panel` do not
+/// intersect at 1050x700@1.35 (nor at 1440x900, where it keeps its one line
+/// at its field point).
+#[test]
+fn midpoint_label_clears_the_construction_panel() {
+    for size in target_sizes() {
+        let mut fixture = sized_battle(7, 16, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let layout = field_layout(&h, f);
+        let panel = layout.construction_panel;
+        let (label, clip) =
+            clipped_bounds(&output, art::MIDPOINT_LABEL).expect("the midpoint label drew");
+        assert!(
+            !label.intersects(panel) && label.right() <= panel.left() - art::OCCLUDER_GAP,
+            "{size:?}: the midpoint label {label:?} lies under the panel {panel:?}"
+        );
+        assert!(clip.contains_rect(label), "{size:?}: {label:?} is clipped");
+        let a = f.game.attempt().unwrap();
+        let field = art::ArenaProjection::for_attempt(layout.field.rect, a);
+        let point = field.world(a.construction_bounds()[1] + 0.2, 0.2);
+        assert!(
+            (label.left() - point.x).abs() < 1.0 && (label.top() - point.y).abs() < 1.0,
+            "{size:?}: the label {label:?} left its field point {point:?}"
+        );
+        if size.x > 1000.0 {
+            assert!(label.height() < 16.0, "{size:?}: one line, {label:?}");
+        }
+    }
+}
+
+/// CF-1-03: a review capture (a still or a frame sequence) never reads the
+/// live OS pointer. With the pointer over the field the aim stays where the
+/// scene pinned it, the field does not hover, and the frame paints exactly
+/// what it paints with no pointer: no hover reticle, no inspector, no
+/// crosshair cursor. With the pointer parked on an enemy the aim already
+/// rests on, the inspector tooltip still never draws in a capture. An
+/// interactive launch still aims with the pointer and inspects the enemy.
+#[test]
+fn review_capture_aim_ignores_the_os_pointer() {
+    use crate::launch::{LaunchConfig, ReviewOptions};
+    use horde_core::content::EnemyKind;
+    let still = ReviewOptions {
+        capture: Some("headless-review-capture.png".into()),
+        exit: true,
+        ..ReviewOptions::default()
+    };
+    let sequence = ReviewOptions {
+        motion: true,
+        sequence: Some("headless-review-sequence".into()),
+        ..ReviewOptions::default()
+    };
+    for (name, review, pinned) in [
+        ("still capture", Some(still), true),
+        ("sequence capture", Some(sequence), true),
+        ("interactive review", Some(ReviewOptions::default()), false),
+        ("play", None, false),
+    ] {
+        for size in target_sizes() {
+            let mut fixture = fresh_battle(Mode::Personal, true);
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            f.launch = LaunchConfig {
+                scenario: review.is_some().then(|| "max-lanes".to_owned()),
+                review: review.clone(),
+                ..LaunchConfig::default()
+            };
+            h.frame_size(f, View::Battle, vec![], size);
+            let still_frame = h.frame_size(f, View::Battle, vec![], size);
+            let aim = f.battle.aim;
+            let field = field_layout(&h, f).field.rect;
+            let over = pos2(field.left() + field.width() * 0.25, field.center().y);
+            let mut hovered_frame = None;
+            for _ in 0..2 {
+                hovered_frame =
+                    Some(h.frame_size(f, View::Battle, vec![Event::PointerMoved(over)], size));
+            }
+            let hovered_frame = hovered_frame.unwrap();
+            let crosshair =
+                hovered_frame.platform_output.cursor_icon == egui::CursorIcon::Crosshair;
+            let same_paint = hovered_frame.shapes == still_frame.shapes;
+            if pinned {
+                assert_eq!(
+                    f.battle.aim, aim,
+                    "{name} {size:?}: the pointer moved the pinned aim"
+                );
+                assert!(
+                    !f.battle.arena_hover,
+                    "{name} {size:?}: the capture let the field hover"
+                );
+                assert!(!crosshair, "{name} {size:?}: the capture owns the cursor");
+                assert!(
+                    same_paint,
+                    "{name} {size:?}: the pointer changed the painted frame"
+                );
+            } else {
+                // The perturbation half: the same pointer does aim, hover and
+                // paint a reticle readout outside a capture.
+                assert_ne!(f.battle.aim, aim, "{name} {size:?}: the pointer aims");
+                assert!(f.battle.arena_hover, "{name} {size:?}: the field hovers");
+                assert!(crosshair, "{name} {size:?}: the field owns the cursor");
+                assert!(!same_paint, "{name} {size:?}: the reticle readout paints");
+            }
+
+            // The inspector half: the pointer parks on an enemy, and the aim
+            // already rests on its body (the scene pinned it there), so only
+            // the capture's missing pointer keeps the inspector away.
+            h.ctx
+                .all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
+            let mut a = f.game.attempt_slot_mut().take().unwrap();
+            a.enemies.clear();
+            a.events.clear();
+            f.game.spawn_enemy(&mut a, EnemyKind::Runner, 1, false);
+            let enemy = a.enemies.last_mut().unwrap();
+            enemy.x = a.width_yards * 0.6;
+            let [sx, sy] = crate::battle_view::crowd_stagger(enemy.id);
+            let body = [enemy.x + sx, enemy.y() + sy];
+            *f.game.attempt_slot_mut() = Some(a);
+            let a = f.game.attempt().unwrap();
+            assert!(
+                matches!(
+                    crate::inspector::target_at(a, body),
+                    Some(crate::inspector::Target::Enemy(_))
+                ),
+                "{name} {size:?}: the body is inspectable"
+            );
+            let on_enemy = art::ArenaProjection::for_attempt(field, a).world(body[0], body[1]);
+            f.battle.aim = body;
+            // The inspector's heading: "<enemy> · lane 2".
+            let dossier = " · lane 2";
+            h.frame_size(f, View::Battle, vec![Event::PointerGone], size);
+            let baseline = h.frame_size(f, View::Battle, vec![], size);
+            assert!(
+                !baseline
+                    .shapes
+                    .iter()
+                    .any(|c| shape_has_text(&c.shape, dossier)),
+                "{name} {size:?}: the inspector draws with no pointer"
+            );
+            let mut inspected = false;
+            let mut last = None;
+            for frame in 0..4 {
+                let events = if frame == 0 {
+                    vec![Event::PointerMoved(on_enemy)]
+                } else {
+                    vec![]
+                };
+                let output = h.frame_size(f, View::Battle, events, size);
+                inspected |= output
+                    .shapes
+                    .iter()
+                    .any(|c| shape_has_text(&c.shape, dossier));
+                last = Some(output);
+            }
+            if pinned {
+                assert!(
+                    !inspected,
+                    "{name} {size:?}: the inspector drew under the OS pointer"
+                );
+                assert_eq!(
+                    f.battle.aim, body,
+                    "{name} {size:?}: the pointer moved the aim"
+                );
+                assert!(
+                    last.unwrap().shapes == baseline.shapes,
+                    "{name} {size:?}: the pointer on the enemy changed the painted frame"
+                );
+            } else {
+                assert!(inspected, "{name} {size:?}: the pointer inspects the enemy");
+            }
+        }
+    }
+}
+
+/// The music director's input (A6-15) is read off the screen and the shown
+/// battle, and reading it changes nothing.
+#[test]
+fn music_input_follows_the_screen_and_the_battle() {
+    use horde_audio::music::{MusicInput, MusicScreen};
+    let mut fixture = IsolatedFrontend::new();
+    {
+        let f = &mut fixture.frontend;
+        for (screen, tab, music) in [
+            (Screen::Menu, Tab::Home, MusicScreen::Menu),
+            (Screen::SurvivorSelection, Tab::Home, MusicScreen::Menu),
+            (Screen::Camp, Tab::Home, MusicScreen::Camp),
+            (Screen::Camp, Tab::Armory, MusicScreen::Camp),
+            (Screen::Camp, Tab::Briefing, MusicScreen::Briefing),
+            (Screen::Results, Tab::Briefing, MusicScreen::Results),
+            (Screen::Upgrades, Tab::Home, MusicScreen::Upgrades),
+            (Screen::Settings, Tab::Home, MusicScreen::Overlay),
+            (Screen::History, Tab::Home, MusicScreen::Overlay),
+        ] {
+            f.screen = screen;
+            f.nav.tab = tab;
+            assert_eq!(
+                f.ctx().music_input(),
+                MusicInput {
+                    screen: music,
+                    battle: None
+                },
+                "{screen:?} {tab:?}"
+            );
+        }
+    }
+    fixture.deploy();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Battle;
+    for _ in 0..3000 {
+        if !f.game.attempt().unwrap().enemies.is_empty() {
+            break;
+        }
+        f.game.tick(Input::default());
+    }
+    {
+        let a = f.game.attempt_mut().unwrap();
+        assert!(!a.enemies.is_empty(), "the first wave arrived");
+        a.hp = a.max_hp / 2;
+        let width = a.width_yards;
+        for enemy in &mut a.enemies {
+            enemy.hp = enemy.max_hp.max(1);
+            enemy.boss = false;
+            enemy.x = width;
+        }
+        a.enemies[0].x = width * 0.5;
+        a.paused = false;
+    }
+    let before = serde_json::to_value(&f.game).unwrap();
+    let a = f.game.attempt().unwrap();
+    let (count, width, hp) = (
+        a.enemies.len() as u32,
+        a.width_yards,
+        a.hp as f32 / a.max_hp as f32,
+    );
+    let input = f.ctx().music_input();
+    assert_eq!(input.screen, MusicScreen::Battle);
+    let battle = input.battle.expect("the battle is read");
+    assert_eq!(battle.enemies_alive, count);
+    assert_eq!(
+        battle.nearest_x_frac,
+        horde_audio::pan::lane_position(width * 0.5, width)
+    );
+    assert_eq!(battle.hp_frac, hp);
+    assert!(!battle.boss_alive);
+    assert_eq!(battle.paused, f.game.global_paused());
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+
+    // A living boss, then a field of the dead.
+    f.game.attempt_mut().unwrap().enemies[0].boss = true;
+    assert!(f.ctx().music_input().battle.unwrap().boss_alive);
+    {
+        let a = f.game.attempt_mut().unwrap();
+        for enemy in &mut a.enemies {
+            enemy.hp = 0;
+        }
+        a.paused = true;
+    }
+    let battle = f.ctx().music_input().battle.unwrap();
+    assert_eq!(battle.enemies_alive, 0);
+    assert_eq!(battle.nearest_x_frac, 1.0);
+    assert!(!battle.boss_alive);
+    assert!(battle.paused);
+    // The camp does not score a battle that runs elsewhere.
+    f.screen = Screen::Camp;
+    f.nav.tab = Tab::Home;
+    assert_eq!(f.ctx().music_input().battle, None);
+}
+
+/// ISO-8 pin (W5-03): the whole App frame of the battle screen, with every
+/// weapon class's volleys (nine-pellet trigger pulls beside turret shots)
+/// live in the event log, normal and reduced, leaves the attempt, its RNG
+/// and the state digest unchanged. A frame reads the game through a shared
+/// borrow and reaches it only through the commands it queues, which the
+/// harness applies after the frame as the App does: that is the path where
+/// presentation could write. The weapon_fx painters themselves only borrow
+/// the attempt shared, so the type system covers them, and the architecture
+/// scan `presentation_never_reads_core_rng` guards the core RNG by name.
+#[test]
+fn shot_fx_never_mutates_attempt() {
+    use horde_core::{sim::Event as SimEvent, sim::EventKind, weapons::WeaponClass};
+    for class in WeaponClass::ALL {
+        for reduced in [false, true] {
+            let mut fixture = IsolatedFrontend::new();
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            // The paused peak scene, staged as the review matrix stages it.
+            f.game = horde_core::sim::peak_render_fixture().expect("peak fixture");
+            f.screen = Screen::Battle;
+            f.campaign.mode = Mode::Npc;
+            f.settings.reduced_effects = reduced;
+            let a = f.game.attempt_mut().unwrap();
+            a.events.clear();
+            a.shots = 0;
+            a.gear_snapshot
+                .iter_mut()
+                .find(|record| record.slot == Slot::Ranged)
+                .expect("the fixture deploys with a ranged weapon")
+                .weapon_class = Some(class);
+            let turret = a
+                .structures
+                .iter()
+                .find(|s| s.kind == StructureKind::Turret)
+                .expect("the fixture has a turret")
+                .id;
+            for ticks_ago in (0..4u64).rev() {
+                a.shots += 1;
+                for (n, actor_id) in (0..9).map(|n| (n, None)).chain([(0, Some(turret))]) {
+                    let seq = a.events.len() as u64 + 1;
+                    a.events.push_back(SimEvent {
+                        kind: EventKind::Shot,
+                        from: a.defender_position(),
+                        to: [30.0, 1.5 + n as f32 * 0.5],
+                        value: 0,
+                        tick: a.tick - ticks_ago,
+                        actor_id,
+                        target_id: None,
+                        lane: None,
+                        duration_ticks: 0,
+                        seq,
+                    });
+                }
+            }
+            let a = f.game.attempt().unwrap();
+            assert!(a.paused, "{class:?}: the peak fixture is paused");
+            // The flash counters are review tooling (W5-10).
+            #[cfg(feature = "review")]
+            {
+                let clock = crate::art::SkyClock::of_tick(a.tick, 1);
+                assert!(
+                    crate::art::flash_facts(a, clock, false).muzzle_flash_count > 0,
+                    "{class:?}: the volleys are inside their flash life"
+                );
+            }
+            let digest = f.game.state_digest();
+            let attempt = serde_json::to_string(a).unwrap();
+            let rng = serde_json::to_string(&a.rng).unwrap();
+            for frame in 0..4 {
+                h.frame_at(f, View::Full, vec![], 100.0 + f64::from(frame) / 60.0);
+                assert_eq!(f.screen, Screen::Battle, "{class:?}: frame {frame}");
+            }
+            let after = f.game.attempt().unwrap();
+            let label = format!("{class:?} reduced {reduced}");
+            assert_eq!(serde_json::to_string(&after.rng).unwrap(), rng, "{label}");
+            assert_eq!(serde_json::to_string(after).unwrap(), attempt, "{label}");
+            assert_eq!(f.game.state_digest(), digest, "{label}");
+        }
+    }
+}
+
+/// CF-3 (closing): the right battle HUD card is painted inside its layout
+/// rect, so the compact PAUSED tag keeps its gap under the card. The card's
+/// four lines grew its frame about 8 pt past `hud_right`, onto the tag.
+/// Checked with the boss incoming and present, at both target sizes, on the
+/// 7x16 field whose banner is the tag under the card.
+#[test]
+fn right_hud_card_is_painted_inside_its_layout_rect() {
+    for size in target_sizes() {
+        for boss in [false, true] {
+            let mut fixture = sized_battle(7, 16, true);
+            let h = Harness::new();
+            let f = &mut fixture.frontend;
+            if boss {
+                let mut attempt = f.game.attempt_slot_mut().take().unwrap();
+                attempt.boss_spawned = true;
+                f.game
+                    .spawn_enemy(&mut attempt, horde_core::content::EnemyKind::Brute, 0, true);
+                *f.game.attempt_slot_mut() = Some(attempt);
+            }
+            let output = h.frame_size(f, View::Battle, vec![], size);
+            let label = if boss { "BOSS ·" } else { "BOSS IN" };
+            assert!(
+                text_runs(&output)
+                    .iter()
+                    .any(|run| run.text.starts_with(label)),
+                "{size:?}: {label} is not painted"
+            );
+            let layout = field_layout(&h, f);
+            let right = layout.hud_right;
+            let card = painted_rects(&output)
+                .into_iter()
+                .filter(|shape| shape.fill == Color32::from_black_alpha(220))
+                .map(|shape| shape.rect.expand(shape.stroke.width * 0.5))
+                .find(|rect| (rect.left() - right.left()).abs() < 1.0)
+                .unwrap_or_else(|| panic!("{size:?}: the right HUD card is not painted"));
+            assert!(
+                right.expand(0.5).contains_rect(card),
+                "{size:?} boss {boss}: the card {card:?} leaves hud_right {right:?}"
+            );
+            // The tag slot keeps its whole gap under the painted card.
+            let slot = layout.pause_banner_slot;
+            assert!(
+                slot.top() - card.bottom() >= slot.top() - right.bottom() - 0.5
+                    && slot.top() > card.bottom(),
+                "{size:?} boss {boss}: the card {card:?} meets the tag slot {slot:?}"
+            );
+        }
+    }
+}
+
+/// CF-3-14: with construction open the PAUSED tag gives way to the panel, so
+/// the panel says the field is paused where it can be read. At 1050x700@1.35
+/// "Paused explicitly" lay below the fold of the panel's scroll area (it
+/// ended at "Clear country plan"); it is painted fully inside the panel and
+/// its visible viewport at both sizes.
+#[test]
+fn construction_panel_names_the_pause_above_its_fold() {
+    for target in Target::BOTH {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.game.set_paused(true);
+        f.battle.construction = true;
+        h.frame(f, View::Battle, vec![]);
+        let output = h.frame(f, View::Battle, vec![]);
+        let panel = field_layout(&h, f).construction_panel;
+        // A label below a scroll area's fold is not painted at all.
+        let (rect, clip) = clipped_bounds(&output, "Paused explicitly")
+            .unwrap_or_else(|| panic!("{target:?}: the pause line is not painted"));
+        assert!(
+            panel.contains_rect(rect) && clip.contains_rect(rect),
+            "{target:?}: \"Paused explicitly\" {rect:?} not visible in the panel {panel:?} (viewport {clip:?})"
+        );
+        // The line takes the old cost line's place: the plan buttons keep
+        // their place above the fold.
+        for label in ["Save country plan", "Clear country plan"] {
+            assert!(
+                fully_visible(&output, label),
+                "{target:?}: {label} below the fold"
+            );
+        }
+    }
+}
+
+/// The galleys of every text run reading exactly `label`, in paint order.
+fn galleys_of(output: &FullOutput, label: &str) -> Vec<std::sync::Arc<egui::Galley>> {
+    fn find(
+        shape: &egui::epaint::Shape,
+        label: &str,
+        found: &mut Vec<std::sync::Arc<egui::Galley>>,
+    ) {
+        match shape {
+            egui::epaint::Shape::Text(t) if t.galley.text() == label => {
+                found.push(t.galley.clone());
+            }
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| find(s, label, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        find(&clipped.shape, label, &mut found);
+    }
+    found
+}
+
+/// CF-3-15: the Tactics popup is a menu, whose layout is justified, and egui
+/// justifies a wrapped label in it, so the decision's first line was
+/// stretched to the popup width with wide, uneven word gaps. The decision
+/// and the latest resolution wrap left-aligned at their normal spacing.
+#[test]
+fn tactics_popup_wraps_the_decision_without_justifying_it() {
+    const DECISION: &str = "Attack: shoot Breacher packling in lane 1 · nearest visible threat, then reload behind the wall";
+    const RESOLUTION: &str = "Shot Breacher packling in lane 1 for 14 damage · 3d6 roll 11 against cover 9 · the packling staggers";
+    for target in Target::BOTH {
+        let mut fixture = fresh_battle(Mode::Npc, true);
+        let h = Harness::at(target);
+        let f = &mut fixture.frontend;
+        f.game.set_paused(true);
+        {
+            let a = f.game.attempt_slot_mut().as_mut().unwrap();
+            a.decision = DECISION.into();
+            a.latest_resolution = Some(RESOLUTION.into());
+        }
+        h.frame(f, View::Battle, vec![]);
+        h.click(f, View::Battle, "Tactics");
+        h.click(f, View::Battle, "Latest resolution");
+        let output = h.frame(f, View::Battle, vec![]);
+        for text in [DECISION, RESOLUTION] {
+            // The popup's run is the one that wraps (the HUD may show the
+            // decision on one truncated line).
+            let wrapped: Vec<_> = galleys_of(&output, text)
+                .into_iter()
+                .filter(|galley| galley.rows.len() > 1)
+                .collect();
+            assert!(
+                !wrapped.is_empty(),
+                "{target:?}: {text:?} wraps in the popup"
+            );
+            for galley in wrapped {
+                assert!(
+                    !galley.job.justify,
+                    "{target:?}: {text:?} is justified across the popup"
+                );
+            }
+        }
+    }
+}
+
+/// CF-7-02: with construction open, the battle screen paints the overlay's
+/// INCOMING cues left of the panel and the field's "NO BUILDING BEYOND
+/// MIDPOINT" label, and a damage number kept clear only of the cue pass
+/// (CF-7-01) still sat on them ("25" on the bottom of "MIDPOINT" and the top
+/// of the INCOMING plate in construction-small). For a hit at points over
+/// and under the label and beside the cue, on the 7x16 field at both target
+/// sizes, in normal and reduced effects, the number meets neither.
+#[test]
+fn construction_damage_numbers_keep_clear_of_the_midpoint_label_and_incoming_cues() {
+    use horde_core::{content::EnemyKind, sim::Event as SimEvent, sim::EventKind};
+    let (mut checked, mut drawn) = (0, 0);
+    for size in target_sizes() {
+        for reduced in [false, true] {
+            for dx in [-0.5_f32, 0.0, 0.5, 1.0] {
+                for step in 0..8 {
+                    let mut fixture = sized_battle(7, 16, true);
+                    let h = Harness::new();
+                    let f = &mut fixture.frontend;
+                    f.battle.construction = true;
+                    f.settings.reduced_effects = reduced;
+                    let mut a = f.game.attempt_slot_mut().take().unwrap();
+                    a.enemies.clear();
+                    let width = a.width_yards;
+                    // A hostile under the panel in lane 0 gets the cue.
+                    f.game.spawn_enemy(&mut a, EnemyKind::Runner, 0, false);
+                    a.enemies.last_mut().unwrap().x = width - 0.5;
+                    a.events.clear();
+                    let build_right = a.construction_bounds()[1];
+                    let at = [build_right + 0.2 + dx, 0.3 + step as f32 * 0.2];
+                    a.events.push_back(SimEvent {
+                        seq: 1,
+                        kind: EventKind::Hit,
+                        from: a.defender_position(),
+                        to: at,
+                        value: 25,
+                        tick: a.tick,
+                        actor_id: None,
+                        target_id: None,
+                        lane: Some(0),
+                        duration_ticks: 0,
+                    });
+                    *f.game.attempt_slot_mut() = Some(a);
+                    let output = h.frame_size(f, View::Battle, vec![], size);
+                    let runs = text_runs(&output);
+                    let number = runs
+                        .iter()
+                        .filter(|run| run.text == "25")
+                        .fold(Rect::NOTHING, |all, run| all.union(run.rect));
+                    let label = runs
+                        .iter()
+                        .find(|run| run.text == art::MIDPOINT_LABEL)
+                        .map(|run| run.rect)
+                        .expect("the midpoint label drew");
+                    let cue = runs
+                        .iter()
+                        .find(|run| run.text == "INCOMING")
+                        .map(|run| run.rect)
+                        .expect("the INCOMING cue drew");
+                    checked += 1;
+                    if !number.is_positive() {
+                        continue;
+                    }
+                    drawn += 1;
+                    let case = format!("{size:?} reduced {reduced}, hit at {at:?}");
+                    assert!(
+                        !number.intersects(label),
+                        "{case}: the number {number:?} meets the midpoint label {label:?}"
+                    );
+                    assert!(
+                        !number.intersects(cue),
+                        "{case}: the number {number:?} meets the INCOMING cue {cue:?}"
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        drawn * 2 > checked,
+        "only {drawn} of {checked} frames drew the number"
+    );
 }
