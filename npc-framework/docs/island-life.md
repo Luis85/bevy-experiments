@@ -280,9 +280,18 @@ resident; three days without contact lower it. The tiers and what each gives:
 | Tier | From | What it gives |
 | --- | --- | --- |
 | Stranger | 0 | nothing yet |
-| Acquaintance | 5,000 | a greeting now and then |
+| Acquaintance | 5,000 | a warmer greeting |
 | Friend | 20,000 | 10% off what you buy from them, a gift back about every 4 days, help on your homestead |
 | Close friend | 50,000 | 20% off, a gift back about every 2 days, help, an invitation to the next gathering |
+
+**Residents notice you.** A resident with free time (its evening, or a moment
+with nothing else to do; never at work, asleep or in a meeting) who sees you
+within 6 m turns to you and says hello, once a day each: the line follows your
+bond tier. If you sold one of its goods today and you stand in its settlement,
+it says "You've been busy at my trade, <your name>." instead. The greeting adds
+half a talk (500 points) to the bond and appears as a speech bubble and a
+message. This is the resident tree's `Player nearby` branch (`life.player_within`
+and `life.greet`, see [authoring](island-ai-authoring.md)).
 
 **Gifts and tastes.** Give 1 to 5 units of bread, berries, a cooked meal, fish,
 logs or planks within 1.5 m. Each resident likes one gift and dislikes another

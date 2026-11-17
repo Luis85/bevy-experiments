@@ -6,6 +6,7 @@
 //! ```json
 //! {"Guard": {"if": "need_below", "need": "Hunger", "value": 40000, "not": false, "abort": "None"}}
 //! {"Guard": {"if": "life.night", "not": true, "abort": "None"}}
+//! {"Guard": {"if": "life.player_within", "value": 6, "abort": "None"}}
 //! ```
 //!
 //! [`rewrite_guards`] turns each into a plain condition name before the tree
@@ -39,6 +40,9 @@ pub enum ParamCond {
     TraitAtLeast { name: String, value: i32 },
     /// The resident's shifted schedule is in this block.
     InBlock(BlockKind),
+    /// The played character is alive and within this many millimetres
+    /// (`life.player_within`, authored in metres).
+    PlayerWithin { mm: i64 },
     /// A registered condition, negated.
     Not(String),
     /// A parameterised condition, negated.
@@ -50,6 +54,9 @@ pub enum ParamCond {
 pub struct ParamConds {
     pub slots: Vec<(String, ParamCond)>,
 }
+
+/// The test of the played character's distance (S3.6, npc-ai#6).
+pub const PLAYER_WITHIN: &str = "life.player_within";
 
 const NEEDS: [&str; 4] = ["Hunger", "Thirst", "Energy", "Warmth"];
 const TRAITS: [&str; 3] = ["diligence", "sociability", "thrift"];
@@ -119,6 +126,10 @@ fn name_of(guard: &serde_json::Map<String, Value>) -> Result<String, String> {
             "in_block:{}",
             text("block").ok_or("`in_block` needs `block`")?
         ),
+        PLAYER_WITHIN => format!(
+            "{PLAYER_WITHIN}:{}",
+            number("value").ok_or("`life.player_within` needs `value` (metres)")?
+        ),
         // A registered condition: only `not` makes it a new name.
         plain if negate => return Ok(format!("not:{plain}")),
         plain => return Ok(plain.to_owned()),
@@ -136,6 +147,7 @@ pub fn is_param(name: &str) -> bool {
             "season:",
             "trait_at_least:",
             "in_block:",
+            "life.player_within:",
         ]
         .iter()
         .any(|prefix| name.starts_with(prefix))
@@ -235,6 +247,13 @@ pub fn parse(name: &str, economy: &EconomySpec) -> Result<ParamCond, String> {
             };
             Ok(ParamCond::InBlock(block))
         }
+        [PLAYER_WITHIN, metres] => {
+            let metres = int(metres)?;
+            if !(1..=100).contains(&metres) {
+                return Err("`life.player_within` value must be 1..=100 (metres)".into());
+            }
+            Ok(ParamCond::PlayerWithin { mm: metres * 1000 })
+        }
         _ => Err(format!("`{name}` is not a condition with parameters")),
     }
 }
@@ -270,6 +289,7 @@ fn eval(world: &World, actor: Entity, cond: &ParamCond) -> bool {
             have >= *value
         }
         ParamCond::InBlock(block) => super::in_block(world, actor, *block),
+        ParamCond::PlayerWithin { mm } => crate::village::live::player_within(world, actor, *mm),
         ParamCond::Not(name) => {
             !super::conditions::find(name).is_some_and(|info| (info.test)(world, actor))
         }

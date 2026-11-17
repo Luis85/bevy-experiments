@@ -145,6 +145,7 @@ is in progress.
 | `life.collect_found` | none | Pick up a dropped coin purse or diary within reach. | None is near. |
 | `life.sleep` | none | Walk home and rest there. Inside the resident's sleep block this is the sleep of the night: it lasts to the end of the block at `tuning.sleep_energy_per_tick`, and only a critical need of the resident, a starving child of the home or a player order ends it earlier (`VillageWoken`). Outside the block it is a short rest of 300 ticks at `tuning.nap_energy_per_tick`. | Never. |
 | `life.warm_up` | none | Walk home and stay by the hearth until warm, at most 1500 ticks. | Never. |
+| `life.greet` | `player` | Turn to the played character, if it is within 12 m, awake and not indoors where the resident is not, and say the bond tier's line of `economy.live.greetings` to it (`VillageSpeech` addressed to it), once a day per resident (`Bond.greeted_day`, saved). If the played character sold one of the resident's goods today and stands in its settlement, the line is "You've been busy at my trade, <name>." The bond gains half of `talk_points`; journal `VillageGreeting` (`to`, `text`, `trade`). Guard it with `life.player_within`. | Nobody to greet, too far, asleep, indoors elsewhere, in a meeting, or already greeted today. |
 | `life.go_to` | `home`, `work`, `centre`, `meal` (home, else the nearest inn, else the square), a key from `behavior.places`, or `{"Pos": [x, z]}` | Walk there and stay. | The way is blocked (`home` never fails). |
 | `life.socialise` | none | Walk to a free neighbour within 15 m for a meeting. | Nobody is free, or the resident met someone in the last 600 ticks. |
 | `life.continue` | none | Keep doing the physical work in progress. | Nothing is in progress. |
@@ -260,9 +261,10 @@ lower-priority work.
 | Chores | none | pick up lost property; put on a coat; fetch hearth fuel when `life.needs_fuel`; stock provisions when `life.has_spare_coins`; replace clothing |
 | Storm | `life.storm` | craft during work hours, else shelter at home |
 | Sell surplus to the boat | none | while the boat is in or due, carry what it buys to the trading post (above the evening: a long walk to the water is finished, not dropped at dusk) |
-| Leisure | `life.wants_leisure` | help a friend, a family evening at home, meet a neighbour (sociable residents), else stroll to the square |
+| Leisure | `life.wants_leisure` | greet the played character within 6 m (`life.player_within`, once a day), help a friend, a family evening at home, meet a neighbour (sociable residents), else stroll to the square |
 | Work hours | `life.in_work_window` | change job, build (a `life.site_needs_builder` guard: a supplied site interrupts the lower work), carry building materials, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
 | Night | `life.in_sleep_window` | stay home |
+| Player nearby | `life.player_within` 6 m | greet the played character (once a day): a resident with nothing else to do notices it too |
 | (last) | none | seek company, idle |
 
 In the living world a resident without a coat out in the cold (night, winter
@@ -572,6 +574,7 @@ A guard may test with parameters, or negate any condition (review fix pass, S3.1
 ```json
 {"Guard": {"if": "need_below", "need": "Hunger", "value": 40000, "not": false, "abort": "None"}}
 {"Guard": {"if": "life.night", "not": true, "abort": "None"}}
+{"Guard": {"if": "life.player_within", "value": 6, "abort": "None"}}
 ```
 
 | `if` | Parameters | True when |
@@ -582,10 +585,11 @@ A guard may test with parameters, or negate any condition (review fix pass, S3.1
 | `season` | `season` | it is that season |
 | `trait_at_least` | `trait` (`diligence`, `sociability`, `thrift`), `value` 0..=100 | the trait is at least the value |
 | `in_block` | `block` (`work`, `meal`, `leisure`, `sleep`) | the resident's shifted schedule is in that block |
+| `life.player_within` | `value` in metres, 1..=100 | the played character has arrived, is alive and is within that distance (integer squared distance; one index lookup, no scan) |
 | any registered condition | `not: true` | the condition is false |
 
 The loader turns each into a plain registered name (`need_below:Hunger:40000`,
-`not:life.night`); a world may use at most 64 distinct ones. A `not` guard, and any
+`not:life.night`, `life.player_within:6`); a world may use at most 64 distinct ones. A `not` guard, and any
 guard with parameters, must not abort lower-priority work.
 
 Which tree a resident runs is data: `behavior.stage_trees` (`child`, `elder`) and a

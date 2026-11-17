@@ -38,12 +38,12 @@ pub type Goods = BTreeMap<String, u32>;
 
 /// `sim_rand` purposes of this module.
 const TASTE_PURPOSE: u32 = 0x4c49_5601;
-const GREETING_PURPOSE: u32 = 0x4c49_5602;
 const NEEDS: [&str; 4] = ["Hunger", "Thirst", "Energy", "Warmth"];
 /// A resident this near its settlement's square attends a gathering.
 const GATHERING_REACH_MM: i64 = 12_000;
-/// A resident this near a played character may greet it.
-const GREETING_REACH_MM: i64 = 3_000;
+/// A resident greets the played character from at most this far (the
+/// tree's `life.player_within` guard narrows it).
+pub const GREETING_REACH_MM: i64 = 12_000;
 /// Work on the homestead counts while its owner is this near the door.
 const HOMESTEAD_REACH_MM: i64 = 4_000;
 
@@ -1645,9 +1645,6 @@ pub fn tick(world: &mut World) {
             repeat(world, *unit, *actor);
         }
     }
-    if now.is_multiple_of(300) {
-        greet(world, &spec, &played, day, now);
-    }
     if now.is_multiple_of(50) {
         gather(world, &played, day);
     }
@@ -2037,68 +2034,136 @@ fn repeat(world: &mut World, unit: SimId, actor: Entity) {
     }
 }
 
-/// A free resident near a played character sometimes speaks first.
-fn greet(world: &mut World, spec: &LiveSpec, played: &[(SimId, Entity)], day: u64, now: u64) {
-    if spec.greetings.is_empty() || spec.greeting_permille == 0 {
-        return;
+/// The played character a resident may notice: arrived, alive, and not the
+/// resident itself. One index lookup, no scan.
+fn noticed_player(world: &World, actor: Entity) -> Option<(SimId, Entity, SimPos)> {
+    let id = world.get_resource::<super::VillageState>()?.played;
+    let player = entity(world, id)?;
+    if player == actor || !is_player(world, player) || !living(world, player) {
+        return None;
     }
-    let seed = world.resource::<WorldSeed>().0;
-    for (unit, actor) in played {
-        if super::indoors::asleep(world, *actor) {
-            continue;
+    Some((id, player, *world.get::<SimPos>(player)?))
+}
+
+/// `life.player_within`: the played character is alive and within
+/// `reach_mm` of `actor` (squared integer distance).
+pub fn player_within(world: &World, actor: Entity, reach_mm: i64) -> bool {
+    let (Some((_, _, at)), Some(here)) = (noticed_player(world, actor), world.get::<SimPos>(actor))
+    else {
+        return false;
+    };
+    here.dist2(at) <= reach_mm.saturating_mul(reach_mm)
+}
+
+/// Whether the played character sold a good `resident` makes today, while it
+/// stands in the resident's settlement.
+fn busy_at_trade(world: &World, player: SimId, at: SimPos, resident: Entity, day: u64) -> bool {
+    let Some(person) = world.get::<Villager>(resident) else {
+        return false;
+    };
+    let home = super::frontier::settlements::member(world, resident);
+    if home.is_none() || super::frontier::settlements::nearest(world, at) != home {
+        return false;
+    }
+    let outputs = catalog::outputs_for(world, person.role);
+    world
+        .resource::<LiveState>()
+        .ledgers
+        .get(&player)
+        .filter(|ledger| ledger.summary.day == day)
+        .is_some_and(|ledger| {
+            ledger
+                .summary
+                .sold
+                .iter()
+                .any(|(kind, count)| *count > 0 && outputs.contains(&kind.as_str()))
+        })
+}
+
+/// `life.greet player`: a free resident turns to the played character and
+/// speaks first, once a day each. The line is the bond tier's greeting, or a
+/// word about its trade when the played character sold one of its goods in
+/// its settlement today. The bond gains half a talk.
+pub(crate) fn greet_player(world: &mut World, resident: Entity) -> Result<(), &'static str> {
+    let Some(spec) = spec(world).cloned() else {
+        return Err("this world keeps no bonds with a played character");
+    };
+    let Some((unit, player, at)) = noticed_player(world, resident) else {
+        return Err("no played character is about");
+    };
+    let Some(here) = world.get::<SimPos>(resident).copied() else {
+        return Err("no played character is about");
+    };
+    if here.dist2(at) > GREETING_REACH_MM.pow(2) {
+        return Err("the played character is too far away to greet");
+    }
+    // A resident at home greets a passer-by from the door; a played
+    // character asleep, or indoors where the resident is not, is not greeted.
+    let indoors = super::indoors::inside_entity(world, player);
+    if super::indoors::asleep(world, player)
+        || (indoors.is_some() && indoors != super::indoors::inside_entity(world, resident))
+    {
+        return Err("the played character cannot be greeted from here");
+    }
+    if world.get::<colony::Chatting>(resident).is_some() {
+        return Err("in a meeting");
+    }
+    let Some(id) = world.get::<SimId>(resident).copied() else {
+        return Err("no played character is about");
+    };
+    let day = super::calendar(world).0;
+    let already = world
+        .resource::<LiveState>()
+        .bonds
+        .get(&unit)
+        .and_then(|bonds| bonds.get(&id))
+        .is_some_and(|bond| bond.greeted_day == Some(day));
+    if already {
+        return Err("already greeted the played character today");
+    }
+    let trade = busy_at_trade(world, unit, at, resident, day);
+    let line = if trade {
+        let name = world
+            .get::<Villager>(player)
+            .map(|person| person.name.clone())
+            .unwrap_or_default();
+        format!("You've been busy at my trade, {name}.")
+    } else {
+        let (tier, _) = tier_of(world, score(world, unit, id));
+        spec.greetings
+            .get(tier.min(spec.greetings.len().saturating_sub(1)))
+            .cloned()
+            .unwrap_or_else(|| "Good day.".to_owned())
+    };
+    if let Some(mut facing) = world.get_mut::<Facing>(resident) {
+        let towards = Facing::towards(here, at);
+        if *facing != towards {
+            *facing = towards;
         }
-        let Some(here) = world.get::<SimPos>(*actor).copied() else {
-            continue;
-        };
-        let Some(mut query) = world.try_query::<(Entity, &SimId, &SimPos, &SocialLife)>() else {
-            continue;
-        };
-        let near: Option<(SimId, Entity)> = query
-            .iter(world)
-            .filter(|(resident, id, pos, _)| {
-                *id != unit
-                    && pos.dist2(here) <= GREETING_REACH_MM.pow(2)
-                    && colony::social_available(world, *resident)
-                    && is_resident(world, *resident)
-            })
-            .map(|(resident, id, _, _)| (*id, resident))
-            .min_by_key(|(id, _)| *id);
-        let Some((resident, _)) = near else {
-            continue;
-        };
-        let already = world
-            .resource::<LiveState>()
+    }
+    world.entity_mut(resident).remove::<MoveIntent>();
+    if super::speech::validate_text(&line).is_ok() {
+        // Addressed: the played character hears it, nobody is scanned for.
+        super::speech::speak(world, id, Some(unit), &line);
+    }
+    {
+        let mut state = bond_mut(world, unit, id);
+        if let Some(bond) = state
             .bonds
-            .get(unit)
-            .and_then(|bonds| bonds.get(&resident))
-            .is_some_and(|bond| bond.greeted_day == Some(day));
-        if already
-            || sim_rand(seed, resident, now, GREETING_PURPOSE) % 1000
-                >= u64::from(spec.greeting_permille)
+            .get_mut(&unit)
+            .and_then(|bonds| bonds.get_mut(&id))
         {
-            continue;
+            bond.greeted_day = Some(day);
         }
-        let (tier, _) = tier_of(world, score(world, *unit, resident));
-        let line = &spec.greetings[tier.min(spec.greetings.len() - 1)];
-        super::speech::speak(world, resident, Some(*unit), line);
-        {
-            let mut state = bond_mut(world, *unit, resident);
-            if let Some(bond) = state
-                .bonds
-                .get_mut(unit)
-                .and_then(|bonds| bonds.get_mut(&resident))
-            {
-                bond.greeted_day = Some(day);
-            }
-        }
-        change_bond(world, *unit, resident, spec.talk_points / 2, "greeting");
-        record_effect(
-            world,
-            Some(resident),
-            "VillageGreeting",
-            &json!({"to":unit,"text":line}),
-        );
     }
+    change_bond(world, unit, id, spec.talk_points / 2, "greeting");
+    record_effect(
+        world,
+        Some(id),
+        "VillageGreeting",
+        &json!({"to":unit,"text":line,"trade":trade}),
+    );
+    Ok(())
 }
 
 /// A resident resting at home in the day, free to attend, gets up for the

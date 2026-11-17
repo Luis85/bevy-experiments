@@ -51,6 +51,7 @@ const BUY_CLASSES: &[&str] = &[
 ];
 const GATHER_CLASSES: &[&str] = &["water", "food", "fuel", "outputs"];
 const SELL_CLASSES: &[&str] = &["surplus"];
+const GREET_TARGETS: &[&str] = &["player"];
 const HAUL_CLASSES: &[&str] = &["fuel", "materials", "surplus", "restock", "boat", "help"];
 
 /// A leaf start measured under the profiler row `start.<action>` (S4
@@ -158,6 +159,17 @@ pub const ACTIONS: &[ActionInfo] = &[
         doc: "Walk to `home`, `work`, `centre` (the settlement centre), a place from \
               `behavior.places`, or a position, and stay there. `home` always starts; any other \
               destination fails when the way is blocked.",
+    },
+    ActionInfo {
+        name: "life.greet",
+        start: timed!("life.greet", greet),
+        param: Param::Names(GREET_TARGETS),
+        always_starts: false,
+        doc: "Turn to the played character within 12 m and say the bond tier's greeting (or a \
+              word about the resident's trade when the played character sold one of its goods \
+              in its settlement today), once a day; the bond gains half a talk. Guard it with \
+              `life.player_within`. Fails when the played character is not about, asleep, \
+              indoors elsewhere, or was already greeted today.",
     },
     ActionInfo {
         name: "life.harvest",
@@ -401,6 +413,7 @@ pub(super) fn label(action: &str, param: &ParamValue) -> Option<&'static str> {
         ("life.go_to", "work") => "going to work",
         ("life.go_to", "centre") => "strolling to the square",
         ("life.go_to", _) => "taking a walk",
+        ("life.greet", _) => "greeting a newcomer",
         ("life.harvest", _) => "harvesting the field",
         ("life.haul", "materials") => "carrying building materials",
         ("life.haul", "surplus") => "storing surplus goods",
@@ -1313,6 +1326,21 @@ fn idle(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
                 return Ok(());
             }
             world.entity_mut(actor).remove::<MoveIntent>();
+            Ok(())
+        },
+    )
+}
+
+fn greet(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
+    begin(
+        world,
+        actor,
+        "life.greet",
+        param,
+        LifeGoal::Leisure,
+        |world, actor| {
+            super::super::live::greet_player(world, actor)?;
+            production::clear_intent(world, actor);
             Ok(())
         },
     )

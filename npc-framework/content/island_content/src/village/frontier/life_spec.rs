@@ -1025,10 +1025,8 @@ pub struct LiveSpec {
     /// Goods a resident may like or dislike as a gift: each likes one and
     /// dislikes another, by seed.
     pub gift_goods: Vec<String>,
-    /// Chance in a thousand, every 300 ticks, that a free resident beside a
-    /// played character speaks first (once a day each).
-    pub greeting_permille: u32,
-    /// What it says, by bond tier.
+    /// What a free resident says when it greets a played character
+    /// (`life.greet player`, once a day each), by bond tier.
     pub greetings: Vec<String>,
     pub gatherings: Vec<GatheringSpec>,
     /// A resident goes to a gathering only while every need is above this.
@@ -1099,7 +1097,6 @@ impl Default for LiveSpec {
                 "log".into(),
                 "plank".into(),
             ],
-            greeting_permille: 250,
             greetings: vec![
                 "Good day.".into(),
                 "Good day to you. How is the homestead?".into(),

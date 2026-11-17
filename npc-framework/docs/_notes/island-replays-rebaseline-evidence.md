@@ -127,3 +127,20 @@ cargo xtask verify            # must print "ok":true
 
 Or create `.claude/rebaseline-approved` and tell the agent in chat to run exactly those commands, then delete the
 marker. Commit the three replays with this note and add a `CHANGELOG.md` line.
+
+## Re-baseline 2026-11-17: residents notice the player (backlog item 3)
+
+Approved by the owner in chat for one swap per hash-changing backlog item. The new condition
+`life.player_within` and leaf `life.greet` change the content hash `5549939943327183273` (`4d0558f93ec4b1a9`)
+-> `16261449980358703144` (`e1ac4699ac103828`), and every state hash. The old files are refused:
+`content hash mismatch: replay 4d0558f93ec4b1a9, this build e1ac4699ac103828`.
+
+Recorded with the commands above into `target/island-split/b3/` (release `npcctl` from this tree), each seed twice,
+byte-identical (`cmp`); each verifies `{"ok":true,"checked":40,"first_mismatch":null}` before and after the swap.
+Marker created and deleted for this swap; `tests/replays.next` removed.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `5f2b6c22a63f3da64de372308e23bfad14272b9737abeec5d702428e960db3fe` |
+| `island_living_world_s11.json` | `3b7a18a9f5ddaf36e9be00c2db3ce16d7ed4c2d41778986c2da71733cc373467` |
+| `island_living_world_s23.json` | `343ad09bc218d6c0c2b9191182e30c1b298e4cba65af874837531562d7df22e3` |

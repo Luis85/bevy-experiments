@@ -10,6 +10,13 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Residents notice the player (S3.6, npc-ai#6): condition `life.player_within` (`value` in metres) and leaf
+  `life.greet player` in the shipped tree (first in `Free time`, and before `Seek company`); a free resident within
+  6 m turns to the played character and greets it once a day (bond tier line, or "You've been busy at my trade,
+  <name>." after the player sold its good in its settlement today), journal `VillageGreeting`, half a talk to the
+  bond, the day kept in `Bond.greeted_day`. The random live-tick greeting and `live.greeting_permille` are removed.
+  Content hash and island state hashes change; island replays re-baselined (content hash `e1ac4699ac103828`).
+
 - Food and trade windows close every day/8 ticks and keep 3 days (they kept 0.3 day); food use is what is eaten;
   boat purchases count as exports; farmers rank goals by food value. Berries spoiled fall below berries eaten.
 - Staple advances reach broke makers; standing work toward the stock target for staples and the made goods their

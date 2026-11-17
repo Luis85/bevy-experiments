@@ -93,6 +93,9 @@
     {"name": "Sell surplus to the boat", "kind": {"Leaf": {"action": "life.haul", "param": {"Name": "boat"}}}},
     {"name": "Leisure", "kind": {"Guard": {"cond": "life.wants_leisure", "abort": "None"}}, "children": [
       {"name": "Free time", "kind": "Selector", "children": [
+        {"name": "Player nearby", "kind": {"Guard": {"if": "life.player_within", "value": 6, "abort": "None"}}, "children": [
+          {"name": "Greet the player", "kind": {"Leaf": {"action": "life.greet", "param": {"Name": "player"}}}}
+        ]},
         {"name": "Help a friend", "kind": {"Leaf": {"action": "life.help", "param": "None"}}},
         {"name": "Family evening", "kind": {"Guard": {"cond": "life.family_at_home", "abort": "None"}}, "children": [
           {"name": "Evening at home", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "home"}}}}
@@ -125,6 +128,9 @@
     ]},
     {"name": "Night", "kind": {"Guard": {"cond": "life.in_sleep_window", "abort": "None"}}, "children": [
       {"name": "Stay home", "kind": {"Leaf": {"action": "life.go_to", "param": {"Name": "home"}}}}
+    ]},
+    {"name": "Player nearby", "kind": {"Guard": {"if": "life.player_within", "value": 6, "abort": "None"}}, "children": [
+      {"name": "Greet the player", "kind": {"Leaf": {"action": "life.greet", "param": {"Name": "player"}}}}
     ]},
     {"name": "Seek company", "kind": {"Leaf": {"action": "life.socialise", "param": "None"}}},
     {"name": "Idle", "kind": {"Leaf": {"action": "life.idle", "param": "None"}}}

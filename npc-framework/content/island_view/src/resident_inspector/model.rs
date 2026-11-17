@@ -625,6 +625,7 @@ pub(crate) fn action_phrase(action: &str, param: &str) -> String {
         ("life.go_to", "work") => "going to work",
         ("life.go_to", "centre") => "strolling to the square",
         ("life.go_to", _) => "taking a walk",
+        ("life.greet", _) => "greeting you",
         ("life.haul", "materials") => "carrying building materials",
         ("life.haul", "surplus") => "storing surplus goods",
         ("life.haul", "restock") => "restocking the stall",
@@ -786,6 +787,7 @@ const BRANCH_REASONS: &[(&str, &str, &str)] = &[
         "it was their working time",
     ),
     ("Night", "it is night", "it was night"),
+    ("Player nearby", "you are nearby", "you were nearby"),
     (
         "Seek company",
         "nothing else needs doing",
