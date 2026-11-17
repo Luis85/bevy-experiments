@@ -1394,6 +1394,22 @@ The gate is `repo_checks::save_docs_name_the_v7_format_every_migration_step_pin_
 
 Amended 14 November 2026 (W4-14, R59): the Npc combat balance pass landed after W4-09 and moves Npc runs on purpose, so the pins above are no longer all at their tables. `PROVISIONAL` holds the three Npc `GOLDEN` and `GAMEPLAY_TRACE` digests and `PROGRESSED_PROVISIONAL` the two recruit-takeover runs, each with the cause rows "W4-14 aim" and "W4-14 arrival" (class G); the takeovers start `PROGRESSED_TAKEOVER_BOSS_LEAD` (3000) ticks before the boss. The v7 continuation moved with the aim fix (the fixture's root defense is Mara's) and is held in `V7_CONTINUATION_PROVISIONAL` with `V7_CONTINUATION_CAUSES`, the same ledger shape. The V1-V6 continuations, `V6_DROP_TRACE_FNV`, the `save_v7.json` identity and the frozen-catalogue pin do not move: pre-v7 attempts keep the old aim test and their frozen snapshots. The closing phase folds the provisional pins (plan §9.6, "W4-14 Npc combat balance").
 
+## Zero-move records and the pins at the release candidate — 17 November 2026 (W5-12, A6-19, W7-10)
+
+The save-determinism rows W5-12, A6-19 and W7-10 record whether waves 5, 6 and 7 moved a pin. The record comes from git history (`a9fc30a..HEAD`) and from the pin tests at HEAD. Under ruling R36 it is written once, in the closing phase.
+
+**What moved after the wave-2 close.** `git log -G` over the pin lines of `tests/determinism.rs` and `tests/save_migration.rs` from a9fc30a to HEAD finds five commits:
+- W4-09 (fa616e99) cut `PROGRESSED_GOLDEN`, `PROGRESSED_TRACE` and `V7_CONTINUATION_FNV`.
+- W4-14 aim (fbedee29) and W4-14 arrival (93321b8a) set `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL`.
+- W4-15 price (63283a9b) set `PROGRESSED_PROVISIONAL`.
+- The closing re-bless (8787675c) folded all of them ("Closing re-bless and ruleset 5" above).
+
+No wave-5, wave-6 or wave-7 commit is among them, and `tests/fixtures/` is unchanged since a9fc30a. No pin value has changed since the closing re-bless. The later commits to `tests/determinism.rs` rewrite only its doc rows.
+
+**W5-12, wave 5: `GOLDEN` 0/6, `PROGRESSED_GOLDEN` and `PROGRESSED_TRACE` 0/4, `GAMEPLAY_TRACE` 0/6.** Wave 5 is W5-01..W5-11 (0512735a..b60ef556) and the integration fixes after it (9ea8a5a1, 35e4b964, f461c72d). None of these commits touches a file under `crates/horde_core`. The `horde_core` tree object is the same, 055c8219, at 5098a066 and at f461c72d. 5098a066 is W3-28, the last commit before W7-01, W7-02 and the wave-6 and wave-5 picks; f461c72d is the last wave-5 integration commit. Presentation reaches no core state: `shot_fx_never_mutates_attempt` (ISO-8) and `sky_flash_never_reads_core_rng` pin that.
+
+W4-08 (4498e26c) has every wave-5 commit as an ancestor. It ran the full verify green (1,826 passed) with `GOLDEN` and `GAMEPLAY_TRACE` at their W2-49 values and `PROVISIONAL` None: 0/6 and 0/6. W4-09 cut the progressed pair on a tree that already held wave 5, so wave 5 is inside their baseline. With no core change, wave 5 cannot move them, and the run at HEAD below confirms 0/4. The V1-V6 continuations, `V6_DROP_TRACE_FNV` and the `save_v7.json` identity did not move.
+
 ## Closing playtest package — 16 November 2026 (W7-02, closing)
 
 Built and verified at HEAD `61bced1a` on the clean tree under Windows PowerShell 5.1.26100 (`powershell`, not `pwsh`), the playtest profile, rustc 1.99.1. Packages and verification folders are under `target/` and not committed.
