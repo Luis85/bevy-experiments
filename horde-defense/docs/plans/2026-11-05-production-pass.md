@@ -2350,4 +2350,235 @@ These have no automated substitute. Each is logged as "pending human check" in `
 
 ## 12. Outcome
 
-To be filled by the orchestrator at W7-12: branch, commits, the change made for each finding, the before/after numbers in §9, verify results, pending human checks, and then a request before fast-forwarding local `main`.
+Written 2026-11-17 by W7-12, after the closing phase (R36). Sources: `git log a9fc30a..HEAD`, this plan, VALIDATION.md, PERF_BUDGET.json and `target/production-after/closing/`. HEAD is `d4b8a197`, the last record commit before this one. Local `main` is not fast-forwarded; that is item 7 of 12.9.
+
+### 12.1 Branch and commits
+
+- Branch `claude/horde-production-pass`, worktree `.claude/worktrees/horde-production-pass`, cut from local `main` at `7bd5de8`. There are 917 commits from the cut to HEAD `d4b8a197`. They change only `horde-defense/` (895 files, +184,016 / -11,213 lines): no root file and no other workspace.
+- Local `main` has moved since the cut. It now carries `34af684c` and `a058087d` (npc-framework, 2026-11-09 and 2026-11-10), which are not on the branch. They touch nothing under `horde-defense/`, but `main` is no longer an ancestor of HEAD, so a fast-forward is not possible.
+
+| Phase | Range | Commits |
+|---|---|---|
+| Wave 1, to its R25 close | `7bd5de8..af530f02` | 297 |
+| Wave 2, to its review close | `af530f02..a9fc30a0` | 295 |
+| Waves 3-7 and the closing phase | `a9fc30a..d4b8a197` | 325 |
+
+The 325 commits after the wave-2 close, by tag:
+
+| Tag | Rows | Commits |
+|---|---|---|
+| `[W2 review]` | ruling R36 and the wave-2 close record (`0e9e7558`) | 1 |
+| Wave 3 | W3-01..W3-32 (two commits for W3-28) | 33 |
+| Wave 4 | W4-01..W4-16 with W4-p, W4-l and W4-c | 27 |
+| `[W4 decisions]` | user decisions R56-R58, R59-R60 and R61-R62 | 3 |
+| Wave 5 | W5-01..W5-11 (two commits for W5-11) and W5-12's zero-move record | 13 |
+| Wave 6 | A6-00..A6-18 and A6-19's zero-move record | 20 |
+| Wave 7 | W7-01..W7-08, W7-09 (2 records), W7-10 (2), W7-11 (4) | 16 |
+| `[integration]` | fixes after the wave-5 and wave-6 picks | 6 |
+| `[closing]`, `[closing verify]` | the closing phase: 86 fix, 74 docs, 27 test, 9 feat, 5 refactor, 4 perf, 1 style | 206 |
+
+### 12.2 The change per goal
+
+| Goal | Built in waves 3-7 | Fixed in the closing phase | At HEAD |
+|---|---|---|---|
+| 1 Architecture and performance | fx caps in PERF_BUDGET.json and fx-stress as a gated scene (W5-11); the build stamp (W7-01) | the 20,000-item save clone fits 1 ms through shared item definition IDs (764dc4f3, 11778f21); the survivor's posed-mesh and appearance caches (400c8efb, 27d763cb); every cue label size warmed, so no egui upload after warmup (b33f03fe); the main-world frame schedules on the single-threaded executor (a0278a08); tracers capped at 96 (b87628c8); the build scripts refuse a build that took another tree's sources (35daf0d2) | perf acceptance met at e54faa88 (12.3) |
+| 2 Post-run flow, camp and navigation | the amber primary registry, Camp home and the 6-entry row, one Escape router with the Quit and ReturnToMenu modals, one Save label and the toast layer, the storage-error modal, the settings draft warning and decision-18 widgets, the extra bindings, a battle bar of at most two rows, hold-to-retreat, the wall-clock boss banner, the low-HP edge, Results and Upgrades as two screens, onboarding callouts and no Debug labels (W3-01..W3-15, W3-24..W3-26, W3-03, W3-28) | the UI findings of the review rounds and the CF-3 UI rows, among them: hints, the legend, callouts and Controls name unbound keys; Escape on Upgrades returns to Results only while the journey runs; rebinding Pause never hands Escape away; coin amounts grouped by thousands and plurals; the camp footer, header, menu column, toast stack and compact skill-tree toolbar and detail | the full-loop headless walk (new game to a recruit defending) passes at both sizes in the closing verify; one amber primary per screen holds in the W7-11 captures |
+| 3 Defenders and campaign | the defender picker, the stamped appearance, SelectCountry and the recruit block and modal (W3-16..W3-19); an expedition's threat follows the recruit (W4-12, R57); the Npc aims only when it pays and `npc_arrival_factor` 0.9 -> 0.5 (W4-14, R59); Survivor network 1,700 -> 1,500 coins and the `train_companions` plan option (W4-15, R61); the Npc `defender_power` plays the stage turn by turn (W4-16, R62) | the bot rates recruit archetypes at their expedition rank (8d569d23); a second Recruit click recruits nobody (62a406d4); Camp home's Next defense card carries the picker (fe14fe4f); the NPC decision names its defender (d789418a) | G3.10, G3.11 and G3.12 pass |
+| 4 Loot and auto-sell | the Results loot block, the History auto-sold line, the Equipment Auto-sell panel and the stash-apply confirmation (W3-20, W3-21); the auto-sell pacing gate and the stash-growth report (W4-l) | the R58 save-clone measurement at 5,000 and 20,000 items; a sale toast never follows the Briefing into battle (e73ae33c) | G4.13 passes; the stash is reported (R39) |
+| 5 Progression and tree | the repriced tree, tree rules 1-6, the tier definition and the blueprint price (W4-p); effect retunes (W4-03); the Results level-grant and milestone lines (W3-22) | doc and pin fixes only | G5.7-G5.10 pass |
+| 6 Enemies and difficulty | Regional and Capstone boss multipliers (W4-01), checkpoint lines (W4-02), the defeat-window summary (W4-04; the tuning loop kept no lever), the `goal6-novice` profile (W4-13, R56), the enemy UI hooks (W3-23) | the Briefing names the boss rank once with its terms (2838e049, 24b3e0ce); the Npc briefing names only the boss damage the Npc rule adds (cb825361); the Capstone hover counts its phases (54b27970) | G6.11 and G6.12 red, accepted (R60); every other goal-6 row passes |
+| 7 Graphics | the render-pass split and theme grades, storm lightning, weapon_fx, light pools, bursts and flames, sparks and decals, elite tells, the quality glint, the review stills, the storm scene and the reduced-zero gate (W5-01..W5-10) | the grade and sky-flash over-rects composite as their tint (e679d449, CF-3-21); popup collisions (CF-3-05, -06, -09, -11, -12, -32, CF-7-01, -02); the fx-stress load carries a boss kill burst (42b123a1) | the night gate and the storm flash gate pass; the reduced MOTION gate is red (CF-3-22, 12.5) |
+| 8 Audio | the Bevy-free `horde_audio` crate, the BS.1770-4 meter, the offline mix, the mastered library (275 files), five buses, lane pan and Mono, start budgets, voice caps, round-robin, ducking, the exhaustive SimEvent mapping, GunTracker, the loot sounds, the music director with deferred track slots (FU-AUD-MUSIC), `SETTINGS_VERSION` 2, the -23 LUFS calibration and the cue log with its replay (A6-00..A6-18) | clippy on both audio crates (df634d85, e8f8ffe2); the reference scene plays its Results loot cues (b0256a17); expedition alerts heard from camp come over the radio (ceca5a0f); every runtime WAV preloads (d0682563); Incoming no longer cuts a boss warning (d8ceaf9e); a collapsed observer window plays no warning without its twin (bbb76bc9); the generator hash covers bank seeds and cue ordinals (482ba417) | the loudness gate passes; the listening pass is pending |
+| 9-10 Package, docs and captures | `package_playtest` and `verify_playtest` under 5.1 (W7-02); the docs rows W7-03..W7-08 and W7-10; the capture findings checker, pairing, curation and final review (W7-11) | a failed `package_playtest` leaves nothing (1e02cebe); `verify_playtest` reads the manifest before it unpacks (61bced1a); the build stamp is the first log line (6f937c88) | package verified (12.7); G10.1 red on CF-3-22 alone |
+| Saves and determinism | the W4-08 re-bless (RULESET 4, nothing to fold); the progressed pins and the v7 continuation (W4-09) | the closing re-bless (8787675c, RULESET 5) folded the W4-14 and W4-15 moves | no pin moved after it; `PROVISIONAL`, `PROGRESSED_PROVISIONAL` and `V7_CONTINUATION_PROVISIONAL` are None; V1-V6 never moved; `SAVE_VERSION` 7 and `save_v7.json` frozen; the final digest table is in VALIDATION.md "Zero-move records and the pins at the release candidate" |
+
+### 12.3 The numbers
+
+**Pacing** (§9.6 "Closing pacing"): the release suite ran at 270b5247. The `horde_core` tree there (ddbb4f51) is the same at HEAD, so the numbers hold for HEAD. 14 of the 16 `pacing_targets` tests pass, and the 2 red rows are accepted (R60). Cells are the lower median [p25, p75] over 20 seeds.
+
+| Row | Target | Closing | Verdict |
+|---|---|---|---|
+| G5.7 first victory | run 2-4 | 3 [3, 4] | PASS |
+| G5.8 tiers 1 / 2 / 3 | about runs 4 / 8 / 12 | 4 / 8 / 12 | PASS |
+| G5.9 Liberation(2) / tree exhausted | tree outlasts it | 19 / 28 | PASS |
+| G5.10 Fortifications / Mara / Operations | in that order | 3 / 16 / 18 | PASS |
+| G6.11 windows outside 10-25% (`goal6-novice`) | 0 | 32 of 37 | FAIL, accepted (R60) |
+| G6.12 longest streak from run 11, median [max] | under 15 | 44 [50] | FAIL, accepted (R60) |
+| G6.15 LUX Easy / Normal / Hard | Easy ≤ 6, Hard ≤ 1.5x Normal | 5 / 9 / 13 | PASS |
+| G6.16 archetype coverage | all | 18 of 18 | PASS |
+| G6.17 boss TTK | 20-60 s | 31.4 s (p90 47.5) | PASS |
+| G6.18 AUT / BGD clamped starts | no run-1 victory | 3 / 3 | PASS |
+| G4.13 auto-sell tiers 1 / 2 / 3 | within 1 run of baseline | 4 / 8 / 11 | PASS |
+| G3.10 S1 liberations 2 / 4 / 10 | reported | 9 / 19 / 39, 3,579.4 coins per minute | PASS |
+| G3.11 S2b / S2a runs to free 3 neighbours | ≤ 2/3 | 6 / 9 = 0.67 | PASS |
+| G3.12 reopens over 10 liberations | < 5 | 0 | PASS |
+
+G3.11 read 9 / 9 = 1.00 at W4-c, W4-12 and W4-14. It passes since W4-15 at exactly its bound: 6 runs is the floor the Parallel timing allows. The equip step that wins the Capstones relies on the W4-12 rule reading item levels, not tiers (item 5 of 12.9). The default `pacing 60 --runs` and `--smoke` were re-recorded at the closing HEAD (§9.6), and every move is attributed to W4-p, W4-14 or W4-15.
+
+**Perf acceptance** (VALIDATION.md "W7-09 final perf acceptance", attempts 1 and 2; `PERF_BUDGET.json acceptance.closing`). Attempt 1 at 30847f90 was not met. Its four valid overs stand (R34): fx-stress dev -VsyncOff normal cpu_frame p99 10.2157 ms, one peak normal egui texture upload in dev and in playtest, and progressed-peak interface_draw 1.1395 / 1.1421 ms. The closing perf fixes followed (400c8efb, 27d763cb, b33f03fe, a0278a08). **Attempt 2 at e54faa88 is met:** all four `measure_performance.ps1` passes exit 0 on their first invocation, and the R31 A/B passes. Every commit from e54faa88 to HEAD is docs only.
+
+| Metric (median of 3, normal / small) | Wave 0 | Gate | Attempt 2 dev | Attempt 2 playtest |
+|---|---|---|---|---|
+| progressed-peak cpu_frame p99, -VsyncOff | v3 dev 20.7 / 19.1 | ≤ 10.0 ms | 5.52 / 6.36 | 5.38 / 4.78 |
+| stress cpu_frame p99, -VsyncOff | v3 dev 31.8 / 38.1 | ≤ 10.0 ms | 6.32 / 6.70 | 6.41 / 6.19 |
+| fx-stress cpu_frame p99, -VsyncOff | n/a | ≤ 10.0 ms | 6.66 / 6.79 | 5.87 / 5.92 |
+| progressed-peak interface_draw, VSync on | 1.613 / 1.472 | ≤ 1.129 / 1.030 ms | 0.932 / 0.903 | |
+| peak interface_draw, VSync on | 1.190 / 1.075 | ≤ 1.1904 / 1.0752 ms | 0.714 / 0.712 | |
+| fx-stress interface_draw, VSync on | n/a | not gated (design 1.13 / 1.03 at 225 enemies) | 1.372 / 1.376 | |
+| R31 A/B interface_total, B / A | | ≤ 1.05 | 0.913 / 0.912 | |
+
+- Frames over 50 ms: 0 in every kept repeat of every pass, with 0 driver stalls. Gate 3 in the shipped default (playtest, pipelined, VSync on) holds: stress runs at 60.00 FPS at both sizes, p99 interval 17.65 / 19.84 ms, with 0 frames over 33 ms.
+- egui: no texture upload after warmup in any scene; at most 22 of 23 battlefield primitives. Vertices: progressed-peak 38,707 of 40,000, stress 55,055 of 61,098, and fx-stress 60,311, which has no vertex gate (item 3 of 12.9). `measure_battlefield_egui_load` reproduces `evidence.egui_measured` exactly.
+- Smoke: shipped `--smoke` 0.888 s (median of 2.131 / 0.888 / 0.877). The packaged `Lastlight.exe --smoke` took 1.50 / 1.51 / 1.47 s (61bced1a).
+- The integrated-GPU run was not measured; it is a pending human check.
+
+**Loudness** (offline_mix, 14 passed, in the closing verify at 387e7f7b; unchanged from A6-17's calibration and both W7-09 attempts). The gate is -23 ±2 LUFS integrated with true peak ≤ 0.95 FS. Before calibration (A6-04): -47.0 stage-1, -42.4 rain.
+
+| Render | Integrated | True peak |
+|---|---|---|
+| `reference_mixed_60s` stage-1 | -24.1 LUFS | 0.405 |
+| `reference_mixed_60s` rain | -22.9 LUFS | 0.399 |
+| `dense_battle_60s` | -23.0 LUFS | 0.885 |
+| `max_sliders_60s` (logged) | -20.3 LUFS | 0.632 |
+
+The A6-18 60 s cue-log replay of a live battle ran at 27d763cb: a 3600-frame `npc` motion run gave 128 starts, -23.6 LUFS and true peak 0.586, +0.5 LU from the stage-1 render (`target/production-after/closing/cue-log/npc-60s`). Its `LASTLIGHT_PERF_AUDIO` change and its records are still uncommitted in the working tree (12.10).
+
+**Save clone (R58)**: a quiet `measure_performance.ps1 -SaveClone` run at c34c39cd, `save_snapshot` p99 against the 1 ms gate (G1.8). Every size passes, so R58 changes nothing and the copy-on-write stash lever is not pulled. The remedy that made 20,000 items fit is 11778f21 (shared item definition IDs).
+
+| Profile | 1,000 | 2,500 | 5,000 | 20,000 items |
+|---|---|---|---|---|
+| dev | 0.464 | 0.433 | 0.395 | 0.683 ms |
+| playtest | 0.428 | 0.354 | 0.416 | 0.760 ms |
+
+### 12.4 Closing review rounds and R25
+
+| Round | Found | Fresh | Confirmed | Above minor |
+|---|---|---|---|---|
+| 1 | 32 | 32 | 28 | 0 |
+| 2 | 20 | 20 | 20 | 1 |
+| 3 | 19 | 19 | 18 | 0 |
+| 4 | 17 | 17 | 17 | 0 |
+
+The closing triage ledger holds 715 items:
+
+| Disposition | Items |
+|---|---|
+| Already done at HEAD when triaged | 212 |
+| Captures | 125 |
+| Verify | 94 |
+| User | 78 |
+| Fix now | 71 |
+| Rejected | 51 |
+| Perf | 41 |
+| Pacing | 31 |
+| Package | 12 |
+
+R25 conditions, applied once to the closing phase (R36):
+- **Two review rounds in a row with nothing above minor: met** by rounds 3 and 4.
+- **Perf acceptance green at HEAD: met.** W7-09 attempt 2 passed at e54faa88, and only docs changed after it.
+- **Full verify green at HEAD: met for the committed tree** (12.6). The one red test belongs to an uncommitted change in the working tree, and `check_capture_findings.py --final` is red on CF-3-22, which is the G10.1 gate and not part of the verify list.
+- **Every confirmed finding fixed or ruled: met per the closing ledger.** The findings that need a user decision are not fixed. They are listed in 12.9 and stay open until the user answers.
+- Items the closing writers reported blocked and that were resolved later: the six uncommitted closing-ui1 items landed as 62a406d4, ac71fcf7, fe14fe4f, d789418a and e73ae33c, and 2838e049 superseded the checkpoint separator. The integrated-GPU row match was fixed in a21e4746. The clippy reds in the audio crates and UI tests were fixed in df634d85, e8f8ffe2 and 27f592da (clippy is green in all three configs in the closing verify). The in-app re-measure that a busy machine blocked became W7-09 attempt 2.
+
+### 12.5 Capture ledger
+
+- **§10 ledger:** 56 rows, 55 fixed, 1 open and 0 deferred.
+
+| Wave | Blocker | Major | Minor | Polish |
+|---|---|---|---|---|
+| 0 | 3 fixed | | 1 fixed | |
+| 1 | | | 7 fixed | 5 fixed |
+| 2 | | | 5 fixed | 1 fixed |
+| 3 | | 3 fixed, 1 open (CF-3-22) | 28 fixed | |
+| 7 | | | 1 fixed | 1 fixed |
+
+- `check_capture_findings.py` passes ("56 capture findings (1 open, 55 fixed, 0 deferred)"). `--final` fails on CF-3-22 alone, so G10.1 is red until the user decides CF-3-22 (item 1 of 12.9).
+- **Runs.** The closing review (10.5) captured 312 of 312 stills and 132 motion sequences at bbd83484. The final run (10.6) was at 9101dbe3, and the W7-11 after set at d53cfe0f: 312 of 312 stills, 1,020 of 1,020 sidecar checks and 24 motion exports. `compare_captures.py` passes, with 312 changed against wave 0. 33 pairs are committed under `docs/screenshots/production/`, 39,099,685 B of the 40,000,000 B budget.
+- **Luminance at d53cfe0f.** The night gate passes: night/dawn 0.4715, within 0.03 of the 0.45 model since CF-3-21. The storm flash gate passes (max frame delta 0.084 < 0.2). The reduced MOTION gate passes on storm and the machine gun. It fails on fx-stress (block 0.153 / 0.337), the turret and the shotgun at 1050x700@1.35, because reduced-mode popups and static tracers change their blocks. Every reduced flash field is 0.
+- **Not re-captured.** The four code commits after d53cfe0f (400c8efb, b33f03fe, 27d763cb, a0278a08: caches, a glyph warm-up and the executor) are meant to leave pixels unchanged, but no capture run confirms it.
+- **Carried items with no recorded judgement.** The plan records no judgement of the W2-37 phase-hold item (label, ring and hold in the boss-phase motion) or of the W2-41 / design-progression-tree §3 item 8 compact Firearms rows; 10.5 left both open.
+
+### 12.6 Verify results
+
+The full verify ran on 2026-11-17 (local 08:09-08:41) at 387e7f7b on the working tree, which held another writer's uncommitted A6-18 edits. Logs are in `target/closing-verify/`. Every commit after 387e7f7b is docs only.
+
+| Step | Result |
+|---|---|
+| `cargo fmt --all -- --check` | clean |
+| clippy -D warnings: workspace, `--no-default-features`, `--features dev` | clean in all three |
+| `cargo test --workspace` | The first run failed `acceptance_ledger_lists_every_production_pass_row`. 387e7f7b fixed it, and the rerun passed: 1,974 passed, 0 failed, 25 ignored, over 83 test binaries |
+| `-p horde-defense --no-default-features` | 922 passed, 1 failed, 3 ignored. The failure, `a_perf_audio_review_keeps_the_battle_audible` (left 0.8, right 0.0), is a test inside the uncommitted A6-18 change and is not at HEAD; every committed test passed |
+| `-p horde-defense --features dev` | 996 passed, 0 failed, 4 ignored |
+| `--smoke` | PASS |
+| `check_views.py` | PASS: 87 Views, 189 module rows, 132 doc links |
+| `test_check_views.py` / `test_check_capture_findings.py` / `test_compare_captures.py` / `test_measure_field_luminance.py` | OK: 21 / 17 / 8 / 17 tests |
+| `check_capture_findings.py` (with `--final`) | PASS (`--final` FAIL on CF-3-22) |
+| `generate_audio.py --check` / `generate_atmosphere_audio.py --check` | PASS, 9 clips each |
+| `generate_world.py --check` / `--self-test` | PASS / 34 cases |
+| `run_script_tests.ps1` (5.1) | PASS, 85 cases |
+| `export_audio` check / `offline_mix --include-ignored` | 275 files match / 14 passed |
+
+This W7-12 commit changes the plan only. After writing it, `check_views.py`, `check_capture_findings.py` and the repo checks that read the plan were run again (see the commit body).
+
+### 12.7 Playtest package
+
+- **Verified package:** `target/playtest/Lastlight-playtest-v0.1.0-61bced1-20261116-175626.zip`, 52,427,602 B, SHA-256 `ef09c5e3bd121bee4217cb46566cb02eadd2293beb7818627c8747fdc9eb9b33`, built at 61bced1a on a clean tree under Windows PowerShell 5.1. `verify_playtest.ps1` printed PASS (329 manifest hashes, stamp `v0.1.0 (61bced1)`, copied-executable smoke). The review package `...-61bced1-20261116-180346.zip` passed `-NativeCapture` (VALIDATION.md "Closing playtest package").
+- **The package is not at HEAD's code.** HEAD differs from 61bced1a by four `horde_game` commits: 400c8efb, b33f03fe, 27d763cb and a0278a08. A hand-off package should be built and verified again at the final HEAD:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1`
+  - then `scripts/verify_playtest.ps1 -Package <zip>`
+- `target/playtest/` also holds two `...-30847f9-...` zips, from 2026-11-16 18:15 and 18:20 UTC, that no record describes. 30847f90 has the same code as 61bced1a.
+
+### 12.8 Pending human checks
+
+All 11 are recorded as "pending human check" in §11 and in docs/ACCEPTANCE.md. None was run.
+
+| Check | Protocol |
+|---|---|
+| Camera feel: a 3x12 field at 2.5x zoom | play the first defense at both sizes |
+| Stepped damage pop (CF-1-04, W1-64) | watch damage numbers at 60 fps, normal mode, both sizes |
+| Whole-pixel text placement (CF-1-05, W1-64) | compare `text-subpixel-on-b` with `text-after`, then read body text live at 1050x700@1.35 |
+| Sheet upscale on 3-lane sprites at 2.5x | inspect the intro and 3x12 weapon-class stills |
+| Weapon-classes review (G7.1) | the `weapon-classes-*` stills and motion |
+| Night and storm look (G7.2, G7.3) | `night-checkpoint`, `storm` and `dawn-reference` stills and storm motion |
+| Listening pass (W7-03) | PLAYTEST_GUIDE "Listening pass" on a packaged build, default sliders and Mono |
+| Click-to-photon run (W7-08) | PLAYTEST_GUIDE protocol; median ≤ 50 ms default, ≤ 34 ms Low latency |
+| World generator against today's Natural Earth master (R54) | `python -I -B scripts/generate_world.py --rebuild --download --check` on a networked machine, record the exit code |
+| Human difficulty playtest (R56, R60) | a Normal campaign at least 20 runs past the first victory, beside G6.11 and G6.12 |
+| Integrated-GPU run | `measure_performance.ps1 -Adapter "Intel(R) Arc(TM) Pro Graphics" -VsyncOff`, then set `hardware.integrated_gpu` |
+
+### 12.9 Open decisions for the user
+
+1. **CF-3-22, the reduced MOTION gate (ISO-10, G7.4; keeps G10.1 red).** The block half of the gate fails on fx-stress, the turret and the small shotgun. The failing blocks hold reduced-mode damage numbers and static tracers, not flashes. Options:
+   - (a) The gate masks popup and HUD-text rects. This needs those rects exported and a change to `measure_motion`.
+   - (b) The reduced MOTION export runs with damage numbers off.
+   - (c) A ruling that the block criterion covers flash and pulse effects only.
+
+   After the decision the gate is rerun on fx-stress at both viewports.
+2. **The fx-stress interface gate.** design-vfx-lighting §13/§14 ask for an fx-stress interface mean of at most 1.13 / 1.03 ms at 225 enemies. The fixture spawns 400, and `PERF_BUDGET.json scenes.fx-stress` gates only frames over 50 ms and CPU p99. Attempt 2 reads 1.372 / 1.376 ms, ungated. Options:
+   - (a) Leave it ungated and amend the design text to say it is information at 400 enemies.
+   - (b) Add a gate at 400 enemies with limits the user names.
+   - (c) Add a 225-enemy measurement point gated at 1.129 / 1.030 ms. This needs fixture and harness work and would likely fail now.
+3. **The fx-stress battlefield vertex gate.** The live maximum is 60,311 with VSync on, 787 under the stress gate. Options:
+   - (a) Add `egui.battlefield_vertices_max.fx-stress`, tied to the stress gate's 61,098 under R22, with its evidence and live-gate pins.
+   - (b) Record that the stress gate covers fx-stress.
+4. **Interface costs that no perf scene shows** (carried items 1, 18, 30, 32, 33 and 37: the BossNotice banner, the low-HP band and an open Auto-sell panel). Options:
+   - (a) New perf fixture variants plus per-system spans. This changes frame report v3 and its pinned phase list.
+   - (b) A ruling that the aggregate interface_draw and cpu_frame gates cover them.
+
+   For reference, the closing probe put the EnemyVoiceIndex sync at 0.08 ms a frame, the W3-24 due check under 0.01 ms, and wall-hit placement inside the 0.10 ms damage pass.
+5. **G3.11 relies on a softness in the W4-12 expedition rule.** The rule prices gear by item level, floored over four slots, not by tier. So the early tier-4 drops of item level 1-4 keep a recruit at rank 0, and `train_companions`' equip step wins the Capstones with them. R61 kept the rule's constants, so this is noted, not changed. Options:
+   - Accept it.
+   - Have the rule read tiers. G3.11 would then likely fail again, and the Npc GOLDEN runs would move.
+6. **§2.5 "A foreign build that starts during a perf pass" (R30).** This is the one wave-2 question still unanswered. The default is to keep R30 unchanged. The closing perf passes ran with no foreign build.
+7. **Integrating into local `main`.** A fast-forward is impossible: `main` gained 34af684c and a058087d after the cut. The branch and those commits change disjoint paths (`horde-defense/` against npc-framework). Options:
+   - (a) A merge commit on `main`.
+   - (b) Leave `main` as it is.
+
+   Rebasing 917 commits is not proposed. Nothing is merged or pushed without the user's answer.
+
+### 12.10 Open work that needs no decision
+
+- **The A6-18 change in the working tree.** It touches `launch.rs`, `ui/review/fixtures.rs`, `matrix.rs` and `tests.rs`, and the VALIDATION.md, AUDIO_SURVIVAL.md and §9.3 records. It is uncommitted. Its test fails under `--no-default-features` (12.6). The writer has to make the test hold in the build without the review feature, then commit, or drop the change.
+- **The W7-09 record has no pin test.** No test pins `PERF_BUDGET.json acceptance.closing` (`RECORDED_CPU_GATED_SCENES` at perf_budget.rs:130 is still progressed-peak and stress). Writing the test was blocked on a passing attempt, and attempt 2 now passes, so `perf_budget_records_the_closing_acceptance` can be written.
+- **The package at the final HEAD** (12.7).
+- **Captures.** One capture run after the four code commits of 12.5, and the two carried items 10.5 left open.
