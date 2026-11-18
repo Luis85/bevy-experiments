@@ -68,7 +68,12 @@ fn a_broke_maker_of_a_short_staple_gets_an_advance() {
     // No bread on offer in the baker's settlement, nothing in the baker's
     // pack, no coins.
     for (_, actor) in residents(app.world(), home) {
-        for kind in ["bread", "village_flour", "village_water", "log"] {
+        let kinds: &[&str] = if actor == baker {
+            &["bread", "village_flour", "village_water", "log"]
+        } else {
+            &["bread"]
+        };
+        for kind in kinds {
             let held = econ::count(app.world(), actor, kind);
             if held > 0 {
                 econ::consume(app.world_mut(), actor, kind, held).expect("emptied");
@@ -80,6 +85,15 @@ fn a_broke_maker_of_a_short_staple_gets_an_advance() {
         stock::on_offer(app.world(), home, "bread") < stock::target(app.world(), home, "bread"),
         "bread is short"
     );
+    // The advance buys inputs that are for sale: the settlement offers what
+    // one batch of bread takes (review #9: a recipe whose inputs nobody sells
+    // is no batch the maker could buy).
+    for (kind, count) in [("village_flour", 2), ("village_water", 1), ("log", 1)] {
+        assert!(
+            stock::on_offer(app.world(), home, kind) >= count,
+            "{kind} is on offer"
+        );
+    }
     fund(app.world_mut(), 200);
     let money = life_support::money(app.world());
     let fund_before = app.world().resource::<VillageState>().fund;
@@ -138,4 +152,47 @@ fn a_target_of_zero_empties_the_trade() {
     run_ticks(app.world_mut(), day / 2);
     assert_eq!(millers(&app), 0, "nobody took the trade up again");
     village::integrity::validate_colony(app.world()).expect("valid");
+}
+
+/// An advance buys inputs that are for sale: with none of a batch's inputs
+/// held or on offer in the settlement, a broke maker of a short staple gets
+/// nothing (review #9: the rule took the cheapest recipe at quoted prices,
+/// whose inputs nobody might sell).
+#[test]
+fn no_advance_when_no_batch_inputs_are_on_offer() {
+    let mut app = world_with(|world| only_weather(world, "clear"));
+    run_ticks(app.world_mut(), 2);
+    let (id, baker) = all_residents(app.world())
+        .into_iter()
+        .find(|(_, actor)| {
+            app.world()
+                .get::<Villager>(*actor)
+                .is_some_and(|person| person.role == Role::Baker)
+        })
+        .expect("a baker");
+    let home = production::economic_settlement(app.world(), baker).expect("settlement");
+    for (_, actor) in residents(app.world(), home) {
+        for kind in ["bread", "village_flour", "village_raw_meat", "village_fish"] {
+            let held = econ::count(app.world(), actor, kind);
+            if held > 0 {
+                econ::consume(app.world_mut(), actor, kind, held).expect("emptied");
+            }
+        }
+    }
+    for kind in ["village_flour", "village_raw_meat", "village_fish"] {
+        assert_eq!(stock::on_offer(app.world(), home, kind), 0, "{kind}");
+    }
+    app.world_mut().get_mut::<Wallet>(baker).unwrap().coins = 0;
+    fund(app.world_mut(), 200);
+    production::advance_staple_makers(app.world_mut(), &[(id, baker)]);
+    assert_eq!(app.world().get::<Wallet>(baker).unwrap().coins, 0);
+    assert_eq!(
+        app.world()
+            .resource::<production::StapleAdvances>()
+            .owed
+            .get(&id)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
 }

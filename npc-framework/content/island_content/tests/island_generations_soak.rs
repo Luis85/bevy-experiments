@@ -84,6 +84,9 @@ struct Run {
     /// Samples of a resident indoors, and of one asleep.
     indoors: u64,
     asleep: u64,
+    /// Staple advances seen in the journal, by the trade of the maker:
+    /// `(count, coins)`.
+    advances_by_trade: BTreeMap<String, (u32, u64)>,
     /// Building and relief levies seen in the journal: `(count, coins)`.
     building_levies: (u32, u64),
     relief_levies: (u32, u64),
@@ -416,6 +419,16 @@ impl Run {
                     {
                         self.coats_sold += coins("quantity");
                     }
+                    Some("VillageStapleAdvance") => {
+                        let trade = entry
+                            .unit
+                            .and_then(|id| world.resource::<SimIndex>().get(id))
+                            .and_then(|actor| world.get::<Villager>(actor))
+                            .map_or("gone", |person| person.role.key());
+                        let row = self.advances_by_trade.entry(trade.to_owned()).or_default();
+                        row.0 += 1;
+                        row.1 += coins("coins");
+                    }
                     Some("VillageBoatDuty") => {
                         *self.fund_flows.entry("boat_duty").or_default() += coins("coins") as i64;
                         self.duties.0 += 1;
@@ -738,6 +751,94 @@ fn soak_on(seed: u64, years: u64, season_days: u64, edit: fn(&mut Value)) -> Run
         run.boat_orders,
         run.coats_sold,
         run.trade_moves,
+    );
+    // Year totals of the foods from the season ledger (it keeps the last
+    // eight seasons), and the days some village had less than a day of food,
+    // water or fuel, by season.
+    let ledger = world.resource::<village::ledger::SeasonLedger>();
+    let mut used = BTreeMap::<String, u64>::new();
+    let mut spoiled = BTreeMap::<String, u64>::new();
+    let mut short = BTreeMap::<String, u32>::new();
+    for tally in &ledger.seasons {
+        for (kind, units) in &tally.used {
+            *used.entry(kind.clone()).or_default() += units;
+        }
+        for (kind, units) in &tally.spoiled {
+            *spoiled.entry(kind.clone()).or_default() += units;
+        }
+        for (what, days) in &tally.short_days {
+            *short.entry(format!("{}:{what}", tally.name)).or_default() += days;
+        }
+    }
+    let state = world.resource::<VillageState>();
+    for kind in [
+        "bread",
+        "village_turnip",
+        "village_egg",
+        catalog::GRAIN,
+        catalog::BERRIES,
+        catalog::COOKED_MEAL,
+    ] {
+        let get = |map: &BTreeMap<String, u64>| map.get(kind).copied().unwrap_or(0);
+        println!(
+            "GENERATIONS_GOOD seed={seed} {kind}: made {} eaten_or_used {} spoiled {} exported {} imported {}",
+            get(&state.produced),
+            get(&used),
+            get(&spoiled),
+            get(&boat.exported),
+            get(&boat.imported),
+        );
+    }
+    println!(
+        "GENERATIONS_SHORT seed={seed} seasons={} short_days={short:?}",
+        ledger.seasons.len()
+    );
+    // Where the turnips are at the end: packs, stores (granaries included)
+    // and seed kept in the fields; and the trades by headcount.
+    let packs: u32 = all_residents(world)
+        .into_iter()
+        .map(|(_, actor)| econ::count(world, actor, "village_turnip"))
+        .sum();
+    let stores: u32 = village::frontier::settlements::all(world)
+        .into_iter()
+        .flat_map(|(settlement, _)| civic::depots(world, settlement))
+        .filter_map(|(_, entity)| world.get::<civic::Depot>(entity))
+        .map(|depot| depot.stock("village_turnip"))
+        .sum();
+    let seed_kept = fields::seed_in_custody(world, "village_turnip");
+    let sowings: u64 = village::frontier::settlements::all(world)
+        .into_iter()
+        .flat_map(|(settlement, _)| fields::fields_of(world, settlement))
+        .filter_map(|(_, entity)| world.get::<fields::Field>(entity))
+        .filter(|field| field.crop == "turnip")
+        .map(|field| field.sowings)
+        .sum();
+    let mut trades = BTreeMap::<&str, u32>::new();
+    for (_, actor) in all_residents(world) {
+        if let Some(person) = world.get::<Villager>(actor) {
+            *trades.entry(person.role.key()).or_default() += 1;
+        }
+    }
+    let pens: Vec<(u32, u64, u64)> = village::livestock::views(world)
+        .iter()
+        .map(|pen| (pen.head, pen.born, pen.died))
+        .collect();
+    let advances = world.resource::<village::production::StapleAdvances>();
+    let mut owed = BTreeMap::<&str, u32>::new();
+    for (id, coins) in &advances.owed {
+        let role = world
+            .resource::<SimIndex>()
+            .get(*id)
+            .and_then(|actor| world.get::<Villager>(actor))
+            .map_or("gone", |person| person.role.key());
+        *owed.entry(role).or_default() += coins;
+    }
+    println!(
+        "GENERATIONS_ADVANCES seed={seed} advanced={} repaid={} by_trade(count,coins)={:?} owed_by_trade={owed:?}",
+        advances.advanced, advances.repaid, run.advances_by_trade
+    );
+    println!(
+        "GENERATIONS_TURNIPS seed={seed} packs={packs} stores={stores} seed_in_fields={seed_kept} sowings={sowings} trades={trades:?} pens(head,born,died)={pens:?}"
     );
     run
 }

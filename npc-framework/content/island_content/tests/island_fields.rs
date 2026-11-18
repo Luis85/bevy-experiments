@@ -49,7 +49,12 @@ fn every_settlement_is_founded_with_a_field_that_is_also_a_granary() {
         "laid out at the first tick"
     );
     run_ticks(app.world_mut(), 2);
-    let all = view::fields(app.world());
+    // The grain fields; the turnip fields of the second crop are checked in
+    // `island_crops_livestock`.
+    let all: Vec<_> = view::fields(app.world())
+        .into_iter()
+        .filter(|field| field.crop == "grain")
+        .collect();
     assert_eq!(all.len(), 3, "one founding field per settlement");
     let last_founder = founders.iter().map(|(id, _)| *id).max().expect("founders");
     for field in &all {
@@ -82,7 +87,8 @@ fn every_settlement_is_founded_with_a_field_that_is_also_a_granary() {
     assert_eq!(effects(app.world(), "VillageSitePlaced").len(), 0);
     // Three fields, the trading post, the harbour's market stall and, since
     // pass 5 (`tuning.found_coat_workshops`, ADR 0041), each settlement's
-    // tailors' workshop: eight buildings founded.
+    // tailors' workshop: eight buildings founded; since the second crop
+    // (economy review #9) also a turnip field and a hen house each.
     let founded = effects(app.world(), "VillageBuildingFounded");
     let mut kinds: Vec<&str> = founded
         .iter()
@@ -95,11 +101,17 @@ fn every_settlement_is_founded_with_a_field_that_is_also_a_granary() {
             "field",
             "field",
             "field",
+            "hen_house",
+            "hen_house",
+            "hen_house",
             "market_stall",
             "tailor_shop",
             "tailor_shop",
             "tailor_shop",
-            "trading_post"
+            "trading_post",
+            "turnip_field",
+            "turnip_field",
+            "turnip_field"
         ]
     );
     assert!(
@@ -198,7 +210,7 @@ fn a_ripe_plot_is_harvested_only_by_a_farmer_with_room_and_only_once() {
     let harbour = settlement(app.world(), "harbour");
     let field = view::fields(app.world())
         .into_iter()
-        .find(|field| field.settlement == harbour)
+        .find(|field| field.settlement == harbour && field.crop == "grain")
         .expect("harbour field");
     let target = entity(app.world(), field.id);
     {
@@ -279,7 +291,8 @@ fn fields_lie_fallow_in_winter_and_sowing_waits_for_spring() {
     assert_eq!(effects_now.season, Season::Winter);
     assert!(effects_now.fallow && effects_now.growth_percent == 0);
     let fallow = effects(app.world(), "VillageFieldFallow");
-    assert_eq!(fallow.len(), 3, "each field is cleared once by winter");
+    // Three grain and three turnip fields since the second crop.
+    assert_eq!(fallow.len(), 6, "each field is cleared once by winter");
     assert!(fallow.iter().all(|record| record["reason"] == "winter"));
     for field in view::fields(app.world()) {
         assert!(field.fallow_season);
@@ -355,7 +368,7 @@ fn the_planner_commissions_a_field_on_a_lasting_grain_shortage() {
     // Every plot of the Harbour field is sown and the grain is gone.
     let field = view::fields(app.world())
         .into_iter()
-        .find(|field| field.settlement == harbour)
+        .find(|field| field.settlement == harbour && field.crop == "grain")
         .expect("harbour field");
     let target = entity(app.world(), field.id);
     {
@@ -383,7 +396,9 @@ fn the_planner_commissions_a_field_on_a_lasting_grain_shortage() {
             econ::consume(app.world_mut(), actor, catalog::GRAIN, carried).expect("grain");
         }
     }
-    assert!(fields::land_is_short(app.world(), harbour));
+    // Every grain plot is in use: the land of the short crop (the turnip
+    // field of the second crop is not short of land).
+    assert!(fields::crop_land_is_short(app.world(), harbour, "grain"));
     let commissioned = until(&mut app, 4_000, 50, |app| {
         effects(app.world(), "VillageCivicProject")
             .iter()

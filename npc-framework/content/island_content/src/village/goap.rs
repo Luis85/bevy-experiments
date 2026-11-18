@@ -356,12 +356,15 @@ fn domain(world: &World, actor: Entity, goal: &str, tuning: &policy::GoapPolicy)
     let station = world.resource::<SimIndex>().get(person.workplace)?;
     let station_pos = *world.get::<SimPos>(station)?;
     let workstation = world.get::<Workstation>(station)?;
+    // A pen whose animals are all fed today has no batch to work.
+    let pen_full = !super::livestock::can_feed(world, person.workplace);
     let registry = world.resource::<RecipeRegistry>();
     let mut recipes: Vec<&RecipeDef> = catalog::recipes_for(world, person.role)
         .iter()
         .filter_map(|name| registry.recipes.get(*name))
         .filter(|recipe| {
-            recipe.hosted_by(&workstation.kinds)
+            !pen_full
+                && recipe.hosted_by(&workstation.kinds)
                 && recipe.tools.is_empty()
                 && recipe.skill.is_none()
         })

@@ -272,6 +272,7 @@ fn as_building(def: &PropDef) -> BuildingDef {
             coast: false,
         },
         field: None,
+        livestock: None,
     }
 }
 

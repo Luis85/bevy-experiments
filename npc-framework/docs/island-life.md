@@ -215,7 +215,13 @@ three beds are one bunk of three berths, and there is no room for a table.
   as the homes: the mill's sails turn over a door you could walk through.
 - **Fields** show every plot: pale bare soil, dark soil with pale green lines
   when sown, green rows that grow taller, and gold (grain) or red rows when
-  ripe. In winter the plots rest under frost.
+  ripe. In winter the plots rest under frost. Each village has a grain field
+  and a smaller turnip field: turnips are sown from spring into early autumn,
+  keep through winter and are eaten when bread runs short.
+- **The hen house** beside each farm is a fenced yard. Its hen keeper feeds the
+  hens grain or turnips once a day and sells their eggs; hens left unfed
+  dwindle, well-fed ones breed up to eight. There is no hen model yet: the yard
+  is drawn empty.
 - **The merchant boat** sails in before it lands, lies broadside off the
   harbour's trading post while it is in, and sails out when it leaves.
 - **Weather** is today's: rain falls in thin streaks under a grey sky, a storm

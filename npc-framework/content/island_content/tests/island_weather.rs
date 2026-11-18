@@ -277,8 +277,11 @@ fn seasonal_shocks_change_growth_warmth_fuel_and_fields() {
     set_journal(blight.world_mut(), true, false);
     run_ticks(blight.world_mut(), 2);
     assert_eq!(view::season_effects(blight.world()).shock, None);
+    // The grain fields (each village also has a turnip field since the
+    // second crop, which this test leaves as the farmers keep it).
     let ids: Vec<_> = view::fields(blight.world())
         .into_iter()
+        .filter(|field| field.crop == "grain")
         .map(|field| field.id)
         .collect();
     assert_eq!(ids.len(), 3);
@@ -301,6 +304,11 @@ fn seasonal_shocks_change_growth_warmth_fuel_and_fields() {
     let lost: u64 = effects(blight.world(), "VillageFieldFallow")
         .iter()
         .filter(|record| record["reason"] == "blight")
+        .filter(|record| {
+            record["field"]
+                .as_u64()
+                .is_some_and(|field| ids.iter().any(|id| u64::from(id.0) == field))
+        })
         .map(|record| record["lost_plots"].as_u64().unwrap_or(0))
         .sum();
     assert!(
@@ -309,6 +317,7 @@ fn seasonal_shocks_change_growth_warmth_fuel_and_fields() {
     );
     let fallow: usize = view::fields(blight.world())
         .iter()
+        .filter(|field| ids.contains(&field.id))
         .flat_map(|field| field.plots.iter())
         .filter(|plot| plot.stage == "fallow")
         .count();

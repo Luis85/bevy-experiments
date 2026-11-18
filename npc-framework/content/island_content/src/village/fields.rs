@@ -397,6 +397,9 @@ pub(super) fn step(world: &mut World, actor: Entity, task: FieldTask) -> Result<
     }
     let ends =
         now.saturating_add(u64::from(living::gather_ticks(world, actor, &good, base)).max(1));
+    if !super::resident::fits_before_rest(world, actor, ends - now) {
+        return Err("the field work would run into the evening");
+    }
     world
         .entity_mut(actor)
         .remove::<MoveIntent>()
@@ -544,26 +547,48 @@ fn finish(world: &mut World, id: SimId, actor: Entity, work: FieldWork, now: u64
     }
 }
 
+/// Lays out the founding fields, the coat workshops and the founding pens.
+/// The first founding field and the coat workshops come first, as before
+/// there was a second crop, so their places do not move; every further
+/// founding field (in list order) and then every founding pen follow.
 fn found(world: &mut World) {
-    let Some(def) = economy_spec::registry(world).and_then(|registry| {
-        registry
-            .spec
-            .buildings
-            .iter()
-            .find(|def| def.field.as_ref().is_some_and(|field| field.founding))
-            .cloned()
-    }) else {
-        return;
-    };
+    let fields: Vec<super::frontier::building_spec::BuildingDef> = economy_spec::registry(world)
+        .map(|registry| {
+            registry
+                .spec
+                .buildings
+                .iter()
+                .filter(|def| def.field.as_ref().is_some_and(|field| field.founding))
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut fields = fields.into_iter();
+    if let Some(first) = fields.next() {
+        found_field(world, &first);
+    }
+    found_coat_makers(world);
+    for def in fields {
+        found_field(world, &def);
+    }
+    found_pens(world);
+}
+
+/// The farm of a settlement: where its fields and pens are laid out.
+fn farm_of(world: &World, settlement: SimId) -> Option<SimPos> {
+    settlements::workplace(world, settlement, super::roles::roles(world).sower)
+        .and_then(|id| world.resource::<SimIndex>().get(id))
+        .and_then(|entity| world.get::<SimPos>(entity).copied())
+}
+
+fn found_field(world: &mut World, def: &super::frontier::building_spec::BuildingDef) {
     let Some(field) = def.field.clone() else {
         return;
     };
     let seed = crop(world, &field.crop).map_or(0, |crop| crop.seed.count * field.plots);
     for (settlement, _) in settlements::all(world) {
         // Beside the farm when the ground allows, else anywhere near the centre.
-        let farm = settlements::workplace(world, settlement, super::roles::roles(world).sower)
-            .and_then(|id| world.resource::<SimIndex>().get(id))
-            .and_then(|entity| world.get::<SimPos>(entity).copied());
+        let farm = farm_of(world, settlement);
         if let Some(id) = super::civic::found_building(
             world,
             &def.id,
@@ -576,7 +601,34 @@ fn found(world: &mut World) {
             state.seed_stock = seed;
         }
     }
-    found_coat_makers(world);
+}
+
+/// Every building with a founding `livestock` attribute, in each settlement,
+/// beside its farm.
+fn found_pens(world: &mut World) {
+    let pens: Vec<String> = economy_spec::registry(world)
+        .map(|registry| {
+            registry
+                .spec
+                .buildings
+                .iter()
+                .filter(|def| def.livestock.as_ref().is_some_and(|herd| herd.founding))
+                .map(|def| def.id.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    for id in pens {
+        for (settlement, _) in settlements::all(world) {
+            let farm = farm_of(world, settlement);
+            let _ = super::civic::found_building(
+                world,
+                &id,
+                settlement,
+                farm,
+                "founded with the village",
+            );
+        }
+    }
 }
 
 /// Living world (`tuning.found_coat_workshops`): each settlement is founded
@@ -831,6 +883,19 @@ pub fn land_is_short(world: &World, settlement: SimId) -> bool {
                 .plots
                 .iter()
                 .all(|plot| plot.stage != PlotStage::Fallow)
+        })
+    })
+}
+
+/// [`land_is_short`] for the fields of one crop only (or none of it).
+pub fn crop_land_is_short(world: &World, settlement: SimId, crop: &str) -> bool {
+    fields_of(world, settlement).into_iter().all(|(_, entity)| {
+        world.get::<Field>(entity).is_none_or(|field| {
+            field.crop != crop
+                || field
+                    .plots
+                    .iter()
+                    .all(|plot| plot.stage != PlotStage::Fallow)
         })
     })
 }

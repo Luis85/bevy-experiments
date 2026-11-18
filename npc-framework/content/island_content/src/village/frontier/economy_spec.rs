@@ -9,10 +9,10 @@
 //! per-profession property is data.
 use crate::village::Role;
 use crate::village::catalog::{
-    BAKE, BERRIES, BOWL, CARVE, COOK, COOK_FISH, COOKED_MEAL, FIBER, FISH, FISHING_ROD, FLOUR,
-    FORGE_AXE, FORGE_HOE, FORGE_PICKAXE, FORGE_SPEAR, GRAIN, HIDE, HOE, INN, LEATHER, MAKE_ROD,
-    MILL, RAW_MEAT, SAW, SMELT, SPEAR, SPIN, TAILOR, TAN, THREAD, TOOL, WARM_CLOTHES, WATER,
-    WEAVE_COAT,
+    BAKE, BERRIES, BOWL, CARVE, COOK, COOK_FISH, COOKED_MEAL, COOP, EGG, FEED_HENS,
+    FEED_HENS_TURNIPS, FIBER, FISH, FISHING_ROD, FLOUR, FORGE_AXE, FORGE_HOE, FORGE_PICKAXE,
+    FORGE_SPEAR, GRAIN, HERDER, HIDE, HOE, INN, LEATHER, MAKE_ROD, MILL, RAW_MEAT, SAW, SMELT,
+    SPEAR, SPIN, TAILOR, TAN, THREAD, TOOL, TURNIP, WARM_CLOTHES, WATER, WEAVE_COAT,
 };
 use bevy_ecs::prelude::*;
 use npc_framework::prelude::*;
@@ -760,6 +760,13 @@ fn default_goods() -> Vec<GoodDef> {
             item: item(500, 10),
             ..good(COOKED_MEAL, "cooked meals", 9, 24)
         },
+        // Laid by the hens of a hen house; eaten as they come.
+        Good {
+            food: Some(30_000),
+            tags: &[Food, Staple],
+            item: item(60, 30),
+            ..good(EGG, "eggs", 3, 30)
+        },
         Good {
             tags: &[Fiber],
             item: item(100, 40),
@@ -818,6 +825,14 @@ fn default_goods() -> Vec<GoodDef> {
             item: item(100, 40),
             ..good(THREAD, "thread", 4, 24)
         },
+        // The second field crop: a root that keeps through winter.
+        Good {
+            food: Some(30_000),
+            tags: &[Food, Staple],
+            gather_tool: Some(HOE),
+            item: item(300, 40),
+            ..good(TURNIP, "turnips", 2, 40)
+        },
         Good {
             tags: &[Clothing, Staple],
             durability: Some(96_000),
@@ -840,6 +855,8 @@ fn default_goods() -> Vec<GoodDef> {
             "bread" => Some(20),
             COOKED_MEAL => Some(10),
             BERRIES => Some(14),
+            EGG => Some(8),
+            TURNIP => Some(30),
             _ => None,
         };
         good
@@ -977,6 +994,23 @@ fn default_recipes() -> Vec<RecipeSpec> {
             480,
             (WARM_CLOTHES, 1),
         ),
+        // One batch feeds two hens and collects the eggs they lay.
+        recipe(
+            FEED_HENS,
+            "Feed the hens grain",
+            COOP,
+            &[(GRAIN, 1)],
+            120,
+            (EGG, 2),
+        ),
+        recipe(
+            FEED_HENS_TURNIPS,
+            "Feed the hens turnips",
+            COOP,
+            &[(TURNIP, 1)],
+            120,
+            (EGG, 2),
+        ),
     ]
 }
 
@@ -1010,7 +1044,8 @@ fn default_professions() -> Vec<ProfessionDef> {
         Baker, Carpenter, Farmer, Fisher, Hunter, Innkeeper, Miller, Miner, Smith, Tailor, Tanner,
         WaterKeeper, Woodcutter,
     };
-    let land = [Farmer, WaterKeeper, Woodcutter, Fisher];
+    let herder = Role::from_key(HERDER);
+    let land = [Farmer, WaterKeeper, Woodcutter, Fisher, herder];
     let grain = [Miller, Baker, Farmer];
     let metal = [Miner, Smith, Woodcutter];
     let hides = [Hunter, Tanner, Tailor, Farmer];
@@ -1022,7 +1057,7 @@ fn default_professions() -> Vec<ProfessionDef> {
     };
     vec![
         ProfessionDef {
-            outputs: names(&[GRAIN, FIBER, BERRIES]),
+            outputs: names(&[GRAIN, FIBER, BERRIES, TURNIP]),
             wants: names(&[HOE]),
             tool: Some(HOE.into()),
             essential: true,
@@ -1164,6 +1199,16 @@ fn default_professions() -> Vec<ProfessionDef> {
             }],
             endowment: stacks(&[(FISH, 2), (FISHING_ROD, 1)]),
             ..profession(Fisher, INN, &land)
+        },
+        // Keeps the hens of the hen house: feeds them grain or turnips and
+        // sells their eggs. No founder holds it; the empty seat is filled.
+        ProfessionDef {
+            outputs: names(&[EGG]),
+            wants: names(&[GRAIN, TURNIP]),
+            recipes: names(&[FEED_HENS, FEED_HENS_TURNIPS]),
+            essential: true,
+            display: "hen keeper".into(),
+            ..profession(herder, COOP, &land)
         },
     ]
 }
@@ -1598,9 +1643,11 @@ impl EconomySpec {
                     .hunt
                     .as_ref()
                     .is_some_and(|hunt| hunt.yields.iter().any(|stack| &stack.good == output));
-                if !crafted && !gathered && !hunted {
+                // A sowing trade grows the harvest goods of the field crops.
+                let sown = entry.sows && self.crops.iter().any(|crop| &crop.harvest.good == output);
+                if !crafted && !gathered && !hunted && !sown {
                     return Err(format!(
-                        "economy: profession `{name}` has no producible output: `{output}` has neither a recipe of this profession nor a resource patch"
+                        "economy: profession `{name}` has no producible output: `{output}` has neither a recipe of this profession, a field crop nor a resource patch"
                     ));
                 }
             }

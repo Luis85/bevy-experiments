@@ -494,7 +494,17 @@ fn begin(
         super::super::indoors::wake(world, actor);
     }
     record::clear_travel_failure(world);
-    let outcome = step(world, actor).and_then(|()| {
+    // A work leaf's timed jobs keep to the work hours (`fits_before_rest`).
+    if goal == LifeGoal::Work
+        && let Some(mut start) = world.get_resource_mut::<super::WorkStart>()
+    {
+        start.0 = Some(actor);
+    }
+    let outcome = step(world, actor);
+    if let Some(mut start) = world.get_resource_mut::<super::WorkStart>() {
+        start.0 = None;
+    }
+    let outcome = outcome.and_then(|()| {
         if record::take_travel_failure(world) {
             Err("the route was abandoned after repeated blockage")
         } else {
@@ -530,19 +540,11 @@ fn name_of(param: &ParamValue) -> &str {
     }
 }
 
-/// The foods a resident reaches for, in order.
-fn foods(world: &World, actor: Entity) -> [&'static str; 3] {
-    let preferred = production::food_preference(world, actor);
-    let alternate = if preferred == super::super::roles::roles(world).baked {
-        super::super::roles::roles(world).cooked
-    } else {
-        super::super::roles::roles(world).baked
-    };
-    [
-        preferred,
-        alternate,
-        super::super::roles::roles(world).foraged,
-    ]
+/// The foods a hungry resident buys, in its eating order: the preferred
+/// food, then every other food of the catalog by food value (a second crop
+/// or a pen's product as much as bread).
+fn foods(world: &World, actor: Entity) -> Vec<&'static str> {
+    production::diet(world, actor)
 }
 
 /// Hearth fuel this resident still has to bring home, if any.

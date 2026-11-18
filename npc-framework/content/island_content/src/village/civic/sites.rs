@@ -481,6 +481,9 @@ pub fn begin_work(world: &mut World, actor: Entity, site: Entity) -> Result<(), 
     let now = world.resource::<SimClock>().tick;
     let mut ticks = ticks;
     let mut ends = now.saturating_add((u64::from(ticks) * pace / 100 * tool / 100).max(1));
+    if !crate::village::resident::fits_before_rest(world, actor, ends.saturating_sub(now)) {
+        return Err("the stage would run into the evening".into());
+    }
     // Resume a stage a critical need interrupted at this site (S3.5).
     if let Some(suspended) = world.get::<super::model::SuspendedWork>(actor).copied() {
         world
@@ -811,6 +814,9 @@ fn finish(world: &mut World, site_id: SimId, builder: Option<SimId>, founding: b
         if let Some(mut depot) = world.get_mut::<Depot>(entity) {
             depot.only = crop;
         }
+    }
+    if let Some(herd) = &def.livestock {
+        crate::village::livestock::established(world, entity, herd);
     }
     crate::village::colony_demand_changed(world);
     if founding {

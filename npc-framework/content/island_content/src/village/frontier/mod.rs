@@ -55,6 +55,7 @@ pub fn register(app: &mut App) {
     app.init_resource::<crate::village::lookup::LookupCache>();
     super::weather::register(app);
     super::fields::register(app);
+    super::livestock::register(app);
     super::merchant::register(app);
     super::demography::register(app);
     super::indoors::register(app);
@@ -119,6 +120,7 @@ pub fn tick(world: &mut World) {
     super::weather::tick(world);
     super::spoilage::tick(world);
     super::fields::tick(world);
+    super::livestock::tick(world);
     super::civic::tick(world);
     super::merchant::tick(world);
     super::demography::tick(world);

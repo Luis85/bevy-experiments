@@ -444,13 +444,9 @@ fn critical_hunger(world: &World, actor: Entity) -> bool {
 /// adult can buy some now.
 fn fetch_for_child(world: &World, actor: Entity, below: i32) -> bool {
     super::super::demography::child_needs_food(world, actor, below)
-        && [
-            super::super::roles::roles(world).baked,
-            super::super::roles::roles(world).cooked,
-            super::super::roles::roles(world).foraged,
-        ]
-        .iter()
-        .any(|kind| ai::market_supplier(world, actor, kind).is_some())
+        && super::super::production::diet(world, actor)
+            .iter()
+            .any(|kind| ai::market_supplier(world, actor, kind).is_some())
 }
 
 fn thirsty(world: &World, actor: Entity) -> bool {

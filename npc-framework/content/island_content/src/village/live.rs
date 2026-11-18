@@ -1900,7 +1900,14 @@ fn repeat(world: &mut World, unit: SimId, actor: Entity) {
         stop_repeat(world, unit, &order, "target_gone", "the target is gone");
         return;
     };
-    let started: Result<(), (&str, String)> = if !order.recipe.is_empty() {
+    let started: Result<(), (&str, String)> = if !order.recipe.is_empty()
+        && !super::livestock::can_feed(world, order.target)
+    {
+        Err((
+            "target_gone",
+            "the animals there are all fed today".to_owned(),
+        ))
+    } else if !order.recipe.is_empty() {
         use npc_framework::crafting::CraftError;
         match npc_framework::crafting::can_craft(world, actor, &order.recipe, Some(order.target)) {
             Err(

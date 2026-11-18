@@ -137,26 +137,52 @@ pub struct CropSpec {
 /// seed, water-free field culture and harvest good) scaled to a field plot.
 pub fn default_crops() -> Vec<CropSpec> {
     use crate::village::{catalog, homestead};
-    vec![CropSpec {
-        key: "grain".into(),
-        display: "Grain".into(),
-        seed: Stack {
-            good: catalog::GRAIN.into(),
-            count: homestead::SEED_COUNT,
+    vec![
+        CropSpec {
+            key: "grain".into(),
+            display: "Grain".into(),
+            seed: Stack {
+                good: catalog::GRAIN.into(),
+                count: homestead::SEED_COUNT,
+            },
+            harvest: Stack {
+                good: catalog::GRAIN.into(),
+                count: homestead::HARVEST_GRAIN * 2,
+            },
+            growth_ticks: homestead::GROW_TICKS * 8,
+            sow_seasons: vec![Season::Spring, Season::Summer],
+            sow_ticks: 160,
+            tend_ticks: 120,
+            harvest_ticks: 200,
+            tend_interval_ticks: 24_000,
+            untended_growth_percent: 60,
+            stock_per_resident: 4,
         },
-        harvest: Stack {
-            good: catalog::GRAIN.into(),
-            count: homestead::HARVEST_GRAIN * 2,
+        // The second field crop: twice grain's growing time, sown from spring
+        // to early autumn (a plot is only sown with its growing time left before
+        // winter), harvested into autumn and kept through winter (turnips keep
+        // thirty days, twice that in a store).
+        CropSpec {
+            key: "turnip".into(),
+            display: "Turnips".into(),
+            seed: Stack {
+                good: catalog::TURNIP.into(),
+                count: 1,
+            },
+            harvest: Stack {
+                good: catalog::TURNIP.into(),
+                count: 6,
+            },
+            growth_ticks: homestead::GROW_TICKS * 16,
+            sow_seasons: vec![Season::Spring, Season::Summer, Season::Autumn],
+            sow_ticks: 160,
+            tend_ticks: 120,
+            harvest_ticks: 200,
+            tend_interval_ticks: 24_000,
+            untended_growth_percent: 60,
+            stock_per_resident: 3,
         },
-        growth_ticks: homestead::GROW_TICKS * 8,
-        sow_seasons: vec![Season::Spring, Season::Summer],
-        sow_ticks: 160,
-        tend_ticks: 120,
-        harvest_ticks: 200,
-        tend_interval_ticks: 24_000,
-        untended_growth_percent: 60,
-        stock_per_resident: 4,
-    }]
+    ]
 }
 
 /// Daily weather of the coastal world.
@@ -447,6 +473,8 @@ impl Default for MerchantSpec {
                 buy(catalog::BOWL, 10, 100, 2),
                 buy(catalog::BERRIES, 30, 100, 8),
                 buy(catalog::HIDE, 12, 100, 2),
+                buy(catalog::TURNIP, 30, 100, 12),
+                buy(catalog::EGG, 12, 100, 4),
             ],
             sells: vec![
                 sell(catalog::GRAIN, 40, 140, 16),

@@ -315,9 +315,22 @@ pub fn target(world: &World, settlement: SimId, kind: &str) -> u32 {
             .and_then(|good| good.shelf_life_days)
             .map_or(days, |life| days.min(life))
     };
+    // A pen's product: while animals are unfed today, what they would yield
+    // is wanted on top of what is on offer, so the keeper feeds the whole
+    // herd whatever the stock (surplus goes to the stores and the boat).
+    let unfed = super::livestock::unfed_yield(world, settlement, kind);
+    let herd = if unfed > 0 {
+        on_offer(world, settlement, kind).saturating_add(unfed)
+    } else {
+        0
+    };
     daily_use(world, settlement, kind)
         .saturating_mul(days)
+        .max(herd)
         .max(crop_target(world, settlement, kind))
+        // A pen's product: one day of what its animals lay when all are
+        // fed, so the keeper feeds the whole herd while that is not on offer.
+        .max(super::livestock::daily_yield(world, settlement, kind))
         .max(batch(world, kind))
         .max(coats_wanted(world, settlement, kind))
 }

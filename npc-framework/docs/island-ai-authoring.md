@@ -343,6 +343,15 @@ Blocks do nothing by themselves. The `life.in_*_window` conditions,
 `life.tired`, `life.bedtime`, `life.wants_meal` and `life.wants_leisure` read
 them, and the tree decides what a window means.
 
+One rule is not the tree's: running work is never cancelled, so a work leaf
+(a leaf of goal work: gathering, crafting, goal pursuit, field and site work)
+started outside the leisure and sleep blocks does not begin a timed job whose
+expected duration (gathering time, a recipe at the slowest work pace, a field
+task, a building stage) would run into the resident's next leisure or sleep
+block (`resident::fits_before_rest`); the leaf fails and the tree tries the
+next option. Needs, a played character and work started in free time are not
+held back.
+
 - `chronotype_shift`: every block moves later by this many permille for a
   resident with chronotype 100, earlier for a negative chronotype.
 - `diligence_shift`: leisure starts this many permille later at diligence 100

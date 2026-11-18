@@ -1050,6 +1050,21 @@
           "shelf_life_days": 10
         },
         {
+          "key": "village_egg",
+          "display": "eggs",
+          "base_price": 3,
+          "food_value": 30000,
+          "tags": [
+            "food",
+            "staple"
+          ],
+          "item": {
+            "weight_g": 60,
+            "max_stack": 30
+          },
+          "shelf_life_days": 8
+        },
+        {
           "key": "village_fiber",
           "display": "fiber",
           "base_price": 1,
@@ -1189,6 +1204,22 @@
             "weight_g": 100,
             "max_stack": 40
           }
+        },
+        {
+          "key": "village_turnip",
+          "display": "turnips",
+          "base_price": 2,
+          "food_value": 30000,
+          "tags": [
+            "food",
+            "staple"
+          ],
+          "gather_tool": "village_hoe",
+          "item": {
+            "weight_g": 300,
+            "max_stack": 40
+          },
+          "shelf_life_days": 30
         },
         {
           "key": "village_warm_clothes",
@@ -1593,6 +1624,42 @@
             }
           ],
           "duration": 480
+        },
+        {
+          "key": "village_feed_hens",
+          "display": "Feed the hens grain",
+          "station": "village_coop",
+          "inputs": [
+            {
+              "good": "village_grain",
+              "count": 1
+            }
+          ],
+          "outputs": [
+            {
+              "good": "village_egg",
+              "count": 2
+            }
+          ],
+          "duration": 120
+        },
+        {
+          "key": "village_feed_hens_turnips",
+          "display": "Feed the hens turnips",
+          "station": "village_coop",
+          "inputs": [
+            {
+              "good": "village_turnip",
+              "count": 1
+            }
+          ],
+          "outputs": [
+            {
+              "good": "village_egg",
+              "count": 2
+            }
+          ],
+          "duration": 120
         }
       ],
       "professions": [
@@ -1602,7 +1669,8 @@
           "outputs": [
             "village_grain",
             "village_fiber",
-            "village_berries"
+            "village_berries",
+            "village_turnip"
           ],
           "wants": [
             "village_hoe"
@@ -1612,7 +1680,8 @@
             "farmer",
             "water_keeper",
             "woodcutter",
-            "fisher"
+            "fisher",
+            "herder"
           ],
           "template": "novice",
           "essential": true,
@@ -1714,7 +1783,8 @@
             "farmer",
             "water_keeper",
             "woodcutter",
-            "fisher"
+            "fisher",
+            "herder"
           ],
           "template": "novice",
           "essential": true
@@ -1733,7 +1803,8 @@
             "farmer",
             "water_keeper",
             "woodcutter",
-            "fisher"
+            "fisher",
+            "herder"
           ],
           "template": "woodcutter",
           "flexible_template": "carpenter",
@@ -2024,7 +2095,8 @@
             "farmer",
             "water_keeper",
             "woodcutter",
-            "fisher"
+            "fisher",
+            "herder"
           ],
           "template": "novice",
           "essential": false,
@@ -2038,6 +2110,31 @@
               "count": 1
             }
           ]
+        },
+        {
+          "role": "herder",
+          "station": "village_coop",
+          "outputs": [
+            "village_egg"
+          ],
+          "wants": [
+            "village_grain",
+            "village_turnip"
+          ],
+          "recipes": [
+            "village_feed_hens",
+            "village_feed_hens_turnips"
+          ],
+          "aptitudes": [
+            "farmer",
+            "water_keeper",
+            "woodcutter",
+            "fisher",
+            "herder"
+          ],
+          "template": "novice",
+          "essential": true,
+          "display": "hen keeper"
         }
       ],
       "patches": [
@@ -2777,6 +2874,82 @@
           }
         },
         {
+          "id": "turnip_field",
+          "display": "Turnip field",
+          "cost": [
+            {
+              "good": "log",
+              "count": 4
+            }
+          ],
+          "work_ticks": 300,
+          "footprint": {
+            "width": 6,
+            "depth": 6
+          },
+          "kind": {
+            "type": "storage",
+            "capacity": 60
+          },
+          "solid": false,
+          "placement": {
+            "surfaces": [
+              "grass",
+              "soil",
+              "stone"
+            ],
+            "max_slope_mm": 2000,
+            "clearance": 1
+          },
+          "field": {
+            "plots": 6,
+            "crop": "turnip"
+          }
+        },
+        {
+          "id": "hen_house",
+          "display": "Hen house",
+          "cost": [
+            {
+              "good": "plank",
+              "count": 6
+            },
+            {
+              "good": "log",
+              "count": 4
+            }
+          ],
+          "work_ticks": 400,
+          "footprint": {
+            "width": 4,
+            "depth": 3
+          },
+          "kind": {
+            "type": "workplace",
+            "profession": "herder",
+            "station": "village_coop",
+            "capacity": 1
+          },
+          "solid": false,
+          "placement": {
+            "surfaces": [
+              "grass",
+              "stone"
+            ],
+            "max_slope_mm": 800,
+            "clearance": 1
+          },
+          "livestock": {
+            "display": "hens",
+            "head": 4,
+            "max_head": 8,
+            "min_head": 2,
+            "fed_per_batch": 2,
+            "starve_days": 3,
+            "breed_days": 4
+          }
+        },
+        {
           "id": "garden",
           "display": "Garden plot",
           "cost": [
@@ -3054,6 +3227,30 @@
           "tend_interval_ticks": 24000,
           "untended_growth_percent": 60,
           "stock_per_resident": 4
+        },
+        {
+          "key": "turnip",
+          "display": "Turnips",
+          "seed": {
+            "good": "village_turnip",
+            "count": 1
+          },
+          "harvest": {
+            "good": "village_turnip",
+            "count": 6
+          },
+          "growth_ticks": 96000,
+          "sow_seasons": [
+            "spring",
+            "summer",
+            "autumn"
+          ],
+          "sow_ticks": 160,
+          "tend_ticks": 120,
+          "harvest_ticks": 200,
+          "tend_interval_ticks": 24000,
+          "untended_growth_percent": 60,
+          "stock_per_resident": 3
         }
       ],
       "weather": {
@@ -3153,6 +3350,18 @@
             "max_units": 12,
             "price_percent": 100,
             "keep_units": 2
+          },
+          {
+            "good": "village_turnip",
+            "max_units": 30,
+            "price_percent": 100,
+            "keep_units": 12
+          },
+          {
+            "good": "village_egg",
+            "max_units": 12,
+            "price_percent": 100,
+            "keep_units": 4
           }
         ],
         "sells": [

@@ -13,7 +13,7 @@ use crate::village::{
 use bevy_ecs::prelude::*;
 use npc_framework::prelude::*;
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The planner leaves this many cells around the centre open as the square.
 const SQUARE_CELLS: i32 = 8;
@@ -136,25 +136,48 @@ pub fn house_homeless(world: &mut World, settlement: SimId) -> (u32, u32) {
 }
 
 /// Surplus the residents hold beyond their working stock that no store of
-/// the settlement has room for.
+/// the settlement has room for. A store that takes only some goods (a
+/// field's granary) is room only for the surplus of those goods: counted as
+/// room for anything, the granaries hid the overflow of every other good
+/// from the planner (a second crop's granary added 60 units of such room a
+/// village, and the stockpiles it would have built went unbuilt).
 fn unstored_surplus(world: &World, settlement: SimId, members: &[Entity]) -> u32 {
     let working = economy_spec::tuning(world).map_or(2, |tuning| tuning.depot_working_stock);
-    let mut surplus = 0_u32;
+    let mut surplus: BTreeMap<&str, u32> = BTreeMap::new();
     for actor in members {
         for kind in catalog::trade_kinds(world) {
             if depot::storable(world, kind) {
-                surplus = surplus.saturating_add(
-                    market::available_to_sell(world, *actor, kind).saturating_sub(working),
-                );
+                let units = market::available_to_sell(world, *actor, kind).saturating_sub(working);
+                if units > 0 {
+                    let entry = surplus.entry(kind).or_default();
+                    *entry = entry.saturating_add(units);
+                }
             }
         }
     }
-    let room: u32 = depot::depots(world, settlement)
-        .into_iter()
-        .filter_map(|(_, entity)| world.get::<Depot>(entity))
-        .map(Depot::free)
-        .sum();
-    surplus.saturating_sub(room)
+    let mut room = 0_u32;
+    for (_, entity) in depot::depots(world, settlement) {
+        let Some(store) = world.get::<Depot>(entity) else {
+            continue;
+        };
+        if store.only.is_empty() {
+            room = room.saturating_add(store.free());
+            continue;
+        }
+        // A restricted store absorbs the surplus of its own goods only.
+        let mut free = store.free();
+        for kind in &store.only {
+            if let Some(units) = surplus.get_mut(kind.as_str()) {
+                let taken = (*units).min(free);
+                *units -= taken;
+                free -= taken;
+            }
+        }
+    }
+    surplus
+        .values()
+        .fold(0_u32, |total, units| total.saturating_add(*units))
+        .saturating_sub(room)
 }
 
 /// The first building of the wanted kind the planner may commission.
@@ -299,12 +322,20 @@ pub fn largest_home_beds(world: &World) -> u32 {
     })
 }
 
-/// Unmet units of the field crops in a settlement.
-fn crop_shortage(world: &World, settlement: SimId) -> u32 {
-    crate::village::fields::crop_goods(world)
-        .iter()
-        .map(|kind| labor::good_shortage(world, settlement, kind))
-        .fold(0, u32::saturating_add)
+/// The field crop a settlement is shortest of with every plot of it sown:
+/// `(crop key, unmet units)`, the most units first, then by key. More land
+/// of that crop, not more labour, answers it.
+fn crop_shortage(world: &World, settlement: SimId) -> Option<(String, u32)> {
+    let crops = economy_spec::registry(world)?.spec.crops.clone();
+    crops
+        .into_iter()
+        .filter(|crop| crate::village::fields::crop_land_is_short(world, settlement, &crop.key))
+        .map(|crop| {
+            let short = labor::good_shortage(world, settlement, &crop.harvest.good);
+            (crop.key, short)
+        })
+        .filter(|(_, short)| *short > 0)
+        .max_by(|(ak, a), (bk, b)| a.cmp(b).then_with(|| bk.cmp(ak)))
 }
 
 /// A planner decision as one sentence for players: the building by its
@@ -428,10 +459,11 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
     }
     let sustain = tuning.planner_sustain_reviews;
     // More land, not more labour, answers a crop shortage with every plot sown.
-    let crops_short = crop_shortage(world, settlement);
-    let land_short = crops_short >= tuning.planner_crop_shortage_units
-        && crate::village::calendar(world).1 != crate::village::Season::Winter
-        && crate::village::fields::land_is_short(world, settlement);
+    let short_crop = crop_shortage(world, settlement)
+        .filter(|(_, units)| *units >= tuning.planner_crop_shortage_units)
+        .filter(|_| crate::village::calendar(world).1 != crate::village::Season::Winter);
+    let crops_short = short_crop.as_ref().map_or(0, |(_, units)| *units);
+    let land_short = short_crop.is_some();
     // A grown child without a seat needs a workplace: the trade whose goods
     // are shortest, else a farm.
     let youth_role = workplaces
@@ -548,7 +580,13 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
             )
         })
     } else if first == Some(1) {
-        civic_def(world, |def| def.field.is_some()).map(|def| {
+        let crop = short_crop.as_ref().map(|(key, _)| key.as_str());
+        civic_def(world, |def| {
+            def.field
+                .as_ref()
+                .is_some_and(|field| crop.is_none_or(|crop| field.crop == crop))
+        })
+        .map(|def| {
             (
                 def.id.clone(),
                 format!("{crops_short} unit(s) of field crops are wanted and every plot is sown"),

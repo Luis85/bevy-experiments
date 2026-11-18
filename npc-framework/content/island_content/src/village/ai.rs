@@ -554,6 +554,13 @@ pub(super) fn craft_best(
             if super::routing::avoiding(world, actor, pos, Some(workplace)) {
                 continue;
             }
+            // A pen's hens are fed once a day: no batch beyond them.
+            if !super::livestock::can_feed(world, workplace) {
+                continue;
+            }
+            if !super::resident::fits_before_rest(world, actor, recipe_ticks(world, &recipe)) {
+                continue;
+            }
             production::intent(world, actor, "craft", &good, &recipe, Some(workplace));
             if !travel(world, actor, pos) {
                 return true;
@@ -854,6 +861,12 @@ pub(super) fn planned_work(world: &mut World, actor: Entity) -> bool {
             let Some(pos) = world.get::<SimPos>(station).copied() else {
                 return false;
             };
+            if !super::livestock::can_feed(world, *target)
+                || !super::resident::fits_before_rest(world, actor, recipe_ticks(world, recipe))
+            {
+                super::goap::forget(world, actor);
+                return false;
+            }
             super::production::intent(world, actor, "craft", good, recipe, Some(*target));
             if !travel(world, actor, pos) {
                 true
@@ -1276,6 +1289,19 @@ pub(super) fn satisfy(
     };
     gather_job(world, e, subsistence)
 }
+/// The ticks one batch of `recipe` takes at the slowest work pace.
+fn recipe_ticks(world: &World, recipe: &str) -> u64 {
+    let slowest = super::frontier::economy_spec::tuning(world)
+        .map_or(100, |tuning| tuning.work_pace_slowest_percent.max(100));
+    world
+        .resource::<RecipeRegistry>()
+        .recipes
+        .get(recipe)
+        .map_or(0, |def| {
+            u64::from(def.duration_ticks) * u64::from(slowest) / 100
+        })
+}
+
 pub(crate) fn begin_gather(
     world: &mut World,
     e: Entity,
@@ -1306,6 +1332,13 @@ pub(crate) fn begin_gather(
                 / 100,
         )
         .max(1);
+    if !super::resident::fits_before_rest(
+        world,
+        e,
+        ends.saturating_sub(world.resource::<SimClock>().tick),
+    ) {
+        return Err("it would run into the evening".into());
+    }
     world
         .entity_mut(e)
         .remove::<MoveIntent>()

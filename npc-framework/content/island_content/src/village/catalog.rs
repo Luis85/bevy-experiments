@@ -41,6 +41,16 @@ pub const HOE: &str = "village_hoe";
 pub const FORGE_AXE: &str = "village_forge_axe";
 pub const FORGE_PICKAXE: &str = "village_forge_pickaxe";
 pub const FORGE_HOE: &str = "village_forge_hoe";
+/// The second field crop: a root that stores through winter.
+pub const TURNIP: &str = "village_turnip";
+/// What the hens of a hen house lay.
+pub const EGG: &str = "village_egg";
+/// The hen keeper's recipes: a batch feeds hens and collects their eggs.
+pub const FEED_HENS: &str = "village_feed_hens";
+pub const FEED_HENS_TURNIPS: &str = "village_feed_hens_turnips";
+/// The hen house's workstation kind, and the keeper's trade key.
+pub const COOP: &str = "village_coop";
+pub const HERDER: &str = "herder";
 /// Completed gathers one regional work tool lasts before it breaks.
 pub const TOOL_DURABILITY: u32 = 120;
 /// Gathering duration with / without the matching tool, as a percentage of the

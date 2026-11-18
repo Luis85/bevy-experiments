@@ -5,6 +5,7 @@
 //! Validation and hashing are driven from [`super::economy_spec::EconomySpec`].
 use super::economy_spec::{EconomySpec, GoodTag, Stack, role_key};
 use crate::village::Role;
+use crate::village::catalog::{COOP, HERDER};
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -111,6 +112,34 @@ pub struct BuildingDef {
     /// them: the store is the granary of the field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field: Option<FieldDef>,
+    /// Animals kept as counted stock. Only a workplace may keep them: its
+    /// trade's recipes feed them (input) and collect what they yield (output).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub livestock: Option<LivestockDef>,
+}
+
+/// The animals of a pen (`village::livestock`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LivestockDef {
+    /// The animals as players read them, plural (`hens`).
+    pub display: String,
+    /// Animals a new pen starts with, 1 to `max_head`.
+    pub head: u32,
+    /// The most the pen holds; a well-fed herd breeds up to it.
+    pub max_head: u32,
+    /// Animals a hungry herd never falls below (they forage for themselves).
+    #[serde(default)]
+    pub min_head: u32,
+    /// Animals one finished batch of the trade's recipes at the pen feeds.
+    pub fed_per_batch: u32,
+    /// Hungry days in a row (some animal unfed at dawn) before one dies.
+    pub starve_days: u32,
+    /// Days in a row of a fully fed herd before one more is born, outside winter.
+    pub breed_days: u32,
+    /// Every settlement is founded with one such building, beside its farm.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub founding: bool,
 }
 
 /// The crop plots of a field building.
@@ -122,8 +151,8 @@ pub struct FieldDef {
     /// Key of the crop in `economy.crops`.
     pub crop: String,
     /// Every settlement is founded with one such building, beside its farm,
-    /// with seed for every plot. Only the first founding field in the list is
-    /// used.
+    /// with seed for every plot. Every founding field of the list is laid
+    /// out, in list order (the first beside the farm).
     #[serde(default = "yes", skip_serializing_if = "is_true")]
     pub founding: bool,
 }
@@ -162,6 +191,7 @@ fn building(id: &str, display: &str, cost: &[(&str, u32)], work_ticks: u32) -> B
         civic: true,
         placement: PlacementRules::default(),
         field: None,
+        livestock: None,
     }
 }
 
@@ -274,6 +304,44 @@ pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
             &[("plank", 6), ("log", 2)],
             300,
         )
+    });
+    // The second field crop's founding field, beside the grain field.
+    out.push(BuildingDef {
+        kind: BuildingKind::Storage { capacity: 60 },
+        field: Some(FieldDef {
+            plots: 6,
+            crop: "turnip".into(),
+            founding: true,
+        }),
+        footprint: FootprintCells { width: 6, depth: 6 },
+        solid: false,
+        placement: PlacementRules {
+            surfaces: vec![BuildSurface::Grass, BuildSurface::Soil, BuildSurface::Stone],
+            max_slope_mm: 2000,
+            ..PlacementRules::default()
+        },
+        ..building("turnip_field", "Turnip field", &[("log", 4)], 300)
+    });
+    // Hens kept by the hen keeper: an open, fenced yard.
+    out.push(BuildingDef {
+        kind: BuildingKind::Workplace {
+            profession: Role::from_key(HERDER),
+            station: COOP.into(),
+            capacity: 1,
+        },
+        livestock: Some(LivestockDef {
+            display: "hens".into(),
+            head: 4,
+            max_head: 8,
+            min_head: 2,
+            fed_per_batch: 2,
+            starve_days: 3,
+            breed_days: 4,
+            founding: true,
+        }),
+        footprint: FootprintCells { width: 4, depth: 3 },
+        solid: false,
+        ..building("hen_house", "Hen house", &[("plank", 6), ("log", 4)], 400)
     });
     // A small plot the overseer lays out with the Shape tools; the planner
     // never commissions it.
@@ -413,6 +481,38 @@ pub fn validate(economy: &EconomySpec) -> Result<(), String> {
                 ));
             }
         }
+        if let Some(herd) = &def.livestock {
+            if !matches!(def.kind, BuildingKind::Workplace { .. }) {
+                return Err(format!(
+                    "economy: building `{name}` keeps livestock, so it must be a workplace: \
+                     its trade feeds the animals and collects what they yield"
+                ));
+            }
+            if herd.display.trim().is_empty() {
+                return Err(format!(
+                    "economy: building `{name}` livestock needs a display name"
+                ));
+            }
+            if !(1..=64).contains(&herd.max_head)
+                || !(1..=herd.max_head).contains(&herd.head)
+                || herd.min_head > herd.head
+            {
+                return Err(format!(
+                    "economy: building `{name}` livestock needs 1 <= head <= max_head <= 64 \
+                     and min_head <= head"
+                ));
+            }
+            if !(1..=herd.max_head).contains(&herd.fed_per_batch) {
+                return Err(format!(
+                    "economy: building `{name}` livestock fed_per_batch must be 1..=max_head"
+                ));
+            }
+            if !(1..=100).contains(&herd.starve_days) || !(1..=100).contains(&herd.breed_days) {
+                return Err(format!(
+                    "economy: building `{name}` livestock starve_days and breed_days must be 1..=100"
+                ));
+            }
+        }
         let rules = &def.placement;
         if rules.surfaces.is_empty() {
             return Err(format!(
@@ -452,7 +552,8 @@ pub fn sim_hash(buildings: &[BuildingDef], h: &mut Fnv64) {
                 capacity,
             } => {
                 h.u8(1);
-                h.u8(profession.tag());
+                // The key of a data-only trade too (every one has tag 14).
+                profession.sim_hash(h);
                 h.str(station);
                 h.u32(*capacity);
             }
@@ -469,6 +570,16 @@ pub fn sim_hash(buildings: &[BuildingDef], h: &mut Fnv64) {
             h.u32(field.plots);
             h.str(&field.crop);
             h.u8(u8::from(field.founding));
+        });
+        h.opt(def.livestock.as_ref(), |h, herd| {
+            h.str(&herd.display);
+            h.u32(herd.head);
+            h.u32(herd.max_head);
+            h.u32(herd.min_head);
+            h.u32(herd.fed_per_batch);
+            h.u32(herd.starve_days);
+            h.u32(herd.breed_days);
+            h.u8(u8::from(herd.founding));
         });
         h.u8(u8::from(def.solid));
         h.u8(u8::from(def.civic));

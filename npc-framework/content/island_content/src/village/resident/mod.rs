@@ -828,13 +828,19 @@ fn contains(from: i32, to: i32, at: i32) -> bool {
 /// Whether `actor` is inside a schedule block of `kind` now. Every block moves
 /// with the resident's chronotype; leisure also starts later for the diligent.
 pub fn in_block(world: &World, actor: Entity, kind: BlockKind) -> bool {
+    in_block_at(world, actor, kind, world.resource::<SimClock>().tick)
+}
+
+/// [`in_block`] at another tick of the clock.
+pub fn in_block_at(world: &World, actor: Entity, kind: BlockKind, tick: u64) -> bool {
     let Some(spec) = spec(world) else {
         return false;
     };
     let traits = traits(world, actor);
     let schedule = &spec.schedule;
-    let at = (day_permille(world) - traits.chronotype * schedule.chronotype_shift / 100)
-        .rem_euclid(1000);
+    let day = world.resource::<SimConfig>().day_length.max(1);
+    let permille = (tick % day * 1000 / day) as i32;
+    let at = (permille - traits.chronotype * schedule.chronotype_shift / 100).rem_euclid(1000);
     schedule
         .blocks
         .iter()
@@ -852,6 +858,47 @@ pub fn in_block(world: &World, actor: Entity, kind: BlockKind) -> bool {
             let delay = (traits.diligence - 50) * schedule.diligence_shift / 50;
             delay < length && contains((block.from + delay).rem_euclid(1000), block.to, at)
         })
+}
+
+/// The resident whose work leaf (a leaf of goal `Work`) is starting its step
+/// now; set by the shared leaf start for the length of the step only. Not
+/// hashed or saved: it never outlives the call that sets it.
+#[derive(Resource, Default)]
+pub struct WorkStart(pub Option<Entity>);
+
+/// Whether a timed job of `ticks` that `actor` is about to start fits before
+/// its free time: a work leaf started in the work hours does not begin a
+/// job (gathering, crafting, field or site work) whose expected duration
+/// would run into the resident's leisure or sleep block, since running work
+/// is never cancelled and the evening would go to it. Anything else (a need,
+/// a played character, work started in free time) is not held back.
+pub fn fits_before_rest(world: &World, actor: Entity, ticks: u64) -> bool {
+    if world
+        .get_resource::<WorkStart>()
+        .is_none_or(|start| start.0 != Some(actor))
+    {
+        return true;
+    }
+    let resting = |tick: u64| {
+        in_block_at(world, actor, BlockKind::Leisure, tick)
+            || in_block_at(world, actor, BlockKind::Sleep, tick)
+    };
+    let now = world.resource::<SimClock>().tick;
+    if resting(now) {
+        return true;
+    }
+    // Blocks are at least a few permille long: a step of a tenth of a
+    // percent of the day cannot jump over one.
+    let step = (world.resource::<SimConfig>().day_length / 1000).max(1);
+    let end = now.saturating_add(ticks);
+    let mut at = now;
+    while at < end {
+        at = at.saturating_add(step).min(end);
+        if resting(at) {
+            return false;
+        }
+    }
+    true
 }
 
 /// Whether `actor` spends its free time in company: sociability at least
@@ -927,6 +974,7 @@ pub(super) fn register(app: &mut App) {
         .behavior
         .clone();
     app.init_resource::<DecisionTrace>()
+        .init_resource::<WorkStart>()
         .register_sim_component::<ResidentTraits>()
         .register_sim_component::<DayRhythm>()
         .register_sim_component::<super::ai::Errand>()

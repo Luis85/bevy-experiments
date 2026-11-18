@@ -170,17 +170,35 @@ pub(crate) fn short_staples(world: &World, settlement: SimId) -> Vec<&'static st
 
 /// Coins `actor` lacks to buy the inputs of one batch of `kind` at today's
 /// quotes, beyond what it holds of them (the cheapest recipe of `kind` its
-/// trade makes); 0 when it can pay or `kind` is not made from inputs.
+/// trade makes whose inputs it holds or can buy now: what it lacks of each is
+/// on offer in its settlement); 0 when it can pay, when `kind` is not made
+/// from inputs, or when no recipe's inputs can be had (an advance would buy
+/// nothing). A recipe whose input nobody sells made the batch look cheap: a
+/// keeper short of grain "could afford" two coins of turnips in a winter
+/// with no turnip on offer, and got no advance.
 fn batch_shortfall(world: &World, actor: Entity, kind: &str) -> u32 {
     let Some(registry) = super::frontier::economy_spec::registry(world) else {
         return 0;
     };
     let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
+    let settlement = economic_settlement(world, actor);
+    let obtainable = |recipe: &&super::frontier::economy_spec::RecipeSpec| {
+        recipe.inputs.iter().all(|input| {
+            let missing = input
+                .count
+                .saturating_sub(econ::count(world, actor, &input.good));
+            missing == 0
+                || settlement.is_some_and(|region| {
+                    super::stock::on_offer(world, region, &input.good) >= missing
+                })
+        })
+    };
     registry
         .spec
         .recipes
         .iter()
         .filter(|recipe| recipe.outputs.iter().any(|output| output.good == kind))
+        .filter(obtainable)
         .map(|recipe| {
             recipe
                 .inputs
@@ -1644,17 +1662,14 @@ fn needed_materials(
 ) -> BTreeSet<String> {
     let mut needed: BTreeSet<String> = civic.keys().cloned().collect();
     for (_, actor, role) in people {
-        let owned_food = [
-            roles(world).baked,
-            roles(world).cooked,
-            roles(world).foraged,
-        ]
-        .into_iter()
-        .map(|kind| {
-            u64::from(econ::count(world, *actor, kind))
-                * catalog::food_restore_in(world, kind).unwrap_or(0).max(0) as u64
-        })
-        .sum::<u64>();
+        // Every food held counts (a second crop or a pen's product too).
+        let owned_food = diet(world, *actor)
+            .into_iter()
+            .map(|kind| {
+                u64::from(econ::count(world, *actor, kind))
+                    * catalog::food_restore_in(world, kind).unwrap_or(0).max(0) as u64
+            })
+            .sum::<u64>();
         if owned_food < forecast_amount(world, *actor, "Hunger") {
             needed.insert(food_preference(world, *actor).into());
         }
@@ -2066,7 +2081,15 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
                 }
             }
         }
-        for kind in [primary, alternate, roles(world).foraged] {
+        // Food already held is kept, in eating order: the preferred food,
+        // the other finished staple, then every other food by food value.
+        let mut kept = vec![primary, alternate];
+        kept.extend(
+            diet(world, *e)
+                .into_iter()
+                .filter(|kind| *kind != primary && *kind != alternate),
+        );
+        for kind in kept {
             let restoration = catalog::food_restore_in(world, kind).unwrap_or(1).max(1) as u64;
             let critical = provisioned
                 .and_then(|goods| goods.get(kind))

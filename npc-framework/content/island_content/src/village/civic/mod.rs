@@ -442,6 +442,7 @@ pub fn validate(world: &World) -> Result<(), String> {
         }
     }
     crate::village::fields::validate(world)?;
+    crate::village::livestock::validate(world)?;
     crate::village::live::validate(world)?;
     crate::village::demography::validate(world)
 }

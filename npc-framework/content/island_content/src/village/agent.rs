@@ -405,15 +405,11 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
         let mut affordance = Affordance::new(verb, label);
         if verb == "eat" {
             affordance.label = "Eat a finished food from your pack".into();
-            cmd.kind = [
-                super::roles::roles(world).baked,
-                super::roles::roles(world).cooked,
-                super::roles::roles(world).foraged,
-            ]
-            .into_iter()
-            .find(|kind| econ::count(world, ctx.entity, kind) > 0)
-            .unwrap_or(super::roles::roles(world).baked)
-            .into();
+            cmd.kind = super::production::diet(world, ctx.entity)
+                .into_iter()
+                .find(|kind| econ::count(world, ctx.entity, kind) > 0)
+                .unwrap_or(super::roles::roles(world).baked)
+                .into();
             affordance = affordance.arg(
                 "kind",
                 "bread (default), village_cooked_meal, village_berries; raw meat must be cooked",

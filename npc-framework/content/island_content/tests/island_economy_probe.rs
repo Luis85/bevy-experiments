@@ -514,6 +514,35 @@ fn probe(seed: u64, days: u64) -> (String, u64, u64) {
             .get_resource::<production::StapleAdvances>()
             .map_or(0, |a| a.repaid),
     ));
+    // Year totals of chosen goods (`PROBE_GOODS`, comma separated) from the
+    // ledger, and the days some village was short of food by season name.
+    let goods = std::env::var("PROBE_GOODS")
+        .unwrap_or_else(|_| "bread,village_turnip,village_egg,village_grain".into());
+    for kind in goods
+        .split(',')
+        .map(str::trim)
+        .filter(|kind| !kind.is_empty())
+    {
+        out.push_str(&format!(
+            "PROBE_GOOD seed={seed} {kind}: made {} eaten_or_used {} spoiled {} exported {} imported {}\n",
+            get(&state.produced, kind),
+            get(&used, kind),
+            get(&spoiled, kind),
+            get(&merchant.exported, kind),
+            get(&merchant.imported, kind),
+        ));
+    }
+    let mut short = BTreeMap::<String, u32>::new();
+    for tally in &ledger.seasons {
+        for (what, days) in &tally.short_days {
+            *short.entry(format!("{}:{what}", tally.name)).or_default() += days;
+        }
+    }
+    let census = village::view::census(world);
+    out.push_str(&format!(
+        "PROBE_LIFE seed={seed} residents={} children={} deaths={:?} short_days={short:?}\n",
+        census.residents, census.children, census.deaths,
+    ));
     let civic = world.resource::<village::civic::CivicState>();
     let longest = housing
         .waiting

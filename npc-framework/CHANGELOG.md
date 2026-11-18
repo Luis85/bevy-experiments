@@ -10,6 +10,29 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- A second field crop and livestock (economy review #9). Turnips (`village_turnip`, food 30,000, keep 30 days):
+  crop `turnip` (four clear days, sown spring to early autumn, six a plot), a founding `turnip_field` (six plots)
+  beside each farm after the grain field; farmers grow them, residents eat them through the diet, hens eat them, the
+  boat buys them above 12. The hen house (`hen_house`, workplace of the data-only trade `herder`, "hen keeper") keeps
+  4 to 8 hens as counted stock (`buildings[].livestock`): recipes `village_feed_hens` (1 grain) and
+  `village_feed_hens_turnips` (1 turnip) each feed two hens and yield two eggs (`village_egg`, food 30,000, keep 8
+  days); a batch starts only for hens not yet fed today; hungry herds lose a hen every 3 hungry days (floor 2), fed
+  ones breed every 4 days outside winter (`village::livestock`, journal `VillageLivestockLost`/`Born`). Every
+  founding field is laid out (not only the first); the planner commissions the field of the short crop; hungry
+  residents buy, eat and keep any food of the diet (not only bread, meals and berries); a sowing trade's crop goods
+  validate as producible. New saved/hashed state `island_livestock_v1`, `island_livestock_state_v1`, craft hook
+  `island.livestock`: content and state hashes change (content hash `74a2921da909adbe`; island replays to be
+  re-baselined). The keeper feeds the whole herd whatever the egg stock (`livestock::unfed_yield` in the egg
+  target). One shipped year, seeds 7/11/23: turnips made 288/348/294, eggs made 216/238/194 and eaten
+  119/127/121; bread eaten 964/1036/973 -> 915/901/875; no deaths, no food-short days before or after.
+- Work keeps to the work hours: a work leaf does not start a timed job (gather, craft, field or site work) whose
+  expected duration would run into the resident's leisure or sleep block (`resident::fits_before_rest`); running
+  work is never cancelled. Timed jobs running in the leisure block, 3 shipped days on seeds 7/11/23: 9/11/2 -> 1/1/0
+  ticks per resident-day.
+- Staple advances judge a maker by the cheapest recipe whose inputs it holds or can buy on offer in its settlement
+  now; with none, no advance (a recipe whose input nobody sold made a broke maker look solvent).
+- The civic planner's storage check counts a field granary as room only for its own crop (it counted as room for
+  any surplus, so stockpiles went unbuilt; the turnip granaries made it worse).
 - Residents notice the player (S3.6, npc-ai#6): condition `life.player_within` (`value` in metres) and leaf
   `life.greet player` in the shipped tree (first in `Free time`, and before `Seek company`); a free resident within
   6 m turns to the played character and greets it once a day (bond tier line, or "You've been busy at my trade,

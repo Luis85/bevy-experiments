@@ -73,9 +73,11 @@ fn shipped_world_file_states_the_built_in_economy() {
     let world = shipped_world();
     let block = &world["living_world"]["economy"];
     assert_eq!(block["version"], 1);
-    assert_eq!(block["goods"].as_array().map(Vec::len), Some(24));
-    assert_eq!(block["recipes"].as_array().map(Vec::len), Some(17));
-    assert_eq!(block["professions"].as_array().map(Vec::len), Some(13));
+    // Turnips and eggs, the two hen-feeding recipes and the hen keeper
+    // (economy review #9).
+    assert_eq!(block["goods"].as_array().map(Vec::len), Some(26));
+    assert_eq!(block["recipes"].as_array().map(Vec::len), Some(19));
+    assert_eq!(block["professions"].as_array().map(Vec::len), Some(14));
     assert_eq!(block["patches"].as_array().map(Vec::len), Some(7));
     let parsed: EconomySpec = serde_json::from_value(block.clone()).expect("economy block");
     assert_eq!(parsed, EconomySpec::default());

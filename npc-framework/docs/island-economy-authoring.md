@@ -167,7 +167,12 @@ around it, worked by farmers (see [Crops and fields](#crops-and-fields)). Only a
 open (`"solid": false`) building of type `storage` may have a field: the store is
 the field's granary and takes only the seed and the harvest good of its crop. `plots` is 1 to 64 and `crop` a key of `crops`. With
 `"founding": true` (the default) every settlement is founded with one such
-building; set it to `false` for a field that is only ever built.
+building, for every founding field of the list (the first beside the farm, as
+before a second crop existed, then the others in list order); set it to `false`
+for a field that is only ever built.
+
+A workplace may carry `"livestock"`: animals kept as counted stock in the
+building (see [Livestock](#livestock)).
 
 `kind` is one of:
 
@@ -196,8 +201,9 @@ open sites.
 
 The shipped list has the cottage, one workplace for each of the thirteen
 professions, a stockpile, a barn, a family house (four beds), a field (eight plots
-of grain with a granary of 80 units), the trading post (the merchant boat's stall)
-and a market stall. The homes and workplaces a
+of grain with a granary of 80 units), the trading post (the merchant boat's stall),
+a market stall, a turnip field (six plots of turnips, a granary of 60), the hen
+house (the hen keeper's workplace, four to eight hens) and the garden plot. The homes and workplaces a
 world starts with are still listed under `settlements`; the buildings section
 describes what can be added later, with the same beds, professions and stations.
 
@@ -243,7 +249,7 @@ what each household starts with.
 | `stock_target_days` | 2 | Makers start no new batch of a good while the settlement's unsold stock, store shelves and open offers of it exceed this many days of the settlement's use. Use is the need decay for water and food and the moving sum of recent sales for everything else; a crop's harvest good also keeps the field's `stock_per_resident`, and one batch of any recipe always counts as working stock. 0 switches it off |
 | `staple_stock_days` | 4 | Staples (the foods, gathered or made, and the winter coat) are made to a planned stock of this many days of the settlement's use, whether or not a buyer has ordered yet (`stock::planned_staple`). Orders come first: what the settlement holds for sale counts first, then the standing work goes to makers with no ordered work, inputs through the recipes. The made goods a staple's recipe consumes (flour; thread and leather for the coat) keep their own stock target (`stock_target_days` of their sales) the same way, so a miller keeps flour on hand for the bakers. Never more days than the good keeps (`shelf_life_days`). Hearth fuel has its planned stock at the homes (`winter_fuel_reserve`) and drink is drawn at the wells, so neither has a stall stock |
 | `staple_winter_stock_days` | 6 | The staple stock in autumn and winter |
-| `staple_advance_per_day` | 120 | Coins the civic fund may advance in a day (at most half the fund) to makers whose purse cannot pay for the inputs of one batch while a staple they make or supply (bread, its flour, the coat, its thread and leather) is below its planned stock in their settlement: the shortfall of the batch at today's quotes, while the maker owes less than `staple_advance_per_maker`; a maker repays half of every sale until it owes nothing (`production::StapleAdvances`). Coins only move between the fund and the maker |
+| `staple_advance_per_day` | 120 | Coins the civic fund may advance in a day (at most half the fund) to makers whose purse cannot pay for the inputs of one batch (of the cheapest recipe whose inputs it holds or can buy on offer in its settlement now; none, no advance) while a staple they make or supply (bread, its flour, the coat, its thread and leather) is below its planned stock in their settlement: the shortfall of the batch at today's quotes, while the maker owes less than `staple_advance_per_maker`; a maker repays half of every sale until it owes nothing (`production::StapleAdvances`). Coins only move between the fund and the maker |
 | `staple_advance_per_maker` | 30 | The most one maker may owe the fund |
 | `stock_cover_pricing` | true | For goods made in batches (a recipe output) or grown once a season (a crop harvest), stock up to the island's stock target is working stock: a market round lowers a quote only for what is offered beyond it, and an order the stock on offer can fill is no scarcity. A quote above base with no glut and no shortage drifts back to base. Needs `stock_target_days` above 0 |
 | `trade_window_rounds` | 24 | Buckets of an eighth of a day (eight a day, closed on the clock, not with the market round) of sales the daily use of goods that are not eaten or drunk is estimated from, and of meals each food's share of the hunger follows: 24 is 3 days. A food's daily use is its share of the hunger by what was eaten, not what was sold; the boat's purchases from the stores are exports, not use |
@@ -331,8 +337,30 @@ settlement. Nothing is minted at a birth, a death or an arrival.
 ]
 ```
 
-The built-in crop is the homestead's grain (same seed and harvest good) scaled to
-a field plot: twice the yield and eight times the growing time of a garden bed.
+The built-in crops are the homestead's grain (same seed and harvest good) scaled to
+a field plot (twice the yield and eight times the growing time of a garden bed),
+and turnips:
+
+```json
+{"key": "turnip", "display": "Turnips",
+ "seed": {"good": "village_turnip", "count": 1},
+ "harvest": {"good": "village_turnip", "count": 6},
+ "growth_ticks": 96000, "sow_seasons": ["spring", "summer", "autumn"],
+ "sow_ticks": 160, "tend_ticks": 120, "harvest_ticks": 200,
+ "tend_interval_ticks": 24000, "untended_growth_percent": 60,
+ "stock_per_resident": 3}
+```
+
+Turnips take four clear days, twice grain's two, so with the seven-day season a
+plot is sown in spring, summer or the first three days of autumn (it needs its
+growing time before winter) and the last are lifted in autumn. A turnip is a food
+of 30,000 (an egg is the same, bread 80,000) that keeps thirty days in a pack and
+twice that in a store, so the autumn harvest carries through winter. Residents eat
+turnips after the food they prefer and the finished staples (the diet is by food
+value), buy them when hungry and nothing better is on offer, feed them to the
+hens, and the boat buys what lies above 12 at the harbour. A world is founded
+with a turnip field beside each farm, after the grain field and the coat
+workshops (those stand where they did before turnips existed).
 
 | Field | Meaning |
 | --- | --- |
@@ -348,13 +376,67 @@ day, `weather.rain_growth_percent` in rain, nothing under snow, and scaled by
 `weather.drought_growth_percent` in a drought. On the first day of winter every
 plot is cleared, sown or ripe, and the field lies fallow until spring.
 
-Every settlement is founded with one building that has a founding `field` (the
-first in `buildings`), beside its farm, with seed for every plot. It costs nothing and is
-not counted as built. The planner commissions another when field crops have
-stayed short by `planner_crop_shortage_units` for `planner_sustain_reviews`
-reviews outside winter with every plot of the settlement sown. Wild grain is a
+Every settlement is founded with each building that has a founding `field`
+(in list order, the first beside its farm), with seed for every plot. It costs
+nothing and is not counted as built. The planner commissions another field of a
+crop when that crop's harvest good has stayed short by
+`planner_crop_shortage_units` for `planner_sustain_reviews` reviews outside
+winter with every plot of that crop sown: the first `civic` field of that crop in
+the list (of two short crops, the one short of more units). Wild grain is a
 finite founding reserve (`patches`: `"finite": true`); grain for the mill comes
 from fields.
+
+### Livestock
+
+```json
+{"id": "hen_house", "display": "Hen house",
+ "cost": [{"good": "plank", "count": 6}, {"good": "log", "count": 4}],
+ "work_ticks": 400, "footprint": {"width": 4, "depth": 3},
+ "kind": {"type": "workplace", "profession": "herder", "station": "village_coop", "capacity": 1},
+ "solid": false,
+ "livestock": {"display": "hens", "head": 4, "max_head": 8, "min_head": 2,
+               "fed_per_batch": 2, "starve_days": 3, "breed_days": 4}}
+```
+
+A workplace with `livestock` keeps a herd as counted stock (no animal is an
+actor). Its trade works the building's recipes as ordinary make-to-order and
+standing work: a recipe's inputs are the feed and its outputs what the animals
+yield, and each finished batch feeds `fed_per_batch` animals. A batch starts
+only while the herd has that many animals not yet fed today (batches being
+worked count), so a pen yields at most one day of its animals a day.
+
+| Field | Meaning |
+| --- | --- |
+| `display` | The animals, plural, as players read them |
+| `head`, `max_head` | Animals of a new pen (founded or built), and the most it holds; 1 to 64 |
+| `min_head` | A hungry herd never falls below this (the animals forage for themselves) |
+| `fed_per_batch` | Animals one finished batch of the trade's recipes at the pen feeds |
+| `starve_days` | Days in a row with some animal unfed at dawn before the herd loses one (1 to 100) |
+| `breed_days` | Days in a row of a fully fed herd before one more is born, not in winter (1 to 100) |
+| `founding` | `true` (default): every settlement is founded with one, beside its farm |
+
+The day is settled at dawn (`village::livestock::tick`, one pass a day): a herd
+left with unfed animals counts a hungry day, otherwise a fed one; journal
+`VillageLivestockLost` and `VillageLivestockBorn`. The keeper feeds the whole
+herd every day whatever the stock of the product: while any animal is unfed
+today, the product's stock target is what is on offer plus what the unfed
+animals would yield (`livestock::unfed_yield`), and it is never below one day
+of what the pens lay with every animal fed (`livestock::daily_yield`). Surplus
+goes to the stores and the boat. `village::livestock::views` reports every pen
+(`head`, `fed_today`, `hungry_days`, `born`, `died`). Only a workplace may keep
+livestock.
+
+The shipped hen house is the workplace of the data-only trade `herder` ("hen
+keeper"): four hens, up to eight, two hens a batch. Its recipes are
+`village_feed_hens` (one grain, 120 ticks, two eggs) and
+`village_feed_hens_turnips` (one turnip, 120 ticks, two eggs; a turnip costs less
+than grain, so it is the usual feed): four hens eat two grain or two turnips a day
+and lay four eggs. An egg (`village_egg`) is a food of
+30,000 that keeps eight days; the boat buys what lies above 4 at the harbour. No
+founder is a hen keeper: the trade is essential, so its empty seat is filled
+(farmers, well keepers, woodcutters and fishers have the aptitude, and a flexible
+founder may take any trade). Without a keeper the hens go hungry and dwindle to
+two.
 
 ### Weather
 
@@ -528,7 +610,7 @@ Each message starts with `economy:` and names the entry. Examples:
 - ``recipe `village_bake` references unknown good `village_rye` ``
 - ``recipe `village_mill` is part of a cycle with no source: input `bread` can never be obtained``
 - ``recipe `village_split` is part of a recipe cycle (a good is its own ingredient)``
-- ``profession `miner` has no producible output: `ingot` has neither a recipe of this profession nor a resource patch``
+- ``profession `miner` has no producible output: `ingot` has neither a recipe of this profession, a field crop nor a resource patch``
 - ``profession `baker` cannot buy `village_flour`, an input of its recipe `village_bake`; add it to wants``
 - ``recipe `village_bake` duration must be 1..=100000 ticks`` (a negative duration fails while the JSON is parsed)
 - ``duplicate good `axe` ``, ``duplicate recipe `village_mill` ``, ``duplicate profession `farmer` ``

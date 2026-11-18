@@ -144,3 +144,19 @@ Marker created and deleted for this swap; `tests/replays.next` removed.
 | `island_living_world_s7.json` | `5f2b6c22a63f3da64de372308e23bfad14272b9737abeec5d702428e960db3fe` |
 | `island_living_world_s11.json` | `3b7a18a9f5ddaf36e9be00c2db3ce16d7ed4c2d41778986c2da71733cc373467` |
 | `island_living_world_s23.json` | `343ad09bc218d6c0c2b9191182e30c1b298e4cba65af874837531562d7df22e3` |
+
+## Re-baseline 2026-11-18: second crop and livestock (backlog item 6)
+
+Same approval (one swap per hash-changing backlog item). Turnips, hen houses, the herder trade, the work-fits-before-rest
+rule, the granary-room fix and the advance recipe check change the content hash `16261449980358703144`
+(`e1ac4699ac103828`) -> `8404440510714457534` (`74a2921da909adbe`) and every state hash. Old files refused:
+`content hash mismatch: replay e1ac4699ac103828, this build 74a2921da909adbe`.
+
+Recorded into `target/island-split/b6/`, each seed twice, byte-identical; each verifies
+`{"ok":true,"checked":40,"first_mismatch":null}` before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `c46829b6fdf731bd2a2a8959988b0e2061be7f6eb759c8b3547d9973b9158f3c` |
+| `island_living_world_s11.json` | `1851a39258f8f9686397220760cb6853db48f09d2249384fd18384b3d3f4806d` |
+| `island_living_world_s23.json` | `88c3f0c7818536adb11facd9931044520622e963e4b0276aab9bb267da3ead63` |

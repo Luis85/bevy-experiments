@@ -407,7 +407,8 @@ fenced yard and a barn a timber shed; both show their stock as props, more of th
 the fuller the store. A market stall lays its goods out in front. The buildings a
 world founds through the same rules are drawn the same way: a field's open
 granary is a fenced yard (its crop plots are not drawn yet) and the trading post
-is a stall. Sites and buildings follow the same fog rules as every other place in
+is a stall. The hen house, an open workplace of a trade only the data defines,
+is a fenced yard too; its hens are counted, not drawn. Sites and buildings follow the same fog rules as every other place in
 Live.
 
 ### Who pays for a site
@@ -535,7 +536,12 @@ trade (ADR 0042).
 - **A building:** an entry in `buildings` with `cost`, `work_ticks`,
   `footprint`, `kind` (home, workplace of a profession, storage, stall),
   `solid` and `placement`; the planner and the build menu read it. A
-  storage building with a `field` is a farm or garden plot.
+  storage building with a `field` is a farm or garden plot (each founding
+  field is laid out in every settlement: the shipped world has grain and
+  turnips). A workplace with `livestock` keeps animals as counted stock that
+  its trade's recipes feed (the inputs) and collect from (the outputs); the
+  shipped hen house is the hen keeper's (`herder`), see
+  [Livestock](island-economy-authoring.md#livestock).
 - **A prop:** an entry in `props` with `id`, `display`, `footprint`
   (`width`, `depth` in cells, 1 to 4), `solid` (blocks walking; default
   true) and `model` (the model the view draws, relative to the asset root).
