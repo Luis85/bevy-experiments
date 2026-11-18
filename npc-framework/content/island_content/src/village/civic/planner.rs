@@ -1,6 +1,8 @@
 //! The civic planner: one slow, staggered review per settlement. It houses
-//! the homeless, and when a shortage lasts it commissions one building, paid
-//! from the civic fund through the site's open material orders.
+//! the homeless, and when a shortage lasts it commissions a building, paid
+//! from the civic fund through the site's open material orders: at most one
+//! a review and one per need, and no more at once than the settlement can
+//! staff and supply (`commission`).
 use super::model::{CivicState, ConstructionSite, Depot};
 use super::placement::{self, Survey};
 use super::{depot, sites};
@@ -401,7 +403,7 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
     let youths = crate::village::demography::waiting_youths(world, settlement);
     let members = census(world, settlement).members;
     let surplus = unstored_surplus(world, settlement, &members);
-    let project = {
+    let projects = {
         let mut civic = world.resource_mut::<CivicState>();
         let planner = civic.planners.entry(settlement).or_default();
         planner.last_review = now;
@@ -410,31 +412,42 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
         planner.surplus_units = surplus;
         planner.crowded = crowded;
         planner.pending_cost = 0;
-        planner.project
+        planner.projects.clone()
     };
-    // One active project per settlement.
-    if let Some(site_id) = project {
-        let site = world
+    // The open projects: one not finished in time is cancelled, one that is
+    // gone is forgotten. What each answers (`need_key`) is not answered twice.
+    let stall = sites::stall_ticks(world);
+    let mut open_keys: BTreeSet<String> = BTreeSet::new();
+    let mut open = Vec::new();
+    let mut in_progress = 0_usize;
+    for site_id in projects {
+        let Some(site) = world
             .resource::<SimIndex>()
             .get(site_id)
-            .and_then(|entity| world.get::<ConstructionSite>(entity));
-        match site {
-            Some(site) => {
-                if now.saturating_sub(site.placed_at) > tuning.planner_project_timeout_ticks {
-                    sites::cancel(world, site_id, "not finished in time");
-                }
-                return;
-            }
-            None => {
-                world
-                    .resource_mut::<CivicState>()
-                    .planners
-                    .entry(settlement)
-                    .or_default()
-                    .project = None;
-            }
+            .and_then(|entity| world.get::<ConstructionSite>(entity))
+        else {
+            continue;
+        };
+        if now.saturating_sub(site.placed_at) > tuning.planner_project_timeout_ticks {
+            sites::cancel(world, site_id, "not finished in time");
+            continue;
         }
+        // A held-up project takes no builder or hauler: it does not count
+        // against what the settlement can staff.
+        if !sites::stalled(site, now, stall) {
+            in_progress += 1;
+        }
+        if let Some(def) = super::definition(world, &site.building) {
+            open_keys.insert(need_key(def));
+        }
+        open.push(site_id);
     }
+    world
+        .resource_mut::<CivicState>()
+        .planners
+        .entry(settlement)
+        .or_default()
+        .projects = open.clone();
     // A shortage must last before it is worth a building.
     let workplaces: Vec<(Role, String)> = economy_spec::trades(world)
         .into_iter()
@@ -492,29 +505,60 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
         .iter()
         .map(|(role, _)| (*role, level(PriorityTopic::Workplace, Some(*role))))
         .collect();
+    // A need with an open project waits for it: its count starts again when
+    // the project is finished or cancelled, as with one project at a time.
+    let storage_id = civic_def(world, |def| {
+        matches!(def.kind, BuildingKind::Storage { .. }) && def.field.is_none()
+    })
+    .map(need_key);
+    let field_id = {
+        let crop = short_crop.as_ref().map(|(key, _)| key.as_str());
+        civic_def(world, |def| {
+            def.field
+                .as_ref()
+                .is_some_and(|field| crop.is_none_or(|crop| field.crop == crop))
+        })
+        .map(need_key)
+    };
+    let answered = |key: &Option<String>| key.as_ref().is_some_and(|key| open_keys.contains(key));
+    let home_open = open_keys.contains(HOME_KEY);
+    let storage_open = answered(&storage_id);
+    let field_open = answered(&field_id);
+    let seat_open = youth_role
+        .and_then(|role| workplaces.iter().find(|(candidate, _)| *candidate == role))
+        .is_some_and(|(_, id)| open_keys.contains(id));
+    let short_roles: Vec<Role> = short_roles
+        .into_iter()
+        .filter(|role| {
+            !workplaces
+                .iter()
+                .any(|(candidate, id)| candidate == role && open_keys.contains(id))
+        })
+        .collect();
     let (beds_due, storage_due, role_due, field_due, seat_due) = {
         let mut civic = world.resource_mut::<CivicState>();
         let planner = civic.planners.entry(settlement).or_default();
-        planner.bed_shortage_reviews = if homeless > 0 || largest_family > 0 {
+        planner.bed_shortage_reviews = if (homeless > 0 || largest_family > 0) && !home_open {
             planner.bed_shortage_reviews.saturating_add(1)
         } else {
             0
         };
-        planner.field_reviews = if land_short {
+        planner.field_reviews = if land_short && !field_open {
             planner.field_reviews.saturating_add(1)
         } else {
             0
         };
-        planner.seat_reviews = if youths > 0 {
+        planner.seat_reviews = if youths > 0 && !seat_open {
             planner.seat_reviews.saturating_add(1)
         } else {
             0
         };
-        planner.overflow_reviews = if surplus >= tuning.planner_storage_overflow_units {
-            planner.overflow_reviews.saturating_add(1)
-        } else {
-            0
-        };
+        planner.overflow_reviews =
+            if surplus >= tuning.planner_storage_overflow_units && !storage_open {
+                planner.overflow_reviews.saturating_add(1)
+            } else {
+                0
+            };
         planner
             .demand_reviews
             .retain(|role, _| short_roles.contains(role));
@@ -560,51 +604,54 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
     if let Some(role) = role_due {
         due.push((role_levels.get(&role).copied().unwrap_or_default(), 4));
     }
-    let first = oversee::order_projects(due).into_iter().next();
-    let choice: Option<(String, String)> = if first == Some(0) {
-        // A crowded family needs a home that holds all of it; a single
-        // resident without a bed needs the first home of the list.
-        let home = |def: &BuildingDef, beds: u32| matches!(def.kind, BuildingKind::Home { beds: b } if b >= beds);
-        let wanted = if homeless > 0 { 1 } else { largest_family };
-        civic_def(world, |def| home(def, wanted)).map(|def| {
-            (
-                def.id.clone(),
-                if homeless == 0 {
-                    format!(
-                        "{crowded} person(s) have slept in an overfull home for {sustain} \
+    // The planner's choice for one due need: the building and its reason.
+    let choose = |world: &World, need: u8| -> Option<(String, String)> {
+        if need == 0 {
+            // A crowded family needs a home that holds all of it; a single
+            // resident without a bed needs the first home of the list.
+            let home = |def: &BuildingDef, beds: u32| matches!(def.kind, BuildingKind::Home { beds: b } if b >= beds);
+            let wanted = if homeless > 0 { 1 } else { largest_family };
+            civic_def(world, |def| home(def, wanted)).map(|def| {
+                (
+                    def.id.clone(),
+                    if homeless == 0 {
+                        format!(
+                            "{crowded} person(s) have slept in an overfull home for {sustain} \
                              reviews; the largest family counts {largest_family}"
-                    )
-                } else {
-                    format!("{homeless} resident(s) have had no bed for {sustain} reviews")
-                },
-            )
-        })
-    } else if first == Some(1) {
-        let crop = short_crop.as_ref().map(|(key, _)| key.as_str());
-        civic_def(world, |def| {
-            def.field
-                .as_ref()
-                .is_some_and(|field| crop.is_none_or(|crop| field.crop == crop))
-        })
-        .map(|def| {
-            (
-                def.id.clone(),
-                format!("{crops_short} unit(s) of field crops are wanted and every plot is sown"),
-            )
-        })
-    } else if first == Some(2) {
-        civic_def(world, |def| {
-            matches!(def.kind, BuildingKind::Storage { .. }) && def.field.is_none()
-        })
-        .map(|def| {
-            (
-                def.id.clone(),
-                format!("{surplus} surplus unit(s) have had no store for {sustain} reviews"),
-            )
-        })
-    } else if first == Some(3) {
-        youth_role.and_then(|role| {
-            workplaces
+                        )
+                    } else {
+                        format!("{homeless} resident(s) have had no bed for {sustain} reviews")
+                    },
+                )
+            })
+        } else if need == 1 {
+            let crop = short_crop.as_ref().map(|(key, _)| key.as_str());
+            civic_def(world, |def| {
+                def.field
+                    .as_ref()
+                    .is_some_and(|field| crop.is_none_or(|crop| field.crop == crop))
+            })
+            .map(|def| {
+                (
+                    def.id.clone(),
+                    format!(
+                        "{crops_short} unit(s) of field crops are wanted and every plot is sown"
+                    ),
+                )
+            })
+        } else if need == 2 {
+            civic_def(world, |def| {
+                matches!(def.kind, BuildingKind::Storage { .. }) && def.field.is_none()
+            })
+            .map(|def| {
+                (
+                    def.id.clone(),
+                    format!("{surplus} surplus unit(s) have had no store for {sustain} reviews"),
+                )
+            })
+        } else if need == 3 {
+            youth_role.and_then(|role| {
+                workplaces
                 .iter()
                 .find(|(candidate, _)| *candidate == role)
                 .map(|(_, id)| {
@@ -616,75 +663,191 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
                         ),
                     )
                 })
-        })
-    } else if first == Some(4) {
-        role_due.and_then(|role| {
-            workplaces
-                .iter()
-                .find(|(candidate, _)| *candidate == role)
-                .map(|(_, id)| {
-                    (
-                        id.clone(),
-                        format!(
-                            "{} unit(s) of {} goods are wanted and every seat is taken",
-                            labor::shortage(world, settlement, role),
-                            role.name()
-                        ),
-                    )
-                })
-        })
+            })
+        } else if need == 4 {
+            role_due.and_then(|role| {
+                workplaces
+                    .iter()
+                    .find(|(candidate, _)| *candidate == role)
+                    .map(|(_, id)| {
+                        (
+                            id.clone(),
+                            format!(
+                                "{} unit(s) of {} goods are wanted and every seat is taken",
+                                labor::shortage(world, settlement, role),
+                                role.name()
+                            ),
+                        )
+                    })
+            })
+        } else {
+            None
+        }
+    };
+    let slots = (members.len() / tuning.planner_residents_per_project.max(1) as usize).max(1);
+    let mut deferral: Option<(String, serde_json::Value)> = None;
+    for need in oversee::order_projects(due) {
+        let Some((building, reason)) = choose(world, need) else {
+            continue;
+        };
+        let Some(def) = economy_spec::registry(world)
+            .and_then(|registry| registry.spec.building(&building))
+            .cloned()
+        else {
+            continue;
+        };
+        if open_keys.contains(&need_key(&def)) {
+            continue;
+        }
+        match commission(world, settlement, &def, &reason, &open, in_progress, slots) {
+            Commission::Placed => return,
+            // Coins and builders bind every need alike: a lower need does
+            // not jump ahead of one that waits for them.
+            Commission::Wait(decision, detail) => {
+                decide(world, settlement, &decision, detail);
+                return;
+            }
+            Commission::Skip(decision, detail) => {
+                deferral.get_or_insert((decision, detail));
+            }
+        }
+    }
+    if let Some((decision, detail)) = deferral {
+        decide(world, settlement, &decision, detail);
+    }
+}
+
+/// What the planner keys an open project by: one project answers each need.
+/// Every home answers the one need for beds; any other building its own.
+const HOME_KEY: &str = "home";
+fn need_key(def: &BuildingDef) -> String {
+    if matches!(def.kind, BuildingKind::Home { .. }) {
+        HOME_KEY.to_owned()
     } else {
-        None
+        def.id.clone()
+    }
+}
+
+/// The outcome of one attempt to open a civic project.
+enum Commission {
+    /// The site is open.
+    Placed,
+    /// Nothing more opens this review: the fund or the builders are short.
+    Wait(String, serde_json::Value),
+    /// This building cannot open now; a lower need may.
+    Skip(String, serde_json::Value),
+}
+
+/// Opens the site of `def` for the planner of `settlement`, if the
+/// settlement can staff and supply it. The first project of a settlement
+/// needs only the coins and a spot, as when one project was the rule; a
+/// further one needs, besides, a free builder (fewer projects that can
+/// progress than `slots`), a place in the open-site allowance that leaves
+/// one for the overseer, no good an open home still lacks, materials that
+/// can come (`supply::materials_reachable`) and coins for itself on top of
+/// what the settlement's open sites still need.
+fn commission(
+    world: &mut World,
+    settlement: SimId,
+    def: &BuildingDef,
+    reason: &str,
+    open: &[SimId],
+    in_progress: usize,
+    slots: usize,
+) -> Commission {
+    let Some(tuning) = economy_spec::tuning(world).cloned() else {
+        return Commission::Wait("deferred: no economy".into(), json!({}));
     };
-    let Some((building, reason)) = choice else {
-        return;
-    };
-    let Some(def) = economy_spec::registry(world)
-        .and_then(|registry| registry.spec.building(&building))
-        .cloned()
-    else {
-        return;
-    };
-    let cost = estimate(world, &def);
+    let building = def.id.clone();
+    let cost = estimate(world, def);
     let fund = world.resource::<VillageState>().fund;
-    // What the fund may spend now, plus what the building levy can raise.
-    if cost > sites::budget(world).saturating_add(sites::levy_capacity(world)) {
+    let further = !open.is_empty();
+    if further {
+        if in_progress >= slots {
+            return Commission::Wait(
+                "deferred: every builder the settlement can spare is busy".into(),
+                json!({"building":building,"reason":reason,"projects":open.len(),
+                    "in_progress":in_progress,"slots":slots}),
+            );
+        }
+        if sites::open_building_sites(world, settlement) + 1 >= super::max_open_sites(world) {
+            return Commission::Wait(
+                "deferred: the last open site is kept for the overseer".into(),
+                json!({"building":building,"reason":reason,"projects":open.len()}),
+            );
+        }
+        let goods: super::model::Goods = def
+            .cost
+            .iter()
+            .map(|stack| (stack.good.clone(), stack.count))
+            .collect();
+        // A home outranks another project for the goods it still lacks
+        // (`sites::home_waits_for`): a further project needing them waits
+        // until the home has them.
+        if let Some(kind) = goods
+            .keys()
+            .find(|kind| sites::home_waits_for(world, settlement, kind))
+        {
+            return Commission::Skip(
+                format!("deferred: a home still waits for {kind}"),
+                json!({"building":building,"reason":reason,"good":kind}),
+            );
+        }
+        if let Err(kind) = super::supply::materials_reachable(world, settlement, &goods) {
+            return Commission::Skip(
+                format!("deferred: no {kind} can reach another site now"),
+                json!({"building":building,"reason":reason,"good":kind}),
+            );
+        }
+    }
+    // What the fund may spend now, plus what the building levy can raise;
+    // a further project also leaves what the open sites still need.
+    let committed = if further {
+        sites::outstanding_cost_of(world, settlement)
+    } else {
+        0
+    };
+    if cost.saturating_add(committed)
+        > sites::budget(world).saturating_add(sites::levy_capacity(world))
+    {
         world
             .resource_mut::<CivicState>()
             .planners
             .entry(settlement)
             .or_default()
             .pending_cost = cost;
-        decide(
-            world,
-            settlement,
-            "deferred: the civic fund cannot pay for the materials yet",
-            json!({"building":building,"reason":reason,"estimated_cost":cost,"fund":fund}),
+        return Commission::Wait(
+            "deferred: the civic fund cannot pay for the materials yet".into(),
+            json!({"building":building,"reason":reason,"estimated_cost":cost,"fund":fund,
+                "committed":committed}),
         );
-        return;
     }
     let Some((x, z, rotation)) =
-        find_site(world, &def, settlement, tuning.planner_search_radius_cells)
+        find_site(world, def, settlement, tuning.planner_search_radius_cells)
     else {
-        decide(
-            world,
-            settlement,
-            "deferred: no buildable site near the centre",
+        return Commission::Skip(
+            "deferred: no buildable site near the centre".into(),
             json!({"building":building,"reason":reason}),
         );
-        return;
     };
-    match placement::place(world, &building, x, z, rotation, true, &reason) {
+    match placement::place(world, &building, x, z, rotation, true, reason) {
         Ok(site) => {
             {
                 let mut civic = world.resource_mut::<CivicState>();
                 let planner = civic.planners.entry(settlement).or_default();
-                planner.project = Some(site);
-                planner.bed_shortage_reviews = 0;
-                planner.overflow_reviews = 0;
-                planner.demand_reviews.clear();
-                planner.field_reviews = 0;
-                planner.seat_reviews = 0;
+                planner.projects.push(site);
+                planner.projects.sort_unstable();
+                // The need this answers starts its count again; the others
+                // keep theirs.
+                match &def.kind {
+                    BuildingKind::Home { .. } => planner.bed_shortage_reviews = 0,
+                    BuildingKind::Workplace { profession, .. } => {
+                        planner.demand_reviews.remove(profession);
+                        planner.seat_reviews = 0;
+                    }
+                    _ if def.field.is_some() => planner.field_reviews = 0,
+                    _ => planner.overflow_reviews = 0,
+                }
                 planner.last_decision = format!("commissioned {building}");
                 planner.last_decision_text =
                     format!("Commissioned a {}: {reason}", def.display.to_lowercase());
@@ -695,13 +858,12 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
                 "VillageCivicProject",
                 &json!({"settlement":settlement,"decision":"commissioned","building":building,
                     "site":site,"reason":reason,"cell":[x,z],"rotation":rotation,
-                    "estimated_cost":cost,"fund":fund}),
+                    "estimated_cost":cost,"fund":fund,"projects":open.len() + 1}),
             );
+            Commission::Placed
         }
-        Err(error) => decide(
-            world,
-            settlement,
-            "deferred: the chosen site was refused",
+        Err(error) => Commission::Skip(
+            "deferred: the chosen site was refused".into(),
             json!({"building":building,"reason":reason,"refusal":error}),
         ),
     }

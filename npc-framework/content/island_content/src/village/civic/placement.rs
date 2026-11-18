@@ -14,8 +14,23 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// A building belongs to the nearest settlement and must stand this close to it.
 pub const MAX_SETTLEMENT_DISTANCE_MM: i32 = 48_000;
-/// Open sites one settlement may have at a time.
-pub const MAX_OPEN_SITES: usize = 4;
+/// Open building sites one settlement may have at a time
+/// (`tuning.max_open_sites`; prop sites have their own allowance).
+pub fn max_open_sites(world: &World) -> usize {
+    economy_spec::tuning(world).map_or(4, |tuning| tuning.max_open_sites as usize)
+}
+
+/// The refusal when a settlement has all its open sites, in words.
+pub fn open_sites_full(cap: usize) -> String {
+    const WORDS: [&str; 17] = [
+        "No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+        "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    ];
+    let count = WORDS
+        .get(cap)
+        .map_or_else(|| cap.to_string(), |word| (*word).to_owned());
+    format!("{count} building sites are already open here. Wait for one to finish or cancel one.")
+}
 /// Cells kept free around a resource site.
 const PATCH_CLEARANCE: i32 = 3;
 /// A waterfront building stands this many cells from the sea at most.
@@ -76,6 +91,8 @@ pub struct Survey {
     open_sites: BTreeMap<SimId, usize>,
     /// Open prop sites, which have their own allowance.
     prop_sites: BTreeMap<SimId, usize>,
+    /// [`max_open_sites`] of the world's data.
+    max_open_sites: usize,
 }
 
 fn cell_of(pos: SimPos) -> CellCoord {
@@ -93,6 +110,7 @@ impl Survey {
             settlements: Vec::new(),
             open_sites: BTreeMap::new(),
             prop_sites: BTreeMap::new(),
+            max_open_sites: max_open_sites(world),
         };
         if let Some(spec) = crate::village::frontier::spec(world) {
             survey.entrances.insert(cell_of(spec.actor_start));
@@ -202,11 +220,8 @@ impl Survey {
         rotation: u8,
     ) -> Result<(Plot, SimId), String> {
         let (plot, settlement) = self.check_ground(world, def, x, z, rotation)?;
-        if self.open_sites.get(&settlement).copied().unwrap_or(0) >= MAX_OPEN_SITES {
-            return Err(
-                "Four building sites are already open here. Wait for one to finish or cancel one."
-                    .to_string(),
-            );
+        if self.open_sites.get(&settlement).copied().unwrap_or(0) >= self.max_open_sites {
+            return Err(open_sites_full(self.max_open_sites));
         }
         Ok((plot, settlement))
     }

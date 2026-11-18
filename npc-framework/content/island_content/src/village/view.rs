@@ -557,10 +557,11 @@ pub fn catalogue(world: &World) -> Vec<CatalogueView> {
     let budget = super::civic::budget(world);
     let levy = super::civic::levy_capacity(world);
     let settlements = super::frontier::settlements::all(world);
+    let cap = super::civic::max_open_sites(world);
     let full = !settlements.is_empty()
-        && settlements.iter().all(|(id, _)| {
-            super::civic::open_sites(world, *id).len() >= super::civic::MAX_OPEN_SITES
-        });
+        && settlements
+            .iter()
+            .all(|(id, _)| super::civic::open_building_sites(world, *id) >= cap);
     let radius = super::frontier::economy_spec::tuning(world)
         .map_or(36, |tuning| tuning.planner_search_radius_cells);
     let tier = |building: &str| {
@@ -592,8 +593,7 @@ pub fn catalogue(world: &World) -> Vec<CatalogueView> {
             }
             if full {
                 let sentence = format!(
-                    "Every settlement already has {} open building sites; finish or cancel one first.",
-                    super::civic::MAX_OPEN_SITES
+                    "Every settlement already has {cap} open building sites; finish or cancel one first."
                 );
                 blocked.get_or_insert(sentence.clone());
                 reasons.push(sentence);

@@ -160,3 +160,16 @@ Recorded into `target/island-split/b6/`, each seed twice, byte-identical; each v
 | `island_living_world_s7.json` | `c46829b6fdf731bd2a2a8959988b0e2061be7f6eb759c8b3547d9973b9158f3c` |
 | `island_living_world_s11.json` | `1851a39258f8f9686397220760cb6853db48f09d2249384fd18384b3d3f4806d` |
 | `island_living_world_s23.json` | `88c3f0c7818536adb11facd9931044520622e963e4b0276aab9bb267da3ead63` |
+
+## Re-baseline 2026-11-18: several civic projects per settlement (backlog item 7)
+
+Same approval. Content hash unchanged (`8404440510714457534`); state hashes change from the first checkpoint
+(old s7: `{"ok":false,"checked":1,"first_mismatch":[600,6339958633871876553,12402308894804814256]}`).
+Recorded into `target/island-split/b7/`, each seed twice, byte-identical; each verifies `"ok":true`, 40 checkpoints,
+before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `e7c08c1cf59eb1aacbdb887eda05de7d29202f6f09f9d5d477b34280656c2e72` |
+| `island_living_world_s11.json` | `058f35ad5c2bb7f8592dd0dc8fb31252ae2c135bd3584206b67dd1115a4f8a73` |
+| `island_living_world_s23.json` | `5922dd4dc8f753c969266dbc9959e473bc8975ab1071e3edf922f52155f82baf` |

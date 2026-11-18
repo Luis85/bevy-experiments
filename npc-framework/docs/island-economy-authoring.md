@@ -262,6 +262,9 @@ what each household starts with.
 | `planner_search_radius_cells` | 36 | How far from the centre the planner looks for a site |
 | `planner_project_timeout_ticks` | 168000 | A civic site not finished after this long (a week) is cancelled |
 | `planner_crop_shortage_units` | 4 | Unmet units of field crops that count as a grain shortage |
+| `max_open_sites` | 4 | Open building sites (prop sites aside) a settlement may have at a time, the overseer's and the planner's together. It bounds the coins the fund holds back from the dividend for open sites and how thinly haulers spread; the planner never takes the last place, so the overseer can always place a plot |
+| `planner_residents_per_project` | 6 | Residents for each civic project a settlement keeps going at once (at least one): a site takes a builder and a hauler at a time, so at most a third of the hands build and the rest keep food, water and fuel coming. 16 residents keep two projects going |
+| `site_stall_days` | 1 | Days without a delivery after which a site still lacking materials is held up: builders and haulers serve every site that can progress first, it does not count against the planner's projects, and no new project needing what it lacks opens. The colony panel's waiting warning uses one day too |
 | `days_per_season` | 7 | Days in a season; a year has four seasons. Ages are counted in seasons, so a shorter year shortens every life with it |
 | `founding_day` | -1 | Calendar day the world is founded on; day 0 is the first day of spring. -1 founds it two days before the first winter |
 | `civic_reserve_grant_days`, `civic_reserve_window_days` | 3, 7 | The fund also keeps this many days of its average shortfall (destitution grants paid above the levy collected) back from building and importing, averaged over the last window of levy days, when that is more than `civic_reserve` |
@@ -591,7 +594,7 @@ the quote and sold on at the quote.
 **The planner.** Every `planner_review_ticks` each settlement is reviewed, one
 settlement per tick at most. The planner first moves crowded families into an
 empty home that fits and gives homeless residents a free bed.
-Then, if nothing is under way, it commissions one building, in this order: a home
+Then it may commission one building per review, for the first due need, in this order: a home
 when residents have had no bed, or a family too few beds, for
 `planner_sustain_reviews` reviews; a field on a lasting crop shortage with every
 plot sown; storage when unstored surplus
@@ -602,6 +605,35 @@ the first `civic` building of that kind in the list, picks the nearest valid spo
 to the centre in a fixed order and waits when the fund cannot pay. The daily
 dividend returns only what open sites do not need. Every decision is a
 `VillageCivicProject` journal effect with its reason.
+
+**Several projects at once.** A settlement may have several civic projects
+open (`PlannerState.projects`), one for each need: homes (all one need),
+a field of one crop, storage, one workplace. A need with an open project
+waits for it and counts its reviews again when it is finished or cancelled.
+The first project needs only the coins and a spot. A further one also needs
+a free builder (fewer projects that can progress than residents divided by
+`planner_residents_per_project`; a held-up project does not count), a place
+in `max_open_sites` that leaves one for the overseer, no good an open home
+still lacks (`civic::home_waits_for`), materials that can come
+(`civic::materials_reachable`: a living maker of each good in some settlement,
+or the island's stores beyond what open sites lack; never a good a held-up
+site of the settlement still lacks) and coins for itself on top of what the
+settlement's open sites still need. When the coins or the builders are short
+nothing more opens that review, so a lower need never jumps ahead of a home
+waiting for coins; a need whose materials or spot are missing lets the next
+one try. Each project is cancelled after `planner_project_timeout_ticks`.
+
+**Which site first.** Builders and haulers serve a settlement's open sites
+in one fixed order (`civic::open_sites`): building sites before prop sites;
+sites that can progress before held-up ones (`civic::stalled`,
+`site_stall_days`); then a home, the overseer's plot, and the planner's
+projects by the overseer's level of their need and then fields, stores,
+workplaces; then the oldest; then by identity. A held-up home is the one
+exception: it goes behind the overseer's plots but stays ahead of the
+planner's other projects, so the goods it lacks still reach it first. A
+held-up civic site never stands in front of a plot the overseer placed, and
+a site's material orders and its share of a settlement's stores follow the
+same order.
 
 ## Validation errors
 

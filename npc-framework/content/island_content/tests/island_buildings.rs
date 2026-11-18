@@ -599,7 +599,7 @@ fn placement_is_validated_rule_by_rule_with_a_reason() {
 
     // At most four open sites per settlement.
     let mut open = vec![first];
-    while open.len() < civic::MAX_OPEN_SITES - 1 {
+    while open.len() < civic::max_open_sites(app.world()) - 1 {
         open.push(place(&mut app, "pad", harbour));
     }
     // Two spots that are both valid now; the fourth site takes the first.
@@ -625,8 +625,11 @@ fn placement_is_validated_rule_by_rule_with_a_reason() {
         // The refusal is worded for the player since the review fix pass.
         "Four building sites are already open here.",
     );
-    assert_eq!(civic::sites(app.world()).len(), civic::MAX_OPEN_SITES);
-    assert_eq!(open.len(), civic::MAX_OPEN_SITES - 1);
+    assert_eq!(
+        civic::sites(app.world()).len(),
+        civic::max_open_sites(app.world())
+    );
+    assert_eq!(open.len(), civic::max_open_sites(app.world()) - 1);
 }
 
 #[test]
@@ -1212,7 +1215,7 @@ fn the_planner_builds_a_home_for_homeless_newcomers_and_houses_them() {
         most_sites = most_sites.max(
             civic::sites(app.world())
                 .iter()
-                .filter(|site| site.settlement == harbour && site.civic)
+                .filter(|site| site.settlement == harbour && site.civic && site.kind == "home")
                 .count(),
         );
         newcomers
@@ -1226,11 +1229,15 @@ fn the_planner_builds_a_home_for_homeless_newcomers_and_houses_them() {
         civic::planner(app.world(), harbour),
         civic::sites(app.world())
     );
-    assert_eq!(most_sites, 1, "one active civic project per settlement");
+    // Several civic projects may be open (economy review #7), but one need
+    // has one project: never two homes at once.
+    assert_eq!(most_sites, 1, "one civic home at a time");
     let commissioned: Vec<&Value> = projects
         .iter()
         .filter(|project| {
-            project["decision"] == "commissioned" && project["settlement"] == json!(harbour)
+            project["decision"] == "commissioned"
+                && project["settlement"] == json!(harbour)
+                && project["building"] == "cottage"
         })
         .collect();
     assert_eq!(commissioned.len(), 1, "{projects:?}");
@@ -1272,7 +1279,7 @@ fn the_planner_builds_a_home_for_homeless_newcomers_and_houses_them() {
     run_ticks(app.world_mut(), 201);
     let planner = civic::planner(app.world(), harbour).expect("planner");
     assert_eq!((planner.homeless, planner.bed_shortage_reviews), (0, 0));
-    assert_ne!(planner.project, Some(home));
+    assert!(!planner.projects.contains(&home));
     assert_eq!(money(app.world()), coins);
     village::integrity::validate_colony(app.world()).expect("colony integrity");
 }

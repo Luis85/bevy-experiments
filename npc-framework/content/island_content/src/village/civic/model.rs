@@ -396,8 +396,11 @@ pub struct PlannerState {
     pub overflow_reviews: u32,
     /// Consecutive reviews with unmet demand and every seat taken, by profession.
     pub demand_reviews: BTreeMap<Role, u32>,
-    /// The one active civic project of this settlement.
-    pub project: Option<SimId>,
+    /// The open civic projects of this settlement, ascending by identity. At
+    /// most one answers each need (homes, a field of one crop, storage, one
+    /// workplace), and the planner keeps no more going than the settlement
+    /// can staff (`tuning.planner_residents_per_project`).
+    pub projects: Vec<SimId>,
     pub last_review: u64,
     /// Figures of the last review, for inspectors.
     pub homeless: u32,
@@ -480,7 +483,10 @@ impl SimHashResource for CivicState {
                 role.sim_hash(h);
                 h.u32(*reviews);
             }
-            h.opt(planner.project.as_ref(), |h, id| h.u32(id.0));
+            h.u32(planner.projects.len() as u32);
+            for id in &planner.projects {
+                h.u32(id.0);
+            }
             h.u64(planner.last_review);
             h.u32(planner.homeless);
             h.u32(planner.free_beds);

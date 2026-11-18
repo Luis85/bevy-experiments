@@ -217,36 +217,130 @@ pub(crate) fn note_grants(world: &mut World, granted: u32, contributed: u32) {
     }
 }
 
-/// Open sites of a settlement, ascending by identity.
+/// Ticks without a delivery after which a site that still lacks materials is
+/// held up: `tuning.site_stall_days` days.
+pub fn stall_ticks(world: &World) -> u64 {
+    let days = economy_spec::tuning(world).map_or(1, |tuning| tuning.site_stall_days);
+    let day = world
+        .get_resource::<SimConfig>()
+        .map_or(24_000, |config| config.day_length);
+    u64::from(days).saturating_mul(day).max(1)
+}
+
+/// Whether a site is held up: it still lacks materials and nothing has been
+/// delivered (or, before the first delivery, since it was placed) for
+/// `stall` ticks. The colony panel's "waiting for materials" warning is the
+/// same rule at one day.
+pub fn stalled(site: &ConstructionSite, now: u64, stall: u64) -> bool {
+    !site.supplied() && now.saturating_sub(site.last_delivery_at.unwrap_or(site.placed_at)) >= stall
+}
+
+/// Where a site stands in the serving order: whether it goes behind every
+/// site that can progress, and its urgency, lowest first. A home comes
+/// first (people wait for a bed); then the overseer's plot; then the
+/// planner's other projects by the overseer's level of their need and the
+/// planner's own order (fields, stores, workplaces). A held-up site goes
+/// behind every site that can progress, except a home: held up, it goes
+/// behind the overseer's plots but stays ahead of the planner's other
+/// projects, so the goods it lacks still reach it first.
+fn rank(world: &World, site: &ConstructionSite, held: bool) -> (bool, u8) {
+    use crate::village::frontier::oversee::{self, PriorityLevel, PriorityTopic};
+    if site.is_prop() {
+        return (held, 0);
+    }
+    let Some(def) = super::definition(world, &site.building) else {
+        return (true, u8::MAX);
+    };
+    if matches!(def.kind, BuildingKind::Home { .. }) {
+        return (false, if held { 2 } else { 0 });
+    }
+    if !site.civic {
+        return (held, 1);
+    }
+    let (topic, profession, order) = match &def.kind {
+        _ if def.field.is_some() => (PriorityTopic::FoodReserve, None, 0),
+        BuildingKind::Workplace { profession, .. } => {
+            (PriorityTopic::Workplace, Some(*profession), 2)
+        }
+        _ => (PriorityTopic::Storage, None, 1),
+    };
+    let level = match oversee::level(world, site.settlement, topic, profession) {
+        PriorityLevel::High => 0,
+        PriorityLevel::Normal => 1,
+        PriorityLevel::Low => 2,
+    };
+    (held, 3 + level * 3 + order)
+}
+
+/// The serving order of one site: prop, behind, urgency, placed at.
+type ServeKey = (bool, bool, u8, u64);
+
+/// Open sites of a settlement in the order builders and haulers serve them:
+/// building sites before prop sites; sites that can progress before held-up
+/// ones ([`stalled`]), a held-up home aside ([`rank`]); then by urgency (a
+/// home, the overseer's plot, the planner's projects by need), age and
+/// identity. A held-up civic site therefore never stands in front of the
+/// overseer's plot, and a held-up site other than a home never in front of
+/// a site that can be supplied or built.
 pub fn open_sites(world: &World, settlement: SimId) -> Vec<(SimId, Entity)> {
     let Some(state) = world.get_resource::<CivicState>() else {
         return Vec::new();
     };
-    state
-        .sites
-        .get(&settlement)
-        .into_iter()
-        .flatten()
-        .filter_map(|id| Some((*id, world.resource::<SimIndex>().get(*id)?)))
-        // Builders and haulers take building sites before prop sites; each
-        // group keeps its placing order (a stable partition).
-        .partition::<Vec<_>, _>(|(_, entity)| {
-            !world
-                .get::<ConstructionSite>(*entity)
-                .is_some_and(ConstructionSite::is_prop)
+    let Some(ids) = state.sites.get(&settlement).filter(|ids| !ids.is_empty()) else {
+        return Vec::new();
+    };
+    let now = world.resource::<SimClock>().tick;
+    let stall = stall_ticks(world);
+    let mut list: Vec<(ServeKey, SimId, Entity)> = ids
+        .iter()
+        .filter_map(|id| {
+            let entity = world.resource::<SimIndex>().get(*id)?;
+            let key = world.get::<ConstructionSite>(entity).map_or(
+                (true, true, u8::MAX, u64::MAX),
+                |site| {
+                    let (behind, urgency) = rank(world, site, stalled(site, now, stall));
+                    (site.is_prop(), behind, urgency, site.placed_at)
+                },
+            );
+            Some((key, *id, entity))
         })
-        .into_concat()
+        .collect();
+    list.sort_unstable_by_key(|(key, id, _)| (*key, *id));
+    list.into_iter()
+        .map(|(_, id, entity)| (id, entity))
+        .collect()
 }
 
-trait IntoConcat {
-    fn into_concat(self) -> Vec<(SimId, Entity)>;
+/// Open building sites (prop sites aside) of a settlement: what
+/// [`super::max_open_sites`] bounds.
+pub fn open_building_sites(world: &World, settlement: SimId) -> usize {
+    world
+        .get_resource::<CivicState>()
+        .and_then(|state| state.sites.get(&settlement))
+        .into_iter()
+        .flatten()
+        .filter_map(|id| world.resource::<SimIndex>().get(*id))
+        .filter(|entity| {
+            world
+                .get::<ConstructionSite>(*entity)
+                .is_some_and(|site| !site.is_prop())
+        })
+        .count()
 }
-impl IntoConcat for (Vec<(SimId, Entity)>, Vec<(SimId, Entity)>) {
-    fn into_concat(self) -> Vec<(SimId, Entity)> {
-        let (mut buildings, props) = self;
-        buildings.extend(props);
-        buildings
-    }
+
+/// Coins needed to finish paying for the open sites of one settlement at
+/// today's quotes.
+pub fn outstanding_cost_of(world: &World, settlement: SimId) -> u32 {
+    open_sites(world, settlement)
+        .into_iter()
+        .filter_map(|(_, entity)| world.get::<ConstructionSite>(entity))
+        .flat_map(|site| {
+            site.cost.keys().map(|kind| {
+                site.missing(kind)
+                    .saturating_mul(market::unit_price(world, kind).unwrap_or(0))
+            })
+        })
+        .fold(0, u32::saturating_add)
 }
 
 /// Materials the open sites of a settlement still wait for and the fund can
@@ -796,10 +890,8 @@ fn finish(world: &mut World, site_id: SimId, builder: Option<SimId>, founding: b
         } else {
             civic.completed += 1;
         }
-        if let Some(planner) = civic.planners.get_mut(&site.settlement)
-            && planner.project == Some(site_id)
-        {
-            planner.project = None;
+        if let Some(planner) = civic.planners.get_mut(&site.settlement) {
+            planner.projects.retain(|id| *id != site_id);
         }
     }
     if let Some(field) = &def.field {
@@ -919,10 +1011,8 @@ pub fn cancel(world: &mut World, site_id: SimId, reason: &str) {
             sites.retain(|id| *id != site_id);
         }
         civic.cancelled += 1;
-        if let Some(planner) = civic.planners.get_mut(&site.settlement)
-            && planner.project == Some(site_id)
-        {
-            planner.project = None;
+        if let Some(planner) = civic.planners.get_mut(&site.settlement) {
+            planner.projects.retain(|id| *id != site_id);
         }
     }
     if let Some(blocker) = site

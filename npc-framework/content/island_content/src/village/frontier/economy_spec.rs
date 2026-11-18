@@ -513,6 +513,23 @@ pub struct EconomyTuning {
     pub inn_bed_price: u32,
     /// Ticks one rented night lasts.
     pub inn_bed_ticks: u64,
+    /// Open building sites (prop sites aside) one settlement may have at a
+    /// time, the overseer's and the planner's together. It bounds the coins
+    /// the fund holds back from the dividend for open sites and how thinly
+    /// the haulers' trips spread; the planner never takes the last place, so
+    /// a plot of the overseer always has room.
+    pub max_open_sites: u32,
+    /// Residents of a settlement for each civic project it keeps going at
+    /// once (at least one project): a site takes one builder and a hauler at
+    /// a time, and with one project per this many residents those are at
+    /// most a third of the settlement's hands, the rest keeping food, water
+    /// and fuel coming.
+    pub planner_residents_per_project: u32,
+    /// Days without a delivery after which a site that still lacks materials
+    /// is held up: it goes behind every site that can progress, does not
+    /// count against the planner's projects, and a new project needing what
+    /// it lacks waits. The colony panel's warning uses the same day.
+    pub site_stall_days: u32,
 }
 impl Default for EconomyTuning {
     fn default() -> Self {
@@ -592,6 +609,9 @@ impl Default for EconomyTuning {
             found_coat_workshops: true,
             inn_bed_price: 3,
             inn_bed_ticks: 300,
+            max_open_sites: 4,
+            planner_residents_per_project: 6,
+            site_stall_days: 1,
         }
     }
 }
@@ -1835,7 +1855,7 @@ impl EconomySpec {
                 "economy: tuning.inn_bed_price must be 1..=1000 and inn_bed_ticks 1..=24000".into(),
             );
         }
-        let checks: [(bool, &str); 18] = [
+        let checks: [(bool, &str); 19] = [
             (t.levy_percent <= 100, "levy_percent must be 0..=100"),
             (
                 t.destitution_floor <= t.levy_threshold,
@@ -1937,6 +1957,12 @@ impl EconomySpec {
                     && (0..=100_000).contains(&t.exposure_warmth)
                     && t.coat_lead_days <= 28,
                 "freezing_warmth and exposure_warmth must be 0..=100000 and coat_lead_days at most 28",
+            ),
+            (
+                (2..=16).contains(&t.max_open_sites)
+                    && (1..=100).contains(&t.planner_residents_per_project)
+                    && (1..=28).contains(&t.site_stall_days),
+                "max_open_sites must be 2..=16, planner_residents_per_project 1..=100 and site_stall_days 1..=28",
             ),
         ];
         for (ok, message) in checks {
@@ -2154,6 +2180,9 @@ impl EconomySpec {
         h.u8(u8::from(t.found_coat_workshops));
         h.u32(t.inn_bed_price);
         h.u64(t.inn_bed_ticks);
+        h.u32(t.max_open_sites);
+        h.u32(t.planner_residents_per_project);
+        h.u32(t.site_stall_days);
         self.demography.sim_hash(h);
         super::life_spec::hash_crops(&self.crops, h);
         self.weather.sim_hash(h);

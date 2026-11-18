@@ -3138,6 +3138,9 @@
         "build_bare_percent": 150,
         "inn_bed_price": 3,
         "inn_bed_ticks": 300,
+        "max_open_sites": 4,
+        "planner_residents_per_project": 6,
+        "site_stall_days": 1,
         "storage_shelf_percent": 200
       },
       "demography": {

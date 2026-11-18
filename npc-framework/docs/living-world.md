@@ -143,8 +143,11 @@ These rules apply to the coastal world only.
   no builder or porter profession.
 - **The planner.** Each settlement is reviewed every 1,200 ticks. Homeless
   residents get a free bed first. A shortage that lasts three reviews leads to one
-  building: a home, a store or a workplace. One project per settlement at a time,
-  and the fund must be able to pay. The daily dividend returns only the coins open
+  building: a home, a store or a workplace. A settlement keeps several projects
+  going, one per need and as many as its residents can staff (one per six) and
+  its makers and stores can supply, and the fund must be able to pay. A site held
+  up for a day without materials goes behind every site that can progress and
+  never in front of a plot the overseer placed. The daily dividend returns only the coins open
   sites do not need. Each decision is in the journal as `VillageCivicProject`.
 - **Money.** The village pays for every building, the overseer's and the
   planner's. When materials cost more than the fund may spend, a building levy

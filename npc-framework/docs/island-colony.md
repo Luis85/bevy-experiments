@@ -422,6 +422,14 @@ are supplied and built the same physical way, by residents who walk to the door,
 and the village's own sites come first in a resident's work hours. The planner
 never counts, funds, prioritises or cancels a homestead upgrade.
 
+A settlement may have several open sites at once (`tuning.max_open_sites`, 4):
+the planner keeps several projects going, one per need, while residents can
+staff them, and always leaves one place for a plot from the build tray. Builders
+and haulers take the sites in one order: sites that can progress before sites
+held up for a day without materials, then a home, then the overseer's plot,
+then the planner's projects. A plot placed in the build tray never waits behind
+a held-up civic site.
+
 A village site whose own settlement has none of a material in store and nobody
 in a trade that makes it is supplied by the nearest other settlement that makes
 or stores it (`civic::unmet_elsewhere`): that settlement's plan funds the work,

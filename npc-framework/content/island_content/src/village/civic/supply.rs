@@ -29,26 +29,82 @@ pub struct Assignment {
     pub units: u32,
 }
 
-/// Every open site of the world with its settlement, buildings before prop
-/// sites, each group in identity order.
+/// Every open site of the world with its settlement: building sites before
+/// prop sites; within each, settlement by settlement in the order its
+/// builders and haulers serve them ([`sites::open_sites`]: a held-up site
+/// after the sites that can progress), so stores go to sites in that order.
 fn all_open(world: &World) -> Vec<(SimId, SimId, Entity)> {
     let Some(state) = world.get_resource::<CivicState>() else {
         return Vec::new();
     };
     let mut list: Vec<(bool, SimId, SimId, Entity)> = state
         .sites
-        .iter()
-        .flat_map(|(settlement, ids)| ids.iter().map(move |id| (*settlement, *id)))
-        .filter_map(|(settlement, id)| {
-            let entity = world.resource::<SimIndex>().get(id)?;
+        .keys()
+        .flat_map(|settlement| {
+            sites::open_sites(world, *settlement)
+                .into_iter()
+                .map(move |(id, entity)| (id, *settlement, entity))
+        })
+        .filter_map(|(id, settlement, entity)| {
             let site = world.get::<ConstructionSite>(entity)?;
             Some((site.is_prop(), id, settlement, entity))
         })
         .collect();
-    list.sort_unstable_by_key(|(prop, id, _, _)| (*prop, *id));
+    // A stable sort: the serving order stays within each group.
+    list.sort_by_key(|(prop, ..)| *prop);
     list.into_iter()
         .map(|(_, id, settlement, entity)| (id, settlement, entity))
         .collect()
+}
+
+/// Whether a living resident of a trade that makes `kind` works for some
+/// settlement's plan (`production::economic_settlement`).
+fn made_anywhere(world: &World, kind: &str) -> bool {
+    let Some(mut query) = world.try_query::<(Entity, &Villager)>() else {
+        return false;
+    };
+    query.iter(world).any(|(actor, person)| {
+        person.role != Role::Visitor
+            && living(world, actor)
+            && catalog::outputs_for(world, person.role).contains(&kind)
+            && production::economic_settlement(world, actor).is_some()
+    })
+}
+
+/// Whether a new site of `settlement` costing `cost` could get its materials
+/// (the planner's check before it opens a second project): every good is
+/// made by a living resident of some settlement (`unmet_elsewhere` assigns
+/// the shortfall to the nearest maker), or the island's stores hold it beyond
+/// what open sites already lack; and no held-up site of the settlement still
+/// lacks it (a new site would wait for the same goods). `Err` names the
+/// first good that cannot come.
+pub fn materials_reachable(world: &World, settlement: SimId, cost: &Goods) -> Result<(), String> {
+    let now = world.resource::<SimClock>().tick;
+    let stall = sites::stall_ticks(world);
+    let held_up: Vec<&ConstructionSite> = sites::open_sites(world, settlement)
+        .into_iter()
+        .filter_map(|(_, entity)| world.get::<ConstructionSite>(entity))
+        .filter(|site| sites::stalled(site, now, stall))
+        .collect();
+    for (kind, count) in cost {
+        if *count == 0 {
+            continue;
+        }
+        if held_up.iter().any(|site| site.missing(kind) > 0) {
+            return Err(kind.clone());
+        }
+        if made_anywhere(world, kind) {
+            continue;
+        }
+        let stocked: u32 = settlements::all(world)
+            .into_iter()
+            .map(|(id, _)| stored(world, id, kind))
+            .fold(0, u32::saturating_add);
+        if stocked < island_shortfall(world, kind).saturating_add(*count) {
+            return Err(kind.clone());
+        }
+    }
+    Ok(())
 }
 
 /// Units of `kind` a hauler could take from the stores of `settlement` now

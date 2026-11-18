@@ -10,6 +10,19 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Several civic projects per settlement (economy review #7). `PlannerState.project` is `projects` (one per need:
+  homes, a field of one crop, storage, one workplace); a further project opens only with a free builder (projects
+  that can progress below residents / `tuning.planner_residents_per_project`, 6), a place in
+  `tuning.max_open_sites` (4, was the constant `MAX_OPEN_SITES`) that leaves one for the overseer, no good an open
+  home lacks, materials that can come (`civic::materials_reachable`, no good a held-up site lacks) and coins on top
+  of the settlement's open sites. Builders and haulers serve `civic::open_sites` in an explicit order: progressing
+  before held up (`civic::stalled`, `tuning.site_stall_days` 1; a held-up home stays ahead of the planner's other
+  projects), then a home, the overseer's plot, the planner's projects by overseer level and need, age, identity; a
+  player plot never waits behind a held-up civic site. New tuning fields
+  are hashed and `PlannerState` is saved: content and state hashes change, `ISLAND_SAVE_VERSION` 5, island replays
+  to be re-baselined. One shipped year, seeds 7/11/23: built 26/25/24 -> 28/25/25, cancelled 0 -> 0, stockpiles
+  5/4/4 -> 6/4/5, births held for a bed 1/12/14 -> 0/12/14, no deaths; the longest wait for materials (counted from
+  commissioning, which now comes earlier) 1.1/0.8/1.6 -> 1.8/1.3/1.2 days, for homes 1.1/0.6/0.6 -> 0.9/0.9/1.2.
 - A second field crop and livestock (economy review #9). Turnips (`village_turnip`, food 30,000, keep 30 days):
   crop `turnip` (four clear days, sown spring to early autumn, six a plot), a founding `turnip_field` (six plots)
   beside each farm after the grain field; farmers grow them, residents eat them through the diet, hens eat them, the
