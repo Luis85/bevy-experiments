@@ -818,9 +818,22 @@ fn fail_travel(world: &mut World, actor: Entity, goal: SimPos, target: Option<Si
 }
 
 pub(super) fn planned_work(world: &mut World, actor: Entity) -> bool {
+    planned_work_in(world, actor, super::goap::Scope::Own)
+}
+
+/// Takes the next step of the resident's plan in `scope`: its own funded
+/// production, or demand elsewhere on the island it serves.
+pub(super) fn planned_work_in(world: &mut World, actor: Entity, scope: super::goap::Scope) -> bool {
     use super::goap::{PlanStep, Recall};
-    let plan = match super::goap::recall(world, actor) {
+    let plan = match super::goap::recall_in(world, actor, scope) {
         Recall::Hit(plan) => plan,
+        // Unplanned demand is looked for once every `LOOK_TICKS` only.
+        Recall::Miss
+            if scope == super::goap::Scope::Elsewhere
+                && !super::goap::elsewhere::looks_now(world, actor) =>
+        {
+            return false;
+        }
         outcome => {
             if let Recall::Failed(reason) = outcome {
                 let actor_id = world.get::<SimId>(actor).copied();
@@ -831,8 +844,16 @@ pub(super) fn planned_work(world: &mut World, actor: Entity) -> bool {
                     &json!({"reason":reason}),
                 );
             }
-            let Some(plan) = super::goap::plan(world, actor) else {
-                super::goap::forget(world, actor);
+            let Some(plan) = super::goap::plan_in(world, actor, scope) else {
+                // A plan of the other scope stays for its own leaf.
+                if world
+                    .get::<super::goap::PlanMemo>(actor)
+                    .is_some_and(|memo| {
+                        memo.plan.elsewhere == (scope == super::goap::Scope::Elsewhere)
+                    })
+                {
+                    super::goap::forget(world, actor);
+                }
                 return false;
             };
             super::goap::remember(world, actor, &plan);
@@ -886,6 +907,32 @@ pub(super) fn planned_work(world: &mut World, actor: Entity) -> bool {
                 begun
             }
         }
+        PlanStep::Deliver {
+            kind,
+            count,
+            target,
+        } => {
+            let Some(place) = entity_of(world, *target) else {
+                super::goap::forget(world, actor);
+                return false;
+            };
+            let units = super::goap::spare(world, actor, kind).min(*count);
+            if units == 0 {
+                super::goap::forget(world, actor);
+                return false;
+            }
+            super::production::intent(world, actor, "deliver", kind, "", Some(*target));
+            if !approach_work(world, actor, place) {
+                true
+            } else {
+                let delivered =
+                    super::civic::depot_deposit(world, actor, place, kind, units).is_ok();
+                if !delivered {
+                    super::goap::forget(world, actor);
+                }
+                delivered
+            }
+        }
     };
     if started && previous.as_ref() != world.get::<super::production::JobIntent>(actor) {
         let actor_id = world.get::<SimId>(actor).copied();
@@ -893,7 +940,8 @@ pub(super) fn planned_work(world: &mut World, actor: Entity) -> bool {
             world,
             actor_id,
             "VillagePlanSelected",
-            &json!({"goal":plan.goal,"steps":plan.steps,"expanded":plan.expanded,"cost":plan.cost}),
+            &json!({"goal":plan.goal,"steps":plan.steps,"expanded":plan.expanded,"cost":plan.cost,
+                "elsewhere":plan.elsewhere,"deliver_to":plan.deliver_to}),
         );
     }
     started

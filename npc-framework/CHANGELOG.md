@@ -10,6 +10,36 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Wider resident planner (review npc-ai#9). The search is content-free (`village::goap::search`: integer facts,
+  actions with consumed inputs and kept tools, bounded uniform-cost search, ties by insertion order over sorted keys);
+  `village::goap` builds its domain from the island's data. New in a plan: a gathering tool the trade lacks and the
+  ledger funds is bought first when the time it saves on the funded units (at most `goap.tool_horizon`, 8) pays for
+  the trip and its share of the price (price in bare-handed work time over the tool's durability); recipe chains are
+  bounded by `goap.max_depth` (4) and one decision by `goap.decision_expansions` (512). New leaf parameter
+  `life.pursue_goal elsewhere` ("Supply demand elsewhere", last in Work hours, after the help leaf): funded demand no
+  maker is planned to meet (`goap::elsewhere`: residents' purchases beyond their makers' plan, a settlement with no
+  maker of the good, the boat's order beyond the port's makers; looked for once every 120 ticks per resident, staggered
+  by identity, unless a plan for it is under way; a good the maker's own settlement is short of is never sent to another
+  settlement or the boat, nor an input bought where its seller's settlement is short of it), shared among makers in
+  identity order, inputs
+  bought only up to what the goods fetch, a raw input nobody offers gathered; the plan ends with a `Deliver` step to a
+  store, stall or the trading post (or the goods stay in the pack for sale when no outlet takes them). `WorkPlan`
+  gains `elsewhere` and `deliver_to` (in `VillagePlanSelected` and the decision record's `plan`); `PlanMemo` is
+  `regional_plan_memo_v2`; `ISLAND_SAVE_VERSION` 6; new policy fields `max_depth`, `decision_expansions`,
+  `tool_horizon`, `serve_elsewhere` are hashed. Content and state hashes change; island replays to be re-baselined.
+  Measured before (afternoon work block, 14 days, seeds 7/11/23): of residents not working, ~70% had no funded goal
+  of their own, ~15-25% had a plan but were on a chore, ~10% had a goal whose inputs come from fields or fed hens; 35-49%
+  of woodcutters' and 77-84% of farmers' gathering was bare-handed. After (14 days): woodcutters bare 47/35/49% -> 15/17/37%,
+  farmers 80/77/84% -> 65/74/70%; afternoon work share 59/57/55% -> 58/56/54% (whole block 54/52/48 -> 52/51/48): the
+  idle trades (smith 9-18%, carpenter 13-28%, tailor 41-48%, innkeeper 48-60%) have little funded demand on the island
+  to plan for. Bread imported 56/23/47 -> 31/26/46; eggs 108/96/90 -> 100/112/94; homes and sites completed
+  18/12/15 -> 13/12/15, cancelled 0, no deaths. One shipped year (28 days): built 28/25/25 -> 22/26/25 (homes 11/12/8 ->
+  11/12/10; seed 7's six fewer are storehouses, which the planner builds for unstored surplus), cancelled 0, no
+  deaths; bread made 1044/1148/988 -> 1008/1096/1096, eaten 935/939/825 -> 867/928/895, imported 78/43/59 -> 52/47/60
+  (+flour 0/0/10 -> 0/3/13); eggs made 214/180/160 -> 176/208/182. A first version sent non-port farmers' grain to the
+  boat's order (150 and 43 units on seeds 7 and 11) while their own hen keepers and millers went short: eggs fell to
+  166/162/156 and seed 11 imported 73 loaves. Seed 11 tick rate at day 7: equal within noise (paired runs).
+
 - Several civic projects per settlement (economy review #7). `PlannerState.project` is `projects` (one per need:
   homes, a field of one crop, storage, one workplace); a further project opens only with a free builder (projects
   that can progress below residents / `tuning.planner_residents_per_project`, 6), a place in

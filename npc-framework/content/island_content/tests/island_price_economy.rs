@@ -563,6 +563,11 @@ fn cached_plan_is_reused_until_its_first_step_precondition_fails() {
             economy::consume(app.world_mut(), actor, &input, held).unwrap();
             "craft inputs are missing"
         }
+        goap::PlanStep::Deliver { kind, .. } => {
+            let held = economy::count(app.world(), actor, kind);
+            economy::consume(app.world_mut(), actor, kind, held).unwrap();
+            "nothing spare to deliver"
+        }
     };
     assert_eq!(
         goap::recall(app.world(), actor),

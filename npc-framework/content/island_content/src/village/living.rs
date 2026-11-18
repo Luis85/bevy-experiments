@@ -439,6 +439,18 @@ pub fn gather_ticks(world: &World, actor: Entity, kind: &str, base: u32) -> u32 
         as u32
 }
 
+/// Ticks one gather of a patch of `base` ticks would take this actor with
+/// the good's tool in hand (the planner weighs a missing tool with it).
+pub fn tooled_gather_ticks(world: &World, actor: Entity, base: u32) -> u32 {
+    let with_tool = super::frontier::economy_spec::tuning(world)
+        .map_or(catalog::TOOL_GATHER_PERCENT, |tuning| {
+            tuning.tool_gather_percent
+        });
+    let pace = super::colony::work_pace_percent(world, actor);
+    (u64::from(base) * u64::from(with_tool) * u64::from(pace) / 10_000)
+        .clamp(1, u64::from(u32::MAX)) as u32
+}
+
 /// One completed gather wears the matching tool; a spent tool breaks for good.
 pub(super) fn wear_gather_tool(world: &mut World, actor: Entity, id: SimId, kind: &str) {
     if let Some(tool) = catalog::gather_tool_in(world, kind) {

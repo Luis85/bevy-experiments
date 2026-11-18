@@ -458,6 +458,9 @@ fn live_plan(world: &World, entity: Entity) -> Option<PlanView> {
             goap::PlanStep::Craft { recipe, .. } => {
                 model::plan_step("craft", &display_name(world, recipe))
             }
+            goap::PlanStep::Deliver { kind, .. } => {
+                model::plan_step("deliver", &good_name(world, kind))
+            }
         })
         .collect();
     Some(PlanView {

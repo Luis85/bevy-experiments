@@ -151,7 +151,8 @@ fn a_goap_record_carries_the_goal_and_the_plan_length() {
         run_ticks(app.world_mut(), 300);
         plan = decisions(app.world())
             .into_iter()
-            .find(|(_, _, record)| record["action"] == "life.pursue_goal");
+            // The own-production leaf (`elsewhere` is a second one).
+            .find(|(_, _, record)| record["action"] == "life.pursue_goal" && record["param"] == "");
     }
     let (tick, unit, record) = plan.expect("no resident pursued a GOAP goal in 4800 ticks");
     println!("GOAP_RECORD tick={tick} unit={} {record}", unit.0);

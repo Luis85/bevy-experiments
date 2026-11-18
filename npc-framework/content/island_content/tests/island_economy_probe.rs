@@ -69,6 +69,75 @@ struct Work {
     slices: [[u64; 4]; SLICES],
     /// Labels of residents in their work block who were not working.
     idle: BTreeMap<String, (u64, u64)>,
+    /// Afternoon (slices 5-9) by trade: (in work block, working).
+    trades: BTreeMap<String, (u64, u64)>,
+    /// Afternoon, not working: why the planner has no plan, with whether the
+    /// trade's tool is missing and whether another settlement (or the boat)
+    /// is short of one of the trade's outputs.
+    reasons: BTreeMap<String, u64>,
+    /// Afternoon gathering samples of a good with a gather tool, by trade:
+    /// (gathering it, of them without the tool).
+    bare: BTreeMap<String, (u64, u64)>,
+}
+
+/// Another settlement than the actor's is below its stock target of one of
+/// the trade's outputs and has no living resident of a trade making it:
+/// demand nobody there is planned to meet.
+fn unserved_elsewhere(world: &World, actor: Entity, role: village::Role) -> bool {
+    let home = production::economic_settlement(world, actor);
+    let outputs = catalog::outputs_for(world, role);
+    let mut makers: Vec<(SimId, &str)> = Vec::new();
+    let people: Vec<(Entity, village::Role)> = world
+        .try_query::<(Entity, &Villager)>()
+        .map(|mut q| q.iter(world).map(|(e, p)| (e, p.role)).collect())
+        .unwrap_or_default();
+    for (entity, person) in people {
+        if person == village::Role::Visitor || !village::living(world, entity) {
+            continue;
+        }
+        if let Some(s) = production::economic_settlement(world, entity) {
+            for kind in catalog::outputs_for(world, person) {
+                makers.push((s, kind));
+            }
+        }
+    }
+    village::frontier::settlements::all(world)
+        .into_iter()
+        .filter(|(settlement, _)| Some(*settlement) != home)
+        .any(|(settlement, _)| {
+            outputs.iter().any(|kind| {
+                !makers.contains(&(settlement, *kind))
+                    && village::stock::target(world, settlement, kind)
+                        > village::stock::on_offer(world, settlement, kind)
+            })
+        })
+}
+
+/// The boat's announced order still wants one of the trade's outputs.
+fn boat_order(world: &World, role: village::Role) -> bool {
+    let merchant = world.resource::<village::merchant::Merchant>();
+    catalog::outputs_for(world, role).iter().any(|kind| {
+        merchant
+            .order
+            .iter()
+            .any(|order| order.good == *kind && order.units > order.delivered)
+    })
+}
+
+/// Another settlement than the actor's is below its stock target of one of
+/// the trade's outputs, or the boat's order (at its port) asks for one.
+fn remote_short(world: &World, actor: Entity, role: village::Role) -> bool {
+    let home = production::economic_settlement(world, actor);
+    let outputs = catalog::outputs_for(world, role);
+    village::frontier::settlements::all(world)
+        .into_iter()
+        .filter(|(settlement, _)| Some(*settlement) != home)
+        .any(|(settlement, _)| {
+            outputs.iter().any(|kind| {
+                village::stock::target(world, settlement, kind)
+                    > village::stock::on_offer(world, settlement, kind)
+            })
+        })
 }
 
 fn funded(world: &World, actor: Entity) -> bool {
@@ -109,6 +178,69 @@ fn sample(world: &mut World, work: &mut Work) {
             let entry = work.idle.entry(label.to_owned()).or_default();
             entry.0 += 1;
             entry.1 += u64::from(has);
+        }
+        if (5..10).contains(&slice)
+            && busy
+            && let Some(intent) = world
+                .get::<production::JobIntent>(actor)
+                .filter(|intent| intent.verb == "gather")
+            && let Some(tool) = catalog::gather_tool_in(world, &intent.good)
+        {
+            let role = world.get::<Villager>(actor).expect("villager").role;
+            let row = work.bare.entry(role.key().to_owned()).or_default();
+            row.0 += 1;
+            row.1 += u64::from(village::living::usable_tool(world, actor, tool).is_none());
+        }
+        if (5..10).contains(&slice) {
+            let role = world.get::<Villager>(actor).expect("villager").role;
+            let trade = work.trades.entry(role.key().to_owned()).or_default();
+            trade.0 += 1;
+            trade.1 += u64::from(busy);
+            if !busy {
+                let tool = catalog::role_tool_in(world, role)
+                    .is_some_and(|tool| village::economy::count(world, actor, tool) == 0);
+                let why = village::goap::diagnose(world, actor);
+                let goals: Vec<&str> = if why == "prerequisites unavailable" {
+                    catalog::outputs_for(world, role)
+                        .iter()
+                        .filter(|kind| production::production_demand(world, actor, kind) > 0)
+                        .copied()
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let key = format!(
+                    "{}: {}{}{}{}",
+                    role.key(),
+                    why,
+                    if goals.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" [{}]", goals.join(","))
+                    },
+                    if tool { " +no tool" } else { "" },
+                    if unserved_elsewhere(world, actor, role) {
+                        " +unserved elsewhere"
+                    } else if remote_short(world, actor, role) {
+                        " +short elsewhere"
+                    } else {
+                        ""
+                    },
+                );
+                let key = format!(
+                    "{key}{}",
+                    if boat_order(world, role) {
+                        " +boat order"
+                    } else {
+                        ""
+                    }
+                );
+                *work.reasons.entry(key).or_default() += 1;
+                *work
+                    .reasons
+                    .entry(format!("*all: {}", village::goap::diagnose(world, actor)))
+                    .or_default() += 1;
+            }
         }
     }
 }
@@ -635,6 +767,35 @@ fn probe(seed: u64, days: u64) -> (String, u64, u64) {
     out.push_str(&format!(
         "PROBE seed={seed} not working in the work block: {}\n",
         idle.join(", ")
+    ));
+    let trades: Vec<String> = work
+        .trades
+        .iter()
+        .map(|(role, (n, w))| format!("{role} {}% of {n}", pct(*w, *n)))
+        .collect();
+    out.push_str(&format!(
+        "PROBE seed={seed} afternoon work share by trade: {}\n",
+        trades.join(", ")
+    ));
+    let bare: Vec<String> = work
+        .bare
+        .iter()
+        .map(|(role, (n, b))| format!("{role} {b} of {n}"))
+        .collect();
+    out.push_str(&format!(
+        "PROBE seed={seed} afternoon gathering without the good's tool: {}\n",
+        bare.join(", ")
+    ));
+    let mut reasons: Vec<_> = work.reasons.iter().collect();
+    reasons.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+    let reasons: Vec<String> = reasons
+        .into_iter()
+        .take(28)
+        .map(|(key, n)| format!("{key} {n}"))
+        .collect();
+    out.push_str(&format!(
+        "PROBE seed={seed} afternoon not working, planner reason: {}\n",
+        reasons.join("; ")
     ));
     (out, get(&used, BERRIES), get(&spoiled, BERRIES))
 }

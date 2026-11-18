@@ -173,3 +173,17 @@ before and after the swap. Marker created and deleted.
 | `island_living_world_s7.json` | `e7c08c1cf59eb1aacbdb887eda05de7d29202f6f09f9d5d477b34280656c2e72` |
 | `island_living_world_s11.json` | `058f35ad5c2bb7f8592dd0dc8fb31252ae2c135bd3584206b67dd1115a4f8a73` |
 | `island_living_world_s23.json` | `5922dd4dc8f753c969266dbc9959e473bc8975ab1071e3edf922f52155f82baf` |
+
+## Re-baseline 2026-11-18: wider GOAP (backlog item 8)
+
+Same approval. New leaf parameter `life.pursue_goal elsewhere` and the planner changes: content hash
+`8404440510714457534` (`74a2921da909adbe`) -> `17349830680797832784` (`f0c6fb14b220e650`), and every state hash.
+Old files refused: `content hash mismatch: replay 74a2921da909adbe, this build f0c6fb14b220e650`.
+Recorded into `target/island-split/b8/`, each seed twice, byte-identical; each verifies `"ok":true`, 40 checkpoints,
+before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `c0ddbc692d16f1328a3a40fbe1c55f1476ead8d9caa81e9d68979f8dc16be0ed` |
+| `island_living_world_s11.json` | `a3e82fff0cdfa89644232ec32499349b680c4fe5df6bce881a2bb5d7bf298c26` |
+| `island_living_world_s23.json` | `c3ab5f9a1eb42fdc4e001218f957c832f45d894b0b178dc018d4faaa6613b6c1` |

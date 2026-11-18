@@ -60,6 +60,18 @@ pub struct GoapPolicy {
     pub buy_cost: u32,
     pub gather_cost: u32,
     pub craft_cost: u32,
+    /// Recipe levels a plan may chain below its goal (raw -> intermediate
+    /// -> final is two).
+    pub max_depth: u32,
+    /// States one decision may search over all the goals it tries.
+    pub decision_expansions: u32,
+    /// Funded units over which the time a missing gathering tool saves is
+    /// weighed against the trip to buy it.
+    pub tool_horizon: u32,
+    /// Plan for funded demand no maker is planned to meet (`life.pursue_goal
+    /// elsewhere`): residents' purchases, settlements without a maker, the
+    /// boat's order.
+    pub serve_elsewhere: bool,
 }
 
 impl Default for GoapPolicy {
@@ -70,6 +82,10 @@ impl Default for GoapPolicy {
             buy_cost: 1,
             gather_cost: 1,
             craft_cost: 1,
+            max_depth: 4,
+            decision_expansions: 512,
+            tool_horizon: 8,
+            serve_elsewhere: true,
         }
     }
 }
@@ -132,6 +148,15 @@ impl IslandAiPolicy {
                     .into(),
             );
         }
+        if !(1..=12).contains(&self.goap.max_depth)
+            || !(self.goap.max_expansions..=4096).contains(&self.goap.decision_expansions)
+            || !(1..=16).contains(&self.goap.tool_horizon)
+        {
+            return Err(
+                "island_ai.goap requires max_depth 1..=12, decision_expansions from max_expansions to 4096 and tool_horizon 1..=16"
+                    .into(),
+            );
+        }
         Ok(())
     }
 }
@@ -189,9 +214,13 @@ impl SimHashResource for IslandAiPolicy {
             self.goap.buy_cost,
             self.goap.gather_cost,
             self.goap.craft_cost,
+            self.goap.max_depth,
+            self.goap.decision_expansions,
+            self.goap.tool_horizon,
         ] {
             hash.u32(value);
         }
+        hash.u8(u8::from(self.goap.serve_elsewhere));
     }
     fn snapshot_fns() -> Option<npc_framework::snapshot::ResourceSnapshotFns> {
         Some(npc_framework::snapshot::serde_resource_fns::<Self>())

@@ -135,7 +135,7 @@ is in progress.
 | `life.help` | none | Living world: lend a played friend (bond at a tier that `helps`) a hand in free time, at most once a day each, with every need above `live.help_needs_above`: walk to the homestead and bring one material its upgrade misses (from the pack, or bought at a store on the way), work one stage of `help_work_ticks` at the door, or harvest a ripe bed of the friend's plot. The shipped tree tries it first in `Free time`. | No friend's homestead needs a hand, the resident is not in its leisure block, a need is too low, or the village is gathering. |
 | `life.hunt` | none | A hunter with a spear and funded demand hunts the nearest prey. | Any of those is missing. |
 | `life.build` | none | Work on the cottage commission the resident holds, else walk to a building site of the settlement whose materials are all delivered and work one stage; else, when hired for a played character's homestead upgrade, walk to its door and work one paid stage there. | No commission, no supplied site and no homestead hire. |
-| `life.pursue_goal` | none | GOAP: plan buy, gather and craft steps towards the funded production goal and take the first. | No funded goal, or no plan within the search limits. |
+| `life.pursue_goal` | none, or `elsewhere` | GOAP: plan buy, gather and craft steps towards the funded production goal and take the first; a gathering tool the trade lacks (and the ledger funds) is bought first when the time it saves on the funded units pays for the trip and its share of the price. `elsewhere` (living world) plans instead for funded demand on the island that no maker is planned to meet and the trade can serve: purchases the residents of its own settlement want beyond what its makers are planned to make, the purchases or stock target of a settlement with no maker of the good, and what the boat's announced order still wants beyond the port's makers; the plan ends with `deliver`, carrying up to four units to that settlement's store or stall, or the trading post, where they are on sale as the resident's own. | No funded goal (no demand elsewhere), or no plan within the search limits. |
 | `life.change_job` | none | Take a requested or better-paid vacant workplace. | Nothing changes (the usual case). |
 | `life.equip` | none | Put on a carried coat. | One is worn or none is carried. |
 | `life.sow` | none | A farmer walks to a field of the settlement with a fallow plot and sows it. Seed comes from the field's own seed stock, else from the pack. | Not a farmer, no fallow plot, not a sowing season, too late to ripen before winter, or no seed. |
@@ -262,7 +262,7 @@ lower-priority work.
 | Storm | `life.storm` | craft during work hours, else shelter at home |
 | Sell surplus to the boat | none | while the boat is in or due, carry what it buys to the trading post (above the evening: a long walk to the water is finished, not dropped at dusk) |
 | Leisure | `life.wants_leisure` | greet the played character within 6 m (`life.player_within`, once a day), help a friend, a family evening at home, meet a neighbour (sociable residents), else stroll to the square |
-| Work hours | `life.in_work_window` | change job, build (a `life.site_needs_builder` guard: a supplied site interrupts the lower work), carry building materials, harvest, sow and tend the field, pursue goal (GOAP), craft, hunt, buy materials, gather, store surplus, restock the stall |
+| Work hours | `life.in_work_window` | change job, build (a `life.site_needs_builder` guard: a supplied site interrupts the lower work), carry building materials, harvest, sow and tend the field, restock the stall, store surplus, pursue goal (GOAP), craft, hunt, buy materials, gather, help with the hauling, supply demand elsewhere (GOAP `elsewhere`) |
 | Night | `life.in_sleep_window` | stay home |
 | Player nearby | `life.player_within` 6 m | greet the played character (once a day): a resident with nothing else to do notices it too |
 | (last) | none | seek company, idle |
@@ -412,7 +412,9 @@ entries may share a key; a resident walks to the nearest one.
   "recovery_threshold": 30000,
   "night_recovery_threshold": 85000,
   "goap": {"max_expansions": 128, "max_steps": 12,
-           "buy_cost": 1, "gather_cost": 1, "craft_cost": 1}
+           "buy_cost": 1, "gather_cost": 1, "craft_cost": 1,
+           "max_depth": 4, "decision_expansions": 512, "tool_horizon": 8,
+           "serve_elsewhere": true}
 }
 ```
 
@@ -465,7 +467,10 @@ schedule guards between `Critical hunger` and `Chores` are left out here):
   not start. "X holds, but ..." means the guard passed and its branch failed.
   Conditions are read at the end of the tick the leaf started in.
 - `plan` appears for `life.pursue_goal`: the GOAP goal, the number of steps,
-  the first step, the plan cost and the states searched.
+  the first step, the plan cost, the states searched and `deliver_to`, the
+  store, stall or trading post a plan of `life.pursue_goal elsewhere` ends
+  at (`null` for the resident's own production, or when the goods stay in
+  the pack for sale), and `elsewhere` (`true` for a plan of that leaf).
 - `candidates` appears for `life.craft`: up to three ready recipes with their
   scores, best first.
 - A `UtilitySelector` on the path lists every child with its `score`.
@@ -547,19 +552,76 @@ for each profession; the planner searches over carried goods, remaining seller
 and patch stock, coins and position for the cheapest sequence of buy, gather
 and craft steps that makes one more unit. Only the first step is executed,
 through the ordinary validated action, and the plan is cached for up to 600
-ticks while its first step stays valid. Search is bounded by
-`island_ai.goap`: 8 to 512 expanded states and 1 to 24 steps; the three cost
-multipliers change preference without changing durations or prices. When the
-search finds nothing the leaf fails and the tree tries `life.craft`,
-`life.hunt`, `life.buy inputs` and `life.gather outputs` in turn, so a search
-budget never turns a viable worker into an idle one.
+ticks while its first step stays valid. Every number is an integer and equal
+costs fall back to insertion order over goods, recipes and places sorted by
+key and identity, so the same world always plans the same.
+
+What a plan may contain (economy review npc-ai#9):
+
+- **Chains.** The trade's recipes at its workplace, raw -> intermediate ->
+  final, as one plan: `max_depth` recipe levels below the goal (4; the
+  shipped trades need at most 2, ore -> ingot -> hammer).
+- **Tools.** A trade that gathers with a tool it lacks (a woodcutter without
+  an axe) and whose working tool the ledger funds may plan to buy it first.
+  The search then plans `tool_horizon` (8) funded units at most, and the
+  purchase costs its trip plus the tool's price in the ticks bare-handed
+  gathering takes to earn it, spread over the tool's durability: the tool
+  is bought when the time it saves on the funded units pays for that.
+- **Demand no maker is planned to meet** (`life.pursue_goal elsewhere`,
+  last in `Work hours`, after `Help with the hauling`; without a plan for it
+  a resident looks once every 120 ticks, staggered by identity): what the residents'
+  funded purchases (`production::purchase_target`: a woodcutter's working
+  axe) still want in the resident's own settlement beyond what its makers
+  are planned to make; in a settlement with no maker of the good, those
+  purchases or its stock target, whichever is more; and the boat's announced
+  order beyond what the port's makers are planned to make and what lies at
+  the post. All beyond what is on offer there. A good the resident's own
+  settlement is short of (below its stock target, or wanted by its
+  residents' funded purchases) is never sent to another settlement or the
+  boat, and a plan for them never buys an input the seller's settlement is
+  short of: a hen keeper's grain stays at home. Each demand is shared out in
+  identity order among the makers of that settlement (its own) or of the
+  other settlements. Inputs are bought only up to what the goods fetch, and
+  a raw input nobody offers may be gathered (bare-handed if need be: a smith
+  cutting ore). The plan ends with `deliver`: up to four units (a full load,
+  or what there is once no more can be made) carried to the nearest store or
+  stall of that settlement that takes them, or the trading post, and laid
+  there as the resident's own (consignment). The trip is in the plan's cost.
+  When no store or stall there takes the good (tools wear, so only a stall
+  does), the plan ends at making it: the goods stay in the maker's pack for
+  sale, and the buyers' own plans come for them, until the pack holds the
+  share.
+
+Search is bounded by `island_ai.goap`: 8 to 512 expanded states and 1 to 24
+steps per goal, and `decision_expansions` (from `max_expansions` to 4096)
+over all the goals one decision tries; the three cost multipliers change
+preference without changing durations or prices; `serve_elsewhere: false`
+turns this demand off. When the search finds nothing the leaf fails and
+the tree tries `life.craft`, `life.hunt`, `life.buy inputs` and
+`life.gather outputs` in turn, so a search budget never turns a viable
+worker into an idle one.
+
+What the measurement behind this showed (afternoon work block, seeds 7, 11
+and 23, 14 days, `tests/island_economy_probe.rs`): of the residents not
+working, about 70% had no funded goal of their own, 15 to 25% had
+a plan but were on a chore, and about 10% had a goal whose inputs nobody
+sold or made (turnips and eggs, which come from fields and fed hens; leather
+without hides). A third to a half of the woodcutters' gathering and four
+fifths of the farmers' was bare-handed. The tool step halves the woodcutters'
+bare-handed share and cuts the farmers' by a third. Gathering another trade's
+raw goods is allowed only for demand no maker is planned to meet, where no
+ledger funds a supplier: no own goal lacked a good a patch offers. The trades
+that stay idle (smiths, carpenters, tailors, innkeepers) have little funded
+demand on the island; planning cannot make it. The search itself
+(`village::goap::search`) names no good, trade or place.
 
 ## What is still code
 
 - What each action does, and each condition tests. A new action or condition
   is a Rust function plus one entry in `village/resident/actions.rs` or
   `conditions.rs`.
-- The production ledger that funds goals, and the GOAP search itself.
+- The production ledger that funds goals, the demand no maker is planned to
+  meet (`village::goap::elsewhere`) and the GOAP search itself.
 - Needs decay, exhaustion, cold and death (`village/ai.rs`, `living.rs`).
 
 ## Tests

@@ -25,6 +25,8 @@ pub enum Param {
     OptionalFood,
     /// Nothing, or the key of a recipe.
     OptionalRecipe,
+    /// Nothing, or one of the listed names.
+    OptionalNames(&'static [&'static str]),
     /// A built-in or authored place name, or a position (`{"Pos": [x, z]}`).
     Place,
 }
@@ -52,6 +54,7 @@ const BUY_CLASSES: &[&str] = &[
 const GATHER_CLASSES: &[&str] = &["water", "food", "fuel", "outputs"];
 const SELL_CLASSES: &[&str] = &["surplus"];
 const GREET_TARGETS: &[&str] = &["player"];
+const GOAL_SCOPES: &[&str] = &["elsewhere"];
 const HAUL_CLASSES: &[&str] = &["fuel", "materials", "surplus", "restock", "boat", "help"];
 
 /// A leaf start measured under the profiler row `start.<action>` (S4
@@ -232,11 +235,17 @@ pub const ACTIONS: &[ActionInfo] = &[
     ActionInfo {
         name: "life.pursue_goal",
         start: timed!("life.pursue_goal", pursue_goal),
-        param: Param::None,
+        param: Param::OptionalNames(GOAL_SCOPES),
         always_starts: false,
         doc: "GOAP: plan a sequence of buy, gather and craft steps towards the funded \
-              production goal and take its first step. The plan is cached while it stays \
-              valid. Fails when there is no funded goal or no plan.",
+              production goal and take its first step (a missing gathering tool is bought \
+              first when the time it saves on the funded units pays for the trip). The plan \
+              is cached while it stays valid. Fails when there is no funded goal or no plan. \
+              `elsewhere` (living world) plans instead for funded demand no maker is planned \
+              to meet: residents' purchases beyond their makers' plan, a settlement without \
+              a maker of the good, the boat's order beyond the port's makers; the plan ends \
+              by carrying up to four units to that settlement's store or stall or the \
+              trading post, where they are on sale as the resident's own.",
     },
     ActionInfo {
         name: "life.sell",
@@ -343,6 +352,9 @@ pub(super) fn check(action: &str, param: &ParamValue, context: &Context) -> Resu
             *param == ParamValue::None
                 || name.is_some_and(|name| context.economy.recipe(name).is_some())
         }
+        Param::OptionalNames(names) => {
+            *param == ParamValue::None || name.is_some_and(|name| names.contains(&name))
+        }
         Param::Place => match param {
             ParamValue::Pos(x, z) => context
                 .bounds
@@ -366,6 +378,10 @@ pub(super) fn check(action: &str, param: &ParamValue, context: &Context) -> Resu
         ),
         Param::OptionalFood => "\"None\" or {\"Name\": <food good key>}".to_owned(),
         Param::OptionalRecipe => "\"None\" or {\"Name\": <recipe key>}".to_owned(),
+        Param::OptionalNames(names) => format!(
+            "\"None\" or {{\"Name\": ..}} with one of: {}",
+            names.join(", ")
+        ),
         Param::Place => format!(
             "{{\"Name\": ..}} with one of: {}, or {{\"Pos\": [x, z]}} inside the map",
             super::list(
@@ -922,7 +938,12 @@ fn pursue_goal(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
         param,
         LifeGoal::Work,
         |world, actor| {
-            if !ai::planned_work(world, actor) {
+            let elsewhere = matches!(param, ParamValue::Name(name) if name == "elsewhere");
+            if elsewhere {
+                if !ai::planned_work_in(world, actor, goap::Scope::Elsewhere) {
+                    return Err("no unplanned demand this trade can serve has an executable plan");
+                }
+            } else if !ai::planned_work(world, actor) {
                 return Err("no funded production goal has an executable plan");
             }
             record::detail(world, actor, |world| {
@@ -935,6 +956,8 @@ fn pursue_goal(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
                             "first": memo.plan.steps.first().map(goap::PlanStep::label),
                             "cost": memo.plan.cost,
                             "expanded": memo.plan.expanded,
+                            "elsewhere": memo.plan.elsewhere,
+                            "deliver_to": memo.plan.deliver_to,
                         }})
                     },
                 )

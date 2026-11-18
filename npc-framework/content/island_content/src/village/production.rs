@@ -481,6 +481,7 @@ pub fn job_summary(world: &World, actor: Entity) -> Option<String> {
         "haul" => format!("Carry {good} to a building site"),
         "fetch" => format!("Fetch {good} from the store"),
         "store" => format!("Store {good}"),
+        "deliver" => format!("Carry {good} to sell where they are wanted"),
         "restock" => format!("Restock the stall with {good}"),
         "buy" => format!("Buy {good}"),
         "gather" => format!("Gather {good}"),
