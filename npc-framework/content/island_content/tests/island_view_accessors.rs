@@ -138,6 +138,8 @@ fn effective_schedule_blocks_follow_chronotype_and_diligence() {
             chronotype,
             thrift: 50,
         };
+        // The own day is derived from the traits (review npc-ai#11).
+        resident::refresh_schedule(app.world_mut(), actor);
     };
     set(&mut app, 0, 50);
     let plain = view::schedule_blocks(app.world(), actor);

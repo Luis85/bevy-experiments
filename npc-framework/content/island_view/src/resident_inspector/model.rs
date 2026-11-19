@@ -1,9 +1,9 @@
 //! Pure projections for the resident inspector: need levels, trait words, the
 //! day's schedule and the "Why" text built from a decision record. Nothing
 //! here reads a `World`; the widget layer supplies plain values.
-#[cfg(test)]
-use island_content::village::resident::ScheduleSpec;
 use island_content::village::resident::{BlockKind, DecisionView, ResidentTraits};
+#[cfg(test)]
+use island_content::village::resident::{DayShape, ScheduleBlock, ScheduleSpec};
 use island_content::village::view::Repose;
 use serde_json::Value;
 
@@ -179,38 +179,81 @@ pub(crate) fn contains(from: i32, to: i32, at: i32) -> bool {
     }
 }
 
-/// Whether a resident with `traits` is inside a block of `kind` at `permille`
-/// of the day. The same rule as the simulation's `resident::in_block`: every
-/// block moves with the chronotype, and leisure starts later for the diligent.
-/// The panel reads the simulation's own blocks (`plan_of_blocks`); this is
-/// the reference the tests hold them against.
+/// Whether a resident with `traits`, whose day the `shapes` shape (trade,
+/// then age), is inside a block of `kind` at `permille` of the day. The same
+/// rule as the simulation's own day (`resident::own_blocks`), written the
+/// other way round (the moment moved back, not the blocks forward): a shape's
+/// own blocks replace the world's of their kind, every block moves with the
+/// whole shift but the shared meals and leisure by at most `align_permille`,
+/// edges move, and leisure starts later for the diligent. The panel reads the
+/// simulation's own blocks (`plan_of_blocks`); this is the reference the
+/// tests hold them against.
 #[cfg(test)]
 pub(crate) fn in_slot(
     spec: &ScheduleSpec,
     traits: ResidentTraits,
+    shapes: &[&DayShape],
     kind: BlockKind,
     permille: i32,
 ) -> bool {
-    let at = (permille - traits.chronotype * spec.chronotype_shift / 100).rem_euclid(1000);
-    spec.blocks
+    let replaced = shapes
         .iter()
-        .filter(|block| block.kind == kind)
-        .any(|block| {
-            if kind != BlockKind::Leisure {
-                return contains(block.from, block.to, at);
-            }
-            let length = if block.to > block.from {
-                block.to - block.from
-            } else {
-                block.to + 1000 - block.from
-            };
-            let delay = (traits.diligence - 50) * spec.diligence_shift / 50;
-            delay < length && contains((block.from + delay).rem_euclid(1000), block.to, at)
-        })
+        .rposition(|shape| shape.blocks.iter().any(|block| block.kind == kind));
+    let candidates: Vec<(ScheduleBlock, bool)> = match replaced {
+        Some(index) => shapes[index]
+            .blocks
+            .iter()
+            .filter(|block| block.kind == kind)
+            .map(|block| (*block, false))
+            .collect(),
+        None => spec
+            .blocks
+            .iter()
+            .filter(|block| block.kind == kind)
+            .map(|block| (*block, true))
+            .collect(),
+    };
+    let whole = traits.chronotype * spec.chronotype_shift / 100
+        + shapes.iter().map(|shape| shape.shift).sum::<i32>();
+    let early: i32 = shapes
+        .iter()
+        .flat_map(|shape| &shape.edges)
+        .filter(|edge| edge.kind == kind)
+        .map(|edge| edge.from)
+        .sum();
+    let late: i32 = shapes
+        .iter()
+        .flat_map(|shape| &shape.edges)
+        .filter(|edge| edge.kind == kind)
+        .map(|edge| edge.to)
+        .sum();
+    let delay = if kind == BlockKind::Leisure {
+        (traits.diligence - 50) * spec.diligence_shift / 50
+    } else {
+        0
+    };
+    candidates.into_iter().any(|(block, shared)| {
+        let moved = if shared && matches!(kind, BlockKind::Meal | BlockKind::Leisure) {
+            whole.clamp(-spec.align_permille, spec.align_permille)
+        } else {
+            whole
+        };
+        let span = (block.to - block.from).rem_euclid(1000);
+        let span = if span == 0 { 1000 } else { span };
+        let length = span + late - early - delay;
+        let at = (permille - moved).rem_euclid(1000);
+        length >= 1000
+            || (length > 0 && (at - (block.from + early + delay)).rem_euclid(1000) < length)
+    })
 }
 
 #[cfg(test)]
-fn slot_of(spec: &ScheduleSpec, traits: ResidentTraits, permille: i32) -> Slot {
+fn slot_of(
+    spec: &ScheduleSpec,
+    traits: ResidentTraits,
+    shapes: &[&DayShape],
+    permille: i32,
+) -> Slot {
     // Blocks overlap: the one the resident's tree serves first shows
     // (sleep, then a meal, then leisure, then work).
     for (kind, slot) in [
@@ -219,7 +262,7 @@ fn slot_of(spec: &ScheduleSpec, traits: ResidentTraits, permille: i32) -> Slot {
         (BlockKind::Leisure, Slot::Leisure),
         (BlockKind::Work, Slot::Work),
     ] {
-        if in_slot(spec, traits, kind, permille) {
+        if in_slot(spec, traits, shapes, kind, permille) {
             return slot;
         }
     }
@@ -424,12 +467,16 @@ pub(crate) fn repose_word(repose: Repose) -> Option<&'static str> {
 }
 
 /// The reference for [`plan_of_blocks`]: the same day from the world's
-/// schedule and the resident's traits.
+/// schedule, the resident's traits and the shapes of its trade and age.
 #[cfg(test)]
-pub(crate) fn day_plan(spec: &ScheduleSpec, traits: ResidentTraits) -> Vec<Segment> {
+pub(crate) fn day_plan(
+    spec: &ScheduleSpec,
+    traits: ResidentTraits,
+    shapes: &[&DayShape],
+) -> Vec<Segment> {
     let mut plan: Vec<Segment> = Vec::new();
     for permille in 0..1000 {
-        let slot = slot_of(spec, traits, permille);
+        let slot = slot_of(spec, traits, shapes, permille);
         match plan.last_mut() {
             Some(last) if last.slot == slot => last.to = permille + 1,
             _ => plan.push(Segment {

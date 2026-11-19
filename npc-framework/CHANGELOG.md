@@ -10,6 +10,53 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Every resident keeps its own day (review npc-ai#11). `resident::OwnSchedule` (hash name `island_own_schedule_v1`,
+  saved) holds the resident's blocks, derived once from data (`resident::own_blocks`) when its tree is assigned
+  (founding, settling, coming of age, a change of trade, becoming an elder) and when the behaviour data is replaced:
+  the trade's new `economy.professions[].day` shape (`shift`, `edges`, own `blocks` replacing the world's blocks of
+  their kind), then for an elder the new `behavior.schedule.elder` (shipped: 20 permille earlier, work ends 60
+  earlier); the whole shift is chronotype x `chronotype_shift` / 100 plus the shapes' shifts; overlap rule: meals and
+  the world's own leisure move by at most the new `schedule.align_permille` (40), work, sleep and a shape's own blocks
+  by the whole shift; diligence delays leisure as before; a shape may not move or replace a meal. Shipped trade data:
+  baker `edges` work start and bedtime -40 (no whole-day shift: its evening and the shared leisure stay), fisher
+  `shift` -30, innkeeper +60 with its own afternoon leisure (300-370) in place of the evening.
+  Every block check reads it in O(blocks): the `life.in_*_window` guards, bedtime, the sit-down meal
+  (`meal_block`), a night's sleep (`indoors::night_left`), fits-before-rest, friendship steering, and the
+  inspector's Day tab (`view::schedule_blocks`); an actor without one (a visitor) gets the rule on the fly. A
+  resident's day is the old one exactly when its trade has no shape and it is not an elder. Spec fields are hashed
+  and validated; `ISLAND_SAVE_VERSION` 8; content and state hashes change, island replays to be re-baselined. Tests:
+  `island_own_schedule` (8); the inspector's reference `in_slot`/`day_plan` take the shapes, and three tests that
+  edit `ResidentTraits` directly now call `resident::refresh_schedule` (mechanical). New ignored probe
+  `island_schedule_probe`. Two mechanisms follow the own day: free-time errands with a destination keep to the
+  resident's own bedtime (`resident::fits_before_bed`, `resident::walk_ticks`: route estimate at its own pace): a
+  friend sets out to help a homestead, and a sociable resident walks to a friend beyond 15 m, only when the walk and
+  the task (the help work, a meeting's `chat_ticks`) end before its sleep block; and the funded plan funds a coat for
+  a resident who wears none and carries none with today's water and food, before stock for the days ahead (planned
+  after that stock its bid was the coin left over, below what any tailor takes: in seed 11's 14-day audit a coatless
+  tanner with 30-40 coins went without while tailors held 22 unsold coats at 27, and "warm garment production
+  stopped" failed). Measured before -> after (14 days, seeds 7/11/23): physical work 5.4/5.2/4.9% -> 5.0/5.0/5.1% of
+  resident samples (1.2/1.2/1.1 -> 1.2/1.2/1.2 h a day); meetings per resident-day 1.57/1.66/1.18 ->
+  1.40/1.48/1.10; sit-down meals missed 7.6/10.0/8.5% -> 5.7/7.8/9.8% of resident-days; inn visits per 100
+  resident-days 10/6/6 -> 9/10/8. 14-day audit passes on 7/11/23 (Hunger low 37454/36404/36052 -> 37062/34838/19812,
+  p5 42812/43156/42868 -> 43060/43288/40356; Warmth low 48154/47316/38860 -> 41374/48404/31642; job changes 43/22/32
+  -> 46/62/51), and with `chat_ticks` 201 (Hunger low 21918/33456/32520, Warmth low 48154/41204/31642). One shipped
+  year: built 27/24/23 -> 33/25/26, cancelled 0, no deaths; bread made 1064/1120/1040 -> 1172/1196/1088; bread
+  imported 88/47/42 -> 51/41/73 (mean 59 -> 55); eggs made 236/168/174 -> 180/192/148; with `chat_ticks` 201: built
+  31/23/27, bread imported 61/41/76, eggs 196/184/130. Traces (temporary diagnostics, the shapes switched on and off
+  by data): with every shape off the run is the old one exactly on all three seeds. A first version shifted the
+  baker's whole day -40, which also ended its working day an hour sooner (the shared leisure moves with it), so
+  evening baking (hours 13-15 after dawn: 13/12/14 -> 5/9/6 tenths of an hour a day) went to the dark hour before
+  dawn, bread made fell and bread imported rose (mean 59 -> 70); flour was on offer all day in every run (22-33
+  units), so the miller keeps the world's day. Edges only keep the evening and add the early hour. A seed 7 Warmth
+  low of 22922 in that first version was a tanner (no shape, the world's hours) whose coat wore out on day 8 of that
+  trajectory, walking far to buy food on a snow day; the same build with `chat_ticks` 201 gave 45394. With the owner's approval one test's setup
+  changed: `island_live_homestead::a_homestead_life_uses_every_live_verb_and_the_village_stays_healthy` runs on a
+  12000-tick day (its own `DAY`; the file's other tests keep 6000), every assertion as written. On 6000-tick days no
+  helper could walk to the cottage and work its 300 ticks before its own bedtime: at the start of the evening the most
+  time any of the 13 neighbours had before bed was 516 ticks and the shortest walk 362; before this change helpers set
+  out, were sent home at bedtime, and one late riser's work happened to finish after its own bedtime. Seed 11 tick rate at day 7,
+  two paired runs: 285/365 -> 314/393 ticks/s (a different day-7 world, 44 against 45 residents).
+
 - Friendship steers meetings (review npc-ai#10), in free time only (the leisure block or a gathering; in working
   hours "Seek company" stays nearest-first and nobody walks to a friend). Whom a free resident meets now weighs its bond (`economy.live.tiers`
   by its own `SocialLife.affinity`): each tier above stranger counts as `schedule.bond_pull_mm` (3000) mm less

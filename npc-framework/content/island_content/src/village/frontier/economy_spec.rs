@@ -216,6 +216,13 @@ pub struct ProfessionDef {
     /// The behaviour tree its workers run (S3.1); none: the default tree.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tree: Option<String>,
+    /// How the trade shapes its workers' day (review npc-ai#11): an early
+    /// start, an evening shift, an afternoon off. Empty: the world's day.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::village::resident::DayShape::is_empty"
+    )]
+    pub day: crate::village::resident::DayShape,
 }
 
 /// What a hunting trade hunts with and what one hunt yields.
@@ -1056,10 +1063,12 @@ fn profession(role: Role, station: &str, aptitudes: &[Role]) -> ProfessionDef {
         sows: false,
         display: String::new(),
         tree: None,
+        day: crate::village::resident::DayShape::default(),
     }
 }
 
 fn default_professions() -> Vec<ProfessionDef> {
+    use crate::village::resident::{BlockEdges, BlockKind, DayShape, ScheduleBlock};
     use Role::{
         Baker, Carpenter, Farmer, Fisher, Hunter, Innkeeper, Miller, Miner, Smith, Tailor, Tanner,
         WaterKeeper, Woodcutter,
@@ -1112,6 +1121,26 @@ fn default_professions() -> Vec<ProfessionDef> {
             }],
             essential: true,
             endowment: stacks(&[(COOKED_MEAL, 2)]),
+            // The bakery is warm before dawn (review npc-ai#11): work starts
+            // and bedtime comes 40 permille earlier. Only those edges move;
+            // a whole-day shift moved the end of the bakers' day too, so
+            // evening baking went to the dark hours before dawn and less
+            // bread was made.
+            day: DayShape {
+                edges: vec![
+                    BlockEdges {
+                        kind: BlockKind::Work,
+                        from: -40,
+                        to: 0,
+                    },
+                    BlockEdges {
+                        kind: BlockKind::Sleep,
+                        from: -40,
+                        to: -40,
+                    },
+                ],
+                ..DayShape::default()
+            },
             ..profession(Baker, BAKE, &grain)
         },
         ProfessionDef {
@@ -1176,6 +1205,17 @@ fn default_professions() -> Vec<ProfessionDef> {
                 .collect(),
             template: "smith".into(),
             service: Some(ServiceDef { wage_floor: 8 }),
+            // The inn is busiest in the others' evening: its keeper works
+            // into the night and takes the afternoon off.
+            day: DayShape {
+                shift: 60,
+                edges: Vec::new(),
+                blocks: vec![ScheduleBlock {
+                    kind: BlockKind::Leisure,
+                    from: 300,
+                    to: 370,
+                }],
+            },
             ..profession(Innkeeper, INN, &[Innkeeper, Baker, Miller, WaterKeeper])
         },
         ProfessionDef {
@@ -1218,6 +1258,11 @@ fn default_professions() -> Vec<ProfessionDef> {
                 reserve_inputs: false,
             }],
             endowment: stacks(&[(FISH, 2), (FISHING_ROD, 1)]),
+            // Out on the water at first light.
+            day: DayShape {
+                shift: -30,
+                ..DayShape::default()
+            },
             ..profession(Fisher, INN, &land)
         },
         // Keeps the hens of the hen house: feeds them grain or turnips and
@@ -2063,6 +2108,7 @@ impl EconomySpec {
             h.u8(u8::from(entry.sows));
             h.str(&entry.display);
             h.opt(entry.tree.as_ref(), |h, tree| h.str(tree));
+            entry.day.sim_hash(h);
         }
         h.u32(self.patches.len() as u32);
         for patch in &self.patches {

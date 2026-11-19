@@ -404,7 +404,7 @@ fn need_levels_follow_the_thresholds() {
 #[test]
 fn the_day_strip_follows_the_schedule_and_the_residents_own_hours() {
     let spec = ScheduleSpec::default();
-    let plan = day_plan(&spec, ResidentTraits::NEUTRAL);
+    let plan = day_plan(&spec, ResidentTraits::NEUTRAL, &[]);
     let slots: Vec<(Slot, i32, i32)> = plan
         .iter()
         .map(|segment| (segment.slot, segment.from, segment.to))
@@ -438,7 +438,7 @@ fn the_day_strip_follows_the_schedule_and_the_residents_own_hours() {
         chronotype: 100,
         ..ResidentTraits::NEUTRAL
     };
-    let late = day_plan(&spec, owl);
+    let late = day_plan(&spec, owl, &[]);
     assert_eq!(
         (late[0].slot, late[0].from, late[0].to),
         (Slot::Sleep, 0, 25)
@@ -480,6 +480,7 @@ fn the_day_strip_follows_the_schedule_and_the_residents_own_hours() {
     assert!(in_slot(
         &spec,
         ResidentTraits::NEUTRAL,
+        &[],
         BlockKind::Leisure,
         neutral_at(block.from + 1)
     ));
@@ -487,6 +488,7 @@ fn the_day_strip_follows_the_schedule_and_the_residents_own_hours() {
         assert!(!in_slot(
             &spec,
             keen,
+            &[],
             BlockKind::Leisure,
             keen_at(block.from + 1)
         ));
@@ -494,6 +496,7 @@ fn the_day_strip_follows_the_schedule_and_the_residents_own_hours() {
     assert!(in_slot(
         &spec,
         keen,
+        &[],
         BlockKind::Leisure,
         keen_at(block.from + shift + 1)
     ));
@@ -521,6 +524,28 @@ fn residents(world: &World) -> Vec<(SimId, Entity)> {
         .collect()
 }
 
+/// The day shapes of a resident's trade and age, from the data (review
+/// npc-ai#11): the reference picks them as the simulation does.
+fn shapes_of(world: &World, entity: Entity) -> Vec<&resident::DayShape> {
+    let mut shapes = Vec::new();
+    if let Some(definition) = world.get::<Villager>(entity).and_then(|person| {
+        island_content::village::frontier::economy_spec::registry(world)?.definition(person.role)
+    }) {
+        shapes.push(&definition.day);
+    }
+    if island_content::village::demography::stage(world, entity)
+        == island_content::village::demography::LifeStage::Elder
+    {
+        shapes.push(
+            &resident::spec(world)
+                .expect("behaviour data")
+                .schedule
+                .elder,
+        );
+    }
+    shapes
+}
+
 #[test]
 fn the_strip_agrees_with_the_simulations_own_schedule_test() {
     let mut app = living_world();
@@ -531,6 +556,7 @@ fn the_strip_agrees_with_the_simulations_own_schedule_test() {
         let now = resident::day_permille(world);
         for (id, entity) in residents(world) {
             let traits = resident::traits(world, entity);
+            let shapes = shapes_of(world, entity);
             for kind in [
                 BlockKind::Work,
                 BlockKind::Meal,
@@ -538,7 +564,7 @@ fn the_strip_agrees_with_the_simulations_own_schedule_test() {
                 BlockKind::Sleep,
             ] {
                 assert_eq!(
-                    in_slot(&spec.schedule, traits, kind, now),
+                    in_slot(&spec.schedule, traits, &shapes, kind, now),
                     resident::in_block(world, entity, kind),
                     "resident {} {kind:?} at {now}",
                     id.0
@@ -552,7 +578,7 @@ fn the_strip_agrees_with_the_simulations_own_schedule_test() {
                 .collect();
             assert_eq!(
                 plan_of_blocks(&blocks),
-                day_plan(&spec.schedule, traits),
+                day_plan(&spec.schedule, traits, &shapes),
                 "resident {}",
                 id.0
             );

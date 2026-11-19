@@ -70,6 +70,8 @@ fn trio(day: u64, permille: u64, offsets: [i32; 2]) -> Trio {
         traits.sociability = 90;
         traits.chronotype = 0;
         traits.diligence = 50;
+        // The own day is derived from the traits (review npc-ai#11).
+        island_content::village::resident::refresh_schedule(app.world_mut(), actor);
     }
     let mut grid = app.world_mut().resource_mut::<SpatialGrid>();
     for z in -20..=20 {

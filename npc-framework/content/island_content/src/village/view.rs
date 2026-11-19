@@ -5,7 +5,7 @@
 //! regional profile, so a view can call them unconditionally.
 pub mod economy;
 use super::frontier::life_spec::{Shock, Weather};
-use super::resident::{BlockKind, ResidentTraits};
+use super::resident::BlockKind;
 use super::{Season, demography, fields, merchant, resident, weather};
 use bevy_ecs::prelude::*;
 pub use economy::{
@@ -193,49 +193,25 @@ pub struct ScheduleBlockView {
     /// The same in ticks of the day.
     pub from_tick: u64,
     pub to_tick: u64,
-    /// The resident is inside the block now.
+    /// The resident is inside a block of this kind now.
     pub active: bool,
 }
 
-/// The effective schedule of a resident: the world's blocks shifted by the
-/// resident's chronotype, with leisure delayed by diligence. A leisure block
-/// the delay swallows is left out.
+/// The resident's own day (`resident::OwnSchedule`): the world's blocks
+/// after its hours, its trade and its age, with leisure delayed by diligence.
+/// A block the delay or a shape swallows is left out.
 pub fn schedule_blocks(world: &World, entity: Entity) -> Vec<ScheduleBlockView> {
-    let Some(spec) = resident::spec(world) else {
-        return Vec::new();
-    };
-    let traits: ResidentTraits = resident::traits(world, entity);
-    let schedule = &spec.schedule;
     let day_length = world.resource::<SimConfig>().day_length.max(1);
-    let shift = traits.chronotype * schedule.chronotype_shift / 100;
     let ticks = |permille: i32| permille as u64 * day_length / 1000;
-    schedule
-        .blocks
+    resident::schedule_of(world, entity)
         .iter()
-        .filter_map(|block| {
-            let mut from = block.from;
-            if block.kind == BlockKind::Leisure {
-                let length = if block.to > block.from {
-                    block.to - block.from
-                } else {
-                    block.to + 1000 - block.from
-                };
-                let delay = (traits.diligence - 50) * schedule.diligence_shift / 50;
-                if delay >= length {
-                    return None;
-                }
-                from += delay;
-            }
-            let from = (from + shift).rem_euclid(1000);
-            let to = (block.to + shift).rem_euclid(1000);
-            Some(ScheduleBlockView {
-                kind: block.kind,
-                from_permille: from,
-                to_permille: to,
-                from_tick: ticks(from),
-                to_tick: ticks(to),
-                active: resident::in_block(world, entity, block.kind),
-            })
+        .map(|block| ScheduleBlockView {
+            kind: block.kind,
+            from_permille: block.from,
+            to_permille: block.to,
+            from_tick: ticks(block.from),
+            to_tick: ticks(block.to),
+            active: resident::in_block(world, entity, block.kind),
         })
         .collect()
 }

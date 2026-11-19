@@ -165,16 +165,11 @@ pub fn asleep(world: &World, actor: Entity) -> bool {
 
 /// Ticks left of the resident's own sleep block; `None` outside it.
 fn night_left(world: &World, actor: Entity) -> Option<u64> {
-    let spec = super::resident::spec(world)?;
     if !super::resident::in_block(world, actor, BlockKind::Sleep) {
         return None;
     }
-    let shift =
-        super::resident::traits(world, actor).chronotype * spec.schedule.chronotype_shift / 100;
-    let at = (super::resident::day_permille(world) - shift).rem_euclid(1000);
-    let end = spec
-        .schedule
-        .blocks
+    let at = super::resident::day_permille(world);
+    let end = super::resident::schedule_of(world, actor)
         .iter()
         .filter(|block| block.kind == BlockKind::Sleep)
         .map(|block| (block.to - at).rem_euclid(1000))

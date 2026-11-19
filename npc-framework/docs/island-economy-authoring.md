@@ -107,6 +107,7 @@ all of its properties are data.
 | `template`, `flexible_template` | Actor template of a founder |
 | `essential` | The settlement keeps its last worker of this profession |
 | `endowment` | Goods a founder starts with, besides `seed.common` and the tool |
+| `day` | How the trade shapes its workers' day: `shift`, `edges`, own `blocks` (an early start, an evening shift, an afternoon off); see "Every resident's own day" in `island-ai-authoring.md`. Meals stay shared. |
 
 ### Patches
 

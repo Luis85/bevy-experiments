@@ -12,6 +12,7 @@
 //! [`conditions::CONDITIONS`]; `docs/island-ai-authoring.md` is the guide.
 pub mod actions;
 pub mod conditions;
+pub mod day;
 pub mod param;
 pub mod record;
 pub mod replace;
@@ -25,6 +26,7 @@ use npc_framework::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 
+pub use day::{BlockEdges, DayShape, OwnSchedule, own_blocks, refresh_schedule, schedule_of};
 pub use record::{ConsideredOption, DecisionTrace, DecisionView, decision, explain};
 
 pub const BEHAVIOR_VERSION: u32 = 1;
@@ -234,7 +236,7 @@ impl Default for TraitSpec {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockKind {
     Work,
@@ -246,7 +248,7 @@ pub enum BlockKind {
 /// A daily window in permille of the day, `from` inclusive, `to` exclusive.
 /// 0 is dawn; with the shipped 30% night, night falls at 700. `from > to`
 /// wraps past midnight.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[serde(deny_unknown_fields)]
 pub struct ScheduleBlock {
     pub kind: BlockKind,
@@ -262,6 +264,14 @@ pub struct ScheduleSpec {
     pub chronotype_shift: i32,
     /// Permille of the day leisure starts later at diligence 100 (earlier at 0).
     pub diligence_shift: i32,
+    /// The shared blocks (meals, and the world's leisure where a trade keeps
+    /// it) move by at most this many permille, whatever a resident's hours,
+    /// trade and age add up to, so meals and free time stay shared (review
+    /// npc-ai#11). Work and sleep take the whole shift.
+    pub align_permille: i32,
+    /// How an elder's day differs (`demography.elder_age_seasons`): applied
+    /// after the trade's own shape.
+    pub elder: DayShape,
     /// During a meal block a resident carrying food eats below this Hunger.
     pub meal_hunger_threshold: i32,
     /// Ticks a meeting lasts; it pays its morale and affinity at the end.
@@ -304,6 +314,18 @@ impl Default for ScheduleSpec {
             ],
             chronotype_shift: 25,
             diligence_shift: 40,
+            align_permille: 40,
+            // Elders rise and go to bed a little earlier and stop work an
+            // hour and a half before the others.
+            elder: DayShape {
+                shift: -20,
+                edges: vec![BlockEdges {
+                    kind: BlockKind::Work,
+                    from: 0,
+                    to: -60,
+                }],
+                blocks: Vec::new(),
+            },
             meal_hunger_threshold: 60_000,
             chat_ticks: 200,
             chat_break_mm: 3000,
@@ -426,6 +448,21 @@ impl BehaviorSpec {
                  and meal_hunger_threshold in 1..=100000"
                     .into(),
             );
+        }
+        if !(0..=200).contains(&schedule.align_permille) {
+            return Err("behavior.schedule needs align_permille in 0..=200".into());
+        }
+        schedule.elder.validate("behavior.schedule.elder")?;
+        for entry in &economy.professions {
+            entry
+                .day
+                .validate(&format!("profession `{}` day", entry.role.key()))?;
+            if entry.day.shift.abs() + schedule.elder.shift.abs() > 200 {
+                return Err(format!(
+                    "profession `{}` day: its shift and the elder's add up to more than 200                      permille",
+                    entry.role.key()
+                ));
+            }
         }
         if !(0..=15_000).contains(&schedule.bond_pull_mm)
             || schedule.curious_permille > 1000
@@ -551,6 +588,8 @@ impl BehaviorSpec {
         }
         h.i32(self.schedule.chronotype_shift);
         h.i32(self.schedule.diligence_shift);
+        h.i32(self.schedule.align_permille);
+        self.schedule.elder.sim_hash(h);
         h.i32(self.schedule.meal_hunger_threshold);
         h.u64(self.schedule.chat_ticks);
         h.i32(self.schedule.chat_break_mm);
@@ -849,7 +888,7 @@ pub fn day_permille(world: &World) -> i32 {
     (world.resource::<SimClock>().tick % day * 1000 / day) as i32
 }
 
-fn contains(from: i32, to: i32, at: i32) -> bool {
+pub(crate) fn contains(from: i32, to: i32, at: i32) -> bool {
     if from <= to {
         from <= at && at < to
     } else {
@@ -857,39 +896,20 @@ fn contains(from: i32, to: i32, at: i32) -> bool {
     }
 }
 
-/// Whether `actor` is inside a schedule block of `kind` now. Every block moves
-/// with the resident's chronotype; leisure also starts later for the diligent.
+/// Whether `actor` is inside a block of `kind` of its own day now
+/// ([`OwnSchedule`]: the world's blocks after the resident's hours, trade and
+/// age, review npc-ai#11).
 pub fn in_block(world: &World, actor: Entity, kind: BlockKind) -> bool {
     in_block_at(world, actor, kind, world.resource::<SimClock>().tick)
 }
 
 /// [`in_block`] at another tick of the clock.
 pub fn in_block_at(world: &World, actor: Entity, kind: BlockKind, tick: u64) -> bool {
-    let Some(spec) = spec(world) else {
-        return false;
-    };
-    let traits = traits(world, actor);
-    let schedule = &spec.schedule;
     let day = world.resource::<SimConfig>().day_length.max(1);
-    let permille = (tick % day * 1000 / day) as i32;
-    let at = (permille - traits.chronotype * schedule.chronotype_shift / 100).rem_euclid(1000);
-    schedule
-        .blocks
+    let at = (tick % day * 1000 / day) as i32;
+    schedule_of(world, actor)
         .iter()
-        .filter(|block| block.kind == kind)
-        .any(|block| {
-            if kind != BlockKind::Leisure {
-                return contains(block.from, block.to, at);
-            }
-            // `from < to` up to a whole day; `from > to` wraps past dawn.
-            let length = if block.to > block.from {
-                block.to - block.from
-            } else {
-                block.to + 1000 - block.from
-            };
-            let delay = (traits.diligence - 50) * schedule.diligence_shift / 50;
-            delay < length && contains((block.from + delay).rem_euclid(1000), block.to, at)
-        })
+        .any(|block| block.kind == kind && contains(block.from, block.to, at))
 }
 
 /// The resident whose work leaf (a leaf of goal `Work`) is starting its step
@@ -919,18 +939,54 @@ pub fn fits_before_rest(world: &World, actor: Entity, ticks: u64) -> bool {
     if resting(now) {
         return true;
     }
-    // Blocks are at least a few permille long: a step of a tenth of a
-    // percent of the day cannot jump over one.
+    !reached_within(world, now, ticks, resting)
+}
+
+/// Whether `inside` holds at some tick after `now` and up to `now + ticks`.
+/// Blocks are at least a few permille long: a step of a tenth of a percent of
+/// the day cannot jump over one.
+fn reached_within(world: &World, now: u64, ticks: u64, inside: impl Fn(u64) -> bool) -> bool {
     let step = (world.resource::<SimConfig>().day_length / 1000).max(1);
     let end = now.saturating_add(ticks);
     let mut at = now;
     while at < end {
         at = at.saturating_add(step).min(end);
-        if resting(at) {
-            return false;
+        if inside(at) {
+            return true;
         }
     }
-    true
+    false
+}
+
+/// Whether a free-time errand of `ticks` (the walk there and the task) that
+/// `actor` would start now is done before its own bedtime: it is not in its
+/// sleep block now and none begins within the errand (review npc-ai#11). An
+/// errand it cannot finish in time is not started, so nobody sets out on a
+/// walk that bedtime breaks off.
+pub fn fits_before_bed(world: &World, actor: Entity, ticks: u64) -> bool {
+    let now = world.resource::<SimClock>().tick;
+    let asleep = |tick: u64| in_block_at(world, actor, BlockKind::Sleep, tick);
+    !asleep(now) && !reached_within(world, now, ticks, asleep)
+}
+
+/// Ticks `actor` needs to walk from where it stands through `legs` at its own
+/// pace: the route estimate of each leg, else the straight line.
+pub fn walk_ticks(world: &World, actor: Entity, legs: &[SimPos]) -> u64 {
+    let Some(mut from) = world.get::<SimPos>(actor).copied() else {
+        return 0;
+    };
+    let speed = world
+        .get::<super::Villager>(actor)
+        .map_or(1, |person| person.base_speed.max(1)) as u64;
+    let mut distance = 0_u64;
+    for to in legs {
+        distance += super::frontier::routes::estimate(world, from, *to).map_or_else(
+            || from.dist2(*to).max(0).isqrt() as u64,
+            |route| u64::from(route.distance_mm),
+        );
+        from = *to;
+    }
+    distance.div_ceil(speed)
 }
 
 /// Whether `actor` spends its free time in company: sociability at least
@@ -1009,6 +1065,7 @@ pub(super) fn register(app: &mut App) {
         .init_resource::<WorkStart>()
         .register_sim_component::<ResidentTraits>()
         .register_sim_component::<DayRhythm>()
+        .register_sim_component::<OwnSchedule>()
         .register_sim_component::<super::ai::Errand>()
         .register_command::<replace::ReplaceBehavior>();
     for action in actions::ACTIONS {
@@ -1074,6 +1131,8 @@ pub fn tree_for(world: &World, actor: Entity) -> Option<npc_framework::ai::TreeI
 /// Gives `actor` the tree [`tree_for`] names, stopping its running leaf
 /// through the one teardown path when the tree changes.
 pub fn assign_tree(world: &mut World, actor: Entity) {
+    // The day follows the trade and the life stage as the tree does.
+    refresh_schedule(world, actor);
     let Some(tree) = tree_for(world, actor) else {
         return;
     };
@@ -1095,6 +1154,7 @@ pub fn assign_tree(world: &mut World, actor: Entity) {
 /// Stops `actor`'s running leaf and gives it a fresh brain on the tree
 /// [`tree_for`] names (after the trees were replaced, every id is new).
 pub fn reset_brain(world: &mut World, actor: Entity) {
+    refresh_schedule(world, actor);
     if world.get::<ActiveLeaf>(actor).is_some() {
         super::behavior::stop(world, actor, npc_framework::ai::StopReason::Aborted);
     }
@@ -1125,19 +1185,10 @@ impl SimHash for DayRhythm {
     }
 }
 
-/// The day, while `actor` is in a meal block (none outside one).
+/// The day, while `actor` is in a meal block of its own day (none outside one).
 pub fn meal_block(world: &World, actor: Entity) -> Option<u64> {
-    let spec = spec(world)?;
-    let traits = traits(world, actor);
-    let schedule = &spec.schedule;
-    let at = (day_permille(world) - traits.chronotype * schedule.chronotype_shift / 100)
-        .rem_euclid(1000);
     let day = world.resource::<SimClock>().tick / world.resource::<SimConfig>().day_length.max(1);
-    schedule
-        .blocks
-        .iter()
-        .any(|block| block.kind == BlockKind::Meal && contains(block.from, block.to, at))
-        .then_some(day)
+    in_block(world, actor, BlockKind::Meal).then_some(day)
 }
 
 /// Marks that the travel of the leaf being started was abandoned for good.

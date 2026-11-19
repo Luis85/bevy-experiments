@@ -118,7 +118,15 @@ fn lowest_resident_need(world: &World) -> i32 {
 
 #[test]
 fn a_homestead_life_uses_every_live_verb_and_the_village_stays_healthy() {
-    let mut app = world_with(quiet);
+    // This scene's day is half the shipped one, not a quarter: a friend sets
+    // out to help only when the walk and the work end before its own bedtime
+    // (review npc-ai#11), and on a 6000-tick day no evening holds the walk to
+    // the cottage and 300 ticks of work. Every wait below counts in this day.
+    const DAY: u64 = 12_000;
+    let mut app = world_with(|world| {
+        quiet(world);
+        short_days(world, DAY);
+    });
     set_journal(app.world_mut(), true, false);
     let id = app.world().resource::<village::VillageState>().played;
     let actor = entity(app.world(), id);

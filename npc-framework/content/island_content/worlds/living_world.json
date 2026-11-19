@@ -1736,6 +1736,12 @@
         },
         {
           "role": "baker",
+          "day": {
+            "edges": [
+              {"kind": "work", "from": -40},
+              {"kind": "sleep", "from": -40, "to": -40}
+            ]
+          },
           "station": "village_bake",
           "outputs": [
             "bread",
@@ -1933,6 +1939,10 @@
         },
         {
           "role": "innkeeper",
+          "day": {
+            "shift": 60,
+            "blocks": [{"kind": "leisure", "from": 300, "to": 370}]
+          },
           "station": "village_inn",
           "wants": [
             "log",
@@ -2076,6 +2086,7 @@
         },
         {
           "role": "fisher",
+          "day": {"shift": -30},
           "station": "village_inn",
           "outputs": [
             "village_fish"

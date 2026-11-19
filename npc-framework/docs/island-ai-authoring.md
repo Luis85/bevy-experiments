@@ -167,6 +167,14 @@ Buying and selling go through the same validated trade a player uses: both
 actors within 1.5 m, real stock, real coins, the buyer's bid limit. `life.buy`
 also buys at a store or stall, where the absent owner is credited.
 
+The bid limit comes from the funded plan (`production`), which spends each
+resident's coins on its needs in order: today's water and food when Thirst
+or Hunger is low, then a coat when it wears none and carries none (its only
+defence against the cold of every night), then its own building materials,
+then stock for the days ahead. A coat planned after that stock was bid with
+what the stock left over, a coin, below what any tailor takes, so a coatless
+resident could go without while coats lay unsold.
+
 ## Conditions
 
 Conditions take no parameter. Thresholds come from the `island_ai` block, the
@@ -196,10 +204,10 @@ schedule or the resident's traits.
 | `life.field_needs_tending` | Not busy, a farmer, and a growing plot has gone the crop's interval without care. | `life.tend` |
 | `life.stall_needs_stock` | A stall of the settlement is short of a good its storage holds and this resident can carry it over. | `life.haul restock` |
 | `has_unit_order` | A player order is queued (engine condition). | `ExecuteOrder` |
-| `life.in_work_window` | Inside a work block. | nothing |
-| `life.in_meal_window` | Inside a meal block. | nothing |
-| `life.in_leisure_window` | Inside a leisure block (delayed by diligence). | nothing |
-| `life.in_sleep_window` | Inside a sleep block. | nothing |
+| `life.in_work_window` | Inside a work block of the resident's own day. | nothing |
+| `life.in_meal_window` | Inside a meal block of the resident's own day. | nothing |
+| `life.in_leisure_window` | Inside a leisure block of the resident's own day (delayed by diligence). | nothing |
+| `life.in_sleep_window` | Inside a sleep block of the resident's own day. | nothing |
 | `life.wants_leisure` | Not busy, inside a leisure block, and not out in the cold (night or winter) without a coat. Everybody has an evening; sociability decides whether it is spent in company. | nothing |
 | `life.family_at_home` | Has a partner or a child, and a home, and the village is not gathering. | nothing |
 | `life.gathering` | The village is gathering, the resident is free to attend (no need at or below `gathering_needs_above`), not busy, not in its sleep block, not cold without a coat. | nothing |
@@ -228,7 +236,9 @@ schedule or the resident's traits.
 | `life.elder` | The resident is an elder (`demography.elder_age_seasons`). | nothing |
 | `life.has_partner` | The resident has a living partner. | nothing |
 
-Every schedule window is shifted by the resident's chronotype. There is no
+Every schedule window is the resident's own (see [Every resident's own
+day](#every-residents-own-day)): moved by its chronotype, its trade and its
+age. There is no
 "not": when a tree needs the opposite of a condition, put the branch after a
 guard on the condition itself, so it is reached only when that guard fails.
 
@@ -324,6 +334,8 @@ walks to the settlement centre instead and stays outdoors.
   ],
   "chronotype_shift": 25,
   "diligence_shift": 40,
+  "align_permille": 40,
+  "elder": {"shift": -20, "edges": [{"kind": "work", "to": -60}]},
   "meal_hunger_threshold": 60000,
   "chat_ticks": 200,
   "chat_break_mm": 3000,
@@ -360,6 +372,7 @@ held back.
   resident with chronotype 100, earlier for a negative chronotype.
 - `diligence_shift`: leisure starts this many permille later at diligence 100
   and as much earlier at diligence 0. A delay as long as the block removes it.
+- `align_permille`, `elder`: how a resident's own day is derived, below.
 - `meal_hunger_threshold`: during a meal block a resident carrying food eats
   below this Hunger, without waiting for `hunger_threshold`.
 - `chat_ticks`: how long a meeting lasts; it pays its morale and affinity at
@@ -369,6 +382,66 @@ held back.
   meeting pays each party; couples form at `demography.pair_affinity`.
 - `bond_pull_mm`, `curious_permille`, `friend_tier`, `seek_friend_mm`: whom a
   resident prefers to meet, below.
+
+### Every resident's own day
+
+The blocks above are the world's plan. Each resident keeps its own copy,
+derived once from data and saved with it (`resident::OwnSchedule`, review
+npc-ai#11); every block check reads it: the `life.in_*_window` guards,
+`life.tired`, `life.bedtime`, `life.wants_meal`, `life.wants_leisure`, the
+day's sit-down meal, a night's sleep, the fits-before-rest rule, friendship
+steering and the inspector's Day tab. The rule, in order:
+
+1. **Shapes.** The trade's `day` (`economy.professions[].day`, below) and,
+   for an elder, `schedule.elder`, in that order. A shape's own `blocks`
+   replace the world's blocks of every kind it brings.
+2. **Shift.** Every block moves by chronotype x `chronotype_shift` / 100
+   plus each shape's `shift`; each shape's `edges` then move the start
+   (`from`) and end (`to`) of the blocks of their kind.
+3. **Overlap rule.** The shared blocks, the meals and the world's own
+   leisure (where no shape replaced it), move by at most `align_permille`
+   (40) in either direction, so every meal overlaps the world's meal and the
+   evening stays shared: meetings, family evenings and the inn still happen.
+   Work, sleep and a shape's own blocks take the whole shift. A shape may not
+   move or replace a meal.
+4. **Diligence** delays leisure as described above; a block the delay or the
+   edges swallow is left out.
+
+A day shape:
+
+```json
+"day": {
+  "shift": 60,
+  "edges": [{"kind": "work", "from": 0, "to": -60}],
+  "blocks": [{"kind": "leisure", "from": 300, "to": 370}]
+}
+```
+
+`shift` and every edge move are -200 to 200 permille; at most 8 edges and
+8 blocks; `blocks` use the world's permille before the shift. Shipped
+shapes: the baker starts work and goes to bed 40 permille (about an hour)
+early by edges alone, so it keeps the shared evening and its evening baking
+(a whole-day `shift` would also end its working day an hour sooner, and the
+hour gained before dawn, dark and cold, made less bread); the fisher's whole
+day is 30 earlier; the innkeeper's day is 60 later, its evening is work at the inn while the
+others take theirs, and its free time is its own afternoon block; an elder
+rises and goes to bed 20 earlier and ends work 60 earlier. Children are
+records, not actors, and have no day.
+
+Free-time errands with a destination keep to the resident's own bedtime
+(`resident::fits_before_bed`): a friend sets out to help a played
+character's homestead, and a sociable resident walks to a friend beyond 15 m,
+only when the walk (route estimate at its own pace, `resident::walk_ticks`)
+and the task (the help work, a meeting's `chat_ticks`) end before its own
+sleep block begins. Who cannot make it in time does not set out; an errand
+already under way is not stopped.
+
+The schedule is derived when the resident's tree is assigned (founding,
+settling, coming of age, a change of trade, becoming an elder) and when the
+behaviour data is replaced, never per tick. An actor without one (a
+visitor) gets the same rule on the fly. The 14-day probe
+`tests/island_schedule_probe.rs` (ignored) reports the work share, meetings,
+missed meals and inn visits that follow.
 
 ### Friendship steers meetings
 
@@ -437,7 +510,7 @@ ranges with the world seed and never changed afterwards.
 |---|---|---|
 | Diligence | 0 to 100 | Delays the leisure block, so a diligent resident works longer. |
 | Sociability | 0 to 100 | At `sociable_min` or more the resident takes leisure: meets neighbours or strolls to the square. Below it the resident spends its free time alone: it strolls, but nobody chats with it in its leisure, neither in passing nor by seeking it out. Not in the cold without a coat. |
-| Chronotype | -100 to 100 | Shifts the whole schedule. Negative is an early riser. |
+| Chronotype | -100 to 100 | Shifts the whole own day (meals and the shared leisure by at most `align_permille`). Negative is an early riser. |
 | Thrift | 0 to 100 | Keeps `thrift` x `thrift_reserve_coins` / 100 coins back from stocking provisions ahead of need. Buying when actually thirsty or hungry is never held back. |
 
 Set `min` equal to `max` to give everybody the same value. Trait effects come

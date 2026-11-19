@@ -484,6 +484,17 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<Help> {
     let settlement = civic::home_settlement(world, actor)?;
     let day = crate::village::calendar(world).0;
     let until = now.saturating_add(claim_ticks(world));
+    // A friend sets out only on an errand it can walk to and finish before
+    // its own bedtime (review npc-ai#11): a walk that bedtime breaks off
+    // helps nobody.
+    let in_time = |legs: &[SimPos], task: u64| {
+        use crate::village::resident::{fits_before_bed, walk_ticks};
+        fits_before_bed(
+            world,
+            actor,
+            walk_ticks(world, actor, legs).saturating_add(task),
+        )
+    };
     for (owner, _) in players(world) {
         let (tier, _) = tier_of(world, score(world, owner, me));
         if !spec.tiers.get(tier).is_some_and(|tier| tier.helps)
@@ -492,10 +503,12 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<Help> {
                 .get(&owner)
                 .and_then(|bonds| bonds.get(&me))
                 .is_some_and(|bond| bond.helped_day == Some(day))
-            || door_for(world, actor, owner).is_none()
         {
             continue;
         }
+        let Some(door) = door_for(world, actor, owner) else {
+            continue;
+        };
         let errand = |how: &str| Help {
             owner,
             how: how.into(),
@@ -517,6 +530,9 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<Help> {
                     continue;
                 }
                 if econ::count(world, actor, kind) > 0 {
+                    if !in_time(&[door], 0) {
+                        continue;
+                    }
                     return Some(Help {
                         kind: kind.clone(),
                         ..errand("material")
@@ -536,7 +552,11 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<Help> {
                             && civic::depot_available(world, *store, kind, Some(me)) > 0
                             && civic::fitting(world, actor, kind, 1) == 1
                     });
-                if let Some((store, _)) = store {
+                if let Some((store, shelf)) = store
+                    && world
+                        .get::<SimPos>(shelf)
+                        .is_some_and(|at| in_time(&[*at, door], 0))
+                {
                     return Some(Help {
                         kind: kind.clone(),
                         store: Some(store),
@@ -545,7 +565,12 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<Help> {
                 }
             }
             if upgrade.supplied() && upgrade.remaining_ticks > 1 {
-                return Some(errand("work"));
+                let work = u64::from(spec.help_work_ticks).min(upgrade.remaining_ticks - 1)
+                    * u64::from(crate::village::colony::work_pace_percent(world, actor))
+                    / 100;
+                if in_time(&[door], work) {
+                    return Some(errand("work"));
+                }
             }
         }
         for (plot_id, plot) in crate::village::homestead::plots(world) {
@@ -555,7 +580,10 @@ pub fn help_trip(world: &World, actor: Entity) -> Option<Help> {
             {
                 continue;
             }
-            if let Some(bed) = garden_bed(world, plot, "harvest") {
+            if let Some(bed) = garden_bed(world, plot, "harvest")
+                && crate::village::homestead::bed_position(world, plot, bed)
+                    .is_some_and(|at| in_time(&[at], 0))
+            {
                 return Some(Help {
                     plot: Some(plot_id),
                     bed,

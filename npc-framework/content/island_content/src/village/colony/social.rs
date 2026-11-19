@@ -334,7 +334,17 @@ fn seek_friend(world: &World, actor: Entity, pos: SimPos, steer: Steer) -> Optio
             }
             let route = super::super::frontier::routes::estimate(world, pos, target)?;
             let distance = i64::from(route.distance_mm);
-            (distance <= steer.seek_mm).then(|| (rank(steer, false, tier, distance, *id), target))
+            // The walk and the meeting end before its own bedtime (review
+            // npc-ai#11), or it does not set out.
+            let speed = world
+                .get::<super::super::Villager>(actor)
+                .map_or(1, |person| person.base_speed.max(1)) as u64;
+            let chat =
+                super::super::resident::spec(world).map_or(200, |spec| spec.schedule.chat_ticks);
+            let errand = u64::from(route.distance_mm).div_ceil(speed) + chat;
+            (distance <= steer.seek_mm
+                && super::super::resident::fits_before_bed(world, actor, errand))
+            .then(|| (rank(steer, false, tier, distance, *id), target))
         })
         .min_by_key(|(key, _)| *key)
         .map(|((_, _, id), target)| (id, target))

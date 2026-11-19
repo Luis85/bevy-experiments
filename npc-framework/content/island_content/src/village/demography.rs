@@ -495,6 +495,8 @@ fn enroll(
     if elder {
         slow_down(world, actor, spec.elder_speed_percent);
     }
+    // An elder's own day (review npc-ai#11).
+    super::resident::refresh_schedule(world, actor);
 }
 
 fn slow_down(world: &mut World, actor: Entity, percent: u32) {

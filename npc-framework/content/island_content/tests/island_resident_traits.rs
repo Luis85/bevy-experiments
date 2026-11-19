@@ -56,6 +56,8 @@ fn set_trait(app: &mut App, id: SimId, edit: impl FnOnce(&mut ResidentTraits)) {
             .get_mut::<ResidentTraits>(actor)
             .expect("traits"),
     );
+    // The own day is derived from the traits (review npc-ai#11).
+    resident::refresh_schedule(app.world_mut(), actor);
 }
 
 /// What one resident did, sampled every [`STEP`] ticks.

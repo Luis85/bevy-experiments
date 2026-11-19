@@ -226,25 +226,25 @@ pub const CONDITIONS: &[ConditionInfo] = &[
         "life.in_leisure_window",
         |world, actor| super::in_block(world, actor, BlockKind::Leisure),
         &[],
-        "Inside a leisure block, shifted by chronotype and delayed by diligence."
+        "Inside a leisure block of the resident's own day (hours, trade, age; delayed by diligence)."
     ),
     condition!(
         "life.in_meal_window",
         |world, actor| super::in_block(world, actor, BlockKind::Meal),
         &[],
-        "Inside a meal block, shifted by chronotype."
+        "Inside a meal block of the resident's own day."
     ),
     condition!(
         "life.in_sleep_window",
         |world, actor| super::in_block(world, actor, BlockKind::Sleep),
         &[],
-        "Inside a sleep block, shifted by chronotype."
+        "Inside a sleep block of the resident's own day."
     ),
     condition!(
         "life.in_work_window",
         |world, actor| super::in_block(world, actor, BlockKind::Work),
         &[],
-        "Inside a work block, shifted by chronotype."
+        "Inside a work block of the resident's own day."
     ),
     condition!(
         "life.needs_fuel",

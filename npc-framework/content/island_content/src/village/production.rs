@@ -1970,6 +1970,23 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             builder.request(*id, food, 1);
             critical.entry(*id).or_default().insert(food.into(), 1);
         }
+        // A resident who wears no coat and carries none has nothing against
+        // the cold of every night: the coat it plans for is a bodily need
+        // like today's water and food, funded before stock for the days
+        // ahead. Planned after that stock, its bid was what the stock left
+        // over (a coin), below what any maker takes, so a coatless resident
+        // went on without one while coats lay unsold.
+        let garment = roles(world).garment;
+        if !super::living::has_coat(world, *e) && econ::count(world, *e, garment) == 0 {
+            let clothing = super::living::clothing_reserve_target(world, *e);
+            if clothing > 0 {
+                builder.request(*id, garment, clothing);
+                critical
+                    .entry(*id)
+                    .or_default()
+                    .insert(garment.into(), clothing);
+            }
+        }
         {
             let threshold = super::policy::active(world).map_or_else(
                 || super::policy::IslandAiPolicy::default().critical_need,
@@ -2001,8 +2018,13 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             |policy| policy.critical_need,
         );
         let clothing = super::living::clothing_reserve_target(world, *e);
-        if econ::need(world, *e, "Warmth") < critical_need && clothing > 0 {
-            builder.request(*id, roles(world).garment, clothing);
+        let planned = critical
+            .get(id)
+            .and_then(|goods| goods.get(roles(world).garment))
+            .copied()
+            .unwrap_or(0);
+        if econ::need(world, *e, "Warmth") < critical_need && clothing > planned {
+            builder.request(*id, roles(world).garment, clothing - planned);
             critical
                 .entry(*id)
                 .or_default()

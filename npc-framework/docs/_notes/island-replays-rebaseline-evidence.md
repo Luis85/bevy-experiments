@@ -201,3 +201,17 @@ before and after the swap. Marker created and deleted.
 | `island_living_world_s7.json` | `890e0897cd04b93c419907da2d1cdedf75b5b15e0c1dd3c80b8a8f798b7fad85` |
 | `island_living_world_s11.json` | `b2d3180c3d9e9ea23bd06987c4dbf528fd241b9a0d8e18a9c0bc67dfc0d6d716` |
 | `island_living_world_s23.json` | `d97e68c9d89368f06bddc4cbdef48f53be7705f3f6e92b11f9dde67180fbf4dd` |
+
+## Re-baseline 2026-11-19: per-resident schedules (backlog item 10)
+
+Same approval. New component `OwnSchedule` (`island_own_schedule_v1`) and spec fields: content hash
+`4851045168373782181` (`43525fe0f24b56a5`) -> `13107680033447328940` (`b5e7d58aff1bbcac`), and every state hash.
+Old files refused: `content hash mismatch: replay 43525fe0f24b56a5, this build b5e7d58aff1bbcac`.
+Recorded into `target/island-split/b10/`, each seed twice, byte-identical; each verifies `"ok":true`, 40 checkpoints,
+before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `0cba87a695a174da80608e90c38b3ffa21a3a1a820858b2fd4af01e5ceb2a78c` |
+| `island_living_world_s11.json` | `a2c7db44fe29830a326950ae2977413f8d9eeb1949954623abe477e23ccdbfc4` |
+| `island_living_world_s23.json` | `8ae47866fecb8c2479a7f8edfa941803a271b83a39b7d5c5cfed37f84f2a067f` |
