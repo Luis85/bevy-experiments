@@ -276,6 +276,19 @@ pub struct ScheduleSpec {
     /// what ten short ones did (ten at 250), so couples still form at
     /// `demography.pair_affinity` (closing fix: at 600 no couple formed).
     pub meet_affinity: i32,
+    /// Friendship steers meetings (review npc-ai#10): each bond tier above
+    /// the first (`economy.live.tiers`) makes a partner count as this many
+    /// millimetres nearer when a resident chooses whom to meet.
+    pub bond_pull_mm: i32,
+    /// Permille of days (seeded per resident and day) on which a resident
+    /// prefers somebody it is not yet friends with, so new bonds still form.
+    pub curious_permille: u32,
+    /// Tier index (`economy.live.tiers`) from which a bond is a friendship:
+    /// friends are sought out, and passed over on a curious day.
+    pub friend_tier: u32,
+    /// With nobody to meet within the local 15 m, a sociable resident walks
+    /// to a free friend up to this route distance (mm); 0 never.
+    pub seek_friend_mm: i32,
 }
 
 impl Default for ScheduleSpec {
@@ -296,6 +309,10 @@ impl Default for ScheduleSpec {
             chat_break_mm: 3000,
             meet_cooldown_ticks: 2400,
             meet_affinity: 1500,
+            bond_pull_mm: 3000,
+            curious_permille: 250,
+            friend_tier: 2,
+            seek_friend_mm: 40_000,
         }
     }
 }
@@ -407,6 +424,17 @@ impl BehaviorSpec {
             return Err(
                 "behavior.schedule needs chronotype_shift and diligence_shift in 0..=200 permille \
                  and meal_hunger_threshold in 1..=100000"
+                    .into(),
+            );
+        }
+        if !(0..=15_000).contains(&schedule.bond_pull_mm)
+            || schedule.curious_permille > 1000
+            || !(1..=16).contains(&schedule.friend_tier)
+            || !(0..=200_000).contains(&schedule.seek_friend_mm)
+        {
+            return Err(
+                "behavior.schedule needs bond_pull_mm in 0..=15000, curious_permille at most \
+                 1000, friend_tier in 1..=16 and seek_friend_mm in 0..=200000"
                     .into(),
             );
         }
@@ -528,6 +556,10 @@ impl BehaviorSpec {
         h.i32(self.schedule.chat_break_mm);
         h.u64(self.schedule.meet_cooldown_ticks);
         h.i32(self.schedule.meet_affinity);
+        h.i32(self.schedule.bond_pull_mm);
+        h.u32(self.schedule.curious_permille);
+        h.u32(self.schedule.friend_tier);
+        h.i32(self.schedule.seek_friend_mm);
         h.u32(self.places.len() as u32);
         for place in &self.places {
             h.str(&place.key);

@@ -10,6 +10,37 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Friendship steers meetings (review npc-ai#10), in free time only (the leisure block or a gathering; in working
+  hours "Seek company" stays nearest-first and nobody walks to a friend). Whom a free resident meets now weighs its bond (`economy.live.tiers`
+  by its own `SocialLife.affinity`): each tier above stranger counts as `schedule.bond_pull_mm` (3000) mm less
+  walking, for `life.socialise`'s choice within 15 m and for a meeting in passing (identity order, each resident its
+  best-ranked partner in reach, ties by identity; no new pass, same spatial buckets). On `schedule.curious_permille`
+  (250) of its days, seeded per resident and day (`colony::curious_today`), a resident prefers somebody below
+  `schedule.friend_tier` (2, "friend"). With nobody within 15 m, a sociable resident walks to a free friend up to
+  `schedule.seek_friend_mm` (40 m), looking only at its own bonds. Fading: a bond fades only once two have not finished
+  a meeting for `economy.live.resident_neglect_after_days` (3), then by `resident_neglect_points_per_day` (25 -> 100) a
+  day (`SocialLife.met_day`, hash name `island_social_life_v2`). The inspector names the meeting and the bond
+  ("meeting Ana, a friend", "chatting with Ana, a friend"; `village::view::meeting`, constant cost: `life.socialise`
+  records whom it set out to meet in `SocialLife.seeking`, cleared when a meeting starts), which the Why section repeats;
+  `VillageSocialMeetingStarted` carries `tier` and `curious`. New spec fields are hashed and validated;
+  `ISLAND_SAVE_VERSION` 7; content and state hashes change, island replays to be re-baselined. New ignored probe
+  `island_social_probe` and `island_year_trace` (a day-by-day year, with perturbation patches). Measured before ->
+  after (14 days, seeds 7/11/23): meetings per resident-day 1.54/1.69/1.18 -> 1.57/1.66/1.18; by tier at the start
+  (stranger / acquaintance / friend) 87/13/0% / 83/17/0.3% / 86/13/1% -> 86/14/0% / 81/17/1.3% / 86/14/0%; distinct
+  partners per resident 9.5/9.7/6.8 -> 9.5/9.1/7.3; residents with a friend at day 14 0/46, 2/48, 2/50 -> 0/48,
+  6/48, 0/46; unsociable residents' leisure spent alone 96/96/96% -> 96/96/96% (their meetings per day
+  0.97/1.01/0.76 against sociable 1.85/2.05/1.45). The steering barely shows in two weeks because few bonds reach a
+  tier that pulls: a friend takes 14 finished meetings with one person, and residents meet about 1.5 times a day,
+  mostly in passing, spread over 7-10 people. A first version steered the working-hours "Seek company" too (hen
+  keepers spend 12-20% of their samples there); with the pull on, eggs fell in 5 of 6 paired year runs (mean -15),
+  so steering is limited to free time. One shipped year, seeds 7/11/23: built 22/26/25 -> 27/24/23, cancelled 0, no
+  deaths; bread imported 52/47/60 -> 88/47/42; eggs made 176/208/182 -> 236/168/174. Single year runs spread widely:
+  on the same build a 1-tick change of `chat_ticks` moves seed 7 from built 22 to 25 and bread imported from 52 to 64;
+  over 12 runs near the old behaviour and 6 of the final build the means are built 25.5 / 24.7, bread imported 56.7 /
+  61.0, eggs 187.8 / 182.7, no deaths in any. Seed 11 tick rate at day 7 (two paired runs): 457/470 -> 418/435
+  ticks/s; the social code itself (`eco.colony` and `start.life.socialise` probes) costs about 4 us a tick more,
+  the rest of the gap is a different day-7 world (more `life.buy` and supplier lookups: 5943 -> 6552 buy starts).
+
 - Wider resident planner (review npc-ai#9). The search is content-free (`village::goap::search`: integer facts,
   actions with consumed inputs and kept tools, bounded uniform-cost search, ties by insertion order over sorted keys);
   `village::goap` builds its domain from the island's data. New in a plan: a gathering tool the trade lacks and the

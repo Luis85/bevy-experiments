@@ -147,7 +147,7 @@ is in progress.
 | `life.warm_up` | none | Walk home and stay by the hearth until warm, at most 1500 ticks. | Never. |
 | `life.greet` | `player` | Turn to the played character, if it is within 12 m, awake and not indoors where the resident is not, and say the bond tier's line of `economy.live.greetings` to it (`VillageSpeech` addressed to it), once a day per resident (`Bond.greeted_day`, saved). If the played character sold one of the resident's goods today and stands in its settlement, the line is "You've been busy at my trade, <name>." The bond gains half of `talk_points`; journal `VillageGreeting` (`to`, `text`, `trade`). Guard it with `life.player_within`. | Nobody to greet, too far, asleep, indoors elsewhere, in a meeting, or already greeted today. |
 | `life.go_to` | `home`, `work`, `centre`, `meal` (home, else the nearest inn, else the square), a key from `behavior.places`, or `{"Pos": [x, z]}` | Walk there and stay. | The way is blocked (`home` never fails). |
-| `life.socialise` | none | Walk to a free neighbour within 15 m for a meeting. | Nobody is free, or the resident met someone in the last 600 ticks. |
+| `life.socialise` | none | Walk to a free neighbour within 15 m for a meeting, the closest bond first (see [Friendship steers meetings](#friendship-steers-meetings)); with nobody in reach, a sociable resident walks to a free friend up to `schedule.seek_friend_mm`. | Nobody is free, or the resident met someone in the last 600 ticks. |
 | `life.continue` | none | Keep doing the physical work in progress. | Nothing is in progress. |
 | `life.idle` | none | Stand still for one decision. | Never. Put it last. |
 | `life.sit_down` | none | Sit down to the meal: eats when hunger is below `schedule.meal_hunger_threshold`; in a meal block it marks the day's sit-down meal had (one a day). | The resident is not alive. |
@@ -185,7 +185,7 @@ schedule or the resident's traits.
 | `life.cold` | Not busy, no coat, it is cold in the open (night, winter or snow) and Warmth is below `recovery_threshold`. The home shelters with or without a lit hearth. | `life.warm_up` |
 | `life.bedtime` | Not busy, inside a sleep block, and the hearth does not still need fuel fetched. | `life.sleep` |
 | `life.busy` | Gathering, crafting, hunting, building, an interaction or a rest is in progress. | `life.continue` |
-| `life.company_nearby` | A free neighbour is in walking distance and the meeting cooldown has passed. | `life.socialise` |
+| `life.company_nearby` | A free neighbour is in walking distance (or, for a sociable resident, a free friend within `schedule.seek_friend_mm`) and the meeting cooldown has passed. | `life.socialise` |
 | `life.has_food` | Carries something edible. | `life.eat` |
 | `life.has_water` | Carries water. | `life.drink` |
 | `life.has_surplus` | Holds surplus of an own product worth a trip and a store of the settlement has room. | `life.haul surplus` |
@@ -328,7 +328,11 @@ walks to the settlement centre instead and stays outdoors.
   "chat_ticks": 200,
   "chat_break_mm": 3000,
   "meet_cooldown_ticks": 2400,
-  "meet_affinity": 1500
+  "meet_affinity": 1500,
+  "bond_pull_mm": 3000,
+  "curious_permille": 250,
+  "friend_tier": 2,
+  "seek_friend_mm": 40000
 }
 ```
 
@@ -363,6 +367,51 @@ held back.
 - `meet_cooldown_ticks`: ticks after a meeting before a resident meets again
   (2400: a few meetings a day). `meet_affinity`: the affinity a finished
   meeting pays each party; couples form at `demography.pair_affinity`.
+- `bond_pull_mm`, `curious_permille`, `friend_tier`, `seek_friend_mm`: whom a
+  resident prefers to meet, below.
+
+### Friendship steers meetings
+
+A resident's fondness for another (`SocialLife.affinity`, paid by finished
+meetings) falls in the bond tiers of `economy.live.tiers` (stranger,
+acquaintance, friend, close friend), and the tier steers whom it meets
+(review npc-ai#10). The rules are few and all data, and they steer only free
+time: the resident's own leisure block, or a gathering of the calendar. In
+working hours the tree's last resort, "Seek company", is a pass-time: the
+nearest free company, ties by identity, and nobody walks off to a friend, so
+it never draws a resident away from its work.
+
+- **Choice.** Among the free company a resident could meet (within 15 m of
+  walking for `life.socialise`, within reach for a meeting in passing), each
+  tier above the first counts as `bond_pull_mm` (3000) millimetres less
+  distance: a friend (tier 2) 9 m away is chosen over a stranger 4 m away, not
+  over one 2 m away. Ties go to the lower identity.
+- **Curious days.** On `curious_permille` (250) of its days, seeded per
+  resident and day (`colony::curious_today`), a resident prefers somebody it
+  is not yet friends with (below `friend_tier`), nearest first, and meets a
+  friend only when nobody else is free. New bonds keep forming; nobody is
+  locked into the first friendship.
+- **Seeking out a friend.** With nobody free within 15 m, a sociable resident
+  walks to a free friend (tier `friend_tier` or closer) up to
+  `seek_friend_mm` (40 m) of walking: wherever the friend spends its free
+  time, at home, the inn or the square. Only the resident's own bonds are
+  looked at, so the search costs as many lookups as it has friends. An
+  unsociable resident never seeks one out and is nobody's company in its
+  free time, as before.
+- **Fading.** A bond kept up by meeting does not fade. Once two residents have
+  not finished a meeting for `economy.live.resident_neglect_after_days` (3),
+  each one's fondness for the other falls by
+  `economy.live.resident_neglect_points_per_day` (100) every morning
+  (`SocialLife.met_day` holds the day of the last meeting with each partner).
+
+The inspector names the partner and the bond: "meeting Ana, a friend" while
+walking there, "chatting with Ana, a friend" once together
+(`village::view::meeting`, which reads `SocialLife.seeking`, the partner
+`life.socialise` set out to meet, or the meeting under way: no search per
+caption), and the Why section repeats it ("Meeting Ana, a
+friend, because it is their free time."). Its Friends list shows the closest
+bonds. The journal's `VillageSocialMeetingStarted` carries `tier` and
+`curious`.
 
 Cold is physical, not scheduled: nights and winter are cold whatever the
 schedule says, so a resident whose work block reaches into the night needs a

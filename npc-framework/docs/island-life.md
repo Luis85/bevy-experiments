@@ -299,6 +299,14 @@ half a talk (500 points) to the bond and appears as a speech bubble and a
 message. This is the resident tree's `Player nearby` branch (`life.player_within`
 and `life.greet`, see [authoring](island-ai-authoring.md)).
 
+**Residents' own friendships.** Residents grow fond of each other by meeting in
+their free time, in the same tiers. A resident prefers a friend to a stranger
+standing about as near, walks over to a free friend (up to about 40 m) when
+nobody is around, and on about one day in four seeks out somebody new instead.
+A friendship nobody keeps up fades after three days. The resident inspector
+names whom a resident is meeting ("meeting Ana, a friend") and lists their
+closest bonds under Friends.
+
 **Gifts and tastes.** Give 1 to 5 units of bread, berries, a cooked meal, fish,
 logs or planks within 1.5 m. Each resident likes one gift and dislikes another
 (6,000 and −2,000 points; anything else 2,000). Only the first gift of a day

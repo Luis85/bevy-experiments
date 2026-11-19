@@ -394,6 +394,16 @@ pub fn tier_of(world: &World, score: i32) -> (usize, String) {
         })
 }
 
+/// The index of the tier `score` falls in ([`tier_of`] without the name).
+pub fn tier_index(world: &World, score: i32) -> usize {
+    spec(world).map_or(0, |spec| {
+        spec.tiers
+            .iter()
+            .rposition(|tier| score >= tier.score)
+            .unwrap_or(0)
+    })
+}
+
 /// The goods one resident likes and dislikes as a gift: seeded, for life.
 pub fn tastes(world: &World, resident: SimId) -> Option<(String, String)> {
     let goods = &spec(world)?.gift_goods;
@@ -2372,8 +2382,13 @@ fn morning(world: &mut World, spec: &LiveSpec, played: &[(SimId, Entity)], day: 
             &json!({"to":player,"day":day}),
         );
     }
-    // Among residents an old fondness fades a little every day too.
+    // Among residents a fondness nobody keeps up fades too: once two have
+    // not met for `resident_neglect_after_days`, a little every day.
     if spec.resident_neglect_points_per_day > 0 {
+        let (fade, after) = (
+            spec.resident_neglect_points_per_day,
+            spec.resident_neglect_after_days,
+        );
         let Some(mut query) = world.try_query::<(Entity, &SimId, &SocialLife)>() else {
             return;
         };
@@ -2387,8 +2402,12 @@ fn morning(world: &mut World, spec: &LiveSpec, played: &[(SimId, Entity)], day: 
         };
         for actor in people {
             if let Some(mut social) = world.get_mut::<SocialLife>(actor) {
-                for affinity in social.affinity.values_mut() {
-                    *affinity = (*affinity - spec.resident_neglect_points_per_day).max(0);
+                let social = &mut *social;
+                for (other, affinity) in &mut social.affinity {
+                    let met = social.met_day.get(other).copied().unwrap_or(0);
+                    if day > met.saturating_add(after) {
+                        *affinity = (*affinity - fade).max(0);
+                    }
                 }
             }
         }

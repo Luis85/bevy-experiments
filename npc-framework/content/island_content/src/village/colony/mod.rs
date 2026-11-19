@@ -20,7 +20,8 @@ pub use housing::{
 pub use model::{AwaitingArrival, ColonyState, Household, HousingProject, SocialLife};
 pub use social::Chatting;
 pub use social::{
-    WORK_PACE_FASTEST, WORK_PACE_SLOWEST, social_available, social_target, work_pace_percent,
+    WORK_PACE_FASTEST, WORK_PACE_SLOWEST, bond_tier, curious_today, meeting_partner,
+    social_available, social_target, work_pace_percent,
 };
 pub use summary::{ColonySummary, summary};
 // Compatibility path for callers of the original colony action API. Execution

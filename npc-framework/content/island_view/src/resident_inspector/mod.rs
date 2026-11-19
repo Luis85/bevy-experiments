@@ -313,6 +313,10 @@ pub(crate) fn activity_label(world: &World, entity: Entity) -> String {
     if leaf == Some("going home") && physical == "idle" {
         return "at home".to_owned();
     }
+    // A meeting names the partner and the bond: "meeting Ana, a friend".
+    if let Some(meeting) = village::view::meeting(world, entity) {
+        return model::meeting_phrase(&meeting.name, &meeting.tier, meeting.under_way);
+    }
     // Building and carrying for the village name the site, the store or the
     // stall: "building Harbour cottage 2", "carrying planks to ...".
     if let Some(leaf) = leaf

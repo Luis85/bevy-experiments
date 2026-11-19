@@ -671,7 +671,10 @@ pub(super) fn gather_outputs(world: &mut World, actor: Entity) -> bool {
 
 /// Walks towards a free neighbour for a leisure meeting.
 pub(super) fn socialise(world: &mut World, actor: Entity) -> bool {
-    if let Some((_, meeting)) = super::colony::social_target(world, actor) {
+    if let Some((partner, meeting)) = super::colony::social_target(world, actor) {
+        if let Some(mut social) = world.get_mut::<super::colony::SocialLife>(actor) {
+            social.seeking = Some(partner);
+        }
         travel(world, actor, meeting);
         return true;
     }

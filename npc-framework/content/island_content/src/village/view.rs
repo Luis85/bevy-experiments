@@ -94,6 +94,36 @@ pub fn relationships(world: &World, of: SimId) -> Vec<RelationView> {
     super::live::relationships(world, of)
 }
 
+/// A meeting of a resident: under way, or the one it walks to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct MeetingView {
+    pub with: SimId,
+    pub name: String,
+    /// The bond tier the resident holds towards the partner
+    /// (`economy.live.tiers` name; the first is "stranger").
+    pub tier: String,
+    /// `true` while the two stand together; `false` while walking there.
+    pub under_way: bool,
+}
+
+/// Whom a resident is meeting, and how close the two are. `None` when it is
+/// not meeting or walking to meet anybody.
+pub fn meeting(world: &World, entity: Entity) -> Option<MeetingView> {
+    let (with, under_way) = super::colony::meeting_partner(world, entity)?;
+    let partner = world.resource::<SimIndex>().get(with)?;
+    let name = world.get::<super::Villager>(partner)?.name.clone();
+    let fondness = world
+        .get::<super::colony::SocialLife>(entity)
+        .and_then(|social| social.affinity.get(&with).copied())
+        .unwrap_or(0);
+    Some(MeetingView {
+        with,
+        name,
+        tier: super::live::tier_of(world, fondness).1,
+        under_way,
+    })
+}
+
 /// The goods a resident likes and dislikes as a gift: `(liked, disliked)`.
 pub fn gift_tastes(world: &World, resident: SimId) -> Option<(String, String)> {
     super::live::tastes(world, resident)

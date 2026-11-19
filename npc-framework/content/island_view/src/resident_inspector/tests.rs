@@ -980,6 +980,43 @@ fn the_friends_list_names_five_bonds_with_their_tier() {
 }
 
 #[test]
+fn a_meeting_names_the_partner_and_the_bond() {
+    use super::model::meeting_phrase;
+    assert_eq!(
+        meeting_phrase("Ana", "friend", false),
+        "meeting Ana, a friend"
+    );
+    assert_eq!(
+        meeting_phrase("Ana", "close friend", true),
+        "chatting with Ana, a close friend"
+    );
+    assert_eq!(
+        meeting_phrase("Bram", "acquaintance", false),
+        "meeting Bram, an acquaintance"
+    );
+    assert_eq!(
+        meeting_phrase("Odo", "stranger", true),
+        "chatting with Odo, someone new"
+    );
+    // The Why section starts from the same words.
+    let record = serde_json::json!({
+        "branch": "Resident > Leisure > Free time > Sociable > Meet a neighbour",
+        "action": "life.socialise",
+        "param": "",
+        "considered": [],
+    });
+    let names = |key: &str| key.to_owned();
+    let context = super::model::WhyContext {
+        activity: Some(meeting_phrase("Ana", "friend", false)),
+        ..super::model::WhyContext::plain(&names)
+    };
+    assert_eq!(
+        super::model::why(&record, &context).chosen,
+        "Meeting Ana, a friend, because it is their free time."
+    );
+}
+
+#[test]
 fn asleep_at_the_inn_keeps_its_own_words_like_asleep_at_home() {
     use super::own_rest_label;
     assert_eq!(own_rest_label("asleep at home"), Some("asleep at home"));

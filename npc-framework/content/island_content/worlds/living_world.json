@@ -3455,7 +3455,8 @@
         "gift_disliked_points": -2000,
         "neglect_after_days": 3,
         "neglect_points_per_day": 500,
-        "resident_neglect_points_per_day": 25,
+        "resident_neglect_points_per_day": 100,
+        "resident_neglect_after_days": 3,
         "gift_goods": [
           "bread",
           "village_berries",

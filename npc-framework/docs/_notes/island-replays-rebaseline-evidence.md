@@ -187,3 +187,17 @@ before and after the swap. Marker created and deleted.
 | `island_living_world_s7.json` | `c0ddbc692d16f1328a3a40fbe1c55f1476ead8d9caa81e9d68979f8dc16be0ed` |
 | `island_living_world_s11.json` | `a3e82fff0cdfa89644232ec32499349b680c4fe5df6bce881a2bb5d7bf298c26` |
 | `island_living_world_s23.json` | `c3ab5f9a1eb42fdc4e001218f957c832f45d894b0b178dc018d4faaa6613b6c1` |
+
+## Re-baseline 2026-11-19: friendship steers meetings (backlog item 9)
+
+Same approval. Social state hash name `island_social_life_v2`, new spec fields: content hash
+`17349830680797832784` (`f0c6fb14b220e650`) -> `4851045168373782181` (`43525fe0f24b56a5`), and every state hash.
+Old files refused: `content hash mismatch: replay f0c6fb14b220e650, this build 43525fe0f24b56a5`.
+Recorded into `target/island-split/b9/`, each seed twice, byte-identical; each verifies `"ok":true`, 40 checkpoints,
+before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `890e0897cd04b93c419907da2d1cdedf75b5b15e0c1dd3c80b8a8f798b7fad85` |
+| `island_living_world_s11.json` | `b2d3180c3d9e9ea23bd06987c4dbf528fd241b9a0d8e18a9c0bc67dfc0d6d716` |
+| `island_living_world_s23.json` | `d97e68c9d89368f06bddc4cbdef48f53be7705f3f6e92b11f9dde67180fbf4dd` |

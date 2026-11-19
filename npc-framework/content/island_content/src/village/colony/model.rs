@@ -78,6 +78,14 @@ pub struct SocialLife {
     pub morale: i32,
     pub affinity: BTreeMap<SimId, i32>,
     pub last_social_tick: u64,
+    /// Day of the last finished meeting with each partner: a bond fades only
+    /// after `economy.live.resident_neglect_after_days` without one.
+    #[serde(default)]
+    pub met_day: BTreeMap<SimId, u64>,
+    /// Whom `life.socialise` last set out to meet; cleared when a meeting
+    /// starts. Read by the inspector instead of a second search.
+    #[serde(default)]
+    pub seeking: Option<SimId>,
 }
 impl Default for SocialLife {
     fn default() -> Self {
@@ -85,11 +93,13 @@ impl Default for SocialLife {
             morale: 75_000,
             affinity: BTreeMap::new(),
             last_social_tick: 0,
+            met_day: BTreeMap::new(),
+            seeking: None,
         }
     }
 }
 impl SimHash for SocialLife {
-    const NAME: &'static str = "island_social_life_v1";
+    const NAME: &'static str = "island_social_life_v2";
     fn sim_hash(&self, h: &mut Fnv64) {
         h.i32(self.morale);
         h.u64(self.last_social_tick);
@@ -98,6 +108,12 @@ impl SimHash for SocialLife {
             h.u32(other.0);
             h.i32(*affinity);
         }
+        h.u32(self.met_day.len() as u32);
+        for (other, day) in &self.met_day {
+            h.u32(other.0);
+            h.u64(*day);
+        }
+        h.opt(self.seeking.as_ref(), |h, id| h.u32(id.0));
     }
 }
 

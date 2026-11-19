@@ -1,13 +1,92 @@
-//! Proximity meetings and morale. Social effects never steer movement or fund production.
+//! Proximity meetings, friendship and morale. Social state never funds
+//! production; walking to company is the resident action's (`life.socialise`).
 use super::super::{economy, living};
 use super::{ColonyState, SocialLife, home_of};
 use bevy_ecs::prelude::*;
+use npc_framework::kernel::rng::sim_rand;
 use npc_framework::prelude::*;
 use serde_json::json;
 
 pub(super) fn welcome(world: &mut World, actor: Entity) {
     if world.get::<SocialLife>(actor).is_none() {
         world.entity_mut(actor).insert(SocialLife::default());
+    }
+}
+
+/// Seeds the day on which a resident prefers somebody new.
+const CURIOUS_PURPOSE: u32 = 0x534f_4301;
+
+/// Whom a resident prefers to meet (`behavior.schedule`, review npc-ai#10).
+#[derive(Clone, Copy)]
+struct Steer {
+    pull_mm: i64,
+    curious_permille: u64,
+    friend_tier: usize,
+    seek_mm: i64,
+}
+
+fn steer(world: &World) -> Steer {
+    let default = super::super::resident::ScheduleSpec::default();
+    let schedule = super::super::resident::spec(world).map_or(&default, |spec| &spec.schedule);
+    Steer {
+        pull_mm: i64::from(schedule.bond_pull_mm),
+        curious_permille: u64::from(schedule.curious_permille),
+        friend_tier: schedule.friend_tier as usize,
+        seek_mm: i64::from(schedule.seek_friend_mm),
+    }
+}
+
+/// Friendship steers only free time: in its leisure block, or at a gathering
+/// of the calendar. Otherwise (the tree's last resort, "Seek company", in
+/// working hours) company is the nearest, as before, and nobody walks off to
+/// a friend: a pass-time must not draw a resident away from its work.
+fn steer_for(world: &World, actor: Entity) -> Option<Steer> {
+    (super::super::resident::in_block(world, actor, super::super::resident::BlockKind::Leisure)
+        || super::super::live::attending(world, actor))
+    .then(|| steer(world))
+}
+
+/// Ranking without friendship: nearest first, then the identity.
+const UNSTEERED: Steer = Steer {
+    pull_mm: 0,
+    curious_permille: 0,
+    friend_tier: usize::MAX,
+    seek_mm: 0,
+};
+
+/// The bond tier (`economy.live.tiers`, by index) `actor` holds towards
+/// `other`: its own fondness, which meetings pay to both alike.
+pub fn bond_tier(world: &World, actor: Entity, other: SimId) -> usize {
+    let fondness = world
+        .get::<SocialLife>(actor)
+        .and_then(|social| social.affinity.get(&other).copied())
+        .unwrap_or(0);
+    super::super::live::tier_index(world, fondness)
+}
+
+/// Whether today is one of `id`'s curious days, on which it prefers
+/// somebody it is not yet friends with (`schedule.curious_permille`).
+pub fn curious_today(world: &World, id: SimId) -> bool {
+    let permille = steer(world).curious_permille;
+    let day = super::super::calendar(world).0;
+    permille > 0
+        && sim_rand(world.resource::<WorldSeed>().0, id, day, CURIOUS_PURPOSE) % 1000 < permille
+}
+
+/// Ranking key of a partner, lowest first: each tier of the bond counts as
+/// `bond_pull_mm` less distance; on a curious day non-friends come first,
+/// nearest first. The key ends in the identity.
+fn rank(
+    steer: Steer,
+    curious: bool,
+    tier: usize,
+    distance_mm: i64,
+    id: SimId,
+) -> (bool, i64, SimId) {
+    if curious {
+        (tier >= steer.friend_tier, distance_mm, id)
+    } else {
+        (false, distance_mm - steer.pull_mm * tier as i64, id)
     }
 }
 
@@ -53,6 +132,7 @@ fn settle_meetings(world: &mut World, now: u64) {
         })
         .unwrap_or_default();
     chats.sort_unstable_by_key(|(id, _, _)| *id);
+    let day = super::super::calendar(world).0;
     let (break_mm, pay) = super::super::resident::spec(world).map_or((3000, 1500), |spec| {
         (spec.schedule.chat_break_mm, spec.schedule.meet_affinity)
     });
@@ -90,6 +170,7 @@ fn settle_meetings(world: &mut World, now: u64) {
                 social.morale = (social.morale + 1000).min(100_000);
                 let affinity = social.affinity.entry(partner).or_default();
                 *affinity = (*affinity + pay).min(100_000);
+                social.met_day.insert(partner, day);
             }
         }
         if paid {
@@ -165,6 +246,11 @@ fn spends_free_time_alone(world: &World, actor: Entity) -> bool {
 }
 
 /// Leisure remains a low-priority action beneath survival and funded work.
+/// Friendship steers the choice (review npc-ai#10): among free company in
+/// walking distance (15 m) a closer bond counts as nearer, by
+/// `schedule.bond_pull_mm` a tier, except on a curious day, when somebody
+/// who is not yet a friend comes first. With nobody in walking distance a
+/// sociable resident walks to a free friend up to `schedule.seek_friend_mm`.
 pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
     let policy = world.get_resource::<ColonyState>()?;
     let social = world.get::<SocialLife>(actor)?;
@@ -177,6 +263,9 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
     }
     let me = world.get::<SimId>(actor)?;
     let pos = world.get::<SimPos>(actor)?;
+    let steered = steer_for(world, actor);
+    let steer = steered.unwrap_or(UNSTEERED);
+    let curious = steered.is_some() && curious_today(world, *me);
     // Only actors with a social life can be met, and distance is the cheapest
     // test, so it comes first. The ranking key ends in the identity.
     let others: Vec<(SimId, Entity)> = world
@@ -188,16 +277,7 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
         .filter_map(|(id, entity)| {
             let target = world.get::<SimPos>(*entity).copied()?;
             let direct = pos.dist2(target);
-            if id == me
-                || direct > 15_000_i64.pow(2)
-                || !social_available(world, *entity)
-                || spends_free_time_alone(world, *entity)
-            {
-                return None;
-            }
-            // Somebody inside a building is company only for those inside it.
-            let indoors = super::super::indoors::inside_entity(world, *entity);
-            if indoors.is_some() && indoors != super::super::indoors::inside_entity(world, actor) {
+            if id == me || direct > 15_000_i64.pow(2) || !free_company(world, actor, *entity) {
                 return None;
             }
             let distance = {
@@ -209,10 +289,67 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
                 }
                 i64::from(route.distance_mm)
             };
-            Some((distance, *id, target))
+            let tier = bond_tier(world, actor, *id);
+            Some((rank(steer, curious, tier, distance, *id), target))
         })
-        .min_by_key(|(distance, id, _)| (*distance, *id))
-        .map(|(_, id, target)| (id, target))
+        .min_by_key(|(key, _)| *key)
+        .map(|((_, _, id), target)| (id, target))
+        .or_else(|| seek_friend(world, actor, *pos, steer))
+}
+
+/// Whether `other` is company for `actor` now: free, not spending its free
+/// time alone, and not inside a building `actor` is not in.
+fn free_company(world: &World, actor: Entity, other: Entity) -> bool {
+    if !social_available(world, other) || spends_free_time_alone(world, other) {
+        return false;
+    }
+    // Somebody inside a building is company only for those inside it.
+    let indoors = super::super::indoors::inside_entity(world, other);
+    indoors.is_none() || indoors == super::super::indoors::inside_entity(world, actor)
+}
+
+/// A free friend (`schedule.friend_tier` or closer) within
+/// `schedule.seek_friend_mm` of walking, for a sociable resident with nobody
+/// in walking distance. Only the resident's own bonds are looked at.
+fn seek_friend(world: &World, actor: Entity, pos: SimPos, steer: Steer) -> Option<(SimId, SimPos)> {
+    if steer.seek_mm <= 0 || !super::super::resident::sociable(world, actor) {
+        return None;
+    }
+    let social = world.get::<SocialLife>(actor)?;
+    social
+        .affinity
+        .iter()
+        .filter_map(|(id, fondness)| {
+            let tier = super::super::live::tier_index(world, *fondness);
+            if tier < steer.friend_tier {
+                return None;
+            }
+            let friend = world.resource::<SimIndex>().get(*id)?;
+            let target = world.get::<SimPos>(friend).copied()?;
+            if pos.dist2(target) > steer.seek_mm.pow(2)
+                || !living(world, friend)
+                || !free_company(world, actor, friend)
+            {
+                return None;
+            }
+            let route = super::super::frontier::routes::estimate(world, pos, target)?;
+            let distance = i64::from(route.distance_mm);
+            (distance <= steer.seek_mm).then(|| (rank(steer, false, tier, distance, *id), target))
+        })
+        .min_by_key(|(key, _)| *key)
+        .map(|((_, _, id), target)| (id, target))
+}
+
+/// Whom `actor` is meeting: the partner of a meeting under way (`true`), or
+/// the one it walks to for a meeting (`false`). For presentation.
+pub fn meeting_partner(world: &World, actor: Entity) -> Option<(SimId, bool)> {
+    if let Some(chat) = world.get::<Chatting>(actor) {
+        return Some((chat.with, true));
+    }
+    (super::super::resident::label(world, actor) == Some("meeting a neighbour"))
+        .then(|| social_target(world, actor))
+        .flatten()
+        .map(|(id, _)| (id, false))
 }
 
 pub(super) fn tick(world: &mut World, now: u64) {
@@ -251,8 +388,10 @@ pub(super) fn tick(world: &mut World, now: u64) {
         super::super::resident::spec(world).map_or(2400, |spec| spec.schedule.meet_cooldown_ticks);
     // Spatial buckets of the meeting reach: a resident can only meet somebody
     // in its own or a neighbouring bucket, so the pass looks at neighbours
-    // instead of at every pair. Candidates keep their identity order, so the
-    // first partner found is the one a pass over all pairs would find.
+    // instead of at every pair. Residents choose in identity order, each the
+    // partner it ranks first among those within reach (`rank`: the bond,
+    // then the distance, then the identity).
+
     const BUCKET_MM: i32 = 1_500;
     let mut buckets: std::collections::BTreeMap<(i32, i32), Vec<usize>> =
         std::collections::BTreeMap::new();
@@ -308,43 +447,56 @@ pub(super) fn tick(world: &mut World, now: u64) {
         {
             continue;
         }
-        for (b_id, b) in near.into_iter().map(|other| &people[other]) {
-            if !economy::near(world, *a, *b)
-                // A passer-by does not meet somebody who is indoors.
-                || super::super::indoors::inside_entity(world, *a)
-                    != super::super::indoors::inside_entity(world, *b)
-                || on_the_way(*b)
-                || spends_free_time_alone(world, *b)
-                || !social_available(world, *b)
-                || world
-                    .get::<SocialLife>(*b)
-                    .expect("social")
-                    .last_social_tick
-                    .saturating_add(cooldown)
-                    > now
-            {
-                continue;
-            }
-            // A meeting lasts `schedule.chat_ticks` and pays at its end.
-            let until = now.saturating_add(
-                super::super::resident::spec(world).map_or(200, |spec| spec.schedule.chat_ticks),
-            );
-            for (person, other) in [(*a, *b_id), (*b, *a_id)] {
-                world
-                    .get_mut::<SocialLife>(person)
-                    .expect("social")
-                    .last_social_tick = now;
-                world
-                    .entity_mut(person)
-                    .insert(Chatting { with: other, until });
-            }
-            record_effect(
-                world,
-                Some(*a_id),
-                "VillageSocialMeetingStarted",
-                &json!({"with":b_id,"until":until}),
-            );
-            break;
+        let steered = steer_for(world, *a);
+        let steer = steered.unwrap_or(UNSTEERED);
+        let curious = steered.is_some() && curious_today(world, *a_id);
+        let chosen = near
+            .into_iter()
+            .map(|other| &people[other])
+            .filter(|(_, b)| {
+                economy::near(world, *a, *b)
+                    // A passer-by does not meet somebody who is indoors.
+                    && super::super::indoors::inside_entity(world, *a)
+                        == super::super::indoors::inside_entity(world, *b)
+                    && !on_the_way(*b)
+                    && !spends_free_time_alone(world, *b)
+                    && social_available(world, *b)
+                    && world
+                        .get::<SocialLife>(*b)
+                        .expect("social")
+                        .last_social_tick
+                        .saturating_add(cooldown)
+                        <= now
+            })
+            .filter_map(|(b_id, b)| {
+                let apart = world
+                    .get::<SimPos>(*a)
+                    .zip(world.get::<SimPos>(*b))
+                    .map(|(here, there)| here.dist2(*there).isqrt())?;
+                let tier = bond_tier(world, *a, *b_id);
+                Some((rank(steer, curious, tier, apart, *b_id), *b, tier))
+            })
+            .min_by_key(|(key, _, _)| *key);
+        let Some(((_, _, b_id), b, tier)) = chosen else {
+            continue;
+        };
+        // A meeting lasts `schedule.chat_ticks` and pays at its end.
+        let until = now.saturating_add(
+            super::super::resident::spec(world).map_or(200, |spec| spec.schedule.chat_ticks),
+        );
+        for (person, other) in [(*a, b_id), (b, *a_id)] {
+            let mut social = world.get_mut::<SocialLife>(person).expect("social");
+            social.last_social_tick = now;
+            social.seeking = None;
+            world
+                .entity_mut(person)
+                .insert(Chatting { with: other, until });
         }
+        record_effect(
+            world,
+            Some(*a_id),
+            "VillageSocialMeetingStarted",
+            &json!({"with":b_id,"until":until,"tier":tier,"curious":curious}),
+        );
     }
 }

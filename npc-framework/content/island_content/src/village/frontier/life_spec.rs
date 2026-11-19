@@ -1048,8 +1048,11 @@ pub struct LiveSpec {
     /// A bond without contact for this many days loses points every day.
     pub neglect_after_days: u64,
     pub neglect_points_per_day: i32,
-    /// Fondness between residents fades by this much a day.
+    /// Fondness between residents fades by this much a day once the two
+    /// have not met for `resident_neglect_after_days`: a bond kept up by
+    /// meeting does not fade.
     pub resident_neglect_points_per_day: i32,
+    pub resident_neglect_after_days: u64,
     /// Goods a resident may like or dislike as a gift: each likes one and
     /// dislikes another, by seed.
     pub gift_goods: Vec<String>,
@@ -1116,7 +1119,8 @@ impl Default for LiveSpec {
             gift_disliked_points: -2_000,
             neglect_after_days: 3,
             neglect_points_per_day: 500,
-            resident_neglect_points_per_day: 25,
+            resident_neglect_points_per_day: 100,
+            resident_neglect_after_days: 3,
             gift_goods: vec![
                 "bread".into(),
                 "village_berries".into(),
@@ -1293,8 +1297,10 @@ pub(super) fn validate_live(economy: &EconomySpec) -> Result<(), String> {
         || !(1..=24_000).contains(&live.help_work_ticks)
         || live.haul_fee_percent > 1000
         || live.builder_wage > 1000
+        || !(0..=100_000).contains(&live.resident_neglect_points_per_day)
+        || live.resident_neglect_after_days > 1000
     {
-        return Err("economy: live.gathering_needs_above and help_needs_above must be 0..=100000, help_work_ticks 1..=24000, haul_fee_percent and builder_wage at most 1000".into());
+        return Err("economy: live.gathering_needs_above and help_needs_above must be 0..=100000, help_work_ticks 1..=24000, haul_fee_percent and builder_wage at most 1000, resident_neglect_points_per_day 0..=100000 and resident_neglect_after_days at most 1000".into());
     }
     const KINDS: [&str; 11] = [
         "own_cottage",

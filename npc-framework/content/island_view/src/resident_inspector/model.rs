@@ -341,6 +341,22 @@ pub(crate) fn friend_lines(relations: &[(String, String, bool)]) -> Vec<String> 
         .collect()
 }
 
+/// A meeting in words, with the bond the resident holds to the partner:
+/// "meeting Ana, a friend" on the way, "chatting with Ana, a friend" once
+/// together. Below the first named tier the partner is "someone new".
+pub(crate) fn meeting_phrase(name: &str, tier: &str, under_way: bool) -> String {
+    let bond = match tier {
+        "" | "stranger" => "someone new".to_owned(),
+        tier if tier.starts_with(['a', 'e', 'i', 'o', 'u']) => format!("an {tier}"),
+        tier => format!("a {tier}"),
+    };
+    if under_way {
+        format!("chatting with {name}, {bond}")
+    } else {
+        format!("meeting {name}, {bond}")
+    }
+}
+
 pub(crate) fn family_lines(family: &Family) -> Vec<String> {
     let mut lines = Vec::new();
     if !family.label.is_empty() {
