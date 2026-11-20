@@ -1,0 +1,234 @@
+{
+  "version": "0.10.0",
+  "recorded_utc": "2026-10-28T12:29:22.012224+00:00",
+  "phase": "final frozen executable confirmation after integrated development review",
+  "final_confirmation_passed": true,
+  "clean_save_quit": true,
+  "source_inputs_unchanged": true,
+  "source_inputs_count": 296,
+  "binary_sha256": "b4add5c97c124f8edfc278c5bd63ce7b9632a22e0ee3bfa2119c65b3b6407405",
+  "process": {
+    "phase": "final native confirmation",
+    "command": [
+      "/tmp/terra-build/target/debug/terra-demo",
+      "--world-profile",
+      "/tmp/terra-native/user-data/worlds/world-1793182693416-16810-0/world.json",
+      "--user-data",
+      "/tmp/terra-native/user-data",
+      "--quality",
+      "performance",
+      "--telemetry",
+      "/tmp/terra-native/release-final-telemetry.json"
+    ],
+    "binary_sha256": "b4add5c97c124f8edfc278c5bd63ce7b9632a22e0ee3bfa2119c65b3b6407405",
+    "started_utc": "2026-10-28T12:22:03.900113+00:00",
+    "pid": 52902,
+    "exit_code": 0,
+    "finished_utc": "2026-10-28T12:27:28.054928+00:00"
+  },
+  "platform": {
+    "os": "Linux x86_64",
+    "display": "X11/Xvfb",
+    "renderer": "Mesa 25.2.8 llvmpipe LLVM 20.1.2, software Vulkan",
+    "input": "keyboard and mouse",
+    "window_pixels": [
+      1100,
+      700
+    ],
+    "interface_text_scale": 1.5
+  },
+  "observed": {
+    "restored_existing_world": true,
+    "character": {
+      "name": "Mira Vale",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 1
+    },
+    "world_title": "Riverbend Commons",
+    "urgent_driver_water_percent": 0,
+    "displayed_water_after_consumption_percent": 60,
+    "guidance_sequence": [
+      "Park and exit to drink",
+      "Open Driving to park and exit",
+      "Obtain water so you can drink",
+      "Go to water",
+      "Gather 1 water",
+      "Drink 1 water",
+      "Claim a housing plot"
+    ],
+    "real_rts_travel_observed": true,
+    "keyboard_revealed_save_quit": true,
+    "exit_code": 0
+  },
+  "verified_checkpoint_summary": {
+    "generation": 137,
+    "account": {
+      "player_id": 1,
+      "money": 20568,
+      "avatar_unit": 1000050,
+      "active_unit": 1000050,
+      "possessed": true
+    },
+    "avatar_name": "Mira Vale",
+    "avatar_needs": {
+      "food": 0.32640237,
+      "water": 0.5989766,
+      "energy": 1.0
+    },
+    "inventory": {
+      "stone": 10,
+      "wheat_seed": 8,
+      "wood": 6
+    },
+    "progression": {
+      "player_id": 1,
+      "experience": 50,
+      "contracts_completed": 1,
+      "settlements_founded": 1
+    },
+    "territory": {
+      "id": 2000017,
+      "name": "Willow Brook",
+      "founder": 1,
+      "tier": "neighborhood",
+      "treasury": 5000
+    },
+    "cumulative_living_metrics": {
+      "production_cycles": 1055,
+      "deliveries_completed": 13,
+      "units_traded": 0,
+      "credits_traded": 0,
+      "npc_purchases": 92,
+      "delivery_replans": 17,
+      "deliveries_returned": 1,
+      "traffic_queries": 447765,
+      "traffic_candidate_tests": 1115060,
+      "intersection_grants": 128,
+      "intersection_waits": 12619,
+      "intersection_requeues": 26,
+      "blocked_exits": 27894
+    }
+  },
+  "asset_pack": {
+    "failed_models": 0,
+    "fallback_instances": 0,
+    "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+    "last_error": null,
+    "loading_instances": 0,
+    "model_count": 5,
+    "name": "Terra woodland wildlife",
+    "ready_instances": 64,
+    "rejected_instances": 0
+  },
+  "regional_persistence": {
+    "authority_paused": false,
+    "blocked": false,
+    "checkpoint_stages": {
+      "compose_ms": 11.556307,
+      "deleted_pages": 0,
+      "encode_ms": 8.071681,
+      "encoded_page_bytes": 0,
+      "encoded_pages": 0,
+      "install_ms": 7.093484,
+      "reused_page_bytes": 213827,
+      "reused_pages": 38,
+      "select_ms": 4.787573,
+      "selected_records_validated": 709,
+      "transaction_ms": 1.3504980000000002,
+      "validation": {
+        "active_records": 709,
+        "certified_environment_groups": 0,
+        "certified_environment_records": 0,
+        "merged_scope_records": 709
+      }
+    },
+    "committed": {
+      "active_records": 581,
+      "active_regions": 38,
+      "checkpoint_bytes": 1622623,
+      "dependency_regions": 0,
+      "dormant_records": 0,
+      "dormant_regions": 0,
+      "generation": 137,
+      "global_records": 128,
+      "pinned_regions": 12
+    },
+    "enabled": true,
+    "last_checkpoint_ms": 32.920193,
+    "last_checkpoint_reason": "Graceful exit",
+    "last_error": null,
+    "last_submission_ms": 20.326291,
+    "pending": false,
+    "restored": true,
+    "seconds_since_checkpoint": 0.0
+  },
+  "telemetry": {
+    "path": "docs/verification/v0.10/native-final-telemetry.json",
+    "sha256": "f83baf741b7bab85c270a3f488b8bfb11e5a7464e4e51eeec56c1fa4c20b5602"
+  },
+  "log": {
+    "path": "docs/verification/v0.10/native-final.log",
+    "sha256": "811d88bc18cb6f5c08ae026bf46c5aefb6ab9a913da094a2c97f628d6a0fbcaf"
+  },
+  "captures": [
+    {
+      "path": "docs/screenshots/v10-final-start.png",
+      "sha256": "bf27781dad53d083443c617da549d42bd0bbd20d44f594cc3bd3170bb501823c",
+      "description": "Restored final game: registered driver water 0%, next goal Park and exit to drink."
+    },
+    {
+      "path": "docs/screenshots/v10-final-guidance.png",
+      "sha256": "9b1b5fc7acda73ef8950999f634c9f61c0b208385374b017d9305b0f85edeac3",
+      "description": "Compact Activities primary action visible at 1100x700 and 150% text."
+    },
+    {
+      "path": "docs/screenshots/v10-final-driving-panel.png",
+      "sha256": "18c21d6605fd65ca44f98762a8717159ad79512d3f8dd53700b68ef95fdab15c",
+      "description": "Guidance opens the real owned pickup #1000053."
+    },
+    {
+      "path": "docs/screenshots/v10-final-on-foot.png",
+      "sha256": "ae2d1029d499e7ccb707dab1732f56b22672ddf9b191473c2fdd8feaf8efb7ee",
+      "description": "Normal Exit on foot switches guidance to water acquisition; instant reference-game dismount is visible."
+    },
+    {
+      "path": "docs/screenshots/v10-final-water-travel.png",
+      "sha256": "c6d217cc048412a3ecd3649daaf4ee0dcba70158154ec2493c5040b61329c4a1",
+      "description": "Go to water submits ordinary RTS movement; avatar moves clear of the parked pickup."
+    },
+    {
+      "path": "docs/screenshots/v10-final-water-detail.png",
+      "sha256": "e893fbbf5c7b5bef3cca625fae320aaa8fd42f099c8323df9a6d479ee5552d2d",
+      "description": "Arrival at an accessible resource enables Gather 1 water."
+    },
+    {
+      "path": "docs/screenshots/v10-final-water-gather.png",
+      "sha256": "121ef7b8788363bf162f10d320749f31444058dab2cf9d1857fed1960463823f",
+      "description": "Gather changes the action to Drink 1 water."
+    },
+    {
+      "path": "docs/screenshots/v10-final-water-restored.png",
+      "sha256": "01d6fd65ba7bcae28491af45c6f78ac1d94c70dc4558b3be6084fc84b0d0cb50",
+      "description": "Consumption restores water from 0% to 60%; Suggested returns to Claim a housing plot."
+    },
+    {
+      "path": "docs/screenshots/v10-final-diagnostics-complete.png",
+      "sha256": "393ca4b80126ec2c39edaee41d35d09f99cfd287933ebae007c5cbd8d9dc844f",
+      "description": "Final installed pack: five models, 64 ready instances, no loading or procedural fallback."
+    },
+    {
+      "path": "docs/screenshots/v10-final-save-focus.png",
+      "sha256": "bfdfb1eada907140b1861b7a6ac58da63357e753d803fd5bff69177764d9a318",
+      "description": "Keyboard Tab navigation reveals and focuses Save and quit at enlarged text size."
+    }
+  ],
+  "summary_markdown": "The final **0.10.0 executable**, identified above, resumed the fictional\n**Riverbend Commons** connected-heightmap world with **Mira Vale**, the ochre\nappearance and persisted **150% text**. The 1100\u00d7700 window retained the\n**205.68-credit** balance, **50 XP**, completed supply contract and **Willow Brook**\nneighborhood with its **50.00-credit treasury**.\n\nThe final native sequence exercised the complete urgent-water loop. The\nregistered pickup's driver had **0% water**. Suggested guidance displayed\n**Park and exit to drink**; its action opened the correct vehicle's Driving\npanel. Parking and the normal Exit on foot action changed the goal to acquiring\nwater. **Go to water** issued ordinary RTS movement, moved the avatar clear of\nthe parked pickup and reached a real accessible resource. **Gather 1 water**\nthen changed to **Drink 1 water**. Consumption raised the displayed need to\n**60%** and restored **Claim a housing plot** as the continuing goal. The final\narchive contains about 59.90% water after ordinary subsequent decay, no extra\nwater in inventory, and the unchanged balance, progression and territory.\n\nThe final pack diagnostics reported **five models and 64 ready instances**,\nwith **zero loading, fallback, rejected or failed instances**. The native world\nhad 49 rendered chunks and 107 living bodies. Session telemetry recorded no\nworld or simulation error. These are active-view observations, not scale or\nperformance certification.\n\nKeyboard navigation scrolled **Save and quit** into view and activated it.\nThe process exited **zero**, with a completed **Graceful exit checkpoint 137**,\nno pending persistence work and no storage error. A read-only export verified\nthe saved state; the private world/database are not included in the release.\nThe final native record retains the exact executable, command, telemetry and\ncapture hashes, and all 296 compiled/config/data/asset inputs remained unchanged.\n\nEarlier development review separately covers character/world creation,\naccept \u2192 physical travel \u2192 delivery of four wood, community founding, manual\ndriving up to an observed 26 km/h, first-person visibility and compact navigation.\nIts captures remain labeled as development evidence; the final confirmation\nabove does not relabel them as captures of the release executable.\n",
+  "limits": [
+    "Earlier development creation, supply delivery and driving are identified separately.",
+    "Reference dismount transfers the avatar to the vehicle position; ordinary outward movement was verified, but door/seat/dismount animation remains prototype presentation.",
+    "No gaming-GPU benchmark, Windows/macOS, screen-reader, localization or physical-controller/wheel certification.",
+    "Private world/database and full archive are excluded; only fictional observations and safe telemetry are supplied."
+  ]
+}

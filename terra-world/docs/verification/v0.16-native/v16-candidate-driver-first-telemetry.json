@@ -1,0 +1,3849 @@
+{
+  "asset_pack": {
+    "failed_models": 0,
+    "fallback_instances": 2,
+    "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+    "last_error": null,
+    "loading_instances": 0,
+    "model_count": 7,
+    "name": "Terra original character transport and wildlife",
+    "ready_instances": 48,
+    "rejected_instances": 0,
+    "scene_budget": {
+      "deferred_instances": 0,
+      "distant_instances": 0,
+      "draining": false,
+      "eligible_instances": 48,
+      "hidden_instances": 2,
+      "immutable_pack_estimated_bytes": 2382856,
+      "invalid_limits": false,
+      "limits": {
+        "animation_channels": 1024,
+        "animation_nodes": 4096,
+        "concurrent_model_loads": 1,
+        "distance_hysteresis_m": 150.0,
+        "distance_m": 650.0,
+        "estimated_bytes": 134217728,
+        "instances": 64,
+        "primitives": 2048,
+        "texture_pixels": 8388608,
+        "triangles": 200000,
+        "vertices": 400000
+      },
+      "loading_models": 0,
+      "peak_reserved_estimated_bytes": 13694148,
+      "reserved": {
+        "animation_channels": 466,
+        "animation_nodes": 1728,
+        "estimated_bytes": 11848092,
+        "instances": 48,
+        "primitives": 1188,
+        "resident_models": 6,
+        "texture_pixels": 0,
+        "triangles": 80904,
+        "vertices": 242712
+      },
+      "retiring_models": 0,
+      "selected": {
+        "animation_channels": 466,
+        "animation_nodes": 1728,
+        "estimated_bytes": 11848092,
+        "instances": 48,
+        "primitives": 1188,
+        "resident_models": 6,
+        "texture_pixels": 0,
+        "triangles": 80904,
+        "vertices": 242712
+      },
+      "unmetered_instances": 0
+    }
+  },
+  "atmosphere_active": false,
+  "capture": {
+    "captured_unix_ms": 1793247806866,
+    "elapsed_seconds": 261.969795715,
+    "last_export_error": null,
+    "periodic_interval_seconds": 10,
+    "prior_write_failures": 0,
+    "sequence": 27,
+    "session": "1793247544896-60180-0",
+    "skipped_busy_captures": 0,
+    "status": "running"
+  },
+  "ecology_work": {
+    "deferred": 0,
+    "deferred_total": 283,
+    "eligible": 22,
+    "evaluated": 22,
+    "evaluated_total": 3039,
+    "far_decisions": 2,
+    "near_decisions": 20,
+    "observer_candidates": 122,
+    "passes": 151,
+    "threat_candidates": 190,
+    "threat_candidates_total": 21108
+  },
+  "history": {
+    "capacity": 16,
+    "scope": "Most recent successful captures at this path, including prior runs; bounded samples, not a continuous trace. A running capture does not certify a healthy or completed session.",
+    "snapshots": [
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247655883,
+          "elapsed_seconds": 110.986903732,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 12,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 0,
+          "deferred_total": 0,
+          "eligible": 0,
+          "evaluated": 0,
+          "evaluated_total": 0,
+          "far_decisions": 0,
+          "near_decisions": 0,
+          "observer_candidates": 0,
+          "passes": 0,
+          "threat_candidates": 0,
+          "threat_candidates_total": 0
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            6,
+            3,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 662661,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 32073
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000551,
+              "max_ms": 0.002804,
+              "mean_ms": 0.0009368083333333332,
+              "p50_ms": 0.000591,
+              "p95_ms": 0.002304,
+              "total_samples": 2130,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.147564,
+              "max_ms": 0.347697,
+              "mean_ms": 0.007116,
+              "p50_ms": 0.00008999999999999999,
+              "p95_ms": 0.00045,
+              "total_samples": 736,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.006771,
+              "max_ms": 1.478352,
+              "mean_ms": 0.05294610833333334,
+              "p50_ms": 0.020911,
+              "p95_ms": 0.146171,
+              "total_samples": 736,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00021,
+              "max_ms": 0.012469000000000001,
+              "mean_ms": 0.0005334000000000004,
+              "p50_ms": 0.00025100000000000003,
+              "p95_ms": 0.001102,
+              "total_samples": 736,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.1153300000000002,
+              "max_ms": 9.799198,
+              "mean_ms": 1.271428908333333,
+              "p50_ms": 1.190062,
+              "p95_ms": 1.6705999999999999,
+              "total_samples": 736,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.026,
+              "max_ms": 0.098259,
+              "mean_ms": 0.020664066666666654,
+              "p50_ms": 0.018878000000000002,
+              "p95_ms": 0.030425999999999998,
+              "total_samples": 570,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 186.08346600000002,
+            "max_ms": 286.149204,
+            "mean_ms": 187.48652302500003,
+            "p50_ms": 183.145405,
+            "p95_ms": 216.671663,
+            "total_samples": 569,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247665961,
+          "elapsed_seconds": 121.064461052,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 13,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 4,
+          "deferred_total": 20,
+          "eligible": 22,
+          "evaluated": 18,
+          "evaluated_total": 200,
+          "far_decisions": 0,
+          "near_decisions": 18,
+          "observer_candidates": 132,
+          "passes": 10,
+          "threat_candidates": 104,
+          "threat_candidates_total": 1022
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            6,
+            3,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 662661,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 32073
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000281,
+              "max_ms": 0.008954,
+              "mean_ms": 0.000991366666666667,
+              "p50_ms": 0.000571,
+              "p95_ms": 0.002283,
+              "total_samples": 2331,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.183728,
+              "max_ms": 0.902478,
+              "mean_ms": 0.14027424999999996,
+              "p50_ms": 0.14143399999999998,
+              "p95_ms": 0.241766,
+              "total_samples": 937,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.005769,
+              "max_ms": 0.5036619999999999,
+              "mean_ms": 0.022896620833333336,
+              "p50_ms": 0.009294,
+              "p95_ms": 0.040642000000000005,
+              "total_samples": 937,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.000211,
+              "max_ms": 0.010586,
+              "mean_ms": 0.0004649000000000001,
+              "p50_ms": 0.00023099999999999998,
+              "p95_ms": 0.001112,
+              "total_samples": 937,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.3702969999999999,
+              "max_ms": 1.902333,
+              "mean_ms": 1.1757559666666668,
+              "p50_ms": 1.143864,
+              "p95_ms": 1.572703,
+              "total_samples": 937,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.013991,
+              "max_ms": 0.142136,
+              "mean_ms": 0.02016771666666666,
+              "p50_ms": 0.018257000000000002,
+              "p95_ms": 0.030425999999999998,
+              "total_samples": 624,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 172.574773,
+            "max_ms": 286.149204,
+            "mean_ms": 188.35875669166668,
+            "p50_ms": 184.206154,
+            "p95_ms": 223.0548,
+            "total_samples": 623,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247676023,
+          "elapsed_seconds": 131.127376129,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 14,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 4,
+          "deferred_total": 40,
+          "eligible": 22,
+          "evaluated": 18,
+          "evaluated_total": 400,
+          "far_decisions": 0,
+          "near_decisions": 18,
+          "observer_candidates": 132,
+          "passes": 20,
+          "threat_candidates": 107,
+          "threat_candidates_total": 2007
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000561,
+              "max_ms": 0.008162,
+              "mean_ms": 0.0010727791666666666,
+              "p50_ms": 0.000611,
+              "p95_ms": 0.002373,
+              "total_samples": 2533,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.215727,
+              "max_ms": 0.401999,
+              "mean_ms": 0.19147489583333346,
+              "p50_ms": 0.181344,
+              "p95_ms": 0.27653900000000003,
+              "total_samples": 1139,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.00625,
+              "max_ms": 0.278102,
+              "mean_ms": 0.020754829166666662,
+              "p50_ms": 0.008283,
+              "p95_ms": 0.089326,
+              "total_samples": 1139,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00033999999999999997,
+              "max_ms": 0.006089,
+              "mean_ms": 0.00048095833333333335,
+              "p50_ms": 0.00023999999999999998,
+              "p95_ms": 0.001102,
+              "total_samples": 1139,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.347232,
+              "max_ms": 2.381579,
+              "mean_ms": 1.2072794875000001,
+              "p50_ms": 1.177735,
+              "p95_ms": 1.546984,
+              "total_samples": 1139,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.016595,
+              "max_ms": 0.142136,
+              "mean_ms": 0.018784762499999996,
+              "p50_ms": 0.017015,
+              "p95_ms": 0.0269,
+              "total_samples": 686,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 144.761856,
+            "max_ms": 276.851309,
+            "mean_ms": 182.46569612916676,
+            "p50_ms": 182.464632,
+            "p95_ms": 218.089275,
+            "total_samples": 685,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247686072,
+          "elapsed_seconds": 141.176215953,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 15,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 3,
+          "deferred_total": 56,
+          "eligible": 22,
+          "evaluated": 19,
+          "evaluated_total": 604,
+          "far_decisions": 1,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 30,
+          "threat_candidates": 125,
+          "threat_candidates_total": 3120
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.00043,
+              "max_ms": 0.008022,
+              "mean_ms": 0.0011457750000000006,
+              "p50_ms": 0.0006209999999999999,
+              "p95_ms": 0.002384,
+              "total_samples": 2734,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.057467,
+              "max_ms": 0.675825,
+              "mean_ms": 0.1817834958333334,
+              "p50_ms": 0.18518,
+              "p95_ms": 0.31511700000000004,
+              "total_samples": 1340,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.005519,
+              "max_ms": 0.281156,
+              "mean_ms": 0.01983527916666667,
+              "p50_ms": 0.008924,
+              "p95_ms": 0.059309,
+              "total_samples": 1340,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00025100000000000003,
+              "max_ms": 0.0061,
+              "mean_ms": 0.0005100541666666665,
+              "p50_ms": 0.00025,
+              "p95_ms": 0.001092,
+              "total_samples": 1340,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 0.9150469999999999,
+              "max_ms": 7.786862999999999,
+              "mean_ms": 1.203052995833333,
+              "p50_ms": 1.159288,
+              "p95_ms": 1.53736,
+              "total_samples": 1340,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.013781,
+              "max_ms": 0.142136,
+              "mean_ms": 0.018473679166666663,
+              "p50_ms": 0.015814,
+              "p95_ms": 0.030425999999999998,
+              "total_samples": 757,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 133.066879,
+            "max_ms": 235.529299,
+            "mean_ms": 168.3510446416667,
+            "p50_ms": 170.816819,
+            "p95_ms": 209.12578100000002,
+            "total_samples": 756,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247696075,
+          "elapsed_seconds": 151.178846717,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 16,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 3,
+          "deferred_total": 76,
+          "eligible": 22,
+          "evaluated": 19,
+          "evaluated_total": 804,
+          "far_decisions": 1,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 40,
+          "threat_candidates": 129,
+          "threat_candidates_total": 4375
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000531,
+              "max_ms": 0.006509,
+              "mean_ms": 0.0011767583333333333,
+              "p50_ms": 0.0006810000000000001,
+              "p95_ms": 0.0024040000000000003,
+              "total_samples": 2934,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.015694,
+              "max_ms": 0.44525499999999996,
+              "mean_ms": 0.035828270833333335,
+              "p50_ms": 0.021202000000000002,
+              "p95_ms": 0.147633,
+              "total_samples": 1540,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.012317999999999999,
+              "max_ms": 0.21907200000000002,
+              "mean_ms": 0.01980925416666667,
+              "p50_ms": 0.013210000000000001,
+              "p95_ms": 0.069416,
+              "total_samples": 1540,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.000211,
+              "max_ms": 0.035294,
+              "mean_ms": 0.0006805499999999999,
+              "p50_ms": 0.00031,
+              "p95_ms": 0.001092,
+              "total_samples": 1540,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.440984,
+              "max_ms": 12.0874,
+              "mean_ms": 1.1893416708333335,
+              "p50_ms": 1.08866,
+              "p95_ms": 1.4524110000000001,
+              "total_samples": 1540,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.014241,
+              "max_ms": 0.084828,
+              "mean_ms": 0.017652516666666666,
+              "p50_ms": 0.014922999999999999,
+              "p95_ms": 0.031368,
+              "total_samples": 832,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 132.377923,
+            "max_ms": 233.46573600000002,
+            "mean_ms": 149.35672967499994,
+            "p50_ms": 143.160964,
+            "p95_ms": 182.641446,
+            "total_samples": 831,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247706194,
+          "elapsed_seconds": 161.29756885,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 17,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 3,
+          "deferred_total": 93,
+          "eligible": 22,
+          "evaluated": 19,
+          "evaluated_total": 1007,
+          "far_decisions": 1,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 50,
+          "threat_candidates": 130,
+          "threat_candidates_total": 5634
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000691,
+              "max_ms": 0.002944,
+              "mean_ms": 0.0011562374999999996,
+              "p50_ms": 0.000691,
+              "p95_ms": 0.002414,
+              "total_samples": 3132,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.029415,
+              "max_ms": 0.24096499999999998,
+              "mean_ms": 0.024160841666666672,
+              "p50_ms": 0.021383,
+              "p95_ms": 0.038859000000000005,
+              "total_samples": 1738,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.0135,
+              "max_ms": 0.19757999999999998,
+              "mean_ms": 0.02025699166666667,
+              "p50_ms": 0.012317999999999999,
+              "p95_ms": 0.051168000000000005,
+              "total_samples": 1738,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00021,
+              "max_ms": 0.013951999999999999,
+              "mean_ms": 0.0005582708333333335,
+              "p50_ms": 0.00031,
+              "p95_ms": 0.001111,
+              "total_samples": 1738,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.0900720000000002,
+              "max_ms": 6.880434,
+              "mean_ms": 1.184088200000001,
+              "p50_ms": 1.107739,
+              "p95_ms": 1.495147,
+              "total_samples": 1738,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.014361,
+              "max_ms": 0.084828,
+              "mean_ms": 0.018264287499999997,
+              "p50_ms": 0.015304000000000002,
+              "p95_ms": 0.032028,
+              "total_samples": 903,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 147.777601,
+            "max_ms": 476.333666,
+            "mean_ms": 140.04138760000004,
+            "p50_ms": 136.020512,
+            "p95_ms": 155.89291699999998,
+            "total_samples": 902,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247716311,
+          "elapsed_seconds": 171.415153531,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 18,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 3,
+          "deferred_total": 113,
+          "eligible": 22,
+          "evaluated": 19,
+          "evaluated_total": 1207,
+          "far_decisions": 1,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 60,
+          "threat_candidates": 120,
+          "threat_candidates_total": 6869
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000671,
+              "max_ms": 0.064388,
+              "mean_ms": 0.0014890458333333336,
+              "p50_ms": 0.000651,
+              "p95_ms": 0.002574,
+              "total_samples": 3334,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.029826,
+              "max_ms": 0.183288,
+              "mean_ms": 0.023499445833333323,
+              "p50_ms": 0.020912,
+              "p95_ms": 0.037045999999999996,
+              "total_samples": 1940,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.0066300000000000005,
+              "max_ms": 0.20531100000000002,
+              "mean_ms": 0.020552091666666668,
+              "p50_ms": 0.011708,
+              "p95_ms": 0.05954,
+              "total_samples": 1940,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00021,
+              "max_ms": 0.0016229999999999999,
+              "mean_ms": 0.0005196208333333335,
+              "p50_ms": 0.0003,
+              "p95_ms": 0.0011409999999999999,
+              "total_samples": 1940,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.324417,
+              "max_ms": 15.855837000000001,
+              "mean_ms": 1.285079333333333,
+              "p50_ms": 1.18123,
+              "p95_ms": 1.5373999999999999,
+              "total_samples": 1940,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.030746,
+              "max_ms": 0.092571,
+              "mean_ms": 0.01857111666666667,
+              "p50_ms": 0.015653,
+              "p95_ms": 0.03286,
+              "total_samples": 978,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 130.795279,
+            "max_ms": 476.333666,
+            "mean_ms": 136.8516341583333,
+            "p50_ms": 133.249268,
+            "p95_ms": 151.132348,
+            "total_samples": 977,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247726350,
+          "elapsed_seconds": 181.454102797,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 19,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 3,
+          "deferred_total": 130,
+          "eligible": 22,
+          "evaluated": 19,
+          "evaluated_total": 1410,
+          "far_decisions": 1,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 70,
+          "threat_candidates": 141,
+          "threat_candidates_total": 8169
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000651,
+              "max_ms": 0.003025,
+              "mean_ms": 0.0011674124999999991,
+              "p50_ms": 0.0007109999999999999,
+              "p95_ms": 0.002444,
+              "total_samples": 3535,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.036235,
+              "max_ms": 0.22988899999999998,
+              "mean_ms": 0.02457999166666666,
+              "p50_ms": 0.021342,
+              "p95_ms": 0.03927,
+              "total_samples": 2141,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.005619,
+              "max_ms": 0.23941300000000001,
+              "mean_ms": 0.021109808333333334,
+              "p50_ms": 0.015354,
+              "p95_ms": 0.08333600000000001,
+              "total_samples": 2141,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00022,
+              "max_ms": 0.01925,
+              "mean_ms": 0.000649041666666667,
+              "p50_ms": 0.00033,
+              "p95_ms": 0.001142,
+              "total_samples": 2141,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.204987,
+              "max_ms": 2.889099,
+              "mean_ms": 1.1336734583333332,
+              "p50_ms": 1.1141079999999999,
+              "p95_ms": 1.4627679999999998,
+              "total_samples": 2141,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.014161,
+              "max_ms": 0.092571,
+              "mean_ms": 0.018782674999999995,
+              "p50_ms": 0.015974,
+              "p95_ms": 0.03288,
+              "total_samples": 1051,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 139.818409,
+            "max_ms": 476.333666,
+            "mean_ms": 137.4537924541667,
+            "p50_ms": 133.249268,
+            "p95_ms": 153.002779,
+            "total_samples": 1050,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247736352,
+          "elapsed_seconds": 191.455833958,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 20,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 3,
+          "deferred_total": 150,
+          "eligible": 22,
+          "evaluated": 19,
+          "evaluated_total": 1610,
+          "far_decisions": 1,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 80,
+          "threat_candidates": 141,
+          "threat_candidates_total": 9606
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.0008309999999999999,
+              "max_ms": 0.002744,
+              "mean_ms": 0.001151891666666666,
+              "p50_ms": 0.0006810000000000001,
+              "p95_ms": 0.002433,
+              "total_samples": 3735,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.015614,
+              "max_ms": 0.129276,
+              "mean_ms": 0.02376801666666667,
+              "p50_ms": 0.021232,
+              "p95_ms": 0.038348,
+              "total_samples": 2341,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.006801,
+              "max_ms": 0.185842,
+              "mean_ms": 0.020264720833333326,
+              "p50_ms": 0.014280999999999999,
+              "p95_ms": 0.07137800000000001,
+              "total_samples": 2341,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00016999999999999999,
+              "max_ms": 0.008523,
+              "mean_ms": 0.0006051125000000002,
+              "p50_ms": 0.00035,
+              "p95_ms": 0.0011719999999999999,
+              "total_samples": 2341,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.034017,
+              "max_ms": 13.567309,
+              "mean_ms": 1.2631296250000001,
+              "p50_ms": 1.1362830000000002,
+              "p95_ms": 1.5875270000000001,
+              "total_samples": 2341,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.017496,
+              "max_ms": 0.092571,
+              "mean_ms": 0.018158570833333325,
+              "p50_ms": 0.015794000000000002,
+              "p95_ms": 0.030907,
+              "total_samples": 1125,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 139.893327,
+            "max_ms": 190.82898600000001,
+            "mean_ms": 135.6103496458333,
+            "p50_ms": 133.58896000000001,
+            "p95_ms": 149.754927,
+            "total_samples": 1124,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247746474,
+          "elapsed_seconds": 201.578133774,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 21,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 1,
+          "deferred_total": 168,
+          "eligible": 22,
+          "evaluated": 21,
+          "evaluated_total": 1834,
+          "far_decisions": 3,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 91,
+          "threat_candidates": 138,
+          "threat_candidates_total": 11200
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000531,
+              "max_ms": 0.032258999999999996,
+              "mean_ms": 0.0013363458333333334,
+              "p50_ms": 0.000741,
+              "p95_ms": 0.002413,
+              "total_samples": 3937,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.016024,
+              "max_ms": 0.13213,
+              "mean_ms": 0.02399137083333335,
+              "p50_ms": 0.021202000000000002,
+              "p95_ms": 0.037487,
+              "total_samples": 2543,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.0067599999999999995,
+              "max_ms": 0.248767,
+              "mean_ms": 0.023050124999999994,
+              "p50_ms": 0.016505,
+              "p95_ms": 0.122065,
+              "total_samples": 2543,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00017999999999999998,
+              "max_ms": 0.022514000000000003,
+              "mean_ms": 0.0007866666666666664,
+              "p50_ms": 0.00035,
+              "p95_ms": 0.001232,
+              "total_samples": 2543,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 0.95011,
+              "max_ms": 9.690013,
+              "mean_ms": 1.2198099416666666,
+              "p50_ms": 1.172968,
+              "p95_ms": 1.4802490000000001,
+              "total_samples": 2543,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.014391,
+              "max_ms": 0.036344999999999995,
+              "mean_ms": 0.017844362500000002,
+              "p50_ms": 0.015714,
+              "p95_ms": 0.029665,
+              "total_samples": 1198,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 135.94990800000002,
+            "max_ms": 269.451137,
+            "mean_ms": 136.88399738333334,
+            "p50_ms": 134.033563,
+            "p95_ms": 152.261712,
+            "total_samples": 1197,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247756571,
+          "elapsed_seconds": 211.675049087,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 22,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 1,
+          "deferred_total": 188,
+          "eligible": 22,
+          "evaluated": 21,
+          "evaluated_total": 2034,
+          "far_decisions": 3,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 101,
+          "threat_candidates": 137,
+          "threat_candidates_total": 12598
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000551,
+              "max_ms": 0.022394,
+              "mean_ms": 0.0013272541666666672,
+              "p50_ms": 0.000701,
+              "p95_ms": 0.002423,
+              "total_samples": 4139,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.016024,
+              "max_ms": 0.074984,
+              "mean_ms": 0.022807354166666672,
+              "p50_ms": 0.021141999999999998,
+              "p95_ms": 0.036786000000000006,
+              "total_samples": 2745,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.012198,
+              "max_ms": 0.200033,
+              "mean_ms": 0.020531541666666663,
+              "p50_ms": 0.012689,
+              "p95_ms": 0.106943,
+              "total_samples": 2745,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00019999999999999998,
+              "max_ms": 0.008433000000000001,
+              "mean_ms": 0.0005597625000000001,
+              "p50_ms": 0.000271,
+              "p95_ms": 0.001142,
+              "total_samples": 2745,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.383507,
+              "max_ms": 9.323284,
+              "mean_ms": 1.2209343666666668,
+              "p50_ms": 1.086367,
+              "p95_ms": 1.482708,
+              "total_samples": 2745,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.015602999999999999,
+              "max_ms": 0.034843,
+              "mean_ms": 0.017468220833333336,
+              "p50_ms": 0.015704,
+              "p95_ms": 0.027561,
+              "total_samples": 1272,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 149.48281799999998,
+            "max_ms": 269.451137,
+            "mean_ms": 137.43964542916666,
+            "p50_ms": 134.552534,
+            "p95_ms": 153.002779,
+            "total_samples": 1271,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247766650,
+          "elapsed_seconds": 221.753771876,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 23,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 1,
+          "deferred_total": 208,
+          "eligible": 22,
+          "evaluated": 21,
+          "evaluated_total": 2234,
+          "far_decisions": 3,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 111,
+          "threat_candidates": 157,
+          "threat_candidates_total": 14053
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000571,
+              "max_ms": 0.008222,
+              "mean_ms": 0.0011876958333333332,
+              "p50_ms": 0.0006209999999999999,
+              "p95_ms": 0.002464,
+              "total_samples": 4341,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.019219,
+              "max_ms": 0.061443,
+              "mean_ms": 0.023159070833333333,
+              "p50_ms": 0.021112,
+              "p95_ms": 0.037907,
+              "total_samples": 2947,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.013581,
+              "max_ms": 0.209097,
+              "mean_ms": 0.020225637499999997,
+              "p50_ms": 0.012259,
+              "p95_ms": 0.09199,
+              "total_samples": 2947,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.000201,
+              "max_ms": 0.006409,
+              "mean_ms": 0.0005220166666666667,
+              "p50_ms": 0.000301,
+              "p95_ms": 0.0011710000000000002,
+              "total_samples": 2947,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.638203,
+              "max_ms": 4.503907,
+              "mean_ms": 1.1669889708333325,
+              "p50_ms": 1.123183,
+              "p95_ms": 1.54985,
+              "total_samples": 2947,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.016075000000000002,
+              "max_ms": 0.182392,
+              "mean_ms": 0.018644808333333335,
+              "p50_ms": 0.015643,
+              "p95_ms": 0.028694,
+              "total_samples": 1342,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 127.833689,
+            "max_ms": 269.451137,
+            "mean_ms": 139.39436913333333,
+            "p50_ms": 134.501651,
+            "p95_ms": 194.68581600000002,
+            "total_samples": 1341,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 0,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 50,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 50,
+            "hidden_instances": 0,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 489,
+              "animation_nodes": 1863,
+              "estimated_bytes": 13636492,
+              "instances": 50,
+              "primitives": 1295,
+              "resident_models": 7,
+              "texture_pixels": 0,
+              "triangles": 85008,
+              "vertices": 255024
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247776765,
+          "elapsed_seconds": 231.868520694,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 24,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 1,
+          "deferred_total": 228,
+          "eligible": 22,
+          "evaluated": 21,
+          "evaluated_total": 2434,
+          "far_decisions": 3,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 121,
+          "threat_candidates": 166,
+          "threat_candidates_total": 15700
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000931,
+              "max_ms": 0.016606,
+              "mean_ms": 0.0012781166666666665,
+              "p50_ms": 0.0007109999999999999,
+              "p95_ms": 0.002293,
+              "total_samples": 4543,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.022274000000000002,
+              "max_ms": 0.104008,
+              "mean_ms": 0.02326859999999998,
+              "p50_ms": 0.021192,
+              "p95_ms": 0.038278,
+              "total_samples": 3149,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.007892,
+              "max_ms": 0.251911,
+              "mean_ms": 0.02097269583333334,
+              "p50_ms": 0.014572,
+              "p95_ms": 0.09199,
+              "total_samples": 3149,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00017999999999999998,
+              "max_ms": 0.07742800000000001,
+              "mean_ms": 0.0009170791666666668,
+              "p50_ms": 0.00033,
+              "p95_ms": 0.001162,
+              "total_samples": 3149,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.1982780000000002,
+              "max_ms": 23.353568000000003,
+              "mean_ms": 1.3181343166666655,
+              "p50_ms": 1.1518979999999999,
+              "p95_ms": 1.5418070000000001,
+              "total_samples": 3149,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.017586,
+              "max_ms": 0.182392,
+              "mean_ms": 0.01981645833333333,
+              "p50_ms": 0.016075000000000002,
+              "p95_ms": 0.034041,
+              "total_samples": 1425,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 121.019088,
+            "max_ms": 232.791644,
+            "mean_ms": 133.93281834583325,
+            "p50_ms": 129.984503,
+            "p95_ms": 175.931149,
+            "total_samples": 1424,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 2,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 48,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 48,
+            "hidden_instances": 2,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 466,
+              "animation_nodes": 1728,
+              "estimated_bytes": 11848092,
+              "instances": 48,
+              "primitives": 1188,
+              "resident_models": 6,
+              "texture_pixels": 0,
+              "triangles": 80904,
+              "vertices": 242712
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 466,
+              "animation_nodes": 1728,
+              "estimated_bytes": 11848092,
+              "instances": 48,
+              "primitives": 1188,
+              "resident_models": 6,
+              "texture_pixels": 0,
+              "triangles": 80904,
+              "vertices": 242712
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247786800,
+          "elapsed_seconds": 241.904086163,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 25,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 1,
+          "deferred_total": 245,
+          "eligible": 22,
+          "evaluated": 21,
+          "evaluated_total": 2637,
+          "far_decisions": 2,
+          "near_decisions": 19,
+          "observer_candidates": 122,
+          "passes": 131,
+          "threat_candidates": 178,
+          "threat_candidates_total": 17424
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000501,
+              "max_ms": 0.007751000000000001,
+              "mean_ms": 0.001224975,
+              "p50_ms": 0.000661,
+              "p95_ms": 0.002394,
+              "total_samples": 4744,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.021703,
+              "max_ms": 0.144531,
+              "mean_ms": 0.023630191666666658,
+              "p50_ms": 0.020982,
+              "p95_ms": 0.037667,
+              "total_samples": 3350,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.009174,
+              "max_ms": 0.251444,
+              "mean_ms": 0.021238279166666676,
+              "p50_ms": 0.014572,
+              "p95_ms": 0.026891,
+              "total_samples": 3350,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00035,
+              "max_ms": 0.010356,
+              "mean_ms": 0.0005630041666666667,
+              "p50_ms": 0.0003,
+              "p95_ms": 0.001062,
+              "total_samples": 3350,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.574958,
+              "max_ms": 23.353568000000003,
+              "mean_ms": 1.2133181291666666,
+              "p50_ms": 1.0300610000000001,
+              "p95_ms": 1.34531,
+              "total_samples": 3350,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.014152,
+              "max_ms": 0.182392,
+              "mean_ms": 0.020425179166666658,
+              "p50_ms": 0.016375,
+              "p95_ms": 0.036055,
+              "total_samples": 1506,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 128.557494,
+            "max_ms": 232.791644,
+            "mean_ms": 129.60408040000002,
+            "p50_ms": 123.679609,
+            "p95_ms": 165.42284400000003,
+            "total_samples": 1505,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 2,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 48,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 48,
+            "hidden_instances": 2,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 466,
+              "animation_nodes": 1728,
+              "estimated_bytes": 11848092,
+              "instances": 48,
+              "primitives": 1188,
+              "resident_models": 6,
+              "texture_pixels": 0,
+              "triangles": 80904,
+              "vertices": 242712
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 466,
+              "animation_nodes": 1728,
+              "estimated_bytes": 11848092,
+              "instances": 48,
+              "primitives": 1188,
+              "resident_models": 6,
+              "texture_pixels": 0,
+              "triangles": 80904,
+              "vertices": 242712
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247796845,
+          "elapsed_seconds": 251.948953565,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 26,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 1,
+          "deferred_total": 265,
+          "eligible": 22,
+          "evaluated": 21,
+          "evaluated_total": 2837,
+          "far_decisions": 3,
+          "near_decisions": 18,
+          "observer_candidates": 122,
+          "passes": 141,
+          "threat_candidates": 191,
+          "threat_candidates_total": 19243
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": false
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.0006309999999999999,
+              "max_ms": 0.049034,
+              "mean_ms": 0.001427116666666667,
+              "p50_ms": 0.000661,
+              "p95_ms": 0.002424,
+              "total_samples": 4945,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.017226,
+              "max_ms": 0.166498,
+              "mean_ms": 0.02390909166666667,
+              "p50_ms": 0.021233000000000002,
+              "p95_ms": 0.037637,
+              "total_samples": 3551,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.008343,
+              "max_ms": 0.22468,
+              "mean_ms": 0.021464825000000003,
+              "p50_ms": 0.01376,
+              "p95_ms": 0.056474,
+              "total_samples": 3551,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.00021,
+              "max_ms": 0.022113,
+              "mean_ms": 0.00061605,
+              "p50_ms": 0.000321,
+              "p95_ms": 0.001112,
+              "total_samples": 3551,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.451979,
+              "max_ms": 7.293627,
+              "mean_ms": 1.169017275,
+              "p50_ms": 1.129843,
+              "p95_ms": 1.470269,
+              "total_samples": 3551,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.014883,
+              "max_ms": 0.097678,
+              "mean_ms": 0.02050262916666666,
+              "p50_ms": 0.017146,
+              "p95_ms": 0.036506,
+              "total_samples": 1584,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 140.852844,
+            "max_ms": 171.162296,
+            "mean_ms": 124.77343771250008,
+            "p50_ms": 123.871552,
+            "p95_ms": 139.156731,
+            "total_samples": 1583,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      },
+      {
+        "asset_pack": {
+          "failed_models": 0,
+          "fallback_instances": 2,
+          "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+          "last_error": null,
+          "loading_instances": 0,
+          "model_count": 7,
+          "name": "Terra original character transport and wildlife",
+          "ready_instances": 48,
+          "rejected_instances": 0,
+          "scene_budget": {
+            "deferred_instances": 0,
+            "distant_instances": 0,
+            "draining": false,
+            "eligible_instances": 48,
+            "hidden_instances": 2,
+            "immutable_pack_estimated_bytes": 2382856,
+            "invalid_limits": false,
+            "limits": {
+              "animation_channels": 1024,
+              "animation_nodes": 4096,
+              "concurrent_model_loads": 1,
+              "distance_hysteresis_m": 150.0,
+              "distance_m": 650.0,
+              "estimated_bytes": 134217728,
+              "instances": 64,
+              "primitives": 2048,
+              "texture_pixels": 8388608,
+              "triangles": 200000,
+              "vertices": 400000
+            },
+            "loading_models": 0,
+            "peak_reserved_estimated_bytes": 13694148,
+            "reserved": {
+              "animation_channels": 466,
+              "animation_nodes": 1728,
+              "estimated_bytes": 11848092,
+              "instances": 48,
+              "primitives": 1188,
+              "resident_models": 6,
+              "texture_pixels": 0,
+              "triangles": 80904,
+              "vertices": 242712
+            },
+            "retiring_models": 0,
+            "selected": {
+              "animation_channels": 466,
+              "animation_nodes": 1728,
+              "estimated_bytes": 11848092,
+              "instances": 48,
+              "primitives": 1188,
+              "resident_models": 6,
+              "texture_pixels": 0,
+              "triangles": 80904,
+              "vertices": 242712
+            },
+            "unmetered_instances": 0
+          }
+        },
+        "atmosphere_active": false,
+        "capture": {
+          "captured_unix_ms": 1793247806866,
+          "elapsed_seconds": 261.969795715,
+          "last_export_error": null,
+          "periodic_interval_seconds": 10,
+          "prior_write_failures": 0,
+          "sequence": 27,
+          "session": "1793247544896-60180-0",
+          "skipped_busy_captures": 0,
+          "status": "running"
+        },
+        "ecology_work": {
+          "deferred": 0,
+          "deferred_total": 283,
+          "eligible": 22,
+          "evaluated": 22,
+          "evaluated_total": 3039,
+          "far_decisions": 2,
+          "near_decisions": 20,
+          "observer_candidates": 122,
+          "passes": 151,
+          "threat_candidates": 190,
+          "threat_candidates_total": 21108
+        },
+        "last_simulation_error": null,
+        "last_world_error": null,
+        "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+        "network_authority": false,
+        "owner_display_prediction": null,
+        "population": {
+          "bodies": 66,
+          "counts_are_active_working_set": false,
+          "counts_are_received_view": false,
+          "wildlife": 22
+        },
+        "presentation": {
+          "immersive_controls": true,
+          "inspector_open": true
+        },
+        "quality": {
+          "atmospheric_sky": false,
+          "quality": "performance",
+          "terrain_lod": true
+        },
+        "regional_persistence": {
+          "authority_paused": false,
+          "blocked": false,
+          "checkpoint_stages": {
+            "compose_ms": 0.0,
+            "deleted_pages": 0,
+            "encode_ms": 0.0,
+            "encoded_page_bytes": 0,
+            "encoded_pages": 0,
+            "install_ms": 0.0,
+            "reused_page_bytes": 0,
+            "reused_pages": 0,
+            "select_ms": 0.0,
+            "selected_records_validated": 0,
+            "transaction_ms": 0.0,
+            "validation": {
+              "active_records": 0,
+              "certified_environment_groups": 0,
+              "certified_environment_records": 0,
+              "merged_scope_records": 0
+            }
+          },
+          "committed": null,
+          "enabled": false,
+          "last_checkpoint_ms": 0.0,
+          "last_checkpoint_reason": "",
+          "last_error": null,
+          "last_submission_ms": 0.0,
+          "pending": false,
+          "restored": false,
+          "seconds_since_checkpoint": 0.0
+        },
+        "release": "0.16.0",
+        "render": {
+          "chunks": 9,
+          "lod_chunks": [
+            7,
+            2,
+            0
+          ],
+          "pending": 0,
+          "source_vertices": 664645,
+          "terrain_full_vertices": 38025,
+          "terrain_vertices": 34057
+        },
+        "replication": null,
+        "source": {
+          "epoch": null,
+          "heightmap": true,
+          "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+        },
+        "timings": {
+          "cpu_stages": {
+            "base_world": {
+              "last_ms": 0.000691,
+              "max_ms": 0.008503,
+              "mean_ms": 0.0013039583333333334,
+              "p50_ms": 0.000892,
+              "p95_ms": 0.002323,
+              "total_samples": 5145,
+              "window_samples": 240
+            },
+            "controlled_motion": {
+              "last_ms": 0.020301,
+              "max_ms": 0.118119,
+              "mean_ms": 0.02354351666666667,
+              "p50_ms": 0.021463,
+              "p95_ms": 0.037135999999999995,
+              "total_samples": 3751,
+              "window_samples": 240
+            },
+            "ecology": {
+              "last_ms": 0.032309,
+              "max_ms": 0.398894,
+              "mean_ms": 0.021676204166666664,
+              "p50_ms": 0.013741,
+              "p95_ms": 0.104589,
+              "total_samples": 3751,
+              "window_samples": 240
+            },
+            "economy": {
+              "last_ms": 0.000661,
+              "max_ms": 0.041373,
+              "mean_ms": 0.0008943833333333335,
+              "p50_ms": 0.000471,
+              "p95_ms": 0.0011719999999999999,
+              "total_samples": 3751,
+              "window_samples": 240
+            },
+            "living": {
+              "last_ms": 1.103739,
+              "max_ms": 31.090819,
+              "mean_ms": 3.440142512499999,
+              "p50_ms": 1.131253,
+              "p95_ms": 18.604782,
+              "total_samples": 3751,
+              "window_samples": 240
+            },
+            "streaming": {
+              "last_ms": 0.034772,
+              "max_ms": 0.097678,
+              "mean_ms": 0.019844479166666668,
+              "p50_ms": 0.016776,
+              "p95_ms": 0.033541,
+              "total_samples": 1662,
+              "window_samples": 240
+            }
+          },
+          "frame_interval": {
+            "last_ms": 129.562352,
+            "max_ms": 171.162296,
+            "mean_ms": 126.91309435416672,
+            "p50_ms": 125.67756299999999,
+            "p95_ms": 143.016874,
+            "total_samples": 1661,
+            "window_samples": 240
+          },
+          "window_capacity": 240
+        },
+        "transport": null
+      }
+    ]
+  },
+  "last_simulation_error": null,
+  "last_world_error": null,
+  "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+  "network_authority": false,
+  "owner_display_prediction": null,
+  "population": {
+    "bodies": 66,
+    "counts_are_active_working_set": false,
+    "counts_are_received_view": false,
+    "wildlife": 22
+  },
+  "presentation": {
+    "immersive_controls": true,
+    "inspector_open": true
+  },
+  "quality": {
+    "atmospheric_sky": false,
+    "quality": "performance",
+    "terrain_lod": true
+  },
+  "regional_persistence": {
+    "authority_paused": false,
+    "blocked": false,
+    "checkpoint_stages": {
+      "compose_ms": 0.0,
+      "deleted_pages": 0,
+      "encode_ms": 0.0,
+      "encoded_page_bytes": 0,
+      "encoded_pages": 0,
+      "install_ms": 0.0,
+      "reused_page_bytes": 0,
+      "reused_pages": 0,
+      "select_ms": 0.0,
+      "selected_records_validated": 0,
+      "transaction_ms": 0.0,
+      "validation": {
+        "active_records": 0,
+        "certified_environment_groups": 0,
+        "certified_environment_records": 0,
+        "merged_scope_records": 0
+      }
+    },
+    "committed": null,
+    "enabled": false,
+    "last_checkpoint_ms": 0.0,
+    "last_checkpoint_reason": "",
+    "last_error": null,
+    "last_submission_ms": 0.0,
+    "pending": false,
+    "restored": false,
+    "seconds_since_checkpoint": 0.0
+  },
+  "release": "0.16.0",
+  "render": {
+    "chunks": 9,
+    "lod_chunks": [
+      7,
+      2,
+      0
+    ],
+    "pending": 0,
+    "source_vertices": 664645,
+    "terrain_full_vertices": 38025,
+    "terrain_vertices": 34057
+  },
+  "replication": null,
+  "source": {
+    "epoch": null,
+    "heightmap": true,
+    "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+  },
+  "telemetry_schema": 1,
+  "timings": {
+    "cpu_stages": {
+      "base_world": {
+        "last_ms": 0.000691,
+        "max_ms": 0.008503,
+        "mean_ms": 0.0013039583333333334,
+        "p50_ms": 0.000892,
+        "p95_ms": 0.002323,
+        "total_samples": 5145,
+        "window_samples": 240
+      },
+      "controlled_motion": {
+        "last_ms": 0.020301,
+        "max_ms": 0.118119,
+        "mean_ms": 0.02354351666666667,
+        "p50_ms": 0.021463,
+        "p95_ms": 0.037135999999999995,
+        "total_samples": 3751,
+        "window_samples": 240
+      },
+      "ecology": {
+        "last_ms": 0.032309,
+        "max_ms": 0.398894,
+        "mean_ms": 0.021676204166666664,
+        "p50_ms": 0.013741,
+        "p95_ms": 0.104589,
+        "total_samples": 3751,
+        "window_samples": 240
+      },
+      "economy": {
+        "last_ms": 0.000661,
+        "max_ms": 0.041373,
+        "mean_ms": 0.0008943833333333335,
+        "p50_ms": 0.000471,
+        "p95_ms": 0.0011719999999999999,
+        "total_samples": 3751,
+        "window_samples": 240
+      },
+      "living": {
+        "last_ms": 1.103739,
+        "max_ms": 31.090819,
+        "mean_ms": 3.440142512499999,
+        "p50_ms": 1.131253,
+        "p95_ms": 18.604782,
+        "total_samples": 3751,
+        "window_samples": 240
+      },
+      "streaming": {
+        "last_ms": 0.034772,
+        "max_ms": 0.097678,
+        "mean_ms": 0.019844479166666668,
+        "p50_ms": 0.016776,
+        "p95_ms": 0.033541,
+        "total_samples": 1662,
+        "window_samples": 240
+      }
+    },
+    "frame_interval": {
+      "last_ms": 129.562352,
+      "max_ms": 171.162296,
+      "mean_ms": 126.91309435416672,
+      "p50_ms": 125.67756299999999,
+      "p95_ms": 143.016874,
+      "total_samples": 1661,
+      "window_samples": 240
+    },
+    "window_capacity": 240
+  },
+  "transport": null
+}

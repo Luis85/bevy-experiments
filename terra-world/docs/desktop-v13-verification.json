@@ -1,0 +1,285 @@
+{
+  "version": "0.13.0",
+  "status": "passed",
+  "finished_utc": "2026-10-28T18:47:33.643266+00:00",
+  "platform": "linux-x86_64",
+  "build_profile": "dev (opt-level 1)",
+  "native_binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+  "package": {
+    "status": "passed",
+    "output": "/workspace/scratch/0fdc9aa7bc4c/output/terra-world-0.13.0-linux-x86_64.zip",
+    "release": "0.13.0",
+    "platform": "linux-x86_64",
+    "build_profile": "dev",
+    "files": 164,
+    "bytes": 38475673,
+    "sha256": "150d46c225e56b54b902748612dc7ab4370d698c79a4586e067df2f860a4a35b",
+    "native_binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0"
+  },
+  "package_manifest": {
+    "path": "docs/verification/v0.13-final/desktop-package-manifest.json",
+    "sha256": "6b8e3a007782f31b544d050532d43795ba2cd673f7d83a64f599108f8047b78d",
+    "bytes": 19629
+  },
+  "sessions": [
+    {
+      "kind": "launcher",
+      "process": {
+        "release": "0.13.0",
+        "kind": "launcher",
+        "command": [
+          "/tmp/terra-native/v13-desktop-extracted/terra-world-0.13.0-linux-x86_64/start-terra.sh"
+        ],
+        "instrumentation": [
+          "strace",
+          "-f",
+          "-qq",
+          "-e",
+          "trace=open,openat"
+        ],
+        "working_directory": "/tmp",
+        "native_binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "started_utc": "2026-10-28T18:40:07.271118+00:00",
+        "pid": 131194,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:41:01.590559+00:00",
+        "source_checkout_file_opens": 0,
+        "opened_packaged_connected_manifest": false,
+        "opened_packaged_wildlife_pack": false,
+        "original_packaged_members_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-desktop-launcher.log",
+          "sha256": "d7d315d7825b762912aeec453bef49a5effb5ae33ae471eddcf135563548966c",
+          "bytes": 1324
+        },
+        "-files.log": {
+          "path": "docs/verification/v0.13-final/v13-desktop-launcher-files.log",
+          "sha256": "2ed736392f525b8f793c8604f1e5dcbe2fdb98ab4b140f3802222a03f0864f38",
+          "bytes": 41223
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-desktop-launcher-process.json",
+          "sha256": "69226ddf1f7fbd59821cbdf95c97628b12969c438bb7ff3e37b1be15b10eaa21",
+          "bytes": 696
+        }
+      }
+    },
+    {
+      "kind": "external",
+      "process": {
+        "release": "0.13.0",
+        "kind": "external",
+        "command": [
+          "/tmp/terra-native/v13-desktop-extracted/terra-world-0.13.0-linux-x86_64/terra-demo",
+          "--config",
+          "configs/connected-heightmap.json",
+          "--camp-view",
+          "--quality",
+          "performance",
+          "--user-data",
+          "/tmp/terra-native/v13-desktop-data/terra-world",
+          "--telemetry",
+          "/tmp/terra-native/v13-desktop-external-telemetry.json",
+          "--asset-pack",
+          "crates/terra-bevy/assets/wildlife-pack/pack.json"
+        ],
+        "instrumentation": [
+          "strace",
+          "-f",
+          "-qq",
+          "-e",
+          "trace=open,openat"
+        ],
+        "working_directory": "/tmp/terra-native/v13-desktop-extracted/terra-world-0.13.0-linux-x86_64",
+        "native_binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "started_utc": "2026-10-28T18:45:13.048211+00:00",
+        "pid": 131536,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:46:16.980128+00:00",
+        "source_checkout_file_opens": 0,
+        "opened_packaged_connected_manifest": true,
+        "opened_packaged_wildlife_pack": true,
+        "original_packaged_members_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-desktop-external.log",
+          "sha256": "a7fbfc517016ccfc1d214e8ce108ca5373868aa13dff5521e1f0c81d5ab813f4",
+          "bytes": 2727
+        },
+        "-files.log": {
+          "path": "docs/verification/v0.13-final/v13-desktop-external-files.log",
+          "sha256": "7d369c29eb762c59a570a3abe60ab090f33f63d6d66d1a2b9da9ff3a6205d738",
+          "bytes": 80755
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-desktop-external-process.json",
+          "sha256": "6d8755651e1e9427f59e6a3c6b2e61d54b2d98a4e57ca068a98daca24d95fc27",
+          "bytes": 1097
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.13-final/v13-desktop-external-telemetry.json",
+          "sha256": "03bf5657799e6245f181fbff07b67765bfa69cd70897d9703a1800e68d32df33",
+          "bytes": 5334
+        }
+      }
+    }
+  ],
+  "source": {
+    "epoch": null,
+    "heightmap": true,
+    "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+  },
+  "asset_pack": {
+    "failed_models": 0,
+    "fallback_instances": 1,
+    "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+    "last_error": null,
+    "loading_instances": 0,
+    "model_count": 5,
+    "name": "Terra woodland wildlife",
+    "ready_instances": 49,
+    "rejected_instances": 0,
+    "scene_budget": {
+      "deferred_instances": 0,
+      "distant_instances": 1,
+      "draining": false,
+      "eligible_instances": 49,
+      "hidden_instances": 0,
+      "immutable_pack_estimated_bytes": 1553668,
+      "invalid_limits": false,
+      "limits": {
+        "animation_channels": 1024,
+        "animation_nodes": 4096,
+        "concurrent_model_loads": 1,
+        "distance_hysteresis_m": 150.0,
+        "distance_m": 650.0,
+        "estimated_bytes": 134217728,
+        "instances": 64,
+        "primitives": 2048,
+        "texture_pixels": 8388608,
+        "triangles": 200000,
+        "vertices": 400000
+      },
+      "loading_models": 0,
+      "peak_reserved_estimated_bytes": 9551500,
+      "reserved": {
+        "animation_channels": 343,
+        "animation_nodes": 1620,
+        "estimated_bytes": 9551500,
+        "instances": 49,
+        "primitives": 1228,
+        "resident_models": 5,
+        "texture_pixels": 0,
+        "triangles": 79828,
+        "vertices": 239484
+      },
+      "retiring_models": 0,
+      "selected": {
+        "animation_channels": 343,
+        "animation_nodes": 1620,
+        "estimated_bytes": 9551500,
+        "instances": 49,
+        "primitives": 1228,
+        "resident_models": 5,
+        "texture_pixels": 0,
+        "triangles": 79828,
+        "vertices": 239484
+      },
+      "unmetered_instances": 0
+    }
+  },
+  "regional_persistence": {
+    "authority_paused": false,
+    "blocked": false,
+    "checkpoint_stages": {
+      "compose_ms": 19.279879,
+      "deleted_pages": 0,
+      "encode_ms": 11.566571,
+      "encoded_page_bytes": 0,
+      "encoded_pages": 0,
+      "install_ms": 15.953094,
+      "reused_page_bytes": 206705,
+      "reused_pages": 38,
+      "select_ms": 8.659234999999999,
+      "selected_records_validated": 679,
+      "transaction_ms": 9.573526000000001,
+      "validation": {
+        "active_records": 679,
+        "certified_environment_groups": 0,
+        "certified_environment_records": 0,
+        "merged_scope_records": 679
+      }
+    },
+    "committed": {
+      "active_records": 553,
+      "active_regions": 38,
+      "checkpoint_bytes": 1613614,
+      "dependency_regions": 0,
+      "dormant_records": 0,
+      "dormant_regions": 0,
+      "generation": 44,
+      "global_records": 126,
+      "pinned_regions": 9
+    },
+    "enabled": true,
+    "last_checkpoint_ms": 67.840123,
+    "last_checkpoint_reason": "Graceful exit",
+    "last_error": null,
+    "last_submission_ms": 133.64575000000002,
+    "pending": false,
+    "restored": true,
+    "seconds_since_checkpoint": 0.0
+  },
+  "captures": [
+    {
+      "path": "docs/screenshots/v13-desktop-launcher.png",
+      "sha256": "2afa036c51c32a850111141a5a3735b191078fbdd3e623c43c6bbc5ab794db89",
+      "bytes": 637801
+    },
+    {
+      "path": "docs/screenshots/v13-desktop-external-models.png",
+      "sha256": "65c78ac1a603cc5dc8ee858021149d8778645b785ccbcad6b34f8ad6ffe7eae8",
+      "bytes": 1192785
+    }
+  ],
+  "probe_setup_observations": {
+    "unsupported_menu_option": {
+      "outcome": "The test invocation added --quality to --menu, which rejects that option. Standard launcher invocation was then accepted.",
+      "log": {
+        "path": "docs/verification/v0.13-final/v13-desktop-launcher-unsupported-option.log",
+        "sha256": "d293f40f9c0ae273de3b15131d881eae4aa499bd5b2fc06babe2db0bbfa10c43",
+        "bytes": 48
+      }
+    },
+    "embedded_pack_expectation": {
+      "outcome": "The default prepared-world run loaded embedded wildlife and saved without world/simulation/asset errors. A probe assertion incorrectly required filesystem model-pack opens. The accepted external run explicitly supplies --asset-pack and records those file opens.",
+      "telemetry": {
+        "path": "docs/verification/v0.13-final/v13-desktop-default-telemetry.json",
+        "sha256": "d6cd40808522a26ab84fb776d9ad4438aa5ce88b8212f3abdbed30afa407d03c",
+        "bytes": 6376
+      },
+      "log": {
+        "path": "docs/verification/v0.13-final/v13-desktop-default.log",
+        "sha256": "07b95e925f79dd648cd9bb6fbaeac89e9ee2f1ce14f0b17fa0bc4cd4cb79d68f",
+        "bytes": 2727
+      }
+    }
+  },
+  "checks": {
+    "zip_crc_and_all_member_hashes": true,
+    "native_executable_matches_gates": true,
+    "standard_launcher_started_from_outside_project": true,
+    "explicit_connected_terrain_and_external_model_pack_loaded": true,
+    "source_checkout_file_opens_zero_in_accepted_processes": true,
+    "packaged_members_unchanged_after_native_smoke": true,
+    "graceful_save_and_exit": true
+  },
+  "limitations": [
+    "Linux software rendering in this container only; system graphics/input/C runtime dependencies remain required.",
+    "Windows build/CI, signing, installer/update policy, physical devices and target GPU qualification were not executed.",
+    "Developer source, historical captures and complete release records are in the companion source project; this desktop package contains its explicit runtime payload and accepted automated gate evidence."
+  ]
+}

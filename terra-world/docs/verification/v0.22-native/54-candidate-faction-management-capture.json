@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "54-candidate-faction-management",
+  "capture_started_utc": "2026-10-29T21:15:58.037602+00:00",
+  "captured_utc": "2026-10-29T21:15:58.257989+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 210688,
+  "window_pid_status": "available",
+  "window_pid_before": 210688,
+  "window_pid_after": 210688,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "54-candidate-faction-management.png",
+    "sha256": "4ff71aa081e288e4fa06a1f0d56d32e742c57dae1995841fe0ec87f1f9ee40ff",
+    "bytes": 589563
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

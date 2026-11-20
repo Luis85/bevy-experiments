@@ -1,0 +1,30 @@
+{
+  "status": "matched",
+  "files": [
+    {
+      "file": "character-pack/fieldhand.glb",
+      "bytes": 162140,
+      "sha256": "b5d62261ee73a9a987b754b322ea95ce9d84941ca82e03c87de00568aa759b7e"
+    },
+    {
+      "file": "character-pack/comet-cabin.glb",
+      "bytes": 224424,
+      "sha256": "07f58f28cc002288213bec5a03db3e318fb07ec8f6708aa713fd807332353d17"
+    },
+    {
+      "file": "character-pack/pack.json",
+      "bytes": 993,
+      "sha256": "e099129736ef939986eedf1aaa77488839232e588a39e35abec41931447859f7"
+    },
+    {
+      "file": "character-demo.pack.json",
+      "bytes": 5132,
+      "sha256": "d0a706a66e69a2c916a04e2e7cd7a51421243806eb20f057e7fc59124eeb8de6"
+    },
+    {
+      "file": "character-authoring.recipe.json",
+      "bytes": 5377,
+      "sha256": "cad9216953aa7e839db1a660181d362577c04229f688e39ec71582f4ac600eed"
+    }
+  ]
+}

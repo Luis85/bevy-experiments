@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo"
+  ],
+  "started_utc": "2026-10-30T12:57:18.614601+00:00",
+  "finished_utc": "2026-10-30T12:58:18.275776+00:00",
+  "seconds": 59.70299407800121,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 162,
+    "retained_log_bytes": 162,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "input_count": 390,
+  "source_inputs": "native-final-build-02-inputs.json",
+  "source_inputs_sha256": "7d3301999afa6184e8f68248e998071b6e916794ea2a6e509bc03ac39fc6efa2",
+  "changed_inputs": [],
+  "log": "native-final-build-02.log",
+  "log_sha256": "9c0f0f205c2f62439d29e2e732855493e8652159869cccc36e2cfe23ff789b8d",
+  "binary": "/tmp/terra023-target/debug/terra-demo",
+  "binary_sha256": "092484f4ffbfc9f89b4950f7b55a935864117e5a7c96e83744224e07f53cb87d",
+  "scope": "Main executable after bounded command-focus inspector text re-extraction correction. Focused state regression passed separately; actual native pixel confirmation and full canonical251-test gate remain pending."
+}

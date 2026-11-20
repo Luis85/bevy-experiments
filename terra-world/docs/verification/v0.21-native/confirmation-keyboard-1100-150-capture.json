@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.21.0",
+  "capture_name": "confirmation-keyboard-1100-150",
+  "capture_started_utc": "2026-10-29T19:40:51.923373+00:00",
+  "captured_utc": "2026-10-29T19:40:52.001873+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Main menu",
+  "window_pid": 174281,
+  "window_pid_status": "available",
+  "window_pid_before": 174281,
+  "window_pid_after": 174281,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "confirmation-keyboard-1100-150.png",
+    "sha256": "5f1c01b5afb57329b60e59d5ce047cdefc27061c911bf10953992cb352383201",
+    "bytes": 153469
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

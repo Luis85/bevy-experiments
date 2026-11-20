@@ -1,0 +1,33 @@
+{
+  "release": "0.14.0",
+  "phase": "accepted executable confirmation",
+  "checks": {
+    "transport_unchanged": true,
+    "players_unchanged": true,
+    "factions_unchanged": true,
+    "settlements_unchanged": true,
+    "living_unchanged": true,
+    "clock_unchanged": true,
+    "identity_unchanged": true,
+    "player_id_unchanged": true,
+    "politics_unchanged": true
+  },
+  "before_export_sha256": "319d09e7e1cd8141f59868209ce12b294a6cd72aa9e0d703fd0f6a7dab1aef61",
+  "after_export_sha256": "319d09e7e1cd8141f59868209ce12b294a6cd72aa9e0d703fd0f6a7dab1aef61",
+  "capture": {
+    "captured_unix_ms": 1793220081190,
+    "elapsed_seconds": 203.319700022,
+    "last_export_error": null,
+    "periodic_interval_seconds": 5,
+    "prior_write_failures": 0,
+    "sequence": 42,
+    "session": "1793219877870-22057-0",
+    "skipped_busy_captures": 0,
+    "status": "graceful_exit"
+  },
+  "retained_snapshots": 16,
+  "asset_ready_instances": 22,
+  "asset_identity": "sha256:58e4c7203eaea18b5cc337243d70a0918211a2770fc7c172fa5b0b9a71143634",
+  "exact_scope": "Nine compared subsystems retained. This final run also retained the complete export; the earlier candidate run could add streamed environmental records.",
+  "complete_export_exact": true
+}

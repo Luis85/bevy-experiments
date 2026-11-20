@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "release": "0.9.0",
+  "status": "passed",
+  "recorded_at_utc": "2026-10-27T18:06:49.848353+00:00",
+  "final_binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+  "builds": {
+    "initial_network_review": "8aa3a510922fe4e4ad46c01883b052d05c6684e027048821ac8696d6d45409fc",
+    "world_creation_and_grounding": "941b32e6d8f45d833dae9823bbaaff8bcff4f9a284276787db4921f9884e5eb7",
+    "footer_and_vehicle_confirmation": "455e6a7c3db68a385abd79aa97da63a91bb65cbfc7d2c5963b28f6a6671d5892",
+    "final_scroll_confirmation": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a"
+  },
+  "captures": [
+    {
+      "file": "screenshots/v9-main-menu.png",
+      "sha256": "2472f7808120afbb088fa9ab252e46454384b9561fc1756153449cbb0c2c003a",
+      "width": 1440,
+      "height": 900,
+      "stage": "final_scroll_confirmation",
+      "binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+      "caption": "Continue opens the previously created Valley Commons world."
+    },
+    {
+      "file": "screenshots/v9-character.png",
+      "sha256": "d18474ece68476b177cda189570f1337bd706fe5e1a7a3a91727f2feb1af3429",
+      "width": 1440,
+      "height": 900,
+      "stage": "world_creation_and_grounding",
+      "binary_sha256": "941b32e6d8f45d833dae9823bbaaff8bcff4f9a284276787db4921f9884e5eb7",
+      "caption": "Native character creation at 150% text; the subsequent typed character is Rowan Vale."
+    },
+    {
+      "file": "screenshots/v9-world-settings.png",
+      "sha256": "926bd98350d39e1634c65b5f2575acd6cecaaeee06cf82a97d9fd6a72467587e",
+      "width": 1440,
+      "height": 900,
+      "stage": "world_creation_and_grounding",
+      "binary_sha256": "941b32e6d8f45d833dae9823bbaaff8bcff4f9a284276787db4921f9884e5eb7",
+      "caption": "Heightmap valley, radius 3, regional persistence and real-time clock selected in native settings."
+    },
+    {
+      "file": "screenshots/v9-world-review.png",
+      "sha256": "07dc7b12aed286e959da3fc8e4867a042d1736ee60e03f840e33efecc349c8e8",
+      "width": 1440,
+      "height": 900,
+      "stage": "world_creation_and_grounding",
+      "binary_sha256": "941b32e6d8f45d833dae9823bbaaff8bcff4f9a284276787db4921f9884e5eb7",
+      "caption": "Final character/world review before creating Valley Commons."
+    },
+    {
+      "file": "screenshots/v9-multiplayer-source.png",
+      "sha256": "d10fdf389c9a7ce12e6cf6c5750e9dd53203d034029d1954080c478653751f21",
+      "width": 1440,
+      "height": 900,
+      "stage": "initial_network_review",
+      "binary_sha256": "8aa3a510922fe4e4ad46c01883b052d05c6684e027048821ac8696d6d45409fc",
+      "caption": "Native Join with explicit matching heightmap source configuration and loopback host."
+    },
+    {
+      "file": "screenshots/v9-company-keyboard.png",
+      "sha256": "d249ca57d1c71d176dc9aea3ecab00a443a769f4428a69f8ae4948c0c71d9e9d",
+      "width": 1440,
+      "height": 900,
+      "stage": "initial_network_review",
+      "binary_sha256": "8aa3a510922fe4e4ad46c01883b052d05c6684e027048821ac8696d6d45409fc",
+      "caption": "Company editor accepts normal physical keyboard typing through the on-screen keyboard workflow."
+    },
+    {
+      "file": "screenshots/v9-warehouse-buy.png",
+      "sha256": "2af61b622aed87093237c489cdac081876936d48d55ab0029c5510200787f12b",
+      "width": 1440,
+      "height": 900,
+      "stage": "initial_network_review",
+      "binary_sha256": "8aa3a510922fe4e4ad46c01883b052d05c6684e027048821ac8696d6d45409fc",
+      "caption": "One bread purchased into the nearby company depot for 2.90 credits."
+    },
+    {
+      "file": "screenshots/v9-warehouse-sale.png",
+      "sha256": "f95154f82e6bffb57e3f8e4e31cb9128fd5c810c3d758e516bd747674ebc639e",
+      "width": 1440,
+      "height": 900,
+      "stage": "initial_network_review",
+      "binary_sha256": "8aa3a510922fe4e4ad46c01883b052d05c6684e027048821ac8696d6d45409fc",
+      "caption": "The bread sold for 1.40 credits; the final company balance is 23.50 credits."
+    },
+    {
+      "file": "screenshots/v9-third-person.png",
+      "sha256": "f79fe2006190e3c45f18c6c83bda7963ecea2a56f1b4c1ae2f220b614364b897",
+      "width": 1440,
+      "height": 900,
+      "stage": "footer_and_vehicle_confirmation",
+      "binary_sha256": "455e6a7c3db68a385abd79aa97da63a91bb65cbfc7d2c5963b28f6a6671d5892",
+      "caption": "Possessed Rowan Vale in third person, beside the local market and source woodland."
+    },
+    {
+      "file": "screenshots/v9-first-person.png",
+      "sha256": "5ccbb984b5f3f02e39501d02ac5c14a476a11aa30b09ba4582cc8d9a6ff42be0",
+      "width": 1440,
+      "height": 900,
+      "stage": "footer_and_vehicle_confirmation",
+      "binary_sha256": "455e6a7c3db68a385abd79aa97da63a91bb65cbfc7d2c5963b28f6a6671d5892",
+      "caption": "The same possessed actor in first person."
+    },
+    {
+      "file": "screenshots/v9-driving.png",
+      "sha256": "72236618a28bc3265d24ccae532d69f8b3a10344e6d231f72e347faf4f67da49",
+      "width": 1440,
+      "height": 900,
+      "stage": "footer_and_vehicle_confirmation",
+      "binary_sha256": "455e6a7c3db68a385abd79aa97da63a91bb65cbfc7d2c5963b28f6a6671d5892",
+      "caption": "Owned pickup after physical driving, braking and parking on source terrain."
+    },
+    {
+      "file": "screenshots/v9-cockpit.png",
+      "sha256": "2d16ac01f8f6d8bc2b68cac64537d7fa210550f77f4f1afbcc4fe32fb2a0ba44",
+      "width": 1440,
+      "height": 900,
+      "stage": "footer_and_vehicle_confirmation",
+      "binary_sha256": "455e6a7c3db68a385abd79aa97da63a91bb65cbfc7d2c5963b28f6a6671d5892",
+      "caption": "The parked vehicle in first-person cockpit view."
+    },
+    {
+      "file": "screenshots/v9-management-small.png",
+      "sha256": "8762a53e88c2828fcee3df8e85bc7817a52c7f41d6fbaf7c587b96242f246305",
+      "width": 1100,
+      "height": 700,
+      "stage": "final_scroll_confirmation",
+      "binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+      "caption": "1100 by 700, 150% text, complete management guidance and status footer."
+    },
+    {
+      "file": "screenshots/v9-focus-reveal.png",
+      "sha256": "919b001010e7295121fdfa1b42dfe9eebb95dc917f6882caee2e4c041d39c898",
+      "width": 1100,
+      "height": 700,
+      "stage": "final_scroll_confirmation",
+      "binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+      "caption": "Keyboard focus reveals an actual action below nested inspector containers."
+    },
+    {
+      "file": "screenshots/v9-valley.png",
+      "sha256": "d941706f3a7708308413f8d6fd760f23b0ba81dbe41f014346880b7aede4e948",
+      "width": 1440,
+      "height": 900,
+      "stage": "final_scroll_confirmation",
+      "binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+      "caption": "Final native view of the same paused, populated synthetic heightmap valley."
+    },
+    {
+      "file": "screenshots/v9-session-menu.png",
+      "sha256": "a66dea23803a21a989cda29d7a525053a61d2e798fe2560a52214f7e5b3f622b",
+      "width": 1440,
+      "height": 900,
+      "stage": "final_scroll_confirmation",
+      "binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+      "caption": "Native paused session controls before graceful final exit."
+    }
+  ],
+  "environment": {
+    "os": "Linux x86_64",
+    "window_system": "X11 / Xvfb",
+    "renderer": "Mesa lavapipe software Vulkan",
+    "sizes": [
+      [
+        1440,
+        900
+      ],
+      [
+        1100,
+        700
+      ]
+    ],
+    "local_text_scale": 1.5,
+    "initial_network_text_scale": 1.0,
+    "preferences_origin": "Existing private validation preferences copied before native local creation; exercised through the real persisted control-preferences loader.",
+    "physical_input": "Native mouse and keyboard only; gamepad and wheel coverage comes from separate virtual-input Rust tests."
+  },
+  "source": {
+    "manifest": "crates/terra-stream/data/heightmap-demo/manifest-v2.json",
+    "synthetic": true,
+    "revision": "terra-authored-heightmap-demo-v2+43aacff901c4fc38514ac317aad9610792a4f47ce3a22e6d577e66cadd17b1e6",
+    "sha256_by_file": {
+      "manifest-v2.json": "969d365a0d13e02a4128c124b4d5d8117ce8084f896ce3713abea061441e0e7f",
+      "features-v2.geojson": "5872e5d210f353b10a0c213b8916a2ac1f947ad36aede6a4e06222691331dc38",
+      "height.png": "bedd5fbb16a8e2765a928f34874d7a44d31e46e2d3eb643710eba9aba930ef5e"
+    },
+    "interpretation": "Original authored elevation and land cover at geographic coordinates, not surveyed Munich terrain or land use."
+  },
+  "observed_native_checks": {
+    "menu_character_world_settings_review_completed": true,
+    "multiplayer_matching_semantic_source_joined": true,
+    "native_company_text_and_nearby_warehouse_trade_completed": true,
+    "final_saved_world_resumed_with_character_and_vehicle": true,
+    "first_person_and_third_person_actor_views_observed": true,
+    "owned_vehicle_driven_braked_parked_and_cockpit_view_observed": true,
+    "final_management_footer_visible_at_1100x700_text_scale150": true,
+    "final_keyboard_focus_reveals_offscreen_driving_action": true,
+    "final_escape_from_management_returns_to_world_without_pause_leak": true,
+    "final_save_and_quit_button_completed": true
+  },
+  "persisted_state_checks": {
+    "network_company_name_and_registration_persisted": true,
+    "network_personal_cash_exact_18000_minor_units": true,
+    "network_company_cash_exact_2350_minor_units": true,
+    "network_sales_revenue_exact_140_minor_units": true,
+    "network_bread_buy_then_sale_left_one_empty_private_depot": true,
+    "local_character_world_and_semantic_source_profile_preserved": true,
+    "local_first_pause_checkpoint_equal_to_graceful_close": true,
+    "local_final_pause_checkpoint_equal_to_graceful_close": true,
+    "local_vehicle_state_exact_across_final_binary_resume": true,
+    "local_paused_clock_exact_across_final_binary_resume": true,
+    "local_personal_money_and_inventory_preserved": true,
+    "local_regional_database_integrity_ok": true
+  },
+  "network_ledger": {
+    "durable_generation": 33,
+    "company_name": "ValleyFreight",
+    "personal_cash_credits": 180.0,
+    "company_cash_credits": 23.5,
+    "company_sales_revenue_credits": 1.4,
+    "registration_credits": 20.0,
+    "owner_funding_credits": 50.0,
+    "bay_opening_credits": 25.0,
+    "bread_purchase_credits": 2.9,
+    "bread_sale_credits": 1.4,
+    "final_depot_bread": 0,
+    "interpretation": "Real native commands on a loopback authoritative heightmap host; distinct from the automated six-session fleet career."
+  },
+  "local_result": {
+    "character": "Rowan Vale",
+    "world": "Valley Commons",
+    "first_checkpoint_generation": 87,
+    "first_closed_generation": 88,
+    "final_checkpoint_generation": 114,
+    "final_closed_generation": 118,
+    "odometer_m": 49.83270642545619,
+    "fuel_l": 48.74316840229321,
+    "parking_brake": true,
+    "personal_cash_credits": 250.0,
+    "clock_paused": true,
+    "time_scale": 1.0,
+    "comparison_scope": "Each paused checkpoint versus its following graceful close compares complete global state, every retained regional payload and metadata exactly, excluding the incrementing generation. Across final-binary resume, vehicle state, clock, personal cash, inventory and world/character/source profile are checked; resident/dormant layout is allowed to change with the camera."
+  },
+  "review_fixes": [
+    "Terrain grounding proceeds after chunks arrive even while management input is active.",
+    "Management entry starts at the current panel and normal native typing reaches world text drafts.",
+    "Footer and related world/panel/floating HUD bounds follow text scaling.",
+    "Focus reveal skips ordinary and horizontal-only nested Node containers; the regression reproduced a zero-scroll failure before the fix and requires 69 logical pixels at 2\u00d7 DPI after the fix."
+  ],
+  "scope": "Actual finite native interaction and durable-state checks. No gaming-GPU performance, physical-device certification, worldwide surveyed data, full Motor Town parity, AAA asset quality, production MMO hosting or concurrent-player capacity claim.",
+  "privacy": "Screenshots, public source hashes and aggregate outcomes only. Private world databases, world profiles, session capabilities, actor saves and raw verification snapshots are excluded."
+}

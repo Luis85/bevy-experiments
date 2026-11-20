@@ -1,0 +1,25 @@
+{
+  "scope": "Development diagnostic of a saved synthetic dense queue; separate from the final fresh-world acceptance gates.",
+  "initial_rear_waypoint_trap_resolved": true,
+  "observed_courier_progress_m": 8.74,
+  "saved_waypoints_advanced": 2,
+  "downstream_status": "Holding before an ungranted junction whose outgoing exit remains inside another queued vehicle's conservative clearance envelope.",
+  "courier_id": 1000040,
+  "oldest_request_ticket": 20,
+  "exit_blocker_id": 1000034,
+  "exit_clearance": {
+    "longitudinal_separation_m": 1.759009821,
+    "longitudinal_bound_m": 4.75,
+    "lateral_separation_m": 2.460302453,
+    "lateral_bound_m": 2.55
+  },
+  "cargo_held": {
+    "wood": 12
+  },
+  "per_item_conservation_verified": true,
+  "total_goods": 654,
+  "state_validation_passed": true,
+  "cargo_return_or_delivery_completed_in_this_replay": false,
+  "interpretation": "No lost request or invalid scheduler rule was demonstrated. Local recovery does not guarantee clearing every dense saved queue. No contact or permit rule was relaxed to force progress.",
+  "log": "docs/verification/v0.10/traffic-exit-limit.log"
+}

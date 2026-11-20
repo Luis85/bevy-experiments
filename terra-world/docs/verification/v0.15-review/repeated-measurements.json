@@ -1,0 +1,30 @@
+{
+  "release": "0.15.0",
+  "status": "passed",
+  "scope": "Fresh final gate executions compared with retained 0.14 reports; traffic order normalized by fixture only.",
+  "reports": {
+    "career-report.json": {
+      "parsed_report_exact": true,
+      "previous_sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "current_sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7"
+    },
+    "purchased-career-report.json": {
+      "parsed_report_exact": true,
+      "previous_sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "current_sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031"
+    },
+    "novice-career-report.json": {
+      "parsed_report_exact": true,
+      "previous_sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+      "current_sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52"
+    },
+    "traffic-recovery.json": {
+      "by_fixture_exact": true,
+      "note": "Parallel test output order may differ; comparison uses named fixture.",
+      "return_physical_seconds": {
+        "rear-trap": 34.0,
+        "occupied-exit": 49.5
+      }
+    }
+  }
+}

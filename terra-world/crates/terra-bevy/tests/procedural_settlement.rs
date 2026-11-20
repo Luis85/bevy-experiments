@@ -93,6 +93,19 @@ fn default_munich_procedural_settlement_produces_and_physically_delivers() {
         living.metrics
     );
     assert!(living.units.len() >= 39);
+    assert!(!sandbox.state.ecology.animals.is_empty());
+    assert!(sandbox.state.ecology.animals.len() <= sandbox.state.ecology.config.max_animals);
+    assert!(sandbox.state.ecology.metrics.behavior_updates > 0);
+    assert!(!sandbox.state.ecology.resources.is_empty());
+    assert!(!sandbox.state.settlements.contracts.is_empty());
+    eprintln!(
+        "Frontier: {} animals, {} resource patches, {} funded contracts, {} wages paid; {:?}",
+        sandbox.state.ecology.animals.len(),
+        sandbox.state.ecology.resources.len(),
+        sandbox.state.settlements.contracts.len(),
+        sandbox.state.settlements.wages_paid,
+        app.world().resource::<LivingDiagnostics>()
+    );
     assert!(living.metrics.production_cycles > 0);
     assert!(
         living.metrics.deliveries_completed > 0,

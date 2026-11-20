@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "capture_name": "48-candidate-funding",
+  "capture_started_utc": "2026-10-30T08:19:45.658007+00:00",
+  "captured_utc": "2026-10-30T08:19:45.889582+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 12147,
+  "window_pid_status": "available",
+  "window_pid_before": 12147,
+  "window_pid_after": 12147,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "48-candidate-funding.png",
+    "sha256": "42616f90ada0e189b7a52198710092b02599410f2e1c3654741dc7d70df33ba8",
+    "bytes": 570918
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

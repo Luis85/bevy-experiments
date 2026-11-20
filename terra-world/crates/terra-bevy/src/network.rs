@@ -9,15 +9,43 @@ use std::{
     time::{Duration, Instant},
 };
 use terra_core::{ActorState, GeoPosition, synthetic_weather};
-use terra_net::{
-    BaseWorldManifest, ClientMessage, NetClient, PROTOCOL_VERSION, ServerMessage, SessionIdentity,
-};
+use terra_net::{BaseWorldManifest, ClientMessage, NetClient, ServerMessage, SessionIdentity};
 use terra_sandbox::{SandboxState, SandboxView};
 
 pub struct TerraNetworkPlugin {
     pub address: SocketAddr,
     pub interest: GeoPosition,
     pub resume_token: Option<String>,
+}
+
+/// Explicit TLS trust for the remote server. Certificate loading and connect
+/// setup run on the connection worker, outside Bevy frame work.
+#[derive(Resource, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkSecurity {
+    pub ca_path: PathBuf,
+    pub server_name: String,
+}
+
+pub struct SecuredNetworkPlugin {
+    plugin: TerraNetworkPlugin,
+    security: NetworkSecurity,
+}
+
+impl TerraNetworkPlugin {
+    pub fn with_tls(self, security: NetworkSecurity) -> SecuredNetworkPlugin {
+        SecuredNetworkPlugin {
+            plugin: self,
+            security,
+        }
+    }
+}
+
+impl Plugin for SecuredNetworkPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(self.security.clone());
+        self.plugin.build(app);
+    }
 }
 /// Insert before TerraNetworkPlugin to preserve the same player across restarts.
 /// Use one path per server/player; its bearer capability is address-pinned.
@@ -40,6 +68,7 @@ struct ClientResource {
 #[derive(Resource, Default)]
 pub struct NetworkStatus {
     pub connected: bool,
+    pub encrypted: bool,
     pub actor_id: Option<u64>,
     pub message: String,
     pub actors: BTreeMap<u64, ActorState>,
@@ -48,12 +77,22 @@ pub struct NetworkStatus {
     pub sandbox_sequence: u64,
     pub resume_token: Option<String>,
     pub desired_velocity_enu_m_s: [f64; 3],
+    pub desired_drive: Option<terra_core::DriveInput>,
     pub follow_player: bool,
     /// Latest completeness flags are tracked independently because their
     /// snapshots arrive at different frequencies.
     pub actor_snapshot_truncated: bool,
     pub sandbox_snapshot_truncated: bool,
     pub snapshot_truncated: bool,
+    /// Actual protocol payload and transport counters for this connection.
+    pub replication: terra_net::ReplicationStats,
+    pub transport: terra_net::TransportStats,
+    pub resync_pending: bool,
+    /// Display-only owner preview. Never copied into SandboxState or saves.
+    pub predicted_actor: Option<ActorState>,
+    pub prediction: terra_net::prediction::ClientPrediction,
+    pub(crate) prediction_seconds: f64,
+    pub(crate) prediction_partial_seconds: f64,
 }
 impl Plugin for TerraNetworkPlugin {
     fn build(&self, app: &mut App) {
@@ -79,6 +118,7 @@ impl Plugin for TerraNetworkPlugin {
         let expected_manifest =
             manifest_from_config(&app.world().resource::<WorldRuntime>().config);
         let live_data = app.world().resource::<WorldRuntime>().config.live_data;
+        let security = app.world().get_resource::<NetworkSecurity>().cloned();
         std::thread::spawn(move || {
             let result = (|| {
                 if live_data { return Err(terra_net::NetError::Configuration("reference multiplayer requires matching procedural data or a versioned local pack".into())); }
@@ -89,6 +129,13 @@ impl Plugin for TerraNetworkPlugin {
                     }
                     (None, None) => None,
                 };
+                if let Some(security) = security {
+                    #[cfg(feature = "tls")]
+                    { return NetClient::connect_tls(address, interest, token, Some(expected_manifest),
+                        terra_net::ClientTlsConfig::from_ca_pem_file(&security.ca_path, security.server_name)?, Duration::from_secs(3)); }
+                    #[cfg(not(feature = "tls"))]
+                    { let _ = security; return Err(terra_net::NetError::Configuration("this build does not enable terra-bevy/tls".into())); }
+                }
                 NetClient::connect_with_manifest(address, interest, token, expected_manifest)
             })()
             .map_err(|error| error.to_string());
@@ -112,7 +159,8 @@ impl Plugin for TerraNetworkPlugin {
         })
         .add_systems(
             Update,
-            network_update
+            (network_update, crate::prediction::predict_owner)
+                .chain()
                 .after(WorldSet::Stream)
                 .before(WorldSet::Sandbox),
         );
@@ -127,6 +175,10 @@ fn network_update(
     mut queue: ResMut<SandboxQueue>,
 ) {
     runtime.network_authority = true;
+    status.prediction_seconds = connection
+        .connected_at
+        .map_or(0., |time| time.elapsed().as_secs_f64());
+    status.prediction_partial_seconds = connection.last_input.elapsed().as_secs_f64().min(0.05);
     if connection.client.is_none() && !connection.terminal {
         let result = match connection.connecting.lock() {
             Ok(receiver) => match receiver.try_recv() {
@@ -201,6 +253,12 @@ fn network_update(
             }
         }
     }
+    if let Some(client) = connection.client.as_ref() {
+        status.replication = client.replication_stats().clone();
+        status.transport = client.transport_stats();
+        status.encrypted = client.is_encrypted();
+        status.resync_pending = client.resync_pending();
+    }
     let timed_out = if status.connected {
         connection
             .last_snapshot
@@ -227,7 +285,7 @@ fn network_update(
         queue.0.clear();
         return;
     }
-    if connection.last_input.elapsed() >= Duration::from_millis(100) {
+    if connection.last_input.elapsed() >= Duration::from_millis(50) {
         connection.last_input = Instant::now();
         let Some(sequence) = status.move_sequence.checked_add(1) else {
             disconnect(
@@ -240,14 +298,18 @@ fn network_update(
             return;
         };
         status.move_sequence = sequence;
+        let movement = status.desired_drive.map_or(
+            ClientMessage::Move {
+                sequence,
+                velocity_enu_m_s: status.desired_velocity_enu_m_s,
+            },
+            |input| ClientMessage::Drive { sequence, input },
+        );
         let sent = connection
             .client
             .as_mut()
             .expect("connected")
-            .send(ClientMessage::Move {
-                sequence,
-                velocity_enu_m_s: status.desired_velocity_enu_m_s,
-            })
+            .send(movement)
             .and_then(|()| {
                 connection
                     .client
@@ -268,6 +330,21 @@ fn network_update(
             );
             return;
         }
+        let input = status.desired_drive.map_or(
+            terra_net::prediction::PredictedInput::Move(status.desired_velocity_enu_m_s),
+            terra_net::prediction::PredictedInput::Drive,
+        );
+        if let Err(error) = status.prediction.record(sequence, input, 0.05) {
+            disconnect(
+                &mut connection,
+                &mut status,
+                &mut sandbox,
+                &mut queue,
+                error,
+            );
+            return;
+        }
+        status.prediction_partial_seconds = 0.;
     }
     if connection.last_ping.elapsed() >= Duration::from_secs(5) {
         connection.last_ping = Instant::now();
@@ -336,9 +413,45 @@ fn apply_message(
     runtime: &mut WorldRuntime,
     sandbox: &mut SandboxRuntime,
 ) -> Result<(), String> {
+    apply_message_with_identity_writer(
+        message,
+        connection,
+        status,
+        runtime,
+        sandbox,
+        |identity, path| identity.save(path).map_err(|error| error.to_string()),
+    )
+}
+
+fn apply_message_with_identity_writer(
+    message: ServerMessage,
+    connection: &mut ClientResource,
+    status: &mut NetworkStatus,
+    runtime: &mut WorldRuntime,
+    sandbox: &mut SandboxRuntime,
+    write_identity: impl FnOnce(&SessionIdentity, &std::path::Path) -> Result<(), String>,
+) -> Result<(), String> {
+    if matches!(&message, ServerMessage::Welcome { .. }) {
+        message
+            .validate_welcome()
+            .map_err(|_| "Server sent an invalid handshake.".to_string())?;
+    }
     match message {
+        ServerMessage::MotionState { state } => {
+            if !status.connected || status.actor_id != Some(state.player_id) {
+                return Err(
+                    "Received motion state for another principal or before handshake.".into(),
+                );
+            }
+            let now = connection
+                .connected_at
+                .map_or(0., |time| time.elapsed().as_secs_f64());
+            status
+                .prediction
+                .reconcile(state, now, status.predicted_actor.as_ref())?;
+            status.prediction_seconds = now;
+        }
         ServerMessage::Welcome {
-            protocol,
             actor_id,
             spawn,
             manifest,
@@ -350,23 +463,13 @@ fn apply_message(
             next_sandbox_sequence,
             ..
         } => {
-            if status.connected
-                || protocol != PROTOCOL_VERSION
-                || actor_id == 0
-                || !valid_position(spawn)
-                || !valid_clock(unix_seconds)
-                || !time_scale.is_finite()
-                || !(0.0..=86_400.0).contains(&time_scale)
-                || next_sandbox_sequence == u64::MAX
-                || resume_token.len() != 64
-                || !resume_token.bytes().all(|byte| byte.is_ascii_hexdigit())
-            {
+            if status.connected {
                 return Err("Server sent an invalid handshake.".into());
             }
             compatible_manifest(&manifest, &runtime.config)?;
             status.resume_token = Some(resume_token.clone());
             if let Some(path) = &connection.session_path {
-                SessionIdentity { server: connection.address, resume_token }.save(path)
+                write_identity(&SessionIdentity { server: connection.address, resume_token }, path)
                     .map_err(|error| format!("Could not save your multiplayer identity: {error}. Choose a writable session path and reconnect."))?;
             }
             status.connected = true;
@@ -425,14 +528,14 @@ fn apply_message(
                     .get(&actor.id)
                     .filter(|account| account.possessed)
                     .map(|account| account.active_unit);
-                if let Some(unit) = active.and_then(|id| sandbox.state.living.units.get_mut(&id))
-                    && unit.kind == actor.kind
-                {
-                    unit.position = actor.position;
-                    unit.velocity_enu_m_s = actor.velocity_enu_m_s;
-                    unit.heading_deg = actor.heading_deg;
-                    if let Some(player) = sandbox.state.players.get_mut(&actor.id) {
-                        player.position = actor.position;
+                if let Some(unit) = active.and_then(|id| sandbox.state.living.units.get_mut(&id)) {
+                    if unit.kind == actor.kind {
+                        unit.position = actor.position;
+                        unit.velocity_enu_m_s = actor.velocity_enu_m_s;
+                        unit.heading_deg = actor.heading_deg;
+                        if let Some(player) = sandbox.state.players.get_mut(&actor.id) {
+                            player.position = actor.position;
+                        }
                     }
                 }
             }
@@ -444,7 +547,11 @@ fn apply_message(
             if !status.connected || !valid_view(&view, status.actor_id) {
                 return Err("Server sent an invalid sandbox snapshot.".into());
             }
-            status.sandbox_snapshot_truncated = view.truncated || view.living.truncated;
+            status.sandbox_snapshot_truncated = view.truncated
+                || view.living.truncated
+                || view.ecology.truncated
+                || view.settlements.truncated
+                || view.transport.truncated;
             status.snapshot_truncated =
                 status.actor_snapshot_truncated || status.sandbox_snapshot_truncated;
             sandbox.player_id = view.player.id;
@@ -466,6 +573,10 @@ fn apply_message(
             sandbox.state.farms = view.farms.into_iter().map(|farm| (farm.id, farm)).collect();
             sandbox.state.feature_edits = view.feature_edits.into_iter().collect();
             sandbox.state.living = terra_sandbox::LivingWorld::from_view(view.living);
+            sandbox.state.ecology = terra_sandbox::EcologyWorld::from_view(view.ecology);
+            sandbox.state.settlements = terra_sandbox::SettlementWorld::from_view(view.settlements);
+            sandbox.state.transport =
+                terra_sandbox::TransportWorld::from_view(view.transport, sandbox.player_id);
             sandbox.state.factions = view
                 .factions
                 .into_iter()
@@ -489,15 +600,15 @@ fn apply_message(
             status.message = message;
         }
         ServerMessage::Pong { .. } => {}
+        ServerMessage::ActorUpdate { .. } | ServerMessage::SandboxUpdate { .. } => {
+            return Err("Unreconstructed replication update reached the world adapter.".into());
+        }
     }
     Ok(())
 }
 
 fn compatible_manifest(manifest: &BaseWorldManifest, config: &WorldConfig) -> Result<(), String> {
-    if config.live_data
-        || config.heightmap_manifest.is_some()
-        || !manifest.matches_data(&manifest_from_config(config))
-    {
+    if config.live_data || !manifest.matches_data(&manifest_from_config(config)) {
         return Err("Server base-world provider, version, epoch or political overlay differs from this client configuration.".into());
     }
     Ok(())
@@ -508,6 +619,8 @@ fn manifest_from_config(config: &WorldConfig) -> BaseWorldManifest {
         base_data_revision: config.base_data_revision.clone(),
         terrain_provider: if config.historical_pack.is_some() {
             "historical-pack"
+        } else if config.heightmap_manifest.is_some() {
+            "heightmap"
         } else {
             "procedural"
         }
@@ -543,6 +656,24 @@ fn bounded_message(message: &str) -> String {
 fn valid_view(view: &SandboxView, actor_id: Option<u64>) -> bool {
     view.version == terra_sandbox::SAVE_VERSION
         && view.living.validate_for(view.player.id).is_ok()
+        && view.ecology.validate().is_ok()
+        && view.settlements.validate_for(view.player.id).is_ok()
+        && view
+            .transport
+            .validate_replica(view.player.id, &view.living)
+            .is_ok()
+        && view.ecology.animals.iter().all(|a| {
+            view.living.units.iter().any(|u| {
+                u.id == a.unit_id
+                    && u.kind == terra_core::ActorKind::Animal
+                    && u.role == terra_sandbox::UnitRole::Animal
+            })
+        })
+        && view.ecology.resources.iter().all(|r| {
+            view.resource_nodes
+                .iter()
+                .any(|n| n.id == r.node_id && n.item == r.kind.item())
+        })
         && Some(view.player.id) == actor_id
         && valid_position(view.player.position)
         && view.tick_seconds.is_finite()
@@ -593,12 +724,16 @@ fn disconnect(
     connection.client = None;
     connection.terminal = true;
     status.connected = false;
+    status.encrypted = false;
     status.actor_id = None;
     status.actors.clear();
     status.actor_snapshot_truncated = false;
     status.sandbox_snapshot_truncated = false;
     status.snapshot_truncated = false;
     status.desired_velocity_enu_m_s = [0.0; 3];
+    status.desired_drive = None;
+    status.prediction.clear();
+    status.predicted_actor = None;
     status.message = message.clone();
     sandbox.last_message = message;
     queue.0.clear();
@@ -607,6 +742,99 @@ fn disconnect(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn welcome_rejects_uncertain_identity_publication_before_admitting_connected_state() {
+        let directory = std::env::temp_dir().join(format!(
+            "terra-identity-publication-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("identity.json");
+        let config = WorldConfig::default();
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(crate::TerraWorldPlugin::new(config.clone()));
+        let mut runtime = app.world_mut().remove_resource::<WorldRuntime>().unwrap();
+        let mut sandbox = SandboxRuntime::new(config.focus);
+        let original_state = serde_json::to_value(&sandbox.state).unwrap();
+        let original_clock = runtime.clock;
+        let (_tx, rx) = mpsc::sync_channel(1);
+        let mut connection = ClientResource {
+            client: None,
+            connecting: Mutex::new(rx),
+            terminal: false,
+            connected_at: None,
+            last_snapshot: None,
+            last_input: Instant::now(),
+            last_ping: Instant::now(),
+            address: "127.0.0.1:7777".parse().unwrap(),
+            session_path: Some(path.clone()),
+        };
+        let mut status = NetworkStatus::default();
+        let token = "ab".repeat(32);
+        let welcome = || ServerMessage::Welcome {
+            protocol: terra_net::PROTOCOL_VERSION,
+            client_id: 7,
+            actor_id: 7,
+            manifest: manifest_from_config(&config),
+            tick: 20,
+            unix_seconds: 1_782_000_000.,
+            time_scale: 15.,
+            paused: false,
+            tick_hz: 20,
+            spawn: config.focus,
+            resume_token: token.clone(),
+            next_sandbox_sequence: 3,
+        };
+        let error = apply_message_with_identity_writer(
+            welcome(),
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+            |identity, path| {
+                identity
+                    .save_with_sync(path, |_| {
+                        Err(std::io::Error::other("injected identity parent sync"))
+                    })
+                    .map_err(|error| error.to_string())
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("published but its durability could not be confirmed"));
+        assert!(!error.contains(&token));
+        assert!(!status.connected && status.actor_id.is_none());
+        assert_eq!(sandbox.player_id, 1);
+        assert_eq!(
+            serde_json::to_value(&sandbox.state).unwrap(),
+            original_state
+        );
+        assert_eq!(runtime.clock.unix_seconds, original_clock.unix_seconds);
+        assert_eq!(
+            SessionIdentity::load(&path, connection.address)
+                .unwrap()
+                .unwrap()
+                .resume_token,
+            token
+        );
+        // A confirmed retry admits the same identity; the failure did not force
+        // an anonymous replacement or permanently disable a valid connection.
+        apply_message(
+            welcome(),
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        assert!(status.connected && status.actor_id == Some(7));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[derive(Resource, Default)]
     struct LateActionProbe {
@@ -954,6 +1182,27 @@ mod tests {
         config.political_dataset_revision = manifest.political_dataset_revision.clone();
         assert!(compatible_manifest(&manifest, &config).is_ok());
         config.live_data = true;
+        assert!(compatible_manifest(&manifest, &config).is_err());
+    }
+
+    #[test]
+    fn heightmap_admission_pins_semantic_bundle_identity() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../terra-stream/data/heightmap-demo/manifest-v2.json");
+        let provider = terra_stream::HeightmapProvider::open(&path, 33).unwrap();
+        let config = WorldConfig {
+            heightmap_manifest: Some(path),
+            terrain_resolution: 33,
+            base_data_revision: provider.source_revision().to_owned(),
+            ..Default::default()
+        };
+        let mut manifest = manifest_from_config(&config);
+        assert_eq!(manifest.terrain_provider, "heightmap");
+        assert!(compatible_manifest(&manifest, &config).is_ok());
+        manifest.base_data_revision = provider.manifest.revision.clone();
+        assert!(compatible_manifest(&manifest, &config).is_err());
+        manifest = manifest_from_config(&config);
+        manifest.terrain_provider = "procedural".into();
         assert!(compatible_manifest(&manifest, &config).is_err());
     }
 

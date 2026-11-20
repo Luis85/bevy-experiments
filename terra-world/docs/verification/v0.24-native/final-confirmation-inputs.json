@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "created_utc": "2026-10-30T12:57:14.258457+00:00",
+  "scope": "Exact copies of real candidate saves and actual saved150% controls for the post-correction final native confirmation. No semantic edits. F9 review required for actual restoration.",
+  "files": [
+    {
+      "source": "/tmp/terra-native024/candidate-building-checkpoint.json",
+      "copy": "/tmp/terra-native024/confirmation-polish.json",
+      "bytes": 1769411,
+      "sha256": "412f4e8ff1369137e3f459bdd4e94532598a5c742cfdcffa785992f1cbdeacfe",
+      "exact_copy": true
+    },
+    {
+      "source": "/tmp/terra-native024/candidate-world.json",
+      "copy": "/tmp/terra-native024/confirmation-final-fleet.json",
+      "bytes": 1776513,
+      "sha256": "932413c61bd2ee1cff5b5847eb9597afe5e5af946979e2d4b41d15b16484e516",
+      "exact_copy": true
+    },
+    {
+      "source": "/tmp/terra-native024/candidate-user/controls.json",
+      "copy": "/tmp/terra-native024/confirmation-polish-user/controls.json",
+      "bytes": 1082,
+      "sha256": "42319017ed584642732493bfacdce6006945ecca92334604fc0b034d9ff1f6bb",
+      "exact_copy": true
+    }
+  ]
+}

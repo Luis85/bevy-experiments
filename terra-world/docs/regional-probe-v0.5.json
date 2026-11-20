@@ -1,0 +1,68 @@
+{
+  "checkpoint": {
+    "max_ms": 110.854655,
+    "mean_ms": 82.55058243750003,
+    "p50_ms": 79.719699,
+    "p95_ms": 110.854655,
+    "samples": 16
+  },
+  "environment": {
+    "arch": "x86_64",
+    "os": "linux",
+    "profile": "optimized dev (opt-level=1, debug assertions enabled)",
+    "sqlite": "3.53.2",
+    "visible_parallelism": 8
+  },
+  "final_status": {
+    "active_records": 448,
+    "active_regions": 4,
+    "checkpoint_bytes": 1686302,
+    "dependency_regions": 0,
+    "dormant_records": 6180,
+    "dormant_regions": 15,
+    "generation": 17,
+    "global_records": 29,
+    "pinned_regions": 4
+  },
+  "fixture": "synthetic finite regional storage and simulation",
+  "initial_checkpoint_ms": 39.667888999999995,
+  "initial_status": {
+    "active_records": 448,
+    "active_regions": 4,
+    "checkpoint_bytes": 1679667,
+    "dependency_regions": 0,
+    "dormant_records": 6180,
+    "dormant_regions": 15,
+    "generation": 1,
+    "global_records": 23,
+    "pinned_regions": 4
+  },
+  "limits": "All aggregate domain caps remain. Checkpoint and activation reconstruct the bounded complete world synchronously; timings are fixture evidence, not a server capacity or latency guarantee.",
+  "restore_complete_world_ms": 38.781678,
+  "scope": {
+    "active_bodies": 59,
+    "active_resource_nodes": 400,
+    "calendar_seconds": 250,
+    "complete_bodies": 239,
+    "complete_resource_nodes": 6400,
+    "imported_collision": false,
+    "live_data": false,
+    "physical_seconds": 25,
+    "region_level": 16,
+    "simulation_steps": 500,
+    "sockets": 0
+  },
+  "simulation": {
+    "active_ms": 10.860435,
+    "complete_ms": 39.927091,
+    "note": "Different intended workloads: dormant environment and ambient bodies freeze; global economy and owned bodies advance in both."
+  },
+  "verification": {
+    "dormant_resource_unchanged": true,
+    "every_checkpoint_exact": true,
+    "full_roundtrip_exact": true,
+    "online_backup_exact": true,
+    "restart_exact": true
+  },
+  "version": "0.5.0"
+}

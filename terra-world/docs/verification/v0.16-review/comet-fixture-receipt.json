@@ -1,0 +1,24 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "test": "frontier::tests::prepared_comet_review_uses_paid_rental_and_physical_approach",
+  "report": {
+    "active_rental": true,
+    "boarding_distance_m": 5.517181314610624,
+    "boarding_range_m": 20.0,
+    "garage_approach_seconds": 0.05,
+    "paid_commands_only": true,
+    "positions_not_overwritten": true,
+    "remaining_wallet": 18820,
+    "rental_bond": 4500,
+    "rental_total": 6180,
+    "review_starts_paused": true,
+    "source_identity": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+    "starting_wallet": 25000,
+    "vehicle_approach_seconds": 0.05,
+    "vehicle_id": 1000073
+  },
+  "log": "comet-fixture.log",
+  "log_sha256": "b9032c313c8eb57ef1b1e0b940d13d36722216b22adc2f751be7afca2d1af909",
+  "scope": "Retained private native review fixture generated through this exact ordinary-command regression. Final release gates execute the test again separately. Private save/database payloads are not distributed."
+}

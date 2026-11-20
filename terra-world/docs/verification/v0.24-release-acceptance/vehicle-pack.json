@@ -1,0 +1,32 @@
+{
+  "accepted": true,
+  "identity": "sha256:a62831e42111472101fd308ace21b5f7f0d68f7c6a533578f4b97b900acdc96b",
+  "models": [
+    {
+      "budget": {
+        "animation_keys": 450,
+        "bytes": 210148,
+        "channels": 9,
+        "clips": 2,
+        "decoded_scalars": 41918,
+        "materials": 10,
+        "nodes": 91,
+        "primitives": 78,
+        "renderer_vertices": 6828,
+        "runtime_animation_keys": 450,
+        "scene_primitives": 78,
+        "scene_renderer_vertices": 6828,
+        "scene_triangles": 2276,
+        "scene_vertices": 6828,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 2276,
+        "vertices": 6828
+      },
+      "id": "comet"
+    }
+  ],
+  "name": "Terra Comet transport example",
+  "schema_version": 1,
+  "scope": "Validated source bytes and supported format; native renderer readiness is checked at runtime"
+}

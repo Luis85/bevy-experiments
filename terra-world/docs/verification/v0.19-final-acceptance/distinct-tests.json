@@ -1,0 +1,4732 @@
+[
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "authoring_keeps_unused_animation_and_hierarchy_validation"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "checked_in_working_recipe_builds_all_species_without_changing_original_identity"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "cli_build_resolves_sources_from_recipe_and_refuses_existing_output_without_writes"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "model_inspection_names_real_clips_and_complete_resource_budgets"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "preparation_snapshots_bytes_and_publishes_identical_content_identified_packs"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "recipe_and_source_size_limits_apply_before_any_output"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "rejected_recipes_leave_no_output_and_explain_binding_or_input_failure"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "shared_model_bytes_keep_distinct_binding_policies_and_provenance"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_authoring",
+    "name": "symlink_sources_and_output_parents_are_rejected_even_when_contained"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "asset_cli",
+    "name": "asset_validator_reports_bundled_budgets_and_rejects_missing_input"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "frontier_validation",
+    "name": "malformed_ecology_references_and_another_players_progress_are_rejected_atomically"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "frontier_validation",
+    "name": "owned_wildlife_is_accepted_and_native_replica_never_runs_host_ecology"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "frontier_world",
+    "name": "ecology_gather_charter_supply_contract_and_exact_restore_share_one_app"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "headless",
+    "name": "a_paused_focus_jump_refreshes_synthetic_weather_for_the_new_region"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "headless",
+    "name": "custom_catalog_streaming_preserves_metadata_without_seeding_unsupported_items"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "headless",
+    "name": "disabling_weather_uses_calm_conditions_without_destroying_the_source_sample"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "headless",
+    "name": "headless_plugin_streams_a_chunk_and_advances_then_pauses_its_clock"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "headless",
+    "name": "queued_sandbox_commands_commit_success_and_leave_rejections_atomic"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "headless",
+    "name": "whole_world_focus_jumps_rebase_and_dateline_moves_stay_finite"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "living_world",
+    "name": "inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "procedural_settlement",
+    "name": "default_munich_procedural_settlement_produces_and_physically_delivers"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "a_visible_source_tree_keeps_its_boundary_tombstone_active_without_nearby_bodies"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "checkpoint_recovery_replays_skipped_source_and_clears_the_error_without_resuming_time"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "commands_resolve_a_dormant_workbench_when_the_player_returns"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "eviction_return_and_restart_preserve_depleted_resources_and_inventory"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "explicit_restore_rewinds_inventory_and_clock_without_overwriting_legacy_json"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "graceful_exit_commits_last_changes_and_failed_commit_returns_error"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "paused_autosave_uses_real_time_even_when_bevy_virtual_time_clamps_a_slow_frame"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "source_mismatch_exits_without_mutating_the_committed_world"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "regional_persistence",
+    "name": "stale_background_result_cannot_replace_a_newer_game_owned_revision"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::all_unused_animation_samplers_count_toward_allocation_budget"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::bundled_wildlife_is_valid_and_content_identified"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::character_customization_rejects_unused_duplicate_translucent_and_precolored_materials"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::character_example_preserves_bounded_customization_and_named_postures"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::character_policy_rejects_wrong_targets_missing_clips_and_ambiguous_material_roles"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::character_rejects_reflected_ancestry_and_negative_scales_in_unselected_clips"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::driver_seat_is_explicit_bounded_model_policy_and_changes_pack_identity"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::duplicate_targets_and_oversized_input_are_rejected_before_install"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::embedded_png_payloads_are_decoded_and_corruption_is_rejected_in_preflight"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::external_resources_traversal_missing_clips_and_invalid_accessors_fail_closed"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::importer_rejects_cycles_multiple_parents_and_orphan_nodes"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::materials_meshless_scenes_and_composed_transforms_are_rejected_before_loading"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::model_bytes_are_copied_and_hash_mismatch_rejected"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::renderer_budgets_count_texture_slot_aliases_and_generated_flat_vertices"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::repeated_mesh_nodes_count_toward_instantiated_geometry_budgets"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::same_model_can_have_distinct_binding_animation_policies"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::scale_animation_cannot_cross_zero_during_keys_or_clip_blends"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::skinned_vertices_require_valid_joint_indices_and_normalized_nonzero_weights"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::undeclared_extension_payloads_are_rejected_but_extras_remain_opaque"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "asset_pack::tests::unused_aliased_accessors_are_bounded_before_binary_scanning"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "config::tests::config_budgets_cover_the_requested_neighborhood"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "environment::tests::bridge_support_and_width_follow_the_same_source_geometry"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "environment::tests::date_line_polygon_does_not_cover_the_other_side_of_earth"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "environment::tests::real_negative_elevation_needs_a_water_mask"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "environment::tests::slope_at_a_chunk_edge_uses_neighbor_or_inward_samples"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "environment::tests::source_underpass_uses_model_height_and_terrain_instead_of_zero_source_elevation"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "environment::tests::vehicle_wheel_material_support_matches_host_on_land_roads_bridges_and_missing_edges"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::authored_terrain_material_is_continuous_at_the_date_line"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::concave_polygon_does_not_fill_the_notch"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::degenerate_polygon_is_rejected"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::distant_terrain_reduces_interiors_without_cracks_or_changed_source_heights"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::enriched_source_geometry_is_finite_and_stays_within_render_budget"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::heightfield_uses_shared_vertices_smooth_normals_and_detail_uvs"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "geometry::tests::terrain_palette_exposes_relief_and_water_has_tangent_space_detail"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "history::tests::historical_bridge_rejects_a_misdeclared_grid_before_streaming"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::absent_manual_input_brakes_possessed_vehicle_but_true_pause_freezes_it"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::manual_vehicle_stops_before_pedestrian_without_repeated_resting_damage"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::missing_vehicle_corner_stops_without_wear_but_solid_obstacle_causes_impact"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::rts_motion_uses_resolver_before_reaching_destination"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::saved_loaded_fleet_clears_perpendicular_traffic_and_delivers_on_imported_heightmap"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::unknown_terrain_and_static_footprints_reject_surface_motion"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::vehicle_on_loaded_heightmap_holds_service_and_parking_brakes_then_rolls_on_release"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "living::tests::water_blocks_a_person_but_accepts_a_boat"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "network::tests::base_world_checks_pin_geometry_epoch_and_political_revision"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "network::tests::heightmap_admission_pins_semantic_bundle_identity"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "network::tests::late_network_intents_and_bounded_backlog_reach_the_authoritative_server"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "network::tests::mixed_snapshot_rates_preserve_each_views_completeness"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "network::tests::queued_snapshots_recover_an_expired_frame_deadline_but_silence_still_times_out"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "network::tests::replica_view_is_owned_and_checks_faction_rosters"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "politics::tests::atlas_frames_a_small_historical_region_and_keeps_missing_dates_explicit"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "politics::tests::drawing_closes_a_faction_boundary_and_exports_a_new_revision"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "politics::tests::self_intersecting_drafts_leave_the_dataset_untouched"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "prediction::tests::predicted_envelope_requires_loaded_terrain_and_cannot_cross_a_source_building"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::damaged_or_incomplete_bundles_never_publish_a_restore"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::local_host_metadata_and_resolved_configuration_are_validated_before_publication"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::missing_changed_or_mismatched_political_dependencies_reject_without_publication"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::portable_recovery_inventory_and_configuration_use_forward_slashes"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::prepared_recovery_survives_loss_of_original_tree_with_exact_cold_state_and_rebased_paths"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::procedural_recovery_rejects_existing_destinations_and_wrong_receipts_without_mutation"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::recovery_destinations_cannot_claim_sqlite_sidecars_or_mutate_retained_bundles"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::recovery_members_are_private_and_symbolic_or_hard_links_are_rejected"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::rehashed_configuration_cannot_redirect_a_restore_to_an_original_path"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "recovery::tests::rewritten_indexes_cannot_hide_escaping_paths_unknown_members_or_unbounded_sizes"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::actual_movement_selects_locomotion_and_pause_freezes_clip_and_blend"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::animation_system_obeys_world_and_virtual_pause_without_coupling_calendar_speed"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::animation_time_and_blends_match_across_slow_and_fast_render_frames"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::human_locomotion_seated_handoff_and_pause_do_not_move_the_actor_root"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::paused_fresh_animation_samples_authored_idle_without_waiting_for_virtual_time"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::shared_model_keeps_binding_speed_and_blend_settings_independent"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::step_and_held_final_rotation_keys_apply_unit_quaternions"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::step_channel_holds_its_final_key_when_another_channel_is_longer"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::stopped_fleeing_actor_does_not_run_in_place"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::vehicle_wheel_phase_matches_slow_frames_and_bounds_large_deltas"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::wheel_phase_follows_signed_movement_and_survives_stopping_reverse_and_pause"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::animation::tests::wheel_rigs_keep_instance_phase_and_binding_scale_independent"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::actual_scene_budget_degradation_restores_mesh_without_changing_body_or_pose"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::current_scene_teardown_is_charged_before_a_priority_replacement"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::hidden_distant_and_animation_or_geometry_excess_keep_procedural_eligibility"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::human_pose_and_independent_materials_are_charged_to_each_instance"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::missing_lazy_model_is_retired_once_and_does_not_retry_every_frame"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::retained_subassets_and_loader_transitions_cannot_evade_residency_limits"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::stable_selection_prioritizes_active_owned_then_nearby_and_budget_increases"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::budget::tests::wheel_rig_work_is_reserved_in_addition_to_preview_clip_channels"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::authored_actor_and_facility_meshes_have_bounded_finite_geometry"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::default_land_neighborhood_stays_below_two_million_source_vertices"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::feature_lod_hysteresis_preserves_detail_at_nearby_tile_edges"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::inventory_and_resource_quantity_do_not_rebuild_visible_geometry"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::mesh_completion_accepts_its_current_source_instance"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::mesh_completion_rejects_replaced_source_and_requeues_its_current_page"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::mesh_completion_requires_source_identity_even_when_content_matches"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::mesh_completion_retains_revision_lod_and_residency_admission"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::cache_tests::plot_boundaries_drape_to_updated_heightmaps_and_never_join_missing_pages"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::character::tests::driver_occupancy_requires_the_actual_known_account_and_never_uses_public_appearance_alone"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::detail::tests::ground_cover_is_bounded_and_never_fills_water_or_unknown_coverage"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::detail::tests::resource_depletion_changes_readable_geometry_with_bounded_palette"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::detail::tests::territory_lines_require_resident_height_and_drape_to_it"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::quality::tests::profiles_have_bounded_gpu_cost_and_an_explicit_compatibility_path"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::scenes::tests::actual_scene_ready_replaces_fallback_and_removal_restores_the_same_body"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::scenes::tests::animated_hierarchy_is_checked_before_fallback_is_hidden"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::scenes::tests::customized_humans_keep_profiles_isolated_reuse_materials_and_release_them_on_teardown"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::scenes::tests::public_vehicle_appearance_selects_model_without_private_state_or_mutation"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::scenes::tests::scene_registry_validates_scale_and_preserves_specific_species_precedence"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::scenes::tests::vehicle_model_binding_is_specific_and_falls_back_to_the_generic_kind"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::surface_materials::tests::authored_materials_have_complete_bounded_mips_and_normal_encoding"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "render::wildlife::tests::species_pose_palette_has_distinct_finite_bounded_grounded_geometry"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::failed_json_restore_preserves_following_actions_for_the_current_principal"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::invalid_saved_player_is_rejected"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::local_save_keeps_clock_and_rejects_another_era"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::native_exit_dispatch_waits_for_source_then_places_the_avatar_clear"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::native_walking_dispatch_shortens_only_after_resident_support_is_available"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::placement_feedback_uses_the_same_oriented_bus_footprint_as_authority"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::successful_json_restore_retires_quoted_trade_and_control_from_previous_principal"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "sandbox::tests::successful_regional_restore_retires_quoted_trade_and_control_from_previous_principal"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "simulation::geo_tests::whole_world_distance_does_not_collapse_at_antipodes"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "terra_bevy",
+    "name": "telemetry::tests::rolling_evidence_drops_startup_spikes_and_rejects_invalid_samples"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "transport_assets",
+    "name": "composed_recipe_preserves_wildlife_and_builds_a_repeatable_transport_handoff"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "transport_assets",
+    "name": "invalid_wheel_rigs_reject_before_publishing_or_rendering"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "transport_assets",
+    "name": "original_comet_has_named_cabin_wheels_and_admitted_preview_animation"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "transport_assets",
+    "name": "vehicle_targets_are_bounded_specific_and_keep_original_pack_identity"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "transport_assets",
+    "name": "wheel_rig_rejects_scaled_or_animated_ancestors_including_unused_clips"
+  },
+  {
+    "crate": "terra-bevy",
+    "harness": "worldctl",
+    "name": "actual_operations_cli_roundtrips_local_and_portable_worlds_without_overwriting"
+  },
+  {
+    "crate": "terra-cli",
+    "harness": "terra_cli",
+    "name": "tests::cli_rejects_unknown_and_duplicate_arguments"
+  },
+  {
+    "crate": "terra-cli",
+    "harness": "terra_cli",
+    "name": "tests::complete_demo_save_preserves_every_f64_coordinate_exactly"
+  },
+  {
+    "crate": "terra-cli",
+    "harness": "terra_cli",
+    "name": "tests::repeated_simulation_is_deterministic_and_bad_steps_fail"
+  },
+  {
+    "crate": "terra-cli",
+    "harness": "terra_cli",
+    "name": "tests::sandbox_demonstration_finishes_with_home_and_tool"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "actors_cross_dateline_preserve_altitude_and_reject_bad_input"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "calendar_handles_epoch_negative_time_and_leap_day"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "clock_pauses_and_rejects_bad_delta"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "coordinate_validation_and_wrap"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "domain_transport_roundtrip_preserves_provenance_and_layers"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "height_field_interpolation_orientation_and_invalid_data"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "local_frame_axes_and_roundtrip"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "seasons_are_opposite_and_weather_is_seeded"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "solar_obeys_day_night_longitude_and_polar_seasons"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "tiles_cover_poles_dateline_and_hierarchy"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "weather_wind_is_from_not_toward_and_biomes_are_explicit_heuristics"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "domain",
+    "name": "wgs84_roundtrips_across_world_and_altitudes"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::adjacent_lanes_and_overpass_are_separate"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::construction_column_uses_oriented_dimensions_and_vertical_clearance"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::continuous_sweep_stops_fast_body_at_first_contact"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::initial_overlap_can_escape_but_not_push_deeper"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::invalid_input_never_returns_a_clear_path"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::seam_and_polar_frames_remain_finite"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::slope_vertical_crossing_is_continuous"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "contacts::tests::turning_corner_sweeps_and_touching_body_can_depart"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::cornering_and_braking_share_the_available_contact_force"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::fixed_input_is_deterministic_and_serialized_state_resumes_exactly"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::invalid_or_zero_steps_never_mutate_state"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::reverse_throttle_brakes_first_and_reverse_steering_changes_sign"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::service_brake_holds_both_slopes_without_creep_and_release_rolls_downhill"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::subnormal_step_cannot_publish_infinite_acceleration_or_partial_state"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::throttle_accelerates_with_inertia_and_brakes_without_reversing"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::underpass_clearance_uses_body_height_real_terrain_and_a_safety_margin"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::vehicle_support_envelope_retains_model_length_across_heading_and_date_line"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle::tests::wet_grip_and_mass_affect_stopping_and_acceleration"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle_ground::tests::four_wheel_support_follows_rotated_slopes_across_date_line"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle_ground::tests::missing_invalid_and_rough_wheel_support_is_not_flat_pavement"
+  },
+  {
+    "crate": "terra-core",
+    "harness": "terra_core",
+    "name": "vehicle_ground::tests::visual_spring_is_partition_stable_bounded_and_does_not_run_while_paused"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "accessibility::tests::controller_keyboard_is_bounded_filtered_and_cancel_drops_the_draft"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "accessibility::tests::controller_text_apply_uses_real_editor_and_back_never_commits"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "accessibility::tests::disabled_text_and_focus_loss_do_not_open_or_replay_queued_edits"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "accessibility::tests::text_preference_applies_once_to_new_controls_and_reverses_without_drift"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "accessibility::tests::world_keyboard_commits_one_action_and_preserves_conflicting_or_busy_drafts"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "camera::tests::chase_distance_matches_actor_scale_and_is_bounded"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "camera::tests::possession_input_uses_camera_yaw_without_diagonal_speed_gain"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "camera::tests::streamed_ground_settles_rts_presentation_without_world_input"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "command_input::tests::command_navigation_skips_hidden_disabled_actions_and_reveals_actual_scroll_bounds"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "command_input::tests::direction_repeat_and_pointer_edges_do_not_replay_stale_actions"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "command_input::tests::expired_or_unavailable_community_confirmation_leaves_cancel_or_normal_navigation_reachable"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "command_input::tests::focused_action_reveals_through_non_scrolling_page_and_horizontal_wrapper"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "command_input::tests::management_capture_isolates_driving_and_escape_then_restores_rts_cursor"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "command_input::tests::new_community_review_gets_focus_once_without_replaying_accept_and_cancel_returns_to_origin"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::cancel_and_changed_player_restore_selection_or_roster_cannot_submit_old_review"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::invitation_actions_use_the_named_display_and_never_fall_through_to_another_invite"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::member_entry_is_bound_to_its_faction_and_rejects_invalid_successors"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::ordinary_member_can_review_leaving_but_current_leader_cannot"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::removal_and_handover_require_explicit_review_and_confirmation"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::roster_is_paged_and_current_role_explains_disabled_management"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "communities::tests::sharing_review_names_permanent_property_and_allows_normal_crop_growth"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "control::tests::focus_loss_cancels_pending_rts_drag_without_selecting_or_issuing_orders"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "control::tests::hit_testing_is_nearest_bounded_and_tie_stable"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "control::tests::possession_round_trip_keeps_identity_and_explicit_spectator_destination"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "control::tests::restore_retires_native_backlogs_and_transient_orders_without_eating_new_actions"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "control::tests::restored_possession_is_adopted_once_and_ordinary_revisions_do_not_undo_rts"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "control::tests::viewport_excludes_drawers_toolbar_and_caption"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::blocked_source_routes_have_a_reason_and_never_draw_a_direct_navigation_line"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::course_navigation_exists_before_a_race_and_garage_can_replace_it"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::exiting_keeps_displayed_vehicle_and_nearby_reentry_without_overriding_explicit_choice"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::floating_driving_huds_yield_to_drawers_and_return_when_closed"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::garage_fixed_livery_blocks_paid_paint_and_procedural_paint_still_applies"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::interact_resumes_the_active_assignment_after_browsing_another_offer"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::interact_stop_rechecks_restore_and_explains_nonserviceable_states"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::queued_paint_rechecks_pack_selection_restore_and_displayed_vehicle"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::refuel_offer_respects_cash_tank_station_and_whole_litres"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::rental_return_never_follows_an_implicit_replacement_vehicle"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::rental_return_rejects_changed_refund_selection_principal_garage_and_restore"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::rental_return_requires_a_rendered_confirmation_and_retains_the_domain_quote"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::rental_ui_reviews_costs_renews_expiry_and_returns_with_authoritative_refund"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::route_map_clips_distant_geometry_and_navigation_uses_geographic_bearings"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "driving::tests::vehicle_controls_follow_authority_even_with_stale_showroom_selection"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::contribution_amount_depot_and_player_changes_require_fresh_fleet_review"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::depot_market_ui_uses_visible_quote_and_authority_rejects_a_changed_price"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::depot_route_shortcuts_create_distinct_owner_scoped_sale_and_transfer_contracts"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::destructive_fleet_reviews_do_not_survive_restore_or_replay_confirmation"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::finances_distinguish_owner_funding_and_known_costs_from_cash_earnings"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::native_quantities_can_create_and_assign_the_measured_three_seat_compact_career"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::native_route_builder_bounds_draft_and_rejects_invalid_freight_endpoints"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::recovery_ui_holds_loaded_trip_and_confirms_physical_return_without_free_payment"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::returning_a_load_binds_the_actual_trip_and_vehicle_not_just_the_driver"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::roadside_selects_an_eligible_garage_and_can_offer_repairs_when_fuel_is_empty"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::suggested_native_route_uses_real_stops_and_all_commands_share_authority"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "fleet::tests::vanished_route_or_employee_does_not_transfer_confirmation_to_chooser_fallback"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::app_run_retains_final_handoff_after_consuming_the_world"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::binding_capture_cannot_restore_and_leaving_controls_cancels_capture"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::clean_portable_exit_restores_the_saved_character_clock_and_failure_is_non_destructive"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::escape_cancels_the_immediate_edit_before_pausing_and_consumes_its_frame"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::local_menu_pause_preserves_saved_clock_and_prior_virtual_pause"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::manual_exit_waits_for_real_save_acknowledgement"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::multiplayer_overlay_never_pauses_simulation_time"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::ordinary_session_keeps_save_restore_retry_and_quit_after_rejecting_terminal_close"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "flow::tests::terminal_recovery_menu_matches_its_guard_and_does_not_retry_uncertain_work"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::commitment_review_rejects_cancelled_reassigned_and_restored_context"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::commitment_review_selects_the_displayed_request_without_performing_it"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::company_guide_opens_exact_expired_rental_without_reusing_old_garage_confirmations"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::company_guide_opens_exact_recovery_and_requires_review_after_service_changes"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::connected_valley_service_approach_reaches_a_funded_delivery_in_native_simulation"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::direct_goal_choices_are_read_only_and_the_chooser_follows_visible_state"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::final_city_tool_contribution_submits_only_the_remaining_three"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::guidance_rejects_same_gather_action_for_a_different_accepted_obligation"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::guidance_requires_review_after_restore_even_when_service_ids_and_status_match"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::guided_market_handoff_keeps_the_seller_through_the_displayed_trade"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::noticeboard_actions_reject_changed_displayed_request_before_dispatch"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::partial_replica_does_not_block_host_building_requirements_but_keeps_known_costs"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::prepared_comet_review_uses_paid_rental_and_physical_approach"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::prepared_company_review_journey_reaches_paid_setup_and_a_physical_loaded_hold"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::queued_selection_and_review_actions_wait_for_the_new_displayed_handoff"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::urgent_rest_opens_command_for_the_active_person_without_issuing_control"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "frontier::tests::vehicle_service_order_requires_dry_wheels_and_body_not_only_a_dry_center"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interaction::tests::atlas_draft_cannot_consume_management_or_suppressed_keys"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interaction::tests::gathering_skips_nearer_forbidden_and_vertically_unreachable_nodes"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interaction::tests::quick_gather_skips_an_unplotted_protected_territory_at_its_boundary"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interaction::tests::regional_demo_seed_preserves_restored_airborne_actor_and_resource_history"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interaction::tests::regional_demo_seed_waits_for_source_hydration_before_checking_dormant_starter_ids"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interaction::tests::regional_demo_seed_waits_while_blocked_and_checkpoints_valid_fresh_initialization"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::immersion_tests::persistence_recovery_keys_replace_resume_until_the_block_is_cleared"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::immersion_tests::possession_recedes_once_and_preserves_deliberate_context_opening"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::immersion_tests::text_entry_and_explicit_keep_panels_preference_are_respected"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::community_review_reveals_confirmation_above_a_scrolled_roster"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::enlarged_inspector_tabs_keep_actions_scroll_state_and_outer_bounds"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::goal_review_reveals_its_start_without_resetting_other_panels_or_later_refresh"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::scaled_footer_reserves_the_same_world_panel_and_floating_hud_bounds"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::small_window_enlarged_text_keeps_navigation_available_without_squeezing_content"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::switching_fleet_section_reveals_its_start_and_keeps_other_scroll_positions"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "interface::layout_tests::wrapped_guidance_banner_is_excluded_from_world_clicks_at_scaled_dpi"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::all_bundled_world_choices_resolve_to_valid_source_configuration"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::coverage_uses_geographic_dimensions_with_latitude_and_pole_clipping"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::diagnostic_consent_defaults_off_and_survives_graphics_changes"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::invalid_world_input_does_not_create_or_overwrite_files"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::join_session_names_cannot_escape_the_managed_folder"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::join_source_configuration_is_checked_before_session_creation_and_roundtrips"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::portable_world_and_screenshot_paths_cannot_replace_profiles_or_databases"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::remote_join_requires_verified_tls_or_an_explicit_insecure_choice"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::model::tests::same_named_worlds_have_distinct_private_stores_and_roundtrip_the_character"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::backup_selection_is_exact_and_unsaved_or_unsupported_worlds_do_not_copy"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::cancelled_or_stale_rename_cannot_mutate_and_new_world_stays_unplayed"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::completed_backup_and_world_stay_reachable_after_bounded_list_refresh"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::completed_verification_does_not_reopen_a_review_after_navigation_away"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::damaged_bundle_or_invalid_external_metadata_never_publishes_a_world"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::incomplete_extra_or_linked_backup_content_is_rejected_without_cleanup_of_existing_data"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::managed_recovery_journey_preserves_complete_world_after_original_loss"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::named_recovery_copies_and_rename_preserve_progress_and_survive_relisting"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::one_background_operation_is_bounded_and_failure_restores_menu_actions"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::politics_free_recovery_remains_explicitly_free_of_a_political_source"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::queued_world_selections_and_cancelled_restore_confirmation_do_not_retarget"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::recovery_output_cannot_occupy_a_future_journal_or_live_inside_a_backup"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::rename_rejects_changed_profile_invalid_name_and_nonmanaged_target"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::rename_rejects_symlink_and_hardlink_profile_aliases"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::recovery::tests::stale_record_or_changed_checkpoint_cannot_retarget_a_review"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::tests::diagnostic_failure_is_distinct_from_world_failure_and_malformed_markers"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::tests::diagnostic_handoff_is_opt_in_and_keeps_paths_as_single_arguments"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::tests::menu_handoff_is_explicit_and_preserves_optional_failure_notice"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::tests::menu_return_keeps_valid_session_controls_and_rejects_malformed_handoffs"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::ui::status_layout_tests::long_status_stays_in_scroll_content_and_footer_actions_keep_their_identity"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::ui::text_tests::captured_space_does_not_reactivate_the_native_binding_button_but_mouse_back_works"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "launcher::ui::text_tests::native_named_space_and_shift_space_preserve_words_without_duplicate_insertion"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "market::tests::authority_rejects_a_price_change_after_ui_enqueue"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "market::tests::displayed_total_is_the_personal_trade_authority_expectation"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "market::tests::price_changed_after_render_requires_review_on_both_sides"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "market::tests::quantity_restore_and_seller_changes_cannot_reuse_a_displayed_quote"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "market::tests::selected_seller_is_retained_instead_of_falling_back_to_a_nearer_shop"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "market::tests::unavailable_trade_explains_inventory_capacity_and_bounds_invalid_indices"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::all_export_kinds_preserve_current_and_future_session_paths"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::derived_political_export_cannot_create_a_database_journal_directory"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::derived_political_export_is_also_protected"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::diagnostic_lock_cannot_occupy_a_current_or_future_session_identity"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::distinct_artifacts_pass_without_creating_any_output"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::screenshot_cannot_target_the_database"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::screenshot_parent_creation_cannot_occupy_a_save_or_sqlite_sidecar"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "output::tests::telemetry_cannot_overwrite_the_database_or_its_sidecar_before_a_window_opens"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::disabled_diagnostics_create_no_report_or_lock"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::failed_final_checkpoint_is_recorded_as_an_error_exit"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::failed_requested_export_overrides_successful_window_exit"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::normal_window_exit_exports_in_the_same_final_update"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::paused_running_app_retains_periodic_evidence_before_final_exit"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::periodic_export_failure_is_visible_and_recovers_only_after_publication"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "performance::tests::stopped_diagnostic_worker_clears_pending_without_replacing_prior_evidence"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::control_file_roundtrip_is_independent_of_world_and_defaults_are_compatible"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::gamepad_disconnect_and_focus_loss_release_drive_and_do_not_replay_actions"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::radial_deadzone_rejects_noise_nonfinite_values_and_keeps_diagonals_bounded"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::rebinding_rejects_conflicts_reserved_keys_and_invalid_saved_settings"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::selected_wheel_is_not_sampled_as_a_gamepad_and_focus_loss_requires_neutral"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::session_handoff_keeps_unsaved_choices_without_capturing_or_writing_a_key"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::standard_pad_neutral_rearm_preserves_menus_keyboard_and_device_handoffs"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "player_input::tests::standard_pad_rearm_requires_zero_triggers_instead_of_stick_deadzone"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "remote::road_presentation::tests::directed_paint_uses_loaded_ground_and_topology_without_inventing_tunnel_markings"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "remote::tests::authored_roads_drape_heightmaps_and_require_loaded_ground"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "remote::tests::heading_interpolation_uses_short_route_across_north"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "remote::tests::known_driver_fallback_tracks_vehicle_hides_in_first_person_and_restores_on_exit"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::diagnostic_lock_child_process"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::diagnostic_lock_symlinks_and_protected_hard_links_are_rejected"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::existing_world_json_and_save_database_aliases_are_never_replaced"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::failed_capture_preserves_previous_report_and_next_success_records_the_failure"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::final_acknowledgement_releases_the_lock_before_a_new_session_starts"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::forced_process_termination_releases_the_operating_system_lock"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::lock_paths_preserve_unrelated_files_and_protected_world_outputs"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::one_writer_owns_a_report_and_the_next_run_recovers_its_history"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::recursive_output_folders_cannot_occupy_future_save_or_database_sidecars"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::report_summary_is_bounded_read_only_and_uses_the_latest_retained_sample"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::retention_survives_reopening_and_only_drops_the_oldest_successful_samples"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "telemetry_capture::tests::symbolic_output_and_parent_aliases_are_rejected_without_writes"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "vehicle_models::tests::all_reference_models_fit_shared_collision_dimensions_and_have_bounded_meshes"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "vehicle_models::tests::profile_palettes_match_character_creation_and_body_scales_are_distinct"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "vehicle_models::tests::seated_profile_fallback_keeps_all_choices_and_a_bounded_hip_origin"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "vehicle_presentation::tests::autonomous_and_remote_wheels_steer_from_motion_manual_wheels_use_actuator"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "vehicle_presentation::tests::restored_model_rebuilds_wheels_and_lamps_without_losing_other_children"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "vehicle_presentation::tests::wheel_springs_use_loaded_height_samples_and_never_mutate_authority"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "wheel_input::tests::combined_pedal_axis_calibrates_neutral_brake_accelerator_and_splits_exclusively"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "wheel_input::tests::dedicated_wheel_does_not_override_keyboard_and_other_axis_selection_is_bounded"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "wheel_input::tests::invalid_or_cancelled_calibration_preserves_valid_profile_and_settings_bounds"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "wheel_input::tests::missing_nonfinite_disconnected_and_reconnected_axes_release_and_require_neutral_again"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "wheel_input::tests::profile_handoff_preserves_bounded_calibration_but_never_devices_or_pending_capture"
+  },
+  {
+    "crate": "terra-demo",
+    "harness": "terra_demo",
+    "name": "wheel_input::tests::wheel_calibration_measures_asymmetric_steering_and_inverted_pedal_endpoints"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "bundled_synthetic_eras_switch_geometry_and_faction_territories"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "catalogs_accept_adjacent_eras_and_reject_ambiguous_coverage"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "dates_are_utc_and_calendar_checked"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "edited_geometry_and_view_bounds_are_checked_before_export_or_query"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "exports_keep_holes_properties_faction_links_and_provenance"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "holes_and_antimeridian_membership_are_preserved"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "included_natural_earth_snapshot_is_current_provenanced_and_queries_germany"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "malformed_or_undated_politics_is_rejected"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "pack_file_count_and_bytes_are_bounded"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "pack_paths_duplicate_keys_and_false_provenance_are_rejected"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "pack_symlinks_cannot_escape_root"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "packs_refuse_wrong_epoch_or_missing_chunk_without_current_fallback"
+  },
+  {
+    "crate": "terra-history",
+    "harness": "history",
+    "name": "temporal_switch_is_half_open_and_overlap_claims_are_not_arbitrated"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "delta_replication",
+    "name": "client_detects_an_actual_wire_gap_requests_one_resync_and_recovers"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "delta_replication",
+    "name": "server_reports_encoded_delta_bytes_against_full_snapshot_equivalents"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "delta_replication",
+    "name": "tcp_delta_views_converge_exactly_and_keep_each_players_wallet_private"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "delta_replication",
+    "name": "tcp_explicit_resync_installs_both_keyframes_and_rate_limits_repeated_requests"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "delta_replication",
+    "name": "tcp_interest_removal_reaches_client_without_stale_ghost_actors"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "drive_cannot_take_over_an_unpossessed_or_other_players_vehicle"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "nonzero_move_cannot_bypass_pedals_and_drive_shares_replay_protection"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "protocol_four_client_is_rejected_before_principal_or_company_allocation"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "public_vehicle_and_hitch_deltas_preserve_other_driver_financial_privacy"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "regional_checkpoint_restart_and_reconnect_keep_driver_vehicle_and_funded_job"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "stale_input_timeout_brakes_the_vehicle_and_zero_move_is_an_explicit_stop"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "tcp_company_ledgers_replicate_privately_and_replayed_transfers_do_not_pay_twice"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "driving",
+    "name": "tcp_pedal_intent_accelerates_steers_coasts_and_consumes_authoritative_fuel"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "faction_lifecycle_tls",
+    "name": "tls_handover_departure_and_private_snapshots_survive_host_restart"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "frontier_protocol",
+    "name": "earlier_living_save_gains_ecology_without_resetting_existing_state_or_policy"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "frontier_protocol",
+    "name": "exact_prior_living_catalog_upgrades_when_a_saved_living_world_is_resumed"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "frontier_protocol",
+    "name": "host_projects_ecology_onto_resident_heights_before_checking_source_footprints"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "frontier_protocol",
+    "name": "legacy_protocols_reject_before_allocating_saved_player_or_capability"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "frontier_protocol",
+    "name": "only_the_exact_archived_builtin_is_extended_by_living_opt_in"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "frontier_protocol",
+    "name": "unloaded_terrain_defers_ecology_and_retries_after_residency_without_duplicates"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "custom_game_catalog_and_new_player_equipment_survive_restart"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "delayed_needs_snapshot_clamps_valid_sprint_intent_without_disconnect"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "disconnect_releases_manual_motion_and_resume_keeps_the_same_body_and_wallet"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "historical_epoch_and_political_revision_are_pinned_in_saves"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "incompatible_data_is_rejected_before_allocating_a_saved_identity"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "living_trade_possession_rts_and_resume_are_authoritative"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "malformed_network_frame_is_dropped_without_killing_server"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "malformed_save_is_rejected_without_replacing_live_world"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "movement_before_handshake_does_not_create_or_mutate_actor"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "quoted_personal_trade_over_tcp_rejects_unseen_total_and_prevents_replay"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "resident_source_geometry_rejects_building_and_water_placement_atomically"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "sandbox_commands_are_owned_transactional_and_replay_protected"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "sandbox_target_requires_authoritative_terrain_support"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "save_restart_and_resume_preserve_inventory_and_command_sequences"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "shared_faction_permissions_and_demotion_survive_player_resume"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "small_pack_grounds_spawn_and_blocks_movement_outside_coverage"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "snapshots_apply_interest_and_explicit_capacity"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "loopback",
+    "name": "two_clients_receive_one_authoritative_world_and_validated_movement"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "network_conditions",
+    "name": "conditioned_tcp_slow_reader_catches_up_without_starving_peer_or_losing_private_state"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "network_conditions",
+    "name": "conditioned_tls_slow_reader_catches_up_then_resumes_exactly_after_restart"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "failed_operator_commit_preserves_connected_peer_policy_money_and_capability"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "failed_provisioning_does_not_consume_ids_capabilities_or_change_cold_residency"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "operator_target_is_exact_and_audit_is_bounded_without_exposing_capabilities"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "provisioned_dormant_crews_still_count_against_living_capacity"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "provisioning_enforces_capacity_and_endpoint_before_any_state_change"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "provisioning_requires_traversable_resident_spawn_before_consuming_identity"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "recovery_identity_requires_an_explicit_usable_client_endpoint_before_mutation"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "resume_only_host_provisions_a_durable_dormant_principal_without_guest_registration"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "resume_only_rejects_guests_invalid_tokens_and_suspended_owners_before_hydration"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "operator_controls",
+    "name": "suspension_and_rotation_are_durable_private_and_preserve_the_same_principal"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "owner_dormancy",
+    "name": "disconnected_owner_retires_bodies_home_and_resumes_exact_identity_after_host_restart"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "prediction",
+    "name": "owner_acknowledges_only_a_completed_step_and_never_another_players_motion"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "already_connected_resume_is_rejected_without_any_hydration_or_checkpoint"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "complete_export_cannot_overwrite_database_companions_or_file_aliases"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "continuous_driving_focus_and_ping_advance_without_per_input_storage_barriers"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "dormant_source_depletion_and_destruction_survive_export_revisit_and_restart"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "failed_commit_holds_success_responses_and_blocks_new_input_until_recovery"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "invalid_private_host_metadata_cannot_replace_a_running_world"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "live_connections_prevent_store_replacement"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "prepared_source_batch_hydrates_in_background_without_simulating_dormant_records"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "regional_restart_preserves_principal_wallet_inventory_clock_and_command_sequence"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "server_json_migration_validates_host_metadata_and_never_overwrites"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "source_feature_tombstone_stays_active_until_all_contributing_tiles_evict"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "stale_host_checkpoint_cannot_overwrite_committed_regions_or_mutate_live_state"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "store_identity_and_catalog_guards_reject_without_replacing_current_world"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_persistence",
+    "name": "unauthenticated_commands_and_obsolete_hello_do_not_activate_cold_pages"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "regional_session_load",
+    "name": "run::expected_writer_lock_cannot_hide_another_error_or_authority_work"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "spawn_placement",
+    "name": "an_avatar_only_island_cannot_create_a_partial_or_unsupported_crew"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "spawn_placement",
+    "name": "reconnect_keeps_saved_body_positions_even_when_the_surface_is_unavailable"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "spawn_placement",
+    "name": "regional_operator_provision_checks_cold_bodies_before_committing_a_new_crew"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "spawn_placement",
+    "name": "successive_principals_receive_complete_unoccupied_crews"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "client::tests::failed_resync_queue_admission_does_not_install_a_phantom_request"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "prediction::tests::absent_terrain_horizon_body_change_and_pause_fail_closed"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "prediction::tests::grounding_allowance_is_shared_by_entire_replay_not_repeated_per_frame"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "prediction::tests::malformed_resolver_cannot_change_identity_speed_or_vertical_location"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "prediction::tests::reconciles_only_unacknowledged_input_and_ignores_old_snapshots"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "prediction::tests::vehicle_preview_uses_shared_dynamics_without_mutating_authority_or_inventory"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "prediction::tests::vehicle_replay_resamples_surface_each_step_and_stops_at_unknown_wheels"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "protocol::tests::capability_debug_redaction_preserves_private_wire_handshakes"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "protocol::tests::interest_distance_wraps_the_dateline"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "protocol::tests::maximum_bounded_sandbox_view_fits_a_single_frame"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "protocol::tests::positions_from_deserialization_still_require_validation"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "protocol::tests::unknown_command_fields_are_rejected"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::actor_deltas_remove_departed_interest_and_keep_zero_change_heartbeats"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::delta_cannot_grow_collections_past_limits_or_mix_full_and_patch"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::faction_departure_keeps_visible_property_context_but_rejects_unrelated_rosters"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::individually_small_patches_cannot_accumulate_an_oversized_baseline"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::malformed_delta_rejects_atomically_and_cannot_reassign_private_recipient"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::missing_base_requests_keyframe_without_advancing_replica"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::sandbox_delta_roundtrip_preserves_stock_money_order_removals_and_nullable_home"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::selection_uses_keyframes_when_delta_is_larger_or_refresh_deadline_is_reached"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "replication::tests::unchanged_view_delta_reduces_bytes_and_preserves_private_progress"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::backpressure_tests::reliable_command_waits_for_response_headroom_and_executes_once_after_drain"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::actor_budget_and_invalid_values_are_enforced"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::authoritative_manual_vehicle_stops_at_dynamic_body_but_not_an_overpass"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::constructed_structure_blocks_fast_authoritative_actor_motion"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::fixed_step_catches_up_with_a_strict_budget"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::invalid_configuration_is_reported_before_binding"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::living_registration_rejection_leaves_no_player_account_or_session"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::model_sized_vehicle_sweep_honors_source_underpass_clearance_and_legacy_provider"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::sandbox_exit_dispatch_rejects_uncovered_dismount_then_places_clear"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::sandbox_walking_dispatch_uses_coverage_before_shortening_a_route"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::vehicle_envelope_missing_coverage_stops_without_collision_wear"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::vehicle_envelope_rejects_invalid_or_uncovered_returned_corner_support"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::vehicle_envelope_respects_coverage_with_custom_point_support"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "server::tests::vehicle_source_sweep_cannot_jump_a_thin_wall_between_old_one_metre_samples"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "session::tests::identity_is_atomic_bounded_and_pinned_to_server"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "surface::tests::source_buildings_block_swept_motion_and_placement"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "surface::tests::steep_resident_heightmap_rejects_ground_motion_and_building"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "surface::tests::underpasses_distinguish_car_bus_and_current_support_height"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "surface::tests::water_ship_and_bridge_support_follow_resident_source_geometry"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "transport::tests::coalesced_frames_are_separate_messages"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "transport::tests::fragmented_header_and_body_decode_once_complete"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "transport::tests::malicious_length_is_rejected_before_body_allocation"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_net",
+    "name": "transport::tests::receive_buffer_and_serialize_budgets_are_enforced"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_server",
+    "name": "tests::reference_environment_preserves_wheel_material_and_body_clearance"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "terra_server",
+    "name": "tests::spawn_residency_is_preserved_when_all_connected_players_are_far_away"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "tls_transport",
+    "name": "invalid_or_oversized_tls_configuration_is_rejected_before_binding"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "tls_transport",
+    "name": "obsolete_protocol_alpn_is_rejected_before_application_admission"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "tls_transport",
+    "name": "plaintext_peer_cannot_be_admitted_to_tls_listener_and_other_peers_continue"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "tls_transport",
+    "name": "trusted_tls_handshake_supports_commands_and_resume_identity"
+  },
+  {
+    "crate": "terra-net",
+    "harness": "tls_transport",
+    "name": "untrusted_ca_and_wrong_hostname_fail_before_player_admission"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::a_committed_deletion_and_cross_region_move_do_not_resurrect_records"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::a_views_only_foreign_database_is_rejected_without_initializing_terra_tables"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::a_zero_generation_with_payload_is_corruption_not_a_new_world"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::abrupt_process_exit_recovers_committed_and_uncommitted_transactions"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::aliases_through_symbolic_and_hard_links_are_rejected_before_output_writes"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::altered_regional_schema_is_rejected_by_readers_and_live_checkpoint_barriers"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::backup_receipt_names_the_copied_generation_and_refuses_corrupt_pages"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::bounded_backup_retries_do_not_publish_a_partial_destination"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::bounded_worker_keeps_visible_state_and_polling_responsive_while_sqlite_is_locked"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::bounds_reject_bad_region_keys_and_oversized_metadata_before_mutation"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::cached_encoding_never_certifies_semantically_forged_external_payloads"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::checkpoint_pages_real_records_and_restart_preserves_depletion_and_ledger"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::corrupted_payload_is_not_installed_or_silently_recreated"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::crash_writer_child"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::decoded_duplicate_page_rejection_preserves_the_first_authoritative_page"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::discarded_restore_result_cannot_make_hydrate_accept_an_old_partial_view"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::dormant_resident_owned_courier_is_not_assigned_new_public_work"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::duplicate_regional_rows_cannot_be_collapsed_into_an_accepted_checkpoint"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::external_descriptor_edits_cannot_relabel_an_open_authority_or_its_archive"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::extra_unique_replace_indexes_cannot_delete_regions_during_the_first_checkpoint"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::failed_incremental_commit_keeps_prior_payloads_metrics_and_residency"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::foreign_world_catalog_level_and_schema_are_rejected_without_resetting_database"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::hydrate_before_registration_does_not_reseed_depleted_nodes"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::incremental_checkpoint_reuses_unchanged_payloads_and_writes_only_changed_pages"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::maintenance_reader_and_recovery_preserve_the_verified_backup_bytes"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::new_database_is_private_and_symlinks_are_rejected"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::online_backup_reads_committed_wal_and_refuses_to_replace_existing_files"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::opening_an_existing_store_requires_restore_before_mutating"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::output_and_backup_destinations_cannot_alias_database_or_reserved_sidecars"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::owned_legacy_courier_retires_with_exact_cargo_and_resumes_without_offline_retries"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::portable_operations_preserve_complete_private_world_and_refuse_overwrite"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::rejected_host_metadata_preserves_the_old_residency_cursor_for_retry"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::same_generation_edit_after_snapshot_composition_cannot_be_overwritten"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::stale_writer_cannot_overwrite_newer_committed_money_or_pages"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::supported_schema_one_remains_readable_and_writable_after_backup"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::transaction_failure_rolls_back_pages_metadata_generation_and_live_state"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::unexpected_sql_triggers_cannot_turn_a_successful_checkpoint_into_data_loss"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::verified_partition_cache_skips_repeat_decode_but_not_external_corruption"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::worker_drop_drains_submitted_checkpoint_in_order"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "tests::worker_failure_preserves_state_and_generation_then_retry_commits"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "worker::tests::disconnected_idle_worker_rejects_submission_and_later_finish"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "worker::tests::lost_checkpoint_completion_stops_waiting_and_reopen_recovers_the_exact_commit"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "worker::tests::lost_hydration_completion_fails_finish_and_preserves_the_checkpoint"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "worker::tests::poisoned_background_store_is_terminal_and_preserves_acknowledged_status"
+  },
+  {
+    "crate": "terra-persistence",
+    "harness": "terra_persistence",
+    "name": "worker::tests::poisoned_idle_store_blocks_read_only_and_maintenance_paths"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "a_blocked_following_queue_allows_admitted_reverse_away_from_the_leader"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "a_legacy_avatar_overlap_can_clear_before_turning_without_teleporting"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "autonomous_motion_is_independent_of_accelerated_calendar_time"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "autonomous_turns_accelerate_and_brake_without_snapping_to_waypoints"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "blocked_vehicle_envelope_does_not_claim_travel_and_can_recover"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "cold_npc_handling_survives_active_ticks_and_complete_orphans_are_rejected"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "crossing_walkers_and_courier_keep_their_avoidance_across_save_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "legacy_traffic_state_loads_with_bounded_default_handling"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "missing_wheel_support_stops_and_restored_support_resumes_the_same_order"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "patrol_detours_do_not_expand_the_persisted_patrol_cursor_bounds"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "patrol_keeps_clearance_from_a_stopped_queue_across_save_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "patrol_uses_supported_saved_detours_and_waits_when_both_sides_are_uncovered"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "pause_and_save_restore_preserve_autonomous_steering_and_physical_progress"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "rear_quarter_goal_reverses_away_from_a_held_forward_boundary"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "registered_autonomy_uses_real_cargo_mass_and_accepted_curve_distance"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "autonomous_driving",
+    "name": "stationary_avatar_corner_retains_clearance_in_both_directions"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "blocked_route_stops_payroll_with_load_intact_until_explicit_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "cold_regional_company_restores_passenger_and_freight_escrow_without_offline_payroll"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "company_private_replica_rejects_another_owner_and_legacy_saves_add_no_company"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "company_runs_actual_physical_passenger_route_and_conserves_money_and_people"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "depot_households_create_finite_recurrent_demand_and_return_earned_money_to_services"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "dismissing_an_employee_preserves_earned_wallet_and_settles_fractional_final_pay"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "dormant_owner_freezes_employee_payroll_and_loads_without_catchup"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "driver_paused_before_disconnect_stays_parked_after_hydration"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "fractional_payroll_is_independent_of_frame_chunking_and_survives_reassignment"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "freight_follows_ordered_waypoint_delivers_real_stock_and_stops_at_finite_demand"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "full_mixed_item_producer_preserves_fleet_cargo_and_fare_until_capacity_is_freed"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "full_source_retains_cancelled_company_cargo_and_escrow_until_space_exists"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "handover_rejects_distance_ownership_capacity_motion_and_duplicate_mutations_atomically"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "held_loaded_company_returns_physically_and_refunds_exactly_once_after_restore"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "invalid_company_mutations_are_atomic_and_route_names_and_capacity_are_bounded"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "issuer_starvation_preserves_source_and_queues_without_hidden_payroll"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "loaded_pause_finishes_delivery_rejects_takeover_and_survives_json_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "nearby_handover_preserves_physical_proof_wallets_and_load_without_moving_bodies"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "owned_depot_waives_only_onsite_callout_and_never_fuel_or_repair_value"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "private_depot_conserves_items_enforces_capacity_and_survives_restore_without_public_exposure"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "public_service_contribution_restarts_funded_work_without_creating_currency"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "roadside_quote_ownership_reach_funds_motion_and_source_denials_are_atomic"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "roadside_service_recovers_loaded_fuel_and_repair_failures_without_losing_commitments"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "companies",
+    "name": "zero_payroll_prevents_motion_and_deposit_resumes_without_minting_wages"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "accounting_exhaustion_rejects_company_and_owner_payments_without_any_partial_mutation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "assigned_rental_renewal_is_an_owner_paid_lease_without_treating_the_bond_as_an_expense"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "company_cash_categories_reconcile_setup_trade_service_and_financing_without_pricing_in_kind"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "compound_service_rejects_atomically_when_only_its_first_receipt_would_fit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "delivery_accounting_exhaustion_retains_people_escrow_and_revenue_until_it_can_commit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "exhausted_accounting_holds_payroll_but_allows_an_already_present_load_to_refund"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "imported_revenue_limit_blocks_new_sales_without_blocking_paid_stock_acquisition"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "legacy_save_starts_from_imported_cash_and_never_relabels_prior_income_as_new_profit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "malformed_accounting_is_rejected_without_treating_a_broken_new_ledger_as_legacy"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "owner_paid_assigned_vehicle_costs_are_separate_and_unassigned_personal_spending_is_not_claimed"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "recent_receipts_are_bounded_while_lifetime_totals_and_cash_remain_exact"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_accounting",
+    "name": "rejected_assigned_vehicle_services_leave_no_phantom_owner_expense"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_career",
+    "name": "finite_novice_passenger_career_prices_rental_costs_and_resumes_for_one_physical_hour"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "capped_buyer_refund_keeps_goods_and_escrow_until_a_real_sale_makes_money_space"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "failed_market_capacity_inventory_and_payer_checks_publish_no_partial_trade"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "loaded_sale_survives_dormancy_partition_restart_and_rejects_forged_escrow_or_reserved_space"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "nearby_market_trades_company_cash_and_private_stock_with_exact_quote_rollback"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "private_transfer_reserves_mixed_capacity_uses_own_bays_and_has_no_public_fare"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "purchased_stock_career_accounts_for_acquisition_setup_and_recovery_without_inventing_profit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "sale_waits_for_real_buyer_funds_and_returns_every_reserved_credit_and_item"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "six_session_warehouse_career_conserves_finite_goods_cash_and_recovers_scarcity"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "warehouse_handover_moves_buyer_commitment_and_space_reservation_exactly_once"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_depots",
+    "name": "warehouse_sale_reserves_buyer_cash_refund_space_and_pays_only_after_physical_delivery"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "briefing_prioritizes_owned_recovery_and_does_not_reveal_another_company"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "company_focus_rejects_retargeted_service_but_not_routine_payroll_or_movement"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "company_setup_guidance_follows_real_paid_commands_without_a_second_progress_ledger"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "expired_rental_guidance_preserves_exact_vehicle_and_remote_renewal_rules"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "held_loaded_service_resumes_guidance_and_preserves_its_physical_return_commitment"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "legacy_company_guidance_does_not_invent_missing_accounting_or_resume_state"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "money_limits_and_empty_capacity_failures_do_not_promise_a_deposit_or_load_return_fix"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "source_failure_briefing_names_recovery_and_cannot_restart_the_vehicle"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_guidance",
+    "name": "suggested_journey_keeps_needs_and_accepted_work_ahead_of_owned_company_and_explicit_goals"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_planning",
+    "name": "missing_buyer_and_depot_are_unknown_while_known_empty_inventory_stays_zero"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_planning",
+    "name": "passenger_receipt_is_first_leg_arithmetic_not_private_funding_or_profit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_planning",
+    "name": "retail_comparison_updates_and_discloses_small_stock_without_reserving_prices"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_planning",
+    "name": "transfer_has_no_receipt_and_does_not_confuse_one_item_with_free_bay_capacity"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "company_planning",
+    "name": "warehouse_preview_exposes_retail_shortfall_without_reclassifying_contributed_stock"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "absent_terrain_blocks_new_bodies_and_does_not_commit_empty_starter_seed"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "chunk_resource_elevation_is_sampled_and_reloads_do_not_refill"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "custom_catalog_skips_unknown_and_unharvestable_resource_types"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "gathered_regrowing_and_finite_nodes_keep_distinct_lifecycle"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "inactive_hours_rest_and_grazing_replenishes_needs"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "malformed_metadata_and_configuration_reject_without_mutation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "nearby_seed_creates_distinct_bounded_species_and_natural_nodes"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "people_trigger_flee_and_undisturbed_wildlife_resume_normal_behavior"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "recovery_is_delayed_and_never_exceeds_carrying_capacity"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "shoreline_and_ore_nodes_require_available_catalog_tools_and_enforce_gathering"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "thirsty_animals_seek_accessible_water_before_hydrating"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "tool_admission_is_atomic_and_improved_tool_is_accepted"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "v2_save_migrates_empty_ecology_and_updated_catalog_example_matches"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "ecology",
+    "name": "views_only_carry_visible_metadata_and_survive_budget_trimming"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "handover_and_departure_preserve_public_funds_stock_and_private_economy_on_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "invitation_decline_and_revocation_release_capacity_without_implicitly_joining"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "leadership_handover_retains_invitations_and_old_leader_has_no_roster_bypass"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "leaving_preserves_personal_homes_and_other_memberships"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "leaving_revokes_shared_home_and_permissions_but_preserves_every_asset"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "lifecycle_intents_roundtrip_internally_tagged_wire_envelopes"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "lifecycle_rejections_are_atomic_and_never_create_a_leaderless_faction"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "faction_lifecycle",
+    "name": "removing_an_offline_member_clears_cold_home_and_survives_both_regional_merge_paths"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "additive_faction_fields_keep_personal_v1_saves_readable"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "faction_persistence_rejects_invalid_rosters_and_retains_shared_ownership"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "faction_rosters_roundtrip_inside_internally_tagged_network_envelopes"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "faction_snapshot_prioritizes_memberships_and_reports_truncation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "invitations_and_role_grants_prevent_self_join_and_escalation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "plot_transfer_cannot_expropriate_another_players_property"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "factions",
+    "name": "transferring_land_also_transfers_assets_and_roles_control_shared_mutation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "builtin_catalog_roundtrips_and_rejects_unknown_materials"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "catalog_aware_restore_rejects_changed_blueprints_and_crop_yields"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "construction_respects_other_owners_rented_bus_body_and_preserves_clear_space"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "crafting_failure_is_atomic_and_checked_against_overflow"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "custom_catalog_registration_checks_equipment_before_registering_player"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "farming_requires_ownership_readiness_and_single_harvest"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "house_build_home_and_demolition_have_no_refund_duplication"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "ownership_and_three_dimensional_reach_prevent_remote_actions"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "owning_a_clipped_source_way_does_not_allow_global_geometry_removal"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "persistence_roundtrip_rejects_version_and_broken_ownership"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "resource_counts_survive_reloading_and_regrow_without_tick_loops"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "snapshots_are_interest_filtered_and_hard_bounded"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "source_removal_is_overlay_only_and_does_not_resurrect"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "gameplay",
+    "name": "tool_requires_owned_nearby_workbench"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "garage_placement",
+    "name": "a_long_bus_and_repeated_rentals_get_distinct_usable_garage_bays"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "garage_placement",
+    "name": "purchased_vehicle_has_clear_garage_parking_and_a_usable_exit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "garage_placement",
+    "name": "rented_vehicle_has_clear_garage_parking_and_a_usable_exit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "garage_placement",
+    "name": "unsupported_or_occupied_parking_leaves_purchase_and_rental_ledgers_unchanged"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "accepted_work_has_priority_and_other_players_contracts_are_never_suggested"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "acquisition_skips_depleted_and_foreign_protected_resources"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "changed_transaction_identity_does_not_match_a_visible_action"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "custom_recipe_cycles_have_a_bounded_recovery_path"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "founding_and_funding_explain_real_costs_without_creating_wealth"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "guidance_is_read_only_for_all_tracks_and_missing_principals"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "guidance_resumes_from_saved_authority_without_a_second_goal_ledger"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "held_recipe_ingredients_do_not_hide_a_finished_item_seller_when_workbench_is_unavailable"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "homes_and_territories_respect_current_ownership"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "low_energy_only_opens_the_existing_command_controls"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "overlapping_markets_keep_the_actual_available_seller_and_reject_changed_intent"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "recipe_goals_use_catalog_costs_and_existing_inventory"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "registered_vehicle_guidance_reads_driver_avatar_and_only_opens_exit_controls"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "resource_permission_work_uses_a_bounded_nearest_shortlist_and_local_refresh"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "resumed_driving_guidance_targets_the_actual_owned_assignment"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "stocked_finished_goods_are_suggested_before_unavailable_recipe_inputs"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "suggested_critical_water_precedes_work_and_food_and_uses_real_inventory"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "supply_journey_uses_real_escrow_inventory_and_once_only_progress"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "urgent_food_can_choose_stocked_cooked_fish_without_fabricating_bread_access"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "urgent_food_chooses_real_available_food_before_a_blocked_bread_recipe"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "urgent_food_uses_only_carried_supported_consumables_for_the_active_person"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "urgent_needs_preserve_explicit_tracks_and_read_only_save_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance",
+    "name": "urgent_water_without_supplies_uses_existing_gather_and_consume_then_bounded_fallback"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "accepted_supply_shows_one_complete_comparison_without_retargeting_its_market_action"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "commitments_are_owner_scoped_bounded_read_only_and_rebuilt_after_save"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "concise_supply_market_text_keeps_recipe_inputs_distinct_from_finished_goods"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "continuing_guidance_journey_preserves_obligations_and_rebuilds_after_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "default_supply_prioritizes_deadline_but_explicit_accepted_choice_stays_exact"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "expired_supply_offers_an_explicit_value_preserving_return"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "supply_brief_compares_complete_missing_quantity_without_claiming_profit_or_reservation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "supply_deadlines_keep_the_last_minutes_and_expiry_distinct"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "guidance_commitments",
+    "name": "supply_intent_carries_request_even_when_gathering_command_matches"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "households",
+    "name": "household_fallback_still_requires_a_local_stocked_shop_and_service_capacity"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "households",
+    "name": "households_skip_unaffordable_or_capped_shops_without_losing_money_or_material"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "a_vehicle_turning_at_a_waypoint_does_not_yield_to_its_previous_following_queue"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "construction_cannot_trap_a_body_and_extreme_rts_altitudes_reject_atomically"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "dormant_controlled_motion_cannot_move_or_reposition_bodies_until_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "facility_geometry_and_forecourt_routing_match_swept_collision"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "finite_sources_production_and_deliveries_are_material_conserving"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "needs_are_per_body_and_consumption_rest_and_speed_are_connected"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "only_owner_may_operate_sites_and_save_rejects_cargo_and_account_tampering"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "parked_owned_rover_is_not_a_same_direction_traffic_queue"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "populated_settlement_delivers_with_facility_collision_and_traffic_enabled"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "possession_keeps_identity_inventory_and_original_body"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "regional_view_marks_all_supported_entity_and_geometry_reductions"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "rejected_demo_seed_leaves_the_previous_world_unchanged"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "repeated_source_roads_keep_unique_stable_segment_ids_in_saved_and_wire_state"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "rts_active_selection_preserves_orders_and_changes_interaction_body"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "rts_orders_are_owned_atomic_and_collision_checked_before_progress"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "shop_cannot_buy_with_missing_cash_and_amount_overflow_rejects"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "snapshot_is_bounded_hides_other_wallets_and_serializes_in_tagged_envelope"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "trading_is_atomic_and_conserves_money_and_stock"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "traffic_starts_are_separated_and_have_valid_forward_waypoints"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "untrusted_living_views_reject_duplicates_nonfinite_fields_and_unowned_control"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "living",
+    "name": "v1_save_missing_living_field_migrates_without_minting_anything"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "logistics",
+    "name": "blocked_loaded_courier_physically_returns_cargo_without_loss"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "logistics",
+    "name": "dispatch_books_both_service_bays_without_blocking_independent_pairs"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "logistics",
+    "name": "dispatch_reserves_source_stock_across_all_couriers"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "logistics",
+    "name": "road_graph_uses_connections_and_repeated_queries_are_deterministic"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "logistics",
+    "name": "stalled_delivery_metadata_is_validated_and_missing_legacy_fields_default"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "logistics",
+    "name": "stranded_pickup_releases_reservation_without_removing_goods"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_clusters",
+    "name": "autonomous_vehicle_passes_a_cluster_without_moving_parked_bodies_or_losing_its_load"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_clusters",
+    "name": "cluster_uses_the_supported_opposite_side_when_the_first_side_is_missing"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_clusters",
+    "name": "moving_obstruction_keeps_its_physical_priority_and_clears_without_a_static_detour"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_clusters",
+    "name": "patrol_cluster_maneuver_keeps_its_circuit_and_exact_saved_continuation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_clusters",
+    "name": "uncovered_cluster_sides_hold_the_original_order_until_support_returns"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_blocked_narrow_junction_preserves_the_queue_and_admits_an_unrelated_exit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_far_original_waypoint_never_enters_an_unbounded_reconnection_callback"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_gap_in_the_last_reconnection_segment_prevents_partial_route_commit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_long_unavailable_flank_keeps_value_and_replans_after_support_returns"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_missing_reconnection_rejects_partial_detours_until_the_complete_route_returns"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_patrol_keeps_its_circuit_through_a_saved_narrow_reverse_approach"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "a_supported_narrow_corridor_passes_a_parked_body_without_leaving_its_envelope"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "legacy_reconnection_admits_a_complete_bounded_leg_above_one_callback_budget"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "two_moving_crossings_clear_physically_before_the_original_route_continues"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "navigation_geometry",
+    "name": "unconsumed_waypoints_still_own_the_full_route_capacity"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "personal_trade",
+    "name": "personal_quote_does_not_bypass_stock_payer_funds_or_receiving_caps"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "personal_trade",
+    "name": "personal_trade_rejects_changed_buy_and_sell_quotes_then_accepts_reviewed_total"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "personal_trade",
+    "name": "quoted_personal_trade_keeps_three_dimensional_reach_and_checked_bounds"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "personal_trade",
+    "name": "quoted_trade_wire_shape_is_explicit_and_legacy_commands_remain_available"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "certified_environment_keeps_cold_construction_dependent_on_current_land_rights"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "certified_environment_merge_matches_complete_validation_across_mutation_and_residency"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "certified_environment_preserves_cross_page_source_links_and_excludes_ecology_policy"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "certified_environment_rejects_duplicate_ids_without_mutating_the_proof"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "cold_animal_population_reserves_capacity_during_passive_recovery"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "cold_record_conflict_fails_atomically_and_invalid_interest_is_rejected"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "cold_resources_reserve_total_capacity_before_new_seed_mutates_state"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "cross_region_resource_references_load_as_one_dependency_closed_set"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "dormant_environment_freezes_while_global_clocks_and_owned_needs_advance"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "dormant_owner_bodies_and_home_retire_without_losing_private_references"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "empty_requested_regions_are_owned_for_later_seed_and_deletion_persists"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "forged_dependency_graph_and_misplaced_or_duplicate_records_are_rejected"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "geographic_partition_round_trips_every_domain_without_refilling"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "homes_ownership_accounts_and_physical_cargo_remain_valid_without_environment"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "immutable_partition_proof_matches_checked_paths_and_rejects_forged_dependencies"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "metric_pins_cover_nearby_records_beyond_one_ring_at_high_latitude_and_dateline"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "migrating_actor_merges_with_existing_cold_region_without_duplication"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "offline_owned_bodies_remain_frozen_when_a_region_is_hot"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "owned_wildlife_age_and_behavior_freeze_even_when_an_observer_loads_its_habitat"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "owned_wildlife_pins_its_habitat_and_closes_dependencies"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "partial_save_is_rejected_and_serialization_preserves_the_marker"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "polar_metric_pins_keep_physically_overlapping_buildings_at_different_longitudes"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "poles_and_date_line_round_trip_without_region_aliasing"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "private_cold_descriptors_cannot_bypass_complete_save_or_owner_validation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "retained_bodies_pin_nearby_environment_when_camera_interest_moves_elsewhere"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "regions",
+    "name": "wildlife_crossing_region_boundary_retains_habitat_and_resource_dependencies"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "exhausted_fuel_or_rental_capacity_rejects_purchase_without_escrow_or_new_body"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "expired_rental_keeps_loaded_company_trip_until_renewal_and_physical_return"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "rental_admission_and_refund_denials_are_atomic_and_owner_private"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "rental_clocks_freeze_during_dormancy_and_survive_cold_region_restoration"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "rental_expiry_stops_motion_without_repossessing_and_remote_renewal_keeps_identity"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "rental_purchase_renewal_and_damaged_return_conserve_bond_money_and_fuel"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rentals",
+    "name": "rental_refund_full_wallet_or_empty_issuer_preserves_vehicle_and_bond"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rts_vehicle_orders",
+    "name": "accepted_rts_move_resumes_exited_rented_and_company_released_vehicles_physically"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rts_vehicle_orders",
+    "name": "an_rts_brake_release_does_not_bypass_fuel_condition_or_rental_expiry"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "rts_vehicle_orders",
+    "name": "rejected_mixed_groups_preserve_all_brakes_orders_and_authority"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "approaching_observer_and_vehicle_threat_bypass_far_budget"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "far_decision_budget_is_fair_and_avoids_scanning_every_threat"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "index_reduces_candidates_without_changing_large_point_query_results"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "indexed_snapshot_matches_all_overlay_layers_and_private_actor_rules"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "interest_index_rejects_other_world_and_rebuild_tracks_removal"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "persisted_player_does_not_grant_near_priority_without_an_active_observer"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "prior_living_metrics_load_with_zero_spatial_work_counters"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "schedule_inputs_reject_atomically_and_clock_rewind_resets_runtime_budget"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "scheduled_unknown_ground_rejects_targets_and_births"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "scheduling_preserves_full_rate_resources_needs_production_and_physical_motion"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "spatial_inputs_and_duplicate_keys_reject_without_unbounded_grid_walks"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "sphere_grid_matches_scan_across_dateline_poles_and_altitudes"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "scaling",
+    "name": "traffic_broad_phase_preserves_yielding_and_bounds_separated_vehicle_work"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "contract_capacity_privacy_and_cancel_reopen_are_bounded"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "contract_failure_keeps_escrow_and_stock_and_respects_spatial_reach"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "contributions_reject_unneeded_or_excess_stock_before_mutation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "dormant_settlement_actions_reject_direct_and_wrapped_calls_without_mutation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "expired_work_reopens_without_refunding_or_minting_escrow"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "faction_builder_can_operate_territory_but_ordinary_member_cannot"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "founding_costs_and_treasury_are_atomic_and_conserved"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "funded_resident_pay_requires_productive_activity_and_conserves_money"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "neighborhood_to_city_uses_real_infrastructure_and_project_costs"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "new_consumables_restore_needs_without_allowing_raw_fish"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "optional_resource_prices_follow_custom_catalog_without_refilling_stock"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "personal_territory_cannot_be_bypassed_by_faction_plot_transfer"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "scarce_prices_are_anchored_and_no_resale_quote_exceeds_lowest_buy_quote"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "settlement_state_and_private_views_survive_serialization_and_reject_corruption"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "supply_contract_moves_goods_into_production_and_pays_escrow_once"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "territory_blocks_outsider_land_without_confiscating_existing_plots"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "territory_extraction_is_personal_or_shared_with_current_faction_members"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "territory_plot_capacity_and_shared_plot_inheritance_are_enforced"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "settlements",
+    "name": "upgrade_rejects_foreign_property_in_expanded_region_atomically"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::autonomous_vehicle_cannot_tunnel_through_a_parked_vehicle"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::cluster_proposals_reject_moving_unknown_duplicate_and_excess_members"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::legacy_walking_path_goes_around_a_vehicle_with_bounded_admitted_steps"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::moving_pedestrians_allow_swept_clearance_away_but_never_toward_them"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::narrow_corridors_require_an_identified_parallel_parked_vehicle"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::occupied_avatar_is_not_a_vehicle_obstacle_and_parked_bodies_are"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::perpendicular_clearance_is_bounded_to_a_stationary_outward_corner"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::sequentially_moving_sparse_bodies_keep_contact_work_local"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::turnaround_clears_a_front_obstruction_behind_the_route_destination"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::updated_bodies_outside_original_index_are_still_obstacles"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::vehicle_clears_its_rear_before_turning_without_bypassing_terrain_or_speed"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::contacts::tests::walking_avatar_can_exit_a_vehicle_overlap_in_any_direction"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::routing::tests::open_road_patrol_returns_in_opposite_lane_and_closes_without_reversal"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::routing::tests::opposite_vehicle_directions_use_separate_lanes_and_exact_stops"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::routing::tests::road_access_projects_to_segment_without_detouring_to_its_endpoint"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::traffic::exit_tests::parallel_exit_clearance_keeps_existing_margins_and_grade_separation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::traffic::exit_tests::rotated_exit_clearance_detects_a_crosswise_body_at_the_future_nose"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "terra_sandbox",
+    "name": "living::traffic::exit_tests::rotated_exit_clearance_does_not_apply_vehicle_length_sideways"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "blocked_exit_does_not_hold_up_an_unrelated_clear_turn"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "cached_road_changes_stale_regional_ids_and_ticket_extremes_are_safe"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "directed_graph_connects_clipped_crossings_and_rejects_wrong_way_shortcuts"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "facility_corner_budget_never_degrades_a_directed_route_into_a_shortcut"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "four_way_arrivals_clear_fifo_without_overlapping_and_survive_save_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "grade_separation_and_date_line_geometry_do_not_create_false_intersections"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "manual_approach_and_occupancy_block_automatic_admission_without_trusting_a_permit"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "numeric_speed_limit_is_obeyed_without_accelerated_calendar_motion"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "occupied_junction_never_expires_and_large_steps_stay_behind_stop_lines"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "reverse_one_way_population_uses_reversed_segment_lengths_without_bunching"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "stalled_grant_requeues_after_physical_timeout_and_hold_prunes_reservations"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic",
+    "name": "supported_source_rules_are_explicit_and_legacy_roads_remain_compatible"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic_recovery",
+    "name": "historical_occupied_exit_returns_its_exact_load_within_original_replay_window"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic_recovery",
+    "name": "historical_rear_trap_returns_its_exact_load_within_original_replay_window"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "traffic_recovery",
+    "name": "saved_loaded_queue_waits_without_fabricating_arrival_when_source_support_is_unavailable"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "active_cargo_driver_profile_and_handling_survive_save_and_regional_roundtrip"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "all_vehicle_definitions_have_valid_distinct_physical_capabilities"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "bootstrap_is_idempotent_and_registers_late_drivers_without_resetting_ledgers"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "character_creation_precedes_population_and_legacy_json_adds_no_currency"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "dormant_loaded_passenger_and_freight_jobs_keep_cargo_escrow_and_remaining_time"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "driver_needs_reduce_manual_vehicle_cap_without_changing_fleet_mechanics"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "expired_uncollected_jobs_refund_without_loss_and_do_not_reset_issuer_capital"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "expiry_uses_physical_time_and_requires_loaded_payload_return"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "freight_cannot_consume_stock_reserved_for_existing_npc_couriers"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "freight_requires_pickup_and_arrival_and_pays_reserved_reward_once"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "fuel_wear_and_rts_share_limits_and_reentry_releases_parking_brake"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "loaded_cancellation_preserves_cargo_until_physical_return_and_refunds_once"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "manual_freight_and_refunds_respect_mixed_producer_storage_without_losing_escrow"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "moving_vehicle_fatigues_its_avatar_in_physical_time_even_with_a_rest_order"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "ownership_reach_licensing_and_insufficient_funds_reject_atomically"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "passenger_trip_conserves_population_and_unlocks_paid_license"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "purchase_refuel_upgrade_paint_and_sale_transfer_finite_money_and_fuel"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "race_requires_ordered_proximity_mileage_and_positive_time_without_click_rewards"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "trailer_capacity_coupling_and_loaded_unhitch_are_validated"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "transport_views_hide_other_private_ledgers_and_roundtrip_in_tagged_envelopes"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "treasury_shortage_and_post_transfer_overflow_leave_entire_job_unchanged"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "transport",
+    "name": "vehicle_purchase_respects_existing_global_body_capacity_including_cold_regions"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "a_single_player_reference_crew_has_a_usable_grounded_dismount"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "dismount_avoids_resident_dormant_people_and_other_vehicle_corridors"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "exiting_cannot_cross_a_structure_or_ignore_a_moving_vehicle"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "grounded_exit_checks_the_whole_avatar_and_resumes_deterministically"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "legacy_exit_command_places_clear_of_rotated_vehicles_at_geodetic_seams"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "rotated_avatar_corners_cannot_cross_an_uncovered_edge"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_exit",
+    "name": "unsupported_shifted_or_discontinuous_exit_ground_rejects_without_mutation"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_ground",
+    "name": "authored_road_material_respects_ribbon_without_rewriting_height_or_source_roads"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_ground",
+    "name": "reserved_passengers_have_no_mass_until_boarded_and_saved_load_resumes_exactly"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "vehicle_ground",
+    "name": "trailer_and_actual_cargo_are_counted_once_and_change_handling_and_fuel"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "a_full_group_shares_one_support_query_budget_without_losing_orders"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "a_parked_body_gets_a_short_supported_detour_with_physical_save_resume"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "an_unavailable_or_sliding_resolver_cannot_replace_the_road_route"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "body_corner_proposals_cannot_skip_missing_footprint_support"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "body_detours_require_support_at_every_corner_and_keep_the_fallback_when_unavailable"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "invalid_host_height_cannot_publish_waypoints_outside_the_save_contract"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "local_detours_try_the_other_side_but_never_plan_around_a_moving_body"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "native_market_pickup_poses_admit_a_local_bypass_on_supported_ground"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "pedestrian_facility_routes_use_walking_clearance_while_vehicle_clearance_stays_intact"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "shortcut_planning_keeps_group_ownership_and_distance_errors_atomic"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "supported_owned_walk_removes_perimeter_excursion_without_moving_the_actor"
+  },
+  {
+    "crate": "terra-sandbox",
+    "harness": "walking_routes",
+    "name": "unsupported_strip_or_only_missing_corner_support_keeps_a_real_detour"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "http_pipeline",
+    "name": "http_sources_are_decoded_attributed_clipped_and_cached"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "providers",
+    "name": "documented_terrarium_encoding_decodes_exactly"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "providers",
+    "name": "offline_mode_requires_no_cache_directory_or_network"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "providers",
+    "name": "osm_features_keep_source_ids_and_reject_invalid_geometry"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "providers",
+    "name": "osm_semantics_keep_shops_roofs_lanes_bridges_and_physical_units"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "providers",
+    "name": "polar_terrain_does_not_silently_clamp_to_mercator_edge"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "providers",
+    "name": "weather_keeps_units_and_timestamp_without_inventing_missing_values"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_sources",
+    "name": "tests::malformed_cli_options_fail_before_touching_sources"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "cache::tests::cache_budget_evicts_old_entries_without_touching_unrelated_files"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "cache::tests::cache_detects_corruption_and_separates_provider_keys"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "cache::tests::cached_sources_keep_original_timestamp_and_obey_ttl"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "clip::tests::crossing_segment_is_limited_and_outside_segment_removed"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "clip::tests::polygon_clipping_keeps_closed_boundary"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap::tests::heightmap_manifest_requires_provenance_and_contained_paths"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap::tests::imported_heightmaps_interpolate_share_edges_and_reject_missing_coverage"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap::tests::semantic_bundle_clips_grounds_attributes_and_pins_actual_content"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap::tests::semantic_import_rejects_holes_duplicates_wrong_geometry_and_path_escape"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_features::tests::disconnected_concave_clip_is_rejected_instead_of_filling_a_false_polygon"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_features::tests::external_ids_remain_provenance_and_fit_persistent_gameplay_after_clipping"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_features::tests::line_fragmentation_budgets_attributes_before_duplicating_them"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_features::tests::multipart_properties_cannot_expand_small_sources_past_memory_budgets"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::a_subpixel_gap_cannot_pass_union_coverage"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::bundled_connected_valley_loads_all_tiles_across_its_shared_edge"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::connected_concave_coverage_does_not_fill_its_missing_quadrant"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::connected_sources_cover_a_tile_crossing_the_join_and_pin_actual_bytes"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::covered_focus_finds_joint_coverage_when_every_child_center_is_unusable"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::overlap_disconnection_nested_collections_and_path_escape_fail"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "heightmap_set::tests::whole_seam_checks_find_a_narrow_knot_mismatch"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "procedural::tests::adjacent_tiles_share_height_samples"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "procedural::tests::antimeridian_and_poles_are_continuous"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::authored_connected_pack_exports_verifies_and_installs_with_exact_identity"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::concave_extent_and_partial_edge_tiles_are_explicit_missing_coverage"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::coverage_enumeration_is_bounded_before_allocating_a_global_tile_list"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::forged_aggregate_and_per_member_byte_bounds_fail_before_any_payload_reads"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::legacy_raster_identity_is_preserved_and_new_file_hashes_still_bind_its_content"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::nested_packages_keep_forward_slash_inventory_paths_on_every_host"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::package_index_cannot_invent_coverage_provenance_or_source_identity"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::portable_paths_reject_platform_characters_and_publication_name_aliases"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::source_members_package_members_and_output_ancestors_reject_symlinks"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::traversal_aliases_and_unindexed_members_are_not_admitted"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "source_distribution::tests::wrong_expected_identity_and_existing_destination_leave_prior_data_intact"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "streamer::tests::invalid_provider_result_is_rejected_with_backoff"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "streamer::tests::repeated_focus_is_deduplicated_and_all_budgets_hold"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "streamer::tests::teleport_rejects_old_completion_and_evicts_residents"
+  },
+  {
+    "crate": "terra-stream",
+    "harness": "terra_stream",
+    "name": "streamer::tests::zero_integration_budget_does_not_load_completed_result"
+  }
+]

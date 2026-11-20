@@ -4,9 +4,11 @@ use super::*;
 impl LivingWorld {
     pub(crate) fn validate(
         &self,
-        players: &BTreeMap<u64, crate::PlayerState>,
+        world: &SandboxState,
         catalog: Option<&Catalog>,
     ) -> Result<(), SandboxError> {
+        self.traffic.validate(world)?;
+        let players = &world.players;
         if self.units.len() > MAX_LIVING_UNITS
             || self.accounts.len() > crate::MAX_PLAYERS
             || self.shops.len() > 8
@@ -42,6 +44,11 @@ impl LivingWorld {
         }
         let mut ids = BTreeSet::new();
         for (&id, unit) in &self.units {
+            let cursor_bound = if matches!(unit.order, UnitOrder::Patrol) {
+                unit.patrol.len()
+            } else {
+                unit.path.len().max(unit.patrol.len())
+            };
             if id != unit.id
                 || id >= self.next_id
                 || !ids.insert(id)
@@ -51,7 +58,7 @@ impl LivingWorld {
                 || !unit.needs.validate()
                 || unit.path.len() > 129
                 || unit.patrol.len() > 512
-                || unit.path_index > unit.path.len().max(unit.patrol.len())
+                || unit.path_index > cursor_bound
                 || unit.pocket_money > MAX_MONEY
                 || !unit.heading_deg.is_finite()
                 || unit.velocity_enu_m_s.iter().any(|v| !v.is_finite())
@@ -72,15 +79,17 @@ impl LivingWorld {
             if id != a.player_id
                 || !players.contains_key(&id)
                 || a.money > MAX_MONEY
-                || [a.avatar_unit, a.active_unit]
-                    .iter()
-                    .any(|u| self.units.get(u).is_none_or(|u| u.owner != Some(id)))
+                || [a.avatar_unit, a.active_unit].iter().any(|u| {
+                    world
+                        .living_unit_reference(*u)
+                        .is_none_or(|(owner, _, _)| owner != Some(id))
+                })
             {
                 return Err(SandboxError::Invalid(
                     "living account or control ownership".into(),
                 ));
             }
-            if players[&id].position != self.units[&a.active_unit].position {
+            if players[&id].position != world.living_unit_reference(a.active_unit).unwrap().2 {
                 return Err(SandboxError::Invalid(
                     "active body position differs from player context".into(),
                 ));
@@ -129,25 +138,27 @@ impl LivingWorld {
         }
         let mut courier_ids = BTreeSet::new();
         for delivery in &self.deliveries {
+            let supplies = world
+                .courier_supplies_reference(delivery.unit_id)
+                .ok_or_else(|| SandboxError::Invalid("delivery courier reference".into()))?;
             if delivery.id >= self.next_id
                 || !ids.insert(delivery.id)
                 || !courier_ids.insert(delivery.unit_id)
-                || self
-                    .units
-                    .get(&delivery.unit_id)
-                    .is_none_or(|u| u.role != UnitRole::Hauler)
                 || !self.producers.contains_key(&delivery.from_site)
                 || (!self.producers.contains_key(&delivery.to_site)
                     && !self.shops.contains_key(&delivery.to_site))
                 || !valid_id(&delivery.item)
                 || delivery.amount == 0
                 || delivery.amount > 100
-                || (delivery.phase == DeliveryPhase::ToPickup
-                    && !self.units[&delivery.unit_id].supplies.is_empty())
-                || (delivery.phase == DeliveryPhase::ToDropoff
-                    && (self.units[&delivery.unit_id].supplies.len() != 1
-                        || self.units[&delivery.unit_id].supplies.get(&delivery.item)
-                            != Some(&delivery.amount)))
+                || !finite_range(delivery.stalled_seconds, 0., 86_400.)
+                || delivery.route_retries > 3
+                || delivery
+                    .last_position
+                    .is_some_and(|p| validate_living_position(p).is_err())
+                || (delivery.phase == DeliveryPhase::ToPickup && !supplies.is_empty())
+                || (delivery.phase != DeliveryPhase::ToPickup
+                    && (supplies.len() != 1
+                        || supplies.get(&delivery.item) != Some(&delivery.amount)))
             {
                 return Err(SandboxError::Invalid("delivery or reserved cargo".into()));
             }
@@ -166,6 +177,7 @@ impl LivingWorld {
                 || road.points.len() < 2
                 || road.points.len() > 64
                 || !finite_range(road.width_m as f64, 2., 30.)
+                || !road.rules.validate()
             {
                 return Err(SandboxError::Invalid("road route".into()));
             }
@@ -178,6 +190,13 @@ impl LivingWorld {
                 .units
                 .values()
                 .map(|u| &u.supplies)
+                .chain(
+                    world
+                        .dormant
+                        .owned_units
+                        .values()
+                        .filter_map(|u| u.courier_supplies.as_ref()),
+                )
                 .chain(self.shops.values().map(|s| &s.stock))
                 .chain(
                     self.producers
@@ -324,6 +343,11 @@ impl LivingView {
                 || !valid_id(&delivery.item)
                 || delivery.amount == 0
                 || delivery.amount > 100
+                || !finite_range(delivery.stalled_seconds, 0., 86_400.)
+                || delivery.route_retries > 3
+                || delivery
+                    .last_position
+                    .is_some_and(|p| validate_living_position(p).is_err())
             {
                 return Err(SandboxError::Invalid("living view delivery".into()));
             }
@@ -335,6 +359,7 @@ impl LivingView {
                 || road.points.len() < 2
                 || road.points.len() > 32
                 || !finite_range(road.width_m as f64, 2., 30.)
+                || !road.rules.validate()
             {
                 return Err(SandboxError::Invalid("living view road".into()));
             }

@@ -1,0 +1,147 @@
+{
+  "version": "0.22.0",
+  "started_utc": "2026-10-29T21:34:14.161901+00:00",
+  "status": "failed",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.12.14",
+    "cargo_build_jobs": "3",
+    "cargo_build_target_environment": null,
+    "offline": true,
+    "gate_timeout_seconds": 3600.0
+  },
+  "scope": "Local TCP/TLS with prepared terrain and 1024 cold overlay regions; bounded autonomous geometry including narrow corridors and restored support, live owner commitments, finite commercial careers, named managed and complete local recovery, portable sources, original animated human/vehicle/wildlife packs, retained diagnostics, native code and build. Native interaction, hardware/platform qualification and uncoached player experience require separate review.",
+  "source_inputs": 378,
+  "gates": [
+    {
+      "name": "compatibility",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "scripts/check_compatibility.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.065,
+      "log": "compatibility.log",
+      "log_sha256": "2407d7aa1052af1a17bae925ca38309dfdca8259c7b3175fbbaaa42cb3050a7f",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0
+    },
+    {
+      "name": "desktop-packaging-tests",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.031,
+      "log": "desktop-packaging-tests.log",
+      "log_sha256": "84d26a09bdfb6bbbd98c6c04f43db60a7a0821552846e3687d28551123a12672",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.72,
+      "log": "format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0
+    },
+    {
+      "name": "headless",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--exclude",
+        "terra-demo",
+        "--exclude",
+        "terra-bevy",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 315.274,
+      "log": "headless.log",
+      "log_sha256": "8ca22867b301c7e55c22fb102cabd72be5be21bf2e11b3699ad9f2fb2265e1bc",
+      "passed_test_executions": 98,
+      "failed_tests": 1,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0
+    }
+  ],
+  "evidence_artifacts": {
+    "startup-metadata.log": "640adb7e0c1547b2797069f730608b45a791a20af3f0ed65685e8c52af2d42a8",
+    "startup-toolchain.log": "55cd0529c005d3f62869ea6e2271bfa9d5196f56dc65a8be00a371af114a4a98",
+    "source-hashes.json": "657f7ebc9aa2c2f2b262b28785e09b4340c9133034d908d147928c98d6db0ad6",
+    "distinct-tests.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "startup_probes": [
+    {
+      "name": "metadata",
+      "command": [
+        "cargo",
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.065,
+      "log": "startup-metadata.log",
+      "log_sha256": "640adb7e0c1547b2797069f730608b45a791a20af3f0ed65685e8c52af2d42a8",
+      "timed_out": false,
+      "timeout_seconds": 120.0
+    },
+    {
+      "name": "toolchain",
+      "command": [
+        "rustc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.115,
+      "log": "startup-toolchain.log",
+      "log_sha256": "55cd0529c005d3f62869ea6e2271bfa9d5196f56dc65a8be00a371af114a4a98",
+      "timed_out": false,
+      "timeout_seconds": 120.0
+    }
+  ],
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "finished_utc": "2026-10-29T21:39:36.479956+00:00",
+  "source_inputs_unchanged": true,
+  "distinct_tests_by_crate": {},
+  "distinct_passing_rust_tests": 0,
+  "published_reports_unchanged": true,
+  "published_logs_unchanged": true,
+  "passing_rust_test_executions": 98,
+  "completion_record": "completed-gates.json"
+}

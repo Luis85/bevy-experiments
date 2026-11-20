@@ -1,0 +1,41 @@
+{
+  "status": "passed",
+  "checked_utc": "2026-10-30T11:27:37.034090+00:00",
+  "archive_name": "terra-world-0.23.0-linux-x86_64.zip",
+  "archive_bytes": 39669704,
+  "archive_sha256": "e13a2b09dee1180ed65f2bfddccdb25cf9c144dba82250f26e73e74da3f8122f",
+  "archive_unchanged": true,
+  "archive_entries": 266,
+  "uncompressed_bytes": 172715399,
+  "package_folder": "terra-world-0.23.0-linux-x86_64",
+  "fresh_extraction": true,
+  "extracted_tree_unchanged": true,
+  "extraction_access": "owner-only Unix parent (0700)",
+  "mode_check": "every extracted regular-file mode matches the archive",
+  "package": {
+    "status": "passed",
+    "release": "0.23.0",
+    "platform": "linux-x86_64",
+    "build_profile": "dev",
+    "files_verified": 265,
+    "payload_bytes": 172684810,
+    "manifest_sha256": "26da9124ac8b5bad15242519094f329a045ab0d9fe540591e3892af95b471d5e",
+    "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+    "acceptance_record_sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+    "smoke_help": {
+      "status": "passed",
+      "exit_code": 0,
+      "seconds": 0.01087,
+      "output_sha256": "d1546eb9baeeff823232dee6a7f83a1331e73a8adf87c7bd194ce683bb87e979",
+      "output_bytes": 3227,
+      "output_limit_bytes": 65536,
+      "descendant_check": {
+        "status": "owned_process_group_absent",
+        "scope": "The owned group no longer exists; deliberately detached descendants are outside this check."
+      },
+      "scope": "Command-line startup only; no window, saved world or device was exercised."
+    },
+    "scope": "Exact extracted-file consistency and accepted-binary association. Not publisher authentication, target-device qualification or a power-loss guarantee."
+  },
+  "scope": "Fresh bounded extraction, exact package consistency and optional command-line startup; no publisher, window, GPU or device qualification."
+}

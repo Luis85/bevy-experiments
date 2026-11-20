@@ -1,0 +1,44 @@
+name: Rust workspace
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Native build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libx11-dev libxkbcommon-dev libvulkan-dev
+      - name: Verify
+        run: python scripts/verify.py --jobs 3 --report-dir verification-results
+      - name: Package accepted desktop executable and original runtime data
+        run: python scripts/package_desktop.py --gates verification-results/completed-gates.json --output desktop-${{ runner.os }}.zip
+      - name: Verify a fresh extracted desktop and bounded startup
+        run: python scripts/verify_desktop_archive.py --archive desktop-${{ runner.os }}.zip --smoke-help --report verification-results/desktop-extracted.json
+      - name: Retain desktop review package
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: desktop-${{ runner.os }}.zip
+          if-no-files-found: error
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-results-${{ runner.os }}
+          path: verification-results
+          if-no-files-found: warn

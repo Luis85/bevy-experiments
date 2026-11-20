@@ -1,0 +1,26 @@
+{
+  "scope": "Focused Python polish regression run after independent descendant-lifetime review; not canonical release acceptance or Windows execution",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "scripts",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "started_utc": "2026-10-30T07:52:39.299994+00:00",
+  "finished_utc": "2026-10-30T07:52:46.617388+00:00",
+  "elapsed_seconds": 7.317400593000002,
+  "exit_code": 0,
+  "tests": 50,
+  "input_hashes": {
+    "scripts/verify_desktop.py": "3a90db41cc6688f4342f2482ba92a89cd93325311aae5d05ec54cc5a2815779b",
+    "scripts/test_verify_desktop.py": "3dd5a8d8d6a52bf8268fee17bf0d3fbde3bf423d6fce6d2457606f87499969e0"
+  },
+  "inputs_unchanged": true,
+  "log_sha256": "07a719f948609b5227d665b99fcbdd3dfaf12f4257f0c99110a9b3e4284ab2a4"
+}

@@ -1,0 +1,30 @@
+{
+  "release": "0.14.0",
+  "checks": {
+    "same_path_retains_two_sessions": true,
+    "prior_interrupted_samples_retained": true,
+    "bounded_to_16": true,
+    "latest_capture_graceful_exit": true,
+    "restart_exit_zero": true,
+    "world_resumed": true,
+    "no_world_or_simulation_or_storage_error": true,
+    "same_accepted_executable": true,
+    "authored_models_ready": true
+  },
+  "retained_snapshots": 16,
+  "prior_interrupted_samples_retained": 14,
+  "latest_capture": {
+    "captured_unix_ms": 1793220315203,
+    "elapsed_seconds": 18.593172503,
+    "last_export_error": null,
+    "periodic_interval_seconds": 3600,
+    "prior_write_failures": 0,
+    "sequence": 2,
+    "session": "1793220296609-22662-0",
+    "skipped_busy_captures": 0,
+    "status": "graceful_exit"
+  },
+  "diagnostic_sha256": "258fcde00e526a5135941f0a496a973ff4934c3b7c5b98a2cea352bb9db0f4e3",
+  "source_inputs_unchanged": true,
+  "scope": "Same-file restart retention and actual local checkpoint reopening after owned-process SIGKILL; no power-loss, health-service or hardware qualification."
+}

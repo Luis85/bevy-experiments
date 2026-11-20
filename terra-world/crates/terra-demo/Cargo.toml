@@ -7,9 +7,13 @@ license.workspace = true
 description = "Native 3D world explorer and integration example"
 
 [dependencies]
-bevy.workspace = true
+bevy = { workspace = true, features = ["bevy_gilrs"] }
+serde.workspace = true
 serde_json.workspace = true
 terra-core = { path = "../terra-core" }
 terra-stream = { path = "../terra-stream" }
-terra-bevy = { path = "../terra-bevy" }
+terra-bevy = { path = "../terra-bevy", features = ["tls"] }
+
+[dev-dependencies]
+terra-persistence = { path = "../terra-persistence" }
 

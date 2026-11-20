@@ -1,0 +1,324 @@
+{
+  "package_version": "0.7.0",
+  "captured_at_utc": "2026-10-27T13:42:23.294036+00:00",
+  "command": "cargo test --workspace --exclude terra-bevy --exclude terra-demo --offline --locked -j 2 --no-fail-fast",
+  "status": "passed",
+  "distinct_rust_test_cases": 339,
+  "failed": 0,
+  "ignored": 0,
+  "doc_test_harnesses": 6,
+  "doc_test_examples": 0,
+  "by_crate": {
+    "terra-cli": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/main.rs",
+          "kind": "rust_test",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "terra-core": {
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/domain.rs",
+          "kind": "rust_test",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "terra-history": {
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/history.rs",
+          "kind": "rust_test",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "terra-net": {
+      "passed": 86,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "passed": 29,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "unittests src/bin/client.rs",
+          "kind": "rust_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "unittests src/bin/server.rs",
+          "kind": "rust_test",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/delta_replication.rs",
+          "kind": "rust_test",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/driving.rs",
+          "kind": "rust_test",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/frontier_protocol.rs",
+          "kind": "rust_test",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/loopback.rs",
+          "kind": "rust_test",
+          "passed": 17,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/owner_dormancy.rs",
+          "kind": "rust_test",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/regional_persistence.rs",
+          "kind": "rust_test",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/tls_transport.rs",
+          "kind": "rust_test",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "terra-persistence": {
+      "passed": 29,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "passed": 29,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "terra-sandbox": {
+      "passed": 161,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/companies.rs",
+          "kind": "rust_test",
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/ecology.rs",
+          "kind": "rust_test",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/factions.rs",
+          "kind": "rust_test",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/gameplay.rs",
+          "kind": "rust_test",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/living.rs",
+          "kind": "rust_test",
+          "passed": 20,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/logistics.rs",
+          "kind": "rust_test",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/regions.rs",
+          "kind": "rust_test",
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/scaling.rs",
+          "kind": "rust_test",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/settlements.rs",
+          "kind": "rust_test",
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/transport.rs",
+          "kind": "rust_test",
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    "terra-stream": {
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/http_pipeline.rs",
+          "kind": "rust_test",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "tests/providers.rs",
+          "kind": "rust_test",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    }
+  },
+  "raw_log": "/tmp/terra-v7-headless-final-gate.log",
+  "counting_policy": "One successful complete 0.7 headless workspace gate only. Earlier targeted attempts/reruns and all terra-bevy/terra-demo tests are excluded to avoid duplicate release counts.",
+  "scope": "Bounded Rust correctness tests, real localhost TCP/TLS, company privacy/replay, cold-owner disconnect/restart/resume, actual shared vehicle contacts, and SQLite failure/recovery. No renderer, public-network capacity, distributed handoff or MMO concurrency claim."
+}

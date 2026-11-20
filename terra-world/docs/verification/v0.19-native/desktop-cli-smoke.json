@@ -1,0 +1,16 @@
+{
+  "release": "0.19.0",
+  "status": "passed",
+  "scope": "Extracted executable command-line help and dynamic loading on this Linux host; no native window or create/play/save/reopen journey",
+  "archive_sha256": "fbe163b22ed574a27e520424c565e935fb7b5ac7cc9f6b41fe0403f128780f79",
+  "executable_sha256": "b86ad4bc44685780b55c6f3eb8f32f88af4330f6f055d9f7d8d71e54339fe704",
+  "command_arguments": [
+    "terra-demo",
+    "--help"
+  ],
+  "cwd": "Separate temporary extraction parent",
+  "exit_code": 0,
+  "help_output_sha256": "d1546eb9baeeff823232dee6a7f83a1331e73a8adf87c7bd194ce683bb87e979",
+  "native_window_launched": false,
+  "extractor_execute_bit_restored_from_package_contract": true
+}

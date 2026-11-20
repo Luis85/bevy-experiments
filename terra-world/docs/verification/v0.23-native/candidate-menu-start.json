@@ -1,0 +1,17 @@
+{
+  "release": "0.23.0",
+  "phase": "candidate",
+  "command": [
+    "/tmp/terra023-target/debug/terra-demo",
+    "--menu",
+    "--user-data",
+    "/tmp/terra-native023/menu"
+  ],
+  "working_directory": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "started_utc": "2026-10-30T08:03:23.951543+00:00",
+  "binary_sha256": "700120e44255afe4c482b3416bdcedaad4200d930012418aa0c36cda0281c7f0",
+  "source_input_count": 381,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 11234
+}

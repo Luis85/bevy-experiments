@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "release": "0.21.0",
+  "phase": "candidate",
+  "profile_path": "/tmp/terra-native021/menu/worlds/world-1793302657792-173552-0/world.json",
+  "checkpoint_present_after_clean_exit": true,
+  "witness_present": true,
+  "witness_sha256": "660e86e3b7574e73c70660ff0501dfb98dde77b030c44489da20403e15862718",
+  "profile_sha256": "1e02f16a6ea01db7f26d8e89c23aef7574bbad9e7ad0b6082f7540eadfb3c0ae",
+  "database_sha256": "e6b521ccb36a84cf137d56d22da4da23a8b698110f200180059188ed02d138d7",
+  "sqlite_integrity_check": [
+    [
+      "ok"
+    ]
+  ],
+  "tables": [
+    "world",
+    "regions"
+  ],
+  "world_region_radius": 1,
+  "scope": "Actual native launcher create, managed regional play, paused save-and-quit; candidate binary before final Space-key/copy polish. Full recovery semantics are separately tested."
+}

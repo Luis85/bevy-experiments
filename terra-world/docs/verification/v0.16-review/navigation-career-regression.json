@@ -1,0 +1,202 @@
+{
+  "scope": "Focused correction of the v0.16 attempt-2 navigation career regression. Full release acceptance remains pending.",
+  "baseline_source_zip_sha256": "92a8c73750a58da22ad48f899d7c941eadb78a4af0894a51cacde26eb25aeb3f",
+  "career_test_source": "crates/terra-sandbox/tests/company_depots.rs",
+  "career_test_source_sha256": "ebc8f6f51faf67eb9591088687774bfff3e3cbfe01c2e7d173e13eea178dc3dc",
+  "career_tests_byte_identical_to_accepted_015": true,
+  "source_files": {
+    "crates/terra-sandbox/src/living/autonomy.rs": "d0905a225b6a428ddfc45054e83c45b25c8e6db7db2103d8bd923cc940332f67",
+    "crates/terra-sandbox/tests/navigation_geometry.rs": "d130e0d3b542188979d3e4182d2bc772f9c6f9d787f943e4e5faa00ff793e698"
+  },
+  "reproduction": {
+    "unchanged_career_failed": true,
+    "deliveries_before_failure": 6,
+    "original_destination_remaining_m_approx": 154,
+    "minimal_route_m": 155,
+    "minimal_admission_failed_before_correction": true,
+    "minimal_admission_passed_after_correction": true
+  },
+  "policy": {
+    "complete_reconnection_3d_limit_m": 160,
+    "source_segment_translation_plus_rotation_m": 64,
+    "source_segment_tolerance_m": 0.1,
+    "shared_extra_callbacks_per_vehicle_update": 12,
+    "original_target_preserved": true,
+    "prefix_only_acceptance": false
+  },
+  "focused_suite_status": "passed",
+  "release_acceptance": "pending",
+  "exit_code": 0,
+  "command": "cargo test --offline --locked -p terra-sandbox --lib --test company_depots --test navigation_geometry --test navigation_clusters --test autonomous_driving --test traffic --test traffic_recovery --test company_career -- --nocapture",
+  "test_target_counts": [
+    {
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "passed_tests": 75,
+  "failed_tests": 0,
+  "ignored_tests": 0,
+  "focused_log_sha256": "8883a510eddee1a775bb6e38ea6527b7a5f5726e25758d3188ead468266483e5",
+  "reconnection_report": {
+    "body_sweeps_clear": true,
+    "case": "complete_155m_route",
+    "driver_travelled_m": 159.50115993806568,
+    "elapsed_physical_seconds": 24.400000000000002,
+    "exact_resumed_steps": 243,
+    "goods_and_money_conserved": true,
+    "max_source_queries_per_update": 6546,
+    "original_destination_reached": true,
+    "source_queries": 15924,
+    "supported_complete_envelopes": true
+  },
+  "existing_geometry_reports_identical": {
+    "two_moving_crossings": true,
+    "parked_body_narrow_corridor": true,
+    "blocked_narrow_junction": true,
+    "unavailable_reconnection": true,
+    "flank_unavailable_then_restored": true
+  },
+  "warehouse_career_summaries": {
+    "CAREER_REPORT": {
+      "sessions": 6,
+      "deliveries": 24,
+      "transfers": 12,
+      "warehouse_sales": 12,
+      "physical_seconds": 2967.4499999999994,
+      "source_water_units": 96,
+      "cash_conserved_minor_credits": 1390000,
+      "water_conserved_including_consumption": 224,
+      "bread_conserved_including_consumption": 40,
+      "fuel_recoveries": 1,
+      "save_resume_checkpoints": 7,
+      "payroll_minor_credits": 1549,
+      "operating_cash_change_excluding_owner_transfers_minor_credits": -469,
+      "final_status": "waiting_goods"
+    },
+    "PURCHASED_CAREER_REPORT": {
+      "sessions": 6,
+      "deliveries": 24,
+      "transfers": 12,
+      "warehouse_sales": 12,
+      "physical_seconds": 2967.4499999999994,
+      "source_water_units": 96,
+      "cash_conserved_minor_credits": 1390000,
+      "water_conserved_including_consumption": 224,
+      "bread_conserved_including_consumption": 40,
+      "fuel_recoveries": 1,
+      "save_resume_checkpoints": 7,
+      "payroll_minor_credits": 1549,
+      "operating_cash_change_excluding_owner_transfers_minor_credits": -469,
+      "final_status": "waiting_goods"
+    }
+  },
+  "historical_loaded_traffic_recovery": [
+    {
+      "every_step_conservation_exact": true,
+      "fixture": "rear-trap",
+      "goods_by_item": {
+        "berries": 12,
+        "bread": 40,
+        "cooked_fish": 6,
+        "fiber": 16,
+        "fish": 8,
+        "fishing_rod": 4,
+        "flour": 50,
+        "iron_tool": 2,
+        "planks": 40,
+        "stone": 100,
+        "stone_blocks": 20,
+        "tool": 8,
+        "water": 148,
+        "wheat": 60,
+        "wheat_seed": 136,
+        "wood": 120
+      },
+      "goods_total": 770,
+      "initial_physical_seconds": 300.0,
+      "money_total_minor_credits": 150000,
+      "original_delivery": {
+        "amount": 12,
+        "id": 1000060,
+        "item": "wood"
+      },
+      "replay_window_seconds": 120,
+      "return_elapsed_physical_seconds": 334.0,
+      "return_physical_seconds": 34.0,
+      "save_resume_exact": true,
+      "source_return_transfer_exact": true
+    },
+    {
+      "every_step_conservation_exact": true,
+      "fixture": "occupied-exit",
+      "goods_by_item": {
+        "berries": 12,
+        "bread": 40,
+        "cooked_fish": 6,
+        "fiber": 16,
+        "fish": 8,
+        "fishing_rod": 4,
+        "flour": 50,
+        "iron_tool": 2,
+        "planks": 40,
+        "stone": 100,
+        "stone_blocks": 20,
+        "tool": 8,
+        "water": 148,
+        "wheat": 60,
+        "wheat_seed": 136,
+        "wood": 120
+      },
+      "goods_total": 770,
+      "initial_physical_seconds": 420.0,
+      "money_total_minor_credits": 150000,
+      "original_delivery": {
+        "amount": 12,
+        "id": 1000060,
+        "item": "wood"
+      },
+      "replay_window_seconds": 120,
+      "return_elapsed_physical_seconds": 469.5,
+      "return_physical_seconds": 49.5,
+      "save_resume_exact": true,
+      "source_return_transfer_exact": true
+    }
+  ]
+}

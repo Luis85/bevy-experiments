@@ -1,0 +1,236 @@
+{
+  "phase": "integrated native review before final courier and urgent-needs corrections",
+  "release_label": "0.10.0",
+  "binary_sha256": "60fb09f71b12e1c7e95925e965ee19be7db38ca54917d8931a90b8f6239f1b34",
+  "platform": {
+    "os": "Linux x86_64",
+    "display": "X11/Xvfb",
+    "renderer": "Mesa 25.2.8 llvmpipe LLVM 20.1.2 (software Vulkan)",
+    "input": "keyboard and mouse; no physical gamepad/wheel"
+  },
+  "window_checks": [
+    {
+      "width": 1440,
+      "height": 900,
+      "text_scale": 1.0
+    },
+    {
+      "width": 1100,
+      "height": 700,
+      "text_scale": 1.5
+    }
+  ],
+  "observed": {
+    "saved_character": "Mira Vale",
+    "outfit": "ochre",
+    "world": "Riverbend Commons",
+    "source": "connected Heightmap valley",
+    "supply_delivery": {
+      "wood_consumed": 4,
+      "wallet_before_minor": 25000,
+      "wallet_after_minor": 25568,
+      "xp_awarded": 40
+    },
+    "neighborhood": {
+      "name": "Willow Brook",
+      "wallet_after_minor": 20568,
+      "treasury_minor": 5000,
+      "experience": 50,
+      "next_goal": "Claim a housing plot"
+    },
+    "vehicle_max_observed_km_h": 26,
+    "vehicle_first_person": true,
+    "vehicle_third_person": true,
+    "keyboard_scrolled_save_quit_into_view": true,
+    "successful_keyboard_save_quit": true,
+    "resumed_previous_state": true,
+    "persisted_text_scale": 1.5
+  },
+  "native_telemetry": {
+    "asset_pack": {
+      "failed_models": 0,
+      "fallback_instances": 0,
+      "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+      "last_error": null,
+      "loading_instances": 0,
+      "model_count": 5,
+      "name": "Terra woodland wildlife",
+      "ready_instances": 64,
+      "rejected_instances": 0
+    },
+    "atmosphere_active": false,
+    "ecology_work": {
+      "deferred": 25,
+      "deferred_total": 23669,
+      "eligible": 64,
+      "evaluated": 39,
+      "evaluated_total": 34763,
+      "far_decisions": 16,
+      "near_decisions": 23,
+      "observer_candidates": 160,
+      "passes": 913,
+      "threat_candidates": 312,
+      "threat_candidates_total": 229903
+    },
+    "last_simulation_error": null,
+    "last_world_error": null,
+    "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+    "network_authority": false,
+    "owner_display_prediction": null,
+    "population": {
+      "bodies": 107,
+      "counts_are_active_working_set": true,
+      "counts_are_received_view": false,
+      "wildlife": 64
+    },
+    "presentation": {
+      "immersive_controls": true,
+      "inspector_open": false
+    },
+    "quality": {
+      "atmospheric_sky": true,
+      "quality": "performance",
+      "terrain_lod": true
+    },
+    "regional_persistence": {
+      "authority_paused": false,
+      "blocked": false,
+      "checkpoint_stages": {
+        "compose_ms": 12.091015,
+        "deleted_pages": 0,
+        "encode_ms": 7.541706,
+        "encoded_page_bytes": 0,
+        "encoded_pages": 0,
+        "install_ms": 5.255247,
+        "reused_page_bytes": 212645,
+        "reused_pages": 38,
+        "select_ms": 3.577227,
+        "selected_records_validated": 718,
+        "transaction_ms": 1.540586,
+        "validation": {
+          "active_records": 718,
+          "certified_environment_groups": 0,
+          "certified_environment_records": 0,
+          "merged_scope_records": 718
+        }
+      },
+      "committed": {
+        "active_records": 581,
+        "active_regions": 38,
+        "checkpoint_bytes": 1621704,
+        "dependency_regions": 0,
+        "dormant_records": 0,
+        "dormant_regions": 0,
+        "generation": 107,
+        "global_records": 137,
+        "pinned_regions": 12
+      },
+      "enabled": true,
+      "last_checkpoint_ms": 30.074692,
+      "last_checkpoint_reason": "Graceful exit",
+      "last_error": null,
+      "last_submission_ms": 15.490874,
+      "pending": false,
+      "restored": true,
+      "seconds_since_checkpoint": 0.0
+    },
+    "release": "0.10.0",
+    "render": {
+      "chunks": 49,
+      "lod_chunks": [
+        7,
+        19,
+        23
+      ],
+      "pending": 0,
+      "source_vertices": 828017,
+      "terrain_full_vertices": 207025,
+      "terrain_vertices": 89105
+    },
+    "replication": null,
+    "source": {
+      "epoch": null,
+      "heightmap": true,
+      "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+    },
+    "timings": {
+      "cpu_stages": {
+        "base_world": {
+          "last_ms": 0.007932,
+          "max_ms": 0.18265,
+          "mean_ms": 0.016267595833333336,
+          "p50_ms": 0.012398000000000001,
+          "p95_ms": 0.03375,
+          "total_samples": 18264,
+          "window_samples": 240
+        },
+        "controlled_motion": {
+          "last_ms": 0.115801,
+          "max_ms": 0.553288,
+          "mean_ms": 0.17951379583333343,
+          "p50_ms": 0.162941,
+          "p95_ms": 0.294235,
+          "total_samples": 18246,
+          "window_samples": 240
+        },
+        "ecology": {
+          "last_ms": 0.017995999999999998,
+          "max_ms": 0.862765,
+          "mean_ms": 0.05062954583333332,
+          "p50_ms": 0.024136,
+          "p95_ms": 0.08559599999999999,
+          "total_samples": 18246,
+          "window_samples": 240
+        },
+        "economy": {
+          "last_ms": 0.00018099999999999998,
+          "max_ms": 0.017296,
+          "mean_ms": 0.0004857833333333333,
+          "p50_ms": 0.000281,
+          "p95_ms": 0.000901,
+          "total_samples": 18246,
+          "window_samples": 240
+        },
+        "living": {
+          "last_ms": 1.401381,
+          "max_ms": 3.249328,
+          "mean_ms": 1.3044707083333331,
+          "p50_ms": 1.2609940000000002,
+          "p95_ms": 1.806911,
+          "total_samples": 18246,
+          "window_samples": 240
+        },
+        "persistence": {
+          "last_ms": 18.704604,
+          "max_ms": 48.855450000000005,
+          "mean_ms": 23.33657762,
+          "p50_ms": 19.720415000000003,
+          "p95_ms": 38.097107,
+          "total_samples": 50,
+          "window_samples": 50
+        },
+        "streaming": {
+          "last_ms": 0.046839000000000006,
+          "max_ms": 0.18031699999999998,
+          "mean_ms": 0.04549482916666667,
+          "p50_ms": 0.043665,
+          "p95_ms": 0.06582700000000001,
+          "total_samples": 5888,
+          "window_samples": 240
+        }
+      },
+      "frame_interval": {
+        "last_ms": 150.279728,
+        "max_ms": 218.033931,
+        "mean_ms": 167.04607382083321,
+        "p50_ms": 164.28314999999998,
+        "p95_ms": 187.447386,
+        "total_samples": 5887,
+        "window_samples": 240
+      },
+      "window_capacity": 240
+    },
+    "transport": null
+  },
+  "limitations": "Creation and supply delivery began in the earlier development executable; the completed state was restored by this 0.10.0 binary. These captures do not certify the later final source. Final confirmation is recorded separately."
+}

@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "checked_utc": "2026-10-29T21:51:59.057145+00:00",
+  "scope": "Evidence helper refuses Python optimized mode before reading receipts or publishing an association",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-O",
+    "docs/verification/v0.22-native/associate_acceptance_022.py"
+  ],
+  "exit_code": 1,
+  "expected_message": "Run without -O or PYTHONOPTIMIZE; evidence checks require assertions",
+  "association_output_created": false
+}

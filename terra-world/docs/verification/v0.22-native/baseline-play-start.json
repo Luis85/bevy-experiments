@@ -1,0 +1,28 @@
+{
+  "release": "0.21.0",
+  "phase": "baseline",
+  "command": [
+    "/tmp/terra-target/debug/terra-demo",
+    "--play",
+    "--user-data",
+    "/tmp/terra-native022/baseline-user",
+    "--quality",
+    "performance",
+    "--no-atmosphere",
+    "--radius",
+    "1",
+    "--camp-view",
+    "--noon",
+    "--save",
+    "/tmp/terra-native022/baseline-world.json"
+  ],
+  "working_directory": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "started_utc": "2026-10-29T20:30:18.345858+00:00",
+  "binary_sha256": "209b5f2ee0d74d8b4776346297af6838dd9e05cf622af80645f63dedb0bc13d1",
+  "source_input_count": 373,
+  "expected_interruption": false,
+  "trace_file": null,
+  "schema": 1,
+  "source_inputs_sha256": "345c5393749e43beba08a6e6cf12aa1127d1e21b341f8fe5399b564b2ca4b19f",
+  "pid": 184817
+}

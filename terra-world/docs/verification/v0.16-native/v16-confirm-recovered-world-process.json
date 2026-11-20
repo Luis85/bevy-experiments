@@ -1,0 +1,31 @@
+{
+  "release": "0.16.0",
+  "phase": "confirmation",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--world-profile",
+    "/tmp/terra-native/launcher-review-fixture-016/player-data/worlds/recovered-1793252594-72827-0/world.json",
+    "--asset-pack",
+    "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/crates/terra-bevy/assets/character-demo.pack.json",
+    "--camp-view",
+    "--telemetry",
+    "/tmp/terra-native/v16-confirm-recovered-world-telemetry.json",
+    "--telemetry-interval-seconds",
+    "2"
+  ],
+  "working_directory": "/tmp/terra-native",
+  "started_utc": "2026-10-29T05:44:16.570047+00:00",
+  "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+  "source_input_count": 366,
+  "expected_interruption": false,
+  "trace_file": null,
+  "schema": 1,
+  "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+  "pid": 73099,
+  "exit_code": 0,
+  "finished_utc": "2026-10-29T05:45:02.839068+00:00",
+  "seconds": 46.14997768499961,
+  "source_inputs_unchanged": true,
+  "log_sha256": "bbd607263fdccfacad3e7147194552f68cbcb8c31d116d655fb49537a4fb953e",
+  "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8"
+}

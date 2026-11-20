@@ -1,0 +1,23 @@
+{
+  "release": "0.13.0",
+  "phase": "confirmation",
+  "kind": "company",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--world-profile",
+    "/tmp/terra-native/v13-confirm-user-data/worlds/world-review-013/world.json",
+    "--user-data",
+    "/tmp/terra-native/v13-confirm-user-data",
+    "--quality",
+    "performance",
+    "--telemetry",
+    "/tmp/terra-native/v13-resume-company-telemetry.json"
+  ],
+  "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+  "source_input_count": 338,
+  "started_utc": "2026-10-28T18:33:23.706143+00:00",
+  "pid": 130590,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T18:34:15.998591+00:00",
+  "source_inputs_unchanged": true
+}

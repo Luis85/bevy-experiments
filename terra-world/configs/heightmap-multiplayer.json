@@ -1,0 +1,14 @@
+{
+  "heightmap_manifest": "crates/terra-stream/data/heightmap-demo/manifest-v2.json",
+  "terrain_resolution": 33,
+  "chunk_level": 15,
+  "chunk_radius": 3,
+  "max_resident_chunks": 81,
+  "max_queued": 81,
+  "seed": 42,
+  "focus": { "latitude": 48.137, "longitude": 11.575, "altitude_m": 0.0 },
+  "region_store": null,
+  "politics_file": null,
+  "live_data": false,
+  "live_weather": false
+}

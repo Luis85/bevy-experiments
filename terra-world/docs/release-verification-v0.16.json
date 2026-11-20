@@ -1,0 +1,140 @@
+{
+  "version": "0.16.0",
+  "status": "passed",
+  "finished_utc": "2026-10-29T05:55:19.328678+00:00",
+  "scope": "Completed automated, final native, extracted Linux package and baseline-preservation acceptance. Source ZIP assembly and the independent final two-archive audit follow this record; their whole-ZIP identities are external to the source archive.",
+  "automated": {
+    "gates": 43,
+    "distinct_passing_rust_tests": 904,
+    "passed_test_executions": 990,
+    "failed": 0,
+    "ignored": 0,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.16-final/gates.json",
+      "sha256": "24b9fbad2b23897cee6dc03160baab6d63fc59290aada4e5c97d762e108d757d",
+      "bytes": 30680
+    }
+  },
+  "source_freeze": {
+    "inputs": 366,
+    "manifest": {
+      "path": "docs/verification/v0.16-final/source-hashes.json",
+      "sha256": "5b85cf0e36c5436bab1d67a9ea10e051157575cda004fd564f945e6be79fef38",
+      "bytes": 42946
+    },
+    "unchanged_through_gates_native_and_package_confirmation": true,
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.16-final/baseline-comparison.json",
+      "sha256": "252a00c4f0e0ea3833b00e5b3e1849b782dbc62dd271fa5949da0c1478168882",
+      "bytes": 132103
+    },
+    "previous_release_paths_retained": 1213,
+    "original_fixture_data_and_asset_inputs_unchanged": 96,
+    "historical_evidence_files_unchanged": 804,
+    "previous_product_review_and_validation_archived_exactly": true
+  },
+  "native": {
+    "evidence": {
+      "path": "docs/native-v16-verification.json",
+      "sha256": "e1c739987aaba771144c4789836f49e3bf6b8b62d021fc5c9374b93b08e962b3",
+      "bytes": 32616
+    },
+    "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+    "completed_processes": 4,
+    "retained_screenshots": 47,
+    "observed_capture_roles": 12
+  },
+  "desktop": {
+    "evidence": {
+      "path": "docs/desktop-package-v0.16.json",
+      "sha256": "3b835aa5f128810d292624a9bff38edb76f4a5271a2c55ba01daa90619247ebd",
+      "bytes": 10310
+    },
+    "accepted_binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+    "completed_extracted_runs": 2,
+    "project_payload_files": 148,
+    "archive_members": 230,
+    "archive_bytes": 39171904,
+    "archive_sha256": "3b01d5e9d0c4760dd2cd0bb898b24041a0f09c30b9eea124c1b4de40821b48c8"
+  },
+  "product_records": [
+    {
+      "path": "docs/PRODUCT_REVIEW.md",
+      "sha256": "7fa6c2f4b3a95e92c4fbf58e7b8af966e7e843b2c38d9d773e3fe305545baaad",
+      "bytes": 19993
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "sha256": "0955fc74ee7d1a7cc6cc2042600190e47ac90c1183271805c9cdd9a5095c95b5",
+      "bytes": 15301
+    },
+    {
+      "path": "docs/REVIEW_GAPS_v0.16.md",
+      "sha256": "0150aa2dc4eb9f723ce8f570e6de1ad7591e8222e4b4cda3839630cc9384aa33",
+      "bytes": 24746
+    }
+  ],
+  "review_records": [
+    {
+      "path": "docs/verification/v0.16-review/final-native-review.md",
+      "sha256": "7af1159c822ab57fb853c43d302194e298e76b6201c3e361021de45384511f6b",
+      "bytes": 7272
+    },
+    {
+      "path": "docs/verification/v0.16-review/final-native-review.json",
+      "sha256": "3dc546cd612bb14340f49007b6532a07fe8782894085f10be4a6b9a0b804187f",
+      "bytes": 8000
+    },
+    {
+      "path": "docs/verification/v0.16-review/native-driving-polish.md",
+      "sha256": "2e40e781288ad2872ab1e29b3ef95256f54522e46bc3876cbf9d86abd78125a4",
+      "bytes": 9703
+    },
+    {
+      "path": "docs/verification/v0.16-review/recovered-presentation-budget-review.md",
+      "sha256": "26ef88e9cf3f60ea3fc113091290bd8404d83ed4429b1a25f07adfddd3449dea",
+      "bytes": 4869
+    },
+    {
+      "path": "docs/verification/v0.16-review/navigation-career-regression.md",
+      "sha256": "bf483756993e2dba4c06096dc04daef5c12c1608ca8e888fe7fb6212a7ce00ad",
+      "bytes": 6285
+    }
+  ],
+  "earlier_release_attempts": [
+    {
+      "path": "docs/verification/v0.16-attempt-1/gates.json",
+      "sha256": "cb4eb770753b8189b9eedaf310e037e16831f1eceb7d75b2a32bef45255cc7e8",
+      "bytes": 2679
+    },
+    {
+      "path": "docs/verification/v0.16-attempt-2/gates.json",
+      "sha256": "f5fabd6ec76e377b61b230448f52388ada03956a2f51823723c7c33122e793af",
+      "bytes": 2680
+    }
+  ],
+  "compatibility": {
+    "domain_save": 1,
+    "regional_schema": 1,
+    "wire": 10,
+    "alpn": "terra-world/10",
+    "human_and_driver_seat_asset_reader": "0.16"
+  },
+  "checks": {
+    "all_declared_final_gates_passed": true,
+    "native_and_desktop_use_the_exact_final_executable": true,
+    "implementation_inputs_remained_unchanged": true,
+    "all_desktop_source_payload_files_match_archive": true,
+    "native_observations_and_process_provenance_retained": true,
+    "exact_recovery_and_original_file_preservation_verified": true,
+    "baseline_inputs_and_historical_evidence_preserved": true,
+    "current_reports_reconciled_to_actual_acceptance_scope": true
+  },
+  "limits": [
+    "Linux Xvfb/software Vulkan review; no Windows, physical GPU or input-device qualification.",
+    "Prepared expert-operated fixtures and finite regression workloads; no uncoached sustained-play or general dense-traffic qualification.",
+    "Asset reservation totals are estimates; procedural fallback at the instance/distance budget is intentional.",
+    "Local TLS and regional recovery workloads do not establish public-service capacity, deployment RPO/RTO or global architecture.",
+    "G01-G18 closure criteria and the minor re-entry status wording remain explicitly documented."
+  ]
+}

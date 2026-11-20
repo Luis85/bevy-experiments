@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "release": "0.23.0",
+  "phase": "candidate",
+  "status": "passed",
+  "started_utc": "2026-10-30T08:31:20.330373+00:00",
+  "finished_utc": "2026-10-30T08:31:20.377816+00:00",
+  "scope": "Current read-only comparison of untouched original candidate world and backup at checkpoint 23. The subsequently reopened recovered world is deliberately excluded.",
+  "isolated_input_root": "/tmp/terra-native023/menu",
+  "method": {
+    "sqlite_version": "3.53.1",
+    "connection": "mode=ro&immutable=1",
+    "session_pragmas": [
+      "query_only=ON",
+      "trusted_schema=OFF"
+    ],
+    "wal_absent_or_empty_before_and_after": true,
+    "complete_rows_queries": [
+      "SELECT * FROM world ORDER BY singleton",
+      "SELECT * FROM regions ORDER BY level,x,y"
+    ],
+    "schema_checked": true,
+    "quick_check": "ok"
+  },
+  "observed_gameplay": {
+    "player_id": 1,
+    "contracts_completed": 1,
+    "experience": 50,
+    "settlements_founded": 1,
+    "wallet_minor_credits": 18113,
+    "wallet_credits": "181.13",
+    "territory_id": 2000017,
+    "territory_name": "Review23",
+    "territory_founder": 1,
+    "territory_treasury_minor_credits": 7500,
+    "territory_treasury_credits": "75.00"
+  },
+  "databases": {
+    "original": {
+      "path_relative_to_isolated_root": "worlds/world-1793347989563-11234-0/world.db",
+      "sha256": "43bc9b98544e1d2b919458c891e6c2441bcf106c4f9727ad6799a842076b24df",
+      "bytes": 3235840,
+      "mode": "0o600",
+      "generation": 23,
+      "region_rows": 12,
+      "quick_check": "ok",
+      "global_state_sha256": "631548eaf6e9d4848633948eaf9e6f0206b423560ded6a7fc41ef17998e3e606",
+      "local_metadata_sha256": "bd19a5a5fa61592690bf668685edb0c06e659e814a6f5231b706276e5a92ce9c",
+      "tick_seconds": 421.49959802627563,
+      "clock": {
+        "paused": false,
+        "time_scale": 1.0,
+        "unix_seconds": 1793016421.499598
+      }
+    },
+    "backup": {
+      "path_relative_to_isolated_root": "backups/backup-1793348595-11234-0/bundle/world.db",
+      "sha256": "b706737fb4e32bb5e13701ee2199e436b039c1a733e07ee8245620bc4e5296cc",
+      "bytes": 3235840,
+      "mode": "0o600",
+      "generation": 23,
+      "region_rows": 12,
+      "quick_check": "ok",
+      "global_state_sha256": "631548eaf6e9d4848633948eaf9e6f0206b423560ded6a7fc41ef17998e3e606",
+      "local_metadata_sha256": "bd19a5a5fa61592690bf668685edb0c06e659e814a6f5231b706276e5a92ce9c",
+      "tick_seconds": 421.49959802627563,
+      "clock": {
+        "paused": false,
+        "time_scale": 1.0,
+        "unix_seconds": 1793016421.499598
+      }
+    }
+  },
+  "all_original_and_backup_schema_and_row_values_identical": true,
+  "physical_database_bytes_identical": false,
+  "input_files_before_and_after": {
+    "worlds/world-1793347989563-11234-0/world.db": {
+      "sha256": "43bc9b98544e1d2b919458c891e6c2441bcf106c4f9727ad6799a842076b24df",
+      "bytes": 3235840,
+      "mode": "0o600"
+    },
+    "worlds/world-1793347989563-11234-0/world.db-wal": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "0o600"
+    },
+    "worlds/world-1793347989563-11234-0/world.db-shm": {
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "bytes": 32768,
+      "mode": "0o600"
+    },
+    "backups/backup-1793348595-11234-0/bundle/world.db": {
+      "sha256": "b706737fb4e32bb5e13701ee2199e436b039c1a733e07ee8245620bc4e5296cc",
+      "bytes": 3235840,
+      "mode": "0o600"
+    }
+  },
+  "all_inspected_input_bytes_sizes_modes_unchanged": true,
+  "save_payloads_copied_into_repository": false,
+  "limits": [
+    "This compares complete logical persisted contents, not physical SQLite file bytes.",
+    "No claim about the recovered world while its confirmation process is running.",
+    "No Rust domain/catalog revalidation or final canonical release qualification is inferred."
+  ]
+}

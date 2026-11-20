@@ -1,0 +1,170 @@
+{
+  "accepted": true,
+  "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+  "models": [
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 135992,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 28804,
+        "materials": 5,
+        "nodes": 30,
+        "primitives": 22,
+        "renderer_vertices": 4404,
+        "runtime_animation_keys": 1190,
+        "scene_primitives": 22,
+        "scene_renderer_vertices": 4404,
+        "scene_triangles": 1468,
+        "scene_vertices": 4404,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1468,
+        "vertices": 4404
+      },
+      "id": "boar"
+    },
+    {
+      "budget": {
+        "animation_keys": 450,
+        "bytes": 224424,
+        "channels": 9,
+        "clips": 2,
+        "decoded_scalars": 44870,
+        "materials": 10,
+        "nodes": 96,
+        "primitives": 83,
+        "renderer_vertices": 7320,
+        "runtime_animation_keys": 450,
+        "scene_primitives": 82,
+        "scene_renderer_vertices": 7044,
+        "scene_triangles": 2348,
+        "scene_vertices": 7044,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 2440,
+        "vertices": 7320
+      },
+      "id": "comet"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 163620,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 34780,
+        "materials": 6,
+        "nodes": 37,
+        "primitives": 29,
+        "renderer_vertices": 5400,
+        "runtime_animation_keys": 1190,
+        "scene_primitives": 29,
+        "scene_renderer_vertices": 5400,
+        "scene_triangles": 1800,
+        "scene_vertices": 5400,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1800,
+        "vertices": 5400
+      },
+      "id": "deer"
+    },
+    {
+      "budget": {
+        "animation_keys": 1700,
+        "bytes": 162140,
+        "channels": 34,
+        "clips": 4,
+        "decoded_scalars": 35033,
+        "materials": 7,
+        "nodes": 39,
+        "primitives": 25,
+        "renderer_vertices": 5268,
+        "runtime_animation_keys": 1700,
+        "scene_primitives": 25,
+        "scene_renderer_vertices": 5268,
+        "scene_triangles": 1756,
+        "scene_vertices": 5268,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1756,
+        "vertices": 5268
+      },
+      "id": "fieldhand"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 135308,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 28732,
+        "materials": 5,
+        "nodes": 29,
+        "primitives": 21,
+        "renderer_vertices": 4392,
+        "runtime_animation_keys": 1190,
+        "scene_primitives": 21,
+        "scene_renderer_vertices": 4392,
+        "scene_triangles": 1464,
+        "scene_vertices": 4392,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1464,
+        "vertices": 4392
+      },
+      "id": "fox"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 135360,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 28732,
+        "materials": 5,
+        "nodes": 29,
+        "primitives": 21,
+        "renderer_vertices": 4392,
+        "runtime_animation_keys": 1190,
+        "scene_primitives": 21,
+        "scene_renderer_vertices": 4392,
+        "scene_triangles": 1464,
+        "scene_vertices": 4392,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1464,
+        "vertices": 4392
+      },
+      "id": "hare"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 156324,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 33268,
+        "materials": 5,
+        "nodes": 35,
+        "primitives": 27,
+        "renderer_vertices": 5148,
+        "runtime_animation_keys": 1190,
+        "scene_primitives": 27,
+        "scene_renderer_vertices": 5148,
+        "scene_triangles": 1716,
+        "scene_vertices": 5148,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1716,
+        "vertices": 5148
+      },
+      "id": "ibex"
+    }
+  ],
+  "name": "Terra original character transport and wildlife",
+  "schema_version": 1,
+  "scope": "Validated source bytes and supported format; native renderer readiness is checked at runtime"
+}

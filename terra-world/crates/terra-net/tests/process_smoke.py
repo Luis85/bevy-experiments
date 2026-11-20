@@ -8,6 +8,7 @@ Alternate binaries: --server /path/terra-server --client /path/terra-client
 import argparse
 import json
 import os
+import shutil
 from pathlib import Path
 import socket
 import subprocess
@@ -107,6 +108,39 @@ def main():
             assert set(saved["sandbox_sequences"].values()) == {2}
             results["save_restart_two_identities"] = True
 
+            regional = work / "regional.sqlite"
+            regional_export = work / "regional-export.json"
+            regional_session = work / "regional-player.json"
+            regional_host = start_server("regional", ["--region-store", regional, "--save", regional_export])
+            finish_client(start_client(["--session", regional_session, "--command", craft]))
+            finish_server(regional_host)
+            saved = json.loads(regional_export.read_text())
+            regional_ids = set(saved["sandbox"]["players"])
+            assert len(regional_ids) == 1
+            assert all(player["inventory"].get("planks") == 4 for player in saved["sandbox"]["players"].values())
+            assert regional.read_bytes()[:16] == b"SQLite format 3\x00"
+            regional_host = start_server("regional-resume", ["--region-store", regional, "--save", regional_export])
+            finish_client(start_client(["--session", regional_session, "--command", craft]))
+            finish_server(regional_host)
+            saved = json.loads(regional_export.read_text())
+            assert set(saved["sandbox"]["players"]) == regional_ids
+            assert all(player["inventory"].get("planks") == 8 for player in saved["sandbox"]["players"].values())
+            assert set(saved["sandbox_sequences"].values()) == {2}
+            results["regional_restart_identity_and_export"] = True
+            reject_server(["--load", world, "--region-store", regional], "separate restore modes")
+            results["ambiguous_restore_modes_rejected"] = True
+
+            # A bad export path is rejected before opening/creating the store.
+            unopened = work / "must-not-create.sqlite"
+            for suffix in ("", "-wal", "-shm", "-journal"):
+                output = Path(str(unopened) + suffix)
+                reject_server(["--region-store", unopened, "--save", output], "output path aliases")
+                assert not unopened.exists() and not output.exists()
+            original_database = regional.read_bytes()
+            reject_server(["--region-store", regional, "--save", regional], "output path aliases")
+            assert regional.read_bytes() == original_database
+            results["regional_export_aliases_rejected_before_open"] = True
+
             data = root / "crates/terra-history/data"
             pack = data / "synthetic-era-b/manifest.json"
             politics = data / "synthetic-politics-eras.geojson"
@@ -142,6 +176,47 @@ def main():
             reject_server([*history_args, "--level", "16"], "differs from the historical pack")
             reject_server(["--world-pack", pack, "--epoch", "2001-01-01", "--politics", politics, "--load", historical_save], "manifest mismatch")
             results["invalid_history_startup_and_resume_rejected"] = True
+
+            # Explicit heightmap bundles use their actual composite source
+            # identity, including semantic GeoJSON; arbitrary rasters never
+            # silently join a procedural host or fall back beyond coverage.
+            heightmap_dir = root / "crates/terra-stream/data/heightmap-demo"
+            heightmap_manifest = heightmap_dir / "manifest-v2.json"
+            heightmap_save = work / "heightmap-world.json"
+            prepared = subprocess.run(
+                [server_bin, "--bind", address, "--ticks", "0", "--heightmap", str(heightmap_manifest), "--save", str(heightmap_save)],
+                cwd=work, capture_output=True, text=True, timeout=10,
+            )
+            assert prepared.returncode == 0, prepared.stderr
+            heightmap_state = json.loads(heightmap_save.read_text())
+            heightmap_identity = heightmap_state["manifest"]
+            assert heightmap_identity["terrain_provider"] == "heightmap"
+            assert heightmap_identity["data_epoch_unix"] is None
+            assert heightmap_identity["base_data_revision"] != json.loads(heightmap_manifest.read_text())["revision"]
+            assert any(feature["kind"] == "forest" for feature in heightmap_state["sandbox"]["world_features"].values())
+            expected.write_text(json.dumps(heightmap_identity))
+            heightmap_host = start_server("heightmap", ["--heightmap", heightmap_manifest, "--load", heightmap_save, "--save", heightmap_save])
+            finish_client(start_client(["--expect-manifest", expected, "--command", craft]))
+            expected.write_text(json.dumps(dict(heightmap_identity, base_data_revision="different-heightmap-bundle")))
+            finish_client(start_client(["--expect-manifest", expected]), expected_ok=False)
+            finish_server(heightmap_host)
+            heightmap_state = json.loads(heightmap_save.read_text())
+            assert len(heightmap_state["sandbox"]["players"]) == 1
+            assert all(player["inventory"].get("planks") == 4 for player in heightmap_state["sandbox"]["players"].values())
+            reject_server(["--heightmap", heightmap_manifest, "--lat", "0", "--lon", "0"], "complete spawn tile")
+            reject_server(["--heightmap", heightmap_manifest, "--world-pack", pack], "do not combine")
+            reject_server(["--heightmap", heightmap_manifest, "--epoch", "2000-01-01"], "do not combine")
+            reject_server(["--heightmap", heightmap_dir / "manifest.json", "--load", heightmap_save], "manifest mismatch")
+            altered = work / "altered-heightmap"
+            shutil.copytree(heightmap_dir, altered)
+            features_path = altered / "features-v2.geojson"
+            features = json.loads(features_path.read_text())
+            features["features"][0]["properties"]["name"] = "Changed source fixture"
+            features_path.write_text(json.dumps(features))
+            reject_server(["--heightmap", altered / "manifest-v2.json", "--load", heightmap_save], "manifest mismatch")
+            results["heightmap_semantic_host_matching_admission_and_crafting"] = True
+            results["heightmap_mismatch_mutation_coverage_and_mixed_sources_rejected"] = True
+
             if hasattr(os, "mkfifo"):
                 fifo = work / "not-a-file"
                 os.mkfifo(fifo)

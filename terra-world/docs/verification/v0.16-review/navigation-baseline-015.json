@@ -1,0 +1,48 @@
+{
+  "record_kind": "observed_expected_failure_before_implementation",
+  "baseline_version": "0.15.0",
+  "source_archive_sha256": "92a8c73750a58da22ad48f899d7c941eadb78a4af0894a51cacde26eb25aeb3f",
+  "baseline_source_sha256": {
+    "crates/terra-sandbox/src/living/autonomy.rs": "62965bac75ef2605590672cfc21584ad52425f9121c843c83ab19ab007284952",
+    "crates/terra-sandbox/src/living/contacts.rs": "b90d79b5d0f9a13b0303941b945e2d0ed675277b839f11c49845b78f2d671aff"
+  },
+  "command": "cargo test --offline --locked -p terra-sandbox --test navigation_geometry -- --nocapture",
+  "exit_code": 101,
+  "case": "parked_body_narrow_corridor",
+  "fixture": "crates/terra-sandbox/tests/navigation_geometry.rs::a_supported_narrow_corridor_passes_a_parked_body_without_leaving_its_envelope",
+  "fixture_geometry": {
+    "origin": [
+      48.137,
+      11.575,
+      100.0
+    ],
+    "driver_dimensions_m": [
+      2.2,
+      1.8,
+      3.9
+    ],
+    "goal_north_m": 60,
+    "parked_body_north_m": 16,
+    "supported_east_bounds_m": [
+      -4.75,
+      4.75
+    ],
+    "supported_local_z_bounds_m": [
+      -80,
+      20
+    ],
+    "step_seconds": 0.1,
+    "physical_steps": 1200,
+    "calendar_seconds": 0
+  },
+  "result": {
+    "arrived": false,
+    "physical_seconds": 120.0,
+    "remaining_goal_m": 52.69792375879236,
+    "travelled_m": 286.42274630757385,
+    "max_lateral_m": 1.134528049284711e-08,
+    "source_queries": 30671,
+    "max_source_queries_per_update": 249
+  },
+  "interpretation": "The current 0.15 geometry failed before navigation source edits: repeated admitted retreats used physical travel without passing the parked body. This record is a retained failing baseline, not release acceptance. The final fixture adds standard measurements and additional geometry cases."
+}

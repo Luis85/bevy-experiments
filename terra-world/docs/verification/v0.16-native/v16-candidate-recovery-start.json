@@ -1,0 +1,17 @@
+{
+  "release": "0.16.0",
+  "phase": "candidate",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--menu",
+    "--user-data",
+    "/tmp/terra-native/launcher-review-fixture-016/player-data"
+  ],
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next",
+  "started_utc": "2026-10-29T04:36:55.397142+00:00",
+  "binary_sha256": "90448c7b042d2d87f811dfbe442005543e696c67f898ff8a9d64db97c1be94db",
+  "source_input_count": 366,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 61469
+}

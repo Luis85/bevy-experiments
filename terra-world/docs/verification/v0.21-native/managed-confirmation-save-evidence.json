@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "release": "0.21.0",
+  "phase": "confirmation",
+  "profile_path": "/tmp/terra-native021/menu/worlds/world-1793302657792-173552-0/world.json",
+  "checkpoint_present_after_reopen_and_clean_exit": true,
+  "witness_unchanged": true,
+  "database_sha256": "7a4fec8565a477e3a1cc4b07e8f8dc66eae89209e4cce1497f7ec55b2562fab1",
+  "sqlite_integrity_check": [
+    [
+      "ok"
+    ]
+  ],
+  "world_metadata": {
+    "singleton": 1,
+    "region_level": 15,
+    "generation": 15,
+    "digest": "0fd7fa9dcf1a0d74ca0aee12df0c7fe42730a307eff877adef4efd1706ba3a24",
+    "payload_bytes": 1715571
+  },
+  "profile_title": "My frontier",
+  "scope": "Final binary reopened the candidate-created managed regional world, rendered playable terrain/UI, paused, then completed Save and quit. This is a bounded Linux software-rendered native journey, not exhaustive recovery or physical-device qualification."
+}

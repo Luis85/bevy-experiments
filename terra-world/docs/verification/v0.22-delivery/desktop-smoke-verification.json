@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "release": "0.22.0",
+  "platform": "linux-x86_64",
+  "build_profile": "dev",
+  "files_verified": 260,
+  "payload_bytes": 172513237,
+  "manifest_sha256": "70a7a762c64d0573939cf1d15013ef674f12d039afd17c62eb513bc4bd0dd903",
+  "native_binary_sha256": "34dc6fe5c906d556fcf182968df0a92742079008c5eb26cc94d652a69a041cd6",
+  "acceptance_record_sha256": "7992f2fb0821faaa1f72d96f0d5b69f0fea18cd3acbc593214109dc1db893085",
+  "smoke_help": {
+    "status": "passed",
+    "exit_code": 0,
+    "seconds": 0.008099,
+    "output_sha256": "d1546eb9baeeff823232dee6a7f83a1331e73a8adf87c7bd194ce683bb87e979",
+    "output_bytes": 3227,
+    "scope": "Command-line startup only; no window, saved world or device was exercised."
+  },
+  "scope": "Exact extracted-file consistency and accepted-binary association. Not publisher authentication, target-device qualification or a power-loss guarantee.",
+  "checked_utc": "2026-10-29T22:19:58.726728+00:00"
+}

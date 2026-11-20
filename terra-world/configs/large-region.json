@@ -1,0 +1,16 @@
+{
+  "focus": {
+    "latitude": 48.137,
+    "longitude": 11.575,
+    "altitude_m": 0.0
+  },
+  "chunk_radius": 5,
+  "terrain_resolution": 65,
+  "max_resident_chunks": 144,
+  "max_queued": 144,
+  "max_in_flight": 2,
+  "integrate_per_frame": 2,
+  "live_weather": false,
+  "time_scale": 10.0,
+  "save_path": "saves/large-region.json"
+}

@@ -1,0 +1,26 @@
+{
+  "release": "0.15.0",
+  "phase": "confirmation",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--menu",
+    "--user-data",
+    "/tmp/terra-native/launcher-review-fixture-015/player-data",
+    "--menu-screen",
+    "backups",
+    "--controls-json",
+    "{\"text_scale\":1.5}"
+  ],
+  "working_directory": "/tmp/terra-native",
+  "started_utc": "2026-10-28T23:01:15.276982+00:00",
+  "binary_sha256": "c12970d499bd2f9045cad0f9c106cdc870dddd64ef7804fd496d8b37c96cc504",
+  "source_input_count": 356,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 48057,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T23:02:34.255508+00:00",
+  "seconds": 78.85720601699995,
+  "source_inputs_unchanged": true,
+  "log_sha256": "8fb47ad1ca55991932ac2ed54baba42f03de2b2f1adc39b6c4ffa47ae4d35db2"
+}

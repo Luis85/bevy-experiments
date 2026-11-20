@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "27-candidate-build-place-controls",
+  "capture_started_utc": "2026-10-30T11:56:34.030538+00:00",
+  "captured_utc": "2026-10-30T11:56:34.596603+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 59077,
+  "window_pid_status": "available",
+  "window_pid_before": 59077,
+  "window_pid_after": 59077,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "27-candidate-build-place-controls.png",
+    "sha256": "1fc02767123b77e9e91bc7ea3ebba4cca20539df7d4d8108041a00b357df6708",
+    "bytes": 1118672
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

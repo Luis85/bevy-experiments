@@ -1,0 +1,259 @@
+{
+  "actual_client_socket_bytes_received": 28936090,
+  "clients": 16,
+  "disconnects": 0,
+  "domain_errors": 0,
+  "ecology_scheduler": {
+    "deferred": 0,
+    "deferred_total": 20,
+    "eligible": 22,
+    "evaluated": 22,
+    "evaluated_total": 222,
+    "far_decisions": 4,
+    "near_decisions": 18,
+    "observer_candidates": 1760,
+    "passes": 11,
+    "threat_candidates": 146,
+    "threat_candidates_total": 1265
+  },
+  "encoded_replication_reduction_fraction": 0.6285891604537868,
+  "environment": {
+    "architecture": "x86_64",
+    "available_parallelism": 8,
+    "debug_assertions": true,
+    "os": "linux"
+  },
+  "fixed_hz": 20,
+  "host_update_ms": {
+    "max": 40.342628,
+    "mean": 14.818156459999994,
+    "p50": 9.955192,
+    "p95": 37.319964999999996,
+    "p99": 39.419803
+  },
+  "limitations": [
+    "local TCP only",
+    "accelerated fixed simulation time; not wall-clock concurrent capacity",
+    "simple kinematic actor records are not full living agents",
+    "existing bounded per-client view caps remain",
+    "no render workload, TLS, Internet latency or distributed host"
+  ],
+  "living_bodies": 140,
+  "measured_ticks": 200,
+  "nonplayer_actor_records": 4096,
+  "per_client_actor_snapshots": [
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110,
+    110
+  ],
+  "per_client_replication": [
+    {
+      "deltas": 162,
+      "entity_removals": 84,
+      "entity_upserts": 9781,
+      "full_snapshot_bytes": 4861903,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 2680351
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 71,
+      "entity_upserts": 3055,
+      "full_snapshot_bytes": 4875792,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1487522
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 61,
+      "entity_upserts": 3049,
+      "full_snapshot_bytes": 4873602,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1483987
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 55,
+      "entity_upserts": 3043,
+      "full_snapshot_bytes": 4873575,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1479039
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 49,
+      "entity_upserts": 9753,
+      "full_snapshot_bytes": 4857298,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 2660895
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 41,
+      "entity_upserts": 3078,
+      "full_snapshot_bytes": 4869151,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1492419
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 31,
+      "entity_upserts": 3127,
+      "full_snapshot_bytes": 4867755,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1513608
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 33,
+      "entity_upserts": 3132,
+      "full_snapshot_bytes": 4867979,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1513799
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 33,
+      "entity_upserts": 9851,
+      "full_snapshot_bytes": 4852224,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 2698666
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 29,
+      "entity_upserts": 3174,
+      "full_snapshot_bytes": 4864542,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1527692
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 29,
+      "entity_upserts": 3174,
+      "full_snapshot_bytes": 4864305,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1525571
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 28,
+      "entity_upserts": 3193,
+      "full_snapshot_bytes": 4865353,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1538057
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 23,
+      "entity_upserts": 9880,
+      "full_snapshot_bytes": 4854856,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 2715314
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 18,
+      "entity_upserts": 3169,
+      "full_snapshot_bytes": 4870901,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1532058
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 13,
+      "entity_upserts": 3173,
+      "full_snapshot_bytes": 4871701,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1534230
+    },
+    {
+      "deltas": 162,
+      "entity_removals": 7,
+      "entity_upserts": 3171,
+      "full_snapshot_bytes": 4873557,
+      "keyframes": 4,
+      "resync_requests": 0,
+      "wire_bytes": 1536544
+    }
+  ],
+  "phases": [
+    {
+      "encoded_replication_reduction_fraction": 0.5975898983116676,
+      "host_update_mean_ms": 15.225492140000007,
+      "host_update_p95_ms": 37.331373,
+      "measured_ticks": 100,
+      "name": "25 percent generic actor records moving",
+      "replication": {
+        "deltas": 1200,
+        "entity_removals": 43,
+        "entity_upserts": 43533,
+        "full_snapshot_bytes": 35109141,
+        "keyframes": 0,
+        "resync_requests": 0,
+        "wire_bytes": 14128273
+      }
+    },
+    {
+      "encoded_replication_reduction_fraction": 0.6846411900662195,
+      "host_update_mean_ms": 14.41082078,
+      "host_update_p95_ms": 36.679586,
+      "measured_ticks": 100,
+      "name": "generic actor records stationary; living world continues",
+      "replication": {
+        "deltas": 1168,
+        "entity_removals": 66,
+        "entity_upserts": 23261,
+        "full_snapshot_bytes": 35430499,
+        "keyframes": 32,
+        "resync_requests": 0,
+        "wire_bytes": 11173320
+      }
+    }
+  ],
+  "principal_aoi_distance_candidates": 1809280,
+  "release": "0.4.0",
+  "replication": {
+    "deltas": 2592,
+    "entity_removals": 605,
+    "entity_upserts": 76803,
+    "full_snapshot_bytes": 77864588,
+    "keyframes": 64,
+    "resync_requests": 0,
+    "wire_bytes": 28919752
+  },
+  "simulated_seconds": 11.0,
+  "total_actor_records": 4112,
+  "wall_seconds": 4.777176285,
+  "warmup_ticks": 20,
+  "wire_protocol": 3,
+  "workload": "single-process host plus actual local TCP clients; four actor regions; 25% moving actor records"
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "81-confirmation-keyboard-cancel-preserved",
+  "capture_started_utc": "2026-10-29T21:30:54.392783+00:00",
+  "captured_utc": "2026-10-29T21:30:54.603257+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 212865,
+  "window_pid_status": "available",
+  "window_pid_before": 212865,
+  "window_pid_after": 212865,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "81-confirmation-keyboard-cancel-preserved.png",
+    "sha256": "9d28ae8bf4fa52783c15691f190f704a2e11aeca889421324121ca0d22989451",
+    "bytes": 623350
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

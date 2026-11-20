@@ -1,0 +1,261 @@
+{
+  "version": "0.15.0",
+  "status": "passed",
+  "finished_utc": "2026-10-28T23:22:36.372321+00:00",
+  "scope": "Regional SDK/reference-game increment: frozen-source automated gates, three matching-executable native confirmations and two extracted Linux review-package runs. No Windows, physical-GPU/device, WAN, public-service, uncoached-player or global-architecture qualification.",
+  "compatibility": {
+    "wire_protocol": 10,
+    "tls_alpn": "terra-world/10",
+    "domain_save": 1,
+    "regional_schema": 1,
+    "asset_schema": 1,
+    "new_optional_vehicle_pack_fields_require_reader": "0.15"
+  },
+  "automated": {
+    "gates": 34,
+    "distinct_passing_rust_tests": 860,
+    "passed_test_executions": 929,
+    "by_crate": {
+      "terra-bevy": 137,
+      "terra-cli": 4,
+      "terra-core": 33,
+      "terra-demo": 146,
+      "terra-history": 13,
+      "terra-net": 121,
+      "terra-persistence": 35,
+      "terra-sandbox": 326,
+      "terra-stream": 45
+    },
+    "failed": 0,
+    "ignored": 0,
+    "all_gate_commands_executed_fresh": true,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.15-final/gates.json",
+      "sha256": "b21b8d92a5ca7a2ffdd7047992c43bc9fb5e93d5325783b9c63e3c17b651f959",
+      "bytes": 24195
+    },
+    "test_identities": {
+      "path": "docs/verification/v0.15-final/distinct-tests.json",
+      "sha256": "5490170e9654dde1b87cf3f196e0feaebe48de4a2ce285015bcad01806fe4737",
+      "bytes": 135467
+    },
+    "reports_and_logs_match_captured_hashes": true,
+    "interrupted_attempt": {
+      "path": "docs/verification/v0.15-interrupted/interruption.json",
+      "sha256": "f6b2ec83558a7285487e7d8ddef38cf658a11057eba938b93f087a09ebed02c6",
+      "bytes": 413
+    }
+  },
+  "source_freeze": {
+    "inputs": 356,
+    "unchanged_through_gates_native_and_package_confirmation": true,
+    "manifest": {
+      "path": "docs/verification/v0.15-final/source-hashes.json",
+      "sha256": "940292677d38ca2272afc0ca0ca6e8468f590f194c42b683d6c6bd977c0ff31d",
+      "bytes": 41705
+    },
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.15-final/baseline-comparison.json",
+      "sha256": "83b8fded0f7cd8c6112904d5764ebc707845c161c90c59360e3a6be92d512941",
+      "bytes": 97812
+    },
+    "previous_release_paths_retained": 959,
+    "original_fixture_data_and_asset_inputs_unchanged": 90,
+    "historical_evidence_files_unchanged": 560,
+    "previous_product_review_and_validation_archived_exactly": true
+  },
+  "native": {
+    "binary_sha256": "c12970d499bd2f9045cad0f9c106cdc870dddd64ef7804fd496d8b37c96cc504",
+    "evidence": {
+      "path": "docs/native-v15-verification.json",
+      "sha256": "8d772159ca28ebcd68d09a7a8c935f85d7c87b6233dd0e611e43a94e3ce5b661",
+      "bytes": 33921
+    },
+    "accepted_runs": 3,
+    "graceful_exits": 3,
+    "candidate_runs": 3,
+    "all_evidence_hashes_rechecked": true,
+    "scope_note": "Candidate contains the ordinary forward/reverse/parking observation. Final paused Comet confirmation verifies presentation, drawer behavior, first-person visibility and fixed-livery controls."
+  },
+  "desktop": {
+    "evidence": {
+      "path": "docs/desktop-package-v0.15.json",
+      "sha256": "b954ad4c7382d4c82cfe9f25965c25bf3eb0b1662d947a9815e21e6bebec1d6f",
+      "bytes": 11485
+    },
+    "platform": "linux-x86_64",
+    "build_profile": "dev (opt-level 1)",
+    "archive": {
+      "filename": "terra-world-0.15.0-linux-x86_64.zip",
+      "bytes": 38974862,
+      "sha256": "9a2a56f3f1b8beef9023a8c7d46a1a5eba68ed159494ff41275b86f60b1a95de",
+      "files": 203
+    },
+    "accepted_binary_sha256": "c12970d499bd2f9045cad0f9c106cdc870dddd64ef7804fd496d8b37c96cc504",
+    "extracted_runs": 2,
+    "all_evidence_hashes_rechecked": true,
+    "windows_executed": false
+  },
+  "measured_cases": {
+    "career_report": {
+      "path": "docs/verification/v0.15-final/career-report.json",
+      "sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "bytes": 12948
+    },
+    "purchased_career_report": {
+      "path": "docs/verification/v0.15-final/purchased-career-report.json",
+      "sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "bytes": 12966
+    },
+    "novice_career_report": {
+      "path": "docs/verification/v0.15-final/novice-career-report.json",
+      "sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+      "bytes": 14379
+    },
+    "traffic_recovery": {
+      "path": "docs/verification/v0.15-final/traffic-recovery.json",
+      "sha256": "14dc943629496a36f4b1d05cdb1d4fdceb52001314298bc58fa7e7649b7830f2",
+      "bytes": 1665
+    },
+    "navigation_cluster": {
+      "path": "docs/verification/v0.15-final/navigation-cluster.json",
+      "sha256": "951606748eeb349eefa598cef8b098eab176047598de37f846dac44c279a4595",
+      "bytes": 1108
+    },
+    "launcher_recovery": {
+      "path": "docs/verification/v0.15-final/launcher-recovery.json",
+      "sha256": "0f28a6461cc8710a6e381f5ba606760059bc8dc42b404129a8c18910f5a885a2",
+      "bytes": 678
+    },
+    "asset_pack": {
+      "path": "docs/verification/v0.15-final/asset-pack.json",
+      "sha256": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+      "bytes": 3261
+    },
+    "asset_inspect": {
+      "path": "docs/verification/v0.15-final/asset-inspect.json",
+      "sha256": "1b32560ff1fd3f9c0404a93b7e9a6084e20be4caf74e10142552d9016f09c263",
+      "bytes": 2255
+    },
+    "asset_build": {
+      "path": "docs/verification/v0.15-final/asset-build.json",
+      "sha256": "4cd0441839d53596ce918722ff2182fd3376beaf3709e3cf51147530e2424354",
+      "bytes": 12819
+    },
+    "asset_authored_validate": {
+      "path": "docs/verification/v0.15-final/asset-authored-validate.json",
+      "sha256": "6e924ee63c4e273d0d6863be589b417ab4df9bcd1bc9246b481fd6566815d8b8",
+      "bytes": 3270
+    },
+    "vehicle_inspect": {
+      "path": "docs/verification/v0.15-final/vehicle-inspect.json",
+      "sha256": "3e5f342ad5f090c9abd53d0dbe51e43d16a927642b02ba2a1fa3d0a448e65d9b",
+      "bytes": 3544
+    },
+    "vehicle_pack": {
+      "path": "docs/verification/v0.15-final/vehicle-pack.json",
+      "sha256": "7fe712cf059b7b846b22a1364dd9d35d037f3538bd318307fe38fd7a4a259625",
+      "bytes": 895
+    },
+    "vehicle_demo_pack": {
+      "path": "docs/verification/v0.15-final/vehicle-demo-pack.json",
+      "sha256": "1b54e95fa9fd90215ccb4dc298b62dd100dec1c07d8060acc19a9ffab86638ab",
+      "bytes": 3859
+    },
+    "vehicle_asset_build": {
+      "path": "docs/verification/v0.15-final/vehicle-asset-build.json",
+      "sha256": "41ebf45320d5a9eb898f5a3500882959b7f02ba75649c7a6a09fb111661a7e65",
+      "bytes": 16962
+    },
+    "vehicle_authored_validate": {
+      "path": "docs/verification/v0.15-final/vehicle-authored-validate.json",
+      "sha256": "76eabb2a3d042c10d9dc5b03e5a3ef3a432f24d963f9ba0f4eb69a10d71c3f07",
+      "bytes": 3872
+    },
+    "source_inspection": {
+      "path": "docs/verification/v0.15-final/source-inspection.json",
+      "sha256": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+      "bytes": 4169
+    },
+    "source_export": {
+      "path": "docs/verification/v0.15-final/source-export.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "source_install": {
+      "path": "docs/verification/v0.15-final/source-install.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "source_verify": {
+      "path": "docs/verification/v0.15-final/source-verify.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "recovery": {
+      "path": "docs/verification/v0.15-final/recovery.json",
+      "sha256": "2cc6c42701193b1912a95c1f3dc90f137699ddea686eed1a04f9302cab570bc5",
+      "bytes": 1884
+    },
+    "recovery_bundle": {
+      "path": "docs/verification/v0.15-final/recovery-bundle.json",
+      "sha256": "6bbde1927760404d80d9e7eca2131da0e714212b72a69e6e9f3823d05f532f5b",
+      "bytes": 3197
+    },
+    "regional_sessions": {
+      "path": "docs/verification/v0.15-final/regional-sessions.json",
+      "sha256": "35351bce0725b69e890905327f7552ea3f216470924ee9cdce28a6142d7331cf",
+      "bytes": 30600
+    }
+  },
+  "review_evidence": {
+    "repeated_measurements": {
+      "path": "docs/verification/v0.15-review/repeated-measurements.json",
+      "sha256": "b63e795f4b2aea5fbc4b5292bdebb61c12c5a78611e32414490c99faa72cf7b9",
+      "bytes": 1224
+    },
+    "final_native_ux": {
+      "path": "docs/verification/v0.15-review/final-native-ux-review-015.md",
+      "sha256": "0f04a7eb0a21d57dbe81161ed737c24911c52f6f8722e692cd5ff8b749bbb273",
+      "bytes": 13406
+    },
+    "final_docs_claims": {
+      "path": "docs/verification/v0.15-review/final-docs-claims-015.md",
+      "sha256": "3bc1c1d98572e7992d775e09a05896d53ea191063682bdcd48f3a6c7cbc99e1e",
+      "bytes": 4035
+    },
+    "release_tooling": {
+      "path": "docs/verification/v0.15-review/final-acceptance-audit-015.md",
+      "sha256": "ab4b6dda9cd9aae24728b57a46cfb8ee5f66b149a6d1926b0171f7b699eaafc5",
+      "bytes": 6432
+    }
+  },
+  "product_records": {
+    "review": {
+      "path": "docs/PRODUCT_REVIEW.md",
+      "sha256": "af2d4af495d2c24ae3e9238bde1355a43f9190a7df64580c48b73e8c23ea44c3",
+      "bytes": 19746
+    },
+    "validation": {
+      "path": "docs/VALIDATION.md",
+      "sha256": "52c2168fd113c5ecef5340cb55de912f1962367dff670ee9aa5fcd4f18c859be",
+      "bytes": 18525
+    },
+    "remaining_gap_register": {
+      "path": "docs/REVIEW_GAPS_v0.15.md",
+      "sha256": "094008691a5497ba6072915f7a75491d6f9883ed8f6430d12ec84784a4cd5766",
+      "bytes": 18945
+    }
+  },
+  "remaining_review_item": {
+    "id": "UX-01",
+    "priority": "P3",
+    "area": "G16",
+    "description": "Repeated restored copies have distinct persisted identities but matching visible titles/subtitles. The new completed result is validated, pinned and focused. A visible creation/checkpoint suffix or rename affordance remains follow-up."
+  },
+  "source_archive": {
+    "manifest": "docs/source-archive-manifest-v0.15.json",
+    "external_record": "terra-world-0.15.0-source-record.json",
+    "note": "The source ZIP digest is recorded outside its own payload to avoid a self-reference."
+  }
+}

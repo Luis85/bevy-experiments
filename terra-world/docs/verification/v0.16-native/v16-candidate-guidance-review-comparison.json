@@ -1,0 +1,10 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "scope": "Native paused two-accepted-request review through normal UI; full authoritative state compared across ordinary saves. No transaction or movement submitted by the review action.",
+  "full_authoritative_state_equal": true,
+  "identity_equal": true,
+  "player_equal": true,
+  "before_save_sha256": "8776ca71347f911907740edb9fddf262cd954454e119e83ce8afd839f490e0b5",
+  "after_save_sha256": "8776ca71347f911907740edb9fddf262cd954454e119e83ce8afd839f490e0b5"
+}

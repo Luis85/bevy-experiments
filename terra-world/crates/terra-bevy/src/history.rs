@@ -21,13 +21,14 @@ impl ChunkProvider for EraProvider {
 }
 pub(crate) fn build_streamer(config: &mut WorldConfig) -> Result<ChunkStreamer, StreamError> {
     if let Some(path) = &config.heightmap_manifest {
-        let provider = terra_stream::HeightmapProvider::open(path, config.terrain_resolution)?;
+        let provider =
+            terra_stream::PreparedHeightmapProvider::open(path, config.terrain_resolution)?;
         let focus = TileKey::at(config.focus, config.chunk_level)
             .map_err(|e| StreamError::Geography(e.to_string()))?;
         if !provider.covers(focus) {
             return Err(StreamError::Configuration("heightmap does not cover the complete focus tile; choose coordinates inside its coverage".into()));
         }
-        config.base_data_revision = provider.manifest.revision.clone();
+        config.base_data_revision = provider.source_revision().to_owned();
         ChunkStreamer::with_provider(config.stream_config(), Arc::new(provider))
     } else if let Some(path) = &config.historical_pack {
         let epoch = config

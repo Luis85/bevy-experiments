@@ -1,0 +1,96 @@
+{
+  "accepted": true,
+  "model": {
+    "budget": {
+      "animation_keys": 1190,
+      "bytes": 163620,
+      "channels": 35,
+      "clips": 5,
+      "decoded_scalars": 34780,
+      "materials": 6,
+      "nodes": 37,
+      "primitives": 29,
+      "renderer_vertices": 5400,
+      "runtime_animation_keys": 1190,
+      "scene_primitives": 29,
+      "scene_renderer_vertices": 5400,
+      "scene_triangles": 1800,
+      "scene_vertices": 5400,
+      "texture_pixels": 0,
+      "texture_slot_pixels": 0,
+      "triangles": 1800,
+      "vertices": 5400
+    },
+    "clips": [
+      {
+        "channels": 7,
+        "duration_seconds": 2.799999952316284,
+        "name": "drink"
+      },
+      {
+        "channels": 7,
+        "duration_seconds": 2.5999999046325684,
+        "name": "feed"
+      },
+      {
+        "channels": 7,
+        "duration_seconds": 3.0,
+        "name": "idle"
+      },
+      {
+        "channels": 7,
+        "duration_seconds": 0.6800000071525574,
+        "name": "run"
+      },
+      {
+        "channels": 7,
+        "duration_seconds": 1.149999976158142,
+        "name": "walk"
+      }
+    ],
+    "nodes": [
+      "animal",
+      "body",
+      "torso",
+      "chest",
+      "head",
+      "neck",
+      "skull",
+      "muzzle",
+      "nose",
+      "eye--1",
+      "ear--1",
+      "ear-inner--1",
+      "horn--1-0",
+      "horn--1-1",
+      "horn--1-2",
+      "antler-tine--1",
+      "eye-1",
+      "ear-1",
+      "ear-inner-1",
+      "horn-1-0",
+      "horn-1-1",
+      "horn-1-2",
+      "antler-tine-1",
+      "front_left",
+      "front_left-limb",
+      "front_left-foot",
+      "front_right",
+      "front_right-limb",
+      "front_right-foot",
+      "rear_left",
+      "rear_left-limb",
+      "rear_left-foot",
+      "rear_right",
+      "rear_right-limb",
+      "rear_right-foot",
+      "tail",
+      "tail-fur"
+    ],
+    "scene": 0,
+    "sha256": "49629810d8e3280764dfa35aed39e8885ce6779e4b9320c6e003ab87de133f80"
+  },
+  "next": "Map these exact clip names in an authoring recipe, then build and inspect the resulting pack in the native game.",
+  "schema_version": 1,
+  "scope": "Validated supported GLB bytes and all import budgets. Clip names do not prove animation intent, scale, axes, foot placement or native readiness."
+}

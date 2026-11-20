@@ -1,0 +1,8 @@
+{
+  "release": "0.15.0",
+  "observed_utc": "2026-10-28T23:00:09.216941+00:00",
+  "reason": "Execution environment no longer retained release runner or Xvfb processes after context continuation; existing gate record was incomplete. Partial evidence preserved, full gates restarted in fresh v0.15-final directory.",
+  "source_inputs_unchanged": true,
+  "completed_gates": 31,
+  "accepted_release_evidence": false
+}

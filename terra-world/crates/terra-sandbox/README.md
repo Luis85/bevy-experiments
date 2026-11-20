@@ -55,6 +55,16 @@ equipment comes from trusted game policy, never from a player's command.
 objects. Each object collection is capped at 64 and the view marks truncation.
 Network commands additionally need replay/sequence checks and rate limits.
 
+Supply interfaces can call `supply_contract_readiness(player, contract_id,
+SupplyContractAction::Deliver, &catalog)`, or use `Accept`/`Return`, and display
+the returned `SupplyContractBlocker`. The query shares command preparation, reports
+receiver/wallet capacity as well as ownership, expiry, goods and reach, and
+changes no state. Query success is not a reservation; execute the ordinary
+`SettlementCommand` through authority and handle a changed condition. A missing
+destination in a recipient view does not establish its global absence. See
+[the economy guide](../../docs/SETTLEMENTS_AND_ECONOMY.md#supply-readiness-and-recovery)
+for recovery and bounded acquisition behavior.
+
 ## Persistence and limits
 
 - Versioned JSON save; strict ownership/reference/range checks on load.
@@ -103,11 +113,16 @@ countries, political borders, legal ownership and historical sovereignty.
 `InviteToFaction`; the invited player must accept with `AcceptFactionInvite`.
 Joining without an invitation and self-promotion both fail without changing
 state. `SetFactionRole` lets the leader grant or revoke Builder privileges.
-Leadership cannot be changed through a role grant.
+Leadership changes through the explicit `TransferFactionLeadership` command
+to an existing member; a role grant cannot change leadership. Invitees can
+`DeclineFactionInvite`, and the current leader can `RevokeFactionInvite`.
+Non-leaders can `LeaveFaction`; the leader can `RemoveFactionMember`. A leader
+must hand over before leaving. Departure clears faction-home access while
+preserving personal property, shared assets and other memberships.
 
 | Role | Permissions on faction property |
 |---|---|
-| Leader | Invite players, grant roles, transfer personally owned land into the faction, and all Builder actions |
+| Leader | Invite players, revoke invitations, remove members, grant roles, hand over leadership, transfer personally owned land into the faction, and all Builder actions |
 | Builder | Build, plant, gather, harvest, damage/demolish structures, and edit permitted tree points |
 | Member | Use shared housing as a home and craft at a nearby shared workbench; no property alteration |
 
@@ -126,7 +141,64 @@ ownership still identifies the owning faction by ID when a roster is truncated.
 All faction and ownership fields are persisted and validated on load. Additive
 serde defaults preserve earlier personal-only version-1 saves.
 
-Faction bank inventories, departure/expulsion, leadership succession, diplomacy,
-warfare, territory capture and historical boundary simulation are extension
-points. Personal inventory remains personal; faction ownership grants access to
+An active sole Leader may use `DissolveFaction` for an unused faction with no
+shared plot or settlement. Invitations are revoked, no funds/property move and
+IDs are not reused. `faction_dissolution_readiness` exposes the same admission
+check; authority rechecks global ownership even if a replica sees no assets.
+
+Faction bank inventories, automatic inactive-leader succession, populated or asset-owning dissolution,
+diplomacy, warfare, territory capture and historical boundary simulation are
+extension points. Personal inventory remains personal; faction ownership grants access to
 property without implicitly sharing every player's materials.
+
+## Regional work and interest indexing
+
+Version 0.4 adds `GeoSpatialIndex`, `LivingInterestIndex` and
+`SandboxInterestIndex`. Build the latter once from an immutable world after a
+fixed update, then use `snapshot_for_indexed` for each recipient. The index borrows
+the world so positions cannot become stale during that batch. Snapshot priority,
+privacy, ownership and truncation rules are unchanged; base scan APIs remain
+available for simpler hosts.
+
+`EcologyScheduler` budgets distant behavior decisions while retaining ordinary
+near/threat response. It does not skip fixed-rate physical movement, actor needs,
+resource/farm clocks, production or cargo transfers. Use
+`advance_ecology_scheduled_with_environment` with trusted observer bodies and a
+loaded-ground resolver. Reset the runtime scheduler when replacing a world;
+floating render-origin changes do not require a reset.
+
+The geographic index is also used for traffic yielding and wildlife threats.
+Work counters distinguish evaluated/deferred AI and actual spatial candidates.
+See [SCALING.md](../../docs/SCALING.md) for contracts, geographic guarantees,
+current limits and the finite `scaling_probe` example. Large point-index probes
+are explicitly separate from full actor or network capacity.
+
+## Regional residency (0.5)
+
+`RegionPartition` separates the retained ownership/economy ledger from geographic
+`RegionPage` payloads. `working_set` loads requested pages, dependencies and
+near-body/home pins; `merge_active` preserves dormant records and validates
+cross-region moves without duplicating identity, money or goods. Empty requested
+keys remain part of residency so newly seeded records have an explicit owner.
+
+`SandboxState::is_partial`, `dormant_reservations` and `require_complete` distinguish
+an active working set from a whole world. Cold records still consume aggregate
+capacity. Ordinary `save`/`load` reject partial worlds; use the independent
+`terra-persistence` crate for atomic regional storage and complete exports.
+Construct states with `SandboxState::new()` or `Default`; the residency marker is
+private so downstream struct literals must migrate to these constructors.
+
+See [REGIONAL_PERSISTENCE.md](../../docs/REGIONAL_PERSISTENCE.md) for the complete
+lifetime policy and integration. Dormant environmental records freeze, global
+production/contracts remain resident, and all existing aggregate limits remain.
+
+## 0.24 supply lifecycle
+
+New funded requests fit real demand and receiving inventory. Confirmed obsolete
+public offers retire only after exact credit to their original issuer; capped
+refunds and unknown receiver data retain escrow. Accepted commitments preserve
+their terms. Readiness adds `SupplyContractBlocker::ObsoleteOffer`; downstream
+exhaustive matches must handle it. Pure demand checks avoid per-frame inventory
+clones; fitting exchanges run only when posting new work. Existing command and
+saved-state shapes are unchanged. See [the economy policy](../../docs/SETTLEMENTS_AND_ECONOMY.md).
+

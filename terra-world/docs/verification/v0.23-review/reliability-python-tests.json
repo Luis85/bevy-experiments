@@ -1,0 +1,26 @@
+{
+  "scope": "Focused Python regression run; not canonical release acceptance or Windows execution",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "scripts",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "started_utc": "2026-10-30T07:45:56.068617+00:00",
+  "finished_utc": "2026-10-30T07:46:03.324576+00:00",
+  "elapsed_seconds": 7.255963020999843,
+  "exit_code": 0,
+  "tests": 49,
+  "input_hashes": {
+    "scripts/verify_desktop.py": "5754a24ea6d5cc73add94c52978b0a21e18d0ff7d74cc16bbece277c7cb05c00",
+    "scripts/test_verify_desktop.py": "949d6d1c3d27e92184a6acb9a6cca6e4d76d3cc3278141987fe9b440e0a8f2ec"
+  },
+  "inputs_unchanged": true,
+  "log_sha256": "76939b24ea8dcd94fbbce4430a86ac2cf0b0d6e32a03e758a9442a6fc322e8bf"
+}

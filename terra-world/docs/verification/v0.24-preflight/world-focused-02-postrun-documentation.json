@@ -1,0 +1,18 @@
+{
+  "observed_utc": "2026-10-30T11:35:55.832645+00:00",
+  "focused_receipt": "world-focused-02.json",
+  "focused_receipt_sha256": "fe00266555be5568b47165fb2024644addddc9a9434bec0c31debe8e17a82020",
+  "focused_execution_finished_utc": "2026-10-30T11:34:28.011460+00:00",
+  "focused_input_map_unchanged_at_finish": true,
+  "current_changes": [
+    {
+      "path": "crates/terra-sandbox/README.md",
+      "before_sha256": "48ca752f020c7decb1b5d7a7011e287be7d7f94accd3e39aacaa627b15470c47",
+      "after_sha256": "d82fa81a9ebf870daab3c8e4ed1a78edbf09e7f3ff3a975dbbd76992d9c2c648",
+      "modified_utc": "2026-10-30T11:34:38.732165+00:00"
+    }
+  ],
+  "changes_are_documentation_only": true,
+  "implementation_inputs_still_unchanged": true,
+  "scope": "The README append followed the completed focused run; no implementation rerun is claimed or needed for this documentation-only delta. Final canonical acceptance will bind current complete inputs."
+}

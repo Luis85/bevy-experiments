@@ -172,7 +172,7 @@ impl MeshBuilder {
                 [0.31, 0.23, 0.15, 1.],
                 5,
             );
-            if seed.is_multiple_of(3) {
+            if seed % 3 == 0 {
                 self.ellipsoid(
                     base + Vec3::Y * h * 0.69,
                     Vec3::new(h * 0.35, h * 0.32, h * 0.33),
@@ -197,14 +197,14 @@ impl MeshBuilder {
         let h = height.clamp(1., 35.);
         let bark = [0.31, 0.23, 0.15, 1.];
         self.cylinder(base, base + Vec3::Y * h * 0.68, h * 0.035, bark, 7);
-        if seed.is_multiple_of(3) {
+        if seed % 3 == 0 {
             // Broadleaf canopy: several intersecting smooth crowns and branches.
             let shades = [
                 [0.24, 0.40, 0.18, 1.],
                 [0.31, 0.46, 0.21, 1.],
                 [0.27, 0.43, 0.23, 1.],
             ];
-            for (i, shade) in shades.into_iter().enumerate() {
+            for i in 0..3 {
                 let angle = (seed % 31) as f32 + i as f32 * 2.1;
                 let crown = base
                     + Vec3::new(
@@ -213,21 +213,48 @@ impl MeshBuilder {
                         angle.sin() * h * 0.16,
                     );
                 self.cylinder(base + Vec3::Y * h * 0.4, crown, h * 0.018, bark, 5);
-                self.ellipsoid(crown, Vec3::new(h * 0.29, h * 0.27, h * 0.27), shade, 8);
+                self.ellipsoid(crown, Vec3::new(h * 0.27, h * 0.26, h * 0.25), shades[i], 8);
+                let lobe =
+                    crown + Vec3::new(angle.sin() * h * 0.18, h * 0.08, angle.cos() * h * 0.16);
+                self.ellipsoid(
+                    lobe,
+                    Vec3::new(h * 0.17, h * 0.20, h * 0.17),
+                    shades[(i + 1) % 3],
+                    6,
+                );
             }
         } else {
-            for tier in 0..4 {
-                let bottom = base + Vec3::Y * h * (0.25 + tier as f32 * 0.15);
-                let tip = base + Vec3::Y * h * (0.68 + tier as f32 * 0.105);
-                let radius = h * (0.28 - tier as f32 * 0.047);
-                let green = 0.28 + (seed % 9) as f32 * 0.011 + tier as f32 * 0.012;
-                for i in 0..9 {
-                    let a = i as f32 * std::f32::consts::TAU / 9.;
-                    let b = (i + 1) as f32 * std::f32::consts::TAU / 9.;
-                    let pa = bottom + Vec3::new(a.cos() * radius, 0., a.sin() * radius);
-                    let pb = bottom + Vec3::new(b.cos() * radius, 0., b.sin() * radius);
-                    self.triangle(pa, tip, pb, [0.12, green, 0.19, 1.]);
-                    self.triangle(bottom, pb, pa, [0.10, green * 0.78, 0.15, 1.]);
+            for tier in 0..6 {
+                let bottom = base + Vec3::Y * h * (0.20 + tier as f32 * 0.12);
+                let radius = h * (0.32 - tier as f32 * 0.043);
+                let green = 0.29 + (seed % 9) as f32 * 0.009 + tier as f32 * 0.013;
+                // Separate drooping bough volumes break the old stacked-cone
+                // silhouette without transparent leaf cards or alpha overdraw.
+                for branch in 0..7 {
+                    let angle = branch as f32 * std::f32::consts::TAU / 7.
+                        + tier as f32 * 0.41
+                        + (seed % 31) as f32 * 0.13;
+                    let direction = Vec3::new(angle.cos(), 0., angle.sin());
+                    let spread = Vec3::new(-direction.z, 0., direction.x) * radius * 0.32;
+                    let length = radius
+                        * (0.84 + (seed.wrapping_add(branch * 7 + tier * 13) % 17) as f32 / 100.);
+                    let root = bottom + direction * h * 0.025;
+                    let tip = bottom + direction * length - Vec3::Y * h * 0.025;
+                    let crest = bottom + direction * length * 0.34 + Vec3::Y * h * 0.23;
+                    self.triangle(root + spread, crest, tip, [0.16, green, 0.22, 1.]);
+                    self.triangle(tip, crest, root - spread, [0.14, green * 0.92, 0.19, 1.]);
+                    self.triangle(
+                        root - spread,
+                        crest,
+                        root + spread,
+                        [0.17, green * 1.04, 0.21, 1.],
+                    );
+                    self.triangle(
+                        root + spread,
+                        tip,
+                        root - spread,
+                        [0.13, green * 0.77, 0.18, 1.],
+                    );
                 }
             }
         }
@@ -265,38 +292,100 @@ fn blend(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
     let t = t.clamp(0., 1.);
     std::array::from_fn(|i| a[i] * (1. - t) + b[i] * t)
 }
+/// A continuous material field in earth-centered coordinates. Keeping the
+/// large coordinates as f64 until the final color avoids stair steps and keeps
+/// the date-line seam consistent. This is authored shading, not soil imagery.
 fn terrain_color(height: f32, slope: f32, p: GeoPosition) -> [f32; 4] {
-    // Latitude/longitude based detail stays continuous across chunk seams. It is
-    // a visualization material, not observed satellite imagery or soil data.
-    let x = (p.longitude.to_radians() * 6_378_137.0 * p.latitude.to_radians().cos()) as f32;
-    let z = (p.latitude.to_radians() * 6_378_137.0) as f32;
-    let variation = ((x * 0.021).sin() * (z * 0.017).cos() * 0.5
-        + (x * 0.085 + z * 0.04).sin() * 0.25
-        + (x * 0.002 - z * 0.003).cos() * 0.25)
-        * 0.055;
+    let lat = p.latitude.to_radians();
+    let lon = p.longitude.to_radians();
+    let x = lon.cos() * lat.cos() * 6_378_137.0;
+    let y = lat.sin() * 6_378_137.0;
+    let z = lon.sin() * lat.cos() * 6_378_137.0;
+    // Smooth stochastic fields avoid the old repeating sinusoidal stripes.
+    // Earth-centered sampling preserves the date line and independent tiles.
+    let broad = material_noise(x * 0.004, y * 0.004, z * 0.004);
+    let patches = material_noise(x * 0.026 + 13., y * 0.026, z * 0.026 - 8.);
     let dry = (p.latitude.abs() as f32 - 24.).abs() < 10.;
-    let base = if dry {
-        [0.55 + variation, 0.51 + variation, 0.32 + variation, 1.]
+    let meadow = if dry {
+        [0.49, 0.43, 0.26, 1.]
     } else {
-        [0.34 + variation, 0.47 + variation, 0.27 + variation, 1.]
+        [0.39, 0.47, 0.26, 1.]
     };
+    let moss = if dry {
+        [0.39, 0.36, 0.22, 1.]
+    } else {
+        [0.24, 0.35, 0.22, 1.]
+    };
+    let soil = [0.53, 0.43, 0.31, 1.];
+    let mut color = blend(meadow, moss, (broad * 0.70).clamp(0., 0.75));
+    color = blend(color, soil, ((patches - 0.38) * 1.20).clamp(0., 0.45));
+    let variation = (broad - 0.5) * 0.075 + (patches - 0.5) * 0.04;
+    for component in color.iter_mut().take(3) {
+        *component = (*component + variation).clamp(0.04, 0.94);
+    }
+    // Rock appears on steep relief instead of painting every altitude green.
     let rock = [
-        0.44 + variation * 0.5,
-        0.43 + variation * 0.5,
-        0.38 + variation * 0.5,
+        0.52 + broad * 0.10,
+        0.51 + broad * 0.09,
+        0.47 + broad * 0.08,
         1.,
     ];
-    let mut c = blend(base, rock, ((slope - 0.16) / 0.42).clamp(0., 1.));
+    let cliff = ((slope - 0.055) / 0.24).clamp(0., 1.);
+    let highland = ((height - 1000.) / 1600.).clamp(0., 0.35) * (0.4 + patches * 0.6);
+    color = blend(color, rock, cliff.max(highland));
     let snowline = (3300. - p.latitude.abs() as f32 * 15.).max(250.);
     let snow = ((height - snowline + 120.) / 300.).clamp(0., 1.) * (1. - slope * 0.75);
-    c = blend(c, [0.91, 0.94, 0.95, 1.], snow);
+    color = blend(color, [0.86, 0.91, 0.94, 1.], snow);
     if height < 0. {
-        c = blend(c, [0.48, 0.44, 0.31, 1.], 0.55);
+        color = blend(color, [0.42, 0.39, 0.27, 1.], 0.55);
     }
-    c
+    color
+}
+
+fn material_noise(x: f64, y: f64, z: f64) -> f32 {
+    let smooth = |x: f64| x * x * (3. - 2. * x);
+    let cell = [x.floor() as i64, y.floor() as i64, z.floor() as i64];
+    let fraction = [
+        smooth(x - x.floor()),
+        smooth(y - y.floor()),
+        smooth(z - z.floor()),
+    ];
+    let mut result = 0.;
+    for dz in 0..2 {
+        for dy in 0..2 {
+            for dx in 0..2 {
+                let mut h = (cell[0] + dx) as u64;
+                h = h.wrapping_mul(0x9e3779b185ebca87) ^ (cell[1] + dy) as u64;
+                h = h.wrapping_mul(0xc2b2ae3d27d4eb4f) ^ (cell[2] + dz) as u64;
+                h ^= h >> 29;
+                h = h.wrapping_mul(0x165667b19e3779f9);
+                let value = (h & 65535) as f64 / 65535.;
+                let weight = [dx, dy, dz]
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &a)| {
+                        if a == 0 {
+                            1. - fraction[i]
+                        } else {
+                            fraction[i]
+                        }
+                    })
+                    .product::<f64>();
+                result += value * weight;
+            }
+        }
+    }
+    result as f32
 }
 
 pub fn terrain_mesh(chunk: &WorldChunk) -> Option<Mesh> {
+    terrain_mesh_lod(chunk, 0)
+}
+
+/// Render-only reduction. Every outer edge retains every original source
+/// sample, so neighboring chunks remain watertight even at different tiers.
+/// Resident terrain queries continue to use the original height field.
+pub fn terrain_mesh_lod(chunk: &WorldChunk, detail: u8) -> Option<Mesh> {
     let frame = LocalFrame::new(chunk.key.center());
     let bounds = chunk.key.bounds();
     let w = chunk.heights.width;
@@ -343,9 +432,9 @@ pub fn terrain_mesh(chunk: &WorldChunk) -> Option<Mesh> {
             for f in &cover {
                 if inside_polygon(p, &f.points) {
                     let mask = match f.kind {
-                        FeatureKind::Forest => [0.24, 0.36, 0.18, 1.],
-                        FeatureKind::Farm => [0.49, 0.43, 0.26, 1.],
-                        _ => [0.39, 0.51, 0.27, 1.],
+                        FeatureKind::Forest => [0.29, 0.33, 0.21, 1.],
+                        FeatureKind::Farm => [0.54, 0.43, 0.27, 1.],
+                        _ => [0.40, 0.49, 0.27, 1.],
                     };
                     color = blend(color, mask, 0.6);
                     break;
@@ -355,36 +444,120 @@ pub fn terrain_mesh(chunk: &WorldChunk) -> Option<Mesh> {
             colors.push(linear_color(color));
         }
     }
-    let mut indices = Vec::with_capacity((w - 1) * (h - 1) * 6);
-    for y in 0..h - 1 {
-        for x in 0..w - 1 {
-            let a = (y * w + x) as u32;
-            let b = a + 1;
-            let c = a + w as u32;
-            let d = c + 1;
-            indices.extend([a, c, b, b, c, d]);
-        }
+    let raw_indices = terrain_indices(w, h, 1usize << detail.min(2));
+    let mut kept = Vec::new();
+    let mut remap = BTreeMap::new();
+    let mut indices = Vec::with_capacity(raw_indices.len());
+    for i in raw_indices {
+        let next = remap.len() as u32;
+        let mapped = *remap.entry(i).or_insert_with(|| {
+            kept.push(i as usize);
+            next
+        });
+        indices.push(mapped);
     }
+    // Whole-number repetitions at tile edges remove texture phase seams.
+    // The nominal repeat spans about 8 m at the equator; it is authored detail.
+    let repeats = (40_075_016.685 / (1u64 << chunk.key.level) as f64 / 8.)
+        .round()
+        .max(1.) as f32;
     let mut mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(
         Mesh::ATTRIBUTE_POSITION,
-        positions.iter().map(|p| p.to_array()).collect::<Vec<_>>(),
+        kept.iter()
+            .map(|&i| positions[i].to_array())
+            .collect::<Vec<_>>(),
     )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
+    .with_inserted_attribute(
+        Mesh::ATTRIBUTE_NORMAL,
+        kept.iter().map(|&i| normals[i]).collect::<Vec<_>>(),
+    )
+    .with_inserted_attribute(
+        Mesh::ATTRIBUTE_COLOR,
+        kept.iter().map(|&i| colors[i]).collect::<Vec<_>>(),
+    )
     .with_inserted_attribute(
         Mesh::ATTRIBUTE_UV_0,
-        positions
-            .iter()
-            .map(|p| [p.x * 0.025, p.z * 0.025])
+        kept.iter()
+            .map(|&i| {
+                [
+                    (i % w) as f32 / (w - 1) as f32 * repeats,
+                    (i / w) as f32 / (h - 1) as f32 * repeats,
+                ]
+            })
             .collect::<Vec<_>>(),
     )
     .with_inserted_indices(Indices::U32(indices));
     let _ = mesh.generate_tangents();
     Some(mesh)
+}
+
+fn terrain_indices(w: usize, h: usize, stride: usize) -> Vec<u32> {
+    let mut indices = Vec::new();
+    if stride == 1 || w <= 2 || h <= 2 {
+        for y in 0..h - 1 {
+            for x in 0..w - 1 {
+                let a = (y * w + x) as u32;
+                let c = a + w as u32;
+                indices.extend([a, c, a + 1, a + 1, c, c + 1]);
+            }
+        }
+        return indices;
+    }
+    let axis = |length: usize| {
+        let mut values: Vec<_> = (0..length).step_by(stride).collect();
+        if values.last().copied() != Some(length - 1) {
+            values.push(length - 1);
+        }
+        // Merge a one-sample tail into its neighbor: a fan center on a shared
+        // edge would otherwise create a T-junction for non-power-of-two grids.
+        if values.len() > 2 && values[values.len() - 1] - values[values.len() - 2] == 1 {
+            values.remove(values.len() - 2);
+        }
+        values
+    };
+    let xs = axis(w);
+    let ys = axis(h);
+    for vertical in ys.windows(2) {
+        for horizontal in xs.windows(2) {
+            let (x, right) = (horizontal[0], horizontal[1]);
+            let (y, bottom) = (vertical[0], vertical[1]);
+            let center = ((x + right) / 2, (y + bottom) / 2);
+            let mut ring = vec![(x, y)];
+            if y == 0 {
+                ring.extend((x + 1..right).map(|i| (i, y)));
+            }
+            ring.push((right, y));
+            if right == w - 1 {
+                ring.extend((y + 1..bottom).map(|i| (right, i)));
+            }
+            ring.push((right, bottom));
+            if bottom == h - 1 {
+                ring.extend((x + 1..right).rev().map(|i| (i, bottom)));
+            }
+            ring.push((x, bottom));
+            if x == 0 {
+                ring.extend((y + 1..bottom).rev().map(|i| (x, i)));
+            }
+            for i in 0..ring.len() {
+                let a = ring[i];
+                let b = ring[(i + 1) % ring.len()];
+                let area = (a.0 as i64 - center.0 as i64) * (b.1 as i64 - center.1 as i64)
+                    - (a.1 as i64 - center.1 as i64) * (b.0 as i64 - center.0 as i64);
+                if area != 0 {
+                    indices.extend([
+                        (center.1 * w + center.0) as u32,
+                        (b.1 * w + b.0) as u32,
+                        (a.1 * w + a.0) as u32,
+                    ]);
+                }
+            }
+        }
+    }
+    indices
 }
 
 /// Ear clipping supports simple concave polygon exteriors; holes are not flattened.
@@ -467,16 +640,17 @@ fn tag<'a>(feature: &'a WorldFeature, key: &str) -> &'a str {
 }
 fn tag_color(value: &str, fallback: [f32; 4]) -> [f32; 4] {
     let v = value.trim().to_lowercase();
-    if let Some(hex) = v.strip_prefix('#')
-        && hex.len() == 6
-        && let Ok(rgb) = u32::from_str_radix(hex, 16)
-    {
-        return [
-            ((rgb >> 16) & 255) as f32 / 255.,
-            ((rgb >> 8) & 255) as f32 / 255.,
-            (rgb & 255) as f32 / 255.,
-            1.,
-        ];
+    if let Some(hex) = v.strip_prefix('#') {
+        if hex.len() == 6 {
+            if let Ok(rgb) = u32::from_str_radix(hex, 16) {
+                return [
+                    ((rgb >> 16) & 255) as f32 / 255.,
+                    ((rgb >> 8) & 255) as f32 / 255.,
+                    (rgb & 255) as f32 / 255.,
+                    1.,
+                ];
+            }
+        }
     }
     match v.as_str() {
         "red" => [0.57, 0.22, 0.16, 1.],
@@ -586,6 +760,26 @@ fn building(
         let length = edge.length();
         let tangent = edge.normalize_or_zero();
         let outside = Vec3::new(edge.z, 0., -edge.x).normalize_or_zero() * area.signum();
+        if lod == 0 && length > 1. {
+            // Grounded plinth and cornice make building scale readable while
+            // retaining the exact source footprint and height.
+            let offset = outside * 0.018;
+            let plinth = blend(facade, [0.38, 0.37, 0.32, 1.], 0.55);
+            builder.quad(
+                a + offset,
+                b + offset,
+                b + offset + Vec3::Y * 0.32,
+                a + offset + Vec3::Y * 0.32,
+                plinth,
+            );
+            builder.quad(
+                at + offset - Vec3::Y * 0.15,
+                bt + offset - Vec3::Y * 0.15,
+                bt + offset,
+                at + offset,
+                blend(facade, [0.87, 0.84, 0.75, 1.], 0.35),
+            );
+        }
         let columns = ((length / 3.).floor() as usize).clamp(0, 7);
         if length > 3. && detail_budget > 0 {
             for level in 0..levels {
@@ -601,6 +795,28 @@ fn building(
                     let half = tangent * (length / (columns.max(1) as f32) * 0.22).min(0.65);
                     let up = Vec3::Y * ((wall_top - bottom) / levels as f32 * 0.22).min(0.62);
                     let glass = [0.19, 0.31 + (seed % 3) as f32 * 0.015, 0.34, 1.];
+                    if lod == 0 && level == 0 && column < 4 {
+                        let frame_center = center + outside * 0.012;
+                        let narrow = tangent * 0.035;
+                        let frame_color = blend(facade, [0.90, 0.87, 0.76, 1.], 0.7);
+                        for side in [-1., 1.] {
+                            let edge_center = frame_center + half * side;
+                            builder.quad(
+                                edge_center - narrow - up,
+                                edge_center + narrow - up,
+                                edge_center + narrow + up,
+                                edge_center - narrow + up,
+                                frame_color,
+                            );
+                        }
+                        builder.quad(
+                            frame_center - half + up - Vec3::Y * 0.035,
+                            frame_center + half + up - Vec3::Y * 0.035,
+                            frame_center + half + up + Vec3::Y * 0.035,
+                            frame_center - half + up + Vec3::Y * 0.035,
+                            frame_color,
+                        );
+                    }
                     if area > 0. {
                         builder.quad(
                             center + half - up,
@@ -747,7 +963,7 @@ fn building(
             );
         }
     }
-    if pitched && seed.is_multiple_of(3) && lod == 0 {
+    if pitched && seed % 3 == 0 && lod == 0 {
         let center = points[0].lerp(points[2], 0.4) + Vec3::Y * (roof_height + 0.4);
         builder.cuboid(center, Vec3::new(0.65, 1.6, 0.7), [0.49, 0.34, 0.28, 1.]);
     }
@@ -949,21 +1165,21 @@ pub fn feature_meshes_lod(
         }
         let seed = hash(&feature.id);
         if feature.kind == FeatureKind::Tree {
-            if trees_left > 0
-                && let Some(&p) = feature.points.first()
-            {
-                trees_left -= 1;
-                explicit_trees_left = explicit_trees_left.saturating_sub(1);
-                builder.tree_lod(
-                    surface(chunk, &frame, p, 0.),
-                    feature.height_m.clamp(3., 28.),
-                    match tag(feature, "leaf_type") {
-                        "broadleaved" => seed / 3 * 3,
-                        "needleleaved" => seed / 3 * 3 + 1,
-                        _ => seed,
-                    },
-                    lod,
-                );
+            if trees_left > 0 {
+                if let Some(&p) = feature.points.first() {
+                    trees_left -= 1;
+                    explicit_trees_left = explicit_trees_left.saturating_sub(1);
+                    builder.tree_lod(
+                        surface(chunk, &frame, p, 0.),
+                        feature.height_m.clamp(3., 28.),
+                        match tag(feature, "leaf_type") {
+                            "broadleaved" => seed / 3 * 3,
+                            "needleleaved" => seed / 3 * 3 + 1,
+                            _ => seed,
+                        },
+                        lod,
+                    );
+                }
             }
             continue;
         }
@@ -1137,7 +1353,7 @@ pub fn feature_meshes_lod(
                             if matches!(tag(feature, "crop"), "wheat" | "barley" | "oat" | "maize")
                             {
                                 [0.64, 0.59, 0.30, 1.]
-                            } else if (row + seed as usize).is_multiple_of(3) {
+                            } else if (row + seed as usize) % 3 == 0 {
                                 [0.60, 0.56, 0.27, 1.]
                             } else {
                                 [0.45, 0.52, 0.24, 1.]
@@ -1150,7 +1366,22 @@ pub fn feature_meshes_lod(
     }
     batches
         .into_iter()
-        .filter_map(|(layer, b)| b.finish().map(|m| (layer, m)))
+        .filter_map(|(layer, b)| {
+            let mut mesh = b.finish()?;
+            if layer == Layer::Water {
+                if let Some(bevy::mesh::VertexAttributeValues::Float32x3(points)) =
+                    mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+                {
+                    let uvs: Vec<_> = points
+                        .iter()
+                        .map(|p| [p[0] * 0.035, p[2] * 0.035])
+                        .collect();
+                    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+                    let _ = mesh.generate_tangents();
+                }
+            }
+            Some((layer, mesh))
+        })
         .collect()
 }
 
@@ -1163,6 +1394,36 @@ mod tests {
             VertexAttributeValues::Float32x3(values) => values,
             _ => panic!("expected geometric vertices"),
         }
+    }
+    #[test]
+    fn authored_terrain_material_is_continuous_at_the_date_line() {
+        let east = terrain_color(
+            400.,
+            0.15,
+            GeoPosition {
+                latitude: 48.,
+                longitude: 180.,
+                altitude_m: 400.,
+            },
+        );
+        let west = terrain_color(
+            400.,
+            0.15,
+            GeoPosition {
+                latitude: 48.,
+                longitude: -180.,
+                altitude_m: 400.,
+            },
+        );
+        for i in 0..4 {
+            assert!((east[i] - west[i]).abs() < 0.0001);
+        }
+        let steep = terrain_color(400., 0.7, GeoPosition::new(48., 11., 400.).unwrap());
+        assert!(
+            steep
+                .iter()
+                .all(|c| c.is_finite() && (0.0..=1.0).contains(c))
+        );
     }
     #[test]
     fn heightfield_uses_shared_vertices_smooth_normals_and_detail_uvs() {
@@ -1192,6 +1453,83 @@ mod tests {
         );
     }
     #[test]
+    fn distant_terrain_reduces_interiors_without_cracks_or_changed_source_heights() {
+        let key =
+            terra_core::TileKey::at(GeoPosition::new(48.137, 11.575, 0.).unwrap(), 15).unwrap();
+        let chunk = terra_stream::procedural_chunk(key, 65, 42);
+        let before = chunk.heights.samples_m.clone();
+        let near = terrain_mesh_lod(&chunk, 0).unwrap();
+        let middle = terrain_mesh_lod(&chunk, 1).unwrap();
+        let far = terrain_mesh_lod(&chunk, 2).unwrap();
+        assert!(middle.count_vertices() < near.count_vertices() * 3 / 5);
+        assert!(far.count_vertices() < near.count_vertices() / 5);
+        assert!(far.indices().unwrap().len() < near.indices().unwrap().len() / 5);
+        assert_eq!(chunk.heights.samples_m, before);
+        for (width, height) in [(65, 65), (34, 18), (66, 34), (2, 5)] {
+            for stride in [1, 2, 4] {
+                let triangles = terrain_indices(width, height, stride);
+                let used: BTreeSet<_> = triangles.iter().copied().collect();
+                let mut edges = BTreeMap::<(u32, u32), usize>::new();
+                let mut area = 0.;
+                for triangle in triangles.chunks_exact(3) {
+                    let point = |i: u32| {
+                        Vec2::new((i as usize % width) as f32, (i as usize / width) as f32)
+                    };
+                    let cross = (point(triangle[1]) - point(triangle[0]))
+                        .perp_dot(point(triangle[2]) - point(triangle[0]));
+                    assert!(cross < 0., "upward winding, nondegenerate triangles");
+                    area += cross.abs() * 0.5;
+                    for i in 0..3 {
+                        let a = triangle[i];
+                        let b = triangle[(i + 1) % 3];
+                        *edges.entry((a.min(b), a.max(b))).or_default() += 1;
+                    }
+                }
+                assert_eq!(area, ((width - 1) * (height - 1)) as f32);
+                for (&(a, b), &count) in &edges {
+                    assert!(count <= 2, "nonmanifold terrain edge");
+                    if count == 1 {
+                        let (ax, ay) = (a as usize % width, a as usize / width);
+                        let (bx, by) = (b as usize % width, b as usize / width);
+                        assert!(
+                            (ax == 0 && bx == 0)
+                                || (ay == 0 && by == 0)
+                                || (ax == width - 1 && bx == width - 1)
+                                || (ay == height - 1 && by == height - 1),
+                            "interior hole"
+                        );
+                    }
+                }
+                for y in 0..height {
+                    for x in 0..width {
+                        if x == 0 || y == 0 || x == width - 1 || y == height - 1 {
+                            assert!(
+                                used.contains(&((y * width + x) as u32)),
+                                "missing source border sample"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn terrain_palette_exposes_relief_and_water_has_tangent_space_detail() {
+        let point = GeoPosition::new(48., 11., 400.).unwrap();
+        let meadow = terrain_color(400., 0.01, point);
+        let cliff = terrain_color(400., 0.6, point);
+        let snow = terrain_color(4000., 0.01, point);
+        assert!(cliff[0] > meadow[0]);
+        assert!(snow[0] > cliff[0] && snow[2] > cliff[2]);
+        let key =
+            terra_core::TileKey::at(GeoPosition::new(48.137, 11.575, 0.).unwrap(), 15).unwrap();
+        let chunk = terra_stream::procedural_chunk(key, 33, 42);
+        let meshes = feature_meshes_lod(&chunk, 128, &BTreeSet::new(), 0);
+        let water = &meshes[&Layer::Water];
+        assert!(water.attribute(Mesh::ATTRIBUTE_UV_0).is_some());
+        assert!(water.attribute(Mesh::ATTRIBUTE_TANGENT).is_some());
+    }
+    #[test]
     fn enriched_source_geometry_is_finite_and_stays_within_render_budget() {
         let key =
             terra_core::TileKey::at(GeoPosition::new(48.137, 11.575, 0.).unwrap(), 15).unwrap();
@@ -1213,6 +1551,15 @@ mod tests {
             count += positions(mesh).len();
         }
         assert!(count < 300_000, "bounded source detail: {count} vertices");
+        for seed in [0, 1, u64::MAX - 1, u64::MAX] {
+            for lod in 0..3 {
+                let mut tree = MeshBuilder::default();
+                tree.tree_lod(Vec3::ZERO, 35., seed, lod);
+                let mesh = tree.finish().unwrap();
+                assert!(mesh.count_vertices() < 3000);
+                assert!(positions(&mesh).iter().flatten().all(|v| v.is_finite()));
+            }
+        }
     }
     #[test]
     fn concave_polygon_does_not_fill_the_notch() {

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.21.0",
+  "capture_name": "managed-save-quit-focused-1100-150",
+  "capture_started_utc": "2026-10-29T19:39:13.731816+00:00",
+  "captured_utc": "2026-10-29T19:39:13.862336+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 173885,
+  "window_pid_status": "available",
+  "window_pid_before": 173885,
+  "window_pid_after": 173885,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "managed-save-quit-focused-1100-150.png",
+    "sha256": "932c459f00b66afa7e1d1621a373077eb0e0a703c8d15fc3217a99e65e1e72da",
+    "bytes": 301769
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

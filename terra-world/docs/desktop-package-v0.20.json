@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "output": "/workspace/scratch/1c0c5a298a25/terra-world-0.20.0-linux-x86_64.zip",
+  "release": "0.20.0",
+  "platform": "linux-x86_64",
+  "build_profile": "dev",
+  "files": 248,
+  "bytes": 39434210,
+  "sha256": "91569517fa66730cc63d462b40fef81b45ea285fb1ae9b71c30a4b3b40326e3a",
+  "native_binary_sha256": "f299f9af1bc2b3669a50de620387a41cd4aa3e9e2bc90648fd2705e7bcbd02f6"
+}

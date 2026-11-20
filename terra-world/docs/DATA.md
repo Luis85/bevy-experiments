@@ -81,6 +81,25 @@ completion before the next request. Defaults cap a session at 256 requests and
 256 MiB of attempted response data. Failed requests also consume the budgets.
 These caps limit accidental load; they are not a provider service guarantee.
 
+### Wildlife and resource provenance
+
+The optional ecology layer uses loaded forests, meadows, shores and highland
+surfaces as habitat suggestions. Its deer, boar, hare, fox and ibex populations
+are authored gameplay. Animal counts, mineral deposits, gathering yields,
+regrowth and carrying capacities are not observed census or geological records.
+Each new ecology resource has its own stable overlay ID and no source-feature
+tombstone; exhausting a fishing spot cannot remove the source lake.
+
+Nearby starter habitats/resources are also authored and require resident dry
+ground, valid slopes and clear footprints. Unknown coverage remains unknown.
+The module saves seed ledgers and depletion so source reload cannot refill a
+deposit. Custom catalogs admit only supported goods and equipment paths. See
+[ECOLOGY.md](ECOLOGY.md) for exact capacities, configuration and limitations.
+
+An embedding game can supply genuinely observed or archival wildlife/resource
+layers through its own provider and provenance policy. Keep those layers
+distinct from simulated births, movement, harvesting and player alterations.
+
 ### Local PNG heightmaps
 
 Use `--heightmap path/to/manifest.json` in the demo or install
@@ -230,3 +249,14 @@ storage/CDN; reconcile data licenses and attributions for the specific sources;
 and make all multiplayer peers agree on the same source revision and weather
 state. Save player structures, factions and world edits separately from imported
 source truth.
+
+### Explicit semantic heightmap bundles (0.9)
+
+The optional `HeightmapManifest.features` source loads a bounded GeoJSON
+FeatureCollection beside the raster. Both datasets retain their own provenance.
+Supported geometry is validated, clipped and grounded; unsupported holes and
+collections fail explicitly. `source_revision()` includes actual content for
+semantic bundles and is the identity used by native/host admission and saves.
+The v2 bundled forests, fields and orchard are original authored data, not an
+OSM extract or an observed historical landscape. Legacy raster-only manifests
+retain their existing identity. See [SOURCE_BUNDLES.md](SOURCE_BUNDLES.md).

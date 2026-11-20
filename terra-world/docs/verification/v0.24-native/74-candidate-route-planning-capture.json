@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "74-candidate-route-planning",
+  "capture_started_utc": "2026-10-30T12:22:06.589443+00:00",
+  "captured_utc": "2026-10-30T12:22:07.119173+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 59077,
+  "window_pid_status": "available",
+  "window_pid_before": 59077,
+  "window_pid_after": 59077,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "74-candidate-route-planning.png",
+    "sha256": "14b586a5f6a49b765a65f5e777f58781d7eff0e499b63572c41e83ee6a32f363",
+    "bytes": 1065411
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

@@ -97,7 +97,7 @@ fn inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app() {
             .len()
             >= 40
     );
-    let (shop, avatar, worker, wallet, bread) = {
+    let (shop, avatar, worker, wallet, bread, price) = {
         let s = app.world().resource::<SandboxRuntime>();
         let life = &s.state.living;
         (
@@ -118,6 +118,7 @@ fn inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app() {
                 .get("bread")
                 .copied()
                 .unwrap_or(0),
+            life.shops.values().next().unwrap().prices["bread"].buy,
         )
     };
     command(
@@ -132,7 +133,7 @@ fn inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app() {
         let s = app.world().resource::<SandboxRuntime>();
         assert_eq!(
             s.state.living.accounts[&1].money,
-            wallet - 250,
+            wallet - price,
             "{}",
             s.last_message
         );
@@ -145,6 +146,7 @@ fn inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app() {
         active: true,
         velocity_enu_m_s: [2., 0., 0.],
         heading_deg: 90.,
+        drive: None,
     };
     for _ in 0..30 {
         app.update();
@@ -198,7 +200,21 @@ fn inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app() {
             s.state.living.units[&avatar].position
         );
     }
-    for _ in 0..2100 {
+    // Await the actual delivery through bounded turns and contact recovery;
+    // the former waypoint controller's fixed completion time is not a contract.
+    // The finite 240-second budget still fails a logistics deadlock.
+    for _ in 0..4800 {
+        if app
+            .world()
+            .resource::<SandboxRuntime>()
+            .state
+            .living
+            .metrics
+            .deliveries_completed
+            > 0
+        {
+            break;
+        }
         app.update();
     }
     {

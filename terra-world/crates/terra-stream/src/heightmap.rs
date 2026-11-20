@@ -14,6 +14,13 @@ const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HeightmapFeatureSource {
+    /// WGS84 GeoJSON FeatureCollection, contained beside the raster manifest.
+    pub geojson: PathBuf,
+    pub source: SourceRecord,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HeightmapManifest {
     pub schema_version: u32,
     pub image: PathBuf,
@@ -23,6 +30,9 @@ pub struct HeightmapManifest {
     /// Immutable content revision, also used by the host's source identity.
     pub revision: String,
     pub source: SourceRecord,
+    /// Optional semantic data; raster-only legacy bundles keep their identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub features: Option<HeightmapFeatureSource>,
 }
 impl HeightmapManifest {
     pub fn validate(&self) -> Result<(), StreamError> {
@@ -68,14 +78,35 @@ impl HeightmapManifest {
                 "heightmap image must be a contained relative path".into(),
             ));
         }
+        if let Some(features) = &self.features {
+            if features.geojson.as_os_str().is_empty()
+                || features.geojson.is_absolute()
+                || features
+                    .geojson
+                    .components()
+                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
+                || features.source.provider.trim().is_empty()
+                || features.source.license.trim().is_empty()
+                || features.source.attribution.trim().is_empty()
+                || features.source.url.trim().is_empty()
+            {
+                return Err(StreamError::Configuration(
+                    "semantic source requires a contained GeoJSON path and complete provenance"
+                        .into(),
+                ));
+            }
+        }
         Ok(())
     }
 }
 
 pub struct HeightmapProvider {
     pub manifest: HeightmapManifest,
-    raster: HeightField,
+    pub(crate) raster: HeightField,
     resolution: usize,
+    pub(crate) features: crate::heightmap_features::FeatureIndex,
+    source_revision: String,
+    pub(crate) content_digest: String,
 }
 impl HeightmapProvider {
     pub fn open(path: impl AsRef<Path>, resolution: usize) -> Result<Self, StreamError> {
@@ -101,6 +132,12 @@ impl HeightmapProvider {
             ));
         }
         let bytes = bounded_file(&image_path, MAX_IMAGE_BYTES)?;
+        let mut identity = blake3::Hasher::new_derive_key("Terra heightmap semantic bundle v1");
+        identity.update(
+            &serde_json::to_vec(&manifest).map_err(|e| StreamError::Payload(e.to_string()))?,
+        );
+        identity.update(&(bytes.len() as u64).to_le_bytes());
+        identity.update(&bytes);
         let mut reader = ImageReader::with_format(Cursor::new(bytes), ImageFormat::Png);
         let mut limits = Limits::default();
         limits.max_image_width = Some(4096);
@@ -132,11 +169,40 @@ impl HeightmapProvider {
         raster
             .validate()
             .map_err(|e| StreamError::Payload(e.to_string()))?;
+        let (features, source_revision) = if let Some(source) = &manifest.features {
+            let feature_path = parent.join(&source.geojson).canonicalize()?;
+            if !feature_path.starts_with(&parent) {
+                return Err(StreamError::Configuration(
+                    "GeoJSON escapes its manifest directory".into(),
+                ));
+            }
+            let bytes = bounded_file(&feature_path, crate::heightmap_features::MAX_BYTES)?;
+            identity.update(&(bytes.len() as u64).to_le_bytes());
+            identity.update(&bytes);
+            (
+                crate::heightmap_features::FeatureIndex::parse(&bytes, manifest.bounds)?,
+                format!("{}+{}", manifest.revision, identity.finalize().to_hex()),
+            )
+        } else {
+            (
+                crate::heightmap_features::FeatureIndex::empty(),
+                manifest.revision.clone(),
+            )
+        };
         Ok(Self {
             manifest,
             raster,
             resolution,
+            features,
+            source_revision,
+            content_digest: identity.finalize().to_hex().to_string(),
         })
+    }
+
+    /// Stable bundle identity for saves and server admission. Semantic bundles
+    /// include a content digest; unchanged raster-only manifests retain v0.8 IDs.
+    pub fn source_revision(&self) -> &str {
+        &self.source_revision
     }
 
     pub fn sample_height(&self, position: GeoPosition) -> Option<f64> {
@@ -186,6 +252,20 @@ impl ChunkProvider for HeightmapProvider {
                 );
             }
         }
+        let mut features = self.features.clipped(key)?;
+        for feature in &mut features {
+            for point in &mut feature.points {
+                point.altitude_m = self.sample_height(*point).ok_or_else(|| {
+                    StreamError::Geography(
+                        "clipped semantic vertex lies outside raster coverage".into(),
+                    )
+                })?;
+            }
+        }
+        let mut sources = vec![self.manifest.source.clone()];
+        if let Some(source) = &self.manifest.features {
+            sources.push(source.source.clone());
+        }
         Ok(ChunkPayload {
             chunk: WorldChunk {
                 key,
@@ -194,10 +274,10 @@ impl ChunkProvider for HeightmapProvider {
                     height: self.resolution,
                     samples_m,
                 },
-                features: Vec::new(),
-                sources: vec![self.manifest.source.clone()],
+                features,
+                sources,
                 warnings: vec![format!(
-                    "Imported heightmap {}; linear grayscale elevation mapping. Vertical datum is source-defined; no semantic features or imagery are inferred.",
+                    "Imported heightmap {}; linear grayscale elevation mapping. Vertical datum is source-defined. Semantics come only from an explicit GeoJSON source; no features or imagery are inferred from elevation.",
                     self.manifest.revision
                 )],
             },
@@ -205,7 +285,7 @@ impl ChunkProvider for HeightmapProvider {
         })
     }
 }
-fn bounded_file(path: &Path, limit: u64) -> Result<Vec<u8>, StreamError> {
+pub(crate) fn bounded_file(path: &Path, limit: u64) -> Result<Vec<u8>, StreamError> {
     use std::io::Read;
     let metadata = std::fs::metadata(path)?;
     if !metadata.is_file() || metadata.len() > limit {
@@ -262,6 +342,7 @@ mod tests {
                 retrieved_unix_seconds: 0,
                 synthetic: true,
             },
+            features: None,
         };
         std::fs::write(
             dir.join("manifest.json"),
@@ -309,6 +390,144 @@ mod tests {
         m.source.license = "test".into();
         m.max_height_m = f64::NAN;
         assert!(m.validate().is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn semantic_bundle_clips_grounds_attributes_and_pins_actual_content() {
+        let (dir, west) = fixture();
+        let path = dir.join("manifest.json");
+        let mut manifest: HeightmapManifest =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let legacy = HeightmapProvider::open(&path, 17).unwrap();
+        assert_eq!(legacy.source_revision(), manifest.revision);
+        manifest.features = Some(HeightmapFeatureSource {
+            geojson: "features.geojson".into(),
+            source: manifest.source.clone(),
+        });
+        std::fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        let b = manifest.bounds;
+        let coordinate = |u: f64, v: f64| {
+            let p = b.point(u, v, 0.).unwrap();
+            serde_json::json!([p.longitude, p.latitude, 9999.])
+        };
+        let mut data = serde_json::json!({"type":"FeatureCollection","features":[
+            {"type":"Feature","id":"road","properties":{"highway":"residential","surface":"gravel","width":7.5},"geometry":{"type":"LineString","coordinates":[coordinate(0.1,0.5),coordinate(0.9,0.5)]}},
+            {"type":"Feature","id":"woods","properties":{"landuse":"forest","leaf_type":"mixed"},"geometry":{"type":"Polygon","coordinates":[[coordinate(0.25,0.2),coordinate(0.75,0.2),coordinate(0.75,0.4),coordinate(0.25,0.4),coordinate(0.25,0.2)]]}}
+        ]});
+        std::fs::write(
+            dir.join("features.geojson"),
+            serde_json::to_vec(&data).unwrap(),
+        )
+        .unwrap();
+        let provider = HeightmapProvider::open(&path, 17).unwrap();
+        assert_ne!(provider.source_revision(), manifest.revision);
+        for key in [west, TileKey::new(west.level, west.x + 1, west.y).unwrap()] {
+            let chunk = provider.load(key).unwrap().chunk;
+            chunk.validate().unwrap();
+            assert_eq!(chunk.sources.len(), 2);
+            assert_eq!(chunk.features.len(), 2);
+            for feature in &chunk.features {
+                for point in &feature.points {
+                    assert!(key.bounds().contains(*point));
+                    assert_eq!(point.altitude_m, provider.sample_height(*point).unwrap());
+                    assert!(point.altitude_m < 301.);
+                }
+            }
+            let road = chunk
+                .features
+                .iter()
+                .find(|f| f.kind == terra_core::FeatureKind::Road)
+                .unwrap();
+            assert_eq!(road.height_m, 7.5);
+            assert_eq!(road.properties["surface"], "gravel");
+            assert_eq!(road.properties["source_id"], "road");
+            assert_eq!(road.properties["geometry"], "line");
+        }
+        data["features"][0]["properties"]["surface"] = serde_json::json!("asphalt");
+        std::fs::write(
+            dir.join("features.geojson"),
+            serde_json::to_vec(&data).unwrap(),
+        )
+        .unwrap();
+        let changed = HeightmapProvider::open(&path, 17).unwrap();
+        assert_ne!(
+            provider.source_revision(),
+            changed.source_revision(),
+            "source edits must invalidate source admission even without a declared revision bump"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn semantic_import_rejects_holes_duplicates_wrong_geometry_and_path_escape() {
+        let (dir, key) = fixture();
+        let path = dir.join("manifest.json");
+        let mut manifest: HeightmapManifest =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        manifest.features = Some(HeightmapFeatureSource {
+            geojson: "features.geojson".into(),
+            source: manifest.source.clone(),
+        });
+        std::fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        let p = key.center();
+        let point = serde_json::json!({"type":"Feature","id":"tree","properties":{"natural":"tree"},"geometry":{"type":"Point","coordinates":[p.longitude,p.latitude]}});
+        let write = |features: Vec<serde_json::Value>| {
+            std::fs::write(
+                dir.join("features.geojson"),
+                serde_json::to_vec(
+                    &serde_json::json!({"type":"FeatureCollection","features":features}),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        };
+        write(vec![point.clone()]);
+        assert!(HeightmapProvider::open(&path, 17).is_ok());
+        write(vec![point.clone(), point.clone()]);
+        assert!(
+            HeightmapProvider::open(&path, 17)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("duplicate")
+        );
+        let mut bad = point.clone();
+        bad["properties"] = serde_json::json!({"building":"yes"});
+        write(vec![bad]);
+        assert!(
+            HeightmapProvider::open(&path, 17)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("requires Polygon")
+        );
+        let mut bad = point.clone();
+        bad["geometry"] = serde_json::json!({"type":"Polygon","coordinates":[[],[]]});
+        bad["properties"] = serde_json::json!({"landuse":"forest"});
+        write(vec![bad]);
+        assert!(
+            HeightmapProvider::open(&path, 17)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("holes")
+        );
+        let mut bad = point.clone();
+        bad["geometry"]["coordinates"] = serde_json::json!([0., 0.]);
+        write(vec![bad]);
+        assert!(
+            HeightmapProvider::open(&path, 17)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("coverage")
+        );
+        manifest.features.as_mut().unwrap().geojson = "../outside.geojson".into();
+        assert!(manifest.validate().is_err());
+        manifest.features.as_mut().unwrap().geojson = "features.geojson".into();
+        manifest.features.as_mut().unwrap().source.license.clear();
+        assert!(manifest.validate().is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "22-candidate-quality-selected",
+  "capture_started_utc": "2026-10-29T21:04:57.150165+00:00",
+  "captured_utc": "2026-10-29T21:04:57.249007+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Main menu",
+  "window_pid": 207201,
+  "window_pid_status": "available",
+  "window_pid_before": 207201,
+  "window_pid_after": 207201,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "22-candidate-quality-selected.png",
+    "sha256": "bb99c04bfd80d5d62be94503291b01279a5bf5526f6b5153b8737b2ce5d2fd08",
+    "bytes": 223533
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

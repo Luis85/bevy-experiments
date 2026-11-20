@@ -30,8 +30,15 @@ pub struct WorldConfig {
     pub fixed_hz: f64,
     pub rebase_distance_m: f64,
     pub save_path: PathBuf,
+    /// Optional transactional regional world. Existing stores resume on startup.
+    /// F5 checkpoints and F9 restores this store; legacy JSON saves stay explicit
+    /// when this option is absent. Clients must leave this unset.
+    pub region_store: Option<PathBuf>,
+    /// Wall-clock autosave cadence, independent of simulation speed or pause.
+    pub region_checkpoint_seconds: f64,
     pub historical_pack: Option<PathBuf>,
-    /// Georeferenced grayscale PNG elevation with a validated source manifest.
+    /// Georeferenced grayscale PNG/semantic bundle, or a validated connected
+    /// heightmap_set manifest. Coverage holes never receive synthetic fallback.
     pub heightmap_manifest: Option<PathBuf>,
     /// Frozen source-data epoch; the simulation may subsequently evolve from it.
     pub data_epoch_unix: Option<i64>,
@@ -68,6 +75,8 @@ impl Default for WorldConfig {
             fixed_hz: 20.0,
             rebase_distance_m: 2_000.0,
             save_path: PathBuf::from("world-save.json"),
+            region_store: None,
+            region_checkpoint_seconds: 30.0,
             historical_pack: None,
             heightmap_manifest: None,
             data_epoch_unix: None,
@@ -103,6 +112,17 @@ impl WorldConfig {
         if self.live_data && self.data_epoch_unix.is_some() {
             return Err(
                 "current live APIs cannot satisfy an explicitly historical data epoch".into(),
+            );
+        }
+        if self
+            .region_store
+            .as_ref()
+            .is_some_and(|path| path.as_os_str().is_empty())
+            || !self.region_checkpoint_seconds.is_finite()
+            || !(1.0..=3600.0).contains(&self.region_checkpoint_seconds)
+        {
+            return Err(
+                "region_store needs a file path; region_checkpoint_seconds must be 1..=3600".into(),
             );
         }
         if !(10..=19).contains(&self.chunk_level) {

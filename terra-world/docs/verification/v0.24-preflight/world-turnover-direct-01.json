@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/tmp/terra023-target/debug/deps/supply_turnover-3848a1e494120063",
+    "--nocapture"
+  ],
+  "cwd": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "binary_sha256": "016cce6e2c55eb81feb718d8f658e45415f8c5d1224d76de2625747b6e60227a",
+  "started_at": "2026-10-30T11:26:22.297773+00:00",
+  "status": "passed",
+  "log": "world-turnover-direct-01.log",
+  "scope": "Previously compiled new harness from world-focused-01; no Cargo build or lock contention.",
+  "exit_code": 0,
+  "finished_at": "2026-10-30T11:26:22.366080+00:00",
+  "elapsed_seconds": 0.06809970100039209
+}

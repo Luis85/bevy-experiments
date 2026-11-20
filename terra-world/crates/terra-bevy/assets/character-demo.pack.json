@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "name": "Terra original character transport and wildlife",
+  "author": "Terra World contributors",
+  "license": "MIT OR Apache-2.0",
+  "models": [
+    {
+      "id": "deer",
+      "file": "wildlife-pack/deer.glb",
+      "sha256": "49629810d8e3280764dfa35aed39e8885ce6779e4b9320c6e003ab87de133f80",
+      "scene": 0
+    },
+    {
+      "id": "ibex",
+      "file": "wildlife-pack/ibex.glb",
+      "sha256": "758abe4583ad3cfc048c729afc6bc69144f8c6521b1a05faa2c3a6622be8c694",
+      "scene": 0
+    },
+    {
+      "id": "boar",
+      "file": "wildlife-pack/boar.glb",
+      "sha256": "3f96fda99dc8f9178435c659561a004dc1d6d82873bd2131aef839f88712f28f",
+      "scene": 0
+    },
+    {
+      "id": "fox",
+      "file": "wildlife-pack/fox.glb",
+      "sha256": "85c4421d02116bfc2a6a0af701b0fcb944d667a585824482b0a92a13c26ba048",
+      "scene": 0
+    },
+    {
+      "id": "hare",
+      "file": "wildlife-pack/hare.glb",
+      "sha256": "e27b4e4a838329bd86d3f20957c179475e018258436dd15313d03a6503d4eb3f",
+      "scene": 0
+    },
+    {
+      "id": "comet",
+      "file": "character-pack/comet-cabin.glb",
+      "sha256": "07f58f28cc002288213bec5a03db3e318fb07ec8f6708aa713fd807332353d17",
+      "scene": 0
+    },
+    {
+      "id": "fieldhand",
+      "file": "character-pack/fieldhand.glb",
+      "sha256": "b5d62261ee73a9a987b754b322ea95ce9d84941ca82e03c87de00568aa759b7e",
+      "scene": 0
+    }
+  ],
+  "bindings": [
+    {
+      "target": {
+        "type": "species",
+        "value": "deer"
+      },
+      "model": "deer",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "ibex"
+      },
+      "model": "ibex",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "boar"
+      },
+      "model": "boar",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "fox"
+      },
+      "model": "fox",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "hare"
+      },
+      "model": "hare",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 0.9,
+        "run_speed_m_s": 3.8,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "vehicle_model",
+        "value": "compact"
+      },
+      "model": "comet",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "parked",
+        "walk": "rolling",
+        "run": "rolling",
+        "feed": "parked",
+        "drink": "parked",
+        "walk_speed_m_s": 2.0,
+        "run_speed_m_s": 10.0,
+        "blend_seconds": 0.18,
+        "vehicle_motion": {
+          "wheel_radius_m": 0.31,
+          "wheels": [
+            "front_left_wheel",
+            "front_right_wheel",
+            "rear_left_wheel",
+            "rear_right_wheel"
+          ],
+          "steering": [
+            "front_left_steer",
+            "front_right_steer"
+          ]
+        }
+      },
+      "driver_seat": {
+        "translation_m": [
+          -0.42,
+          0.46,
+          -0.24
+        ]
+      }
+    },
+    {
+      "target": {
+        "type": "kind",
+        "value": "human"
+      },
+      "model": "fieldhand",
+      "scale": 1.0,
+      "ground_offset_m": 0.0,
+      "yaw_offset_degrees": 0.0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "idle",
+        "drink": "idle",
+        "walk_speed_m_s": 2.0,
+        "run_speed_m_s": 5.0,
+        "blend_seconds": 0.18,
+        "human": {
+          "seated": "seated",
+          "skin_material": "character_skin",
+          "hair_material": "character_hair",
+          "outfit_material": "character_outfit"
+        }
+      }
+    }
+  ]
+}

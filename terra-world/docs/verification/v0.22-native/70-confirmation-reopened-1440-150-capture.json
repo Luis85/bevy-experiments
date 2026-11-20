@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "70-confirmation-reopened-1440-150",
+  "capture_started_utc": "2026-10-29T21:27:28.033463+00:00",
+  "captured_utc": "2026-10-29T21:27:28.426595+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 212865,
+  "window_pid_status": "available",
+  "window_pid_before": 212865,
+  "window_pid_after": 212865,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "70-confirmation-reopened-1440-150.png",
+    "sha256": "94672d62c2fdfec50b1fdc865e858176cda0229cbdb39a4e5a3863cae4c6e971",
+    "bytes": 1126197
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

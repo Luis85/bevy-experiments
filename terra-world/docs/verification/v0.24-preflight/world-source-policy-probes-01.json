@@ -1,0 +1,33 @@
+{
+  "scope": "Independent bounded policy-function fixtures only. No acceptance receipt or full source package was produced. Synthetic history ZIP and files lived only in a cleaned temporary directory.",
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-preflight/world_source_policy_probes.py"
+  ],
+  "cwd": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "started_utc": "2026-10-30T11:42:36.273216+00:00",
+  "finished_utc": "2026-10-30T11:42:36.337606+00:00",
+  "elapsed_seconds": 0.0643754259999696,
+  "exit_code": 0,
+  "checks": {
+    "exit_zero": true,
+    "eleven_tests_reported": true,
+    "reviewed_inputs_unchanged": true
+  },
+  "inputs_before": {
+    "docs/verification/v0.24-preflight/world_source_policy_probes.py": "3dcd676e58ce0c0d28e561332274cada252628011c3d3d02d5c38ed841b20b6e",
+    "docs/verification/v0.24-delivery/package_source_024.py": "7fc024a66fc7fd658979de4d6cf8365e1ca594704f1147f0dfed4ba1699170b3",
+    "docs/verification/v0.24-review/audit_preservation.py": "e2bd86ccb8227676ac5f4cb043788c8ed2a0419d8c4861d4163058fd6452709d"
+  },
+  "inputs_after": {
+    "docs/verification/v0.24-preflight/world_source_policy_probes.py": "3dcd676e58ce0c0d28e561332274cada252628011c3d3d02d5c38ed841b20b6e",
+    "docs/verification/v0.24-delivery/package_source_024.py": "7fc024a66fc7fd658979de4d6cf8365e1ca594704f1147f0dfed4ba1699170b3",
+    "docs/verification/v0.24-review/audit_preservation.py": "e2bd86ccb8227676ac5f4cb043788c8ed2a0419d8c4861d4163058fd6452709d"
+  },
+  "log": "docs/verification/v0.24-preflight/world-source-policy-probes-01.log",
+  "log_sha256": "17929a6c269c1e73ae4dd5b051d972d3dfede31523f475e83fa8f7f9359cc103",
+  "stdout_bytes": 0,
+  "stderr_bytes": 1644
+}

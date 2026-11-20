@@ -1,0 +1,54 @@
+{
+  "status": "passed",
+  "checked_utc": "2026-10-30T11:34:13.437612+00:00",
+  "baseline_archive_sha256": "99d619069fc8f6275e625f40a7c4a916535ededcafb20f733f34ef0a3f361140",
+  "baseline_verify_sha256": "177c424019de79fcb26755599f06641d4137886a72da6a7b7731c39bf8beed6e",
+  "current_verify_sha256": "e031ef498d44fcc529ae93abdf32ad105fc2c95e3f59cf6e3fea0d5fea481a52",
+  "cases": {
+    "delivered_023": {
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds_through_return_and_observation": 0.3148643759996048,
+      "child_completed_at_return": false,
+      "child_published_after_return": true,
+      "captured_log": "leader done\n",
+      "published_log_exact": true,
+      "log_sha256": "4b423a462277c8e1675e25dad0bcccb813adfc25ab4fe4fa3f0922a8628ee3b8",
+      "execution": null
+    },
+    "current": {
+      "exit_code": 124,
+      "timed_out": true,
+      "seconds_through_return_and_observation": 0.752326900999833,
+      "child_completed_at_return": false,
+      "child_published_after_return": false,
+      "captured_log": "leader done\n\nTerra verification timed out after 0.5 seconds, including output completion; cleanup={'request': 'owned process group termination requested', 'leader_exit_observed': True, 'descendant_check': {'status': 'owned_process_group_present'}, 'output_closed': True}\n",
+      "published_log_exact": true,
+      "log_sha256": "d195f957ee3518099bab88d20546e17f38442de5cd3b56894141e93a5df5bb58",
+      "execution": {
+        "status": "failed",
+        "process_platform": "posix",
+        "failure_reason": "timeout",
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 12,
+        "retained_log_bytes": 271,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_present"
+        },
+        "cleanup": {
+          "request": "owned process group termination requested",
+          "leader_exit_observed": true,
+          "descendant_check": {
+            "status": "owned_process_group_present"
+          },
+          "output_closed": true
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    }
+  },
+  "scope": "Bounded real child-process regression on this host, comparing exact delivered source; not a release acceptance or Windows proof."
+}

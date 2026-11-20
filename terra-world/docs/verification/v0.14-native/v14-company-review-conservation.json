@@ -1,0 +1,28 @@
+{
+  "release": "0.14.0",
+  "phase": "candidate native review before final polish",
+  "before_sha256": "dc1ac2655252bd11e01fccbaba6fa3523f2e0dbd67acdc8f32a6ea4671397d65",
+  "after_sha256": "319d09e7e1cd8141f59868209ce12b294a6cd72aa9e0d703fd0f6a7dab1aef61",
+  "checks": {
+    "transport_unchanged": true,
+    "players_unchanged": true,
+    "factions_unchanged": true,
+    "settlements_unchanged": true,
+    "living_unchanged": true,
+    "clock_unchanged": true,
+    "identity_unchanged": true,
+    "player_id_unchanged": true,
+    "politics_unchanged": true
+  },
+  "observed_actions": [
+    "Open held-service guide",
+    "Open exact Fleet/Recovery",
+    "F5 checkpoint and F9 restore",
+    "Set150% text at1100x700",
+    "Keyboard-scroll to return action",
+    "Open named return confirmation without confirming",
+    "Select Company section to cancel the review",
+    "Save and quit"
+  ],
+  "scope": "Prepared fixture built through paid commands and ordinary simulation; paused native session. Exact compared subsystems retained. Streaming may extend other environmental records. Private complete saves excluded."
+}

@@ -1,0 +1,32 @@
+{
+  "accepted": true,
+  "identity": "sha256:7e6e8f71f5835c9783c5648e89fde284599b5448ce2a628c892e3489db1df1d1",
+  "models": [
+    {
+      "budget": {
+        "animation_keys": 1700,
+        "bytes": 162140,
+        "channels": 34,
+        "clips": 4,
+        "decoded_scalars": 35033,
+        "materials": 7,
+        "nodes": 39,
+        "primitives": 25,
+        "renderer_vertices": 5268,
+        "runtime_animation_keys": 1700,
+        "scene_primitives": 25,
+        "scene_renderer_vertices": 5268,
+        "scene_triangles": 1756,
+        "scene_vertices": 5268,
+        "texture_pixels": 0,
+        "texture_slot_pixels": 0,
+        "triangles": 1756,
+        "vertices": 5268
+      },
+      "id": "fieldhand"
+    }
+  ],
+  "name": "Terra original Fieldhand character",
+  "schema_version": 1,
+  "scope": "Validated source bytes and supported format; native renderer readiness is checked at runtime"
+}

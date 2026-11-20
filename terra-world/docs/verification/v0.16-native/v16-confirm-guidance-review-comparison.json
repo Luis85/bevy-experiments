@@ -1,0 +1,22 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "completed_utc": "2026-10-29T05:40:00.738671+00:00",
+  "scope": "Real paused F5 saves immediately before and after exact accepted-request Review. All authoritative state, clock, identity and principal are compared; private save contents are not distributed.",
+  "confirmation": {
+    "process": "v16-confirm-guidance",
+    "pid": 72029,
+    "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+    "gate_sha256": "24b9fbad2b23897cee6dc03160baab6d63fc59290aada4e5c97d762e108d757d",
+    "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+    "observed_utc": "2026-10-29T05:39:46.226566+00:00",
+    "observation_phase": "during_process"
+  },
+  "full_authoritative_state_equal": true,
+  "identity_equal": true,
+  "player_equal": true,
+  "clock_equal": true,
+  "complete_save_equal": true,
+  "before_save_sha256": "d1b751aad34bab91db4d44bd90d696a6f28238dd2f1c038c20b75b596427e122",
+  "after_save_sha256": "d1b751aad34bab91db4d44bd90d696a6f28238dd2f1c038c20b75b596427e122"
+}

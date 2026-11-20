@@ -1,0 +1,186 @@
+{
+  "asset_pack": {
+    "failed_models": 0,
+    "fallback_instances": 0,
+    "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+    "last_error": null,
+    "loading_instances": 0,
+    "model_count": 5,
+    "name": "Terra woodland wildlife",
+    "ready_instances": 64,
+    "rejected_instances": 0
+  },
+  "atmosphere_active": false,
+  "ecology_work": {
+    "deferred": 0,
+    "deferred_total": 0,
+    "eligible": 0,
+    "evaluated": 0,
+    "evaluated_total": 0,
+    "far_decisions": 0,
+    "near_decisions": 0,
+    "observer_candidates": 0,
+    "passes": 0,
+    "threat_candidates": 0,
+    "threat_candidates_total": 0
+  },
+  "last_simulation_error": null,
+  "last_world_error": null,
+  "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+  "network_authority": false,
+  "owner_display_prediction": null,
+  "population": {
+    "bodies": 107,
+    "counts_are_active_working_set": true,
+    "counts_are_received_view": false,
+    "wildlife": 64
+  },
+  "presentation": {
+    "immersive_controls": true,
+    "inspector_open": true
+  },
+  "quality": {
+    "atmospheric_sky": true,
+    "quality": "performance",
+    "terrain_lod": true
+  },
+  "regional_persistence": {
+    "authority_paused": false,
+    "blocked": false,
+    "checkpoint_stages": {
+      "compose_ms": 15.505463,
+      "deleted_pages": 0,
+      "encode_ms": 10.454583999999999,
+      "encoded_page_bytes": 0,
+      "encoded_pages": 0,
+      "install_ms": 7.3465370000000005,
+      "reused_page_bytes": 213438,
+      "reused_pages": 38,
+      "select_ms": 5.932126,
+      "selected_records_validated": 719,
+      "transaction_ms": 1.632462,
+      "validation": {
+        "active_records": 719,
+        "certified_environment_groups": 0,
+        "certified_environment_records": 0,
+        "merged_scope_records": 719
+      }
+    },
+    "committed": {
+      "active_records": 581,
+      "active_regions": 38,
+      "checkpoint_bytes": 1622643,
+      "dependency_regions": 0,
+      "dormant_records": 0,
+      "dormant_regions": 0,
+      "generation": 209,
+      "global_records": 138,
+      "pinned_regions": 9
+    },
+    "enabled": true,
+    "last_checkpoint_ms": 40.943528,
+    "last_checkpoint_reason": "Graceful exit",
+    "last_error": null,
+    "last_submission_ms": 17.994821,
+    "pending": false,
+    "restored": true,
+    "seconds_since_checkpoint": 0.0
+  },
+  "release": "0.11.0",
+  "render": {
+    "chunks": 49,
+    "lod_chunks": [
+      7,
+      19,
+      23
+    ],
+    "pending": 0,
+    "source_vertices": 828017,
+    "terrain_full_vertices": 207025,
+    "terrain_vertices": 89105
+  },
+  "replication": null,
+  "source": {
+    "epoch": null,
+    "heightmap": true,
+    "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+  },
+  "timings": {
+    "cpu_stages": {
+      "base_world": {
+        "last_ms": 0.004417,
+        "max_ms": 0.232729,
+        "mean_ms": 0.013268416666666668,
+        "p50_ms": 0.009184000000000001,
+        "p95_ms": 0.023184,
+        "total_samples": 22191,
+        "window_samples": 240
+      },
+      "controlled_motion": {
+        "last_ms": 0.039468,
+        "max_ms": 0.398378,
+        "mean_ms": 0.07650182916666667,
+        "p50_ms": 0.06702899999999999,
+        "p95_ms": 0.136472,
+        "total_samples": 10498,
+        "window_samples": 240
+      },
+      "ecology": {
+        "last_ms": 0.019829,
+        "max_ms": 0.749798,
+        "mean_ms": 0.05314574583333333,
+        "p50_ms": 0.023554,
+        "p95_ms": 0.178164,
+        "total_samples": 10498,
+        "window_samples": 240
+      },
+      "economy": {
+        "last_ms": 0.00008999999999999999,
+        "max_ms": 0.008383,
+        "mean_ms": 0.0005356125,
+        "p50_ms": 0.000321,
+        "p95_ms": 0.001092,
+        "total_samples": 10498,
+        "window_samples": 240
+      },
+      "living": {
+        "last_ms": 1.162498,
+        "max_ms": 3.783983,
+        "mean_ms": 1.6042550541666665,
+        "p50_ms": 1.45487,
+        "p95_ms": 2.702995,
+        "total_samples": 10498,
+        "window_samples": 240
+      },
+      "persistence": {
+        "last_ms": 18.450507,
+        "max_ms": 46.583102000000004,
+        "mean_ms": 22.06782714062501,
+        "p50_ms": 21.431039,
+        "p95_ms": 29.835647,
+        "total_samples": 64,
+        "window_samples": 64
+      },
+      "streaming": {
+        "last_ms": 0.041281,
+        "max_ms": 1.270486,
+        "mean_ms": 0.05392312916666667,
+        "p50_ms": 0.046078,
+        "p95_ms": 0.077585,
+        "total_samples": 7111,
+        "window_samples": 240
+      }
+    },
+    "frame_interval": {
+      "last_ms": 151.950695,
+      "max_ms": 295.14693600000004,
+      "mean_ms": 172.19765064583328,
+      "p50_ms": 166.558408,
+      "p95_ms": 215.131064,
+      "total_samples": 7110,
+      "window_samples": 240
+    },
+    "window_capacity": 240
+  },
+  "transport": null
+}

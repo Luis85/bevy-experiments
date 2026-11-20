@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "0.17.0",
+  "driver": {
+    "origin": "Exact previous paid-rental fixture copied; F9 explicitly restores its portable save. No accepted transport assignment in the initial fixture.",
+    "authority_input_sha256": "a345a4d2f68b35e1e196c14d2a3d161519ce83c38c8b7ba0edd44423f67b74cf",
+    "source_fixture_sha256": "a345a4d2f68b35e1e196c14d2a3d161519ce83c38c8b7ba0edd44423f67b74cf",
+    "interact_key": "K",
+    "text_scale": 1.5,
+    "controls_sha256": "9f7a9a37ecbc2d877a8e791982d0ff94110161ca48d041179d3a60bcf3ab9619"
+  },
+  "large": {
+    "origin": "New procedural world from bundled large-region configuration, private cache/store paths only.",
+    "requested_chunk_radius": 5,
+    "max_resident_chunks": 144
+  },
+  "diagnostic_isolation": "Previous candidate latest.json was moved intact to a separate private file before final confirmation. Each final game stream is retained separately; private world authority is not reset."
+}

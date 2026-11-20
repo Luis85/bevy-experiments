@@ -1,0 +1,374 @@
+{
+  "release": "0.8.0",
+  "status": "passed",
+  "captured_at_utc": "2026-10-27T16:32:09.050574+00:00",
+  "environment": {
+    "os": "Linux x86_64",
+    "display": "Private X11 virtual display without a window manager; explicit window focus",
+    "renderer": "Mesa lavapipe software Vulkan",
+    "sizes": [
+      [
+        1440,
+        900
+      ],
+      [
+        1100,
+        700
+      ]
+    ],
+    "gaming_gpu_performance_claim": false
+  },
+  "review_policy": "Batched native review, concrete integration/layout fixes with regressions, then combined confirmation using the same saved world and final executable. The extra whole-game pass covered building, farming, territory, trade and transport together.",
+  "final_native_binary_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+  "reviewed_builds": [
+    {
+      "started_at_utc": "2026-10-27T15:19:15Z",
+      "binary_sha256": "a097a96767e1ace9c57524f88f59e2d27f234e5f51535845de6b447170132848"
+    },
+    {
+      "started_at_utc": "2026-10-27T15:30:53Z",
+      "binary_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a"
+    },
+    {
+      "started_at_utc": "2026-10-27T16:07:08Z",
+      "binary_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86"
+    }
+  ],
+  "action_log": {
+    "actions": 241,
+    "sha256": "2dcb824a19d94d3cecc8ff151ddd6e5a1c30255a3a5479decf24d002067a6d90",
+    "scope": "Native keyboard/mouse automation of the actual application, with read-only SQLite checkpoint comparisons; no save-state injection."
+  },
+  "actual_interactions": [
+    "Inspected main/pause menus, wheel setup with no device, 150% text at 1440x900 and 1100x700, and the fixed Controls footer.",
+    "Used the on-screen keyboard to apply Mira, then reopened it, added a character and discarded the draft without changing the applied name. This used native mouse/keyboard; gamepad button navigation is covered by virtual tests.",
+    "Created Mira Vale and Greenhaven Roads, selected the authored Heightmap valley at GPS 48.137,11.575, radius 3 (49 chunks), seed 42, balanced graphics, one-times clock and regional SQLite storage.",
+    "Paused the simulation for deterministic transactions. Rented a Comet hatchback for 1.80 credits plus 15.00 for 10 litres of finite fuel and a 45.00 bond; renewed for 1.80, preserving 600 physical seconds while paused.",
+    "Registered Greenhaven Transit for 20 personal credits, deposited 50, opened a 25-company-credit depot at Roadside garage, stored four wood and hired Eli Stone for 10 company credits.",
+    "Bought bread and water for a combined 3.30 credits from the actual market. Full-needs consumption actions were correctly disabled; consumption is not claimed from this interaction.",
+    "Claimed a 40-metre housing plot, gathered five wood and five stone, and founded Greenhaven neighborhood using 20 wood, 10 stone and 50 credits.",
+    "Crafted building materials, placed a house and workbench, planted one wheat seed, and set the house as home through the real UI.",
+    "Saved and returned to the menu, then quit and restarted the final binary. Global state, regional records and metadata matched the previous checkpoint exactly before resuming.",
+    "Confirmed the final terrain-draped plot ring, readable enlarged inspector/Fleet tabs, and adjacent rental chooser. Returned the selected rental at the original garage after confirming the 60-credit quote.",
+    "The rental return restored ten litres to the garage and refunded the 45-credit escrow plus 15-credit fuel payment. Company, depot and carried inventory were unchanged.",
+    "Withdrew one wood from the persisted depot: carried stock 3 to 4, depot stock 4 to 3, with no money change.",
+    "Used session Controls to change text from saved 150% to unsaved 100%, entered the owned pickup, drove with keyboard pedals, switched chase/cockpit with C, engaged P parking brake, released possession with F1, paused the RTS clock and checkpointed.",
+    "Save and quit committed exact global, regional and metadata state. No game processes remained; the owned virtual display was stopped. Saved controls retained 150% because the session-only change was not explicitly saved."
+  ],
+  "persisted_state_checks": {
+    "first_save_return_global_exact": true,
+    "first_save_return_regions_exact": true,
+    "first_save_return_clock_exact": true,
+    "final_build_resume_global_exact": true,
+    "final_build_resume_regions_exact": true,
+    "final_build_resume_metadata_exact": true,
+    "unsaved_text_scale_did_not_overwrite_saved_preference": true,
+    "rental_creation_debited_exact_6180_minor_credits": true,
+    "rental_creation_consumed_exact_10_litres": true,
+    "rental_renewal_debited_exact_180_minor_credits": true,
+    "paused_rental_term_preserved_at_600_seconds": true,
+    "returned_rental_removed": true,
+    "returned_rental_refunded_quoted_6000_minor_credits": true,
+    "returned_rental_restocked_exact_10_litres": true,
+    "rental_refund_conserved_bond_and_issuer_funds": true,
+    "rental_return_preserved_company_and_depot": true,
+    "rental_return_preserved_carried_inventory": true,
+    "depot_withdrawal_added_one_carried_wood": true,
+    "depot_withdrawal_removed_one_stored_wood": true,
+    "depot_withdrawal_preserved_money": true,
+    "final_personal_ledger_reconciled": true,
+    "final_company_ledger_reconciled": true,
+    "neighborhood_treasury_preserved": true,
+    "home_set_and_preserved": true,
+    "house_and_workbench_preserved": true,
+    "farm_preserved": true,
+    "owned_pickup_physically_moved": true,
+    "owned_pickup_parked_and_stopped": true,
+    "final_world_clock_paused": true,
+    "final_exit_global_exact": true,
+    "final_exit_regions_exact": true,
+    "final_exit_metadata_exact": true,
+    "final_exit_generation_advanced": true,
+    "no_retained_game_processes": true,
+    "owned_virtual_display_stopped": true
+  },
+  "confirmed_progress": {
+    "character": "Mira Vale",
+    "world": "Greenhaven Roads",
+    "company": "Greenhaven Transit",
+    "employee": "Eli Stone",
+    "personal_money_minor_credits": 12310,
+    "company_money_minor_credits": 1500,
+    "territory_treasury_minor_credits": 5000,
+    "rental_refund_minor_credits": 6000,
+    "garage_fuel_after_return_l": 5000.0,
+    "depot_wood": 3,
+    "carried_wood": 4,
+    "placed_structures": 2,
+    "planted_farms": 1,
+    "home_structure_id": 2,
+    "neighborhoods": 1,
+    "parked_pickup_odometer_m": 546.3667855185489,
+    "manual_odometer_increase_m": 546.3667855185489,
+    "generation_after_first_return": 115,
+    "generation_after_final_build_resume": 128,
+    "generation_after_final_exit": 181
+  },
+  "first_return_checks": {
+    "global_exact": true,
+    "regions_exact": true,
+    "clock_exact": true,
+    "generation_advanced": true,
+    "home_set": true,
+    "rental_seconds": 600.0,
+    "disk_text_scale_unchanged": true
+  },
+  "final_build_restore_checks": {
+    "global_exact": true,
+    "regions_exact": true,
+    "metadata_exact": true,
+    "generation_advanced": true
+  },
+  "final_lifecycle_checks": {
+    "checks": {
+      "global_exact": true,
+      "regions_exact": true,
+      "metadata_exact": true,
+      "generation_advanced": true,
+      "no_retained_game_processes": true,
+      "saved_text_scale_preserved": true
+    },
+    "generation_before": 177,
+    "generation_after": 181,
+    "owned_virtual_display_stopped": true
+  },
+  "captures": [
+    {
+      "file": "screenshots/v8-main-menu.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "290e78ede188110db5fe807a378cb5161685779281d65d11354a24e45e7e9c91",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:07:31.274214+00:00",
+      "phase": "final_confirmation",
+      "description": "Final main menu with the persisted world and 150% text"
+    },
+    {
+      "file": "screenshots/v8-controls-small.png",
+      "width": 1100,
+      "height": 700,
+      "sha256": "bccc4791da24c3d0a28e89868ef49ec5e93270dc66c6df6341c98ef638ab3319",
+      "capture_build_sha256": "a097a96767e1ace9c57524f88f59e2d27f234e5f51535845de6b447170132848",
+      "captured_at_utc": "2026-10-27T15:20:25.035823+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: 150% controls at the minimum 1100 by 700 window"
+    },
+    {
+      "file": "screenshots/v8-wheel-setup.png",
+      "width": 1100,
+      "height": 700,
+      "sha256": "092305a774cc20036f697a46e406ecdd5cb2853f685b58da813bb6f7e80cc527",
+      "capture_build_sha256": "a097a96767e1ace9c57524f88f59e2d27f234e5f51535845de6b447170132848",
+      "captured_at_utc": "2026-10-27T15:22:27.011586+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: wheel setup with no attached hardware; no hardware certification"
+    },
+    {
+      "file": "screenshots/v8-text-keyboard.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "3e840e5060141edd7f93bfc4fc107dbab3cd9bdf12aaad756b5ffe0eb392a161",
+      "capture_build_sha256": "a097a96767e1ace9c57524f88f59e2d27f234e5f51535845de6b447170132848",
+      "captured_at_utc": "2026-10-27T15:23:58.878262+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: actual on-screen text keyboard at 150%"
+    },
+    {
+      "file": "screenshots/v8-character.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "dec278c2905c9481b0df4e8091b90f371fd0b7b9660f50f67eac4c5cf9a770f4",
+      "capture_build_sha256": "a097a96767e1ace9c57524f88f59e2d27f234e5f51535845de6b447170132848",
+      "captured_at_utc": "2026-10-27T15:25:53.913745+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: applied character draft retained after a later draft was discarded"
+    },
+    {
+      "file": "screenshots/v8-world-settings.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "ce05363480fea7b87257d5ba4bb69b81c0c609f1e682db145bfbe708676a38dc",
+      "capture_build_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a",
+      "captured_at_utc": "2026-10-27T15:32:32.409996+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: georeferenced authored heightmap settings"
+    },
+    {
+      "file": "screenshots/v8-world-review.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "e28c33d1d7816e65befef81e48eb8a9e08b2a1a37307f7c9a1bafb1308df85ae",
+      "capture_build_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a",
+      "captured_at_utc": "2026-10-27T15:33:06.571049+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: character and world creation review"
+    },
+    {
+      "file": "screenshots/v8-fleet-driver.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "0212330c4fb397934bf268da09aa03ff5b7fc8c46144b77fc77f2e2c51f9285b",
+      "capture_build_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a",
+      "captured_at_utc": "2026-10-27T15:47:34.825636+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: hired employee and real company funds"
+    },
+    {
+      "file": "screenshots/v8-market.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a80d446e5de4d4c04afed3df08d2caf2fb229a6ed344bc599c1f7ec9a0110297",
+      "capture_build_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a",
+      "captured_at_utc": "2026-10-27T15:49:20.888715+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: finite market and actual purchases"
+    },
+    {
+      "file": "screenshots/v8-house-built.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "70d2f0044343ef6af9107d22c8180dbe731f00089892f4db0e3c63bf24232b5c",
+      "capture_build_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a",
+      "captured_at_utc": "2026-10-27T16:00:41.837541+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: crafted and placed house"
+    },
+    {
+      "file": "screenshots/v8-home-and-farm.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "bb9f789688706fd510bcc2c6abdd333b7a4f68161529cff027ab88f103f8335a",
+      "capture_build_sha256": "e2aae2315e5821dcca134576e7b28ad195d129dbd25956953ae0eb70a79eff7a",
+      "captured_at_utc": "2026-10-27T16:04:11.087987+00:00",
+      "phase": "initial_review",
+      "description": "Initial review: house, workbench, crop and home assignment"
+    },
+    {
+      "file": "screenshots/v8-restored-world.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "3fb1d0547d16a1b1b40b9de20237f848ad1a4bf30d654bdd901b927263c31db0",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:10:38.795889+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: exact restored property and terrain-draped plot ring, enlarged inspector"
+    },
+    {
+      "file": "screenshots/v8-fleet-tabs.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "965d0a5535eb4150e7ec1c423ba046415b8607a3537fd3c10fc80aa36967d50c",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:19:40.672540+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: two-column Fleet tabs and wrapped title/wallet"
+    },
+    {
+      "file": "screenshots/v8-inspector-small.png",
+      "width": 1100,
+      "height": 700,
+      "sha256": "8034590f5f62e7dd67b83975ff944da2bcd2f5d76d38984f9660b1e754e6a59e",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:17:51.865106+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: enlarged inspector at 1100 by 700"
+    },
+    {
+      "file": "screenshots/v8-rental-chooser.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "9bd7207f878c95223816035ac07230d5a26f61e444d7edbef4e2e3defb293ba6",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:15:31.596982+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: vehicle chooser beside rental controls"
+    },
+    {
+      "file": "screenshots/v8-rental-refund.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "5d3389eab2538bfdbda1bb15114ac3ca02dd21d3909172d48851812251c509b9",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:16:11.902092+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: itemized 60-credit bond and fuel return quote"
+    },
+    {
+      "file": "screenshots/v8-rental-returned.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "686e850c51628658e95d70e30975fd90cb1b00bd2550f6b33b60d54c126e915b",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:17:31.996497+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: completed rental refund"
+    },
+    {
+      "file": "screenshots/v8-depot-stock.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "8888f68c5720a985735ef3a1c7db313c7056b89f9ab719a00c581123a05a5c55",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:22:01.292743+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: restored real wood stock before one-unit withdrawal"
+    },
+    {
+      "file": "screenshots/v8-driving.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "c0b9d68242a2a319903f011692c9f82eae70be94706b02fc3b96a2cee0d45635",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:26:48.577753+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: third-person vehicle control on the authored heightmap"
+    },
+    {
+      "file": "screenshots/v8-cockpit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "1c361fa34b6387f04514d917ed2fc6a41706d139036e45833613f1e64028224e",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:27:09.346559+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: first-person cockpit and driving HUD"
+    },
+    {
+      "file": "screenshots/v8-rts-return.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "37def2e744fe55f318e84bc8d374bc60ffaa08ff36dd5dce14017e58d2b7e3a9",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:28:28.584831+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: release possession and return to RTS"
+    },
+    {
+      "file": "screenshots/v8-save-and-quit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "b3229881134b7d9c4fc063c277a5eee816d07ba3d760440805f1992cc7fc9d40",
+      "capture_build_sha256": "69fc20ec8c4b3d98189f31f726cfa0e9497a0f44317f876fb759bd7afe202b86",
+      "captured_at_utc": "2026-10-27T16:28:40.981190+00:00",
+      "phase": "final_confirmation",
+      "description": "Final build: normal saved-exit flow"
+    }
+  ],
+  "limitations": [
+    "Authored synthetic terrain and settlement at real geographic coordinates; no real-world survey or historical-reconstruction claim.",
+    "Prototype geometric assets, sparse/repeated environment detail and sampled kinematic vehicle contacts; no AAA visual or full vehicle-physics claim.",
+    "Loaded relief handover, dismissal/household spending, intersection fairness, multiplayer prediction, host operations and cold-page certification are established by domain/integration/localhost tests, not by the local screenshots.",
+    "No physical controller/wheel certification, force feedback, gamepad-only RTS/management, gaming-GPU frame-rate result or Windows/macOS certification.",
+    "The native run does not establish a balanced long career, real global data availability, public accounts, distributed authority or MMORPG player capacity."
+  ]
+}

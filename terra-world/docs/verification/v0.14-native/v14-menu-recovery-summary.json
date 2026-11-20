@@ -1,0 +1,25 @@
+{
+  "release": "0.14.0",
+  "phase": "candidate default-menu recovery rehearsal",
+  "bundle_identity": "sha256:e65795360ed84090cbc0699c246612ee447138773ddb1fdd66747e57849a6821",
+  "actual_menu_world_removed": true,
+  "original_resolved_config_and_political_copy_removed": true,
+  "exact_full_export_retained": true,
+  "political_source_sha256": "304718be169beffee91191729e7514fea5ff7564d216909808f6601cee9b7fbe",
+  "before_export_sha256": "098bb7d75d3212110f9e33f427b8bcbf1f33d9471cf5787c233028d37a597eb1",
+  "after_export_sha256": "098bb7d75d3212110f9e33f427b8bcbf1f33d9471cf5787c233028d37a597eb1",
+  "character": {
+    "name": "Alex",
+    "body_style": 0,
+    "skin": 2,
+    "hair": 1,
+    "outfit": 1
+  },
+  "create_ms": 620.027567998477,
+  "restore_ms": 450.46176700270735,
+  "restored_configuration": "/tmp/terra-native/v14-menu-recovery-restored/world-config.json",
+  "source": "terra-procedural-v2",
+  "native_reopen": "passed with exact accepted executable from unrelated working directory",
+  "private_worlds_excluded": true,
+  "native_process_record": "v14-confirm-menu-recovery-process.json"
+}

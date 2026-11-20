@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "87-candidate-career-saved",
+  "capture_started_utc": "2026-10-30T12:29:47.330893+00:00",
+  "captured_utc": "2026-10-30T12:29:47.791577+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 59077,
+  "window_pid_status": "available",
+  "window_pid_before": 59077,
+  "window_pid_after": 59077,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "87-candidate-career-saved.png",
+    "sha256": "deea7281b387f9c3561431f15528b55603a673d2d425c1f6f09547569cf90506",
+    "bytes": 1080951
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

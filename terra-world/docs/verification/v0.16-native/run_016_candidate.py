@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Record owned native review processes without treating candidates as acceptance."""
+import argparse,datetime,hashlib,json,os,subprocess,sys,time
+from pathlib import Path
+
+ROOT=Path('/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next')
+OUT=Path('/tmp/terra-native')
+sys.path.insert(0,str(ROOT/'scripts'))
+from verify import source_inputs
+
+def digest(path):
+    with Path(path).open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
+def main():
+    p=argparse.ArgumentParser()
+    p.add_argument('--phase',choices=['candidate','confirmation','package_confirmation'],default='candidate')
+    p.add_argument('--binary',default='/tmp/terra-build/target/debug/terra-demo')
+    p.add_argument('--cwd',default=str(ROOT))
+    p.add_argument('--trace-log')
+    p.add_argument('--expected-interruption',action='store_true')
+    p.add_argument('name');p.add_argument('args',nargs=argparse.REMAINDER)
+    a=p.parse_args();args=a.args[1:] if a.args[:1]==['--'] else a.args
+    prefix=OUT/a.name
+    assert not Path(str(prefix)+'-process.json').exists()
+    log=Path(str(prefix)+'.log');assert not log.exists()
+    frozen=source_inputs()
+    command=[a.binary,*args]
+    if a.trace_log:command=['strace','-f','-qq','-e','trace=file','-o',a.trace_log,*command]
+    env=os.environ.copy();env.update(DISPLAY=':101',WGPU_BACKEND='vulkan',XDG_RUNTIME_DIR='/tmp/terra-native/xdg')
+    Path(env['XDG_RUNTIME_DIR']).mkdir(exist_ok=True,mode=0o700)
+    record={'release':'0.16.0','phase':a.phase,'command':command,'working_directory':a.cwd,'started_utc':now(),'binary_sha256':digest(a.binary),'source_input_count':len(frozen),'expected_interruption':a.expected_interruption,'trace_file':a.trace_log}
+    started=time.monotonic()
+    with log.open('xb') as output:
+        process=subprocess.Popen(command,cwd=a.cwd,env=env,stdout=output,stderr=subprocess.STDOUT)
+        record['pid']=process.pid
+        Path(str(prefix)+'-start.json').write_text(json.dumps(record,indent=2)+'\n')
+        print(json.dumps({'name':a.name,'pid':process.pid}),flush=True)
+        code=process.wait()
+    record.update(exit_code=code,finished_utc=now(),seconds=time.monotonic()-started,source_inputs_unchanged=source_inputs()==frozen,log_sha256=digest(log))
+    if a.trace_log:record['trace_sha256']=digest(a.trace_log)
+    Path(str(prefix)+'-process.json').write_text(json.dumps(record,indent=2)+'\n')
+    print(json.dumps(record,indent=2),flush=True)
+    if code!=0 and not(a.expected_interruption and code<0):sys.exit(1)
+if __name__=='__main__':main()

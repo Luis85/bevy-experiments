@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "Associates native confirmation source inputs with final acceptance inputs; only the desktop packaging document allowlist changed after native captures. Final executable identity is checked separately after acceptance.",
+  "native_source_input_count": 373,
+  "final_source_input_count": 373,
+  "native_source_inputs_sha256": "53339826e1360eb8567b793dc534bc1d10d302e493d57a3a18bf986bcb19b395",
+  "final_source_inputs_sha256": "345c5393749e43beba08a6e6cf12aa1127d1e21b341f8fe5399b564b2ca4b19f",
+  "changed_inputs": [
+    "scripts/desktop-payload.json"
+  ],
+  "runtime_source_config_and_assets_unchanged": true,
+  "final_acceptance_status": "passed",
+  "final_receipt_sha256": "fa7a05e0761db19a134af0c0272f79ae2c9c17bcf8323c4bdcffce9e100c898e",
+  "accepted_native_binary_sha256": "209b5f2ee0d74d8b4776346297af6838dd9e05cf622af80645f63dedb0bc13d1",
+  "accepted_executable_matches_native_confirmations": true
+}

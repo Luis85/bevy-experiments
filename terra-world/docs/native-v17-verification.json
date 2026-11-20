@@ -1,0 +1,444 @@
+{
+  "release": "0.17.0",
+  "status": "passed",
+  "finished_utc": "2026-10-29T09:55:03.538685+00:00",
+  "accepted_gate_record_sha256": "539c17efce1d3cf5a452561a1cda5732d34216c3199015699a6bd30208ec2cf4",
+  "accepted_native_binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+  "source_input_count": 367,
+  "source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6",
+  "scope": "Observed direct native confirmations after the final gates, on Linux Xvfb/software Vulkan. Candidate menu creation is retained separately. A final telemetry sample records an exit request; process exit is checked independently.",
+  "environment": {
+    "os": "Linux",
+    "display": "Xvfb :101",
+    "renderer": "software Vulkan",
+    "text_scale": 1.5
+  },
+  "accepted_processes": [
+    {
+      "release": "0.17.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--world-profile",
+        "/tmp/terra-native-017/menu-player-data/worlds/world-1793264306585-80307-0/world.json",
+        "--user-data",
+        "/tmp/terra-native-017/menu-player-data",
+        "--quality",
+        "performance",
+        "--telemetry",
+        "/tmp/terra-native-017/menu-player-data/diagnostics/latest.json",
+        "--telemetry-interval-seconds",
+        "10"
+      ],
+      "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+      "started_utc": "2026-10-29T09:45:26.630795+00:00",
+      "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+      "source_input_count": 367,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6",
+      "pid": 86533,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T09:46:59.029694+00:00",
+      "seconds": 92.25118779100012,
+      "source_inputs_unchanged": true,
+      "log_sha256": "4ee4c0cf3a0849af81887d432d494bd202d35c8b6134254a42d0dcb44971b0de",
+      "finished_source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6"
+    },
+    {
+      "release": "0.17.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--world-profile",
+        "/tmp/terra-native-017/menu-player-data/worlds/world-1793264306585-80307-0/world.json",
+        "--user-data",
+        "/tmp/terra-native-017/menu-player-data",
+        "--quality",
+        "performance",
+        "--telemetry",
+        "/tmp/terra-native-017/menu-player-data/diagnostics/latest.json",
+        "--telemetry-interval-seconds",
+        "10"
+      ],
+      "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+      "started_utc": "2026-10-29T09:47:24.098594+00:00",
+      "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+      "source_input_count": 367,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6",
+      "pid": 87131,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T09:48:25.457121+00:00",
+      "seconds": 61.239473132001876,
+      "source_inputs_unchanged": true,
+      "log_sha256": "f1bba80093cb92e44d16750bab449d7377edbee60ae1c85f5893b324cbe4eb42",
+      "finished_source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6"
+    },
+    {
+      "release": "0.17.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--config",
+        "/tmp/terra-native-017/driver-confirmation/comet-config.json",
+        "--user-data",
+        "/tmp/terra-native-017/driver-confirmation/player-data",
+        "--no-default-politics",
+        "--quality",
+        "performance",
+        "--asset-pack",
+        "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017/crates/terra-bevy/assets/character-demo.pack.json",
+        "--telemetry",
+        "/tmp/terra-native-017/v17-confirm-driver-telemetry.json",
+        "--telemetry-interval-seconds",
+        "10"
+      ],
+      "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+      "started_utc": "2026-10-29T09:48:52.954356+00:00",
+      "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+      "source_input_count": 367,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6",
+      "pid": 87460,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T09:50:29.235206+00:00",
+      "seconds": 96.15205667400005,
+      "source_inputs_unchanged": true,
+      "log_sha256": "3abee30dfd9164591c1a3086d3b6086a45238be8386c5c277b2349556079e5c1",
+      "finished_source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6"
+    },
+    {
+      "release": "0.17.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--config",
+        "/tmp/terra-native-017/large-confirmation/config.json",
+        "--user-data",
+        "/tmp/terra-native-017/large-confirmation/player-data",
+        "--no-default-politics",
+        "--quality",
+        "performance",
+        "--telemetry",
+        "/tmp/terra-native-017/v17-confirm-large-telemetry.json",
+        "--telemetry-interval-seconds",
+        "10"
+      ],
+      "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+      "started_utc": "2026-10-29T09:50:53.947106+00:00",
+      "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+      "source_input_count": 367,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6",
+      "pid": 87621,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T09:52:00.208073+00:00",
+      "seconds": 66.12790979700367,
+      "source_inputs_unchanged": true,
+      "log_sha256": "4b5e91859feb77378e535d9feb2672ccd338ad797e286975af841482a93daaf0",
+      "finished_source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6"
+    },
+    {
+      "release": "0.17.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--menu",
+        "--menu-screen",
+        "settings",
+        "--user-data",
+        "/tmp/terra-native-017/menu-player-data"
+      ],
+      "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+      "started_utc": "2026-10-29T09:52:19.868781+00:00",
+      "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+      "source_input_count": 367,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6",
+      "pid": 87933,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T09:53:58.640743+00:00",
+      "seconds": 98.65008684599889,
+      "source_inputs_unchanged": true,
+      "log_sha256": "8d3fdab21aacec94b66ed4af7a0dfe6a39c4a8426c1d595a8e57b252026d6057",
+      "finished_source_inputs_sha256": "d3bcffe3c6d80db510416f5a455d848f8cfc35c2224026891976f6d3a8d844b6"
+    }
+  ],
+  "telemetry_by_process": {
+    "v17-confirm-managed": {
+      "path": "docs/verification/v0.17-native/v17-confirm-managed-telemetry.json",
+      "sha256": "bf5b808f4093d7af5546f18091564818d03a825b28b8067c5717e981fd2f6873",
+      "bytes": 102885
+    },
+    "v17-confirm-reopen": {
+      "path": "docs/verification/v0.17-native/v17-confirm-reopen-telemetry.json",
+      "sha256": "e8d076e47b9e59ecb0e14a91a6c242c5d462cc0c640c36e3545dbfb9901c4bc9",
+      "bytes": 67392
+    },
+    "v17-confirm-driver": {
+      "path": "docs/verification/v0.17-native/v17-confirm-driver-telemetry.json",
+      "sha256": "89eb22c455f6ea88e7d26bf4c78ad6ef4a608b0fd3b8ed2758d1dcea2b7d8845",
+      "bytes": 94111
+    },
+    "v17-confirm-large": {
+      "path": "docs/verification/v0.17-native/v17-confirm-large-telemetry.json",
+      "sha256": "429cafd18b1266ead40bc2771cf59a154c655b4194351ca41b874166b8bd2db9",
+      "bytes": 73293
+    }
+  },
+  "measured_game_runs": {
+    "v17-confirm-managed": {
+      "rendered_chunks": 49,
+      "bodies": 107,
+      "wildlife": 64,
+      "source_revision": "terra-procedural-v2",
+      "final_phase": "saving",
+      "final_capture_status": "graceful_exit",
+      "committed_generation": 68,
+      "restored": true,
+      "retained_samples": 11
+    },
+    "v17-confirm-reopen": {
+      "rendered_chunks": 49,
+      "bodies": 107,
+      "wildlife": 64,
+      "source_revision": "terra-procedural-v2",
+      "final_phase": "saving",
+      "final_capture_status": "graceful_exit",
+      "committed_generation": 85,
+      "restored": true,
+      "retained_samples": 7
+    },
+    "v17-confirm-driver": {
+      "rendered_chunks": 9,
+      "bodies": 102,
+      "wildlife": 58,
+      "source_revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+      "final_phase": "saving",
+      "final_capture_status": "graceful_exit",
+      "committed_generation": null,
+      "restored": false,
+      "retained_samples": 11
+    },
+    "v17-confirm-large": {
+      "rendered_chunks": 121,
+      "bodies": 107,
+      "wildlife": 64,
+      "source_revision": "terra-procedural-v2",
+      "final_phase": "saving",
+      "final_capture_status": "graceful_exit",
+      "committed_generation": 68,
+      "restored": false,
+      "retained_samples": 8
+    }
+  },
+  "observation_review": {
+    "path": "docs/verification/v0.17-review/final-native-review.json",
+    "sha256": "83743e81cbd862a2c29283773fe6059fbd952cbd6826e7851fc7e91c9d390585",
+    "bytes": 9006
+  },
+  "save_reopen_comparison": {
+    "path": "docs/verification/v0.17-native/save-reopen-comparison.json",
+    "sha256": "60a2622aee64b4b3f7c7aa70d4ecc16809ad64e73a0b402289a2b73d86b49f78",
+    "bytes": 3280
+  },
+  "candidate_evidence": {
+    "path": "docs/verification/v0.17-native/candidate-evidence-manifest.json",
+    "sha256": "e519e8ab320869a8496385b65b76f1aebfd3eee58fba3508b33e61ac76dfb6f3",
+    "bytes": 10903
+  },
+  "checks": {
+    "all_final_processes_exited_zero": true,
+    "exact_final_binary_and_sources": true,
+    "captured_images_bound_to_direct_process_pid_and_time": true,
+    "bounded_healthy_game_reports_and_settled_final_terrain": true,
+    "saved_player_inventory_money_identity_and_appearance_retained": true,
+    "source_and_model_authority_unchanged": true,
+    "fresh_observed_review_completed": true
+  },
+  "artifact_sha256": {
+    "screenshots/v17-confirm-driver-first-person.png": "013777859416d74a09f58967ffa1ecabb9ff07ddfdc60085118b7e6b5d2da3ae",
+    "screenshots/v17-confirm-driver-restored.png": "2357a35d394a6d96abcb0f63462b4c83e0deee5aa5a39a98264d53d2c5120e36",
+    "screenshots/v17-confirm-large-pause.png": "dab4174cce86c8a770acdf534b560c3b9e44f2adf96f664ef1ece425d5650724",
+    "screenshots/v17-confirm-large-performance.png": "da8119131ae98b8cd859bf619d185a120778c357deba23abcc5bf1628b52222b",
+    "screenshots/v17-confirm-large-world.png": "6710b6a8680ad70137b3b394406df5e8b9b4a2e73f6aa8d79772550bd1f2dfb0",
+    "screenshots/v17-confirm-managed-pause-small.png": "8b2fee4b4210f298d56e52d2d238abbb957cf5b625b827b150ce3c0c68845d1c",
+    "screenshots/v17-confirm-managed-pause.png": "36a7837c84f0bce4f5875c20395ede321403897827d0f199c98274fb10fa635c",
+    "screenshots/v17-confirm-managed-performance-report.png": "445d48f5232eb57c66498fdf4f3818d78a67b9051ae2954783c0454bec1e64f9",
+    "screenshots/v17-confirm-managed-save-focus.png": "02679b57439720d9e8b5d7f02c68118342732ea491b52fe839c6fbb529281cd5",
+    "screenshots/v17-confirm-managed-world.png": "0a8401b409ae11c43d798024327eaeb063672e89b05837a4153db740982436a4",
+    "screenshots/v17-confirm-menu-home.png": "51c2ac9a4c672f5d8008b920115f6ab3f13246ebf3b4a1e004967de609d10494",
+    "screenshots/v17-confirm-menu-report.png": "6171bb23f59934366e0a0b58654c62f269b40b83f603bb75e81aa12dd4e2c73b",
+    "screenshots/v17-confirm-menu-settings.png": "2734c66e8fcca5124e5546e6bc3bee2e31adb3afad5c89fff8cac0d327b4e25f",
+    "screenshots/v17-confirm-reopen-pause.png": "3437fb506db0148733a1d6aa1f8ec2583612d0ee00171b8a723fd443249c20e3",
+    "verification/v0.17-native/save-reopen-comparison.json": "60a2622aee64b4b3f7c7aa70d4ecc16809ad64e73a0b402289a2b73d86b49f78",
+    "verification/v0.17-native/v17-confirm-driver-first-person-capture.json": "a6b666289683d7be6267317ef41c1533c75c36076e9a4ed7ef7a648c05fbafa9",
+    "verification/v0.17-native/v17-confirm-driver-process.json": "ef1ccf420227a888e9c6dada6333c4f1899c0c73ec6ae1e33644c4e369ce1c7d",
+    "verification/v0.17-native/v17-confirm-driver-restored-capture.json": "27061c6b5b9c209e79f7dd8f362ad137f632f6b5359cba4d1d6c8e571fd080e2",
+    "verification/v0.17-native/v17-confirm-driver-start.json": "df28443a91a3a9fcf4380bf5c29e741092f7528efdc493b4a0d6dddd89b94432",
+    "verification/v0.17-native/v17-confirm-driver-telemetry.json": "89eb22c455f6ea88e7d26bf4c78ad6ef4a608b0fd3b8ed2758d1dcea2b7d8845",
+    "verification/v0.17-native/v17-confirm-driver.log": "3abee30dfd9164591c1a3086d3b6086a45238be8386c5c277b2349556079e5c1",
+    "verification/v0.17-native/v17-confirm-large-pause-capture.json": "2d29c558f869ed8074cfbaa9023d29e79a69f3e16b995a3483cbd820d1eae5db",
+    "verification/v0.17-native/v17-confirm-large-performance-capture.json": "e3793a6bba9511f29d59cf179f2fe2b2a019b84f7124b479600354205325b9b0",
+    "verification/v0.17-native/v17-confirm-large-process.json": "f285902610e864b830e740ca1bb8ee085b8ed4f8310a51118cee19d7afee79fd",
+    "verification/v0.17-native/v17-confirm-large-start.json": "63dad3a47eb851722dff96a4c6671b2bee0ba4571379e48d0681833d3e45802a",
+    "verification/v0.17-native/v17-confirm-large-telemetry.json": "429cafd18b1266ead40bc2771cf59a154c655b4194351ca41b874166b8bd2db9",
+    "verification/v0.17-native/v17-confirm-large-world-capture.json": "60778deb0c5784515b27602ca7e410665150dc305771c736a95f7225633406a5",
+    "verification/v0.17-native/v17-confirm-large.log": "4b5e91859feb77378e535d9feb2672ccd338ad797e286975af841482a93daaf0",
+    "verification/v0.17-native/v17-confirm-managed-pause-capture.json": "07c9809319f0456eb7e01ffc03a5231d316b863619c5184b4e4a3e8c21d7580e",
+    "verification/v0.17-native/v17-confirm-managed-pause-small-capture.json": "d951ecb60f76e3c34b6cae01f07e64bff203e833a9ff03303c3aa46069f5b886",
+    "verification/v0.17-native/v17-confirm-managed-performance-report-capture.json": "5182322470083a57d6c29517424c291581a7908695f73b02317993c918c70eae",
+    "verification/v0.17-native/v17-confirm-managed-process.json": "0ede81cfb79cf23f17979455bdc7b10be0e3b2da16e942664d8e29581ca63f6c",
+    "verification/v0.17-native/v17-confirm-managed-save-focus-capture.json": "933f930222680e320161a0cd35565cbf6527a79c46bb4a7067befb4fe1a831bc",
+    "verification/v0.17-native/v17-confirm-managed-start.json": "080ece819fefe647309feb2dd5f18e63bdb1bba4eb491f5fe64670637e46648d",
+    "verification/v0.17-native/v17-confirm-managed-telemetry.json": "bf5b808f4093d7af5546f18091564818d03a825b28b8067c5717e981fd2f6873",
+    "verification/v0.17-native/v17-confirm-managed-world-capture.json": "ae8023c5c5846e54ad4ca0b4918f1dff94d6c0fbb2a1f8ce90a7cb3a409dd3cd",
+    "verification/v0.17-native/v17-confirm-managed.log": "4ee4c0cf3a0849af81887d432d494bd202d35c8b6134254a42d0dcb44971b0de",
+    "verification/v0.17-native/v17-confirm-menu-home-capture.json": "9bff403d4c35c558d67bda5d5ad480b20ea2668f86890df1f93ef5ca7c488eef",
+    "verification/v0.17-native/v17-confirm-menu-process.json": "3c1baa763a8981b0982d0245a3abbcb2fda8515deef3ffaa7170dab86baa6fe1",
+    "verification/v0.17-native/v17-confirm-menu-report-capture.json": "22a232ceccbc580ee49b231e78263fdb992f37f422063808c83bb816634ddf4b",
+    "verification/v0.17-native/v17-confirm-menu-settings-capture.json": "c433bb234e0982e07371f39b1839ec28aafc93f3659489bc1cc9e46c6090ae9c",
+    "verification/v0.17-native/v17-confirm-menu-start.json": "f7516e139df6f1974d06c3c3fe1f6026a514d2b2e474c2ca02561e29c38f1a70",
+    "verification/v0.17-native/v17-confirm-menu.log": "8d3fdab21aacec94b66ed4af7a0dfe6a39c4a8426c1d595a8e57b252026d6057",
+    "verification/v0.17-native/v17-confirm-reopen-pause-capture.json": "9018b75300dbdba583d355b2ae01a346f1f8a31723ddeddeb1db946a9ca1efae",
+    "verification/v0.17-native/v17-confirm-reopen-process.json": "8fb724b010a032aa4eaefceea64204f7c31965f49b9e4dae299351544c20a2ff",
+    "verification/v0.17-native/v17-confirm-reopen-start.json": "79c5db28f92daa996e7670facff627aeee195ea09d6b0d9640037717ba9d46b7",
+    "verification/v0.17-native/v17-confirm-reopen-telemetry.json": "e8d076e47b9e59ecb0e14a91a6c242c5d462cc0c640c36e3545dbfb9901c4bc9",
+    "verification/v0.17-native/v17-confirm-reopen.log": "f1bba80093cb92e44d16750bab449d7377edbee60ae1c85f5893b324cbe4eb42",
+    "verification/v0.17-review/final-native-review.json": "83743e81cbd862a2c29283773fe6059fbd952cbd6826e7851fc7e91c9d390585",
+    "verification/v0.17-review/final-native-review.md": "8364ad1e1fcfc71ecaf7d12de326908d7357607d5777bf39d30a7e4ae360bfbd"
+  },
+  "screenshot_pixels": {
+    "v17-confirm-managed-world.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-managed-pause.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-managed-pause-small.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-managed-performance-report.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-managed-save-focus.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-reopen-pause.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-driver-restored.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-driver-first-person.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-large-world.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-large-performance.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-large-pause.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-menu-settings.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-menu-report.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-menu-home.png": [
+      1100,
+      700
+    ]
+  },
+  "observed_screenshot_pixels": {
+    "v17-confirm-managed-world.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-managed-pause.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-managed-pause-small.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-managed-performance-report.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-managed-save-focus.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-reopen-pause.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-driver-restored.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-driver-first-person.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-large-world.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-large-performance.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-large-pause.png": [
+      1440,
+      900
+    ],
+    "v17-confirm-menu-settings.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-menu-report.png": [
+      1100,
+      700
+    ],
+    "v17-confirm-menu-home.png": [
+      1100,
+      700
+    ]
+  },
+  "observed_check_basis": "Fresh actual native screenshots plus explicit operator observations; machine provenance checked separately.",
+  "limits": [
+    "No clean-machine Windows, physical GPU/controller/wheel or assistive-technology qualification.",
+    "Expert-operated prepared fixtures; no uncoached usability, career balance, general dense traffic or global-world claim.",
+    "Rental stale-confirmation and terminal worker-loss behavior have source/regression evidence; native fault injection or a completed rental return is not inferred from the screenshots.",
+    "Private SQLite/profile snapshots support the independent audit but are excluded from the source ZIP. Save/reopen checks the declared player subset, not equality of all advancing simulation state."
+  ]
+}

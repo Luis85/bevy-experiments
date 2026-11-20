@@ -1,0 +1,389 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "phase": "pending",
+  "status": "pending_canonical_acceptance",
+  "authorizes_release": false,
+  "audit_started_utc": "2026-10-30T13:20:06.173240+00:00",
+  "checked_utc": "2026-10-30T13:20:06.737903+00:00",
+  "native_provenance_checks": "passed",
+  "registry": "docs/verification/v0.24-native/APPROVED-REGISTRY.json",
+  "registry_sha256": "1f0f8fdda92f24edbf7488b689669edb8bc433a4a5e14e2c4af9d18722fe3c07",
+  "declared_visual_reviewer": "Root integrator; every selected PNG individually inspected. Original209/220 prose also verified by exact RGB comparison and crop inspection; unsupported disappearance finding withdrawn.",
+  "declared_visual_reviewed_utc": "2026-10-30T13:14:26.144533+00:00",
+  "source_input_count": 390,
+  "source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+  "native_binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+  "capture_count": 18,
+  "processes": [
+    {
+      "name": "confirmation-building",
+      "pid": 76362,
+      "command": [
+        "/tmp/terra023-target/debug/terra-demo",
+        "--play",
+        "--camp-view",
+        "--quality",
+        "performance",
+        "--no-atmosphere",
+        "--time-scale",
+        "1",
+        "--radius",
+        "1",
+        "--user-data",
+        "/tmp/terra-native024/confirmation-building-user",
+        "--save",
+        "/tmp/terra-native024/confirmation-building.json"
+      ],
+      "started_utc": "2026-10-30T12:36:24.707234+00:00",
+      "finished_utc": "2026-10-30T12:49:31.188663+00:00",
+      "seconds": 786.3567591940009,
+      "wall_seconds": 786.481429,
+      "exit_code": 0,
+      "log_sha256": "b903b4f3b2e49b6eff206b5fc8f1cb0aa36cb94d535de1d72465b9cff799091b",
+      "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+      "source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+      "captures": [
+        "201-confirmation-building-restore-review",
+        "202-confirmation-building-restored",
+        "205-confirmation-build-panel",
+        "207-confirmation-minimum-property",
+        "208-confirmation-damage-review",
+        "209-confirmation-cancel-focus",
+        "210-confirmation-keyboard-cancelled",
+        "216-confirmation-repeat-cancel-focus",
+        "220-confirmation-repeat-focus-exited",
+        "221-confirmation-retained-fence",
+        "223-confirmation-building-save-exit"
+      ]
+    },
+    {
+      "name": "confirmation-final-fleet",
+      "pid": 79904,
+      "command": [
+        "/tmp/terra023-target/debug/terra-demo",
+        "--play",
+        "--camp-view",
+        "--quality",
+        "performance",
+        "--no-atmosphere",
+        "--time-scale",
+        "1",
+        "--radius",
+        "1",
+        "--user-data",
+        "/tmp/terra-native024/confirmation-final-fleet-user",
+        "--save",
+        "/tmp/terra-native024/confirmation-final-fleet.json"
+      ],
+      "started_utc": "2026-10-30T13:10:39.172742+00:00",
+      "finished_utc": "2026-10-30T13:13:44.633927+00:00",
+      "seconds": 185.3201771109998,
+      "wall_seconds": 185.461185,
+      "exit_code": 0,
+      "log_sha256": "9df714c6b00a3d092dfd158734dae82867e9505e613d0f8715ae20b6306cdc03",
+      "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+      "source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+      "captures": [
+        "331-confirmation-final-fleet-restore-review",
+        "332-confirmation-final-fleet-restored",
+        "333-confirmation-final-fleet-resumed",
+        "334-confirmation-final-fleet-company",
+        "335-confirmation-final-fleet-drivers",
+        "336-confirmation-final-fleet-assignment",
+        "337-confirmation-final-fleet-exit-menu"
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "image": "201-confirmation-building-restore-review.png",
+      "receipt": "201-confirmation-building-restore-review-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "cc22a92192ed1a1c3d25d693b75e9373b18350ed57bbd308b10c31222fd9f2be",
+      "capture_started_utc": "2026-10-30T12:37:25.398557+00:00",
+      "captured_utc": "2026-10-30T12:37:25.647374+00:00"
+    },
+    {
+      "image": "202-confirmation-building-restored.png",
+      "receipt": "202-confirmation-building-restored-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "b1ba829665fd9a2a4e2a1080ad32733a5a3a603e7c64b131c3a1125feb3eea02",
+      "capture_started_utc": "2026-10-30T12:38:11.521120+00:00",
+      "captured_utc": "2026-10-30T12:38:11.754951+00:00"
+    },
+    {
+      "image": "205-confirmation-build-panel.png",
+      "receipt": "205-confirmation-build-panel-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "5d1518b275fbd4fcd5915db83ed9819ab0ae76936ea2840a6d654cdee51ab14b",
+      "capture_started_utc": "2026-10-30T12:39:57.216273+00:00",
+      "captured_utc": "2026-10-30T12:39:57.633861+00:00"
+    },
+    {
+      "image": "207-confirmation-minimum-property.png",
+      "receipt": "207-confirmation-minimum-property-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "fa75ea09591d6a4f4f9936d9c9d36ba5431da6034da602144e324880f3124ddb",
+      "capture_started_utc": "2026-10-30T12:40:07.294476+00:00",
+      "captured_utc": "2026-10-30T12:40:07.517657+00:00"
+    },
+    {
+      "image": "208-confirmation-damage-review.png",
+      "receipt": "208-confirmation-damage-review-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "1f33bd1537a5d869ba55561513eb2bb553c3eb164b31ab0eeadd50b3ba176ed3",
+      "capture_started_utc": "2026-10-30T12:43:53.656023+00:00",
+      "captured_utc": "2026-10-30T12:43:53.898715+00:00"
+    },
+    {
+      "image": "209-confirmation-cancel-focus.png",
+      "receipt": "209-confirmation-cancel-focus-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "beb741e18c8038088a40cab53939675dfc867701e28ebffd36ac347bc9c1b844",
+      "capture_started_utc": "2026-10-30T12:44:08.749880+00:00",
+      "captured_utc": "2026-10-30T12:44:09.020583+00:00"
+    },
+    {
+      "image": "210-confirmation-keyboard-cancelled.png",
+      "receipt": "210-confirmation-keyboard-cancelled-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "37288b5286778068947a5bf0e96c173906b5c1bd7ebce10a4d45df82562b06e6",
+      "capture_started_utc": "2026-10-30T12:44:34.289249+00:00",
+      "captured_utc": "2026-10-30T12:44:34.547616+00:00"
+    },
+    {
+      "image": "216-confirmation-repeat-cancel-focus.png",
+      "receipt": "216-confirmation-repeat-cancel-focus-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "09618a0cc372c14274ab925109b1852f4f17dc69c0d95349d159207c556191c2",
+      "capture_started_utc": "2026-10-30T12:46:31.479080+00:00",
+      "captured_utc": "2026-10-30T12:46:31.721255+00:00"
+    },
+    {
+      "image": "220-confirmation-repeat-focus-exited.png",
+      "receipt": "220-confirmation-repeat-focus-exited-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "43733ddf088495e445a04ef7f6f8fccea6c8a66b5f2f5329511538c1e5ff445e",
+      "capture_started_utc": "2026-10-30T12:47:55.061552+00:00",
+      "captured_utc": "2026-10-30T12:47:55.358650+00:00"
+    },
+    {
+      "image": "221-confirmation-retained-fence.png",
+      "receipt": "221-confirmation-retained-fence-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "584d2b4333398183dcc2041c4157547aaf8844471ac20b8d0ffb3c87f1326e36",
+      "capture_started_utc": "2026-10-30T12:48:07.561499+00:00",
+      "captured_utc": "2026-10-30T12:48:07.835219+00:00"
+    },
+    {
+      "image": "223-confirmation-building-save-exit.png",
+      "receipt": "223-confirmation-building-save-exit-capture.json",
+      "pid": 76362,
+      "process": "confirmation-building",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "33ad311f689bf5830f956ececbf048c87d7be3095eb4eb1f87331e8785b71348",
+      "capture_started_utc": "2026-10-30T12:49:04.877933+00:00",
+      "captured_utc": "2026-10-30T12:49:05.031954+00:00"
+    },
+    {
+      "image": "331-confirmation-final-fleet-restore-review.png",
+      "receipt": "331-confirmation-final-fleet-restore-review-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "78d618662aa43ddbb0b878dd66ff65306c2dafe227a511c408f2227632773dc4",
+      "capture_started_utc": "2026-10-30T13:11:07.099941+00:00",
+      "captured_utc": "2026-10-30T13:11:07.427103+00:00"
+    },
+    {
+      "image": "332-confirmation-final-fleet-restored.png",
+      "receipt": "332-confirmation-final-fleet-restored-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "b575613f986637298a1b5851b22a189da618a6e6ebbf2e6b0902974e44340fb6",
+      "capture_started_utc": "2026-10-30T13:11:29.438761+00:00",
+      "captured_utc": "2026-10-30T13:11:29.673215+00:00"
+    },
+    {
+      "image": "333-confirmation-final-fleet-resumed.png",
+      "receipt": "333-confirmation-final-fleet-resumed-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "c0ecb3a49643740b7410a3e0ffbae3146412f196f87d40ee01e85406383de51e",
+      "capture_started_utc": "2026-10-30T13:11:39.175332+00:00",
+      "captured_utc": "2026-10-30T13:11:39.680016+00:00"
+    },
+    {
+      "image": "334-confirmation-final-fleet-company.png",
+      "receipt": "334-confirmation-final-fleet-company-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "262871d2e37f30da77b0828a6858da2d04bddec37427ff41d68f8022559254aa",
+      "capture_started_utc": "2026-10-30T13:12:10.790790+00:00",
+      "captured_utc": "2026-10-30T13:12:11.271543+00:00"
+    },
+    {
+      "image": "335-confirmation-final-fleet-drivers.png",
+      "receipt": "335-confirmation-final-fleet-drivers-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "b25aaba8ef04bf774ad2bb42070aeb548f5e79f4ddbeaedf663806c70b32b704",
+      "capture_started_utc": "2026-10-30T13:12:21.010297+00:00",
+      "captured_utc": "2026-10-30T13:12:21.494037+00:00"
+    },
+    {
+      "image": "336-confirmation-final-fleet-assignment.png",
+      "receipt": "336-confirmation-final-fleet-assignment-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "88da802e221e53e4000cf68963036db82c72dc72593ad2a275e7a820da52e826",
+      "capture_started_utc": "2026-10-30T13:12:31.621488+00:00",
+      "captured_utc": "2026-10-30T13:12:32.078529+00:00"
+    },
+    {
+      "image": "337-confirmation-final-fleet-exit-menu.png",
+      "receipt": "337-confirmation-final-fleet-exit-menu-capture.json",
+      "pid": 79904,
+      "process": "confirmation-final-fleet",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "307a5ac5e542cd80bdbfcf48d22bd2ba6502d21c062f0f7467ba71203c5a40ee",
+      "capture_started_utc": "2026-10-30T13:13:11.070736+00:00",
+      "captured_utc": "2026-10-30T13:13:11.316964+00:00"
+    }
+  ],
+  "acceptance": {
+    "status": "pending_terminal_receipt",
+    "terminal_receipt_validated": false
+  },
+  "evidence_sha256": {
+    "docs/verification/v0.24-delivery/package_source_024.py": "7fc024a66fc7fd658979de4d6cf8365e1ca594704f1147f0dfed4ba1699170b3",
+    "docs/verification/v0.24-native/201-confirmation-building-restore-review-capture.json": "7fc93b15d1ce039cda886a0dfdc28daa0fc9770f099a3c7db2cc1c73480b7d69",
+    "docs/verification/v0.24-native/201-confirmation-building-restore-review.png": "cc22a92192ed1a1c3d25d693b75e9373b18350ed57bbd308b10c31222fd9f2be",
+    "docs/verification/v0.24-native/202-confirmation-building-restored-capture.json": "ce86bb84bd1564c74b7746c02370dc6e8c2672b156fe4c9d3658d7ef1312bdcb",
+    "docs/verification/v0.24-native/202-confirmation-building-restored.png": "b1ba829665fd9a2a4e2a1080ad32733a5a3a603e7c64b131c3a1125feb3eea02",
+    "docs/verification/v0.24-native/205-confirmation-build-panel-capture.json": "80f03aab6356afb3d19f210cf2aa4c3858bfcca13e14cc10a54b8ff1c61f12b4",
+    "docs/verification/v0.24-native/205-confirmation-build-panel.png": "5d1518b275fbd4fcd5915db83ed9819ab0ae76936ea2840a6d654cdee51ab14b",
+    "docs/verification/v0.24-native/207-confirmation-minimum-property-capture.json": "afdd38e9089c30697d7d7156da5ebc46f876c9f3297bd5fd4b9cc4a54ed1ab85",
+    "docs/verification/v0.24-native/207-confirmation-minimum-property.png": "fa75ea09591d6a4f4f9936d9c9d36ba5431da6034da602144e324880f3124ddb",
+    "docs/verification/v0.24-native/208-confirmation-damage-review-capture.json": "23e077c86690028d807ac01142f938b87b79dfdf68bf120e5531b852c5f55312",
+    "docs/verification/v0.24-native/208-confirmation-damage-review.png": "1f33bd1537a5d869ba55561513eb2bb553c3eb164b31ab0eeadd50b3ba176ed3",
+    "docs/verification/v0.24-native/209-confirmation-cancel-focus-capture.json": "e5318656663a1e06363e373289d04f5da5a4d715eaa4c03986330444c152be6d",
+    "docs/verification/v0.24-native/209-confirmation-cancel-focus.png": "beb741e18c8038088a40cab53939675dfc867701e28ebffd36ac347bc9c1b844",
+    "docs/verification/v0.24-native/210-confirmation-keyboard-cancelled-capture.json": "a95513ca0b95a530370e10448796c35a324c2f16db5a424cc2af83c85544391e",
+    "docs/verification/v0.24-native/210-confirmation-keyboard-cancelled.png": "37288b5286778068947a5bf0e96c173906b5c1bd7ebce10a4d45df82562b06e6",
+    "docs/verification/v0.24-native/216-confirmation-repeat-cancel-focus-capture.json": "fa0162bd1ec0b57da957812d6ab88ba1a6fdd6366ff284b0454519f75c2cb4ae",
+    "docs/verification/v0.24-native/216-confirmation-repeat-cancel-focus.png": "09618a0cc372c14274ab925109b1852f4f17dc69c0d95349d159207c556191c2",
+    "docs/verification/v0.24-native/220-confirmation-repeat-focus-exited-capture.json": "45e71b2087007925b6c9d16937c116ef0dd2321373a27e13b00519a6a2a2a5be",
+    "docs/verification/v0.24-native/220-confirmation-repeat-focus-exited.png": "43733ddf088495e445a04ef7f6f8fccea6c8a66b5f2f5329511538c1e5ff445e",
+    "docs/verification/v0.24-native/221-confirmation-retained-fence-capture.json": "328279aac1c0d90e5ccd362423f122ce456d9aa99b34f5f53271e1892bbd9619",
+    "docs/verification/v0.24-native/221-confirmation-retained-fence.png": "584d2b4333398183dcc2041c4157547aaf8844471ac20b8d0ffb3c87f1326e36",
+    "docs/verification/v0.24-native/223-confirmation-building-save-exit-capture.json": "2fffdfee5e1215ae1eab5e7258f9075ab617aaf986e2ad384c0c92c3a1b563e0",
+    "docs/verification/v0.24-native/223-confirmation-building-save-exit.png": "33ad311f689bf5830f956ececbf048c87d7be3095eb4eb1f87331e8785b71348",
+    "docs/verification/v0.24-native/331-confirmation-final-fleet-restore-review-capture.json": "5ec6eabcd0335481f89852a82ff282180a96befa1bb2d997709c3cd95eb43d7e",
+    "docs/verification/v0.24-native/331-confirmation-final-fleet-restore-review.png": "78d618662aa43ddbb0b878dd66ff65306c2dafe227a511c408f2227632773dc4",
+    "docs/verification/v0.24-native/332-confirmation-final-fleet-restored-capture.json": "d58d5340414cae39c666b1188485a79ad5cf241b0522c453d156b4d05bd76437",
+    "docs/verification/v0.24-native/332-confirmation-final-fleet-restored.png": "b575613f986637298a1b5851b22a189da618a6e6ebbf2e6b0902974e44340fb6",
+    "docs/verification/v0.24-native/333-confirmation-final-fleet-resumed-capture.json": "18d9dc5c06ff49816a5eb2c97eeb0db10a0fab1e3d0048ca6850f6e6e8d36861",
+    "docs/verification/v0.24-native/333-confirmation-final-fleet-resumed.png": "c0ecb3a49643740b7410a3e0ffbae3146412f196f87d40ee01e85406383de51e",
+    "docs/verification/v0.24-native/334-confirmation-final-fleet-company-capture.json": "44d922f06ef2091e3e9c8dd6857b59ff5a92392c493171f10d409c1392ffc456",
+    "docs/verification/v0.24-native/334-confirmation-final-fleet-company.png": "262871d2e37f30da77b0828a6858da2d04bddec37427ff41d68f8022559254aa",
+    "docs/verification/v0.24-native/335-confirmation-final-fleet-drivers-capture.json": "b164438e7edaa57fcc7cbba96119eec6d9bc6b20a782ee1b91439f47c6f1d5d5",
+    "docs/verification/v0.24-native/335-confirmation-final-fleet-drivers.png": "b25aaba8ef04bf774ad2bb42070aeb548f5e79f4ddbeaedf663806c70b32b704",
+    "docs/verification/v0.24-native/336-confirmation-final-fleet-assignment-capture.json": "73090f09936251dd0302d0fe27ecf619138c422f7bf39572d5c6f6544908af3f",
+    "docs/verification/v0.24-native/336-confirmation-final-fleet-assignment.png": "88da802e221e53e4000cf68963036db82c72dc72593ad2a275e7a820da52e826",
+    "docs/verification/v0.24-native/337-confirmation-final-fleet-exit-menu-capture.json": "2a0537aaa2f913df341a8fc97d3c29c1277cfa94cd4bafacdffa942700d6303f",
+    "docs/verification/v0.24-native/337-confirmation-final-fleet-exit-menu.png": "307a5ac5e542cd80bdbfcf48d22bd2ba6502d21c062f0f7467ba71203c5a40ee",
+    "docs/verification/v0.24-native/APPROVED-REGISTRY.json": "1f0f8fdda92f24edbf7488b689669edb8bc433a4a5e14e2c4af9d18722fe3c07",
+    "docs/verification/v0.24-native/audit_native_024.py": "84975472864a6d5c4cff3c18fd47851e6df9eb95c76e0638333ebeb7691023c4",
+    "docs/verification/v0.24-native/confirmation-building-process.json": "494b37cdea2ae8d0f99f8cf4999c11e4fd58354157ae610aee93a6b44025237e",
+    "docs/verification/v0.24-native/confirmation-building-start.json": "4c560ba8a6338a6b2ad66a1215f15c1ea431ce8a768c2d5d2eb5f826b7be7446",
+    "docs/verification/v0.24-native/confirmation-building.log": "b903b4f3b2e49b6eff206b5fc8f1cb0aa36cb94d535de1d72465b9cff799091b",
+    "docs/verification/v0.24-native/confirmation-final-fleet-process.json": "cb806b461e73709baf9481c458abf2e54395a8fa867f188de1d6ece888bd5d55",
+    "docs/verification/v0.24-native/confirmation-final-fleet-start.json": "ca196c2010790299fadd35b459d992233cf1a91315d939789480f0ee1d930ccd",
+    "docs/verification/v0.24-native/confirmation-final-fleet.log": "9df714c6b00a3d092dfd158734dae82867e9505e613d0f8715ae20b6306cdc03"
+  },
+  "duration_tolerance_seconds": 2.0,
+  "clock_assumption": "UTC and the monotonic clock are assumed not to drift or step apart by more than two seconds during each recorded native process. Larger disagreement rejects the record rather than interpreting its lifetime as proven.",
+  "scope": "Recorded direct-process lifetime and before/after window PID association; exact reviewed image/log/binary bytes and agreeing start/finish/current source identity. Accepted mode additionally binds actual complete canonical evidence. This is not publisher authentication, an atomic filesystem snapshot, new visual inspection or physical-device qualification.",
+  "historical_exclusion": "All baseline and candidate captures/processes are excluded from final acceptance. Their original records, including rejected images and known historical labeling errors, are left unchanged."
+}

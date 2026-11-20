@@ -1,0 +1,93 @@
+{
+  "accepted": true,
+  "model": {
+    "budget": {
+      "animation_keys": 1700,
+      "bytes": 162140,
+      "channels": 34,
+      "clips": 4,
+      "decoded_scalars": 35033,
+      "materials": 7,
+      "nodes": 39,
+      "primitives": 25,
+      "renderer_vertices": 5268,
+      "runtime_animation_keys": 1700,
+      "scene_primitives": 25,
+      "scene_renderer_vertices": 5268,
+      "scene_triangles": 1756,
+      "scene_vertices": 5268,
+      "texture_pixels": 0,
+      "texture_slot_pixels": 0,
+      "triangles": 1756,
+      "vertices": 5268
+    },
+    "clips": [
+      {
+        "channels": 2,
+        "duration_seconds": 3.0,
+        "name": "idle"
+      },
+      {
+        "channels": 10,
+        "duration_seconds": 0.6200000047683716,
+        "name": "run"
+      },
+      {
+        "channels": 12,
+        "duration_seconds": 2.0,
+        "name": "seated"
+      },
+      {
+        "channels": 10,
+        "duration_seconds": 1.0,
+        "name": "walk"
+      }
+    ],
+    "nodes": [
+      "fieldhand",
+      "hips",
+      "trouser_hips",
+      "chest",
+      "jacket_body",
+      "jacket_zipper",
+      "left_jacket_pocket",
+      "right_jacket_pocket",
+      "neck",
+      "head",
+      "face",
+      "hair_cap",
+      "nose",
+      "left_eye",
+      "left_ear",
+      "right_eye",
+      "right_ear",
+      "left_hip",
+      "left_thigh",
+      "left_knee",
+      "left_shin",
+      "left_ankle",
+      "left_boot",
+      "left_shoulder",
+      "left_sleeve",
+      "left_elbow",
+      "left_forearm",
+      "left_hand",
+      "right_hip",
+      "right_thigh",
+      "right_knee",
+      "right_shin",
+      "right_ankle",
+      "right_boot",
+      "right_shoulder",
+      "right_sleeve",
+      "right_elbow",
+      "right_forearm",
+      "right_hand"
+    ],
+    "scene": 0,
+    "sha256": "b5d62261ee73a9a987b754b322ea95ce9d84941ca82e03c87de00568aa759b7e"
+  },
+  "next": "Map these exact clip names in an authoring recipe, then build and inspect the resulting pack in the native game.",
+  "schema_version": 1,
+  "scope": "Validated supported GLB bytes and all import budgets. Clip names do not prove animation intent, scale, axes, foot placement or native readiness."
+}

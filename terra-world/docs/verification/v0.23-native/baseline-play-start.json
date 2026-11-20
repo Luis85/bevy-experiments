@@ -1,0 +1,30 @@
+{
+  "release": "0.23.0",
+  "phase": "baseline",
+  "command": [
+    "/workspace/scratch/96f1d170dd13/baseline/desktop/terra-world-0.22.0-linux-x86_64/terra-demo",
+    "--play",
+    "--user-data",
+    "/tmp/terra-native023/baseline",
+    "--quality",
+    "performance",
+    "--no-atmosphere",
+    "--radius",
+    "1",
+    "--camp-view",
+    "--noon",
+    "--time-scale",
+    "0",
+    "--save",
+    "/tmp/terra-native023/baseline/save.json"
+  ],
+  "working_directory": "/workspace/scratch/96f1d170dd13/baseline/desktop/terra-world-0.22.0-linux-x86_64",
+  "started_utc": "2026-10-30T07:50:28.867047+00:00",
+  "binary_sha256": "34dc6fe5c906d556fcf182968df0a92742079008c5eb26cc94d652a69a041cd6",
+  "source_input_count": 381,
+  "expected_interruption": false,
+  "trace_file": null,
+  "schema": 1,
+  "source_inputs_sha256": "007ea6433d559926c29688804ec204cb9eadad032310d8a956a7a43e7504b0fa",
+  "pid": 7991
+}

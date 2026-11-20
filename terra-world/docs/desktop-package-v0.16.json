@@ -1,0 +1,245 @@
+{
+  "version": "0.16.0",
+  "status": "passed",
+  "finished_utc": "2026-10-29T05:52:37.319880+00:00",
+  "platform": "linux-x86_64",
+  "build_profile": "dev (opt-level 1)",
+  "native_binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+  "accepted_gate_record_sha256": "24b9fbad2b23897cee6dc03160baab6d63fc59290aada4e5c97d762e108d757d",
+  "source_input_count": 366,
+  "package": {
+    "status": "passed",
+    "output": "/workspace/scratch/0fdc9aa7bc4c/output/terra-world-0.16.0-linux-x86_64.zip",
+    "release": "0.16.0",
+    "platform": "linux-x86_64",
+    "build_profile": "dev",
+    "files": 230,
+    "bytes": 39171904,
+    "sha256": "3b01d5e9d0c4760dd2cd0bb898b24041a0f09c30b9eea124c1b4de40821b48c8",
+    "native_binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434"
+  },
+  "package_manifest": {
+    "path": "docs/verification/v0.16-desktop/package-manifest.json",
+    "sha256": "a869a00e03a561df243bab2b50fc98abd78b6135c19515c34c3e968a50679892",
+    "bytes": 26881
+  },
+  "extracted_runs": [
+    {
+      "kind": "launcher",
+      "process": {
+        "release": "0.16.0",
+        "phase": "package_confirmation",
+        "command": [
+          "strace",
+          "-f",
+          "-qq",
+          "-e",
+          "trace=file",
+          "-o",
+          "/tmp/terra-native/v16-desktop-launcher.trace",
+          "/tmp/terra-desktop-016/terra-world-0.16.0-linux-x86_64/start-terra.sh",
+          "--frames",
+          "140",
+          "--screenshot",
+          "/tmp/terra-native/v16-desktop-launcher.png"
+        ],
+        "working_directory": "/tmp/terra-desktop-unrelated-016",
+        "started_utc": "2026-10-29T05:50:49.003617+00:00",
+        "binary_sha256": "73bef2f236d0b6c7a93cc17de86a22d7e85c15ac67a49d7fec9c74a5c71caf61",
+        "source_input_count": 366,
+        "expected_interruption": false,
+        "trace_file": "/tmp/terra-native/v16-desktop-launcher.trace",
+        "schema": 1,
+        "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+        "pid": 74052,
+        "exit_code": 0,
+        "finished_utc": "2026-10-29T05:51:05.517946+00:00",
+        "seconds": 16.514077273997827,
+        "source_inputs_unchanged": true,
+        "log_sha256": "bb2f5c59914b6e9d9a99a385083f79ab88277b2cb42c29bc2f96835bb216e153",
+        "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+        "trace_sha256": "540ac8fa6b0a8d4e49e4393d9bf8a1d17dd63dfa7997575e3666f8f9822a08d8"
+      },
+      "source_checkout_path_mentions": 0,
+      "successful_packaged_opens": {
+        "crates/terra-stream/data/heightmap-connected/manifest.json": 0,
+        "crates/terra-bevy/assets/character-demo.pack.json": 0,
+        "crates/terra-bevy/assets/character-pack/fieldhand.glb": 0,
+        "crates/terra-bevy/assets/character-pack/comet-cabin.glb": 0
+      },
+      "original_packaged_payload_unchanged_after_both_runs": true,
+      "process_binary_hash_describes": "launcher shell script"
+    },
+    {
+      "kind": "prepared_world",
+      "process": {
+        "release": "0.16.0",
+        "phase": "package_confirmation",
+        "command": [
+          "strace",
+          "-f",
+          "-qq",
+          "-e",
+          "trace=file",
+          "-o",
+          "/tmp/terra-native/v16-desktop-world.trace",
+          "/tmp/terra-desktop-016/terra-world-0.16.0-linux-x86_64/terra-demo",
+          "--play",
+          "--heightmap",
+          "/tmp/terra-desktop-016/terra-world-0.16.0-linux-x86_64/crates/terra-stream/data/heightmap-connected/manifest.json",
+          "--no-default-politics",
+          "--region-store",
+          "/tmp/terra-native/v16-desktop-world.db",
+          "--quality",
+          "performance",
+          "--radius",
+          "1",
+          "--time-scale",
+          "0",
+          "--camp-view",
+          "--noon",
+          "--user-data",
+          "/tmp/terra-desktop-data-016/world-user-data",
+          "--asset-pack",
+          "/tmp/terra-desktop-016/terra-world-0.16.0-linux-x86_64/crates/terra-bevy/assets/character-demo.pack.json",
+          "--telemetry",
+          "/tmp/terra-native/v16-desktop-world-telemetry.json",
+          "--frames",
+          "180",
+          "--screenshot",
+          "/tmp/terra-native/v16-desktop-world.png"
+        ],
+        "working_directory": "/tmp/terra-desktop-unrelated-016",
+        "started_utc": "2026-10-29T05:51:11.554073+00:00",
+        "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+        "source_input_count": 366,
+        "expected_interruption": false,
+        "trace_file": "/tmp/terra-native/v16-desktop-world.trace",
+        "schema": 1,
+        "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+        "pid": 74108,
+        "exit_code": 0,
+        "finished_utc": "2026-10-29T05:51:57.239323+00:00",
+        "seconds": 45.57851135300007,
+        "source_inputs_unchanged": true,
+        "log_sha256": "e6b2b64be840746dd423b05c986f652a5b4a3fa327e1b8f4eeb6e9cf98c8cfcb",
+        "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+        "trace_sha256": "0a62d4a40942665c700e0c7d426c7137188c8f08868e6781039914e1ba9ac64a"
+      },
+      "source_checkout_path_mentions": 0,
+      "successful_packaged_opens": {
+        "crates/terra-stream/data/heightmap-connected/manifest.json": 2,
+        "crates/terra-bevy/assets/character-demo.pack.json": 1,
+        "crates/terra-bevy/assets/character-pack/fieldhand.glb": 1,
+        "crates/terra-bevy/assets/character-pack/comet-cabin.glb": 1
+      },
+      "original_packaged_payload_unchanged_after_both_runs": true,
+      "process_binary_hash_describes": "accepted ELF executable",
+      "observed_application_pid": 74111,
+      "application_pid_evidence": "successful exact extracted terra-demo execve in retained trace; process PID is the tracing parent"
+    }
+  ],
+  "source": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+  "asset_pack": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+  "telemetry": {
+    "path": "docs/verification/v0.16-desktop/v16-desktop-world-telemetry.json",
+    "sha256": "140114dff824d0929185780246ba613abce6b9c837789e682c470361a00a3245",
+    "bytes": 15281
+  },
+  "runtime_dependencies": {
+    "path": "docs/verification/v0.16-desktop/v16-desktop-ldd.log",
+    "sha256": "faf65b0da7e376c3149f1ddb11d440d7976dcff5b1a65a299b03651e81853cbd",
+    "bytes": 441
+  },
+  "checks": {
+    "archive_crc_and_every_member_valid": true,
+    "all_payload_hashes_and_modes_match_archive": true,
+    "extracted_executable_matches_final_gate": true,
+    "all_148_project_payload_files_match_packaged_bytes": true,
+    "two_clean_extracted_runs_from_unrelated_directory": true,
+    "accepted_source_inputs_unchanged": true,
+    "both_traces_have_zero_checkout_path_mentions": true,
+    "packaged_prepared_source_and_seven_model_pack_and_human_cabin_opened": true,
+    "prepared_world_ready_and_graceful_exit_without_reported_errors": true,
+    "seven_models_no_failed_or_rejected_instance": true,
+    "runtime_dependencies_resolved_on_recorded_host": true,
+    "packaged_original_payload_unchanged_after_both_runs": true
+  },
+  "limits": [
+    "Local Linux Xvfb/software Vulkan smoke only, not clean-machine Windows or hardware/device qualification.",
+    "System graphics/input/C runtime libraries are not bundled.",
+    "Source/developer/historical evidence links refer to the complete source companion archive."
+  ],
+  "artifact_references": [
+    {
+      "path": "docs/verification/v0.16-desktop/package-build.json",
+      "sha256": "69d2427af9b2cd9bf1cc78b856defdd39d0cdb35952d8ff030b709fd59fb0275",
+      "bytes": 405
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/package-manifest.json",
+      "sha256": "a869a00e03a561df243bab2b50fc98abd78b6135c19515c34c3e968a50679892",
+      "bytes": 26881
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-launcher-process.json",
+      "sha256": "40ede859dcb2ac3d2644fbb580079b8200e2d4fa5666507a70d7fd73af483df9",
+      "bytes": 1243
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-launcher-start.json",
+      "sha256": "bf673154839f2deb1862cd694e58f41901215ec6ab197110a727cfa5a7519a2c",
+      "bytes": 830
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-launcher.log",
+      "sha256": "bb2f5c59914b6e9d9a99a385083f79ab88277b2cb42c29bc2f96835bb216e153",
+      "bytes": 1460
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-launcher.trace",
+      "sha256": "540ac8fa6b0a8d4e49e4393d9bf8a1d17dd63dfa7997575e3666f8f9822a08d8",
+      "bytes": 81126
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-ldd.log",
+      "sha256": "faf65b0da7e376c3149f1ddb11d440d7976dcff5b1a65a299b03651e81853cbd",
+      "bytes": 441
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-world-process.json",
+      "sha256": "f6dc5051caf880b9b5cf3349f94d23319ef4365f878fac975203481811a31824",
+      "bytes": 1882
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-world-start.json",
+      "sha256": "5c56a7f6d69a664fc0aea8ef3fe77d93692fec51dc8bcea3f4f73b78749d6495",
+      "bytes": 1470
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-world-telemetry.json",
+      "sha256": "140114dff824d0929185780246ba613abce6b9c837789e682c470361a00a3245",
+      "bytes": 15281
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-world.log",
+      "sha256": "e6b2b64be840746dd423b05c986f652a5b4a3fa327e1b8f4eeb6e9cf98c8cfcb",
+      "bytes": 2043
+    },
+    {
+      "path": "docs/verification/v0.16-desktop/v16-desktop-world.trace",
+      "sha256": "0a62d4a40942665c700e0c7d426c7137188c8f08868e6781039914e1ba9ac64a",
+      "bytes": 203561
+    },
+    {
+      "path": "docs/screenshots/v16-desktop-launcher.png",
+      "sha256": "a604b55188ab66d4b7c5b76c29827aa7e85e0da6148b33d36ab5943ccadbde75",
+      "bytes": 810652
+    },
+    {
+      "path": "docs/screenshots/v16-desktop-world.png",
+      "sha256": "4939639f675e1db221ada39d41ec7986575904413bc7e35494bea3680dcc22d0",
+      "bytes": 1271348
+    }
+  ]
+}

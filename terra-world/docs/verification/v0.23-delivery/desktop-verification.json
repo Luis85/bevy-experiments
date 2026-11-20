@@ -1,0 +1,1761 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "status": "passed",
+  "checked_utc": "2026-10-30T09:15:30.713663+00:00",
+  "archive": {
+    "path": "/workspace/scratch/96f1d170dd13/deliverables/terra-world-0.23.0-linux-x86_64.zip",
+    "name": "terra-world-0.23.0-linux-x86_64.zip",
+    "bytes": 39669704,
+    "sha256": "e13a2b09dee1180ed65f2bfddccdb25cf9c144dba82250f26e73e74da3f8122f"
+  },
+  "package_prefix": "terra-world-0.23.0-linux-x86_64/",
+  "archive_entries": 266,
+  "uncompressed_bytes": 172715399,
+  "unix_mode_counts": {
+    "0o644": 264,
+    "0o755": 2
+  },
+  "all_entries_regular_portable_unique": true,
+  "zip_crc_and_streamed_crc_checks_passed": true,
+  "all_manifest_hashes_and_sizes_matched": true,
+  "declared_payload_entries": 180,
+  "declared_payload_allowlist_sha256": "936ae45c7c23352afe39edc44d8f0bee285cf371e3e23079d3462e28cd9f8e18",
+  "all_declared_payload_bytes_match_source": true,
+  "accepted_evidence_files": 82,
+  "all_packaged_evidence_bytes_match_actual_canonical_files": true,
+  "acceptance_record_sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+  "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+  "canonical_gates": 44,
+  "distinct_passing_rust_tests": 1070,
+  "passing_rust_test_executions": 1171,
+  "source_inputs": 381,
+  "source_manifest_sha256": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9",
+  "private_extraction_parent": "/tmp/terra023-desktop-independent-_sa8sdsz",
+  "private_parent_mode": "0o700",
+  "extracted_package": "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.12.14",
+    "smoke_mode": "current_host_environment",
+    "host_library_check": {
+      "command": [
+        "ldd",
+        "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64/terra-demo"
+      ],
+      "working_directory": "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.007103,
+      "log": {
+        "name": "desktop-host-libraries.log",
+        "bytes": 441,
+        "sha256": "4058c83631fe22a02d38ec3c2cc9e5995830ac257b81c8977fd5a1debb8a172b"
+      },
+      "missing_libraries": []
+    },
+    "wrapper": null,
+    "wrapper_sha256": null,
+    "runtime_library_prefix": null,
+    "inherited_LD_LIBRARY_PATH": null,
+    "effective_smoke_LD_LIBRARY_PATH": null,
+    "wrapper_boundary": "Current container dependencies only; no clean-machine claim."
+  },
+  "executions": {
+    "passive": {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-B",
+        "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64/scripts/verify_desktop.py",
+        "--directory",
+        "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64"
+      ],
+      "working_directory": "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.211388,
+      "result": {
+        "name": "desktop-passive.json",
+        "bytes": 711,
+        "sha256": "b3f7a384f35f61957b596b9e101cac9282c0758328922ba7110b0c62c976e129"
+      },
+      "stderr": {
+        "name": "desktop-passive.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "reported": {
+        "status": "passed",
+        "release": "0.23.0",
+        "platform": "linux-x86_64",
+        "build_profile": "dev",
+        "files_verified": 265,
+        "payload_bytes": 172684810,
+        "manifest_sha256": "26da9124ac8b5bad15242519094f329a045ab0d9fe540591e3892af95b471d5e",
+        "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+        "acceptance_record_sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+        "smoke_help": {
+          "status": "not_requested"
+        },
+        "scope": "Exact extracted-file consistency and accepted-binary association. Not publisher authentication, target-device qualification or a power-loss guarantee.",
+        "checked_utc": "2026-10-30T09:15:30.176817+00:00"
+      }
+    },
+    "smoke": {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-B",
+        "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64/scripts/verify_desktop.py",
+        "--directory",
+        "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64",
+        "--smoke-help",
+        "--timeout-seconds",
+        "20"
+      ],
+      "working_directory": "/tmp/terra023-desktop-independent-_sa8sdsz/terra-world-0.23.0-linux-x86_64",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.331465,
+      "result": {
+        "name": "desktop-smoke.json",
+        "bytes": 1176,
+        "sha256": "952eee5c4df274c83bf007209b9b78f4d9faa64cff559de4d33c4f1779c8ba3f"
+      },
+      "stderr": {
+        "name": "desktop-smoke.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "reported": {
+        "status": "passed",
+        "release": "0.23.0",
+        "platform": "linux-x86_64",
+        "build_profile": "dev",
+        "files_verified": 265,
+        "payload_bytes": 172684810,
+        "manifest_sha256": "26da9124ac8b5bad15242519094f329a045ab0d9fe540591e3892af95b471d5e",
+        "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+        "acceptance_record_sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+        "smoke_help": {
+          "status": "passed",
+          "exit_code": 0,
+          "seconds": 0.010872,
+          "output_sha256": "d1546eb9baeeff823232dee6a7f83a1331e73a8adf87c7bd194ce683bb87e979",
+          "output_bytes": 3227,
+          "output_limit_bytes": 65536,
+          "descendant_check": {
+            "status": "owned_process_group_absent",
+            "scope": "The owned group no longer exists; deliberately detached descendants are outside this check."
+          },
+          "scope": "Command-line startup only; no window, saved world or device was exercised."
+        },
+        "scope": "Exact extracted-file consistency and accepted-binary association. Not publisher authentication, target-device qualification or a power-loss guarantee.",
+        "checked_utc": "2026-10-30T09:15:30.508580+00:00"
+      }
+    }
+  },
+  "all_extracted_bytes_modes_inventory_unchanged_afterward": true,
+  "original_archive_unchanged_afterward": true,
+  "implementation_inputs_and_canonical_receipt_unchanged": true,
+  "entry_inventory": {
+    "LICENSE-APACHE": {
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+      "bytes": 10173,
+      "mode": "0o644",
+      "zip_crc32": "b8c21ebb"
+    },
+    "LICENSE-MIT": {
+      "sha256": "94935f1000935144661cf0d1465e26d1610705d39f6ddbfd461141561fbc5a93",
+      "bytes": 1081,
+      "mode": "0o644",
+      "zip_crc32": "5b062596"
+    },
+    "START_HERE.txt": {
+      "sha256": "0444ff73b0bf46f56f3ab7f2c7bd3f9c72f91561acccaec3fbf94555ab325fdb",
+      "bytes": 1500,
+      "mode": "0o644",
+      "zip_crc32": "30361903"
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "sha256": "40ea541d6562cb220d139fd72cd569245b2327fc300b7610bd36d5fd7cdf7578",
+      "bytes": 4776,
+      "mode": "0o644",
+      "zip_crc32": "faab8da1"
+    },
+    "configs/connected-heightmap-multiplayer.json": {
+      "sha256": "c293d6c8d78cf2e310555624ae8e355516ea1bfcf63cc1082d7fabd65b9cba13",
+      "bytes": 305,
+      "mode": "0o644",
+      "zip_crc32": "96ea36be"
+    },
+    "configs/connected-heightmap.json": {
+      "sha256": "bd8fc1f17dc337e3c72c087ece6d54f5b14e116dbb8038e0f31f9c69ebc844fb",
+      "bytes": 345,
+      "mode": "0o644",
+      "zip_crc32": "450a98ad"
+    },
+    "configs/heightmap-multiplayer.json": {
+      "sha256": "2735f956c2a27cab3d4138a1b91db509543b3f50f90a5072b00d729e5a021f2e",
+      "bytes": 391,
+      "mode": "0o644",
+      "zip_crc32": "00156ddc"
+    },
+    "configs/heightmap.json": {
+      "sha256": "824c24f98eaca0ca034c240f4e4d84cd7036507a232c5503c0ca80ead5f33399",
+      "bytes": 278,
+      "mode": "0o644",
+      "zip_crc32": "55e95212"
+    },
+    "configs/historical-1950.json": {
+      "sha256": "52cc470d0a2777ea298c2b5a4ce8f38c40681c50836f99f99e53cef0a7fa8383",
+      "bytes": 451,
+      "mode": "0o644",
+      "zip_crc32": "9541e035"
+    },
+    "configs/historical-1980.json": {
+      "sha256": "29dcc605f1d1da4876d4254eafe1ff58f0ef2d8364f717314088e97155483f28",
+      "bytes": 450,
+      "mode": "0o644",
+      "zip_crc32": "0b6aa437"
+    },
+    "configs/large-region.json": {
+      "sha256": "77a08bddcc9a0aa901105f7690ac62a8dda0b1cda3493e01658309fb5fb39b63",
+      "bytes": 331,
+      "mode": "0o644",
+      "zip_crc32": "77d1a15e"
+    },
+    "configs/live.json": {
+      "sha256": "04495a459beec087b28b119f0310dc301ae5b2c3b1c68be90d280d126e476012",
+      "bytes": 297,
+      "mode": "0o644",
+      "zip_crc32": "cecfa1e7"
+    },
+    "configs/offline.json": {
+      "sha256": "93803d0021018222387d28a289badf974e9e20393081505e937506880f3d8a04",
+      "bytes": 544,
+      "mode": "0o644",
+      "zip_crc32": "07226673"
+    },
+    "crates/terra-bevy/assets/character-authoring.recipe.json": {
+      "sha256": "cad9216953aa7e839db1a660181d362577c04229f688e39ec71582f4ac600eed",
+      "bytes": 5377,
+      "mode": "0o644",
+      "zip_crc32": "cd9ecc5d"
+    },
+    "crates/terra-bevy/assets/character-demo.pack.json": {
+      "sha256": "d0a706a66e69a2c916a04e2e7cd7a51421243806eb20f057e7fc59124eeb8de6",
+      "bytes": 5132,
+      "mode": "0o644",
+      "zip_crc32": "c3fe8e95"
+    },
+    "crates/terra-bevy/assets/character-pack/README.md": {
+      "sha256": "9bc977c0da07af41bf59e8bb763a5c18ef55b1cc1e06ea814edf19a79602b513",
+      "bytes": 4368,
+      "mode": "0o644",
+      "zip_crc32": "8bc0bc24"
+    },
+    "crates/terra-bevy/assets/character-pack/comet-cabin.glb": {
+      "sha256": "07f58f28cc002288213bec5a03db3e318fb07ec8f6708aa713fd807332353d17",
+      "bytes": 224424,
+      "mode": "0o644",
+      "zip_crc32": "5f71ffc7"
+    },
+    "crates/terra-bevy/assets/character-pack/fieldhand.glb": {
+      "sha256": "b5d62261ee73a9a987b754b322ea95ce9d84941ca82e03c87de00568aa759b7e",
+      "bytes": 162140,
+      "mode": "0o644",
+      "zip_crc32": "48264723"
+    },
+    "crates/terra-bevy/assets/character-pack/pack.json": {
+      "sha256": "e099129736ef939986eedf1aaa77488839232e588a39e35abec41931447859f7",
+      "bytes": 993,
+      "mode": "0o644",
+      "zip_crc32": "52125a87"
+    },
+    "crates/terra-bevy/assets/transport-authoring.recipe.json": {
+      "sha256": "b85f1f523ec15bfce258f25bf4b0877c9558faecfcbfa114cba700a2ad093de5",
+      "bytes": 4786,
+      "mode": "0o644",
+      "zip_crc32": "6b9c7069"
+    },
+    "crates/terra-bevy/assets/transport-demo.pack.json": {
+      "sha256": "76be4a7fbd8187b6f64710ef0ea2ee9e6b53a3cd6abdf06daf379ff340b4c6b9",
+      "bytes": 4168,
+      "mode": "0o644",
+      "zip_crc32": "7e27341f"
+    },
+    "crates/terra-bevy/assets/transport-pack/README.md": {
+      "sha256": "ca1f77f531f8c3014451e87eb4c9955838833b141f91a8b1725c0eb208555ad6",
+      "bytes": 2140,
+      "mode": "0o644",
+      "zip_crc32": "5fd48d89"
+    },
+    "crates/terra-bevy/assets/transport-pack/comet.glb": {
+      "sha256": "e13f7026ad6bee911f52c664e480cfd5f42a3417d2ecd463ea755b7ce72479c4",
+      "bytes": 210148,
+      "mode": "0o644",
+      "zip_crc32": "a6bc29e4"
+    },
+    "crates/terra-bevy/assets/transport-pack/pack.json": {
+      "sha256": "293115155bd63a315d72401fa7abf778d68e45af53bedad2e5c7f04a7fbfe4e2",
+      "bytes": 1132,
+      "mode": "0o644",
+      "zip_crc32": "bc1b7d0d"
+    },
+    "crates/terra-bevy/assets/wildlife-authoring.recipe.json": {
+      "sha256": "b6c6b0663d062178667bbc54ac46129f4f0819f8bdcf3a7932cd3b05cea40ca6",
+      "bytes": 3665,
+      "mode": "0o644",
+      "zip_crc32": "b1d738a9"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/README.md": {
+      "sha256": "2c9e10fe70a0000e6841811b3fc6b36515153ff688d6e6dd52272be042a1a231",
+      "bytes": 604,
+      "mode": "0o644",
+      "zip_crc32": "6728bdca"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/boar.glb": {
+      "sha256": "3f96fda99dc8f9178435c659561a004dc1d6d82873bd2131aef839f88712f28f",
+      "bytes": 135992,
+      "mode": "0o644",
+      "zip_crc32": "886ed24d"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/deer.glb": {
+      "sha256": "49629810d8e3280764dfa35aed39e8885ce6779e4b9320c6e003ab87de133f80",
+      "bytes": 163620,
+      "mode": "0o644",
+      "zip_crc32": "7475caa0"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/fox.glb": {
+      "sha256": "85c4421d02116bfc2a6a0af701b0fcb944d667a585824482b0a92a13c26ba048",
+      "bytes": 135308,
+      "mode": "0o644",
+      "zip_crc32": "75fc794f"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/hare.glb": {
+      "sha256": "e27b4e4a838329bd86d3f20957c179475e018258436dd15313d03a6503d4eb3f",
+      "bytes": 135360,
+      "mode": "0o644",
+      "zip_crc32": "0646701d"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/ibex.glb": {
+      "sha256": "758abe4583ad3cfc048c729afc6bc69144f8c6521b1a05faa2c3a6622be8c694",
+      "bytes": 156324,
+      "mode": "0o644",
+      "zip_crc32": "5f09bcb2"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/pack.json": {
+      "sha256": "59f7a987de912f5f696087a8d6a886c44dfd31feff6474893118c4a7dbf9990a",
+      "bytes": 3126,
+      "mode": "0o644",
+      "zip_crc32": "dd414143"
+    },
+    "crates/terra-demo/assets/DejaVuSans-LICENSE.txt": {
+      "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9",
+      "bytes": 3859,
+      "mode": "0o644",
+      "zip_crc32": "436bd13d"
+    },
+    "crates/terra-demo/assets/DejaVuSans.ttf": {
+      "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+      "bytes": 759720,
+      "mode": "0o644",
+      "zip_crc32": "611423b6"
+    },
+    "crates/terra-history/data/natural-earth-countries-2026-10-26.geojson": {
+      "sha256": "304718be169beffee91191729e7514fea5ff7564d216909808f6601cee9b7fbe",
+      "bytes": 911939,
+      "mode": "0o644",
+      "zip_crc32": "d87cbc6d"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7618.json": {
+      "sha256": "b52c9b53064115e2df5497d6fcbbf56cbf6425d01f2470445f5db9528ea97280",
+      "bytes": 8700,
+      "mode": "0o644",
+      "zip_crc32": "d61cd484"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7619.json": {
+      "sha256": "6d101a2c6407930187bdf4ba947cfed0db7a56bfe6fa85219884d97ededfe1ed",
+      "bytes": 8696,
+      "mode": "0o644",
+      "zip_crc32": "d23bdbdc"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7620.json": {
+      "sha256": "fcef0a14117c79f950114e8fa5bff3b0c5183733a7d9492c7a290cc494ee0409",
+      "bytes": 8678,
+      "mode": "0o644",
+      "zip_crc32": "e21f33f8"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7621.json": {
+      "sha256": "eab5c2c7411efb2e91a2928e99638164783750587ddf2314685414f4267427bd",
+      "bytes": 8699,
+      "mode": "0o644",
+      "zip_crc32": "d0a89fe7"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7622.json": {
+      "sha256": "3e370a15a95ea4c56584ac5c698945186c4d84a52f3bbb5ed217397846515cea",
+      "bytes": 8693,
+      "mode": "0o644",
+      "zip_crc32": "7655c139"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7618.json": {
+      "sha256": "2e02d5a2e32cc133e3c0d6db47ccfbb81da15a0d105cceb656038ac379c76247",
+      "bytes": 8708,
+      "mode": "0o644",
+      "zip_crc32": "e0841092"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7619.json": {
+      "sha256": "35972712347b2b4affc1892f038b9754aacc6e8e6cdf895f580306a7be496135",
+      "bytes": 8707,
+      "mode": "0o644",
+      "zip_crc32": "12932ed6"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7620.json": {
+      "sha256": "0ed489da5f6ef2e7f9879340173a0fa1179d42891975cb73fbcfd7a541536611",
+      "bytes": 8703,
+      "mode": "0o644",
+      "zip_crc32": "304f522e"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7621.json": {
+      "sha256": "21d339030a9b03d86cdf1599fdee9fb51ab239c1b8fe09b4bff72c2b9475da60",
+      "bytes": 8708,
+      "mode": "0o644",
+      "zip_crc32": "763329dd"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7622.json": {
+      "sha256": "4799348fab3638d59cff98427c5be83b2820e93936fd9cb11331a55f1081a0e9",
+      "bytes": 8701,
+      "mode": "0o644",
+      "zip_crc32": "a5a37e8d"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7618.json": {
+      "sha256": "84657d2e5b23dd1e217b3b085874ff811650f3dd169f24b5742fe377e9080b92",
+      "bytes": 8706,
+      "mode": "0o644",
+      "zip_crc32": "67a6f7f9"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7619.json": {
+      "sha256": "2284215ab6ab567cc50ea40f33ec008ee6740096ba69e0565d66edb1eb170310",
+      "bytes": 8690,
+      "mode": "0o644",
+      "zip_crc32": "c978d45b"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7620.json": {
+      "sha256": "c218cb58513f5a078cbcbe6943ff5f1c2b519b72176351fb786e4a89407e2f17",
+      "bytes": 8695,
+      "mode": "0o644",
+      "zip_crc32": "e8b328c4"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7621.json": {
+      "sha256": "3be05a0452d34ff5b64c0f9f9760dad4d32ae5076e8936ae895cf7d25e45a3b4",
+      "bytes": 8698,
+      "mode": "0o644",
+      "zip_crc32": "040fbf92"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7622.json": {
+      "sha256": "a5e99a579d33174e92fcaa1d7ce87ccd01973deb5df12831255316e0d4daf44a",
+      "bytes": 8701,
+      "mode": "0o644",
+      "zip_crc32": "e9f66b17"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7618.json": {
+      "sha256": "ac5c1ae3f38c0faedbb1491da811ed7d61a18eac812e571c0d5babeaa9284be1",
+      "bytes": 8674,
+      "mode": "0o644",
+      "zip_crc32": "29eef6c3"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7619.json": {
+      "sha256": "6f0dd997b355a432bd204ac12270ff2106879d16e29410a67fed5f89dd5145fd",
+      "bytes": 8438,
+      "mode": "0o644",
+      "zip_crc32": "485d9b00"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7620.json": {
+      "sha256": "a25c8219475baa3cc70f7a7d835e588e1f3332f87e2c8180f0165e61151e1320",
+      "bytes": 8397,
+      "mode": "0o644",
+      "zip_crc32": "46f5892a"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7621.json": {
+      "sha256": "a6c952ad51d1bf6b2b59b922e562cda67c0781fdc08ca9924a8d51a287375e45",
+      "bytes": 8526,
+      "mode": "0o644",
+      "zip_crc32": "67a9ef2a"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7622.json": {
+      "sha256": "5f1a64a2548ac047aaa1462421c64f15980ffcf6d9916c8903968220e17f2aff",
+      "bytes": 8697,
+      "mode": "0o644",
+      "zip_crc32": "2db5356b"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7618.json": {
+      "sha256": "51ac1b9968341b518917c35d25945d9839a9f73f6b3698edeaee44c9aee16a26",
+      "bytes": 8695,
+      "mode": "0o644",
+      "zip_crc32": "5e465134"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7619.json": {
+      "sha256": "224a76ad9e5025f5b2078ea2eb1bda251ed249cd71feab74483e679c3641223d",
+      "bytes": 8595,
+      "mode": "0o644",
+      "zip_crc32": "da0dd7ce"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7620.json": {
+      "sha256": "e2a0f7fcc6e2007d58613a2a79d3c7e14202b272942d1e99a45917e279075e61",
+      "bytes": 8561,
+      "mode": "0o644",
+      "zip_crc32": "6bca3779"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7621.json": {
+      "sha256": "f38aa8a75beb12b2b2d48fce1283ae0508d471bd7da670923fca0b87d9548e79",
+      "bytes": 8644,
+      "mode": "0o644",
+      "zip_crc32": "a4893b6c"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7622.json": {
+      "sha256": "e11046a79c93d683c70e93719f394dae961126837a5cccd4a4accc20820800a8",
+      "bytes": 8685,
+      "mode": "0o644",
+      "zip_crc32": "6a9a685c"
+    },
+    "crates/terra-history/data/synthetic-era-a/manifest.json": {
+      "sha256": "6f08226baf3941f2eed6021714a9a6956a2c1509314da0de8facb0b5394d3da7",
+      "bytes": 1207,
+      "mode": "0o644",
+      "zip_crc32": "5df45805"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7618.json": {
+      "sha256": "c11032329d1c1037093486b51528ac278d9e7b9efcd621aebefdabacf2baa2d8",
+      "bytes": 10996,
+      "mode": "0o644",
+      "zip_crc32": "223781ef"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7619.json": {
+      "sha256": "05751a007086f34e6e4654b3f10d4394fdd26b66c20ecaf7d55529dcfb9ead81",
+      "bytes": 11001,
+      "mode": "0o644",
+      "zip_crc32": "b96b8349"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7620.json": {
+      "sha256": "27b452e54208fbc97f638391e07cd78014bf6ea090408907b09f7cac41dc330f",
+      "bytes": 10972,
+      "mode": "0o644",
+      "zip_crc32": "c56ef342"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7621.json": {
+      "sha256": "7f4cc81d72d2e2d5928daf8fff835785a3ee3eb577b0c971a1787ffe501bb08f",
+      "bytes": 11004,
+      "mode": "0o644",
+      "zip_crc32": "305e738d"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7622.json": {
+      "sha256": "beb8f4cabb354f5855ff6decb78aa3c71a61c8ab41dd603208705d74e95aafea",
+      "bytes": 10992,
+      "mode": "0o644",
+      "zip_crc32": "66a1bdec"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7618.json": {
+      "sha256": "90120f9719ca6ad8a84852d381a966d577b6aa7a4b1d451e006ffc7a40061fc2",
+      "bytes": 11008,
+      "mode": "0o644",
+      "zip_crc32": "84572792"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7619.json": {
+      "sha256": "c03104ed7b81def93b9b35c1c995bc2be4d4c404655998d921fd33554362e5f1",
+      "bytes": 11010,
+      "mode": "0o644",
+      "zip_crc32": "f2b02e9a"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7620.json": {
+      "sha256": "a3cfbb6ad4e93be55ec3c4a678f713a51e698c97d9e12788d5fbd188bd88e147",
+      "bytes": 11000,
+      "mode": "0o644",
+      "zip_crc32": "0d737797"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7621.json": {
+      "sha256": "9a5574d586ba11a8c8a4c268abf1109b864bb4021f33831fc62ce838bc76fa5b",
+      "bytes": 11011,
+      "mode": "0o644",
+      "zip_crc32": "2b370562"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7622.json": {
+      "sha256": "059a6a370546102e1d530abc13ca5d9aa80de28bedd8b26d27fdd454b69188e5",
+      "bytes": 10999,
+      "mode": "0o644",
+      "zip_crc32": "d35e73f9"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7618.json": {
+      "sha256": "04dfb6d8e58ac56417c9e6d0ec44a3a1ae1331b2e0045e84500129f4355d13b1",
+      "bytes": 11007,
+      "mode": "0o644",
+      "zip_crc32": "2bb8413e"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7619.json": {
+      "sha256": "e87bafea82014607bc7d0fd2b1080601241d101d8492ebcbe34b3af3e2c1c015",
+      "bytes": 10993,
+      "mode": "0o644",
+      "zip_crc32": "c36a3825"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7620.json": {
+      "sha256": "6e5f11b9b83d89477917d2bdc816eac0dc342e7e8a7c1fa894ba19d864fc7282",
+      "bytes": 10992,
+      "mode": "0o644",
+      "zip_crc32": "b2022de9"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7621.json": {
+      "sha256": "e8b99ec91688ff3855f83c338c3639601fe3b20f11046b86307c648ab444de7c",
+      "bytes": 11003,
+      "mode": "0o644",
+      "zip_crc32": "2c95cc67"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7622.json": {
+      "sha256": "2e6f7afea2e55333b435c4e48d1b7c9f5eab7ca0754f6f4641ffbfeb43b29e34",
+      "bytes": 11001,
+      "mode": "0o644",
+      "zip_crc32": "5cef1e44"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7618.json": {
+      "sha256": "b8623d628b4ce44245bf1d62e2b39ceaddc926b63d4b85111c4d479d208e740c",
+      "bytes": 10975,
+      "mode": "0o644",
+      "zip_crc32": "c7312af7"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7619.json": {
+      "sha256": "34b67f2a029c997b8e10ccbe70b94f547859ee464998301f7455648cee807675",
+      "bytes": 10723,
+      "mode": "0o644",
+      "zip_crc32": "30c85f8a"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7620.json": {
+      "sha256": "f50d7a9ed37a127d35b97d89a23a0512de3b3f4e7a0bf19456bbc010e45ef3b2",
+      "bytes": 10676,
+      "mode": "0o644",
+      "zip_crc32": "d05aa055"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7621.json": {
+      "sha256": "2d3c5d76a131de81ad0d93deb938843a923a13bbbac52ccce92f9501a11e5c3a",
+      "bytes": 10827,
+      "mode": "0o644",
+      "zip_crc32": "53b901f7"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7622.json": {
+      "sha256": "53b58dadc65a8a4bfbe8af228a0511c86df601ba69dd33117569789dc391764d",
+      "bytes": 10996,
+      "mode": "0o644",
+      "zip_crc32": "09505597"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7618.json": {
+      "sha256": "ab3768618c7e2dfd0402a19cf1ee4b9beb47a0c3155959d4c4ac27d7bf41d238",
+      "bytes": 10994,
+      "mode": "0o644",
+      "zip_crc32": "c9cada57"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7619.json": {
+      "sha256": "4b0a87d2bc0b90b0f02ec76a4ea21bfc8725498f1702f2682ad56271b38b8223",
+      "bytes": 10885,
+      "mode": "0o644",
+      "zip_crc32": "9dfba9e8"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7620.json": {
+      "sha256": "d4065a952d72800d4b92edfc35304b941d53a86b6437794a5bdd2fe6a1f9e9a9",
+      "bytes": 10839,
+      "mode": "0o644",
+      "zip_crc32": "9385469f"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7621.json": {
+      "sha256": "f0599cd41f07da9b6ef0443ba0ccfce8b8710354d75c1d2a8c94592b1e0ce698",
+      "bytes": 10949,
+      "mode": "0o644",
+      "zip_crc32": "759bafbf"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7622.json": {
+      "sha256": "05f1947b1a37ad152c94fb3f06417cf52d2ae4b911bafd82f6b0a860dd3e7d52",
+      "bytes": 10982,
+      "mode": "0o644",
+      "zip_crc32": "e84163f8"
+    },
+    "crates/terra-history/data/synthetic-era-b/manifest.json": {
+      "sha256": "92ed0613321cf9c5f24e8353748e10bcab824c6fd055ed062b186e6644eb3ffd",
+      "bytes": 1210,
+      "mode": "0o644",
+      "zip_crc32": "7e1b4ec6"
+    },
+    "crates/terra-history/data/synthetic-politics-eras.geojson": {
+      "sha256": "73c586e12e79524715d12a2428a3c91120ca2251ccbdbae8b4078d90a83bf77b",
+      "bytes": 4512,
+      "mode": "0o644",
+      "zip_crc32": "4b6045ad"
+    },
+    "crates/terra-stream/data/heightmap-connected/README.md": {
+      "sha256": "04b93f9992bc0a44a68fd501e77aa5f5e6a0c2698c43e3b79783d5a52cf82fc5",
+      "bytes": 1051,
+      "mode": "0o644",
+      "zip_crc32": "3bf53a64"
+    },
+    "crates/terra-stream/data/heightmap-connected/east.geojson": {
+      "sha256": "14f87645e509a83ede40f2a1dc2b57247a6838cd120b33b0b8e6b9245e63dcd6",
+      "bytes": 9866,
+      "mode": "0o644",
+      "zip_crc32": "9816e0a8"
+    },
+    "crates/terra-stream/data/heightmap-connected/east.json": {
+      "sha256": "cd0c9a7be84b07a33c2f356ac584dc1c72fdb7956bf677c09226ca1e1593e3b1",
+      "bytes": 1065,
+      "mode": "0o644",
+      "zip_crc32": "b3b908b2"
+    },
+    "crates/terra-stream/data/heightmap-connected/east.png": {
+      "sha256": "5b2ab8ae8a04afeea99fa0de1f4bb10afee3df56d24750c122bd42e0df61200f",
+      "bytes": 47205,
+      "mode": "0o644",
+      "zip_crc32": "94eef8e4"
+    },
+    "crates/terra-stream/data/heightmap-connected/manifest.json": {
+      "sha256": "5be2aa55117ea771ad8aa2b3a151b2ac76a11a2ed5d2099890724bf83d081139",
+      "bytes": 177,
+      "mode": "0o644",
+      "zip_crc32": "6d567790"
+    },
+    "crates/terra-stream/data/heightmap-connected/west.geojson": {
+      "sha256": "a31f9a48fd6936a91a22d56561a71f01642a9fdae42cad6e7de5541dd0149963",
+      "bytes": 8203,
+      "mode": "0o644",
+      "zip_crc32": "8b086b9b"
+    },
+    "crates/terra-stream/data/heightmap-connected/west.json": {
+      "sha256": "5bc6cabf9802f07832cc1c1bcdb1decc00388b837423646bd10b89522144b50c",
+      "bytes": 1066,
+      "mode": "0o644",
+      "zip_crc32": "48e840dc"
+    },
+    "crates/terra-stream/data/heightmap-connected/west.png": {
+      "sha256": "6d7e8bbaffb57b3e01730dbdb1fdc5ec32e99730ef0d9271852db23eb72874f5",
+      "bytes": 47734,
+      "mode": "0o644",
+      "zip_crc32": "515570be"
+    },
+    "crates/terra-stream/data/heightmap-demo/README.md": {
+      "sha256": "1235c5bd5a27259da9af6af318c845312664d8dd70a06637504afe64e0d40cf0",
+      "bytes": 1680,
+      "mode": "0o644",
+      "zip_crc32": "d0fc1913"
+    },
+    "crates/terra-stream/data/heightmap-demo/features-v2.geojson": {
+      "sha256": "5872e5d210f353b10a0c213b8916a2ac1f947ad36aede6a4e06222691331dc38",
+      "bytes": 15715,
+      "mode": "0o644",
+      "zip_crc32": "4ee1ab6e"
+    },
+    "crates/terra-stream/data/heightmap-demo/height.png": {
+      "sha256": "bedd5fbb16a8e2765a928f34874d7a44d31e46e2d3eb643710eba9aba930ef5e",
+      "bytes": 93883,
+      "mode": "0o644",
+      "zip_crc32": "c50fdc12"
+    },
+    "crates/terra-stream/data/heightmap-demo/manifest-v2.json": {
+      "sha256": "969d365a0d13e02a4128c124b4d5d8117ce8084f896ce3713abea061441e0e7f",
+      "bytes": 1004,
+      "mode": "0o644",
+      "zip_crc32": "04819dd3"
+    },
+    "crates/terra-stream/data/heightmap-demo/manifest.json": {
+      "sha256": "b4e7492b20aabb11c3bf7f646b06089f650fa1f73f92ff2a37e89c38ccf28324",
+      "bytes": 601,
+      "mode": "0o644",
+      "zip_crc32": "fae3f893"
+    },
+    "docs/ARCHITECTURE.md": {
+      "sha256": "0f5ceaedd8777b559c9477406a0e545ed87f7ec13d153d9e76c1f9f52ad3113c",
+      "bytes": 25715,
+      "mode": "0o644",
+      "zip_crc32": "724f97e8"
+    },
+    "docs/ASSET_AUTHORING.md": {
+      "sha256": "b5186d53856e2126003f53f561d6db72bbb0c9773b55fd8d3fa71ee991a04aae",
+      "bytes": 24004,
+      "mode": "0o644",
+      "zip_crc32": "c547d1b7"
+    },
+    "docs/ASSET_PACKS.md": {
+      "sha256": "5dc59856872853c8703b5e117094a1c9b3ca84aef752a3398661634528dc3aed",
+      "bytes": 22099,
+      "mode": "0o644",
+      "zip_crc32": "340b0e98"
+    },
+    "docs/CLIENT_PREDICTION.md": {
+      "sha256": "29198991d663a7f7196773c1901d765325d3da418765eb661d3f89ab1e6e2aa3",
+      "bytes": 5956,
+      "mode": "0o644",
+      "zip_crc32": "088d3728"
+    },
+    "docs/COMPANIES.md": {
+      "sha256": "abe428732761ed5851f25f4885f3a53e4ab5d1215b87f468e7b24f7a3ff50216",
+      "bytes": 45219,
+      "mode": "0o644",
+      "zip_crc32": "3c330b64"
+    },
+    "docs/COMPATIBILITY.md": {
+      "sha256": "f943bf8e6ec60ff5c36d2ecb40fdd839e93d9d16954b759298ccfc1f88b14224",
+      "bytes": 12832,
+      "mode": "0o644",
+      "zip_crc32": "47af700e"
+    },
+    "docs/CONTACTS_AND_ROUTING.md": {
+      "sha256": "03c8dcf8158e9720849c10064cc194dad120c0d86cab69e12b8c608b9365c97b",
+      "bytes": 41366,
+      "mode": "0o644",
+      "zip_crc32": "fa615c66"
+    },
+    "docs/CONTROLS.md": {
+      "sha256": "d61a56d7291d00ca306b626e61dd5af8efbe76deed5e9765f0f233f7a42df113",
+      "bytes": 18457,
+      "mode": "0o644",
+      "zip_crc32": "10f297a4"
+    },
+    "docs/DATA.md": {
+      "sha256": "10a51567e606655827617d634431c25b982d544cdedd331205349f485de83344",
+      "bytes": 16428,
+      "mode": "0o644",
+      "zip_crc32": "488f2803"
+    },
+    "docs/DESKTOP_DELIVERY.md": {
+      "sha256": "b74f48ed83658096760e2b14e3a5a523fe8ca154692bf2c80a084c0936dd602d",
+      "bytes": 24132,
+      "mode": "0o644",
+      "zip_crc32": "0e52bc2d"
+    },
+    "docs/DIAGNOSTICS.md": {
+      "sha256": "db3d89268a51c9fc2b6e02c05ec2a419350257b3b176af1cfaba934f5ffa0c1c",
+      "bytes": 10840,
+      "mode": "0o644",
+      "zip_crc32": "7ad6008d"
+    },
+    "docs/ECOLOGY.md": {
+      "sha256": "e791466ceffd8ef495986dc5e110c279d3f7c23c32ba7865022f6e6dd0b89394",
+      "bytes": 7160,
+      "mode": "0o644",
+      "zip_crc32": "5ee768ae"
+    },
+    "docs/GAMEPLAY.md": {
+      "sha256": "6cad64b80644e09ab7ff1cdc929c08648e67443ce68816af29cdd6fac9e6c5cd",
+      "bytes": 44262,
+      "mode": "0o644",
+      "zip_crc32": "9efff1d4"
+    },
+    "docs/GAME_FLOW.md": {
+      "sha256": "219a1c27cefcb5ce38af5b726f957b9af0f7052c0e77b6a9ba0e16aa8214845f",
+      "bytes": 32799,
+      "mode": "0o644",
+      "zip_crc32": "34c54157"
+    },
+    "docs/GRAPHICS_AND_MAPS.md": {
+      "sha256": "6ec43e08d99ceb1def40b373f927048ae3b6b08c9f9941791a8a33c63c71cbe7",
+      "bytes": 24446,
+      "mode": "0o644",
+      "zip_crc32": "a5b2aa25"
+    },
+    "docs/GUIDANCE.md": {
+      "sha256": "b2eed102a72443ed8a9a66f61e3cd86a490f7115ea255e0c8f9ed91a8b351296",
+      "bytes": 21347,
+      "mode": "0o644",
+      "zip_crc32": "d027c404"
+    },
+    "docs/HISTORY.md": {
+      "sha256": "513e81207b94b1e55182951b6cc314e9e1a0269685ed06e7b73fbfd586d965b8",
+      "bytes": 11219,
+      "mode": "0o644",
+      "zip_crc32": "f115cbf8"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.18.md": {
+      "sha256": "c48da3ad60bd4a9f5171b079b6229e96941eb36f5bc5f7364d0a8b56a1403bcd",
+      "bytes": 3066,
+      "mode": "0o644",
+      "zip_crc32": "2f2faeb3"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.19.md": {
+      "sha256": "e00c43d8c4a21b92030ced66cf31569cbc974d8bd56ccebfad6a18c55e46e967",
+      "bytes": 6332,
+      "mode": "0o644",
+      "zip_crc32": "44b76ab2"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.20.md": {
+      "sha256": "efcdbb89db1a118b799b2664bd78bdbc7b54bfba5e655ca351678eaae0ef702c",
+      "bytes": 2669,
+      "mode": "0o644",
+      "zip_crc32": "0c03e391"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.21.md": {
+      "sha256": "1a052eb68540d4b6b6c53d82fd3f33ee388c3e107ffe84b911836c9c960c14fa",
+      "bytes": 21662,
+      "mode": "0o644",
+      "zip_crc32": "b94ad8b6"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.22.md": {
+      "sha256": "05d839210b940090c96548004aa1d55fb0113be41f3a2a5a9408b4bc6c53e49b",
+      "bytes": 23997,
+      "mode": "0o644",
+      "zip_crc32": "5ed81357"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.23.md": {
+      "sha256": "599502aa0a3bd5dc2026fa871356682c78e3295c5eed0b7de84bdaf7f8cb65ab",
+      "bytes": 17099,
+      "mode": "0o644",
+      "zip_crc32": "52375be6"
+    },
+    "docs/INTEGRATION.md": {
+      "sha256": "fcd0974b92acb6eadaf8d53a7332017d22cbf2ce79d8346c264e6bdf086621eb",
+      "bytes": 49468,
+      "mode": "0o644",
+      "zip_crc32": "822d2e99"
+    },
+    "docs/LIVING_WORLD.md": {
+      "sha256": "4e8163860febfb27f44bb480e5647a40985f6ea550fb6a419792dde66d7a716f",
+      "bytes": 24091,
+      "mode": "0o644",
+      "zip_crc32": "57454bd7"
+    },
+    "docs/MMORPG_FOUNDATION.md": {
+      "sha256": "03257b12db6cb51812aee8a50641eea78fced23d37907adb6d3d2e98ff919c2a",
+      "bytes": 37151,
+      "mode": "0o644",
+      "zip_crc32": "cdfd3431"
+    },
+    "docs/MOTORTOWN_PARITY.md": {
+      "sha256": "98a74431a65e5873405890c650aea9fb333cddb5707c117d0f414073b04db946",
+      "bytes": 35296,
+      "mode": "0o644",
+      "zip_crc32": "c9cef43c"
+    },
+    "docs/MULTIPLAYER.md": {
+      "sha256": "4cf4dc0021215a2462a0008464597c75e25ef9f83057204e8c008806fd08c0b2",
+      "bytes": 34566,
+      "mode": "0o644",
+      "zip_crc32": "5af4f606"
+    },
+    "docs/NETWORK_REPLICATION.md": {
+      "sha256": "3faf6178afaed31ad73a30be25091c7b5fbff17744e6a133f2923368a67b92b8",
+      "bytes": 30217,
+      "mode": "0o644",
+      "zip_crc32": "acd79002"
+    },
+    "docs/OPEN_GAPS_REPORT_v0.12.md": {
+      "sha256": "f38decd75dc33dccc5ebea339396b643d6fb5b5b36c6a3d75ed3f0195896cdee",
+      "bytes": 41228,
+      "mode": "0o644",
+      "zip_crc32": "baa0596e"
+    },
+    "docs/OPERATIONS.md": {
+      "sha256": "a3bd51aa3fd38a484e6046139714b8be530d287f8bfb8979840e150cfed53eb9",
+      "bytes": 33286,
+      "mode": "0o644",
+      "zip_crc32": "4a8244af"
+    },
+    "docs/PERFORMANCE.md": {
+      "sha256": "5db18fed1392c57ba2f56ad0404299619e1ad7d177c3d24bf9bce985bfd030a9",
+      "bytes": 29450,
+      "mode": "0o644",
+      "zip_crc32": "4da9adf9"
+    },
+    "docs/PLAYTESTING.md": {
+      "sha256": "0b7ed91ac09ba3eae5ac738405dcaf24bc59fd9ae64742d73639cd2b63fc91a0",
+      "bytes": 25969,
+      "mode": "0o644",
+      "zip_crc32": "2080b0c2"
+    },
+    "docs/PRODUCT_REVIEW.md": {
+      "sha256": "35a1df048869ae0417544151e49bac231064b555d56d96cc621d57a049eaf815",
+      "bytes": 17822,
+      "mode": "0o644",
+      "zip_crc32": "955b5f5b"
+    },
+    "docs/PRODUCT_REVIEW_v0.12.md": {
+      "sha256": "2036e2c0d3c3eced9f014a994446f2699ff34dec43d0ccc12922d28367bd1b1c",
+      "bytes": 24033,
+      "mode": "0o644",
+      "zip_crc32": "f3e38b68"
+    },
+    "docs/PRODUCT_REVIEW_v0.13.md": {
+      "sha256": "105560b0dde9df32af149181232105afe8a0430199a7ad348d6071c493b6703c",
+      "bytes": 15949,
+      "mode": "0o644",
+      "zip_crc32": "d8856fc7"
+    },
+    "docs/PRODUCT_REVIEW_v0.14.md": {
+      "sha256": "ca5768e7c628cbd39f91515c7c05a5df8aa3d9c2cc70b01da9d8436c2bfc88f9",
+      "bytes": 22735,
+      "mode": "0o644",
+      "zip_crc32": "7689e484"
+    },
+    "docs/PRODUCT_REVIEW_v0.15.md": {
+      "sha256": "af2d4af495d2c24ae3e9238bde1355a43f9190a7df64580c48b73e8c23ea44c3",
+      "bytes": 19746,
+      "mode": "0o644",
+      "zip_crc32": "5fd72c6a"
+    },
+    "docs/PRODUCT_REVIEW_v0.16.md": {
+      "sha256": "7fa6c2f4b3a95e92c4fbf58e7b8af966e7e843b2c38d9d773e3fe305545baaad",
+      "bytes": 19993,
+      "mode": "0o644",
+      "zip_crc32": "1f364a9d"
+    },
+    "docs/PRODUCT_REVIEW_v0.17.md": {
+      "sha256": "24dcccafe4ddc051722c34e2249f838e4a151097eb09303f6dd9aa3a696b78e6",
+      "bytes": 13974,
+      "mode": "0o644",
+      "zip_crc32": "6c4a0c45"
+    },
+    "docs/PRODUCT_REVIEW_v0.18.md": {
+      "sha256": "b6c1bdb022639e8b7821b288d56a0cbe97bda672aa231e6ca0f17b3dbe2b9ede",
+      "bytes": 1015,
+      "mode": "0o644",
+      "zip_crc32": "157418d2"
+    },
+    "docs/PRODUCT_REVIEW_v0.19.md": {
+      "sha256": "319b0ad1984e7530a96107fde5092ec2bafd0f57b2ad325a01cac5a0cebd4538",
+      "bytes": 1281,
+      "mode": "0o644",
+      "zip_crc32": "e1ba91d4"
+    },
+    "docs/PRODUCT_REVIEW_v0.20.md": {
+      "sha256": "a1fdcaab64c544ab277f6c5dd20b6fec38ea1ba53a6b99d2a1be1e0606d9b6b0",
+      "bytes": 1565,
+      "mode": "0o644",
+      "zip_crc32": "48e27b99"
+    },
+    "docs/PRODUCT_REVIEW_v0.21.md": {
+      "sha256": "7e03b6a75dd1f65f0efa276aa330e5f06373d89aa9dd73494d529ad352e44a79",
+      "bytes": 9838,
+      "mode": "0o644",
+      "zip_crc32": "6d365d80"
+    },
+    "docs/PRODUCT_REVIEW_v0.22.md": {
+      "sha256": "3aa5382f8c144d8401e421b73428b2767edad50d96d3fa890bc0ad5465d8501a",
+      "bytes": 19253,
+      "mode": "0o644",
+      "zip_crc32": "ac566171"
+    },
+    "docs/RECOVERY_BUNDLES.md": {
+      "sha256": "103306b4bcf645ddc028be142d5ae32d9ea380d0a831dd1c0dab27b145910440",
+      "bytes": 19468,
+      "mode": "0o644",
+      "zip_crc32": "f1537465"
+    },
+    "docs/REGIONAL_PERSISTENCE.md": {
+      "sha256": "92646d6dd3579f67cacf7b1e4225a030877aa8a130c7537c24ddc6ab027db3cf",
+      "bytes": 28413,
+      "mode": "0o644",
+      "zip_crc32": "a98a136f"
+    },
+    "docs/RELEASE_HISTORY.md": {
+      "sha256": "b74478ac1d103cf3ae2e06272a592ae3c4230ae9d2e35994cb3009c9a1a8ad8a",
+      "bytes": 25382,
+      "mode": "0o644",
+      "zip_crc32": "a4c8e6e8"
+    },
+    "docs/RESEARCH_v0.22.md": {
+      "sha256": "3b107d7c166eceee2c91e20b46fd741d887437fc4e267868c1329fc8ab40b99b",
+      "bytes": 13662,
+      "mode": "0o644",
+      "zip_crc32": "d4739b42"
+    },
+    "docs/RESEARCH_v0.23.md": {
+      "sha256": "20ae2db777137d2759e1ad4248be94081f2d958053b3669c284491fcb7abf031",
+      "bytes": 10681,
+      "mode": "0o644",
+      "zip_crc32": "04e22e3d"
+    },
+    "docs/REVIEW_GAPS_v0.13.md": {
+      "sha256": "e620d854acee39e722f50151b20ae0eb050de0c829c8fd0c34829bdc1fcc5eff",
+      "bytes": 17538,
+      "mode": "0o644",
+      "zip_crc32": "a6785218"
+    },
+    "docs/REVIEW_GAPS_v0.14.md": {
+      "sha256": "e5449e02ec2e6d4ce2975180b913e7d463c68fc58a95e3c2b33bf2de30d7dcb7",
+      "bytes": 23728,
+      "mode": "0o644",
+      "zip_crc32": "806edce0"
+    },
+    "docs/REVIEW_GAPS_v0.15.md": {
+      "sha256": "094008691a5497ba6072915f7a75491d6f9883ed8f6430d12ec84784a4cd5766",
+      "bytes": 18945,
+      "mode": "0o644",
+      "zip_crc32": "8ce90a64"
+    },
+    "docs/REVIEW_GAPS_v0.16.md": {
+      "sha256": "0150aa2dc4eb9f723ce8f570e6de1ad7591e8222e4b4cda3839630cc9384aa33",
+      "bytes": 24746,
+      "mode": "0o644",
+      "zip_crc32": "53bf9c8e"
+    },
+    "docs/REVIEW_GAPS_v0.17.md": {
+      "sha256": "6872b3d995115450d91852e6bc59bc04d1cfff97b0388f66358c499ff1020d5d",
+      "bytes": 20068,
+      "mode": "0o644",
+      "zip_crc32": "ccaf6db9"
+    },
+    "docs/REVIEW_GAPS_v0.18.md": {
+      "sha256": "b55211c7f0ed4d5b67f21396aaf348a1c1175989e61d746ea17c08fbcba2f0c7",
+      "bytes": 10117,
+      "mode": "0o644",
+      "zip_crc32": "562550a1"
+    },
+    "docs/REVIEW_GAPS_v0.19.md": {
+      "sha256": "913d52ca7e14b31b03dfc80028d7d85e0acddd5542510afada63808ab085d82a",
+      "bytes": 13429,
+      "mode": "0o644",
+      "zip_crc32": "4233e655"
+    },
+    "docs/REVIEW_GAPS_v0.20.md": {
+      "sha256": "320bba7d1a3a768b1f2c0668bed54fbf6118fabb68b7dd10b8fd96487c46f75b",
+      "bytes": 10988,
+      "mode": "0o644",
+      "zip_crc32": "a9745298"
+    },
+    "docs/REVIEW_GAPS_v0.21.md": {
+      "sha256": "1bf374eaf42a96339a0c1d2697d495f6df14865652d0af36a525b3381676dcf5",
+      "bytes": 12737,
+      "mode": "0o644",
+      "zip_crc32": "5bcfd8d7"
+    },
+    "docs/REVIEW_GAPS_v0.22.md": {
+      "sha256": "c9802259ae7403ba5731f8a2aa47e3018104b0fdb26dea102e0c0330109e1104",
+      "bytes": 12642,
+      "mode": "0o644",
+      "zip_crc32": "2215447c"
+    },
+    "docs/REVIEW_GAPS_v0.23.md": {
+      "sha256": "492a8596b12f2b768c035ded1b951a0d39fa2e41abfd8a304c66725118c6edf0",
+      "bytes": 10347,
+      "mode": "0o644",
+      "zip_crc32": "ba978290"
+    },
+    "docs/SCALING.md": {
+      "sha256": "456db85af3c5f2c1400e64240ad6a1b2e575e286f910b209ddead47bfca43c47",
+      "bytes": 26786,
+      "mode": "0o644",
+      "zip_crc32": "e1832299"
+    },
+    "docs/SETTLEMENTS_AND_ECONOMY.md": {
+      "sha256": "8cb9c0cbe8a01ed6931732c127b29835288342c5cb79bc15068a15f805e2b99f",
+      "bytes": 21944,
+      "mode": "0o644",
+      "zip_crc32": "cf7a07c8"
+    },
+    "docs/SOURCE_BUNDLES.md": {
+      "sha256": "330a16ffd0db9fa639804d0217556513db6362739082182c4a81c22e8224e629",
+      "bytes": 20216,
+      "mode": "0o644",
+      "zip_crc32": "c9ee4e36"
+    },
+    "docs/TRANSPORT.md": {
+      "sha256": "26b84a28a37d16a535b53a6fe14c1c839904ff57179bf607e8c0a6bff108a0f2",
+      "bytes": 20612,
+      "mode": "0o644",
+      "zip_crc32": "91668b6c"
+    },
+    "docs/VALIDATION.md": {
+      "sha256": "a94a86e568b3328ce03c902920a237fdecf273544c9f64458a0f02b35b0dc354",
+      "bytes": 14967,
+      "mode": "0o644",
+      "zip_crc32": "9617a187"
+    },
+    "docs/VALIDATION_v0.12.md": {
+      "sha256": "4bdb8d8877a28127ca19379b7a56da74b42549b860617d2db5f54476ae1e9ce8",
+      "bytes": 26876,
+      "mode": "0o644",
+      "zip_crc32": "f9e78f5d"
+    },
+    "docs/VALIDATION_v0.13.md": {
+      "sha256": "e57e7b03ff1ff61ce86dc5332065cc5c93f72c355e1c7e84c862a8c6f85542c7",
+      "bytes": 10804,
+      "mode": "0o644",
+      "zip_crc32": "2d3ba8f6"
+    },
+    "docs/VALIDATION_v0.14.md": {
+      "sha256": "983d9cd3db08dddd18bd1d54b21943a7a56d2840b2b1dacee966c8e6df883e3e",
+      "bytes": 18633,
+      "mode": "0o644",
+      "zip_crc32": "fad6d422"
+    },
+    "docs/VALIDATION_v0.15.md": {
+      "sha256": "52c2168fd113c5ecef5340cb55de912f1962367dff670ee9aa5fcd4f18c859be",
+      "bytes": 18525,
+      "mode": "0o644",
+      "zip_crc32": "d4b90113"
+    },
+    "docs/VALIDATION_v0.16.md": {
+      "sha256": "0955fc74ee7d1a7cc6cc2042600190e47ac90c1183271805c9cdd9a5095c95b5",
+      "bytes": 15301,
+      "mode": "0o644",
+      "zip_crc32": "294ebd11"
+    },
+    "docs/VALIDATION_v0.17.md": {
+      "sha256": "108ccf5823d611b6b9aa04dd66f7bcf2136e40988e8e2d4e794d480fd275ab06",
+      "bytes": 15057,
+      "mode": "0o644",
+      "zip_crc32": "8fc1babf"
+    },
+    "docs/VALIDATION_v0.18.md": {
+      "sha256": "9ec04fe38ab6afc3bccadfd4ede189c116636b24827dd086a6450fed8e9200c5",
+      "bytes": 5301,
+      "mode": "0o644",
+      "zip_crc32": "040ab792"
+    },
+    "docs/VALIDATION_v0.19.md": {
+      "sha256": "bb81c117cff809b8ab4193b55690eabe3d99c13e7accfd7650cd2665f98ab771",
+      "bytes": 6624,
+      "mode": "0o644",
+      "zip_crc32": "5d7d9ba6"
+    },
+    "docs/VALIDATION_v0.20.md": {
+      "sha256": "2bf69133df684f7878c2603f8425452ba629fccae16fc29f4739ce33f3ff7ca2",
+      "bytes": 5620,
+      "mode": "0o644",
+      "zip_crc32": "2a196085"
+    },
+    "docs/VALIDATION_v0.21.md": {
+      "sha256": "4cb03983edb4f8b4bd6be92678020933833b1a4cac546cc88fe9d1f4809b79e6",
+      "bytes": 10533,
+      "mode": "0o644",
+      "zip_crc32": "9b80c505"
+    },
+    "docs/VALIDATION_v0.22.md": {
+      "sha256": "6536abfe5a91c4939ac21f8e5f0f55fa8851217ecdda40ab36cbd8d1a2a25598",
+      "bytes": 18591,
+      "mode": "0o644",
+      "zip_crc32": "f6f2c84e"
+    },
+    "docs/VEHICLE_DYNAMICS.md": {
+      "sha256": "3971d080d8fd8e78169e691ce79885fccc124062f65c7ca3b688b3464d5e4733",
+      "bytes": 23339,
+      "mode": "0o644",
+      "zip_crc32": "1ca0f20e"
+    },
+    "docs/reports/Terra-World-0.12-Open-Gaps-Report.pdf": {
+      "sha256": "b88068efe8b99448174ba28e09a543f6382ac3c6eb329b231070355aaae74569",
+      "bytes": 109445,
+      "mode": "0o644",
+      "zip_crc32": "bbb95995"
+    },
+    "evidence/asset-authored-validate.json": {
+      "sha256": "6e924ee63c4e273d0d6863be589b417ab4df9bcd1bc9246b481fd6566815d8b8",
+      "bytes": 3270,
+      "mode": "0o644",
+      "zip_crc32": "b0a2ac1a"
+    },
+    "evidence/asset-authored-validate.log": {
+      "sha256": "892d03f4d250a797a10ce0b99345c4427e0997cfc4fc3b2ef591d572ba79af72",
+      "bytes": 3453,
+      "mode": "0o644",
+      "zip_crc32": "dbcc6439"
+    },
+    "evidence/asset-build.json": {
+      "sha256": "4cd0441839d53596ce918722ff2182fd3376beaf3709e3cf51147530e2424354",
+      "bytes": 12819,
+      "mode": "0o644",
+      "zip_crc32": "5be2e9c2"
+    },
+    "evidence/asset-build.log": {
+      "sha256": "0f4189da3862dac123da18e4249aaeff26d8318a0ddc77420ca2bf26732008a2",
+      "bytes": 13045,
+      "mode": "0o644",
+      "zip_crc32": "083ee721"
+    },
+    "evidence/asset-inspect.json": {
+      "sha256": "1b32560ff1fd3f9c0404a93b7e9a6084e20be4caf74e10142552d9016f09c263",
+      "bytes": 2255,
+      "mode": "0o644",
+      "zip_crc32": "ebb020e0"
+    },
+    "evidence/asset-inspect.log": {
+      "sha256": "c6b3f2dd101e3374c35864ca3c094e6a0831609a632dbd8f800d921bdc8934a2",
+      "bytes": 2424,
+      "mode": "0o644",
+      "zip_crc32": "f0f2b71e"
+    },
+    "evidence/asset-pack.json": {
+      "sha256": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+      "bytes": 3261,
+      "mode": "0o644",
+      "zip_crc32": "f56d6ae0"
+    },
+    "evidence/asset-pack.log": {
+      "sha256": "6e49b7b50c49564d53cbf2590a6770334d2498c2b4747d08c5f08b56872a13e8",
+      "bytes": 3432,
+      "mode": "0o644",
+      "zip_crc32": "47b76214"
+    },
+    "evidence/bevy-headless.log": {
+      "sha256": "4a9998964d9ee844c136c8125176c5483e0db6afd580606ad4e3505c3276de97",
+      "bytes": 17499,
+      "mode": "0o644",
+      "zip_crc32": "143892ec"
+    },
+    "evidence/bevy-render.log": {
+      "sha256": "88682184047140ba672b588927af5cce6067d472cb223674411c3169499ae18b",
+      "bytes": 15758,
+      "mode": "0o644",
+      "zip_crc32": "78d09c0b"
+    },
+    "evidence/career-report.json": {
+      "sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "bytes": 12948,
+      "mode": "0o644",
+      "zip_crc32": "55876aa8"
+    },
+    "evidence/career-report.log": {
+      "sha256": "10e29f72beda1618e800a6a2fad803447865e808de3a0f69d679618c1785614a",
+      "bytes": 8937,
+      "mode": "0o644",
+      "zip_crc32": "935e3f8a"
+    },
+    "evidence/character-asset-build.json": {
+      "sha256": "d26ce353915d4f114755e146239baaf9476059a702d5cf8ecc08420416c3d3e4",
+      "bytes": 19215,
+      "mode": "0o644",
+      "zip_crc32": "6e106202"
+    },
+    "evidence/character-asset-build.log": {
+      "sha256": "6bba3c0a5e2d7b68a24afaca006eae42486bf96d0572943d56159cc54a14dd4f",
+      "bytes": 19452,
+      "mode": "0o644",
+      "zip_crc32": "3bd16014"
+    },
+    "evidence/character-authored-validate.json": {
+      "sha256": "3aaaedf689bbf483295a7aebb60697c0cb133d716fada1445332c31d1e120baf",
+      "bytes": 4475,
+      "mode": "0o644",
+      "zip_crc32": "9750d9a2"
+    },
+    "evidence/character-authored-validate.log": {
+      "sha256": "30b785afe3acf660a7d61257105cc9338df172983a787ded90490795f4578836",
+      "bytes": 4668,
+      "mode": "0o644",
+      "zip_crc32": "c0482a12"
+    },
+    "evidence/character-demo-pack.json": {
+      "sha256": "7d1a3d5cab0fe8f32affc88f1b86a0bd8c70f38639c6cba2db45aa8dc6e38363",
+      "bytes": 4475,
+      "mode": "0o644",
+      "zip_crc32": "3fe33f9d"
+    },
+    "evidence/character-demo-pack.log": {
+      "sha256": "c4631716d172f3e2266c9a7d5fa17879f3739011e2df349b4d3f540aadd3619d",
+      "bytes": 4647,
+      "mode": "0o644",
+      "zip_crc32": "0e9db62a"
+    },
+    "evidence/character-generator.json": {
+      "sha256": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+      "bytes": 858,
+      "mode": "0o644",
+      "zip_crc32": "3471e921"
+    },
+    "evidence/character-generator.log": {
+      "sha256": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+      "bytes": 858,
+      "mode": "0o644",
+      "zip_crc32": "3471e921"
+    },
+    "evidence/character-inspect.json": {
+      "sha256": "2e3a70ab38a5c1675068f23614a3c2e4114d28bffe2e0b23b1a470940d8d83a7",
+      "bytes": 2182,
+      "mode": "0o644",
+      "zip_crc32": "24d088b8"
+    },
+    "evidence/character-inspect.log": {
+      "sha256": "7ddfbbc88f0e9020e3c2f37efe36ce47d6ec40175f702aea5de98e9e7e42a9af",
+      "bytes": 2357,
+      "mode": "0o644",
+      "zip_crc32": "4bf5fc46"
+    },
+    "evidence/character-pack.json": {
+      "sha256": "3928168d402dd15595352c5e64ac1d509707337b277dd8800a0140862e7214ca",
+      "bytes": 906,
+      "mode": "0o644",
+      "zip_crc32": "3b86e402"
+    },
+    "evidence/character-pack.log": {
+      "sha256": "2da4a26bdf2da96d4da8afb6d3802ad3401683ddf748ad99d0822ec07a0b865e",
+      "bytes": 1078,
+      "mode": "0o644",
+      "zip_crc32": "0308af2b"
+    },
+    "evidence/compatibility.log": {
+      "sha256": "8e71b89ed5d502f9bcd06ede7a726618b5ab3295f3d530375128b7024ba9e130",
+      "bytes": 1066,
+      "mode": "0o644",
+      "zip_crc32": "1719f354"
+    },
+    "evidence/completed-gates.json": {
+      "sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+      "bytes": 35017,
+      "mode": "0o644",
+      "zip_crc32": "23628013"
+    },
+    "evidence/custom-provider-example.log": {
+      "sha256": "e1277a8639bcc625bb7ed5718c7be0e697fe7a684da2a766b6707a48adbde8a1",
+      "bytes": 159,
+      "mode": "0o644",
+      "zip_crc32": "d87492fb"
+    },
+    "evidence/demo-check.log": {
+      "sha256": "821ec5a57da280bfabb113e0784bce41affc26c2dbb737e959c4f55c1504332c",
+      "bytes": 12196,
+      "mode": "0o644",
+      "zip_crc32": "718e6b6e"
+    },
+    "evidence/demo.log": {
+      "sha256": "075a51b3cdb2a11a04bf7c38f6c07cd38bcf26b08d7cbe222458750b569d0b0d",
+      "bytes": 24929,
+      "mode": "0o644",
+      "zip_crc32": "16abae88"
+    },
+    "evidence/desktop-packaging-tests.log": {
+      "sha256": "ab21650d4a78923aff5e07f4b50357508ba32f418650a533156c2268f010d9a3",
+      "bytes": 8471,
+      "mode": "0o644",
+      "zip_crc32": "56be8d62"
+    },
+    "evidence/distinct-tests.json": {
+      "sha256": "cf0498e3b82dd4f8ae2ccc6ade60fd49fab9142439e15ab35daf8e6012ea759c",
+      "bytes": 171271,
+      "mode": "0o644",
+      "zip_crc32": "576f60ff"
+    },
+    "evidence/format.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "0o644",
+      "zip_crc32": "00000000"
+    },
+    "evidence/gates.json": {
+      "sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+      "bytes": 35017,
+      "mode": "0o644",
+      "zip_crc32": "23628013"
+    },
+    "evidence/guidance-continuity.json": {
+      "sha256": "b1f7720a11daa681e4d8863a6a461663760ded8d1139f1378402a3fa43b89257",
+      "bytes": 1431,
+      "mode": "0o644",
+      "zip_crc32": "228e31b6"
+    },
+    "evidence/guidance-continuity.log": {
+      "sha256": "c2a6a24a65008e6b981df591904c9a08899aefb820b3aac1e3ed4ee438dd8cc5",
+      "bytes": 1794,
+      "mode": "0o644",
+      "zip_crc32": "7265a883"
+    },
+    "evidence/headless-example.log": {
+      "sha256": "a95d1003235b7c797f69084ac8e98b7ad1c0be10c5d3a519a9eb7184b7dc1343",
+      "bytes": 221,
+      "mode": "0o644",
+      "zip_crc32": "a136bb19"
+    },
+    "evidence/headless.log": {
+      "sha256": "adb943d8a7a408e2db714dd264ebf8700dc44f94b9258c18aaf32198f9e6e585",
+      "bytes": 71173,
+      "mode": "0o644",
+      "zip_crc32": "5f1210b8"
+    },
+    "evidence/launcher-recovery.json": {
+      "sha256": "0f28a6461cc8710a6e381f5ba606760059bc8dc42b404129a8c18910f5a885a2",
+      "bytes": 678,
+      "mode": "0o644",
+      "zip_crc32": "3d0d1d28"
+    },
+    "evidence/launcher-recovery.log": {
+      "sha256": "985884056445e4c2052a6bab5e95a458a82f801486e69091ccec9ca8ef02b188",
+      "bytes": 1001,
+      "mode": "0o644",
+      "zip_crc32": "90333ba2"
+    },
+    "evidence/launcher-world-names.json": {
+      "sha256": "83a561d29d951186fdcd7b703942537bb0924f8184d3358e706d9cc591036e8c",
+      "bytes": 671,
+      "mode": "0o644",
+      "zip_crc32": "5d6b2a6c"
+    },
+    "evidence/launcher-world-names.log": {
+      "sha256": "7c24e12ffb5de7d086bde31502eb94f44cdfb6d36c45bfb86be3a0f8b888f011",
+      "bytes": 1004,
+      "mode": "0o644",
+      "zip_crc32": "33a802a3"
+    },
+    "evidence/native-build.log": {
+      "sha256": "5dd2925987595dde1ced55f796ef76bc6050d1226b10b825b39b1d9c2aed900e",
+      "bytes": 395141,
+      "mode": "0o644",
+      "zip_crc32": "74a09707"
+    },
+    "evidence/navigation-cluster.json": {
+      "sha256": "951606748eeb349eefa598cef8b098eab176047598de37f846dac44c279a4595",
+      "bytes": 1108,
+      "mode": "0o644",
+      "zip_crc32": "6aecd3de"
+    },
+    "evidence/navigation-cluster.log": {
+      "sha256": "802389ca63c94f589ab781935ed946148b4348a2eb6f85f437628671870a03bf",
+      "bytes": 1488,
+      "mode": "0o644",
+      "zip_crc32": "1e525281"
+    },
+    "evidence/navigation-geometry.json": {
+      "sha256": "ef7c3e110dec36ed0413f060c1ce60994b255814889fcacc74005067d4622fd1",
+      "bytes": 7595,
+      "mode": "0o644",
+      "zip_crc32": "f7c90d78"
+    },
+    "evidence/navigation-geometry.log": {
+      "sha256": "9008822b65d4dfc76508a4ea439e15d8cafaa92ea743819f595e76590b2324b8",
+      "bytes": 7854,
+      "mode": "0o644",
+      "zip_crc32": "9961c571"
+    },
+    "evidence/novice-career-report.json": {
+      "sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+      "bytes": 14379,
+      "mode": "0o644",
+      "zip_crc32": "aa0fc691"
+    },
+    "evidence/novice-career-report.log": {
+      "sha256": "51dfbe791ae90b8f57451ac3cdc1c31baa24d0e970b46600ce1bf583e574da3b",
+      "bytes": 9988,
+      "mode": "0o644",
+      "zip_crc32": "2474356f"
+    },
+    "evidence/purchased-career-report.json": {
+      "sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "bytes": 12966,
+      "mode": "0o644",
+      "zip_crc32": "3224aa1a"
+    },
+    "evidence/purchased-career-report.log": {
+      "sha256": "ce42225ca2cd06740e364e27ac5a5e5f19df4f7acde1a4788ea2287ea71ceea5",
+      "bytes": 8860,
+      "mode": "0o644",
+      "zip_crc32": "adb0e9b5"
+    },
+    "evidence/recovery-bundle.json": {
+      "sha256": "a118c634d1a28061c4639abdc72af5a295efab253bda407952ea5dca5faaac3d",
+      "bytes": 3198,
+      "mode": "0o644",
+      "zip_crc32": "5dfd9f7b"
+    },
+    "evidence/recovery-bundle.log": {
+      "sha256": "34071159bb782575906b21b89f78f464167ba5ebf2ebb2f12adf31488c623995",
+      "bytes": 3402,
+      "mode": "0o644",
+      "zip_crc32": "5890590f"
+    },
+    "evidence/recovery-probe.log": {
+      "sha256": "8d6db09f257e213d6ea45a7b3fd6ee9e4d6f2fbc4b7e2f84f0d7d45fc992c18b",
+      "bytes": 2367,
+      "mode": "0o644",
+      "zip_crc32": "85032bd3"
+    },
+    "evidence/recovery.json": {
+      "sha256": "9af53f246335f7c7dfed6b5c00d5a47a860bcc4527aafbc3236cf5bde3bcb401",
+      "bytes": 1881,
+      "mode": "0o644",
+      "zip_crc32": "9d75c944"
+    },
+    "evidence/regional-sessions.json": {
+      "sha256": "46c6d9fb4dc1e5f1a218f75e5abf6f98db745a0a9647512a3bd2bbffdd0034be",
+      "bytes": 30565,
+      "mode": "0o644",
+      "zip_crc32": "206f6eda"
+    },
+    "evidence/regional-sessions.log": {
+      "sha256": "2f6d74b0d4ddfcba014c5f7325236e2eb9761271238f61139d5cc432455196a0",
+      "bytes": 30914,
+      "mode": "0o644",
+      "zip_crc32": "9ce85307"
+    },
+    "evidence/session-probe-checks.log": {
+      "sha256": "43714e60d681fddd0b965373bdab59067e22ce12bd2f61e96fbb957bb9057442",
+      "bytes": 488,
+      "mode": "0o644",
+      "zip_crc32": "7fd333c0"
+    },
+    "evidence/source-export.json": {
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528,
+      "mode": "0o644",
+      "zip_crc32": "77dd2b43"
+    },
+    "evidence/source-export.log": {
+      "sha256": "d30c2ace262bc6f571639a124d31af52160b68e88a9ec9b8205a56e132e72d57",
+      "bytes": 4773,
+      "mode": "0o644",
+      "zip_crc32": "1ee1168f"
+    },
+    "evidence/source-hashes.json": {
+      "sha256": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9",
+      "bytes": 44628,
+      "mode": "0o644",
+      "zip_crc32": "066ee2d8"
+    },
+    "evidence/source-inspect.log": {
+      "sha256": "e951a80c4d302555e77ed1337784ff6b2512b083eec3cecdb982f409d1ebcce4",
+      "bytes": 5039,
+      "mode": "0o644",
+      "zip_crc32": "695dba5e"
+    },
+    "evidence/source-inspection.json": {
+      "sha256": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+      "bytes": 4169,
+      "mode": "0o644",
+      "zip_crc32": "6f13381b"
+    },
+    "evidence/source-install.json": {
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528,
+      "mode": "0o644",
+      "zip_crc32": "77dd2b43"
+    },
+    "evidence/source-install.log": {
+      "sha256": "a06223b28b74d616c562ada59d4afbbded222e887d26b5e527bc60afb3b137fa",
+      "bytes": 4953,
+      "mode": "0o644",
+      "zip_crc32": "90d02722"
+    },
+    "evidence/source-verify.json": {
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528,
+      "mode": "0o644",
+      "zip_crc32": "77dd2b43"
+    },
+    "evidence/source-verify.log": {
+      "sha256": "da8512c49fa013ae4ab696ac8ffbc650aaa056be957ce0f83b22fc87210c4113",
+      "bytes": 4906,
+      "mode": "0o644",
+      "zip_crc32": "b2d2a62c"
+    },
+    "evidence/startup-metadata.log": {
+      "sha256": "51970de8a32a2a34f159983cdb841c765ad994584ac9f4e6292bc5ac554c55b4",
+      "bytes": 42271,
+      "mode": "0o644",
+      "zip_crc32": "9cb0754f"
+    },
+    "evidence/startup-toolchain.log": {
+      "sha256": "55cd0529c005d3f62869ea6e2271bfa9d5196f56dc65a8be00a371af114a4a98",
+      "bytes": 36,
+      "mode": "0o644",
+      "zip_crc32": "c70d8e0e"
+    },
+    "evidence/traffic-recovery.json": {
+      "sha256": "14dc943629496a36f4b1d05cdb1d4fdceb52001314298bc58fa7e7649b7830f2",
+      "bytes": 1665,
+      "mode": "0o644",
+      "zip_crc32": "cc99a77a"
+    },
+    "evidence/traffic-recovery.log": {
+      "sha256": "bcc6640a2742e63e8050d353a7aa314e4abed5eba8cce699b833926b7c99ebd0",
+      "bytes": 1895,
+      "mode": "0o644",
+      "zip_crc32": "2a66e759"
+    },
+    "evidence/vehicle-asset-build.json": {
+      "sha256": "41ebf45320d5a9eb898f5a3500882959b7f02ba75649c7a6a09fb111661a7e65",
+      "bytes": 16962,
+      "mode": "0o644",
+      "zip_crc32": "9041cd17"
+    },
+    "evidence/vehicle-asset-build.log": {
+      "sha256": "0248f948d7152b3c7a7e3a007d33dee863c38fb02f708b4cd6bea7a7ef4b267c",
+      "bytes": 17197,
+      "mode": "0o644",
+      "zip_crc32": "028e23ae"
+    },
+    "evidence/vehicle-authored-validate.json": {
+      "sha256": "76eabb2a3d042c10d9dc5b03e5a3ef3a432f24d963f9ba0f4eb69a10d71c3f07",
+      "bytes": 3872,
+      "mode": "0o644",
+      "zip_crc32": "8dc30724"
+    },
+    "evidence/vehicle-authored-validate.log": {
+      "sha256": "9c21bf8fcf0d016ee9d8a4829dbf6f273bb88dfd5588600b7e68afdb2dfc78e3",
+      "bytes": 4063,
+      "mode": "0o644",
+      "zip_crc32": "ff4678a3"
+    },
+    "evidence/vehicle-demo-pack.json": {
+      "sha256": "1b54e95fa9fd90215ccb4dc298b62dd100dec1c07d8060acc19a9ffab86638ab",
+      "bytes": 3859,
+      "mode": "0o644",
+      "zip_crc32": "e48ff901"
+    },
+    "evidence/vehicle-demo-pack.log": {
+      "sha256": "dc5e751cc8770490c3e62bd6fa1cf0770ac2ea046f3d590e2b353995c3bc2d75",
+      "bytes": 4031,
+      "mode": "0o644",
+      "zip_crc32": "6e9bc202"
+    },
+    "evidence/vehicle-generator.json": {
+      "sha256": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+      "bytes": 178,
+      "mode": "0o644",
+      "zip_crc32": "31a1c41a"
+    },
+    "evidence/vehicle-generator.log": {
+      "sha256": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+      "bytes": 178,
+      "mode": "0o644",
+      "zip_crc32": "31a1c41a"
+    },
+    "evidence/vehicle-inspect.json": {
+      "sha256": "3e5f342ad5f090c9abd53d0dbe51e43d16a927642b02ba2a1fa3d0a448e65d9b",
+      "bytes": 3544,
+      "mode": "0o644",
+      "zip_crc32": "40730a07"
+    },
+    "evidence/vehicle-inspect.log": {
+      "sha256": "b7d9b335576de5f76ddd90b3672c5112b81a09ddbe7381758a8be769eccdb9b0",
+      "bytes": 3715,
+      "mode": "0o644",
+      "zip_crc32": "7c95cc8b"
+    },
+    "evidence/vehicle-pack.json": {
+      "sha256": "7fe712cf059b7b846b22a1364dd9d35d037f3538bd318307fe38fd7a4a259625",
+      "bytes": 895,
+      "mode": "0o644",
+      "zip_crc32": "9ccbb3af"
+    },
+    "evidence/vehicle-pack.log": {
+      "sha256": "1130f3746fe1da356d2d6334437939cfefe54fdb8a58ae53146a5bd050627458",
+      "bytes": 1067,
+      "mode": "0o644",
+      "zip_crc32": "fb14a531"
+    },
+    "package-manifest.json": {
+      "sha256": "26da9124ac8b5bad15242519094f329a045ab0d9fe540591e3892af95b471d5e",
+      "bytes": 30589,
+      "mode": "0o644",
+      "zip_crc32": "413746df"
+    },
+    "scripts/verify_desktop.py": {
+      "sha256": "3a90db41cc6688f4342f2482ba92a89cd93325311aae5d05ec54cc5a2815779b",
+      "bytes": 20578,
+      "mode": "0o644",
+      "zip_crc32": "d50c572c"
+    },
+    "start-terra.sh": {
+      "sha256": "73bef2f236d0b6c7a93cc17de86a22d7e85c15ac67a49d7fec9c74a5c71caf61",
+      "bytes": 138,
+      "mode": "0o755",
+      "zip_crc32": "dabfff01"
+    },
+    "terra-demo": {
+      "sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+      "bytes": 165999296,
+      "mode": "0o755",
+      "zip_crc32": "40518ec0"
+    }
+  },
+  "auditor_sha256": "0528eda5e36bd864483afb45075990a8f821f5bfa4ec51ff40dd2f2da3344edc",
+  "scope": "Exact independently inspected ZIP and extracted payload; shipped passive verifier and finite Linux command-line help. No native window, saved world, physical device, Windows, clean-machine install or publisher authentication is qualified by this run."
+}

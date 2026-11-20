@@ -1,0 +1,573 @@
+{
+  "schema": 1,
+  "status": "passed_selected_restore_invariants",
+  "reviewer": "world/framework specialist independent read-only audit",
+  "started_utc": "2026-10-30T12:55:39.582199+00:00",
+  "finished_utc": "2026-10-30T12:55:39.720544+00:00",
+  "binary_scope": {
+    "sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+    "phase": "pre-final rendering correction",
+    "final_acceptance": false,
+    "source_revision_limit": "The Fleet process receipt records source_inputs_unchanged=false while the integrator prepared the rendering/focus correction. This audit associates these saves with the recorded running binary, not the later current source or final rebuilt executable."
+  },
+  "method": "Stable regular-file reads and duplicate-key-rejecting JSON parse; compare selected actual values in each requested before/after pair; verify original hashes against the earlier audit and copy record; independently reread every audited input digest.",
+  "prior_candidate_audit": {
+    "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-native/candidate-checkpoint-audit.json",
+    "bytes": 10129,
+    "sha256": "20a3aa07de15cee1d75cb59f761d34ec6b219da1e40dac2d74185d977fec8d6d",
+    "mtime_ns": 1793363731594279591,
+    "mtime_utc": "2026-10-30T12:35:31.594280+00:00",
+    "read_identity_stable": true
+  },
+  "confirmation_copy_record": {
+    "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-native/confirmation-inputs.json",
+    "bytes": 1031,
+    "sha256": "d12af24740302f5ad71f3d63c04677441011a20f8141e311cdf3de7b0bbf401f",
+    "mtime_ns": 1793363815890986782,
+    "mtime_utc": "2026-10-30T12:36:55.890987+00:00",
+    "read_identity_stable": true
+  },
+  "pairs": {
+    "building": {
+      "original": {
+        "path": "/tmp/terra-native024/candidate-building-checkpoint.json",
+        "bytes": 1769411,
+        "sha256": "412f4e8ff1369137e3f459bdd4e94532598a5c742cfdcffa785992f1cbdeacfe",
+        "mtime_ns": 1793361935617066244,
+        "mtime_utc": "2026-10-30T12:05:35.617066+00:00",
+        "read_identity_stable": true
+      },
+      "restored_and_saved": {
+        "path": "/tmp/terra-native024/confirmation-building.json",
+        "bytes": 1768720,
+        "sha256": "f7a4a292f8cfeeca9ecced70698a3cf4dc85efe61865fb8fe97f9d717a460095",
+        "mtime_ns": 1793364570872908969,
+        "mtime_utc": "2026-10-30T12:49:30.872909+00:00",
+        "read_identity_stable": true
+      },
+      "selected_before": {
+        "wrapper_schema": 1,
+        "domain_version": 1,
+        "world_identity": {
+          "base_data_revision": "terra-procedural-v2",
+          "seed": 42,
+          "chunk_level": 15,
+          "terrain_resolution": 65,
+          "live_data": false,
+          "osm_features": true,
+          "data_epoch_unix": null,
+          "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+        },
+        "player_id": 1,
+        "personal_money_minor": 25613,
+        "inventory": {
+          "planks": 2,
+          "stone": 20,
+          "wheat_seed": 8,
+          "wood": 24
+        },
+        "progress": {
+          "player_id": 1,
+          "experience": 40,
+          "contracts_completed": 1,
+          "settlements_founded": 0
+        },
+        "owned_supply_claims": [],
+        "fence_2": {
+          "id": 2,
+          "owner": 1,
+          "faction_owner": null,
+          "blueprint": "fence",
+          "position": {
+            "latitude": 48.135177538384454,
+            "longitude": 11.57254442548286,
+            "altitude_m": 160.6080322265625
+          },
+          "hitpoints": 15,
+          "max_hitpoints": 40,
+          "radius_m": 0.7,
+          "housing": false,
+          "workbench": false
+        },
+        "structure_count": 1,
+        "active_unit": 1000050,
+        "avatar_unit": 1000050,
+        "possessed": false,
+        "player_position": {
+          "latitude": 48.13518071651678,
+          "longitude": 11.572375996295891,
+          "altitude_m": 160.31017150878907
+        },
+        "company": null
+      },
+      "selected_after": {
+        "wrapper_schema": 1,
+        "domain_version": 1,
+        "world_identity": {
+          "base_data_revision": "terra-procedural-v2",
+          "seed": 42,
+          "chunk_level": 15,
+          "terrain_resolution": 65,
+          "live_data": false,
+          "osm_features": true,
+          "data_epoch_unix": null,
+          "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+        },
+        "player_id": 1,
+        "personal_money_minor": 25613,
+        "inventory": {
+          "planks": 2,
+          "stone": 20,
+          "wheat_seed": 8,
+          "wood": 24
+        },
+        "progress": {
+          "player_id": 1,
+          "experience": 40,
+          "contracts_completed": 1,
+          "settlements_founded": 0
+        },
+        "owned_supply_claims": [],
+        "fence_2": {
+          "id": 2,
+          "owner": 1,
+          "faction_owner": null,
+          "blueprint": "fence",
+          "position": {
+            "latitude": 48.135177538384454,
+            "longitude": 11.57254442548286,
+            "altitude_m": 160.6080322265625
+          },
+          "hitpoints": 15,
+          "max_hitpoints": 40,
+          "radius_m": 0.7,
+          "housing": false,
+          "workbench": false
+        },
+        "structure_count": 1,
+        "active_unit": 1000050,
+        "avatar_unit": 1000050,
+        "possessed": false,
+        "player_position": {
+          "latitude": 48.13518071651678,
+          "longitude": 11.572375996295891,
+          "altitude_m": 160.31017150878907
+        },
+        "company": null
+      },
+      "selected_invariants": {
+        "wrapper_schema": true,
+        "domain_version": true,
+        "world_identity": true,
+        "player_id": true,
+        "personal_money_minor": true,
+        "inventory": true,
+        "progress": true,
+        "owned_supply_claims": true,
+        "fence_2": true,
+        "structure_count": true,
+        "active_unit": true,
+        "avatar_unit": true,
+        "possessed": true,
+        "player_position": true,
+        "company": true
+      },
+      "normal_simulation_before": {
+        "clock": {
+          "unix_seconds": 1793013966.49929,
+          "time_scale": 1.0,
+          "paused": false
+        },
+        "state_tick_seconds": 744.4992899894714,
+        "living_elapsed_seconds": 744.4999999998706,
+        "settlement_elapsed_seconds": 744.4999999998706,
+        "transport_elapsed_seconds": 744.4999999998706,
+        "avatar_needs": {
+          "food": 0.9813622,
+          "water": 0.96982455,
+          "energy": 1.0
+        }
+      },
+      "normal_simulation_after": {
+        "clock": {
+          "unix_seconds": 1793014521.0487611,
+          "time_scale": 1.0,
+          "paused": false
+        },
+        "state_tick_seconds": 1299.0487611293793,
+        "living_elapsed_seconds": 1299.0499999993663,
+        "settlement_elapsed_seconds": 1299.0499999993663,
+        "transport_elapsed_seconds": 1299.0499999993663,
+        "avatar_needs": {
+          "food": 0.96747965,
+          "water": 0.947348,
+          "energy": 1.0
+        }
+      },
+      "world_time_delta_seconds": 554.5494711399078,
+      "process_receipt": {
+        "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-native/confirmation-building-process.json",
+        "bytes": 1159,
+        "sha256": "494b37cdea2ae8d0f99f8cf4999c11e4fd58354157ae610aee93a6b44025237e",
+        "mtime_ns": 1793364571188913731,
+        "mtime_utc": "2026-10-30T12:49:31.188914+00:00",
+        "read_identity_stable": true,
+        "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+        "exit_code": 0,
+        "started_utc": "2026-10-30T12:36:24.707234+00:00",
+        "finished_utc": "2026-10-30T12:49:31.188663+00:00",
+        "source_input_count": 390,
+        "source_inputs_unchanged": true,
+        "source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+        "finished_source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf"
+      }
+    },
+    "fleet": {
+      "original": {
+        "path": "/tmp/terra-native024/candidate-world.json",
+        "bytes": 1776513,
+        "sha256": "932413c61bd2ee1cff5b5847eb9597afe5e5af946979e2d4b41d15b16484e516",
+        "mtime_ns": 1793363528836796139,
+        "mtime_utc": "2026-10-30T12:32:08.836796+00:00",
+        "read_identity_stable": true
+      },
+      "restored_and_saved": {
+        "path": "/tmp/terra-native024/confirmation-fleet.json",
+        "bytes": 1776980,
+        "sha256": "56999955add4a1a2ac9dea04244f4aba464701abd33301bcdf0bb0351cfd3dd5",
+        "mtime_ns": 1793364786280303126,
+        "mtime_utc": "2026-10-30T12:53:06.280303+00:00",
+        "read_identity_stable": true
+      },
+      "selected_before": {
+        "wrapper_schema": 1,
+        "domain_version": 1,
+        "world_identity": {
+          "base_data_revision": "terra-procedural-v2",
+          "seed": 42,
+          "chunk_level": 15,
+          "terrain_resolution": 65,
+          "live_data": false,
+          "osm_features": true,
+          "data_epoch_unix": null,
+          "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+        },
+        "player_id": 1,
+        "personal_money_minor": 18613,
+        "inventory": {
+          "planks": 2,
+          "stone": 20,
+          "wheat_seed": 8,
+          "wood": 24
+        },
+        "progress": {
+          "player_id": 1,
+          "experience": 40,
+          "contracts_completed": 1,
+          "settlements_founded": 0
+        },
+        "owned_supply_claims": [],
+        "fence_2": {
+          "id": 2,
+          "owner": 1,
+          "faction_owner": null,
+          "blueprint": "fence",
+          "position": {
+            "latitude": 48.135177538384454,
+            "longitude": 11.57254442548286,
+            "altitude_m": 160.6080322265625
+          },
+          "hitpoints": 15,
+          "max_hitpoints": 40,
+          "radius_m": 0.7,
+          "housing": false,
+          "workbench": false
+        },
+        "structure_count": 1,
+        "active_unit": 1000050,
+        "avatar_unit": 1000050,
+        "possessed": false,
+        "player_position": {
+          "latitude": 48.1370158975197,
+          "longitude": 11.57493645584602,
+          "altitude_m": 167.12274780273438
+        },
+        "company": {
+          "name": "Field Service",
+          "owner": 1,
+          "cash_minor": 3934,
+          "revenue_minor": 0,
+          "drivers": [
+            {
+              "id": 1,
+              "name": "Mira",
+              "vehicle_id": 1000053,
+              "route_id": 2,
+              "next_stop": 0,
+              "running": false,
+              "status": "paused",
+              "trip": null,
+              "wages_earned": 66,
+              "wages_spent": 0,
+              "wage_fraction": 0.8999999999999999,
+              "stalled_seconds": 0.0,
+              "deliveries_completed": 0
+            }
+          ],
+          "routes": [
+            {
+              "id": 2,
+              "name": "Town service",
+              "stops": [
+                2,
+                3
+              ],
+              "service": {
+                "type": "passengers",
+                "count": 1
+              }
+            }
+          ],
+          "accounting_coverage": "since_registration",
+          "opening_cash_minor": 0,
+          "accounting_totals_minor": {
+            "payroll": 66,
+            "recruitment": 1000,
+            "owner_deposit": 5000,
+            "owner_paid_registration": 2000
+          },
+          "monetary_entry_count": 69,
+          "retained_receipt_count": 64,
+          "retained_receipts_sha256": "136842938550d5aa5e899e513b4c8f4ed62bfd44cb6f9817ef7da649e4a51570"
+        }
+      },
+      "selected_after": {
+        "wrapper_schema": 1,
+        "domain_version": 1,
+        "world_identity": {
+          "base_data_revision": "terra-procedural-v2",
+          "seed": 42,
+          "chunk_level": 15,
+          "terrain_resolution": 65,
+          "live_data": false,
+          "osm_features": true,
+          "data_epoch_unix": null,
+          "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+        },
+        "player_id": 1,
+        "personal_money_minor": 18613,
+        "inventory": {
+          "planks": 2,
+          "stone": 20,
+          "wheat_seed": 8,
+          "wood": 24
+        },
+        "progress": {
+          "player_id": 1,
+          "experience": 40,
+          "contracts_completed": 1,
+          "settlements_founded": 0
+        },
+        "owned_supply_claims": [],
+        "fence_2": {
+          "id": 2,
+          "owner": 1,
+          "faction_owner": null,
+          "blueprint": "fence",
+          "position": {
+            "latitude": 48.135177538384454,
+            "longitude": 11.57254442548286,
+            "altitude_m": 160.6080322265625
+          },
+          "hitpoints": 15,
+          "max_hitpoints": 40,
+          "radius_m": 0.7,
+          "housing": false,
+          "workbench": false
+        },
+        "structure_count": 1,
+        "active_unit": 1000050,
+        "avatar_unit": 1000050,
+        "possessed": false,
+        "player_position": {
+          "latitude": 48.1370158975197,
+          "longitude": 11.57493645584602,
+          "altitude_m": 167.12274780273438
+        },
+        "company": {
+          "name": "Field Service",
+          "owner": 1,
+          "cash_minor": 3934,
+          "revenue_minor": 0,
+          "drivers": [
+            {
+              "id": 1,
+              "name": "Mira",
+              "vehicle_id": 1000053,
+              "route_id": 2,
+              "next_stop": 0,
+              "running": false,
+              "status": "paused",
+              "trip": null,
+              "wages_earned": 66,
+              "wages_spent": 0,
+              "wage_fraction": 0.8999999999999999,
+              "stalled_seconds": 0.0,
+              "deliveries_completed": 0
+            }
+          ],
+          "routes": [
+            {
+              "id": 2,
+              "name": "Town service",
+              "stops": [
+                2,
+                3
+              ],
+              "service": {
+                "type": "passengers",
+                "count": 1
+              }
+            }
+          ],
+          "accounting_coverage": "since_registration",
+          "opening_cash_minor": 0,
+          "accounting_totals_minor": {
+            "payroll": 66,
+            "recruitment": 1000,
+            "owner_deposit": 5000,
+            "owner_paid_registration": 2000
+          },
+          "monetary_entry_count": 69,
+          "retained_receipt_count": 64,
+          "retained_receipts_sha256": "136842938550d5aa5e899e513b4c8f4ed62bfd44cb6f9817ef7da649e4a51570"
+        }
+      },
+      "selected_invariants": {
+        "wrapper_schema": true,
+        "domain_version": true,
+        "world_identity": true,
+        "player_id": true,
+        "personal_money_minor": true,
+        "inventory": true,
+        "progress": true,
+        "owned_supply_claims": true,
+        "fence_2": true,
+        "structure_count": true,
+        "active_unit": true,
+        "avatar_unit": true,
+        "possessed": true,
+        "player_position": true,
+        "company": true
+      },
+      "normal_simulation_before": {
+        "clock": {
+          "unix_seconds": 1793015460.0478656,
+          "time_scale": 1.0,
+          "paused": false
+        },
+        "state_tick_seconds": 2238.047865629196,
+        "living_elapsed_seconds": 2238.0499999993763,
+        "settlement_elapsed_seconds": 2238.0499999993763,
+        "transport_elapsed_seconds": 2238.0499999993763,
+        "avatar_needs": {
+          "food": 0.94397277,
+          "water": 0.90928924,
+          "energy": 1.0
+        }
+      },
+      "normal_simulation_after": {
+        "clock": {
+          "unix_seconds": 1793015562.447768,
+          "time_scale": 1.0,
+          "paused": false
+        },
+        "state_tick_seconds": 2340.447767972946,
+        "living_elapsed_seconds": 2340.449999999749,
+        "settlement_elapsed_seconds": 2340.449999999749,
+        "transport_elapsed_seconds": 2340.449999999749,
+        "avatar_needs": {
+          "food": 0.9414093,
+          "water": 0.90513885,
+          "energy": 1.0
+        }
+      },
+      "world_time_delta_seconds": 102.39990234375,
+      "process_receipt": {
+        "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-native/confirmation-fleet-process.json",
+        "bytes": 1155,
+        "sha256": "4ad66e43f5febd31c42c4235cdf4a0177b27c1657b1432e56cc1c9651999b371",
+        "mtime_ns": 1793364786638876955,
+        "mtime_utc": "2026-10-30T12:53:06.638877+00:00",
+        "read_identity_stable": true,
+        "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+        "exit_code": 0,
+        "started_utc": "2026-10-30T12:49:54.938575+00:00",
+        "finished_utc": "2026-10-30T12:53:06.638400+00:00",
+        "source_input_count": 390,
+        "source_inputs_unchanged": false,
+        "source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+        "finished_source_inputs_sha256": "d193c756277794b3c83b06e20f85fae5ea4ff666ab1ecb4ee97ba19d5282d7b4"
+      }
+    }
+  },
+  "checks": {
+    "building.wrapper_schema_unchanged": true,
+    "building.domain_version_unchanged": true,
+    "building.world_identity_unchanged": true,
+    "building.player_id_unchanged": true,
+    "building.personal_money_minor_unchanged": true,
+    "building.inventory_unchanged": true,
+    "building.progress_unchanged": true,
+    "building.owned_supply_claims_unchanged": true,
+    "building.fence_2_unchanged": true,
+    "building.structure_count_unchanged": true,
+    "building.active_unit_unchanged": true,
+    "building.avatar_unit_unchanged": true,
+    "building.possessed_unchanged": true,
+    "building.player_position_unchanged": true,
+    "building.company_unchanged": true,
+    "building.original_matches_previous_audit": true,
+    "building.original_matches_copy_record": true,
+    "building.process_receipt_matches_observed_copy_and_pre_final_binary": true,
+    "building.saved_files_are_distinct": true,
+    "building.world_time_advanced": true,
+    "building.fence_remains_15_of_40": true,
+    "fleet.wrapper_schema_unchanged": true,
+    "fleet.domain_version_unchanged": true,
+    "fleet.world_identity_unchanged": true,
+    "fleet.player_id_unchanged": true,
+    "fleet.personal_money_minor_unchanged": true,
+    "fleet.inventory_unchanged": true,
+    "fleet.progress_unchanged": true,
+    "fleet.owned_supply_claims_unchanged": true,
+    "fleet.fence_2_unchanged": true,
+    "fleet.structure_count_unchanged": true,
+    "fleet.active_unit_unchanged": true,
+    "fleet.avatar_unit_unchanged": true,
+    "fleet.possessed_unchanged": true,
+    "fleet.player_position_unchanged": true,
+    "fleet.company_unchanged": true,
+    "fleet.original_matches_previous_audit": true,
+    "fleet.original_matches_copy_record": true,
+    "fleet.process_receipt_matches_observed_copy_and_pre_final_binary": true,
+    "fleet.saved_files_are_distinct": true,
+    "fleet.world_time_advanced": true,
+    "fleet.fence_remains_15_of_40": true,
+    "readback.candidate-checkpoint-audit.json": true,
+    "readback.confirmation-inputs.json": true,
+    "readback.candidate-building-checkpoint.json": true,
+    "readback.confirmation-building.json": true,
+    "readback.confirmation-building-process.json": true,
+    "readback.candidate-world.json": true,
+    "readback.confirmation-fleet.json": true,
+    "readback.confirmation-fleet-process.json": true
+  },
+  "limits": [
+    "Only selected saved gameplay invariants are compared. Whole files differ and ordinary world time, needs and autonomous simulation continue.",
+    "The integrator reports F9 restore and two damage cancellations in Building, and Fleet restore/readback. This file audit verifies the retained results; it does not independently reconstruct UI events or cancellation counts.",
+    "Both native process receipts report exit 0 for the exact pre-final binary. Their results do not qualify the later rendering correction, final executable, canonical release or delivered package.",
+    "No source or checkpoint was modified, no full save copied into the repository, and no Cargo/native executable launched by this audit.",
+    "This is selected state/readback evidence, not complete authoritative validation, whole-world conservation, Windows/device qualification or publisher authentication."
+  ]
+}

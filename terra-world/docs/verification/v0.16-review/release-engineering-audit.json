@@ -1,0 +1,63 @@
+{
+  "status": "passed",
+  "release": "0.16.0",
+  "checked_utc": "2026-10-29T04:10:15.716318+00:00",
+  "scope": "Independent read-only baseline, integration-source and temporary-helper regression review. Does not publish final artifacts or certify unfinished gates/native/desktop acceptance.",
+  "baseline": {
+    "filename": "terra-world-0.15.0.zip",
+    "sha256": "92a8c73750a58da22ad48f899d7c941eadb78a4af0894a51cacde26eb25aeb3f",
+    "paths": 1213,
+    "original_inputs": 96,
+    "historical_evidence_files": 804
+  },
+  "declared_gate_count": 43,
+  "desktop_allowlist_files": 148,
+  "pending_desktop_payload_paths": [
+    "docs/REVIEW_GAPS_v0.16.md"
+  ],
+  "compatibility": {
+    "release": "0.16.0",
+    "wire_protocol": 10,
+    "tls_alpn": "terra-world/10",
+    "domain_save": 1,
+    "regional_schema": 1,
+    "rust_minimum": "1.97.1",
+    "rust_acceptance": "1.99.1"
+  },
+  "checks": {
+    "baseline_crc_sha_and_1213_paths": true,
+    "96_original_inputs_and_804_history_files_exact": true,
+    "prior_current_documents_archived_exactly": true,
+    "independent_contract_matches_root": true,
+    "only_nine_workspace_lock_versions_changed": true,
+    "external_dependency_resolution_unchanged": true,
+    "current_compatibility_check": true,
+    "43_unique_declared_gates": true,
+    "desktop_allowlist_includes_cabin_and_only_pending_release_docs_are_missing": true,
+    "atomic_publication_and_existing_output_rejection": true,
+    "dangling_symlink_output_rejected": true,
+    "zip_bytes_manifest_and_unix_modes_verified": true,
+    "lost_executable_bit_rejected": true
+  },
+  "reviewed_implementation": [
+    {
+      "path": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/scripts/verify.py",
+      "sha256": "1a04e372bc931a63a9c28db7c08265be826e80e54aa530e3b249fbfc82356333"
+    },
+    {
+      "path": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/scripts/desktop-payload.json",
+      "sha256": "a4841a7b055610910b02055e66648d465a2cb3f34f42f45e11018df0c9814449"
+    }
+  ],
+  "reviewed_helpers": [
+    {
+      "path": "/tmp/terra-build/package_source_016.py",
+      "sha256": "eb41f15a2de5866f79c2da797d3a279d3c7c984a99497caec59e06b988752bab"
+    },
+    {
+      "path": "/tmp/terra-build/release_preservation_016.py",
+      "sha256": "ad8393c5660c1759c4aa8dbc83ef4a06914e9b0aab69fd363c5b8c4966d94c8b"
+    }
+  ],
+  "final_artifact_extraction_review": "pending"
+}

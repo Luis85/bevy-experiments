@@ -1,0 +1,803 @@
+{
+  "version": "0.12.0",
+  "recorded_utc": "2026-10-28T16:37:25.323685+00:00",
+  "phase": "final frozen executable, empty-state confirmation, company review and exact save/reopen continuation",
+  "final_confirmation_passed": true,
+  "clean_save_quit": true,
+  "source_inputs_unchanged": true,
+  "source_inputs_count": 327,
+  "binary_sha256": "4b1a7ae522a51e321dad33fbfb7e3b83f098c3dd3d1b025825f39034ada2de95",
+  "platform": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "display": "X11/Xvfb",
+    "renderers": [
+      {
+        "backend": "Vulkan",
+        "driver": "Mesa 25.2.8-0ubuntu0.24.04.2 (LLVM 20.1.2)",
+        "name": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "software": true
+      }
+    ],
+    "quality": "performance",
+    "input": "keyboard and mouse",
+    "window_pixels": [
+      [
+        1440,
+        900
+      ],
+      [
+        1100,
+        700
+      ]
+    ],
+    "interface_text_scale": 1.5
+  },
+  "world": {
+    "title": "Riverbend Commons",
+    "character": {
+      "name": "Mira Vale",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 1
+    },
+    "source_revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+    "source_scope": "Authored synthetic connected heightmaps at real coordinates. Isolated copies of the prior acceptance world.",
+    "original_database_unchanged": true,
+    "original_database_sha256": "5eb6c2497b655ff558fa8b96d63793be1369b7f3822b570d3beabaf780ce93ca"
+  },
+  "observations_source": {
+    "path": "docs/verification/v0.12-final/v12-native-observations.json",
+    "sha256": "577d20c40548a05ae70c8bbb416b15f88b6e9521ec03021e18069cf5d5d27a15",
+    "bytes": 5438
+  },
+  "observed": {
+    "empty_finances": {
+      "concise_explanation": true,
+      "manage_company_visible_without_scrolling": true,
+      "keyboard_focus_visible": true,
+      "keyboard_action_opens_company": true
+    },
+    "management": {
+      "compact_activity_chooser": true,
+      "six_company_sections_reachable": true,
+      "active_section_highlight": true,
+      "section_change_resets_content_scroll": true,
+      "resize_preserves_content_scroll": true
+    },
+    "financial_report": {
+      "company_cash_minor": 4000,
+      "owner_cash_minor": 13188,
+      "before_owner_funding_minor": -1000,
+      "after_recorded_owner_costs_minor": -3000,
+      "owner_deposit_minor": 5000,
+      "owner_paid_registration_minor": 2000,
+      "recruitment_minor": 1000,
+      "recent_entries": 3,
+      "cash_basis_limitations_visible": true
+    },
+    "camera": {
+      "third_person_character_visible": true,
+      "return_to_body_focused_rts_keeps_character_in_view": true,
+      "saved_heading_degrees_approximately": 212.64352
+    },
+    "guidance": {
+      "community_xp": 50,
+      "completed_supply_contracts": 1,
+      "next_step": "Claim a housing plot",
+      "primary_action": "Open building tools",
+      "retained_after_reopen": true
+    },
+    "presentation": {
+      "performance_preset": true,
+      "models": 5,
+      "ready_instances_observed": 57,
+      "distant_procedural_fallbacks_observed": 7,
+      "estimated_payload_display_mib": 9.6,
+      "estimated_payload_limit_mib": 128,
+      "gpu_allocation_and_gpu_time_explicitly_unmeasured": true
+    },
+    "session_handling": {
+      "three_distinct_final_executable_processes": true,
+      "all_clean_save_and_quit": true,
+      "company_comparison_world_kept_paused": true,
+      "normal_menu_keyboard_exit": true
+    }
+  },
+  "empty_state": {
+    "company_absent": true,
+    "owner_wallet_unchanged": true,
+    "character_and_source_unchanged": true,
+    "clean_exit_generation": 25
+  },
+  "company": {
+    "name": "Vale Transport",
+    "owner": 1,
+    "wallet_minor": 13188,
+    "company_cash_minor": 4000,
+    "coverage": "since_registration",
+    "recorded_totals_minor": {
+      "recruitment": 1000,
+      "owner_deposit": 5000,
+      "owner_paid_registration": 2000
+    },
+    "monetary_entry_count": 3,
+    "recent_entries": [
+      {
+        "sequence": 1,
+        "elapsed_seconds": 2207.9499999992668,
+        "category": "owner_paid_registration",
+        "amount": 2000,
+        "cash_after": 0
+      },
+      {
+        "sequence": 2,
+        "elapsed_seconds": 2207.9499999992668,
+        "category": "owner_deposit",
+        "amount": 5000,
+        "cash_after": 5000
+      },
+      {
+        "sequence": 3,
+        "elapsed_seconds": 2207.9499999992668,
+        "category": "recruitment",
+        "amount": 1000,
+        "cash_after": 4000
+      }
+    ],
+    "cash_result_before_owner_funding_minor": -1000,
+    "cash_result_after_known_owner_costs_minor": -3000,
+    "driver": {
+      "name": "Nora Lane",
+      "status": "unassigned"
+    },
+    "scope": "Known registration, owner deposit and recruitment are recorded. These checks do not certify campaign balance or full asset valuation."
+  },
+  "resume": {
+    "first_clean_exit_generation": 320,
+    "reopened_checkpoint_generation": 341,
+    "second_clean_exit_generation": 346,
+    "exact_checks": {
+      "company_and_accounting": true,
+      "owner_account_and_identity": true,
+      "player_record_and_inventory": true,
+      "avatar_body": true,
+      "character_profile": true,
+      "progression": true,
+      "territories": true,
+      "owned_vehicle": true,
+      "owned_vehicle_body": true,
+      "world_identity": true,
+      "metadata_player_identity": true,
+      "politics": true
+    },
+    "wallet_minor": 13188,
+    "inventory": {
+      "stone": 10,
+      "water": 4,
+      "wheat_seed": 8,
+      "wood": 6
+    },
+    "progression": {
+      "player_id": 1,
+      "experience": 50,
+      "contracts_completed": 1,
+      "settlements_founded": 1
+    },
+    "scope": "Exact equality for the listed company, player, avatar, vehicle, ownership and source fields. No whole-world equality across elapsed native play is asserted."
+  },
+  "sessions": [
+    {
+      "scenario": "v12-empty-confirm",
+      "process": {
+        "phase": "0.12 native confirmation",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v12-empty-user-data/worlds/world-review-empty/world.json",
+          "--user-data",
+          "/tmp/terra-native/v12-empty-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v12-empty-confirm-telemetry.json"
+        ],
+        "binary_sha256": "4b1a7ae522a51e321dad33fbfb7e3b83f098c3dd3d1b025825f39034ada2de95",
+        "source_input_count": 327,
+        "started_utc": "2026-10-28T16:24:42.066128+00:00",
+        "pid": 113465,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T16:27:32.801197+00:00"
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.12-final/v12-empty-confirm.log",
+          "sha256": "5d5c19d3fe9a0ffe78ac009ea55190096e75878dd0e94b022f2fa31e716f52fb",
+          "bytes": 1620
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.12-final/v12-empty-confirm-process.json",
+          "sha256": "8247fead5f7505dfb6e7bdfeb84146ca4fe9ba7c7a78280c56233de58c32892d",
+          "bytes": 649
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.12-final/v12-empty-confirm-telemetry.json",
+          "sha256": "8de424f9af357f9b7a7c4a419a35585501a51ea5620670fd6bae3623a6694d16",
+          "bytes": 6349
+        }
+      },
+      "renderer": {
+        "name": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "driver": "Mesa 25.2.8-0ubuntu0.24.04.2 (LLVM 20.1.2)",
+        "backend": "Vulkan",
+        "software": true
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 7,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 57,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 7,
+          "draining": false,
+          "eligible_instances": 57,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10067748,
+          "reserved": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 8.691496,
+          "deleted_pages": 0,
+          "encode_ms": 10.400648,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 6.454339,
+          "reused_page_bytes": 213926,
+          "reused_pages": 38,
+          "select_ms": 2.318587,
+          "selected_records_validated": 716,
+          "transaction_ms": 1.408982,
+          "validation": {
+            "active_records": 716,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 716
+          }
+        },
+        "committed": {
+          "active_records": 581,
+          "active_regions": 38,
+          "checkpoint_bytes": 1623041,
+          "dependency_regions": 0,
+          "dormant_records": 0,
+          "dormant_regions": 0,
+          "generation": 25,
+          "global_records": 135,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 29.336857000000002,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 17.321872,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    },
+    {
+      "scenario": "v12-confirm",
+      "process": {
+        "phase": "0.12 native confirmation",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v12-user-data/worlds/world-review-012/world.json",
+          "--user-data",
+          "/tmp/terra-native/v12-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v12-confirm-telemetry.json"
+        ],
+        "binary_sha256": "4b1a7ae522a51e321dad33fbfb7e3b83f098c3dd3d1b025825f39034ada2de95",
+        "source_input_count": 327,
+        "started_utc": "2026-10-28T16:27:46.038411+00:00",
+        "pid": 113783,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T16:34:15.240936+00:00"
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.12-final/v12-confirm.log",
+          "sha256": "f9885eb1594f50bae683e725fd88750317bf0cb8b29f7046c863baa6bf1b8793",
+          "bytes": 1394
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.12-final/v12-confirm-process.json",
+          "sha256": "1e00ba2dc561eb30825d6fc98e0519c4da0b2ac08e4044e011911d00b4aa9824",
+          "bytes": 629
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.12-final/v12-confirm-telemetry.json",
+          "sha256": "2a2b7c065d22cf6f7ed72dafaf42d6152d914a2f1964d9cae793d91f97526a04",
+          "bytes": 5347
+        }
+      },
+      "renderer": {
+        "name": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "driver": "Mesa 25.2.8-0ubuntu0.24.04.2 (LLVM 20.1.2)",
+        "backend": "Vulkan",
+        "software": true
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 7,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 57,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 7,
+          "draining": false,
+          "eligible_instances": 57,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10067748,
+          "reserved": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 10.760276,
+          "deleted_pages": 0,
+          "encode_ms": 8.249841,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 5.6137060000000005,
+          "reused_page_bytes": 215277,
+          "reused_pages": 38,
+          "select_ms": 2.715493,
+          "selected_records_validated": 692,
+          "transaction_ms": 1.4749999999999999,
+          "validation": {
+            "active_records": 692,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 718
+          }
+        },
+        "committed": {
+          "active_records": 555,
+          "active_regions": 34,
+          "checkpoint_bytes": 1628866,
+          "dependency_regions": 0,
+          "dormant_records": 26,
+          "dormant_regions": 4,
+          "generation": 320,
+          "global_records": 137,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 28.886483000000002,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 14.377107,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    },
+    {
+      "scenario": "v12-resume",
+      "process": {
+        "phase": "0.12 native confirmation",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v12-user-data/worlds/world-review-012/world.json",
+          "--user-data",
+          "/tmp/terra-native/v12-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v12-resume-telemetry.json"
+        ],
+        "binary_sha256": "4b1a7ae522a51e321dad33fbfb7e3b83f098c3dd3d1b025825f39034ada2de95",
+        "source_input_count": 327,
+        "started_utc": "2026-10-28T16:34:42.194156+00:00",
+        "pid": 114423,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T16:36:42.714347+00:00"
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.12-final/v12-resume.log",
+          "sha256": "fdcf89cb1196e5980aec2efc010b2a12f705888a61ecb84c8679954507b777c6",
+          "bytes": 1393
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.12-final/v12-resume-process.json",
+          "sha256": "30b3fcb25a01ea880c041093c2e79262d4cb5f0a6c5b2e79d0bc6b145a36ed3a",
+          "bytes": 628
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.12-final/v12-resume-telemetry.json",
+          "sha256": "3b855e65ee0f5dd33da966393bf467c9352509fd66ce75d790209e99d3443ed7",
+          "bytes": 5322
+        }
+      },
+      "renderer": {
+        "name": "llvmpipe (LLVM 20.1.2, 256 bits)",
+        "driver": "Mesa 25.2.8-0ubuntu0.24.04.2 (LLVM 20.1.2)",
+        "backend": "Vulkan",
+        "software": true
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 5,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 59,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 5,
+          "draining": false,
+          "eligible_instances": 59,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10183060,
+          "reserved": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 12.848237000000001,
+          "deleted_pages": 0,
+          "encode_ms": 8.692602,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 6.829125,
+          "reused_page_bytes": 215277,
+          "reused_pages": 38,
+          "select_ms": 6.757219,
+          "selected_records_validated": 692,
+          "transaction_ms": 1.509905,
+          "validation": {
+            "active_records": 692,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 718
+          }
+        },
+        "committed": {
+          "active_records": 555,
+          "active_regions": 34,
+          "checkpoint_bytes": 1628866,
+          "dependency_regions": 0,
+          "dormant_records": 26,
+          "dormant_regions": 4,
+          "generation": 346,
+          "global_records": 137,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 36.704448,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 15.14396,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    }
+  ],
+  "captures": [
+    {
+      "path": "docs/screenshots/v12-empty-confirm-finances.png",
+      "sha256": "ba49dcafbc45bf33f72be59eb6ebe7a9d930ebe59e5f45de72eba9e3589cec13",
+      "bytes": 593919,
+      "description": "An unregistered company has one concise Finances explanation and a visible Manage company action at 1100 by 700 with 150% text.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-empty-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-empty-confirm-keyboard.png",
+      "sha256": "cf441d67b62a4937792dae316fb05ffdca5ec16226faac015eaf26a475611b80",
+      "bytes": 596514,
+      "description": "Keyboard management navigation visibly focuses Manage company; activating it opens the Company section.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-empty-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-character.png",
+      "sha256": "0c0fb7fba16c35f791a4fe068defbcec5853289c7efdee52840c9bb6107a6fe7",
+      "bytes": 1017652,
+      "description": "The saved Mira Vale character remains visible in third person at 1440 by 900 before returning to the RTS overview.",
+      "window_pixels": [
+        1440,
+        900
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-rts-company.png",
+      "sha256": "e349152643dc7a85d8ef5311d2bd8a42e70286b9e8773263f9ced4f86cb60f68",
+      "bytes": 1044167,
+      "description": "Returning from third person to RTS keeps the marked character in the overview; the company summary and six section buttons remain available.",
+      "window_pixels": [
+        1440,
+        900
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-finances-small-result.png",
+      "sha256": "77b2d60b1e40da2f531ebf81f013ce3bbebb4968fcafc6ddddd72fa40aabac00",
+      "bytes": 581782,
+      "description": "The compact financial result shows -10.00 credits before owner funding and -30.00 after recorded owner-paid costs, with the Manage company action visible.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-finances-funding.png",
+      "sha256": "30b2d6c4e829097418775730ffe1827e08bce2b9afd2b7f9d2333c44690893ed",
+      "bytes": 593255,
+      "description": "The owner funding section shows the 50.00-credit company deposit, 20.00-credit personally paid setup and 70.00-credit gross known owner funding.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-finances-journal.png",
+      "sha256": "f448942b9b20531d30d0b0407fa5b3182a34ef2bb2d7f67571f3638a09620c54",
+      "bytes": 591059,
+      "description": "The report explains that it covers cash since registration and does not value goods, vehicles, unpaid time or depreciation; the recruitment journal entry follows.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-finances-entries.png",
+      "sha256": "e0eab025c65b962f3417c50a7ef4b3434b60af8c2a44de9320c7430fc28df60b",
+      "bytes": 587725,
+      "description": "The recent journal retains the owner deposit and personally paid registration, distinguishes their cash effects and reports all three entries.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-compact-chooser.png",
+      "sha256": "df00674a38f61a67dbfc2a1503672c6c629547703cf654b05a260357ad5adff6",
+      "bytes": 557154,
+      "description": "The compact activity chooser shows management destinations with Fleet highlighted at 1100 by 700 and 150% text.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-activities.png",
+      "sha256": "f1fd81d1f593993c3b7314c814e1644dedeb80466b1c3762cb60708a503f638f",
+      "bytes": 576816,
+      "description": "Activities retains 50 community XP, one completed supply contract and the housing-plot next step with a visible building-tools action.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-confirm-scene-budget.png",
+      "sha256": "c02d3934c22ab22055ef4dd19ada6885cad4d9179439c76cf66d3587f457c9dd",
+      "bytes": 516289,
+      "description": "Performance diagnostics show 57 selected wildlife instances, seven distant procedural fallbacks, five retained models and a 9.6 MiB estimated payload against the 128 MiB limit; unmeasured CPU/GPU allocation and GPU time are explicitly labeled.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-confirm"
+    },
+    {
+      "path": "docs/screenshots/v12-resume-activities.png",
+      "sha256": "891449ac30bf619b72284d65e1f25e3dcd028f1735d719426f06c8ac6d95a947",
+      "bytes": 573442,
+      "description": "A separate process reopens the saved paused world with the same community progress, housing goal and personal cash.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-resume"
+    },
+    {
+      "path": "docs/screenshots/v12-resume-sections.png",
+      "sha256": "52755a43f2d10662875d8ea84d6c683deedbac436dde8d912783f6b8401ebd7b",
+      "bytes": 570845,
+      "description": "The reopened world retains Vale Transport, 40.00 company credits and one employee; all six compact company sections remain reachable.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-resume"
+    },
+    {
+      "path": "docs/screenshots/v12-resume-finances.png",
+      "sha256": "27286dbe36c05f6b133de2f5303c23ef1ba8bedc9553f13acadce186eb8034bd",
+      "bytes": 575807,
+      "description": "The reopened company retains the same -10.00 and -30.00 credit financial results at 1100 by 700 with 150% text.",
+      "window_pixels": [
+        1100,
+        700
+      ],
+      "session": "v12-resume"
+    }
+  ],
+  "limitations": [
+    "Native confirmation used Linux X11/Xvfb, the Performance preset, keyboard and mouse, and Mesa llvmpipe software Vulkan. It does not qualify representative graphics hardware, controller or wheel hardware, other operating systems, or screen-reader behavior.",
+    "The 1440 by 900 and 1100 by 700 captures use 150% interface text. Other viewport and text-scale combinations are not established by these captures.",
+    "Scene payload figures are importer estimates, not measured CPU/GPU allocations or a hardware frame-rate guarantee. Distant actors intentionally remain procedural under the presentation policy.",
+    "The final native company sequence verifies the reviewed paused registration/funding/recruitment state and save/reopen continuity. Automated career reports separately measure physical routes and cash conservation; neither claims campaign profitability or complete asset valuation.",
+    "The reviewed source is an authored synthetic connected heightmap example at real coordinates, not worldwide terrain coverage. The earlier candidate walking observations do not establish a general shortest-path guarantee."
+  ],
+  "private_checkpoint_handling": "Full regional exports, runtime databases and user-data files are not included in the release."
+}

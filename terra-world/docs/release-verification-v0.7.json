@@ -1,0 +1,48 @@
+{
+  "release": "0.7.0",
+  "validation_date": "2026-10-27",
+  "wire_protocol": 5,
+  "tls_alpn": "terra-world/5",
+  "domain_save_version": 1,
+  "regional_schema_version": 1,
+  "distinct_rust_tests": 461,
+  "failed_final_tests": 0,
+  "ignored_final_tests": 0,
+  "by_crate": {
+    "terra-cli": 4,
+    "terra-core": 26,
+    "terra-history": 13,
+    "terra-net": 86,
+    "terra-persistence": 29,
+    "terra-sandbox": 161,
+    "terra-stream": 20,
+    "terra-bevy": 65,
+    "terra-demo": 57
+  },
+  "counting_policy": "339 non-Bevy tests plus 57 demo tests plus 44 Bevy render-library tests plus 21 Bevy integrations. The 25 headless-library cases overlap render-library cases and are counted once. Earlier attempts, targeted reruns, examples, actual CLI operations and native actions contribute no extra Rust cases.",
+  "gates": {
+    "headless_workspace": "passed",
+    "bevy_no_default_features": "passed",
+    "bevy_render_library": "passed",
+    "native_demo_tests": "passed",
+    "headless_example": "passed",
+    "custom_provider_example": "passed",
+    "native_executable_build": "passed",
+    "cargo_fmt_check": "passed",
+    "server_cli_operations": "passed",
+    "native_confirmation": "passed"
+  },
+  "evidence": [
+    "headless-verification-v0.7.json",
+    "server-operations-v0.7.json",
+    "regional-probe-v0.7.json",
+    "native-v7-verification.json"
+  ],
+  "native_binary_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+  "source_freeze": {
+    "rust_files": 153,
+    "hashes_unchanged_after_final_gates": true
+  },
+  "measurement_provenance": "Regional probe and process-operation evidence were collected before the final narrow turn-clearance predicate. Storage/operation code and fixture definitions did not change afterward. Full final Rust/Bevy/demo gates and native confirmation include the final movement correction.",
+  "scope": "Bounded local correctness, real localhost TCP/TLS, SQLite recovery and Linux/X11 native interaction with Mesa software Vulkan. No complete Motor Town parity, AAA assets/physics, gaming-GPU performance, public account hosting, distributed authority or MMORPG concurrency claim."
+}

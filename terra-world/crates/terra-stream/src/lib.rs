@@ -9,12 +9,16 @@ mod cache;
 mod clip;
 mod config;
 mod heightmap;
+mod heightmap_features;
+mod heightmap_set;
 mod procedural;
 pub mod providers;
+pub mod source_distribution;
 mod streamer;
 
 pub use config::{StreamConfig, StreamError};
-pub use heightmap::{HeightmapManifest, HeightmapProvider};
+pub use heightmap::{HeightmapFeatureSource, HeightmapManifest, HeightmapProvider};
+pub use heightmap_set::{HeightmapSetManifest, PreparedHeightmapProvider};
 pub use procedural::{procedural_chunk, procedural_height};
 pub use providers::{fetch_weather, load_chunk};
 pub use streamer::{ChunkPayload, ChunkProvider, ChunkStreamer, StreamEvent, StreamStats};

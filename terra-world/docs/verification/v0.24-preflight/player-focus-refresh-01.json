@@ -1,0 +1,55 @@
+{
+  "status": "failed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo",
+    "interface::layout_tests::focus_transitions_refresh_only_inspector_prose_without_changing_review_or_layout",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_utc": "2026-10-30T12:54:49.565834+00:00",
+  "finished_utc": "2026-10-30T12:54:56.181410+00:00",
+  "seconds": 6.659355871001026,
+  "exit_code": 101,
+  "timed_out": false,
+  "execution": {
+    "status": "failed",
+    "process_platform": "posix",
+    "failure_reason": "nonzero_exit",
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 917,
+    "retained_log_bytes": 917,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "request": "owned process group already absent",
+      "leader_exit_observed": true,
+      "descendant_check": {
+        "status": "owned_process_group_absent"
+      },
+      "output_closed": true
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "summaries": [],
+  "source_inputs": "player-focus-refresh-01-inputs.json",
+  "source_inputs_sha256": "6c9d6b281de03bb65e973c992cc4f02fa8970fb2ef83949840cef6d93b502ba7",
+  "input_count": 390,
+  "changed_inputs": [],
+  "log": "player-focus-refresh-01.log",
+  "log_sha256": "044c3988b9e00e85493053a7e9433be0c686c7bc051f99ecc0ab0c350b98d105",
+  "scope": "Focused inspector text invalidation state/component regression. Pixel recovery requires separately retained actual native captures."
+}

@@ -1,0 +1,147 @@
+{
+  "release": "0.15.0",
+  "status": "passed",
+  "completed_utc": "2026-10-28T23:02:16.760071+00:00",
+  "scope": "Pre-open comparison after native launcher recovery of the original prepared Recovery valley backup. Native opening and final binary acceptance are recorded separately. Original directory deletion is established by the retained fixture test and rechecked here.",
+  "profile": "/tmp/terra-native/launcher-review-fixture-015/player-data/worlds/recovered-1793228529-48057-0/world.json",
+  "selected_backup": "/tmp/terra-native/launcher-review-fixture-015/player-data/backups/backup-1793225971-27285-0",
+  "bundle_identity": "sha256:04751b00f58c0e917f1b58c2cd513c920d048d5412d3f14828bf6abdadb9da32",
+  "source_generation": 2,
+  "tables": {
+    "regions": {
+      "rows": 19,
+      "columns": [
+        "level",
+        "x",
+        "y",
+        "payload",
+        "digest"
+      ],
+      "all_values_equal": true,
+      "typed_row_content_sha256": "3df73fa01dbf3c59a464d766b5196eaac6f3b24191ac9aeeb35d61c53b210c38"
+    },
+    "world": {
+      "rows": 1,
+      "columns": [
+        "singleton",
+        "identity",
+        "catalog",
+        "region_level",
+        "generation",
+        "global_state",
+        "metadata",
+        "digest",
+        "payload_bytes"
+      ],
+      "all_values_equal": true,
+      "typed_row_content_sha256": "ba9ace7227d8ae17baccdd3a6d2fe2b2ad94afe4c295d92b441886afad5704fa"
+    }
+  },
+  "copied_dependencies": [
+    {
+      "path": "catalog.json",
+      "sha256": "b778f1e125b0a0680eea456a1a925bb32dc50afb25420989a2d203c2d833bb4a",
+      "bytes": 2707
+    },
+    {
+      "path": "politics.geojson",
+      "sha256": "304718be169beffee91191729e7514fea5ff7564d216909808f6601cee9b7fbe",
+      "bytes": 911939
+    },
+    {
+      "path": "source/east.geojson",
+      "sha256": "14f87645e509a83ede40f2a1dc2b57247a6838cd120b33b0b8e6b9245e63dcd6",
+      "bytes": 9866
+    },
+    {
+      "path": "source/east.json",
+      "sha256": "cd0c9a7be84b07a33c2f356ac584dc1c72fdb7956bf677c09226ca1e1593e3b1",
+      "bytes": 1065
+    },
+    {
+      "path": "source/east.png",
+      "sha256": "5b2ab8ae8a04afeea99fa0de1f4bb10afee3df56d24750c122bd42e0df61200f",
+      "bytes": 47205
+    },
+    {
+      "path": "source/manifest.json",
+      "sha256": "5be2aa55117ea771ad8aa2b3a151b2ac76a11a2ed5d2099890724bf83d081139",
+      "bytes": 177
+    },
+    {
+      "path": "source/source-package.json",
+      "sha256": "ce93e6b9b418889072f29af40a4fea8a7902650e1c6a6d3a16b2e4f694a46841",
+      "bytes": 4168
+    },
+    {
+      "path": "source/west.geojson",
+      "sha256": "a31f9a48fd6936a91a22d56561a71f01642a9fdae42cad6e7de5541dd0149963",
+      "bytes": 8203
+    },
+    {
+      "path": "source/west.json",
+      "sha256": "5bc6cabf9802f07832cc1c1bcdb1decc00388b837423646bd10b89522144b50c",
+      "bytes": 1066
+    },
+    {
+      "path": "source/west.png",
+      "sha256": "6d7e8bbaffb57b3e01730dbdb1fdc5ec32e99730ef0d9271852db23eb72874f5",
+      "bytes": 47734
+    }
+  ],
+  "checks": {
+    "exactly_one_additional_managed_profile": true,
+    "all_original_42_files_unchanged": true,
+    "selected_backup_and_existing_world_retained": true,
+    "database_integrity_checks_passed": true,
+    "all_database_definitions_exact": true,
+    "every_database_row_and_column_exact": true,
+    "character_quality_and_start_hour_exact": true,
+    "runtime_paths_absolute_and_rehomed": true,
+    "non_path_configuration_exact": true,
+    "managed_and_backend_configuration_equal": true,
+    "prepared_and_political_inputs_byte_exact": true,
+    "source_and_political_identities_exact": true,
+    "original_input_directory_still_absent": true,
+    "original_managed_world_directory_still_absent": true,
+    "complete_checkpoint_present_before_open": true
+  },
+  "profile_creation": {
+    "original_world_created_unix_seconds": 1793225971,
+    "backup_created_unix_seconds": 1793225972,
+    "recovered_profile_created_unix_seconds": 1793228529,
+    "note": "The recovered managed profile intentionally has a new creation time; original creation time remains in the backup wrapper."
+  },
+  "references": {
+    "baseline": {
+      "path": "/tmp/terra-native/v15-confirm-recovery-before.json",
+      "sha256": "126881b989635ffe0ba2f5d0cd918feb328b695e8c57c80beff3e71fa0bdfa25",
+      "bytes": 5528
+    },
+    "retained_fixture_receipt": {
+      "path": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/docs/verification/v0.15-review/launcher-recovery-015-receipt.json",
+      "sha256": "7770dfe5130f9275d60f20f6e8347b3ac2d1c4e6086118fd99d0274fa0116820",
+      "bytes": 992
+    },
+    "profile_before_open": {
+      "path": "/tmp/terra-native/launcher-review-fixture-015/player-data/worlds/recovered-1793228529-48057-0/world.json",
+      "sha256": "f24c20d2134f8d9e2d0fb7a73cdd524809d0abc9052fa861d651fe549cdabfac",
+      "bytes": 2193
+    },
+    "wrapper": {
+      "path": "/tmp/terra-native/launcher-review-fixture-015/player-data/backups/backup-1793225971-27285-0/world-backup.json",
+      "sha256": "483a0ce26251ed762faba2cd1279af3af44f6b0780077fc723ffcfae269b674b",
+      "bytes": 491
+    },
+    "restore_receipt": {
+      "path": "/tmp/terra-native/launcher-review-fixture-015/player-data/worlds/recovered-1793228529-48057-0/world/restore-receipt.json",
+      "sha256": "cb4421e19618c10894f360b4c9470eeb6956089c8358acbfecd66b892ac088fe",
+      "bytes": 404
+    },
+    "comparison_helper": {
+      "path": "/tmp/terra-native/compare_recovery_015.py",
+      "sha256": "05d16556b94294efaf6a3f3dfdc4bfd246173394fd0b1bc5a217e403d54edc74",
+      "bytes": 11192
+    }
+  }
+}

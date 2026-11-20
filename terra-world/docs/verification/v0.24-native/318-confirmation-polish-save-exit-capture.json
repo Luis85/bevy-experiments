@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "318-confirmation-polish-save-exit",
+  "capture_started_utc": "2026-10-30T13:07:09.306864+00:00",
+  "captured_utc": "2026-10-30T13:07:09.451603+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 78977,
+  "window_pid_status": "available",
+  "window_pid_before": 78977,
+  "window_pid_after": 78977,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "318-confirmation-polish-save-exit.png",
+    "sha256": "ed6edc0d78e3eeb145205d1edcda7c0802b68eded10d46935e73ef0996ee007c",
+    "bytes": 294860
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

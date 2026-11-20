@@ -87,6 +87,14 @@ implements the same `ChunkProvider` interface. See the authored fixture in
 in the declared vertical datum; a tile outside the manifest's full extent fails
 explicitly. The importer never supplies zero elevation for missing coverage.
 
+`PreparedHeightmapProvider::open(path, resolution)` accepts that same manifest
+or a connected `heightmap_set` collection. Child rasters must be edge-connected,
+nonoverlapping and seam-validated; exact union coverage rejects holes even when
+a requested tile spans multiple bundles. New native heightmap worlds use the
+original [`heightmap-connected`](data/heightmap-connected) fixture. See the
+[source bundle contract](../../docs/SOURCE_BUNDLES.md) for content identity,
+feature-ID normalization and all input/output budgets.
+
 Overpass is serialized across this process with at least two seconds between
 completed requests, a default 256-request session budget, and a 256 MiB session
 download cap. Rejected/error requests consume these budgets as well. Stable terrain/map results cache for seven

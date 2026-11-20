@@ -1,0 +1,548 @@
+{
+  "version": "0.11.0",
+  "recorded_utc": "2026-10-28T14:05:18.525283+00:00",
+  "phase": "final frozen executable, native product review and clean save/resume",
+  "final_confirmation_passed": true,
+  "clean_save_quit": true,
+  "source_inputs_unchanged": true,
+  "source_inputs_count": 313,
+  "binary_sha256": "a1e3391a81327c2a05b9e31bd442d8e9cb27b0b99cd09b6bc1f8e84cc5f15107",
+  "platform": {
+    "os": "Linux x86_64",
+    "display": "X11/Xvfb",
+    "renderer": "Mesa 25.2.8 llvmpipe LLVM 20.1.2, software Vulkan",
+    "quality": "performance",
+    "input": "keyboard and mouse",
+    "window_pixels": [
+      [
+        1440,
+        900
+      ],
+      [
+        1100,
+        700
+      ]
+    ],
+    "interface_text_scale": 1.5
+  },
+  "world": {
+    "title": "Riverbend Commons",
+    "character": {
+      "name": "Mira Vale",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 1
+    },
+    "source_revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+    "source_scope": "Authored synthetic connected heightmaps at real coordinates. Copied prior 0.10 acceptance world; original retained unchanged.",
+    "original_database_unchanged": true
+  },
+  "market": {
+    "version": "0.11.0",
+    "source": "observed native UI actions and complete committed snapshots",
+    "purchase": {
+      "item": "water",
+      "quantity": 5,
+      "displayed_total_minor": 410,
+      "wallet_before_minor": 20568,
+      "wallet_after_minor": 20158,
+      "shop_before_units": 37,
+      "shop_after_units": 32,
+      "carried_after_units": 5
+    },
+    "sale": {
+      "item": "water",
+      "quantity": 1,
+      "displayed_total_minor": 30,
+      "wallet_after_minor": 20188,
+      "shop_after_units": 33,
+      "carried_after_units": 4
+    },
+    "exact_exchange": {
+      "combined_money_before_minor": 94238,
+      "combined_money_after_minor": 94238,
+      "combined_water_before_units": 37,
+      "combined_water_after_units": 37
+    },
+    "checkpoint_generation": 167,
+    "progress_unchanged": true,
+    "simulation_paused_during_trades": true
+  },
+  "observed": {
+    "ordinary_market_approach_completed": true,
+    "market_arrival_displayed_distance_m": 11,
+    "market_keyboard_focus_visible": true,
+    "compact_controls_scrollable_and_unobscured": true,
+    "ordinary_walk_to_boarding_range": true,
+    "normal_nearby_boarding": true,
+    "throttle_and_brake_observed": true,
+    "moving_hud_km_h": 18,
+    "distance_added_through_braking_checkpoint_m": 17.26136527545441,
+    "distance_added_through_dismount_m": 19.192399544949524,
+    "grounded_dismount": {
+      "avatar_unit": 1000050,
+      "vehicle_unit": 1000053,
+      "avatar_position": {
+        "latitude": 48.13776627021241,
+        "longitude": 11.574897031097356,
+        "altitude_m": 166.97823181152344
+      },
+      "vehicle_position": {
+        "latitude": 48.13775480396596,
+        "longitude": 11.574919386929219,
+        "altitude_m": 166.8827117919922
+      },
+      "horizontal_center_separation_m": 2.0922704739792835,
+      "vehicle_parking_brake": true,
+      "vehicle_velocity_enu_m_s": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "saved_dynamics": {
+        "speed_m_s": 0.0,
+        "lateral_speed_m_s": 0.0,
+        "steering_rad": 0.0,
+        "yaw_rate_rad_s": 0.0,
+        "engine_rpm": 800.0,
+        "gear": 0
+      }
+    },
+    "f5_checkpoint_and_f9_restore_exercised": true,
+    "session_restore_exercised": true,
+    "keyboard_revealed_save_quit": true,
+    "clean_exit_then_reopen_then_clean_exit": true,
+    "guidance_goal_after_restore_and_resume": "Claim a housing plot"
+  },
+  "resume": {
+    "first_clean_exit_generation": 209,
+    "reopened_checkpoint_generation": 227,
+    "second_clean_exit_generation": 230,
+    "exact_checks": {
+      "account": true,
+      "avatar_position": true,
+      "avatar_heading": true,
+      "character_profile": true,
+      "inventory": true,
+      "progression": true,
+      "territories": true,
+      "owned_vehicle": true,
+      "vehicle_position": true,
+      "vehicle_heading": true,
+      "world_identity": true,
+      "metadata_player_id": true,
+      "metadata_politics": true
+    },
+    "wallet_minor": 20188,
+    "inventory": {
+      "stone": 10,
+      "water": 4,
+      "wheat_seed": 8,
+      "wood": 6
+    },
+    "progression": {
+      "player_id": 1,
+      "experience": 50,
+      "contracts_completed": 1,
+      "settlements_founded": 1
+    },
+    "territory": {
+      "id": 2000017,
+      "name": "Willow Brook",
+      "founder": 1,
+      "faction_owner": null,
+      "center": {
+        "latitude": 48.13651187136406,
+        "longitude": 11.574194660571473,
+        "altitude_m": 173.33148803710938
+      },
+      "tier": "neighborhood",
+      "stock": {},
+      "treasury": 5000
+    },
+    "scope": "Exact equality for the listed authoritative fields. World time, needs and autonomous NPCs legitimately advance while playing; whole-state equality across live elapsed time is not asserted."
+  },
+  "sessions": [
+    {
+      "process": {
+        "phase": "0.11 final native confirmation",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v11-user-data/worlds/world-review-011/world.json",
+          "--user-data",
+          "/tmp/terra-native/v11-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v11-native-telemetry.json"
+        ],
+        "binary_sha256": "a1e3391a81327c2a05b9e31bd442d8e9cb27b0b99cd09b6bc1f8e84cc5f15107",
+        "started_utc": "2026-10-28T13:42:01.380212+00:00",
+        "pid": 67283,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T14:01:42.755456+00:00"
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.11/v11-native.log",
+          "sha256": "e1a3c9616d4abc8354270e709ef62ca0fe12203cdd1b745a983c7451df90d6cd",
+          "bytes": 1393
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.11/v11-native-telemetry.json",
+          "sha256": "506fd4c2c1f6db4d65ab46edfdf2e325edc9ac36cc1d1d7fc2eb626ebabd8934",
+          "bytes": 4974
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.11/v11-native-process.json",
+          "sha256": "ebf36d2afc514b9021be6dfc198466e8506d4699a0f56ec4f1b0a5b89f2ddc28",
+          "bytes": 604
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 0,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 64,
+        "rejected_instances": 0
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 15.505463,
+          "deleted_pages": 0,
+          "encode_ms": 10.454583999999999,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 7.3465370000000005,
+          "reused_page_bytes": 213438,
+          "reused_pages": 38,
+          "select_ms": 5.932126,
+          "selected_records_validated": 719,
+          "transaction_ms": 1.632462,
+          "validation": {
+            "active_records": 719,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 719
+          }
+        },
+        "committed": {
+          "active_records": 581,
+          "active_regions": 38,
+          "checkpoint_bytes": 1622643,
+          "dependency_regions": 0,
+          "dormant_records": 0,
+          "dormant_regions": 0,
+          "generation": 209,
+          "global_records": 138,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 40.943528,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 17.994821,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    },
+    {
+      "process": {
+        "phase": "0.11 final native confirmation",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v11-user-data/worlds/world-review-011/world.json",
+          "--user-data",
+          "/tmp/terra-native/v11-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v11-resume-telemetry.json"
+        ],
+        "binary_sha256": "a1e3391a81327c2a05b9e31bd442d8e9cb27b0b99cd09b6bc1f8e84cc5f15107",
+        "started_utc": "2026-10-28T14:01:57.834979+00:00",
+        "pid": 70110,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T14:03:20.586318+00:00"
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.11/v11-resume.log",
+          "sha256": "b4e076433975f5387c54708f7b31baa2347bc6ce188c9084036de3267911d5cd",
+          "bytes": 1393
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.11/v11-resume-telemetry.json",
+          "sha256": "1b055449f092749c77068f62533bb136e6e46f39473796be3805afe1f3cfb24b",
+          "bytes": 5015
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.11/v11-resume-process.json",
+          "sha256": "f11070344808ee9925c7e939839a39d757df1442706b359d94c81dc09828f753",
+          "bytes": 604
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 0,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 64,
+        "rejected_instances": 0
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 12.971228,
+          "deleted_pages": 0,
+          "encode_ms": 10.734449999999999,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 9.054519,
+          "reused_page_bytes": 213477,
+          "reused_pages": 38,
+          "select_ms": 6.875592,
+          "selected_records_validated": 718,
+          "transaction_ms": 1.610178,
+          "validation": {
+            "active_records": 718,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 718
+          }
+        },
+        "committed": {
+          "active_records": 581,
+          "active_regions": 38,
+          "checkpoint_bytes": 1622801,
+          "dependency_regions": 0,
+          "dormant_records": 0,
+          "dormant_regions": 0,
+          "generation": 230,
+          "global_records": 137,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 41.318064,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 23.532958,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    }
+  ],
+  "captures": [
+    {
+      "path": "docs/screenshots/v11-guidance.png",
+      "sha256": "7f8ae3076fad785cc0d95bef7928ec1193903110a3e4918eb527a47fe566b820",
+      "bytes": 910758,
+      "description": "Restored original character and sustained housing goal at 1440x900.",
+      "window_pixels": [
+        1440,
+        900
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-distant.png",
+      "sha256": "33673215b709e22ff862a2490e194ca5386f5cf0ec5e1f36c12c93333fa34e12",
+      "bytes": 906836,
+      "description": "Named Market at 50 m, with ordinary Go to market action.",
+      "window_pixels": [
+        1440,
+        900
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-arrived.png",
+      "sha256": "f4b51f94b962cd9e888bcc60ea790720027b8ae451d5180e91f66b13ee7629a8",
+      "bytes": 574436,
+      "description": "Completed approach at 11 m; compact 1100x700 layout, 150% text and quantity control.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-five-quote.png",
+      "sha256": "1eaea23a8bd71b019882fc2dc5bad5a7e75210c1d6e7612e0027cd8a46d5d34d",
+      "bytes": 568468,
+      "description": "Displayed five-water purchase total 4.10 cr before acceptance; carried stock zero.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-bought-five.png",
+      "sha256": "c6fcbd90c6385f5a6ac111abdc68e9470fc1e3f7f4cb1ecaa0d7490f4eae1b6e",
+      "bytes": 569622,
+      "description": "Accepted purchase: wallet 201.58 cr, shop 32 and carried water five.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-sale-quote.png",
+      "sha256": "5507ba57321028b32fd226f903079b5da6802135975c81f3bc41bb8548d3d326",
+      "bytes": 570077,
+      "description": "Quantity one shows Sell 1 for 0.30 cr before acceptance.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-sold-one.png",
+      "sha256": "7834b9088fd59007ba9f70f36fd06bb46a6da56fce9918de3e07e0fe8b869e1a",
+      "bytes": 570330,
+      "description": "Accepted sale: wallet 201.88 cr, shop 33 and carried water four.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-market-keyboard-focus.png",
+      "sha256": "a92c2418418665604eb4a580a563da46bb736b9cb6b6132446341216fc34fddf",
+      "bytes": 578979,
+      "description": "Visible keyboard management focus on the enabled water purchase button.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-ready-to-board.png",
+      "sha256": "501a6273dc395144ca39d1aebc794e32867bd8884e4f184ce18e847cccd1aa5b",
+      "bytes": 564341,
+      "description": "Normal walking order completed near the pickup; Enter vehicle became available.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-boarded.png",
+      "sha256": "baeb42cea0bd661d84521003537e9530ecefe8156f8112d8c516658c49202373",
+      "bytes": 428937,
+      "description": "Normal nearby boarding switches to the pickup chase camera and driver HUD.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-driving-moving.png",
+      "sha256": "29c562ddfd91c29909c5a9d5bb162663ac4e39d1a928047537a21e9b12a657fa",
+      "bytes": 427753,
+      "description": "Physical throttle input: displayed 18 km/h in D1 with unchanged wallet.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-driving-stopped.png",
+      "sha256": "8566074cbeefc5bd6bcf70d3b91311a09256361cdd1a88c851c74f2544cb5888",
+      "bytes": 412855,
+      "description": "Braking brings the pickup to displayed zero speed before dismount.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-safe-exit.png",
+      "sha256": "d29d04e07a99fb7a94ec6908aef3b7577f6c65cc22ea3ea9b215e2c0ab6f5461",
+      "bytes": 467600,
+      "description": "Grounded Exit on foot puts Mira beside the parked pickup, preserving appearance.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-guidance-after-exit.png",
+      "sha256": "e21e250dc96b023d9cfd1a60b1f45fb4949b66df55c1fa90c21b67770d7eaa83",
+      "bytes": 471180,
+      "description": "Housing goal, 50 XP and completed contract remain after checkpoint restoration.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-session-restored.png",
+      "sha256": "992a7c21cbc440530d971c75394a0e11c25078eddf0f736162ab48d53697abb3",
+      "bytes": 282376,
+      "description": "Session view after F9 restoration; subsequent camera adoption is deferred while paused.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-save-quit-focused.png",
+      "sha256": "0d1081f38c7e4161eee635258d41b2eb703e2db49167fd27e9b6fb3c6a390499",
+      "bytes": 273365,
+      "description": "Keyboard Tab navigation reveals the complete Save and quit button at enlarged text.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-resumed-world.png",
+      "sha256": "9048d8bbabfb01ca35645033033ecdab7646805e2517091b63bd4e14ddc245a1",
+      "bytes": 502527,
+      "description": "Reopened final executable restores the exact on-foot pose beside the pickup and balance.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    },
+    {
+      "path": "docs/screenshots/v11-resumed-guidance.png",
+      "sha256": "87a14db6d021ca7b1971e1f10d7272d36dd05e6ddd3d8f84a9df13ed0dae8ced",
+      "bytes": 473813,
+      "description": "Reopened Activities retains 50 XP, completed contract and the housing goal.",
+      "window_pixels": [
+        1100,
+        700
+      ]
+    }
+  ],
+  "limitations": [
+    "Native session resumes the prior acceptance world; character/world creation was not repeated in this final 0.11 session.",
+    "Native actions cover Market trades, walking, ordinary boarding, a short straight drive and brake, dismount, checkpoint/restore, keyboard focus and save/resume. Other corrected branches are covered by fresh automated regressions, not claimed as native interactions.",
+    "Market and walking approaches used the bounded road planner and could take perimeter detours; no shortest-route or dense-queue guarantee.",
+    "No hardware GPU performance, Windows/macOS, screen-reader, localization or physical controller/wheel certification.",
+    "No full current-world archive, user-data database or multiplayer session credentials are included in the release; this record contains selected verification facts."
+  ],
+  "independent_exit_geometry": {
+    "path": "docs/verification/v0.11/native-exit-geometry.json",
+    "sha256": "aa3cdfe9a3e382d80d86322356b63cc3a5939f6e753ed65a2b7548b138bb717d",
+    "bytes": 11363
+  }
+}

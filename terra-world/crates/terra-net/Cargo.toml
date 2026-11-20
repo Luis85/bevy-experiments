@@ -6,12 +6,14 @@ description = "Bounded authoritative multiplayer reference for Terra World"
 license = "MIT OR Apache-2.0"
 
 [features]
-default = ["reference-server"]
+default = ["reference-server", "tls"]
 reference-server = ["dep:terra-stream", "dep:terra-history", "dep:ctrlc"]
+tls = ["dep:rustls"]
 
 [dependencies]
 terra-core = { path = "../terra-core" }
 terra-sandbox = { path = "../terra-sandbox" }
+terra-persistence = { path = "../terra-persistence" }
 terra-stream = { path = "../terra-stream", optional = true }
 terra-history = { path = "../terra-history", optional = true }
 serde = { version = "1", features = ["derive"] }
@@ -20,6 +22,10 @@ thiserror = "2"
 getrandom = "0.4"
 tempfile = "3"
 ctrlc = { version = "3.5", optional = true }
+rustls = { version = "=0.23.46", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
+
+[dev-dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 
 [[bin]]
 name = "terra-server"

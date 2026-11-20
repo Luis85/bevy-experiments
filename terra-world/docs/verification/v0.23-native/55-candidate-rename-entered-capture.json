@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "capture_name": "55-candidate-rename-entered",
+  "capture_started_utc": "2026-10-30T08:22:44.198895+00:00",
+  "captured_utc": "2026-10-30T08:22:44.443751+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Main menu",
+  "window_pid": 11234,
+  "window_pid_status": "available",
+  "window_pid_before": 11234,
+  "window_pid_after": 11234,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "55-candidate-rename-entered.png",
+    "sha256": "6f259434356573a8a235c341e966b23911234e5279fee4716c46e9b4e3092eeb",
+    "bytes": 501185
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

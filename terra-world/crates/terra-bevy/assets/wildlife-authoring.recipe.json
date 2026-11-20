@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "name": "Terra woodland authoring example",
+  "author": "Terra World contributors",
+  "license": "MIT OR Apache-2.0",
+  "models": [
+    {
+      "id": "deer",
+      "source": "wildlife-pack/deer.glb",
+      "scene": 0,
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art."
+    },
+    {
+      "id": "ibex",
+      "source": "wildlife-pack/ibex.glb",
+      "scene": 0,
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art."
+    },
+    {
+      "id": "boar",
+      "source": "wildlife-pack/boar.glb",
+      "scene": 0,
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art."
+    },
+    {
+      "id": "fox",
+      "source": "wildlife-pack/fox.glb",
+      "scene": 0,
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art."
+    },
+    {
+      "id": "hare",
+      "source": "wildlife-pack/hare.glb",
+      "scene": 0,
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art."
+    }
+  ],
+  "bindings": [
+    {
+      "target": {
+        "type": "species",
+        "value": "deer"
+      },
+      "model": "deer",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "ibex"
+      },
+      "model": "ibex",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "boar"
+      },
+      "model": "boar",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "fox"
+      },
+      "model": "fox",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 1.4,
+        "run_speed_m_s": 4.4,
+        "blend_seconds": 0.22
+      }
+    },
+    {
+      "target": {
+        "type": "species",
+        "value": "hare"
+      },
+      "model": "hare",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "feed",
+        "drink": "drink",
+        "walk_speed_m_s": 0.9,
+        "run_speed_m_s": 3.8,
+        "blend_seconds": 0.22
+      }
+    }
+  ]
+}

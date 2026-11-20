@@ -1,0 +1,659 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "finished_utc": "2026-10-29T05:47:44.834521+00:00",
+  "accepted_gate_record_sha256": "24b9fbad2b23897cee6dc03160baab6d63fc59290aada4e5c97d762e108d757d",
+  "accepted_native_binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+  "source_input_count": 366,
+  "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+  "scope": "Four completed native confirmations after final gates, using the exact accepted executable and source map. Agent-observed local review and exact bounded recovery; not an uncoached usability study, hardware benchmark or deployment certificate.",
+  "environment": {
+    "os": "Linux x86_64",
+    "display": "X11/Xvfb",
+    "renderer": "Vulkan llvmpipe",
+    "display_pixels": [
+      1440,
+      900
+    ],
+    "small_window_pixels": [
+      1100,
+      700
+    ],
+    "enlarged_text_scale": 1.5
+  },
+  "accepted_processes": [
+    {
+      "release": "0.16.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--config",
+        "/tmp/terra-native/comet-confirmation-016/comet-config.json",
+        "--asset-pack",
+        "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/crates/terra-bevy/assets/character-demo.pack.json",
+        "--quality",
+        "performance",
+        "--no-atmosphere",
+        "--no-default-politics",
+        "--camp-view",
+        "--user-data",
+        "/tmp/terra-native/comet-confirmation-016/player-data",
+        "--telemetry",
+        "/tmp/terra-native/v16-confirm-driver-telemetry.json",
+        "--telemetry-interval-seconds",
+        "2"
+      ],
+      "working_directory": "/tmp/terra-native",
+      "started_utc": "2026-10-29T05:26:46.945460+00:00",
+      "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+      "source_input_count": 366,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+      "pid": 71680,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T05:32:37.493275+00:00",
+      "seconds": 350.42949794800006,
+      "source_inputs_unchanged": true,
+      "log_sha256": "54ace773e0c3fb47a9b9718e0a20e601e4d4f50e01b02c78bf91084d5fa7d3f0",
+      "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8"
+    },
+    {
+      "release": "0.16.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--config",
+        "/tmp/terra-native/guidance-confirmation-016/comet-config.json",
+        "--asset-pack",
+        "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/crates/terra-bevy/assets/character-demo.pack.json",
+        "--quality",
+        "performance",
+        "--no-atmosphere",
+        "--no-default-politics",
+        "--camp-view",
+        "--user-data",
+        "/tmp/terra-native/guidance-confirmation-016/player-data",
+        "--telemetry",
+        "/tmp/terra-native/v16-confirm-guidance-telemetry.json",
+        "--telemetry-interval-seconds",
+        "2"
+      ],
+      "working_directory": "/tmp/terra-native",
+      "started_utc": "2026-10-29T05:32:53.030999+00:00",
+      "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+      "source_input_count": 366,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+      "pid": 72029,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T05:41:52.038478+00:00",
+      "seconds": 538.8841838039989,
+      "source_inputs_unchanged": true,
+      "log_sha256": "90bdf02ef500406f2eb976bf5381c50b35a3e6c89ab6d0f1c360524b1d7fff2e",
+      "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8"
+    },
+    {
+      "release": "0.16.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--menu",
+        "--user-data",
+        "/tmp/terra-native/launcher-review-fixture-016/player-data",
+        "--menu-screen",
+        "backups"
+      ],
+      "working_directory": "/tmp/terra-native",
+      "started_utc": "2026-10-29T05:42:08.233546+00:00",
+      "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+      "source_input_count": 366,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+      "pid": 72827,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T05:44:09.791704+00:00",
+      "seconds": 121.43431172399869,
+      "source_inputs_unchanged": true,
+      "log_sha256": "71a907ea6a70d5d27e76fc71315a0ef78d423e71c8c6865c5c7de4db2359b19a",
+      "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8"
+    },
+    {
+      "release": "0.16.0",
+      "phase": "confirmation",
+      "command": [
+        "/tmp/terra-build/target/debug/terra-demo",
+        "--world-profile",
+        "/tmp/terra-native/launcher-review-fixture-016/player-data/worlds/recovered-1793252594-72827-0/world.json",
+        "--asset-pack",
+        "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/crates/terra-bevy/assets/character-demo.pack.json",
+        "--camp-view",
+        "--telemetry",
+        "/tmp/terra-native/v16-confirm-recovered-world-telemetry.json",
+        "--telemetry-interval-seconds",
+        "2"
+      ],
+      "working_directory": "/tmp/terra-native",
+      "started_utc": "2026-10-29T05:44:16.570047+00:00",
+      "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+      "source_input_count": 366,
+      "expected_interruption": false,
+      "trace_file": null,
+      "schema": 1,
+      "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+      "pid": 73099,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T05:45:02.839068+00:00",
+      "seconds": 46.14997768499961,
+      "source_inputs_unchanged": true,
+      "log_sha256": "bbd607263fdccfacad3e7147194552f68cbcb8c31d116d655fb49537a4fb953e",
+      "finished_source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8"
+    }
+  ],
+  "candidate_evidence": {
+    "processes": [
+      {
+        "release": "0.16.0",
+        "phase": "candidate",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--play",
+          "--config",
+          "/tmp/terra-native/comet-review-fixture-016-play/comet-config.json",
+          "--asset-pack",
+          "crates/terra-bevy/assets/character-demo.pack.json",
+          "--quality",
+          "performance",
+          "--no-atmosphere",
+          "--no-default-politics",
+          "--camp-view",
+          "--user-data",
+          "/tmp/terra-native/controls-016",
+          "--telemetry",
+          "/tmp/terra-native/v16-candidate-driver-telemetry.json",
+          "--telemetry-interval-seconds",
+          "10"
+        ],
+        "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next",
+        "started_utc": "2026-10-29T04:19:04.631440+00:00",
+        "binary_sha256": "90448c7b042d2d87f811dfbe442005543e696c67f898ff8a9d64db97c1be94db",
+        "source_input_count": 366,
+        "expected_interruption": false,
+        "trace_file": null,
+        "pid": 60180,
+        "exit_code": 0,
+        "finished_utc": "2026-10-29T04:35:53.334886+00:00",
+        "seconds": 1008.5766081340007,
+        "source_inputs_unchanged": true,
+        "log_sha256": "78c6dd9067f37781a652c983ecf55a2bf7e2ba9168e5b77514be8daf79fa26bf"
+      },
+      {
+        "release": "0.16.0",
+        "phase": "candidate",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--menu",
+          "--user-data",
+          "/tmp/terra-native/launcher-review-fixture-016/player-data"
+        ],
+        "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next",
+        "started_utc": "2026-10-29T04:36:55.397142+00:00",
+        "binary_sha256": "90448c7b042d2d87f811dfbe442005543e696c67f898ff8a9d64db97c1be94db",
+        "source_input_count": 366,
+        "expected_interruption": false,
+        "trace_file": null,
+        "pid": 61469,
+        "exit_code": 0,
+        "finished_utc": "2026-10-29T04:44:50.368486+00:00",
+        "seconds": 474.8547108669991,
+        "source_inputs_unchanged": true,
+        "log_sha256": "5a583d1bf11e29f8f338f936b44c58497df422ab2e9215e491aedc1c9f6e71c5"
+      }
+    ],
+    "scope": "Pre-polish native driving, character, commitments, enlarged text, title-only rename and named restore. Historical receipts are kept separate from final executable acceptance."
+  },
+  "excluded_setup_attempt": {
+    "process": {
+      "path": "docs/verification/v0.16-native/v16-candidate-character-process.json",
+      "sha256": "49a710c358ad1d67f0b847812a3e8ac15523df0848445503467c2481cb1780e4",
+      "bytes": 1103
+    },
+    "reason": "Politics-free save launched without --no-default-politics; F9 correctly rejected a different identity. Window-close left process alive; owned process stopped with SIGTERM, exit -15. Excluded from native acceptance."
+  },
+  "recovery": {
+    "pre_open_comparison": {
+      "path": "docs/verification/v0.16-native/v16-confirm-recovery-exact.json",
+      "sha256": "21ac97929f2551385796aeaadd61f651eecbc2410d7b8a5ab4c1c1d461e7818e",
+      "bytes": 6111
+    },
+    "originals_after_open": {
+      "path": "docs/verification/v0.16-native/v16-confirm-originals-after-open.json",
+      "sha256": "b8755c1332eb09a798876720e985098d63c49ae61e8e937c81cd37f6d176dbbc",
+      "bytes": 1014
+    },
+    "saved_regions": 19,
+    "world_rows": 1,
+    "existing_files_retained": 57
+  },
+  "guidance": {
+    "review_authority_comparison": {
+      "path": "docs/verification/v0.16-native/v16-confirm-guidance-review-comparison.json",
+      "sha256": "92ac94946275d8398876042a9162e7943d4079f8333f8177204fca1c7834fad4",
+      "bytes": 1091
+    },
+    "native_findings": {
+      "path": "docs/verification/v0.16-review/final-native-review.md",
+      "sha256": "7af1159c822ab57fb853c43d302194e298e76b6201c3e361021de45384511f6b",
+      "bytes": 7272
+    },
+    "observed_attestation": {
+      "path": "docs/verification/v0.16-review/final-native-review.json",
+      "sha256": "3dc546cd612bb14340f49007b6532a07fe8782894085f10be4a6b9a0b804187f",
+      "bytes": 8000
+    }
+  },
+  "presentation": {
+    "pack_identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+    "models": 7,
+    "third_person_ready": 50,
+    "first_person_ready": 48,
+    "first_person_intentionally_hidden": 2,
+    "count_scope": "The 50/48 settled counts are only the paid Comet driver fixture; other contexts are validated separately.",
+    "recovered_world_budget": {
+      "ready": 64,
+      "imported_instance_limit": 64,
+      "eligible": 73,
+      "budget_deferred": 9,
+      "distant": 18,
+      "procedural_fallback": 27,
+      "scope": "Final graceful-exit telemetry. Deferred and distant actors retain procedural presentation under the existing performance budget; no loading, failed, rejected or unmetered instances and no draining. This is not a GPU residency measurement."
+    },
+    "scope": "Known manual owner occupancy, static authored seating fit, fallback readiness and actual native appearance; no remote occupancy, IK or timed boarding claim."
+  },
+  "checks": {
+    "four_completed_exact_executable_confirmations": true,
+    "all_implementation_inputs_unchanged": true,
+    "confirmation_source_maps_match_final_gates": true,
+    "final_gate_and_artifact_hashes_exact": true,
+    "prepared_worlds_ready_without_reported_errors": true,
+    "seven_models_no_failed_or_rejected_instances": true,
+    "recovered_scene_budget_and_procedural_fallback_accounting_verified": true,
+    "first_person_rider_and_exterior_hidden": true,
+    "recovery_database_and_dependencies_exact_before_open": true,
+    "all_existing_recovery_files_unchanged_after_open": true,
+    "review_action_preserves_authoritative_state": true,
+    "native_polish_observed_on_final_binary": true,
+    "observed_captures_bound_to_confirmation_pid_and_time": true,
+    "actual_large_and_enlarged_small_window_captures_retained": true
+  },
+  "artifact_sha256": {
+    "verification/v0.16-native/compare_recovery_016.py": "4208623de8411b303748850edad230e62dc5714833ecdebfe6fc5a29583a4ddc",
+    "verification/v0.16-native/receipts_016.py": "d84cf58e1690df191d8881fb3275c6fc8b87d62a9d9bcc02dd48a46df6165d75",
+    "verification/v0.16-native/run_016.py": "f5687f381dc43c8cd66b85387b22adbc86c77f172d939ea39b53d3d708cf59df",
+    "verification/v0.16-native/run_016_candidate.py": "f074bbb848d8887f5c380bc629a0c7dfa5975b3283036cc49f1c3f0b8ae74d14",
+    "verification/v0.16-native/ui_016.py": "6713334977d5c7e7db8362b4c433758d974f6c9b3d2b0d11f93b3fffcdef9753",
+    "verification/v0.16-native/ui_016_candidate.py": "4e0ef7967a74109d29c0fa4efa07572e66feaa3a57e64707a9273f3da0ac19d8",
+    "verification/v0.16-native/v16-baseline-recovery-ui-process.json": "568b5d405b335f1a188dd216192dfcfda9c90a28efa7158d849a88fb50bcf57e",
+    "verification/v0.16-native/v16-baseline-recovery-ui-start.json": "90d205c87e4387b631fc2cf0f70dde3bcd4ba037db6e306b18f84d797e5b9966",
+    "verification/v0.16-native/v16-baseline-recovery-ui.log": "1ff9c72cb7b57f20a02e58d4ec816d410e22fd525a54ee20c70b712e2d51af1f",
+    "verification/v0.16-native/v16-candidate-before-named-restore.json": "7c49437c7ba92db0934d030ee64fc614ca970aee37c97d9a24c878aa2eda8169",
+    "verification/v0.16-native/v16-candidate-character-process.json": "49a710c358ad1d67f0b847812a3e8ac15523df0848445503467c2481cb1780e4",
+    "verification/v0.16-native/v16-candidate-character-start.json": "9aec4b0fc78342d727e17e0f29e79da50f0015b9a3d6d53ab2260012cbabee83",
+    "verification/v0.16-native/v16-candidate-character.log": "e138e94605c3656ec22675f69b51f5f425f860f313d7cab46329470d5f054993",
+    "verification/v0.16-native/v16-candidate-driver-first-telemetry.json": "fa47bb98d2bc89cbbb21f3b7e3d5e5f441049e5d90498419497c32ffa7a1e03e",
+    "verification/v0.16-native/v16-candidate-driver-process.json": "92701c94a53f0be612d9409a92f30fe5c40502027f9e6bad42c803891222a52e",
+    "verification/v0.16-native/v16-candidate-driver-start.json": "36f8b8ca9c77a4daa67d313d924b40db5d615bed2d735ceb604d7e3d2d0f967a",
+    "verification/v0.16-native/v16-candidate-driver-telemetry.json": "21cd259be28cc013ca36528e0d28b36f1fc31b6413e895a0755e335c2d748f3e",
+    "verification/v0.16-native/v16-candidate-driver.log": "78c6dd9067f37781a652c983ecf55a2bf7e2ba9168e5b77514be8daf79fa26bf",
+    "verification/v0.16-native/v16-candidate-guidance-review-comparison.json": "5b71a061241e1a7f2cd673050796632b7c539c995cbb448b5d9097b20aea91a8",
+    "verification/v0.16-native/v16-candidate-named-recovery-comparison.json": "c1619e7545868e37ce15874e4b23ce5388655749522acd9422655b9282f29713",
+    "verification/v0.16-native/v16-candidate-recovery-before.json": "f8ae9378f2221db52d7d0b9582814d228e8af6c7268fad6347cf265b83729482",
+    "verification/v0.16-native/v16-candidate-recovery-exact.json": "386583ebb7f87a7409cc1bf9d9bb0e868a936ef1e9fd007ff966c2d703ee4a32",
+    "verification/v0.16-native/v16-candidate-recovery-process.json": "3c3e4ebffdc38ce79bdf6a3272915051ca1d5dc9759703cf9d40c365af86b922",
+    "verification/v0.16-native/v16-candidate-recovery-start.json": "a4550ef49d7714dc35d411dc3663d8cc2eb24146cd1d17a2dd824a3cf1a462e4",
+    "verification/v0.16-native/v16-candidate-recovery.log": "5a583d1bf11e29f8f338f936b44c58497df422ab2e9215e491aedc1c9f6e71c5",
+    "verification/v0.16-native/v16-candidate-rename-comparison.json": "41552e214605d63a92141a833af0a325aa45220d0d971567f17f502bb7b134e7",
+    "verification/v0.16-native/v16-confirm-before-named-restore.json": "a37a7f5f18b8c324929e34ac3cb14986044d8f32d779d6ffbaf52f4685499734",
+    "verification/v0.16-native/v16-confirm-driver-cabin-clear-capture.json": "da0b88559620a665d06c7bca04c6c705fa13033375fb75de87c37348c93224c7",
+    "verification/v0.16-native/v16-confirm-driver-exit-selection-capture.json": "0424b674f976b07f60e5a98aeb49f5b5de3c9772c35ae2a710fa087d307eebb7",
+    "verification/v0.16-native/v16-confirm-driver-first-clear-capture.json": "bbf71512078c00dd528966547fb6c9f25b3b3b692b6ae8da636f045595a25cd8",
+    "verification/v0.16-native/v16-confirm-driver-first-telemetry.json": "df00c750a73c989e24d3ed35b1abcfb3a96294f990009496a1b3da686f0debbb",
+    "verification/v0.16-native/v16-confirm-driver-loaded-capture.json": "c394aa6fb1fa2f694aca6666efb528f627f2c22b0f5d087a0e46855ae124930f",
+    "verification/v0.16-native/v16-confirm-driver-panel-capture.json": "b2ad78da1fb4f887e37d9618f0bd3c31efced795ccc9f180f0c4657dad302e26",
+    "verification/v0.16-native/v16-confirm-driver-process.json": "d4e9c135f6948b52ce05c5f9933155aad0bd5e30f959c7d0d71f1938cf33bda1",
+    "verification/v0.16-native/v16-confirm-driver-reentered-capture.json": "ed1ef5dbde3729dfaca46bb85cae3f9c01ccc733f561ab55c66288db11c1d779",
+    "verification/v0.16-native/v16-confirm-driver-route-remaining-capture.json": "69689028ff1f42fcd8a5942f5b752eb1af878e352d1b742c48335d9e8d42c635",
+    "verification/v0.16-native/v16-confirm-driver-start.json": "c1d142169c203f3ae789aa9a85f0b4c32ff7061b138f25be3894b23adc2ba155",
+    "verification/v0.16-native/v16-confirm-driver-telemetry.json": "08387dd4229a2f3b80b0eadfecb11b16aa789a98fc53942685bde294b7317616",
+    "verification/v0.16-native/v16-confirm-driver-third-telemetry.json": "c58c56ff1a266793f010cddda1b0b289d613ed6c5648b6c54102bbe927bcdf83",
+    "verification/v0.16-native/v16-confirm-driver.log": "54ace773e0c3fb47a9b9718e0a20e601e4d4f50e01b02c78bf91084d5fa7d3f0",
+    "verification/v0.16-native/v16-confirm-fixture-preparation.json": "d6ba2b22f938b7c2eecc3cf4133311d3b51e7eae34ccaa95edf27e8fb28dbcd9",
+    "verification/v0.16-native/v16-confirm-guidance-exact-request-capture.json": "86827e3d35d08062d6bf6e1fa0b906f345151a8dcde3e7c27c72061b2c48772a",
+    "verification/v0.16-native/v16-confirm-guidance-goals-visible-capture.json": "39acb0d1d7a91b8b1e8ef76a562a0b2cfdf420a14fbd70beaf6482740fc2a2ab",
+    "verification/v0.16-native/v16-confirm-guidance-price-comparison-capture.json": "1aa4f36911981926fee9c1412d5190f71aef4496d6570ae5113f9cb98a7487ba",
+    "verification/v0.16-native/v16-confirm-guidance-process.json": "3d4c30710f562c8b94546e21d1a6c9ecd207ba6f4178d67fa7527deeb0e3ff53",
+    "verification/v0.16-native/v16-confirm-guidance-review-comparison.json": "92ac94946275d8398876042a9162e7943d4079f8333f8177204fca1c7834fad4",
+    "verification/v0.16-native/v16-confirm-guidance-review-rows-capture.json": "04d085eed9f089fd404df4e700cb039748294e1715165c3a5d94fe25ad1be320",
+    "verification/v0.16-native/v16-confirm-guidance-selected-goal-capture.json": "cb0d7b9d263679f68fc0a5f3732dddfc32d097ee41aae2ca73b33c03feda8df9",
+    "verification/v0.16-native/v16-confirm-guidance-small-150-capture.json": "3f9ddf05ced0617fe665bcd83466da187334d39fc50573ed85d1c41e2d7db012",
+    "verification/v0.16-native/v16-confirm-guidance-start.json": "34f74106bd77660f67cd8aef2557838652720ef07bac2ffbca87a01f0dab7dc3",
+    "verification/v0.16-native/v16-confirm-guidance-telemetry.json": "c8dced2321a8b0b6963431ea96d5c905d4f0c84bd58082a2a610d002f3d7f71a",
+    "verification/v0.16-native/v16-confirm-guidance-wheat-review-capture.json": "3b3cc7dd0b4d1baa59c341bc4bc36422f1e13d56ad6a1a057ee547e5b598a623",
+    "verification/v0.16-native/v16-confirm-guidance.log": "90bdf02ef500406f2eb976bf5381c50b35a3e6c89ab6d0f1c360524b1d7fff2e",
+    "verification/v0.16-native/v16-confirm-originals-after-open.json": "b8755c1332eb09a798876720e985098d63c49ae61e8e937c81cd37f6d176dbbc",
+    "verification/v0.16-native/v16-confirm-recovered-world-exit-menu-capture.json": "da20a8df3db2b6b7edcc41b25fa8a1143b6e8cf5fd221c1232929a66595f96ce",
+    "verification/v0.16-native/v16-confirm-recovered-world-open-capture.json": "180e5d7721b27ad8a4d1ff703eb35712f7afd5cf9c0456692c61c95cee048f12",
+    "verification/v0.16-native/v16-confirm-recovered-world-process.json": "1881f38afea403dc3bb943af5ffa76de186650ac6d569c3627fb3bd444d5f1be",
+    "verification/v0.16-native/v16-confirm-recovered-world-start.json": "462054cfefeb9a96a90ad7aafdd5ee9b45f4eaca8be13586ad8fea5652f97d93",
+    "verification/v0.16-native/v16-confirm-recovered-world-telemetry.json": "1330f2a90aff2a1c83f211a9aef3b4e434d8b5bc60363ed4d820e421630905b1",
+    "verification/v0.16-native/v16-confirm-recovered-world.log": "bbd607263fdccfacad3e7147194552f68cbcb8c31d116d655fb49537a4fb953e",
+    "verification/v0.16-native/v16-confirm-recovery-exact-raw.json": "3a58e6ccdf135526af62a562c0d8ec3775b133c54d9118fc9c75a3f8a357fbb2",
+    "verification/v0.16-native/v16-confirm-recovery-exact.json": "21ac97929f2551385796aeaadd61f651eecbc2410d7b8a5ab4c1c1d461e7818e",
+    "verification/v0.16-native/v16-confirm-recovery-menu-process.json": "c6a8acc21eec3a45e09cfede6b9dd43751236e9d77fd8bbc5da5ccfb81cdadfc",
+    "verification/v0.16-native/v16-confirm-recovery-menu-start.json": "87e7524708d02f02347dca93a8bf328879abdb82d4b8b7ccf09f89c8b1b3c66c",
+    "verification/v0.16-native/v16-confirm-recovery-menu.log": "71a907ea6a70d5d27e76fc71315a0ef78d423e71c8c6865c5c7de4db2359b19a",
+    "verification/v0.16-native/v16-confirm-recovery-named-copy-capture.json": "ba2cf6c2df18945f38885baa5f87070fd0e494211c1e441ff1455d395f9ee8b7",
+    "verification/v0.16-native/v16-confirm-recovery-world-list-capture.json": "81167b7489416135407f645477da1dafdff4c3dbdf2280d960312aaf10b33d3d",
+    "screenshots/v16-baseline-recovery-worlds.png": "cbc255220af92068a66dd670f906a975e403a8e4b8e279ed055f6df3a56d4ad1",
+    "screenshots/v16-candidate-character-loaded.png": "af73d712f92d20607e69f132cd17c32f2fb68e335d7627194d22688da91cbb0f",
+    "screenshots/v16-candidate-commitments-rows.png": "1075f7e81f4c75f8f168542099fec74262364ee23e222eca023abd4d3a66abfb",
+    "screenshots/v16-candidate-commitments.png": "eaa2c8821170b4a138e87481b5a589b17a76a3f8abe09e683ca42b9248b9b9f1",
+    "screenshots/v16-candidate-driver-cabin.png": "9214c873e7cdcd4e2f9d9d04196bf7ed710fb6f308cbc329c4af08602782fc33",
+    "screenshots/v16-candidate-driver-first.png": "3a929bcceae371fbfbd72d7e5fd8db16045d83d35705bd39d40c04653ee3b1f3",
+    "screenshots/v16-candidate-driver-forward.png": "7f22fe27f74ec7ea06d39d6913073c2e52a948ec561244497e1c0f010f5a0af9",
+    "screenshots/v16-candidate-driver-loaded.png": "d50be25e022eb46fa1d9997b0963509608736fc758a710ddf2abb202f6c335fb",
+    "screenshots/v16-candidate-driver-parked.png": "50b1e6aedb88bf89dc7bb62649d5867b5b94a417e53c978860f3519da2a6a98a",
+    "screenshots/v16-candidate-driving-panel.png": "0b7053e9e25a7a6bd644ad50ce0a0317fc25a8f125d55cd0b898e90208e539bb",
+    "screenshots/v16-candidate-exit-options.png": "eb14fd3e7306218fc57af2f9e1b3ec03b8e67a8093669228f95e437ec6f567bb",
+    "screenshots/v16-candidate-goal-choices-150.png": "922e058f3970a9ef53b93c3a1a3a1627c2e39ac2d225808bd1e04608b3b2509e",
+    "screenshots/v16-candidate-goal-choices.png": "2dcdb2771f22b3f12f562366a1885bb1eaf252c989c3d7038b961ed22bfd0f89",
+    "screenshots/v16-candidate-human-exit.png": "987f824c8f91cae2e2b8074ed0e614abd5230612c889cffc7d132f79f52e065c",
+    "screenshots/v16-candidate-human-on-foot.png": "0649c9da134985d2bb98b938ad220443deb73e13997b56f72c977a33a6773b44",
+    "screenshots/v16-candidate-human-run.png": "8d79def51e4f3fbe02cbba4d6521b0e6d1ce24696461c52ceaf2c2a8aac66bbb",
+    "screenshots/v16-candidate-human-walk.png": "2efbcc91954dd4356c564947b9be21f7819a74dc1f91068a64aae24e712a8b1e",
+    "screenshots/v16-candidate-named-recovery-complete.png": "833027bf8a06f3a0a8243c766df7907b4b4e338a8262b7ebb1ecf462f94f4722",
+    "screenshots/v16-candidate-next-request.png": "58c0df57bd3f03b3132d6571e2069707e60c4dcef410e6f660e1c687283dc5e1",
+    "screenshots/v16-candidate-recovery-name-ready.png": "d80c0b6007368883232ebcc80887de797280889509448050b711aae80be28d19",
+    "screenshots/v16-candidate-recovery-review-150.png": "72720c78403d08843f2e4285e0c7816a8b8d3c4c2d4fa5de70a6cea06d160e7e",
+    "screenshots/v16-candidate-rename-cancelled.png": "fb7d8b7127c6b7be78721aa6653a36ebaf8f47ddd2354f61c6d00635ff9ee2f0",
+    "screenshots/v16-candidate-rename-ready.png": "39deb6a85829ef7c5cf5ad101a6435a3a56118f0456faf3ae392c1fc53177e49",
+    "screenshots/v16-candidate-rename-review.png": "63fff9543b4734b3dbaad1b922f53af5604fc7a191442dfd201b69eaad9df2f3",
+    "screenshots/v16-candidate-rename-select-all.png": "b934e22c629fb3f641886192381edd7a1a46d5ecfa8aadee78b8244397b874a8",
+    "screenshots/v16-candidate-renamed-world.png": "384f7f066023c1fa42d5125c3c7638a3957bd3ffb97ef3e49583b805577dff60",
+    "screenshots/v16-candidate-review-exact-request.png": "5a9001fec58d73f155d7eeb899ba85f92bf27c66f7d048accc6cf59961e27b19",
+    "screenshots/v16-candidate-small-150.png": "05bae50f46b99cfcb9dcaf2fc3530556df274d3c0c5632a021ab093c9de00c93",
+    "screenshots/v16-candidate-worlds-150.png": "ae7e72dd246729d20a266e0d0d1926cb84ff04c171086fe01b565b2813082ee7",
+    "screenshots/v16-confirm-driver-cabin-clear.png": "ce74625209df2f41060355bf3aad5e506d8e3831079ed1e80f65c56d6186f83f",
+    "screenshots/v16-confirm-driver-exit-selection.png": "840f2d26005dbc33eea586970d788f2db209d97612fb430630ebcec0e55331ec",
+    "screenshots/v16-confirm-driver-first-clear.png": "0113256764a74c1f5f5b937f2c6946d83a2fcdc3014ef62476a5fd14744899f2",
+    "screenshots/v16-confirm-driver-loaded.png": "4ae53d58f4062141c165e928a10a9a9299ffb82d86d5e878c6d51a48a33957e1",
+    "screenshots/v16-confirm-driver-panel.png": "05260449c771c2d3810631a084d83cdc3ffff6bad8efec49fe3514fd44f5a7be",
+    "screenshots/v16-confirm-driver-reentered.png": "be0a3025766405c6af05f57efb7349df06b30a3c943dc6d37e69d622b71c8bf4",
+    "screenshots/v16-confirm-driver-route-remaining.png": "4ae53d58f4062141c165e928a10a9a9299ffb82d86d5e878c6d51a48a33957e1",
+    "screenshots/v16-confirm-guidance-exact-request.png": "543b2100da6fbeb8bfaca32ad119c72009ab34271d662aee9a2a1402835c1cd4",
+    "screenshots/v16-confirm-guidance-goals-visible.png": "3e61c9991410a594a481aadd755417a8594b79db83cf4e011673f53e1dda45d5",
+    "screenshots/v16-confirm-guidance-price-comparison.png": "255ef615052561fc7ee98c4c8a8df2b955d9947e043a269273cccc062051b8a1",
+    "screenshots/v16-confirm-guidance-review-rows.png": "5ce09ddc42a6e4609ceee7f00d9b161ad4016bb6bff9c602e968e0f8d54eac4d",
+    "screenshots/v16-confirm-guidance-selected-goal.png": "02deb8e0ee588218b3b4c057f57d99c6372ba51f0285904c85aee6f7af302a7e",
+    "screenshots/v16-confirm-guidance-small-150.png": "2047baaa508404492ea4ef87ef63fc8518099962017f98bcf5ba6e5561894b54",
+    "screenshots/v16-confirm-guidance-wheat-review.png": "20f77635c54197fab9ae2885b5eeaddd630fbbf6d4a662d68ccf99a7f1aa6686",
+    "screenshots/v16-confirm-recovered-world-exit-menu.png": "a474e68a579dfa19e9ac97675beecc375e35b400a671c16ebd18df43784e7470",
+    "screenshots/v16-confirm-recovered-world-open.png": "87e8e435a9e73e0bb74818775edc53e29eec11b6c64623dde20ab1cea615fa8d",
+    "screenshots/v16-confirm-recovery-named-copy.png": "c55ca79b49bad407849a3d30a8e5a7fff357a794203f9804a5926e94df7ad1c8",
+    "screenshots/v16-confirm-recovery-world-list.png": "26c44453fb04fe38dd5b68390e761be0516dbce0a414d8de3caf0e88d4b98f17",
+    "verification/v0.16-review/final-native-review.md": "7af1159c822ab57fb853c43d302194e298e76b6201c3e361021de45384511f6b",
+    "verification/v0.16-review/final-native-review.json": "3dc546cd612bb14340f49007b6532a07fe8782894085f10be4a6b9a0b804187f"
+  },
+  "screenshot_pixels": {
+    "v16-baseline-recovery-worlds.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-character-loaded.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-commitments-rows.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-commitments.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-driver-cabin.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-driver-first.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-driver-forward.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-driver-loaded.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-driver-parked.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-driving-panel.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-exit-options.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-goal-choices-150.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-goal-choices.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-human-exit.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-human-on-foot.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-human-run.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-human-walk.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-named-recovery-complete.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-next-request.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-recovery-name-ready.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-recovery-review-150.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-rename-cancelled.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-rename-ready.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-rename-review.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-rename-select-all.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-renamed-world.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-review-exact-request.png": [
+      1440,
+      900
+    ],
+    "v16-candidate-small-150.png": [
+      1100,
+      700
+    ],
+    "v16-candidate-worlds-150.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-driver-cabin-clear.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-exit-selection.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-first-clear.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-loaded.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-panel.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-reentered.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-route-remaining.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-guidance-exact-request.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-goals-visible.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-price-comparison.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-review-rows.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-selected-goal.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-small-150.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-wheat-review.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-recovered-world-exit-menu.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-recovered-world-open.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-recovery-named-copy.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-recovery-world-list.png": [
+      1100,
+      700
+    ]
+  },
+  "observed_screenshot_pixels": {
+    "v16-confirm-driver-cabin-clear.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-first-clear.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-exit-selection.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-driver-route-remaining.png": [
+      1440,
+      900
+    ],
+    "v16-confirm-guidance-goals-visible.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-selected-goal.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-exact-request.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-price-comparison.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-guidance-small-150.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-recovery-named-copy.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-recovery-world-list.png": [
+      1100,
+      700
+    ],
+    "v16-confirm-recovered-world-open.png": [
+      1440,
+      900
+    ]
+  },
+  "observed_check_basis": "Validated, explicit agent observation attestation with captured-image provenance; visual semantics are reviewed by the agent, not inferred from file existence.",
+  "limits": [
+    "Xvfb/software Vulkan only; no Windows or physical GPU/device qualification.",
+    "Agent-operated prepared fixtures, not uncoached play or career balance measurement.",
+    "Native recovered fixture has 19 saved regions; larger backend workloads are separate automated evidence.",
+    "Scope and remaining criteria are in REVIEW_GAPS_v0.16.md."
+  ]
+}

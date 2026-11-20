@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo",
+    "interface::layout_tests::focus_transitions_refresh_only_inspector_prose_without_changing_review_or_layout",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "started_utc": "2026-10-30T12:55:34.329596+00:00",
+  "finished_utc": "2026-10-30T12:56:54.939773+00:00",
+  "seconds": 80.65839499600042,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 492,
+    "retained_log_bytes": 492,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "summaries": [
+    "ok. 1 passed; 0 failed; 0 ignored; 0 measured; 250 filtered out; finished in 0.01s"
+  ],
+  "source_inputs": "player-focus-refresh-02-inputs.json",
+  "source_inputs_sha256": "7d3301999afa6184e8f68248e998071b6e916794ea2a6e509bc03ac39fc6efa2",
+  "input_count": 390,
+  "changed_inputs": [],
+  "log": "player-focus-refresh-02.log",
+  "log_sha256": "6ae59b1e7ffbaec87f331992b25c1a96dd8cffad4f32f302555c4560d8e5f735",
+  "scope": "Focused inspector text invalidation state/component regression. Pixel recovery requires separately retained actual native captures."
+}

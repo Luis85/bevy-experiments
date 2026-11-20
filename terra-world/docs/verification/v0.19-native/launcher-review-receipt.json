@@ -1,0 +1,49 @@
+{
+  "release": "0.19.0",
+  "status": "blocked",
+  "scope": "Fresh bounded launcher visual/input review",
+  "recorded_utc": "2026-10-29T15:18:07.950017+00:00",
+  "candidate_executable_sha256": "b86ad4bc44685780b55c6f3eb8f32f88af4330f6f055d9f7d8d71e54339fe704",
+  "candidate_game_process_launched": false,
+  "screenshots_captured": 0,
+  "planned_screens": [
+    "Home",
+    "Join",
+    "World settings",
+    "Settings"
+  ],
+  "planned_window_sizes": [
+    [
+      1100,
+      700
+    ],
+    [
+      1440,
+      900
+    ]
+  ],
+  "planned_text_scale": 1.5,
+  "planned_error_characters": 600,
+  "blocker": {
+    "unix_socket_bind_errno": 1,
+    "unix_socket_bind_error": "Operation not permitted",
+    "xvfb_failure": "Cannot establish any listening sockets - Make sure an X server is not already running",
+    "existing_display_101": "Could not open display"
+  },
+  "cleanup": {
+    "owned_game_processes": 0,
+    "owned_xvfb_processes_remaining": 0,
+    "temporary_authenticated_transport_probe_stopped": true
+  },
+  "not_established": [
+    "Rendered clipping or footer reachability",
+    "Native Tab/Back/footer interaction",
+    "Windows execution",
+    "Physical device or assistive-access qualification",
+    "Final gate artifact match"
+  ],
+  "available_alternative_evidence": "Integrator-owned 12-screen headless UI-tree/wrapping/Activate-action regression; refer to canonical gate receipts for actual outcome.",
+  "expected_candidate_sha256": "b86ad4bc44685780b55c6f3eb8f32f88af4330f6f055d9f7d8d71e54339fe704",
+  "candidate_matches_dispatched_hash": true,
+  "fresh_native_observation_qualifies_final_binary": false
+}

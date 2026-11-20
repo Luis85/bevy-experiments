@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "test",
+    "-p",
+    "terra-persistence",
+    "--locked",
+    "--offline"
+  ],
+  "started_utc": "2026-10-30T11:37:06.392811+00:00",
+  "finished_utc": "2026-10-30T11:37:46.733822+00:00",
+  "seconds": 40.34106316100042,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 5254,
+    "retained_log_bytes": 5254,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "log": "reliability-persistence-final.log",
+  "log_sha256": "8204a0f43a2e2f8945b48b25a754c70b5c6af7f607f29a0d20363d084f2e7fb1",
+  "scope": "Focused terra-persistence Linux host tests; Windows-specific fixtures compile/run only on actual Windows CI and are not qualified here."
+}

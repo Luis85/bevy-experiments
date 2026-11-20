@@ -1,0 +1,41 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "scripts",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "started_utc": "2026-10-30T11:37:13.183567+00:00",
+  "finished_utc": "2026-10-30T11:37:22.764163+00:00",
+  "seconds": 9.580599529999745,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 12810,
+    "retained_log_bytes": 12810,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "log": "reliability-python-final.log",
+  "log_sha256": "8590ce604285e233677d425d03a5919dfec6d0e9d25bb37bde5988d65b372c60",
+  "scope": "Final focused Python tooling fixtures after receipt-evidence review; no Rust, Windows host, native-window or device qualification."
+}

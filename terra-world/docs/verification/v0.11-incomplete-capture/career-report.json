@@ -1,0 +1,29 @@
+{
+  "additional_owner_deposits_minor_credits": 500,
+  "bread_conserved_including_consumption": 40,
+  "cancelled_and_retried_transfer": 1,
+  "cash_conserved_minor_credits": 1390000,
+  "company_final_minor_credits": 1393,
+  "company_initial_minor_credits": 14000,
+  "customer_water_purchases": 96,
+  "deliveries": 24,
+  "final_status": "waiting_goods",
+  "fuel_recoveries": 1,
+  "goods_revenue_minor_credits": 2880,
+  "household_consumed": {
+    "bread": 3,
+    "water": 4
+  },
+  "operating_cash_change_excluding_owner_transfers_minor_credits": -469,
+  "owner_withdrawals_minor_credits": 12638,
+  "payroll_minor_credits": 1549,
+  "physical_seconds": 2967.4499999999994,
+  "save_resume_checkpoints": 7,
+  "sessions": 6,
+  "shop_final_minor_credits": 5870,
+  "shop_initial_minor_credits": 0,
+  "source_water_units": 96,
+  "transfers": 12,
+  "warehouse_sales": 12,
+  "water_conserved_including_consumption": 224
+}

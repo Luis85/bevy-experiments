@@ -1,0 +1,216 @@
+[
+  {
+    "arrived": true,
+    "blocked_seconds": 12.0,
+    "case": "blocked_narrow_junction",
+    "exact_resume": true,
+    "goods_money_preserved": true,
+    "limits": {
+      "driver_max_heading_delta_deg": 16.05,
+      "driver_max_step_m": 0.801,
+      "extra_corridor_admissions_per_vehicle_update": 12,
+      "fixture_source_queries_per_update": 32768,
+      "max_path_waypoints": 129,
+      "physical_step_seconds": 0.1
+    },
+    "metrics": {
+      "driver_max_heading_delta_deg": 2.7395427227020264,
+      "driver_max_step_m": 0.8000000018217692,
+      "driver_travelled_m": 59.76269716265106,
+      "elapsed_physical_seconds": 20.5,
+      "exact_resumed_steps": 85,
+      "max_path_waypoints": 4,
+      "max_source_queries_per_update": 88,
+      "physical_steps": 205,
+      "source_queries": 10598
+    },
+    "queue_crossed_only_after_exit_available": true,
+    "road_width_m": 9.5,
+    "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+    "seconds_after_physical_clear_order": 8.5,
+    "supported_envelopes": true,
+    "swept_contacts_clear": true,
+    "unrelated_exit_completed_while_blocked": true,
+    "verification": {
+      "body_sweeps_clear": true,
+      "bounded_motion": true,
+      "complete_state_valid": true,
+      "exact_save_resume": true,
+      "goods_and_money_conserved": true,
+      "physical_arrival": true,
+      "source_work_bounded": true,
+      "supported_complete_envelopes": true
+    }
+  },
+  {
+    "arrived": true,
+    "case": "flank_unavailable_then_restored",
+    "exact_resume": true,
+    "goods_money_preserved": true,
+    "limits": {
+      "driver_max_heading_delta_deg": 16.05,
+      "driver_max_step_m": 0.801,
+      "extra_corridor_admissions_per_vehicle_update": 12,
+      "fixture_source_queries_per_update": 32768,
+      "max_path_waypoints": 129,
+      "physical_step_seconds": 0.1
+    },
+    "metrics": {
+      "driver_max_heading_delta_deg": 2.458446502685547,
+      "driver_max_step_m": 0.8000000017780948,
+      "driver_travelled_m": 1482.4198489090313,
+      "elapsed_physical_seconds": 619.7,
+      "exact_resumed_steps": 197,
+      "max_path_waypoints": 4,
+      "max_source_queries_per_update": 3362,
+      "physical_steps": 6197,
+      "source_queries": 179235
+    },
+    "restored_width_m": 9.5,
+    "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+    "seconds_after_restoration": 19.700000000000003,
+    "supported_envelopes": true,
+    "swept_contacts_clear": true,
+    "unavailable_width_m": 5.0,
+    "unsupported_seconds": 600,
+    "verification": {
+      "body_sweeps_clear": true,
+      "bounded_motion": true,
+      "complete_state_valid": true,
+      "exact_save_resume": true,
+      "goods_and_money_conserved": true,
+      "physical_arrival": true,
+      "source_work_bounded": true,
+      "supported_complete_envelopes": true
+    }
+  },
+  {
+    "arrived": true,
+    "case": "parked_body_narrow_corridor",
+    "exact_resume": true,
+    "goods_money_preserved": true,
+    "limits": {
+      "driver_max_heading_delta_deg": 16.05,
+      "driver_max_step_m": 0.801,
+      "extra_corridor_admissions_per_vehicle_update": 12,
+      "fixture_source_queries_per_update": 32768,
+      "max_path_waypoints": 129,
+      "physical_step_seconds": 0.1
+    },
+    "max_lateral_m": 3.6000097206732913,
+    "max_source_queries_per_step": 2538,
+    "metrics": {
+      "driver_max_heading_delta_deg": 2.510385513305664,
+      "driver_max_step_m": 0.8000000017710824,
+      "driver_travelled_m": 60.51131080872048,
+      "elapsed_physical_seconds": 17.400000000000002,
+      "exact_resumed_steps": 172,
+      "max_path_waypoints": 3,
+      "max_source_queries_per_update": 2538,
+      "physical_steps": 174,
+      "source_queries": 8661
+    },
+    "physical_seconds": 17.400000000000002,
+    "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+    "source_queries": 8661,
+    "support_width_m": 9.5,
+    "supported_envelopes": true,
+    "swept_contacts_clear": true,
+    "travelled_m": 60.51131080872048,
+    "verification": {
+      "body_sweeps_clear": true,
+      "bounded_motion": true,
+      "complete_state_valid": true,
+      "exact_save_resume": true,
+      "goods_and_money_conserved": true,
+      "physical_arrival": true,
+      "source_work_bounded": true,
+      "supported_complete_envelopes": true
+    }
+  },
+  {
+    "arrived": true,
+    "case": "two_moving_crossings",
+    "crossings_physically_cleared": 2,
+    "exact_resume": true,
+    "goods_money_preserved": true,
+    "limits": {
+      "driver_max_heading_delta_deg": 16.05,
+      "driver_max_step_m": 0.801,
+      "extra_corridor_admissions_per_vehicle_update": 12,
+      "fixture_source_queries_per_update": 32768,
+      "max_path_waypoints": 129,
+      "physical_step_seconds": 0.1
+    },
+    "metrics": {
+      "driver_max_heading_delta_deg": 3.6617393561755307e-09,
+      "driver_max_step_m": 0.8000000013572631,
+      "driver_travelled_m": 59.73550983290629,
+      "elapsed_physical_seconds": 10.100000000000001,
+      "exact_resumed_steps": 90,
+      "max_path_waypoints": 1,
+      "max_source_queries_per_update": 132,
+      "physical_steps": 101,
+      "source_queries": 6216
+    },
+    "physical_seconds": 10.100000000000001,
+    "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+    "supported_envelopes": true,
+    "swept_contacts_clear": true,
+    "verification": {
+      "body_sweeps_clear": true,
+      "bounded_motion": true,
+      "complete_state_valid": true,
+      "exact_save_resume": true,
+      "goods_and_money_conserved": true,
+      "physical_arrival": true,
+      "source_work_bounded": true,
+      "supported_complete_envelopes": true
+    }
+  },
+  {
+    "arrived": true,
+    "case": "unavailable_reconnection",
+    "exact_resume": true,
+    "goods_money_preserved": true,
+    "limits": {
+      "driver_max_heading_delta_deg": 16.05,
+      "driver_max_step_m": 0.801,
+      "extra_corridor_admissions_per_vehicle_update": 12,
+      "fixture_source_queries_per_update": 32768,
+      "max_path_waypoints": 129,
+      "physical_step_seconds": 0.1
+    },
+    "metrics": {
+      "driver_max_heading_delta_deg": 4.5421600341796875,
+      "driver_max_step_m": 0.8000000011353536,
+      "driver_travelled_m": 101.27674545120027,
+      "elapsed_physical_seconds": 21.8,
+      "exact_resumed_steps": 198,
+      "max_path_waypoints": 5,
+      "max_source_queries_per_update": 7700,
+      "physical_steps": 218,
+      "source_queries": 137416
+    },
+    "partial_proposals_rejected": true,
+    "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+    "seconds_after_restoration": 19.8,
+    "supported_envelopes": true,
+    "swept_contacts_clear": true,
+    "unavailable_strip_m": [
+      -38,
+      -32
+    ],
+    "unsupported_seconds": 2.0,
+    "verification": {
+      "body_sweeps_clear": true,
+      "bounded_motion": true,
+      "complete_state_valid": true,
+      "exact_save_resume": true,
+      "goods_and_money_conserved": true,
+      "physical_arrival": true,
+      "source_work_bounded": true,
+      "supported_complete_envelopes": true
+    }
+  }
+]

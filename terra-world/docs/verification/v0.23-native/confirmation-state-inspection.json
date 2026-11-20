@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "release": "0.23.0",
+  "phase": "confirmation",
+  "status": "passed",
+  "started_utc": "2026-10-30T08:34:32.214664+00:00",
+  "finished_utc": "2026-10-30T08:34:32.302651+00:00",
+  "scope": "Independent read-only persisted-state inspection after direct recovered-world confirmation exited cleanly. Original/backup remain the exact checkpoint-23 pair; recovered runtime has advanced normally. No full save payload is copied into the repository.",
+  "isolated_input_root": "/tmp/terra-native023/menu",
+  "method": {
+    "sqlite_version": "3.53.1",
+    "connection_uri_options": "mode=ro&immutable=1",
+    "session_pragmas": [
+      "query_only=ON",
+      "trusted_schema=OFF"
+    ],
+    "wal_absent_or_empty_before_and_after": true,
+    "complete_row_queries": [
+      "SELECT * FROM world ORDER BY singleton",
+      "SELECT * FROM regions ORDER BY level,x,y"
+    ],
+    "schema_checked": true,
+    "quick_check_all_databases": "ok",
+    "money_unit": "100 integer minor credits = 1.00 credit"
+  },
+  "observed_preserved_gameplay_in_all_three": {
+    "player_id": 1,
+    "contracts_completed": 1,
+    "experience": 50,
+    "settlements_founded": 1,
+    "wallet_minor_credits": 18113,
+    "wallet_credits": "181.13",
+    "territory_id": 2000017,
+    "territory_name": "Review23",
+    "territory_founder": 1,
+    "territory_treasury_minor_credits": 7500,
+    "territory_treasury_credits": "75.00"
+  },
+  "databases": {
+    "original": {
+      "path_relative_to_isolated_root": "worlds/world-1793347989563-11234-0/world.db",
+      "sha256": "43bc9b98544e1d2b919458c891e6c2441bcf106c4f9727ad6799a842076b24df",
+      "bytes": 3235840,
+      "mode": "0o600",
+      "sqlite_application_id": 1413829202,
+      "sqlite_user_version": 1,
+      "checkpoint_generation": 23,
+      "region_level": 15,
+      "world_rows": 1,
+      "region_rows": 12,
+      "quick_check": "ok",
+      "global_state_sha256": "631548eaf6e9d4848633948eaf9e6f0206b423560ded6a7fc41ef17998e3e606",
+      "local_metadata_sha256": "bd19a5a5fa61592690bf668685edb0c06e659e814a6f5231b706276e5a92ce9c",
+      "tick_seconds": 421.49959802627563,
+      "clock": {
+        "paused": false,
+        "time_scale": 1.0,
+        "unix_seconds": 1793016421.499598
+      },
+      "wal_absent_or_empty": true
+    },
+    "backup": {
+      "path_relative_to_isolated_root": "backups/backup-1793348595-11234-0/bundle/world.db",
+      "sha256": "b706737fb4e32bb5e13701ee2199e436b039c1a733e07ee8245620bc4e5296cc",
+      "bytes": 3235840,
+      "mode": "0o600",
+      "sqlite_application_id": 1413829202,
+      "sqlite_user_version": 1,
+      "checkpoint_generation": 23,
+      "region_level": 15,
+      "world_rows": 1,
+      "region_rows": 12,
+      "quick_check": "ok",
+      "global_state_sha256": "631548eaf6e9d4848633948eaf9e6f0206b423560ded6a7fc41ef17998e3e606",
+      "local_metadata_sha256": "bd19a5a5fa61592690bf668685edb0c06e659e814a6f5231b706276e5a92ce9c",
+      "tick_seconds": 421.49959802627563,
+      "clock": {
+        "paused": false,
+        "time_scale": 1.0,
+        "unix_seconds": 1793016421.499598
+      },
+      "wal_absent_or_empty": true
+    },
+    "recovered": {
+      "path_relative_to_isolated_root": "worlds/recovered-1793348668-11234-1/world/world.db",
+      "sha256": "d12d7dee44b43ea557749a6b790e8eb6160cc911d221db5e259675a5f565b8c1",
+      "bytes": 3235840,
+      "mode": "0o600",
+      "sqlite_application_id": 1413829202,
+      "sqlite_user_version": 1,
+      "checkpoint_generation": 35,
+      "region_level": 15,
+      "world_rows": 1,
+      "region_rows": 12,
+      "quick_check": "ok",
+      "global_state_sha256": "2c44efb5ab57d98381eeb0548e069123c6c6b637f18ea61b96dc255149c04512",
+      "local_metadata_sha256": "9ed307ec130c081d0950878dfba8ca4f8c637eebba7f76c2c2b931719f3c7cdb",
+      "tick_seconds": 532.9494917392731,
+      "clock": {
+        "paused": false,
+        "time_scale": 1.0,
+        "unix_seconds": 1793016532.9494917
+      },
+      "wal_absent_or_empty": true
+    }
+  },
+  "comparison": {
+    "original_and_backup_all_schema_and_row_values_identical": true,
+    "recovered_requested_progression_and_treasury_invariants_identical": true,
+    "source_identity_catalog_and_region_level_identical": true,
+    "recovered_all_row_values_equal_to_checkpoint23": false,
+    "checkpoint_generation_increase": 12,
+    "simulation_tick_seconds_increase": 111.44989371299744,
+    "changed_global_top_level_keys": [
+      "ecology",
+      "living",
+      "settlements",
+      "tick_seconds",
+      "transport"
+    ],
+    "changed_local_metadata_keys": [
+      "clock"
+    ],
+    "interpretation": "The recovered world was played and autosaved during direct confirmation. Its later generation, simulation state and clock are expected to differ. The requested progression, personal funds and settlement funds remain identical; no final all-gameplay byte-equality claim is made."
+  },
+  "backup_restore_binding": {
+    "all_backup_and_restore_records_name_generation": 23,
+    "bundle_identity": "sha256:57cc1feec3ce855ce2f0bebeee6d83f0d849335e9766c41ff4ce91294017ce82",
+    "committed_archive_sha256_recorded_by_bundle_and_restore": "sha256:0320f81a8afdaab56d70c127fa8e100bb7ac448fb719b071e5ba4d3a6c278533",
+    "backup_database_hash_matches_bundle_manifest": true,
+    "committed_archive_hash_independently_recomputed": false
+  },
+  "native_process_binding": {
+    "receipt": "docs/verification/v0.23-native/confirmation-recovered-process.json",
+    "receipt_sha256": "d5cc97034c385c63862744e93ca6aaf6d9790fff213cd184cbbf82f5b5275809",
+    "pid": 14073,
+    "exit_code": 0,
+    "process_finished_utc": "2026-10-30T08:32:32.447792+00:00",
+    "binary_sha256_recorded": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+    "source_inputs": 381,
+    "source_inputs_start_and_end_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+    "source_inputs_unchanged_recorded": true,
+    "actual_log_hash_matches_receipt": true,
+    "log_sha256": "c318fa6d30b34eaa7484515c3cfb607f0219cbbc1c97f4056c66997389dca1bd",
+    "selected_captures": [
+      {
+        "capture": "docs/verification/v0.23-native/70-confirmation-recovered-capture.json",
+        "capture_sha256": "f40842cfbde5b1bd86fc96fb7bfd5546b27b1eff28bb0d2b079f0010a862dc90",
+        "image_sha256": "85e095518aad105894d7928739d840d65a63817f995cfc6c7cead66dc4a3fd16",
+        "window_pid": 14073
+      },
+      {
+        "capture": "docs/verification/v0.23-native/72-confirmation-territory-capture.json",
+        "capture_sha256": "178f4adcd259939f89ddd4af6a53f1f05e77406d470b4eeaabfa4e9c4f18b597",
+        "image_sha256": "87bea5d2477b0eed7d46324b2c51bd1913dfcb0b890e06370319bf3bcb7caf6d",
+        "window_pid": 14073
+      },
+      {
+        "capture": "docs/verification/v0.23-native/76-confirmation-save-quit-capture.json",
+        "capture_sha256": "a94c7d2517fda0b8e5a12a8e828f72d236e60d2769487388da93f2e7ecb5e12a",
+        "image_sha256": "58a3fc1fe216f788c9e36b2f2328c59dc39ea200d4b8ec2fc817f169992069bd",
+        "window_pid": 14073
+      }
+    ],
+    "association_scope": "This confirmation has a direct process receipt for recovered-world PID 14073. Earlier candidate captures establish only a stable window PID, 12147. They do not independently establish its parentage, executable, or exit status; no parent-log PID link or standalone process receipt was retained for that window."
+  },
+  "input_preservation": {
+    "files_before_and_after": {
+      "worlds/world-1793347989563-11234-0/world.db": {
+        "sha256": "43bc9b98544e1d2b919458c891e6c2441bcf106c4f9727ad6799a842076b24df",
+        "bytes": 3235840,
+        "mode": "0o600"
+      },
+      "worlds/world-1793347989563-11234-0/world.db-wal": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "mode": "0o600"
+      },
+      "worlds/world-1793347989563-11234-0/world.db-shm": {
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+        "bytes": 32768,
+        "mode": "0o600"
+      },
+      "backups/backup-1793348595-11234-0/bundle/world.db": {
+        "sha256": "b706737fb4e32bb5e13701ee2199e436b039c1a733e07ee8245620bc4e5296cc",
+        "bytes": 3235840,
+        "mode": "0o600"
+      },
+      "worlds/recovered-1793348668-11234-1/world/world.db": {
+        "sha256": "d12d7dee44b43ea557749a6b790e8eb6160cc911d221db5e259675a5f565b8c1",
+        "bytes": 3235840,
+        "mode": "0o600"
+      },
+      "backups/backup-1793348595-11234-0/world-backup.json": {
+        "sha256": "a7e902919ea8e261ac4c43f180da6b8702d53402fb5ab670cd9a4d07fd1b5ae8",
+        "bytes": 497,
+        "mode": "0o600"
+      },
+      "backups/backup-1793348595-11234-0/bundle/recovery-bundle.json": {
+        "sha256": "57cc1feec3ce855ce2f0bebeee6d83f0d849335e9766c41ff4ce91294017ce82",
+        "bytes": 1134,
+        "mode": "0o600"
+      },
+      "worlds/recovered-1793348668-11234-1/world/restore-receipt.json": {
+        "sha256": "9cbaf8b19f830e7404f9e80d1c572a41f1c1fb3fc00b16772924e1e459edafe3",
+        "bytes": 405,
+        "mode": "0o600"
+      }
+    },
+    "inspected_files": 8,
+    "all_bytes_sizes_modes_unchanged": true,
+    "original_backup_files_still_match_earlier_bound_receipt": true,
+    "earlier_original_backup_receipt": "docs/verification/v0.23-native/candidate-original-backup-state.json",
+    "earlier_original_backup_receipt_sha256": "90465aaa3a1cba9a6b6563f602bb35fff85862d09eb8a70fbf50d63128c732da",
+    "full_save_payloads_copied_into_repository": false
+  },
+  "historical_initial_observation": {
+    "status": "unbound_tool_observation_only",
+    "statement": "Before the recovered-world confirmation started, an earlier direct tool read observed generation 23 and complete logical equality across original, backup and recovered databases. That early observation has no independent quiescence receipt and is not used as a current closed-world proof. A later nonempty-WAL guard refusal is retained separately.",
+    "deferred_attempt_receipt": "docs/verification/v0.23-native/candidate-state-inspection-deferred.json"
+  },
+  "limits": [
+    "Read-only SQLite integrity and row inspection do not replace Rust domain/catalog validation.",
+    "Confirmed persisted invariants after resumed play are narrower than full-state equality to the original checkpoint.",
+    "The process receipt records the confirmation binary and source identities; this state inspection does not independently re-run the native UI or authenticate a publisher.",
+    "Final canonical release acceptance remains separate."
+  ]
+}

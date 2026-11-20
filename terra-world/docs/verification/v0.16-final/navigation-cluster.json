@@ -1,0 +1,31 @@
+{
+  "case": "three_parked_bodies",
+  "distance_travelled_m": 75.48865786078075,
+  "elapsed_limit_seconds": 120,
+  "elapsed_physical_seconds": 14.5,
+  "exact_resumed_steps": 143,
+  "farthest_lateral_distance_m": 18.65694611943519,
+  "fixture_source_query_ceiling_per_step": 16384,
+  "max_heading_delta_deg": 3.367809295654297,
+  "max_path_waypoints": 3,
+  "max_source_queries_per_step": 5760,
+  "max_step_distance_m": 0.80000000156063,
+  "obstacle_count": 3,
+  "physical_step_seconds": 0.1,
+  "physical_steps": 145,
+  "remaining_goal_distance_m": 0.26763031676563404,
+  "scope": "Authored flat SDK fixture; no world coverage, hardware performance, company profitability or general traffic-flow guarantee.",
+  "source_queries": 10512,
+  "verification": {
+    "body_sweeps_clear": true,
+    "bounded_steps_and_steering": true,
+    "complete_state_valid": true,
+    "exact_save_resume": true,
+    "goods_and_money_conserved": true,
+    "parked_bodies_unchanged": true,
+    "path_bound_retained": true,
+    "physical_arrival": true,
+    "source_work_bounded": true,
+    "supported_complete_envelopes": true
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "release": "0.17.0",
+  "phase": "baseline",
+  "command": [
+    "/tmp/terra-build/accepted-016/terra-demo",
+    "--menu",
+    "--user-data",
+    "/tmp/terra-native-017/baseline-player-data"
+  ],
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next",
+  "started_utc": "2026-10-29T08:33:18.115158+00:00",
+  "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+  "source_input_count": 367,
+  "expected_interruption": false,
+  "trace_file": null,
+  "schema": 1,
+  "source_inputs_sha256": "6805b5d675aae9eca698dfe56bd51d839082349510fe3e21e59937a9b92e9999",
+  "pid": 76733,
+  "exit_code": 0,
+  "finished_utc": "2026-10-29T08:38:38.762127+00:00",
+  "seconds": 320.5249481139981,
+  "source_inputs_unchanged": false,
+  "log_sha256": "02ebac9c6c88afcfe665a76067d7ede58eed7630318795c4c44da11151362ed5",
+  "finished_source_inputs_sha256": "e5e769df7b44b2f62260e3fb15f94558837d76fd2cb868b1b3071766cf9b262a"
+}

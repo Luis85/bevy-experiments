@@ -1,0 +1,1100 @@
+{
+  "started_utc": "2026-10-29T14:34:09.609600+00:00",
+  "archive": "/workspace/scratch/d5dec1debc6b/terra-world-0.18.0-linux-x86_64.zip",
+  "archive_sha256": "4f2fffea8081d4928569d670ea403a05a74b619a06b8fc3e7a96ff54558455bb",
+  "extracted_root": "/tmp/terra018-package-smoke-sw9v69sq/extracted/terra-world-0.18.0-linux-x86_64",
+  "unrelated_cwd": "/tmp/terra018-package-smoke-sw9v69sq/unrelated",
+  "binary_sha256": "e16c25fabf30d8e96ff6b68cea99766ea1f4cc4d67afc1fbaeaff4433ffa8881",
+  "launcher_mode": "0o755",
+  "payload_before": {
+    "LICENSE-APACHE": {
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+      "mode": "0o644"
+    },
+    "terra-demo": {
+      "sha256": "e16c25fabf30d8e96ff6b68cea99766ea1f4cc4d67afc1fbaeaff4433ffa8881",
+      "mode": "0o755"
+    },
+    "start-terra.sh": {
+      "sha256": "73bef2f236d0b6c7a93cc17de86a22d7e85c15ac67a49d7fec9c74a5c71caf61",
+      "mode": "0o755"
+    },
+    "THIRD_PARTY_NOTICES.md": {
+      "sha256": "40ea541d6562cb220d139fd72cd569245b2327fc300b7610bd36d5fd7cdf7578",
+      "mode": "0o644"
+    },
+    "LICENSE-MIT": {
+      "sha256": "94935f1000935144661cf0d1465e26d1610705d39f6ddbfd461141561fbc5a93",
+      "mode": "0o644"
+    },
+    "package-manifest.json": {
+      "sha256": "4c89d456251e6f92b6fc9c274f84c2f498437e2baaf29fb306d3acdd63e98b74",
+      "mode": "0o644"
+    },
+    "START_HERE.txt": {
+      "sha256": "6ca2f6225f504e65194715429f52f0d65619a182c3a3767219457352a98bc3b6",
+      "mode": "0o644"
+    },
+    "evidence/asset-build.json": {
+      "sha256": "4cd0441839d53596ce918722ff2182fd3376beaf3709e3cf51147530e2424354",
+      "mode": "0o644"
+    },
+    "evidence/recovery.json": {
+      "sha256": "288c639ca23150e75cd436ae4df4c89bfaa44b6ff86732e29c142d18c4263ecc",
+      "mode": "0o644"
+    },
+    "evidence/guidance-continuity.log": {
+      "sha256": "1c67530cb6039a9a5ae314acf22bf1e0d6518b3b5d2db83f49d35ef48e30984e",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-generator.log": {
+      "sha256": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+      "mode": "0o644"
+    },
+    "evidence/launcher-recovery.log": {
+      "sha256": "ba9584f74153ed5de0f50e988b15429ceab9d4d0448524aac827c84de2de66cd",
+      "mode": "0o644"
+    },
+    "evidence/source-verify.log": {
+      "sha256": "9ea85cd3e0f1492f7dfe61cc18e1b39d7ebfa202cdbbc8b340c92ccb1df68b2f",
+      "mode": "0o644"
+    },
+    "evidence/distinct-tests.json": {
+      "sha256": "224ff52905279a792e53c55ca5e8e9f49bc8672e90bd136e17cbdbd7191edd01",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-demo-pack.json": {
+      "sha256": "1b54e95fa9fd90215ccb4dc298b62dd100dec1c07d8060acc19a9ffab86638ab",
+      "mode": "0o644"
+    },
+    "evidence/career-report.log": {
+      "sha256": "cf8ac7eef6fe9eb8d1fd77e26047ddeb3036632f7631511aa4e6a775da8e10a0",
+      "mode": "0o644"
+    },
+    "evidence/bevy-headless.log": {
+      "sha256": "445d7bb8c211973b1a33e2d68fbcac1d4dd477823b2575321b180b82893f4410",
+      "mode": "0o644"
+    },
+    "evidence/asset-authored-validate.log": {
+      "sha256": "5b8018408af7afbeb2fcbfbe5532203f77e2c05d3d8dd42ae6d514ad51e8dd4d",
+      "mode": "0o644"
+    },
+    "evidence/source-inspection.json": {
+      "sha256": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+      "mode": "0o644"
+    },
+    "evidence/source-install.json": {
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "mode": "0o644"
+    },
+    "evidence/regional-sessions.log": {
+      "sha256": "fdde785795ddeb0d39188dfa8b59477e2eb6f6a8b494e0b03baca784b0d03ac2",
+      "mode": "0o644"
+    },
+    "evidence/traffic-recovery.log": {
+      "sha256": "b815042b7140a9980002f51e5957f0b89a31134a6bb6d1ca3c4c7b6a5c7bc12e",
+      "mode": "0o644"
+    },
+    "evidence/navigation-geometry.json": {
+      "sha256": "ef7c3e110dec36ed0413f060c1ce60994b255814889fcacc74005067d4622fd1",
+      "mode": "0o644"
+    },
+    "evidence/novice-career-report.json": {
+      "sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+      "mode": "0o644"
+    },
+    "evidence/regional-sessions.json": {
+      "sha256": "042a40787a4e925f860b429cd2d67b173eaac004c258830570781816656dd5a4",
+      "mode": "0o644"
+    },
+    "evidence/character-asset-build.json": {
+      "sha256": "d26ce353915d4f114755e146239baaf9476059a702d5cf8ecc08420416c3d3e4",
+      "mode": "0o644"
+    },
+    "evidence/asset-authored-validate.json": {
+      "sha256": "6e924ee63c4e273d0d6863be589b417ab4df9bcd1bc9246b481fd6566815d8b8",
+      "mode": "0o644"
+    },
+    "evidence/asset-inspect.json": {
+      "sha256": "1b32560ff1fd3f9c0404a93b7e9a6084e20be4caf74e10142552d9016f09c263",
+      "mode": "0o644"
+    },
+    "evidence/traffic-recovery.json": {
+      "sha256": "14dc943629496a36f4b1d05cdb1d4fdceb52001314298bc58fa7e7649b7830f2",
+      "mode": "0o644"
+    },
+    "evidence/source-hashes.json": {
+      "sha256": "e6c1173fcb701aa04681d882d32de3d5aa927e24c5c451f9feefdbc7be7bbf21",
+      "mode": "0o644"
+    },
+    "evidence/native-build.log": {
+      "sha256": "8fb6eb10dd2496c55112b3cbb436ce41180ee6de96d2caeb2eef1cda1e0a6926",
+      "mode": "0o644"
+    },
+    "evidence/custom-provider-example.log": {
+      "sha256": "c17ddec19eaaa34d81a14ae4d4df24a54e053e12f87bbf4b67bb9c61a4b00834",
+      "mode": "0o644"
+    },
+    "evidence/purchased-career-report.json": {
+      "sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-inspect.log": {
+      "sha256": "fd5e5590ae6afbbe370b94095fac534db95eadea1ed55778261a9e8f017550d2",
+      "mode": "0o644"
+    },
+    "evidence/character-pack.json": {
+      "sha256": "3928168d402dd15595352c5e64ac1d509707337b277dd8800a0140862e7214ca",
+      "mode": "0o644"
+    },
+    "evidence/bevy-render.log": {
+      "sha256": "03e364d53548a4530b69afb8bafc3b847b29641768fffc322e58842b005ee8ab",
+      "mode": "0o644"
+    },
+    "evidence/session-probe-checks.log": {
+      "sha256": "e0ec8aa957e02a44bb6a94b4fc4b06933fe45a7b4456c10b1e434ad7c2f12586",
+      "mode": "0o644"
+    },
+    "evidence/launcher-world-names.json": {
+      "sha256": "1b3af6381e7dc72ba36046b800356378f5eec4d9baa8c23a51dad2052a00b8db",
+      "mode": "0o644"
+    },
+    "evidence/recovery-probe.log": {
+      "sha256": "90917068f0c7ae6c4ba8cfe0108bde235d711313412cbc62859fa20a03e86362",
+      "mode": "0o644"
+    },
+    "evidence/recovery-bundle.log": {
+      "sha256": "59eb35628a51ddc35e9bfa22658d7b6d3a2c16b9d186a66ad30efcfffd241f85",
+      "mode": "0o644"
+    },
+    "evidence/character-demo-pack.json": {
+      "sha256": "7d1a3d5cab0fe8f32affc88f1b86a0bd8c70f38639c6cba2db45aa8dc6e38363",
+      "mode": "0o644"
+    },
+    "evidence/guidance-continuity.json": {
+      "sha256": "b1f7720a11daa681e4d8863a6a461663760ded8d1139f1378402a3fa43b89257",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-demo-pack.log": {
+      "sha256": "c47d6f3ceaeab054fbb20dc40c1b5f8e4ee6e1738b29dc7c1ee8110276f37668",
+      "mode": "0o644"
+    },
+    "evidence/source-verify.json": {
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "mode": "0o644"
+    },
+    "evidence/gates.json": {
+      "sha256": "a15b291f0ee394f65aba60b10eecec989d73e865a3491c390a28b73e33d920f6",
+      "mode": "0o644"
+    },
+    "evidence/desktop-packaging-tests.log": {
+      "sha256": "1386560548ba4ddbec8508c226374b11f4ae938a77f8824590c7db77433725ee",
+      "mode": "0o644"
+    },
+    "evidence/character-authored-validate.log": {
+      "sha256": "d57b0be79c8bb9f9bfbd0efb5d93c169aa67cfc7a2b90fe19db820b450cc2240",
+      "mode": "0o644"
+    },
+    "evidence/headless.log": {
+      "sha256": "6d906eac01ebd8719bb0d1390e0a10ea9aece0855b1ae01d50628c401766ad43",
+      "mode": "0o644"
+    },
+    "evidence/character-asset-build.log": {
+      "sha256": "8e5d11401bf83a25c3f33364008ef4ef458fa2e089e0ad476eb065c145e59ca2",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-asset-build.json": {
+      "sha256": "41ebf45320d5a9eb898f5a3500882959b7f02ba75649c7a6a09fb111661a7e65",
+      "mode": "0o644"
+    },
+    "evidence/demo-check.log": {
+      "sha256": "2f6f06b7d2e35d31dc97b1a0daf9c418bbe32bfd63129f4c5c57e3f3a8ca2d49",
+      "mode": "0o644"
+    },
+    "evidence/source-export.log": {
+      "sha256": "4a69be25dd9637aacb0304580e20100986679ca8959874b12e33a51889038c29",
+      "mode": "0o644"
+    },
+    "evidence/demo.log": {
+      "sha256": "8685572548e4986c7b31f808bbe8722ca2ac34985f5408d2019760870d7d7b40",
+      "mode": "0o644"
+    },
+    "evidence/asset-build.log": {
+      "sha256": "ee2ba097c3aa6e1e378fdcaa8fc4806d4f14b35414c498b27157545efc089480",
+      "mode": "0o644"
+    },
+    "evidence/source-export.json": {
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "mode": "0o644"
+    },
+    "evidence/recovery-bundle.json": {
+      "sha256": "544bd51b17e03276a6a2595ec247015989995c0102d29699332e57ab789fe7f5",
+      "mode": "0o644"
+    },
+    "evidence/character-inspect.json": {
+      "sha256": "2e3a70ab38a5c1675068f23614a3c2e4114d28bffe2e0b23b1a470940d8d83a7",
+      "mode": "0o644"
+    },
+    "evidence/novice-career-report.log": {
+      "sha256": "b4d1167ed95b74180a831ab8668d5aa03aa8a53c79da1be5ad7439ed4c209841",
+      "mode": "0o644"
+    },
+    "evidence/navigation-geometry.log": {
+      "sha256": "efa16c6150e5b3dfbaf6a13566775f21e4f79a222775ac29591206084c859778",
+      "mode": "0o644"
+    },
+    "evidence/headless-example.log": {
+      "sha256": "5a3aae288576dc350f2183b555a3a4ef53641ba289a77021a91c37f62b2da306",
+      "mode": "0o644"
+    },
+    "evidence/asset-inspect.log": {
+      "sha256": "7d060223ccef3ba7980e00ea71cdc72de6a773aa0e0445066250bb41b8ed0d04",
+      "mode": "0o644"
+    },
+    "evidence/career-report.json": {
+      "sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "mode": "0o644"
+    },
+    "evidence/character-authored-validate.json": {
+      "sha256": "3aaaedf689bbf483295a7aebb60697c0cb133d716fada1445332c31d1e120baf",
+      "mode": "0o644"
+    },
+    "evidence/source-install.log": {
+      "sha256": "ea5d64f5546b2ac12ff82bf3fcde01a3a4ad6ea5ec40cd86c9cc1e30b59e3902",
+      "mode": "0o644"
+    },
+    "evidence/asset-pack.log": {
+      "sha256": "b297c546d5b22cc46663ef93f6350ac148d1bb5f2f4b35ecc11b94f324027dc4",
+      "mode": "0o644"
+    },
+    "evidence/purchased-career-report.log": {
+      "sha256": "25211e5d0476c1a3fe75efeb9b8b0886ecf0fd80e8135a6f8e5a120591a09b5c",
+      "mode": "0o644"
+    },
+    "evidence/launcher-world-names.log": {
+      "sha256": "ccdfd5fedcaa5026a3ad0a11a23c4f7c72ce7496cfd9e523a4cba1a28440f864",
+      "mode": "0o644"
+    },
+    "evidence/character-generator.json": {
+      "sha256": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+      "mode": "0o644"
+    },
+    "evidence/navigation-cluster.log": {
+      "sha256": "3ea3d8643631976463c1072e7379c08d5a71d3f319386049b34fcb9a2f0a0561",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-pack.json": {
+      "sha256": "7fe712cf059b7b846b22a1364dd9d35d037f3538bd318307fe38fd7a4a259625",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-authored-validate.log": {
+      "sha256": "737f73bb40c276ec68672664aabe1fd2fa524e22b872b98f97b7dc99e9602cc0",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-pack.log": {
+      "sha256": "19606d64d268843798901c7199c3f31584346bbe26b4872035807d62e4573bd3",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-authored-validate.json": {
+      "sha256": "76eabb2a3d042c10d9dc5b03e5a3ef3a432f24d963f9ba0f4eb69a10d71c3f07",
+      "mode": "0o644"
+    },
+    "evidence/compatibility.log": {
+      "sha256": "f09752e0ab4b234c966349018d1d9df18f401bd772e34274ce3f48d49d640655",
+      "mode": "0o644"
+    },
+    "evidence/asset-pack.json": {
+      "sha256": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-inspect.json": {
+      "sha256": "3e5f342ad5f090c9abd53d0dbe51e43d16a927642b02ba2a1fa3d0a448e65d9b",
+      "mode": "0o644"
+    },
+    "evidence/character-pack.log": {
+      "sha256": "78e7b7f9e423639967d55e8b6e675739775a33c2756457f40a5c78b7c323245a",
+      "mode": "0o644"
+    },
+    "evidence/launcher-recovery.json": {
+      "sha256": "0f28a6461cc8710a6e381f5ba606760059bc8dc42b404129a8c18910f5a885a2",
+      "mode": "0o644"
+    },
+    "evidence/format.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-asset-build.log": {
+      "sha256": "bddfbd7e00e2583d312458e9aac7d1fb05da5f288f27916d98d1ea2685c7cebe",
+      "mode": "0o644"
+    },
+    "evidence/navigation-cluster.json": {
+      "sha256": "951606748eeb349eefa598cef8b098eab176047598de37f846dac44c279a4595",
+      "mode": "0o644"
+    },
+    "evidence/character-generator.log": {
+      "sha256": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+      "mode": "0o644"
+    },
+    "evidence/character-demo-pack.log": {
+      "sha256": "31f3c5f258851e53cba0ec34e99ab6c72711aecf44bb1612c6f41cadd8bf4783",
+      "mode": "0o644"
+    },
+    "evidence/character-inspect.log": {
+      "sha256": "798b74eeb17a7c67f1a91d60c686e43052c0a6d764f000fe8b7089736a63da94",
+      "mode": "0o644"
+    },
+    "evidence/source-inspect.log": {
+      "sha256": "a1c338b4bc5807566d8095b52ce78c5533a43f05f47feb4d70773dab96546f25",
+      "mode": "0o644"
+    },
+    "evidence/vehicle-generator.json": {
+      "sha256": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+      "mode": "0o644"
+    },
+    "configs/live.json": {
+      "sha256": "04495a459beec087b28b119f0310dc301ae5b2c3b1c68be90d280d126e476012",
+      "mode": "0o644"
+    },
+    "configs/large-region.json": {
+      "sha256": "77a08bddcc9a0aa901105f7690ac62a8dda0b1cda3493e01658309fb5fb39b63",
+      "mode": "0o644"
+    },
+    "configs/heightmap.json": {
+      "sha256": "824c24f98eaca0ca034c240f4e4d84cd7036507a232c5503c0ca80ead5f33399",
+      "mode": "0o644"
+    },
+    "configs/connected-heightmap-multiplayer.json": {
+      "sha256": "c293d6c8d78cf2e310555624ae8e355516ea1bfcf63cc1082d7fabd65b9cba13",
+      "mode": "0o644"
+    },
+    "configs/connected-heightmap.json": {
+      "sha256": "bd8fc1f17dc337e3c72c087ece6d54f5b14e116dbb8038e0f31f9c69ebc844fb",
+      "mode": "0o644"
+    },
+    "configs/heightmap-multiplayer.json": {
+      "sha256": "2735f956c2a27cab3d4138a1b91db509543b3f50f90a5072b00d729e5a021f2e",
+      "mode": "0o644"
+    },
+    "configs/offline.json": {
+      "sha256": "93803d0021018222387d28a289badf974e9e20393081505e937506880f3d8a04",
+      "mode": "0o644"
+    },
+    "configs/historical-1950.json": {
+      "sha256": "52cc470d0a2777ea298c2b5a4ce8f38c40681c50836f99f99e53cef0a7fa8383",
+      "mode": "0o644"
+    },
+    "configs/historical-1980.json": {
+      "sha256": "29dcc605f1d1da4876d4254eafe1ff58f0ef2d8364f717314088e97155483f28",
+      "mode": "0o644"
+    },
+    "docs/DESKTOP_DELIVERY.md": {
+      "sha256": "16c90de0590c2b63969178c1cfe50c93cb5f4ffb694e940c3c8402559ca3bfeb",
+      "mode": "0o644"
+    },
+    "docs/PLAYTESTING.md": {
+      "sha256": "9aa75ef5ff08cb7ba3a362b0906446ee6cdd0525d44283ba5cfe15fdd772e8ce",
+      "mode": "0o644"
+    },
+    "docs/OPEN_GAPS_REPORT_v0.12.md": {
+      "sha256": "f38decd75dc33dccc5ebea339396b643d6fb5b5b36c6a3d75ed3f0195896cdee",
+      "mode": "0o644"
+    },
+    "docs/REGIONAL_PERSISTENCE.md": {
+      "sha256": "418c3f30ca6fbdbe286e5d91c1ee3170e22f25133d16822a3700f8d58e70f27c",
+      "mode": "0o644"
+    },
+    "docs/GRAPHICS_AND_MAPS.md": {
+      "sha256": "633f34996a9adebc1cb374bdbe9aa89994e0a5b22d9fa75243fdd8265741c655",
+      "mode": "0o644"
+    },
+    "docs/HISTORY.md": {
+      "sha256": "513e81207b94b1e55182951b6cc314e9e1a0269685ed06e7b73fbfd586d965b8",
+      "mode": "0o644"
+    },
+    "docs/OPERATIONS.md": {
+      "sha256": "d4ba6df21e23c175a55c0bfba5533584c125f0190a60c1f344606cd6fe322474",
+      "mode": "0o644"
+    },
+    "docs/REVIEW_GAPS_v0.14.md": {
+      "sha256": "e5449e02ec2e6d4ce2975180b913e7d463c68fc58a95e3c2b33bf2de30d7dcb7",
+      "mode": "0o644"
+    },
+    "docs/ASSET_AUTHORING.md": {
+      "sha256": "b5186d53856e2126003f53f561d6db72bbb0c9773b55fd8d3fa71ee991a04aae",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW_v0.16.md": {
+      "sha256": "7fa6c2f4b3a95e92c4fbf58e7b8af966e7e843b2c38d9d773e3fe305545baaad",
+      "mode": "0o644"
+    },
+    "docs/COMPATIBILITY.md": {
+      "sha256": "20cc854986df6975db2f77f8017f145aef69b68b1c0477bc2bba89e2fc01825f",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION_v0.14.md": {
+      "sha256": "983d9cd3db08dddd18bd1d54b21943a7a56d2840b2b1dacee966c8e6df883e3e",
+      "mode": "0o644"
+    },
+    "docs/INTEGRATION.md": {
+      "sha256": "cf5325ae282b12a101c94a14181c7fb5f9f01e1715090a75b899900ac9c1b9ac",
+      "mode": "0o644"
+    },
+    "docs/LIVING_WORLD.md": {
+      "sha256": "09b792b5916e30a0f2e85140672f1f4ebc686c08b327bb0e26f89f86d2e82651",
+      "mode": "0o644"
+    },
+    "docs/CLIENT_PREDICTION.md": {
+      "sha256": "29198991d663a7f7196773c1901d765325d3da418765eb661d3f89ab1e6e2aa3",
+      "mode": "0o644"
+    },
+    "docs/IMPLEMENTATION_PLAN_v0.18.md": {
+      "sha256": "c48da3ad60bd4a9f5171b079b6229e96941eb36f5bc5f7364d0a8b56a1403bcd",
+      "mode": "0o644"
+    },
+    "docs/ASSET_PACKS.md": {
+      "sha256": "5dc59856872853c8703b5e117094a1c9b3ca84aef752a3398661634528dc3aed",
+      "mode": "0o644"
+    },
+    "docs/MOTORTOWN_PARITY.md": {
+      "sha256": "98a74431a65e5873405890c650aea9fb333cddb5707c117d0f414073b04db946",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION_v0.13.md": {
+      "sha256": "e57e7b03ff1ff61ce86dc5332065cc5c93f72c355e1c7e84c862a8c6f85542c7",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW_v0.15.md": {
+      "sha256": "af2d4af495d2c24ae3e9238bde1355a43f9190a7df64580c48b73e8c23ea44c3",
+      "mode": "0o644"
+    },
+    "docs/REVIEW_GAPS_v0.17.md": {
+      "sha256": "6872b3d995115450d91852e6bc59bc04d1cfff97b0388f66358c499ff1020d5d",
+      "mode": "0o644"
+    },
+    "docs/REVIEW_GAPS_v0.16.md": {
+      "sha256": "0150aa2dc4eb9f723ce8f570e6de1ad7591e8222e4b4cda3839630cc9384aa33",
+      "mode": "0o644"
+    },
+    "docs/SCALING.md": {
+      "sha256": "456db85af3c5f2c1400e64240ad6a1b2e575e286f910b209ddead47bfca43c47",
+      "mode": "0o644"
+    },
+    "docs/VEHICLE_DYNAMICS.md": {
+      "sha256": "3971d080d8fd8e78169e691ce79885fccc124062f65c7ca3b688b3464d5e4733",
+      "mode": "0o644"
+    },
+    "docs/RECOVERY_BUNDLES.md": {
+      "sha256": "b730bc7db9b4f311a5e90f4106555be212a2f6cfdc3d12029d0e79099b1d0a58",
+      "mode": "0o644"
+    },
+    "docs/GAMEPLAY.md": {
+      "sha256": "89a9d3fbfd3bcdb236b1a8552465ce253cf6dec59dc1be0170d6216d677ef33e",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION_v0.12.md": {
+      "sha256": "4bdb8d8877a28127ca19379b7a56da74b42549b860617d2db5f54476ae1e9ce8",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION_v0.17.md": {
+      "sha256": "108ccf5823d611b6b9aa04dd66f7bcf2136e40988e8e2d4e794d480fd275ab06",
+      "mode": "0o644"
+    },
+    "docs/GUIDANCE.md": {
+      "sha256": "13fd8cca9b0d4ebdfc1b2ab913bb579ad4bf707224ba84cb4941219bf335426d",
+      "mode": "0o644"
+    },
+    "docs/REVIEW_GAPS_v0.13.md": {
+      "sha256": "e620d854acee39e722f50151b20ae0eb050de0c829c8fd0c34829bdc1fcc5eff",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW_v0.13.md": {
+      "sha256": "105560b0dde9df32af149181232105afe8a0430199a7ad348d6071c493b6703c",
+      "mode": "0o644"
+    },
+    "docs/PERFORMANCE.md": {
+      "sha256": "5db18fed1392c57ba2f56ad0404299619e1ad7d177c3d24bf9bce985bfd030a9",
+      "mode": "0o644"
+    },
+    "docs/SETTLEMENTS_AND_ECONOMY.md": {
+      "sha256": "c30aabdfc34b80fbd7399885dbd8cba34c29c39f35b1c3dbdde433b9b5562a5f",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW_v0.12.md": {
+      "sha256": "2036e2c0d3c3eced9f014a994446f2699ff34dec43d0ccc12922d28367bd1b1c",
+      "mode": "0o644"
+    },
+    "docs/REVIEW_GAPS_v0.15.md": {
+      "sha256": "094008691a5497ba6072915f7a75491d6f9883ed8f6430d12ec84784a4cd5766",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION_v0.16.md": {
+      "sha256": "0955fc74ee7d1a7cc6cc2042600190e47ac90c1183271805c9cdd9a5095c95b5",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW.md": {
+      "sha256": "b6c1bdb022639e8b7821b288d56a0cbe97bda672aa231e6ca0f17b3dbe2b9ede",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION_v0.15.md": {
+      "sha256": "52c2168fd113c5ecef5340cb55de912f1962367dff670ee9aa5fcd4f18c859be",
+      "mode": "0o644"
+    },
+    "docs/ECOLOGY.md": {
+      "sha256": "e791466ceffd8ef495986dc5e110c279d3f7c23c32ba7865022f6e6dd0b89394",
+      "mode": "0o644"
+    },
+    "docs/REVIEW_GAPS_v0.18.md": {
+      "sha256": "b55211c7f0ed4d5b67f21396aaf348a1c1175989e61d746ea17c08fbcba2f0c7",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW_v0.14.md": {
+      "sha256": "ca5768e7c628cbd39f91515c7c05a5df8aa3d9c2cc70b01da9d8436c2bfc88f9",
+      "mode": "0o644"
+    },
+    "docs/MMORPG_FOUNDATION.md": {
+      "sha256": "03257b12db6cb51812aee8a50641eea78fced23d37907adb6d3d2e98ff919c2a",
+      "mode": "0o644"
+    },
+    "docs/SOURCE_BUNDLES.md": {
+      "sha256": "330a16ffd0db9fa639804d0217556513db6362739082182c4a81c22e8224e629",
+      "mode": "0o644"
+    },
+    "docs/COMPANIES.md": {
+      "sha256": "abe428732761ed5851f25f4885f3a53e4ab5d1215b87f468e7b24f7a3ff50216",
+      "mode": "0o644"
+    },
+    "docs/PRODUCT_REVIEW_v0.17.md": {
+      "sha256": "24dcccafe4ddc051722c34e2249f838e4a151097eb09303f6dd9aa3a696b78e6",
+      "mode": "0o644"
+    },
+    "docs/ARCHITECTURE.md": {
+      "sha256": "1e34271f0606a82b839a4d2cb78476b2ff78592d8017264620c06365914607ec",
+      "mode": "0o644"
+    },
+    "docs/NETWORK_REPLICATION.md": {
+      "sha256": "3af5183e31ed0ea984cc0747267d2ce983b29dfb3aaa9d87daf4ef11da5bbde3",
+      "mode": "0o644"
+    },
+    "docs/TRANSPORT.md": {
+      "sha256": "26b84a28a37d16a535b53a6fe14c1c839904ff57179bf607e8c0a6bff108a0f2",
+      "mode": "0o644"
+    },
+    "docs/GAME_FLOW.md": {
+      "sha256": "48f14b590ac88867068175011a10ad0d54c1a2cfdbc3c70ed08798f6e7bc6579",
+      "mode": "0o644"
+    },
+    "docs/CONTACTS_AND_ROUTING.md": {
+      "sha256": "03c8dcf8158e9720849c10064cc194dad120c0d86cab69e12b8c608b9365c97b",
+      "mode": "0o644"
+    },
+    "docs/VALIDATION.md": {
+      "sha256": "9ec04fe38ab6afc3bccadfd4ede189c116636b24827dd086a6450fed8e9200c5",
+      "mode": "0o644"
+    },
+    "docs/DIAGNOSTICS.md": {
+      "sha256": "db3d89268a51c9fc2b6e02c05ec2a419350257b3b176af1cfaba934f5ffa0c1c",
+      "mode": "0o644"
+    },
+    "docs/MULTIPLAYER.md": {
+      "sha256": "3229f5a39f40ae4a7fe92e334e6216544fb643b4584171149d6a6c3152f4abd1",
+      "mode": "0o644"
+    },
+    "docs/CONTROLS.md": {
+      "sha256": "c5f3b7163dd28d5a69cd419e6f602a1ec964ca28ac985357a83dbd8ac00b41d4",
+      "mode": "0o644"
+    },
+    "docs/DATA.md": {
+      "sha256": "10a51567e606655827617d634431c25b982d544cdedd331205349f485de83344",
+      "mode": "0o644"
+    },
+    "docs/reports/Terra-World-0.12-Open-Gaps-Report.pdf": {
+      "sha256": "b88068efe8b99448174ba28e09a543f6382ac3c6eb329b231070355aaae74569",
+      "mode": "0o644"
+    },
+    "crates/terra-demo/assets/DejaVuSans-LICENSE.txt": {
+      "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9",
+      "mode": "0o644"
+    },
+    "crates/terra-demo/assets/DejaVuSans.ttf": {
+      "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/natural-earth-countries-2026-10-26.geojson": {
+      "sha256": "304718be169beffee91191729e7514fea5ff7564d216909808f6601cee9b7fbe",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-politics-eras.geojson": {
+      "sha256": "73c586e12e79524715d12a2428a3c91120ca2251ccbdbae8b4078d90a83bf77b",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7622.json": {
+      "sha256": "4799348fab3638d59cff98427c5be83b2820e93936fd9cb11331a55f1081a0e9",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7618.json": {
+      "sha256": "b52c9b53064115e2df5497d6fcbbf56cbf6425d01f2470445f5db9528ea97280",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7619.json": {
+      "sha256": "6d101a2c6407930187bdf4ba947cfed0db7a56bfe6fa85219884d97ededfe1ed",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7618.json": {
+      "sha256": "51ac1b9968341b518917c35d25945d9839a9f73f6b3698edeaee44c9aee16a26",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7620.json": {
+      "sha256": "c218cb58513f5a078cbcbe6943ff5f1c2b519b72176351fb786e4a89407e2f17",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/manifest.json": {
+      "sha256": "6f08226baf3941f2eed6021714a9a6956a2c1509314da0de8facb0b5394d3da7",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7621.json": {
+      "sha256": "3be05a0452d34ff5b64c0f9f9760dad4d32ae5076e8936ae895cf7d25e45a3b4",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7621.json": {
+      "sha256": "eab5c2c7411efb2e91a2928e99638164783750587ddf2314685414f4267427bd",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7620.json": {
+      "sha256": "a25c8219475baa3cc70f7a7d835e588e1f3332f87e2c8180f0165e61151e1320",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7622.json": {
+      "sha256": "a5e99a579d33174e92fcaa1d7ce87ccd01973deb5df12831255316e0d4daf44a",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7619.json": {
+      "sha256": "35972712347b2b4affc1892f038b9754aacc6e8e6cdf895f580306a7be496135",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7620.json": {
+      "sha256": "fcef0a14117c79f950114e8fa5bff3b0c5183733a7d9492c7a290cc494ee0409",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7620.json": {
+      "sha256": "0ed489da5f6ef2e7f9879340173a0fa1179d42891975cb73fbcfd7a541536611",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7622.json": {
+      "sha256": "e11046a79c93d683c70e93719f394dae961126837a5cccd4a4accc20820800a8",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7618.json": {
+      "sha256": "84657d2e5b23dd1e217b3b085874ff811650f3dd169f24b5742fe377e9080b92",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7621.json": {
+      "sha256": "f38aa8a75beb12b2b2d48fce1283ae0508d471bd7da670923fca0b87d9548e79",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7622.json": {
+      "sha256": "5f1a64a2548ac047aaa1462421c64f15980ffcf6d9916c8903968220e17f2aff",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7618.json": {
+      "sha256": "2e02d5a2e32cc133e3c0d6db47ccfbb81da15a0d105cceb656038ac379c76247",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7619.json": {
+      "sha256": "6f0dd997b355a432bd204ac12270ff2106879d16e29410a67fed5f89dd5145fd",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7620.json": {
+      "sha256": "e2a0f7fcc6e2007d58613a2a79d3c7e14202b272942d1e99a45917e279075e61",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17436-7621.json": {
+      "sha256": "21d339030a9b03d86cdf1599fdee9fb51ab239c1b8fe09b4bff72c2b9475da60",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17435-7622.json": {
+      "sha256": "3e370a15a95ea4c56584ac5c698945186c4d84a52f3bbb5ed217397846515cea",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7621.json": {
+      "sha256": "a6c952ad51d1bf6b2b59b922e562cda67c0781fdc08ca9924a8d51a287375e45",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17439-7619.json": {
+      "sha256": "224a76ad9e5025f5b2078ea2eb1bda251ed249cd71feab74483e679c3641223d",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17438-7618.json": {
+      "sha256": "ac5c1ae3f38c0faedbb1491da811ed7d61a18eac812e571c0d5babeaa9284be1",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-a/15-17437-7619.json": {
+      "sha256": "2284215ab6ab567cc50ea40f33ec008ee6740096ba69e0565d66edb1eb170310",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7622.json": {
+      "sha256": "059a6a370546102e1d530abc13ca5d9aa80de28bedd8b26d27fdd454b69188e5",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7618.json": {
+      "sha256": "c11032329d1c1037093486b51528ac278d9e7b9efcd621aebefdabacf2baa2d8",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7619.json": {
+      "sha256": "05751a007086f34e6e4654b3f10d4394fdd26b66c20ecaf7d55529dcfb9ead81",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7618.json": {
+      "sha256": "ab3768618c7e2dfd0402a19cf1ee4b9beb47a0c3155959d4c4ac27d7bf41d238",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7620.json": {
+      "sha256": "6e5f11b9b83d89477917d2bdc816eac0dc342e7e8a7c1fa894ba19d864fc7282",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/manifest.json": {
+      "sha256": "92ed0613321cf9c5f24e8353748e10bcab824c6fd055ed062b186e6644eb3ffd",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7621.json": {
+      "sha256": "e8b99ec91688ff3855f83c338c3639601fe3b20f11046b86307c648ab444de7c",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7621.json": {
+      "sha256": "7f4cc81d72d2e2d5928daf8fff835785a3ee3eb577b0c971a1787ffe501bb08f",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7620.json": {
+      "sha256": "f50d7a9ed37a127d35b97d89a23a0512de3b3f4e7a0bf19456bbc010e45ef3b2",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7622.json": {
+      "sha256": "2e6f7afea2e55333b435c4e48d1b7c9f5eab7ca0754f6f4641ffbfeb43b29e34",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7619.json": {
+      "sha256": "c03104ed7b81def93b9b35c1c995bc2be4d4c404655998d921fd33554362e5f1",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7620.json": {
+      "sha256": "27b452e54208fbc97f638391e07cd78014bf6ea090408907b09f7cac41dc330f",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7620.json": {
+      "sha256": "a3cfbb6ad4e93be55ec3c4a678f713a51e698c97d9e12788d5fbd188bd88e147",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7622.json": {
+      "sha256": "05f1947b1a37ad152c94fb3f06417cf52d2ae4b911bafd82f6b0a860dd3e7d52",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7618.json": {
+      "sha256": "04dfb6d8e58ac56417c9e6d0ec44a3a1ae1331b2e0045e84500129f4355d13b1",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7621.json": {
+      "sha256": "f0599cd41f07da9b6ef0443ba0ccfce8b8710354d75c1d2a8c94592b1e0ce698",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7622.json": {
+      "sha256": "53b58dadc65a8a4bfbe8af228a0511c86df601ba69dd33117569789dc391764d",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7618.json": {
+      "sha256": "90120f9719ca6ad8a84852d381a966d577b6aa7a4b1d451e006ffc7a40061fc2",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7619.json": {
+      "sha256": "34b67f2a029c997b8e10ccbe70b94f547859ee464998301f7455648cee807675",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7620.json": {
+      "sha256": "d4065a952d72800d4b92edfc35304b941d53a86b6437794a5bdd2fe6a1f9e9a9",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17436-7621.json": {
+      "sha256": "9a5574d586ba11a8c8a4c268abf1109b864bb4021f33831fc62ce838bc76fa5b",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17435-7622.json": {
+      "sha256": "beb8f4cabb354f5855ff6decb78aa3c71a61c8ab41dd603208705d74e95aafea",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7621.json": {
+      "sha256": "2d3c5d76a131de81ad0d93deb938843a923a13bbbac52ccce92f9501a11e5c3a",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17439-7619.json": {
+      "sha256": "4b0a87d2bc0b90b0f02ec76a4ea21bfc8725498f1702f2682ad56271b38b8223",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17438-7618.json": {
+      "sha256": "b8623d628b4ce44245bf1d62e2b39ceaddc926b63d4b85111c4d479d208e740c",
+      "mode": "0o644"
+    },
+    "crates/terra-history/data/synthetic-era-b/15-17437-7619.json": {
+      "sha256": "e87bafea82014607bc7d0fd2b1080601241d101d8492ebcbe34b3af3e2c1c015",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-demo/manifest-v2.json": {
+      "sha256": "969d365a0d13e02a4128c124b4d5d8117ce8084f896ce3713abea061441e0e7f",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-demo/features-v2.geojson": {
+      "sha256": "5872e5d210f353b10a0c213b8916a2ac1f947ad36aede6a4e06222691331dc38",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-demo/manifest.json": {
+      "sha256": "b4e7492b20aabb11c3bf7f646b06089f650fa1f73f92ff2a37e89c38ccf28324",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-demo/height.png": {
+      "sha256": "bedd5fbb16a8e2765a928f34874d7a44d31e46e2d3eb643710eba9aba930ef5e",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-demo/README.md": {
+      "sha256": "1235c5bd5a27259da9af6af318c845312664d8dd70a06637504afe64e0d40cf0",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/west.geojson": {
+      "sha256": "a31f9a48fd6936a91a22d56561a71f01642a9fdae42cad6e7de5541dd0149963",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/east.geojson": {
+      "sha256": "14f87645e509a83ede40f2a1dc2b57247a6838cd120b33b0b8e6b9245e63dcd6",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/west.png": {
+      "sha256": "6d7e8bbaffb57b3e01730dbdb1fdc5ec32e99730ef0d9271852db23eb72874f5",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/west.json": {
+      "sha256": "5bc6cabf9802f07832cc1c1bcdb1decc00388b837423646bd10b89522144b50c",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/manifest.json": {
+      "sha256": "5be2aa55117ea771ad8aa2b3a151b2ac76a11a2ed5d2099890724bf83d081139",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/README.md": {
+      "sha256": "04b93f9992bc0a44a68fd501e77aa5f5e6a0c2698c43e3b79783d5a52cf82fc5",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/east.json": {
+      "sha256": "cd0c9a7be84b07a33c2f356ac584dc1c72fdb7956bf677c09226ca1e1593e3b1",
+      "mode": "0o644"
+    },
+    "crates/terra-stream/data/heightmap-connected/east.png": {
+      "sha256": "5b2ab8ae8a04afeea99fa0de1f4bb10afee3df56d24750c122bd42e0df61200f",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/character-authoring.recipe.json": {
+      "sha256": "cad9216953aa7e839db1a660181d362577c04229f688e39ec71582f4ac600eed",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/transport-demo.pack.json": {
+      "sha256": "76be4a7fbd8187b6f64710ef0ea2ee9e6b53a3cd6abdf06daf379ff340b4c6b9",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/transport-authoring.recipe.json": {
+      "sha256": "b85f1f523ec15bfce258f25bf4b0877c9558faecfcbfa114cba700a2ad093de5",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/character-demo.pack.json": {
+      "sha256": "d0a706a66e69a2c916a04e2e7cd7a51421243806eb20f057e7fc59124eeb8de6",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-authoring.recipe.json": {
+      "sha256": "b6c6b0663d062178667bbc54ac46129f4f0819f8bdcf3a7932cd3b05cea40ca6",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/transport-pack/README.md": {
+      "sha256": "ca1f77f531f8c3014451e87eb4c9955838833b141f91a8b1725c0eb208555ad6",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/transport-pack/pack.json": {
+      "sha256": "293115155bd63a315d72401fa7abf778d68e45af53bedad2e5c7f04a7fbfe4e2",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/transport-pack/comet.glb": {
+      "sha256": "e13f7026ad6bee911f52c664e480cfd5f42a3417d2ecd463ea755b7ce72479c4",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/README.md": {
+      "sha256": "2c9e10fe70a0000e6841811b3fc6b36515153ff688d6e6dd52272be042a1a231",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/fox.glb": {
+      "sha256": "85c4421d02116bfc2a6a0af701b0fcb944d667a585824482b0a92a13c26ba048",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/hare.glb": {
+      "sha256": "e27b4e4a838329bd86d3f20957c179475e018258436dd15313d03a6503d4eb3f",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/pack.json": {
+      "sha256": "59f7a987de912f5f696087a8d6a886c44dfd31feff6474893118c4a7dbf9990a",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/boar.glb": {
+      "sha256": "3f96fda99dc8f9178435c659561a004dc1d6d82873bd2131aef839f88712f28f",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/deer.glb": {
+      "sha256": "49629810d8e3280764dfa35aed39e8885ce6779e4b9320c6e003ab87de133f80",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/wildlife-pack/ibex.glb": {
+      "sha256": "758abe4583ad3cfc048c729afc6bc69144f8c6521b1a05faa2c3a6622be8c694",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/character-pack/README.md": {
+      "sha256": "9bc977c0da07af41bf59e8bb763a5c18ef55b1cc1e06ea814edf19a79602b513",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/character-pack/fieldhand.glb": {
+      "sha256": "b5d62261ee73a9a987b754b322ea95ce9d84941ca82e03c87de00568aa759b7e",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/character-pack/pack.json": {
+      "sha256": "e099129736ef939986eedf1aaa77488839232e588a39e35abec41931447859f7",
+      "mode": "0o644"
+    },
+    "crates/terra-bevy/assets/character-pack/comet-cabin.glb": {
+      "sha256": "07f58f28cc002288213bec5a03db3e318fb07ec8f6708aa713fd807332353d17",
+      "mode": "0o644"
+    }
+  },
+  "processes": [
+    {
+      "name": "menu",
+      "command": [
+        "/tmp/terra018-package-smoke-sw9v69sq/extracted/terra-world-0.18.0-linux-x86_64/start-terra.sh",
+        "--frames",
+        "100"
+      ],
+      "cwd": "/tmp/terra018-package-smoke-sw9v69sq/unrelated",
+      "started_utc": "2026-10-29T14:34:10.854873+00:00",
+      "binary_sha256": "e16c25fabf30d8e96ff6b68cea99766ea1f4cc4d67afc1fbaeaff4433ffa8881",
+      "pid": 9,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T14:34:20.225878+00:00",
+      "log": "packaged-menu.log",
+      "log_sha256": "60a99f4b2869c2cc107d200bad13fc870d95886808ba24ef83f4817f88e1bc49"
+    },
+    {
+      "name": "prepared-models",
+      "command": [
+        "/tmp/terra018-package-smoke-sw9v69sq/extracted/terra-world-0.18.0-linux-x86_64/terra-demo",
+        "--config",
+        "configs/connected-heightmap.json",
+        "--region-store",
+        "/tmp/terra018-package-smoke-sw9v69sq/runtime/prepared.db",
+        "--user-data",
+        "/tmp/terra018-package-smoke-sw9v69sq/runtime/userdata",
+        "--asset-pack",
+        "crates/terra-bevy/assets/character-demo.pack.json",
+        "--frames",
+        "100",
+        "--telemetry",
+        "/tmp/terra018-package-smoke-sw9v69sq/runtime/prepared-telemetry.json"
+      ],
+      "cwd": "/tmp/terra018-package-smoke-sw9v69sq/extracted/terra-world-0.18.0-linux-x86_64",
+      "started_utc": "2026-10-29T14:34:20.226066+00:00",
+      "binary_sha256": "e16c25fabf30d8e96ff6b68cea99766ea1f4cc4d67afc1fbaeaff4433ffa8881",
+      "pid": 47,
+      "exit_code": 0,
+      "finished_utc": "2026-10-29T14:35:04.475135+00:00",
+      "log": "packaged-prepared-models.log",
+      "log_sha256": "23141ba33d50731bd00a2154055e74d06c2056bb51b7e4c6a70c34fcbeb5d036"
+    }
+  ],
+  "scope": "Fresh extracted Linux package on current host, Xvfb loopback TCP, software Vulkan. No Windows/clean-machine/GPU/device qualification.",
+  "finished_utc": "2026-10-29T14:35:04.686251+00:00",
+  "payload_files_unchanged": true,
+  "payload_file_count": 239,
+  "archive_unchanged": true,
+  "binary_unchanged": true,
+  "telemetry_keys": [
+    "asset_pack",
+    "atmosphere_active",
+    "capture",
+    "ecology_work",
+    "history",
+    "last_simulation_error",
+    "last_world_error",
+    "measurement_scope",
+    "network_authority",
+    "owner_display_prediction",
+    "population",
+    "presentation",
+    "quality",
+    "regional_persistence",
+    "release",
+    "render",
+    "replication",
+    "session_state",
+    "source",
+    "telemetry_schema",
+    "timings",
+    "transport"
+  ],
+  "private_telemetry_path": "/tmp/terra018-package-smoke-sw9v69sq/runtime/prepared-telemetry.json",
+  "status": "passed",
+  "telemetry_evidence": {
+    "path": "packaged-prepared-telemetry.json",
+    "sha256": "a44272135693a6042f063020ee0a97036c86865a25a3aa6d6c32e9086236c455",
+    "summary": {
+      "release": "0.18.0",
+      "source": {
+        "epoch": null,
+        "heightmap": true,
+        "political_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f",
+        "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+      },
+      "render": {
+        "chunks": 49,
+        "lod_chunks": [
+          6,
+          20,
+          23
+        ],
+        "pending": 0,
+        "source_vertices": 826033,
+        "terrain_full_vertices": 207025,
+        "terrain_vertices": 87121
+      },
+      "capture_status": "graceful_exit",
+      "asset_pack": {
+        "identity": "sha256:124a1baa698dce14cbdbb39e8896673611059af098580c19dc4cfc694e6cd2c0",
+        "model_count": 7,
+        "ready_instances": 91,
+        "loading_instances": 0,
+        "fallback_instances": 0,
+        "failed_models": 0,
+        "rejected_instances": 0,
+        "last_error": null
+      },
+      "regional_persistence": {
+        "pending": false,
+        "blocked": false,
+        "last_error": null,
+        "last_checkpoint_reason": "Graceful exit",
+        "committed": {
+          "active_records": 581,
+          "active_regions": 38,
+          "checkpoint_bytes": 1625825,
+          "dependency_regions": 0,
+          "dormant_records": 0,
+          "dormant_regions": 0,
+          "generation": 25,
+          "global_records": 128,
+          "pinned_regions": 9
+        }
+      },
+      "unsaved_changes": false,
+      "last_world_error": null,
+      "last_simulation_error": null
+    }
+  },
+  "payload_snapshot_scope": "Every extracted regular-file path, SHA256 and permission mode compared before and after both runs; no file additions/deletions/changes."
+}

@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo"
+  ],
+  "started_utc": "2026-10-30T13:08:36.133841+00:00",
+  "finished_utc": "2026-10-30T13:09:39.021005+00:00",
+  "seconds": 63.05801493299805,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 162,
+    "retained_log_bytes": 162,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "input_count": 390,
+  "source_inputs": "native-final-build-03-inputs.json",
+  "source_inputs_sha256": "1b7dc0264668315eba39d8e10acbb9fcb34a9282263413db03085c06c5117407",
+  "changed_inputs": [],
+  "source_inputs_match_build_01": true,
+  "log": "native-final-build-03.log",
+  "log_sha256": "1dce91012ea4125f1ac0b90f70d2120a2d1e7b14b1005e9bfc929b3e6759d493",
+  "binary": "/tmp/terra023-target/debug/terra-demo",
+  "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+  "binary_matches_build_01": true,
+  "scope": "Final main executable after exact withdrawal of experimental text-refresh registration/helper/regression. Pixel-identical retained crops overturned the alleged defect; useful short damage labels remain. Final canonical250-test gate and native acceptance are owned by the integrator."
+}

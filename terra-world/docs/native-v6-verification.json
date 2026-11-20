@@ -1,0 +1,154 @@
+{
+  "release": "0.6.0",
+  "captured_at_utc": "2026-10-27T11:38:19.721354+00:00",
+  "status": "passed",
+  "environment": {
+    "os": "Linux x86_64",
+    "display": "private X11 virtual display",
+    "renderer": "Mesa software Vulkan (lavapipe)",
+    "sizes": [
+      [
+        1440,
+        900
+      ],
+      [
+        1100,
+        700
+      ]
+    ],
+    "performance_claim": false
+  },
+  "review_policy": "One initial batched native review, followed by one combined confirmation after the integrated fixes; independent final review read the existing images without additional rendering.",
+  "actual_interactions": [
+    "Menu to named character Talia and changed outfit",
+    "World named Talia Highlands, authored heightmap, 1x clock, regional persistence, review and create",
+    "Wide landscape start with population, traffic, wildlife and transport stops",
+    "Native vehicle entry, third-person/first-person camera switch and parking brake",
+    "Accept passenger job, route to physical pickup, board, route to destination and complete",
+    "Wallet changed from 250.00 to 275.00 credits; driver gained one job and 150 XP",
+    "Garage displayed finite station stock, exact 10 L / 15.00-credit fuel offer and disabled out-of-reach servicing",
+    "Pause action set fits 1100 x 700",
+    "Save and return to fresh menu, browse two separate worlds, inspect Join and Continue",
+    "Continue restored same possessed parked vehicle into third-person view with 275.00-credit balance",
+    "Switch resumed vehicle to cockpit view; complete a second save-and-return cycle",
+    "Inspect verified-TLS certificate/hostname fields; no external server joined",
+    "Quit menu; no retained native game processes"
+  ],
+  "persisted_state_checks": {
+    "character_exact": true,
+    "wallet_exact": true,
+    "progression_exact": true,
+    "job_completed_once": true,
+    "possessed_vehicle_preserved": true,
+    "parking_brake_preserved": true,
+    "parked_mileage_preserved": true,
+    "source_clock_speed_preserved": true,
+    "clock_not_rewound": true,
+    "generation_advanced": true,
+    "earlier_world_unchanged": true,
+    "no_retained_game_processes": true
+  },
+  "confirmed_progress": {
+    "character": "Talia",
+    "world": "Talia Highlands",
+    "money_minor_credits": 27500,
+    "jobs_completed": 1,
+    "driver_xp": 150,
+    "earnings_minor_credits": 2500,
+    "odometer_m": 754.4848488067425,
+    "generation_after_first_return": 53,
+    "generation_after_second_return": 70
+  },
+  "process_lifecycle": {
+    "native_processes_after_two_returns": 1,
+    "native_processes_after_menu_quit": 0
+  },
+  "captures": [
+    {
+      "file": "screenshots/v6-main-menu.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "5384cae522dc22bd7061ce191ae6e1797a81285a5b1a119b6f3a05160b2acb10"
+    },
+    {
+      "file": "screenshots/v6-character.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "9d438e90928ff379008cf69af9511ce3da8a52808fd9ad5d76f3693563c9873a"
+    },
+    {
+      "file": "screenshots/v6-world-settings.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "8fb77a2e5e6cbc7ed4a4c3805313d51a5e2fa12c7fe57be0a8d375811f663f1f"
+    },
+    {
+      "file": "screenshots/v6-world-review.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "411d971ee910d4ad64be833bdbe8cc54b0da98641fb50ee9a98f3d006651efe5"
+    },
+    {
+      "file": "screenshots/v6-heightmap-overview.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "59cf0bb3859072577d6680144b564b37dec6faef9a4d8a8f400041c2a2b25301"
+    },
+    {
+      "file": "screenshots/v6-third-person.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "348ffdfea5d85e785388e91da9410391b6d3e41b133a843a22067a1e31ef4b2b"
+    },
+    {
+      "file": "screenshots/v6-cockpit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "6e9e2f2db12622015cbc24961750d2e8c535accc8395440e68f4afd152f4e7e2"
+    },
+    {
+      "file": "screenshots/v6-transport-payment.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "0b535254cf39b44d13ddba34f1b487341d891b0dd5b71a46f65616e6cad85fb6"
+    },
+    {
+      "file": "screenshots/v6-garage.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "ac2d07bf93025417c3c29533d25e01ac59a9a6fe12ee1b74895c4bf3f78a4438"
+    },
+    {
+      "file": "screenshots/v6-pause-minimum.png",
+      "width": 1100,
+      "height": 700,
+      "sha256": "758333b1f01411781cb814367b342dc0f56689589eb94d9a4dd53e2b0aa23f5e"
+    },
+    {
+      "file": "screenshots/v6-returned-menu.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "3968f937a09ed32dd539a47efad9e455ba08f75f1dcae36b265b71c194c3d39e"
+    },
+    {
+      "file": "screenshots/v6-world-browser.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "060aa618c8bbdce055c606a4c6a1a025696992b385e822d8e2967d05ccaf5ff9"
+    },
+    {
+      "file": "screenshots/v6-tls-join.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "2ef801c4396a5e25d2317f78fad0fbf6ce3a07fea0160acfe07ce8ddef67306c"
+    }
+  ],
+  "limitations": [
+    "Geometric prototype art, sparse repeated environmental detail; no AAA visual claim.",
+    "No physical vehicle-pedestrian contacts: a nearby NPC briefly occluded the cockpit until the vehicle moved away. Full dynamic contacts remain open.",
+    "Native Join setup was inspected; actual TLS connection, rejection and resume are covered by the separate localhost Rust suites.",
+    "Garage fuel transaction/cash bounds are covered by rules/UI tests; native garage check inspected price and reach gating.",
+    "Storage choice is below the initial world-settings fold; pause repeats regional checkpoint diagnostics.",
+    "No gaming GPU, gamepad/wheel, Windows/macOS or public MMORPG capacity certification."
+  ]
+}

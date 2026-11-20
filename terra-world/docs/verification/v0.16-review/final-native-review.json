@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "release": "0.16.0",
+  "status": "passed",
+  "completed_utc": "2026-10-29T05:47:26.799438+00:00",
+  "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+  "gate_sha256": "24b9fbad2b23897cee6dc03160baab6d63fc59290aada4e5c97d762e108d757d",
+  "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+  "basis": "agent-observed native interaction",
+  "reviewer": "root native operator, with independent content_increment_016 and guidance_increment_016 screenshot/evidence review",
+  "scope": "Four exact-executable native confirmations; one paid-driver appearance, six-goal and accepted-work handoffs, 1100x700 150% guidance/recovery menus, named exact bounded recovery and subsequent open. Expert local Linux software-rendered review, not uncoached usability, complete accessibility, hardware performance or deployment qualification.",
+  "observed_checks": {
+    "driver_fit_in_ready_cabin": true,
+    "first_person_hides_rider_and_exterior": true,
+    "exit_retains_displayed_vehicle": true,
+    "configured_hint_has_no_duplicate_shortcut_list": true,
+    "route_distance_labels_remaining_length": true,
+    "selected_goal_reveals_next_action": true,
+    "accepted_request_review_reveals_exact_request": true,
+    "supply_reward_and_missing_cost_comparison_visible": true,
+    "small_window_150_percent_navigation_and_actions_usable": true,
+    "named_recovery_creates_distinct_world": true,
+    "recovered_world_opens_and_reads_checkpoint": true
+  },
+  "narrative": {
+    "path": "docs/verification/v0.16-review/final-native-review.md",
+    "sha256": "7af1159c822ab57fb853c43d302194e298e76b6201c3e361021de45384511f6b",
+    "bytes": 7272
+  },
+  "images": {
+    "driver_cabin": {
+      "process": "v16-confirm-driver",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-driver-cabin-clear.png",
+        "sha256": "ce74625209df2f41060355bf3aad5e506d8e3831079ed1e80f65c56d6186f83f",
+        "bytes": 1034014
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-driver-cabin-clear-capture.json",
+        "sha256": "da0b88559620a665d06c7bca04c6c705fa13033375fb75de87c37348c93224c7",
+        "bytes": 834
+      }
+    },
+    "driver_first_person": {
+      "process": "v16-confirm-driver",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-driver-first-clear.png",
+        "sha256": "0113256764a74c1f5f5b937f2c6946d83a2fcdc3014ef62476a5fd14744899f2",
+        "bytes": 623113
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-driver-first-clear-capture.json",
+        "sha256": "bbf71512078c00dd528966547fb6c9f25b3b3b692b6ae8da636f045595a25cd8",
+        "bytes": 833
+      }
+    },
+    "driver_exit_selection": {
+      "process": "v16-confirm-driver",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-driver-exit-selection.png",
+        "sha256": "840f2d26005dbc33eea586970d788f2db209d97612fb430630ebcec0e55331ec",
+        "bytes": 880496
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-driver-exit-selection-capture.json",
+        "sha256": "0424b674f976b07f60e5a98aeb49f5b5de3c9772c35ae2a710fa087d307eebb7",
+        "bytes": 839
+      }
+    },
+    "driver_route_remaining": {
+      "process": "v16-confirm-driver",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-driver-route-remaining.png",
+        "sha256": "4ae53d58f4062141c165e928a10a9a9299ffb82d86d5e878c6d51a48a33957e1",
+        "bytes": 839055
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-driver-route-remaining-capture.json",
+        "sha256": "69689028ff1f42fcd8a5942f5b752eb1af878e352d1b742c48335d9e8d42c635",
+        "bytes": 841
+      }
+    },
+    "guidance_goals": {
+      "process": "v16-confirm-guidance",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-guidance-goals-visible.png",
+        "sha256": "3e61c9991410a594a481aadd755417a8594b79db83cf4e011673f53e1dda45d5",
+        "bytes": 461021
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-guidance-goals-visible-capture.json",
+        "sha256": "39acb0d1d7a91b8b1e8ef76a562a0b2cfdf420a14fbd70beaf6482740fc2a2ab",
+        "bytes": 841
+      }
+    },
+    "guidance_selected_goal": {
+      "process": "v16-confirm-guidance",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-guidance-selected-goal.png",
+        "sha256": "02deb8e0ee588218b3b4c057f57d99c6372ba51f0285904c85aee6f7af302a7e",
+        "bytes": 469557
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-guidance-selected-goal-capture.json",
+        "sha256": "cb0d7b9d263679f68fc0a5f3732dddfc32d097ee41aae2ca73b33c03feda8df9",
+        "bytes": 841
+      }
+    },
+    "guidance_exact_request": {
+      "process": "v16-confirm-guidance",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-guidance-exact-request.png",
+        "sha256": "543b2100da6fbeb8bfaca32ad119c72009ab34271d662aee9a2a1402835c1cd4",
+        "bytes": 467608
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-guidance-exact-request-capture.json",
+        "sha256": "86827e3d35d08062d6bf6e1fa0b906f345151a8dcde3e7c27c72061b2c48772a",
+        "bytes": 841
+      }
+    },
+    "guidance_supply_comparison": {
+      "process": "v16-confirm-guidance",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-guidance-price-comparison.png",
+        "sha256": "255ef615052561fc7ee98c4c8a8df2b955d9947e043a269273cccc062051b8a1",
+        "bytes": 492215
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-guidance-price-comparison-capture.json",
+        "sha256": "1aa4f36911981926fee9c1412d5190f71aef4496d6570ae5113f9cb98a7487ba",
+        "bytes": 847
+      }
+    },
+    "guidance_small_150": {
+      "process": "v16-confirm-guidance",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-guidance-small-150.png",
+        "sha256": "2047baaa508404492ea4ef87ef63fc8518099962017f98bcf5ba6e5561894b54",
+        "bytes": 465285
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-guidance-small-150-capture.json",
+        "sha256": "3f9ddf05ced0617fe665bcd83466da187334d39fc50573ed85d1c41e2d7db012",
+        "bytes": 833
+      },
+      "observed_text_scale": 1.5
+    },
+    "recovery_named_copy": {
+      "process": "v16-confirm-recovery-menu",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-recovery-named-copy.png",
+        "sha256": "c55ca79b49bad407849a3d30a8e5a7fff357a794203f9804a5926e94df7ad1c8",
+        "bytes": 290293
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-recovery-named-copy-capture.json",
+        "sha256": "ba2cf6c2df18945f38885baa5f87070fd0e494211c1e441ff1455d395f9ee8b7",
+        "bytes": 826
+      }
+    },
+    "recovery_world_list": {
+      "process": "v16-confirm-recovery-menu",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-recovery-world-list.png",
+        "sha256": "26c44453fb04fe38dd5b68390e761be0516dbce0a414d8de3caf0e88d4b98f17",
+        "bytes": 241141
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-recovery-world-list-capture.json",
+        "sha256": "81167b7489416135407f645477da1dafdff4c3dbdf2280d960312aaf10b33d3d",
+        "bytes": 826
+      }
+    },
+    "recovered_world_open": {
+      "process": "v16-confirm-recovered-world",
+      "image": {
+        "path": "docs/screenshots/v16-confirm-recovered-world-open.png",
+        "sha256": "87e8e435a9e73e0bb74818775edc53e29eec11b6c64623dde20ab1cea615fa8d",
+        "bytes": 779354
+      },
+      "capture": {
+        "path": "docs/verification/v0.16-native/v16-confirm-recovered-world-open-capture.json",
+        "sha256": "180e5d7721b27ad8a4d1ff703eb35712f7afd5cf9c0456692c61c95cee048f12",
+        "bytes": 837
+      }
+    }
+  }
+}

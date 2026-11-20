@@ -1,0 +1,30 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "test": "launcher::recovery::tests::managed_recovery_journey_preserves_complete_world_after_original_loss",
+  "report": {
+    "character_and_presentation_retained": true,
+    "checkpoint_present": true,
+    "complete_archive_exact": true,
+    "global_records": 25,
+    "living_bodies": 52,
+    "nonempty_regions": 19,
+    "original_backup_unchanged": true,
+    "original_world_and_inputs_removed": true,
+    "paged_records": 57,
+    "players": 2,
+    "political_input_exact": true,
+    "profile_published_after_complete_restore": true,
+    "recovered_world_can_be_backed_up_again": true,
+    "repeat_backup_uses_new_directory": true,
+    "resources": 16,
+    "restored_profile_discoverable": true,
+    "runtime_paths_absolute_and_rehomed": true,
+    "schema_version": 1,
+    "source_generation": 2,
+    "source_identity_retained": true
+  },
+  "log": "recovery-fixture.log",
+  "log_sha256": "1e40732dea0148bbe3db9411a98632bd9f1469b404e54a0d9e6ebd74936eaf49",
+  "scope": "Retained private native review fixture generated through this exact ordinary-command regression. Final release gates execute the test again separately. Private save/database payloads are not distributed."
+}

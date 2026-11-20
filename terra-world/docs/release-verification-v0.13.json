@@ -1,0 +1,151 @@
+{
+  "version": "0.13.0",
+  "status": "passed frozen-source automated gates, native confirmation and extracted Linux package smoke",
+  "finished_utc": "2026-10-28T18:47:33.785919+00:00",
+  "compatibility": {
+    "wire_protocol": 10,
+    "tls_alpn": "terra-world/10",
+    "domain_save": 1,
+    "regional_schema": 1
+  },
+  "automated": {
+    "distinct_passing_rust_tests": 785,
+    "passed_test_executions": 842,
+    "by_crate": {
+      "terra-bevy": 107,
+      "terra-cli": 4,
+      "terra-core": 33,
+      "terra-demo": 117,
+      "terra-history": 13,
+      "terra-net": 121,
+      "terra-persistence": 35,
+      "terra-sandbox": 311,
+      "terra-stream": 44
+    },
+    "failed": 0,
+    "ignored": 0,
+    "all_commands_executed_fresh": true,
+    "gates": 22,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.13-final/gates.json",
+      "sha256": "17a3634066564c43169c7dbc438dcdc6761110f73d3de0dbd7df743771fd9fb7",
+      "bytes": 15352
+    },
+    "test_identities": {
+      "path": "docs/verification/v0.13-final/distinct-tests.json",
+      "sha256": "e7458942effaf84b816ba98bc54302301df4461e0a5eb99b0cbc25eb296d905d",
+      "bytes": 122942
+    }
+  },
+  "source_freeze": {
+    "inputs": 338,
+    "unchanged_through_gates_and_native_confirmation": true,
+    "manifest": {
+      "path": "docs/verification/v0.13-final/source-hashes.json",
+      "sha256": "f340f0741257062f50c7d7220fcfe80c8abbc68637adbe154bc7b7ee328215e1",
+      "bytes": 39545
+    },
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.13-final/baseline-comparison.json",
+      "sha256": "ca418ea29a57e6e9aa0d8f2b8e61236a2887d8d5c4fe9fcc021c86714f2852be",
+      "bytes": 4919
+    }
+  },
+  "native": {
+    "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+    "evidence": {
+      "path": "docs/native-v13-verification.json",
+      "sha256": "a93254bc7c9b40465da4494e3c93b96ee9cdae148659d87f053a6b6bbce4b814",
+      "bytes": 30301
+    },
+    "accepted_sessions": 3,
+    "candidate_sessions": 2
+  },
+  "desktop": {
+    "evidence": {
+      "path": "docs/desktop-v13-verification.json",
+      "sha256": "131906c2d7abb8a0fbc8c76b88d2d1c28f78b0dfe924775bec5cd5a913d493e2",
+      "bytes": 10352
+    },
+    "platform": "linux-x86_64",
+    "windows_executed": false
+  },
+  "measured_cases": {
+    "novice_passenger_career": {
+      "path": "docs/verification/v0.13-final/novice-career-report.json",
+      "sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+      "bytes": 14379
+    },
+    "contributed_warehouse_career": {
+      "path": "docs/verification/v0.13-final/career-report.json",
+      "sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "bytes": 12948
+    },
+    "purchased_warehouse_career": {
+      "path": "docs/verification/v0.13-final/purchased-career-report.json",
+      "sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "bytes": 12966
+    },
+    "walking_replay": {
+      "path": "docs/verification/v0.13-final/walking-replay.json",
+      "sha256": "db58a8d6e689f0d0c2d6b11875da9796dac64ad011679b502dd7e8efaa253a74",
+      "bytes": 2100
+    },
+    "walking_replay_log": {
+      "path": "docs/verification/v0.13-final/walking-replay.log",
+      "sha256": "8a33e4a768a691ee4e0cc999d94bf164292a519d069be35894bb5912795f5bcd",
+      "bytes": 1619
+    },
+    "traffic_recovery": {
+      "path": "docs/verification/v0.13-final/traffic-recovery.json",
+      "sha256": "0f78fb3565db55773ee4ebb281d9bbda71d3a9a6c134533fa15c6bb45e5d4e7c",
+      "bytes": 1665
+    },
+    "asset_pack": {
+      "path": "docs/verification/v0.13-final/asset-pack.json",
+      "sha256": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+      "bytes": 3261
+    },
+    "source_distribution": {
+      "path": "docs/verification/v0.13-final/source-verify.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "recovery": {
+      "path": "docs/verification/v0.13-final/recovery.json",
+      "sha256": "6344f33b025796b273c955f4bf435310b345a74dd0fea0234a6a0797c796b211",
+      "bytes": 1884
+    },
+    "combined_regional_sessions": {
+      "path": "docs/verification/v0.13-final/regional-sessions.json",
+      "sha256": "886f78872ee1f5657868f183aee35a042278c20d8718a17390fa7c7d38ba9f64",
+      "bytes": 30599
+    }
+  },
+  "product_review": {
+    "path": "docs/PRODUCT_REVIEW.md",
+    "sha256": "105560b0dde9df32af149181232105afe8a0430199a7ad348d6071c493b6703c",
+    "bytes": 15949
+  },
+  "gap_register": {
+    "path": "docs/REVIEW_GAPS_v0.13.md",
+    "sha256": "e620d854acee39e722f50151b20ae0eb050de0c829c8fd0c34829bdc1fcc5eff",
+    "bytes": 17538
+  },
+  "validation_narrative": {
+    "path": "docs/VALIDATION.md",
+    "sha256": "e57e7b03ff1ff61ce86dc5332065cc5c93f72c355e1c7e84c862a8c6f85542c7",
+    "bytes": 10804
+  },
+  "original_gap_report": {
+    "path": "docs/reports/Terra-World-0.12-Open-Gaps-Report.pdf",
+    "sha256": "b88068efe8b99448174ba28e09a543f6382ac3c6eb329b231070355aaae74569",
+    "bytes": 109445
+  },
+  "scope": "Regional SDK/reference-game improvement. Finite managed career and local movement cases; actual local TLS and native software-rendered journeys. No Windows/hardware/WAN/public-service/global-architecture qualification.",
+  "current_documents_check": {
+    "path": "docs/verification/v0.13-final/current-documents-check.json",
+    "sha256": "68b68747c07f9e0ec7aa67362238192e1d90d5e33ae0624ba8736eb33122129b",
+    "bytes": 1066
+  }
+}

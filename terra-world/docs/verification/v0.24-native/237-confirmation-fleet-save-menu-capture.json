@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "237-confirmation-fleet-save-menu",
+  "capture_started_utc": "2026-10-30T12:52:42.551306+00:00",
+  "captured_utc": "2026-10-30T12:52:42.846941+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 77552,
+  "window_pid_status": "available",
+  "window_pid_before": 77552,
+  "window_pid_after": 77552,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "237-confirmation-fleet-save-menu.png",
+    "sha256": "f4c341a1d35cb8f80d82ed0bb51103e5192a223c4a821df9c0538c4f9deb6fcd",
+    "bytes": 711068
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

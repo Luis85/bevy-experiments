@@ -1,0 +1,47 @@
+{
+  "captured_utc": "2026-10-29T14:29:22.463686+00:00",
+  "scope": "Read-only committed SQLite state after first save-and-return and second save-and-quit. Runtime private data excluded from delivery. Summary is a bounded field comparison, not whole-world equality.",
+  "before_reopen": {
+    "generation": 34,
+    "title": "Native Playtest 018",
+    "character": {
+      "name": "AlexaNative Eighteen",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 0
+    },
+    "player_id": 1,
+    "money_minor": 25000,
+    "avatar_name": "AlexaNative Eighteen",
+    "avatar_owner": 1,
+    "inventory_sha256": "0406189f3b04cea69713224a7e19856b06f1d4b6a76ae0ab37852ff0da656e58"
+  },
+  "after_reopen_clean_exit": {
+    "generation": 52,
+    "title": "Native Playtest 018",
+    "character": {
+      "name": "AlexaNative Eighteen",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 0
+    },
+    "player_id": 1,
+    "money_minor": 25000,
+    "avatar_name": "AlexaNative Eighteen",
+    "avatar_owner": 1,
+    "inventory_sha256": "0406189f3b04cea69713224a7e19856b06f1d4b6a76ae0ab37852ff0da656e58"
+  },
+  "matching_fields": [
+    "title",
+    "character",
+    "player_id",
+    "money_minor",
+    "avatar_name",
+    "avatar_owner",
+    "inventory_sha256"
+  ],
+  "sqlite_quick_check": "ok",
+  "generation_advanced": true
+}

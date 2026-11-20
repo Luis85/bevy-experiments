@@ -1,0 +1,1809 @@
+{
+  "started_utc": "2026-10-29T14:20:57.944833+00:00",
+  "executable": "/tmp/terra-build/target/debug/terra-demo",
+  "executable_sha256": "e16c25fabf30d8e96ff6b68cea99766ea1f4cc4d67afc1fbaeaff4433ffa8881",
+  "cwd": "/tmp/terra-v018-integration/terra-world",
+  "pid": 8,
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--menu",
+    "--user-data",
+    "/tmp/terra018-native-private-vzaj3e_c/userdata"
+  ],
+  "private_runtime_directory": "/tmp/terra018-native-private-vzaj3e_c",
+  "display": "127.0.0.1:118",
+  "actions": [
+    {
+      "utc": "2026-10-29T14:21:01.630992+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 10
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:11.633046+00:00",
+      "request": {
+        "action": "capture",
+        "name": "01-home"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "01-home.png",
+        "utc": "2026-10-29T14:21:13.144225+00:00",
+        "window": "2097154",
+        "sha256": "b8eceb0ea4dac3e170221c0b966f1800e55d0b1fcf1f3c41559ad3b6073442cb",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:31.545704+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "320",
+          "518",
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:31.652535+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:32.657165+00:00",
+      "request": {
+        "action": "capture",
+        "name": "02-controls"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "02-controls.png",
+        "utc": "2026-10-29T14:21:34.349217+00:00",
+        "window": "2097154",
+        "sha256": "ae442e1e598f5a9efd11bf623a8e1a37ff294135a3e503c1f38207dc701aaf9b",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:53.065593+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:53.178331+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:21:54.178984+00:00",
+      "request": {
+        "action": "capture",
+        "name": "03-controls-open"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "03-controls-open.png",
+        "utc": "2026-10-29T14:21:54.676490+00:00",
+        "window": "2097154",
+        "sha256": "48720ac77bf53d25d73e9de993fc2cfec65f439a370b7bbaed55f522d1736d61",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:15.041604+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "1000",
+          "650"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:15.048021+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.3
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:15.349155+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "--repeat",
+          "7",
+          "--delay",
+          "140",
+          "5"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:16.337535+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:17.341155+00:00",
+      "request": {
+        "action": "capture",
+        "name": "04-controls-recovery-help"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "04-controls-recovery-help.png",
+        "utc": "2026-10-29T14:22:17.969294+00:00",
+        "window": "2097154",
+        "sha256": "2f101a407ad9e60ad4dc228f55e85b648d59974b0aefd8ae4a6834b7db0c2946",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:17.973485+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:17.992728+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:18.993678+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "Return"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:19.011278+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:20.012559+00:00",
+      "request": {
+        "action": "capture",
+        "name": "05-character"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "05-character.png",
+        "utc": "2026-10-29T14:22:20.635600+00:00",
+        "window": "2097154",
+        "sha256": "2f101a407ad9e60ad4dc228f55e85b648d59974b0aefd8ae4a6834b7db0c2946",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:46.884800+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "windowfocus",
+          "2097154"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:46.894564+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:46.916692+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:47.421129+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "160",
+          "352"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:47.430401+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:47.931266+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:48.045347+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:22:49.046469+00:00",
+      "request": {
+        "action": "capture",
+        "name": "06-character-open"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "06-character-open.png",
+        "utc": "2026-10-29T14:22:49.811793+00:00",
+        "window": "2097154",
+        "sha256": "89e99e5a848264faf7283dec3c0056f3d642a43a3dcb92a193e6679b4c583e60",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:06.267867+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "ctrl+a"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:06.304672+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "type",
+          "--clearmodifiers",
+          "Native Eighteen"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:06.440512+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "850",
+          "682"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:06.450895+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.4
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:06.853157+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:06.965764+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:07.973260+00:00",
+      "request": {
+        "action": "capture",
+        "name": "07-world-settings"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "07-world-settings.png",
+        "utc": "2026-10-29T14:23:08.480629+00:00",
+        "window": "2097154",
+        "sha256": "bcdae97ad34bd240720856b310909e9d89488cf4f1c8a0cb314cfca9f37979f2",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:27.505172+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "ctrl+a"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:27.550910+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "type",
+          "--clearmodifiers",
+          "Native Playtest 018"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:27.729494+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "850",
+          "784"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:27.735621+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.4
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:28.141290+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:28.253744+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:29.254731+00:00",
+      "request": {
+        "action": "capture",
+        "name": "08-create-review"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "08-create-review.png",
+        "utc": "2026-10-29T14:23:30.213223+00:00",
+        "window": "2097154",
+        "sha256": "f2c63a0424c860ff90148fa34b29077378764fc377b3472baa10630f7e948b44",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:59.783006+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "300",
+          "630"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:23:59.794656+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.3
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:00.096011+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:00.213327+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:00.714330+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "--repeat",
+          "60",
+          "--delay",
+          "15",
+          "BackSpace"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:01.843848+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "type",
+          "Native Playtest 018"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:02.029688+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "850",
+          "784"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:02.043794+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.3
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:02.345164+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:02.455164+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:02.960545+00:00",
+      "request": {
+        "action": "capture",
+        "name": "09-named-create-review"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "09-named-create-review.png",
+        "utc": "2026-10-29T14:24:03.921384+00:00",
+        "window": "2097154",
+        "sha256": "c00c82c2ddf9e80f27bbd93b1d38e4d160d05fab59ae348cfdb124902ff31bed",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:03.938615+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "Return"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:03.962632+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 12
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:15.964089+00:00",
+      "request": {
+        "action": "capture",
+        "name": "10-first-world"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "10-first-world.png",
+        "utc": "2026-10-29T14:24:17.073160+00:00",
+        "window": "4194306",
+        "sha256": "f928cad7624e07fb664ff92369f5851bad93c70ac65f52bab023073b04ff7ad8",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:58.001175+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "windowfocus",
+          "4194306"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:24:58.007085+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 12
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:10.008933+00:00",
+      "request": {
+        "action": "capture",
+        "name": "11-running-ready"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "11-running-ready.png",
+        "utc": "2026-10-29T14:25:11.189306+00:00",
+        "window": "4194306",
+        "sha256": "43c430d6a56c1fe5dcd6c17ec34aad2db4137198cba9a1eca628badb75447f1e",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:11.197845+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "F2"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:11.222363+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:12.223596+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keydown",
+          "w"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:12.240222+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 2
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:14.241456+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keyup",
+          "w"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:14.257605+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "key",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:14.274709+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:15.277936+00:00",
+      "request": {
+        "action": "capture",
+        "name": "12-pause-wide"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "12-pause-wide.png",
+        "utc": "2026-10-29T14:25:17.033347+00:00",
+        "window": "4194306",
+        "sha256": "8581fd4d3ca4a6affc6c20df14dd3f585f16ebab5727f0af599ddd99180990ac",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:49.361186+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keydown",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:49.378093+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:49.879517+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keyup",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:49.897687+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:50.905979+00:00",
+      "request": {
+        "action": "capture",
+        "name": "13-pause-wide-visible"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "13-pause-wide-visible.png",
+        "utc": "2026-10-29T14:25:51.721269+00:00",
+        "window": "4194306",
+        "sha256": "a042d697d2e8a9cb15ac9094da88c68517c1932a750171229e88180f840c699b",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:51.726054+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "windowsize",
+          "4194306",
+          "1100",
+          "700"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:51.738351+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:25:52.741944+00:00",
+      "request": {
+        "action": "capture",
+        "name": "14-pause-1100x700"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "14-pause-1100x700.png",
+        "utc": "2026-10-29T14:25:53.820883+00:00",
+        "window": "4194306",
+        "sha256": "787d7dc51001c64b55bb4fcad4b957699c22ae3f508e8408ef26ac3e0cc60a3d",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1100\nHEIGHT=700\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:24.172774+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "getwindowfocus"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "4194306\n",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:24.177051+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "windowfocus",
+          "--sync",
+          "4194306"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:24.181761+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:25.184829+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keydown",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:25.207903+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 2
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:27.214059+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keyup",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:27.237771+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:28.244542+00:00",
+      "request": {
+        "action": "capture",
+        "name": "15-escape-retry"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "15-escape-retry.png",
+        "utc": "2026-10-29T14:26:28.673161+00:00",
+        "window": "4194306",
+        "sha256": "abdae2807c59adfd77204de17ddffa165d6840f1e65dd0b053d62ae94cfa07f4",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1100\nHEIGHT=700\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:43.925200+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "550",
+          "526"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:43.935033+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:44.436658+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:44.547574+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 8
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:26:52.549664+00:00",
+      "request": {
+        "action": "capture",
+        "name": "16-returned-menu"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "16-returned-menu.png",
+        "utc": "2026-10-29T14:26:54.121109+00:00",
+        "window": "2097154",
+        "sha256": "ff9d5f758c8babfab2d645f609a206fd19da72477d00d56df0446704b2471841",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:27:36.646890+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "200",
+          "350"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:27:36.655993+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:27:37.157517+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:27:37.278265+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 12
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:27:49.280280+00:00",
+      "request": {
+        "action": "capture",
+        "name": "17-reopened-world"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "17-reopened-world.png",
+        "utc": "2026-10-29T14:27:50.520201+00:00",
+        "window": "4194306",
+        "sha256": "c57fde41a3db905cef8cf8f01da99a0af1f13c9b273a7c5c851c8077bd3b7021",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:27:50.531021+00:00",
+      "request": {
+        "action": "status"
+      },
+      "result": {
+        "exit_code": null,
+        "windows": {
+          "exit_code": 0,
+          "stdout": "4194306\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:18.493629+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "windowfocus",
+          "4194306"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:18.503381+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 12
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:30.504971+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keydown",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:30.528080+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:31.530085+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "keyup",
+          "Escape"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:31.549666+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 1
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:32.551749+00:00",
+      "request": {
+        "action": "capture",
+        "name": "18-reopened-paused"
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "capture": {
+        "path": "18-reopened-paused.png",
+        "utc": "2026-10-29T14:28:33.417120+00:00",
+        "window": "4194306",
+        "sha256": "586ece81c150bf893e14a3a2821e0eb1fe00ed3211829701d7cb88b989e4923b",
+        "geometry": {
+          "exit_code": 0,
+          "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:58.546939+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "getwindowpid",
+          "4194306"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "402\n",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:58.555027+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "mousemove",
+          "700",
+          "677"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:58.563653+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 0.5
+      },
+      "result": {
+        "exit_code": null
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:59.065947+00:00",
+      "request": {
+        "action": "xdotool",
+        "args": [
+          "click",
+          "1"
+        ]
+      },
+      "result": {
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "utc": "2026-10-29T14:28:59.205026+00:00",
+      "request": {
+        "action": "wait",
+        "seconds": 8
+      },
+      "result": {
+        "exit_code": 0
+      }
+    },
+    {
+      "utc": "2026-10-29T14:29:07.206753+00:00",
+      "request": {
+        "action": "status"
+      },
+      "result": {
+        "exit_code": 0,
+        "windows": {
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": ""
+        }
+      }
+    },
+    {
+      "utc": "2026-10-29T14:29:07.211424+00:00",
+      "request": {
+        "action": "finish",
+        "wait": 5
+      },
+      "result": {
+        "exit_code": 0
+      }
+    }
+  ],
+  "captures": [
+    {
+      "path": "01-home.png",
+      "utc": "2026-10-29T14:21:13.144225+00:00",
+      "window": "2097154",
+      "sha256": "b8eceb0ea4dac3e170221c0b966f1800e55d0b1fcf1f3c41559ad3b6073442cb",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "main menu, no saved worlds"
+    },
+    {
+      "path": "02-controls.png",
+      "utc": "2026-10-29T14:21:34.349217+00:00",
+      "window": "2097154",
+      "sha256": "ae442e1e598f5a9efd11bf623a8e1a37ff294135a3e503c1f38207dc701aaf9b",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "main menu after first pointer attempt; Controls not yet open"
+    },
+    {
+      "path": "03-controls-open.png",
+      "utc": "2026-10-29T14:21:54.676490+00:00",
+      "window": "2097154",
+      "sha256": "48720ac77bf53d25d73e9de993fc2cfec65f439a370b7bbaed55f522d1736d61",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Controls top section"
+    },
+    {
+      "path": "04-controls-recovery-help.png",
+      "utc": "2026-10-29T14:22:17.969294+00:00",
+      "window": "2097154",
+      "sha256": "2f101a407ad9e60ad4dc228f55e85b648d59974b0aefd8ae4a6834b7db0c2946",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Controls scrolled to recovery help, fully visible"
+    },
+    {
+      "path": "05-character.png",
+      "utc": "2026-10-29T14:22:20.635600+00:00",
+      "window": "2097154",
+      "sha256": "2f101a407ad9e60ad4dc228f55e85b648d59974b0aefd8ae4a6834b7db0c2946",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Controls bottom; attempted Escape/Return before explicit window focus"
+    },
+    {
+      "path": "06-character-open.png",
+      "utc": "2026-10-29T14:22:49.811793+00:00",
+      "window": "2097154",
+      "sha256": "89e99e5a848264faf7283dec3c0056f3d642a43a3dcb92a193e6679b4c583e60",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Character creation"
+    },
+    {
+      "path": "07-world-settings.png",
+      "utc": "2026-10-29T14:23:08.480629+00:00",
+      "window": "2097154",
+      "sha256": "bcdae97ad34bd240720856b310909e9d89488cf4f1c8a0cb314cfca9f37979f2",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "World settings"
+    },
+    {
+      "path": "08-create-review.png",
+      "utc": "2026-10-29T14:23:30.213223+00:00",
+      "window": "2097154",
+      "sha256": "f2c63a0424c860ff90148fa34b29077378764fc377b3472baa10630f7e948b44",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Review before correcting appended world title"
+    },
+    {
+      "path": "09-named-create-review.png",
+      "utc": "2026-10-29T14:24:03.921384+00:00",
+      "window": "2097154",
+      "sha256": "c00c82c2ddf9e80f27bbd93b1d38e4d160d05fab59ae348cfdb124902ff31bed",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Reviewed named world Native Playtest 018"
+    },
+    {
+      "path": "10-first-world.png",
+      "utc": "2026-10-29T14:24:17.073160+00:00",
+      "window": "4194306",
+      "sha256": "f928cad7624e07fb664ff92369f5851bad93c70ac65f52bab023073b04ff7ad8",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "First world preparing (not running acceptance)"
+    },
+    {
+      "path": "11-running-ready.png",
+      "utc": "2026-10-29T14:25:11.189306+00:00",
+      "window": "4194306",
+      "sha256": "43c430d6a56c1fe5dcd6c17ec34aad2db4137198cba9a1eca628badb75447f1e",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Running RTS world, region ready"
+    },
+    {
+      "path": "12-pause-wide.png",
+      "utc": "2026-10-29T14:25:17.033347+00:00",
+      "window": "4194306",
+      "sha256": "8581fd4d3ca4a6affc6c20df14dd3f585f16ebab5727f0af599ddd99180990ac",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Third-person running world, not paused"
+    },
+    {
+      "path": "13-pause-wide-visible.png",
+      "utc": "2026-10-29T14:25:51.721269+00:00",
+      "window": "4194306",
+      "sha256": "a042d697d2e8a9cb15ac9094da88c68517c1932a750171229e88180f840c699b",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Third-person running world, not paused"
+    },
+    {
+      "path": "14-pause-1100x700.png",
+      "utc": "2026-10-29T14:25:53.820883+00:00",
+      "window": "4194306",
+      "sha256": "787d7dc51001c64b55bb4fcad4b957699c22ae3f508e8408ef26ac3e0cc60a3d",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1100\nHEIGHT=700\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Resized third-person running world, not paused"
+    },
+    {
+      "path": "15-escape-retry.png",
+      "utc": "2026-10-29T14:26:28.673161+00:00",
+      "window": "4194306",
+      "sha256": "abdae2807c59adfd77204de17ddffa165d6840f1e65dd0b053d62ae94cfa07f4",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1100\nHEIGHT=700\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Actual paused 1100x700 world, all session actions visible"
+    },
+    {
+      "path": "16-returned-menu.png",
+      "utc": "2026-10-29T14:26:54.121109+00:00",
+      "window": "2097154",
+      "sha256": "ff9d5f758c8babfab2d645f609a206fd19da72477d00d56df0446704b2471841",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=2097154\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Returned main menu with Continue Native Playtest 018"
+    },
+    {
+      "path": "17-reopened-world.png",
+      "utc": "2026-10-29T14:27:50.520201+00:00",
+      "window": "4194306",
+      "sha256": "c57fde41a3db905cef8cf8f01da99a0af1f13c9b273a7c5c851c8077bd3b7021",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Reopened world preparing"
+    },
+    {
+      "path": "18-reopened-paused.png",
+      "utc": "2026-10-29T14:28:33.417120+00:00",
+      "window": "4194306",
+      "sha256": "586ece81c150bf893e14a3a2821e0eb1fe00ed3211829701d7cb88b989e4923b",
+      "geometry": {
+        "exit_code": 0,
+        "stdout": "WINDOW=4194306\nX=0\nY=0\nWIDTH=1440\nHEIGHT=900\nSCREEN=0\n",
+        "stderr": ""
+      },
+      "observed_role": "Reopened world paused at 1440x900"
+    }
+  ],
+  "limits": "Linux Xvfb loopback TCP/software Vulkan smoke only. No physical gamepad, Windows, GPU performance or uncoached play qualification.",
+  "finished_utc": "2026-10-29T14:29:07.211446+00:00",
+  "exit_code": 0,
+  "executable_unchanged": true,
+  "timing_scope": "Native session began before completion of the canonical automated gates. Later completed acceptance bound the same executable hash; post-gate execution is not claimed.",
+  "qualification_limits": [
+    "Linux Xvfb loopback TCP and llvmpipe software Vulkan only",
+    "No physical controller/wheel; gamepad hotplug monitor unavailable in sandbox",
+    "No Windows or hardware frame-time qualification",
+    "Expert assisted bounded session, no uncoached play or career balance finding",
+    "Diagnostics remained Off; no new diagnostic report claimed",
+    "Intermediate attempted capture names do not establish their attempted roles; observed_role is authoritative"
+  ]
+}

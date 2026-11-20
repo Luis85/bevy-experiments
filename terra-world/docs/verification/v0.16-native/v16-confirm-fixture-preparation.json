@@ -1,0 +1,29 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "scope": "Byte-exact private copies of the ordinary paid fixture and the legitimately played candidate continuation; no gameplay edits. Only config output/cache paths rebased.",
+  "copies": [
+    {
+      "from": "/tmp/terra-native/comet-review-fixture-016/comet.json",
+      "to": "/tmp/terra-native/comet-confirmation-016/comet.json",
+      "save_sha256": "f1b6870aea5069d517201721094bc3518f42de9a4cd2b3970dedcfb2985c94a9",
+      "save_bytes_exact": true,
+      "config_only_rebased_fields": [
+        "cache_dir",
+        "save_path"
+      ],
+      "text_scale_150_copy": false
+    },
+    {
+      "from": "/tmp/terra-native/comet-review-fixture-016-play/comet.json",
+      "to": "/tmp/terra-native/guidance-confirmation-016/comet.json",
+      "save_sha256": "94634987fa953dc85294195b046f4974299c67561b798edf88242c9ef64c890f",
+      "save_bytes_exact": true,
+      "config_only_rebased_fields": [
+        "cache_dir",
+        "save_path"
+      ],
+      "text_scale_150_copy": true
+    }
+  ]
+}

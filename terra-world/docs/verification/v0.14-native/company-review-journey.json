@@ -1,0 +1,16 @@
+{
+  "approach_seconds": 0.05,
+  "company_cash_after_setup": 9000,
+  "dispatch_to_load_seconds": 2.8000000000000003,
+  "driver_id": 1,
+  "loaded_held": true,
+  "owner_cash_after_setup": 13000,
+  "paid_commands_only": true,
+  "positions_not_overwritten": true,
+  "route_id": 2,
+  "source_identity": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+  "starting_wallet": 25000,
+  "vehicle_id": 1000053,
+  "phase": "candidate prepared input generation; same integration case also passed in final demo gate",
+  "scope": "Ordinary 250-credit wallet, paid commands and physical 2.8-second pickup. The garage approach was a single 0.05-second step from a nearby start; no long walking benchmark."
+}

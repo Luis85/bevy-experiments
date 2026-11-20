@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "236-confirmation-fleet-assignment",
+  "capture_started_utc": "2026-10-30T12:52:24.481272+00:00",
+  "captured_utc": "2026-10-30T12:52:24.945281+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 77552,
+  "window_pid_status": "available",
+  "window_pid_before": 77552,
+  "window_pid_after": 77552,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "236-confirmation-fleet-assignment.png",
+    "sha256": "d1b9a7cb155424bcaa31f2752a47f0197b6d0c24c290ef05fa8a5ca599db1b82",
+    "bytes": 1163663
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

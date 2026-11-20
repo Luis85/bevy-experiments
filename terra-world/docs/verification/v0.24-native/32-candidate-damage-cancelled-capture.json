@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "32-candidate-damage-cancelled",
+  "capture_started_utc": "2026-10-30T11:59:00.141045+00:00",
+  "captured_utc": "2026-10-30T11:59:00.689472+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 59077,
+  "window_pid_status": "available",
+  "window_pid_before": 59077,
+  "window_pid_after": 59077,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "32-candidate-damage-cancelled.png",
+    "sha256": "3320a2f0d88fe33946b555ec3cab8c3fee0aad2443a11efc3f23858cb13a655e",
+    "bytes": 1125974
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

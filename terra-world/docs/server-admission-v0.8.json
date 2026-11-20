@@ -1,0 +1,21 @@
+{
+  "package_version": "0.8.0",
+  "wire_protocol": 6,
+  "captured_at_utc": "2026-10-27T15:39:07.716510+00:00",
+  "status": "passed",
+  "executable_sha256": "af86cd300443586789a71c3834dc4346da2904e88074a396b063b3ccdb9a254f",
+  "commands": [
+    "terra-server --help",
+    "terra-server --bind 127.0.0.1:0 --resume-only --ticks 3 --region-store <temporary>/world.db"
+  ],
+  "verification": {
+    "help_exposes_resume_only": true,
+    "fresh_host_advertises_existing_saved_players_only": true,
+    "actual_loopback_listener_started": true,
+    "three_tick_process_exited_successfully": true,
+    "final_regional_database_quick_check": true,
+    "final_committed_generation": 7
+  },
+  "scope": "Actual final server executable CLI parsing, safe policy diagnostic, local listener startup and graceful regional flush. No client admission attempted in this process smoke; five operator_controls Rust regressions in the complete headless gate verify guest/invalid/suspended rejection and exact authenticated readmission. This is functional evidence without isolated timing or capacity claims.",
+  "source_gate": "headless-verification-v0.8.json; final formatted sources including construction-footprint review fix"
+}

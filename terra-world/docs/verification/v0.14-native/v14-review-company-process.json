@@ -1,0 +1,32 @@
+{
+  "release": "0.14.0",
+  "phase": "review",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--config",
+    "/tmp/terra-native/v14-company-held-config.json",
+    "--no-default-politics",
+    "--user-data",
+    "/tmp/terra-native/v14-review-user-data",
+    "--quality",
+    "performance",
+    "--camp-view",
+    "--asset-pack",
+    "/tmp/terra-native/v14-authored-pack/pack.json",
+    "--telemetry",
+    "/tmp/terra-native/v14-review-company-telemetry.json",
+    "--telemetry-interval-seconds",
+    "5"
+  ],
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world",
+  "started_utc": "2026-10-28T20:04:11.809641+00:00",
+  "binary_sha256": "304986f3177505b9f988840b958db7acce69bf49bb3db760eea55aca9d3c870c",
+  "source_input_count": 347,
+  "expected_interruption": false,
+  "pid": 13955,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T20:12:50.655317+00:00",
+  "seconds": 518.6870084670009,
+  "source_inputs_unchanged": false,
+  "log_sha256": "c741f161e43697f38e8a7f1ace5434f276441f8c547310ec20e9f8744e49b402"
+}

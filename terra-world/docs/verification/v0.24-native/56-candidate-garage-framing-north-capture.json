@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "56-candidate-garage-framing-north",
+  "capture_started_utc": "2026-10-30T12:11:28.577625+00:00",
+  "captured_utc": "2026-10-30T12:11:28.857485+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 59077,
+  "window_pid_status": "available",
+  "window_pid_before": 59077,
+  "window_pid_after": 59077,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "56-candidate-garage-framing-north.png",
+    "sha256": "da44bbcbdb4968aa0f6fe5d6398f34cecaa8073331f7e17e58c9637ab4234057",
+    "bytes": 576844
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

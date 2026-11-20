@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "observed_utc": "2026-10-29T21:22:14.824332+00:00",
+  "status": "passed",
+  "title": "My frontier",
+  "checkpoint_present": true,
+  "integrity": [
+    "ok"
+  ],
+  "generation": 40,
+  "stored_regions": 12,
+  "factions": {},
+  "next_domain_id": 2,
+  "player_id": 1,
+  "account": {
+    "player_id": 1,
+    "money": 25000,
+    "avatar_unit": 1000050,
+    "active_unit": 1000053,
+    "possessed": false
+  },
+  "player_inventory": {
+    "stone": 20,
+    "wheat_seed": 8,
+    "wood": 30
+  },
+  "clock": {
+    "paused": true,
+    "time_scale": 1.0,
+    "unix_seconds": 1793016308.299706
+  },
+  "files": {
+    "profile": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world.json",
+      "bytes": 1883,
+      "sha256": "4f7040f4cc07fed136c28359ac6ecbd756863c055a08e834265dc0945a6c93cc",
+      "unix_mode": "0o600"
+    },
+    "witness": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world-started.json",
+      "bytes": 607,
+      "sha256": "2cb7bf921f11e59e1cf7de65ca43d595093bb1535d9ed02f84aef14be48aaf00",
+      "unix_mode": "0o600"
+    },
+    "lease": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world-session.lock",
+      "bytes": 31,
+      "sha256": "0e48f48ce3b23f425253ea43359fcec5aa6bdbb2ad0bc92f6c14cae113315281",
+      "unix_mode": "0o600"
+    },
+    "database": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world.db",
+      "bytes": 3235840,
+      "sha256": "ac184c2dd876a2881696fb79d1c7f8782b6e8adefb5f30179d3e2d4847e88316",
+      "unix_mode": "0o600"
+    }
+  },
+  "files_unchanged_during_read": true,
+  "scope": "Read-only inspection of a closed isolated native test world; SQLite integrity and observed saved values, not a power-loss or gameplay-balance qualification."
+}

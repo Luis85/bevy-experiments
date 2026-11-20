@@ -549,6 +549,7 @@ fn shared_faction_permissions_and_demotion_survive_player_resume() {
 
 #[test]
 fn small_pack_grounds_spawn_and_blocks_movement_outside_coverage() {
+    const COVERAGE_RADIUS_M: f64 = 20.;
     struct SmallPack {
         center: GeoPosition,
     }
@@ -557,7 +558,7 @@ fn small_pack_grounds_spawn_and_blocks_movement_outside_coverage() {
             self.can_enter(position).then_some(17.0)
         }
         fn can_enter(&self, position: GeoPosition) -> bool {
-            position.surface_distance_m(self.center) < 1.0
+            position.surface_distance_m(self.center) < COVERAGE_RADIUS_M
         }
     }
     let mut server = server();
@@ -570,13 +571,22 @@ fn small_pack_grounds_spawn_and_blocks_movement_outside_coverage() {
     for messages in &received {
         assert!(messages.iter().any(|message| matches!(message, ServerMessage::Welcome { spawn, .. } if spawn.altitude_m == 17.0)));
     }
+    // Both identities need supported, separate spawn points. Drive the second
+    // player radially outward so this checks the actual finite coverage edge,
+    // independent of which clear spawn angle was selected.
+    let start = server.actors()[&bob_id].position;
+    let offset = terra_core::LocalFrame::new(spawn).to_local(start);
+    let distance = offset[0].hypot(offset[2]);
+    assert!(distance > 1.2);
     bob.send(ClientMessage::Move {
         sequence: 1,
-        velocity_enu_m_s: [10.0, 0.0, 0.0],
+        velocity_enu_m_s: [offset[0] / distance * 10., -offset[2] / distance * 10., 0.],
     })
     .unwrap();
     pump(&mut server, &mut [&mut alice, &mut bob], 12);
-    assert!(server.actors()[&bob_id].position.surface_distance_m(spawn) < 1.0);
+    let stopped = server.actors()[&bob_id].position;
+    assert!(start.surface_distance_m(stopped) > 1.);
+    assert!(stopped.surface_distance_m(spawn) < COVERAGE_RADIUS_M);
     assert_eq!(server.actors()[&bob_id].velocity_enu_m_s, [0.0; 3]);
 }
 
@@ -737,12 +747,15 @@ fn living_trade_possession_rts_and_resume_are_authoritative() {
     assert_ne!(host.sandbox().living.accounts[&other].active_unit, rover);
     let start = host.sandbox().living.units[&rover].position;
     alice
-        .send(ClientMessage::Move {
+        .send(ClientMessage::Drive {
             sequence: 1,
-            velocity_enu_m_s: [8., 0., 0.],
+            input: terra_core::DriveInput {
+                throttle: 1.,
+                ..Default::default()
+            },
         })
         .unwrap();
-    pump(&mut host, &mut [&mut alice, &mut bob], 12);
+    pump(&mut host, &mut [&mut alice, &mut bob], 32);
     assert!(start.surface_distance_m(host.sandbox().living.units[&rover].position) > 1.);
     assert_eq!(
         host.actors()[&owner].position,
@@ -765,6 +778,23 @@ fn living_trade_possession_rts_and_resume_are_authoritative() {
     let destination = LocalFrame::new(host.sandbox().living.units[&rover].position)
         .to_geo([14., 0., 0.])
         .unwrap();
+    // The original eastward target lies inside the two players' standing crew
+    // lineup, and Bob's parked rover also occupies its approach. Accept the RTS
+    // order, but never satisfy it by driving through another authoritative body.
+    let (blocker, blocker_position) = host
+        .sandbox()
+        .living
+        .units
+        .values()
+        .filter(|unit| unit.kind == ActorKind::Human && unit.owner.is_some())
+        .min_by(|a, b| {
+            a.position
+                .surface_distance_m(destination)
+                .total_cmp(&b.position.surface_distance_m(destination))
+        })
+        .map(|unit| (unit.id, unit.position))
+        .unwrap();
+    assert!(blocker_position.surface_distance_m(destination) < 1.2);
     alice
         .send(ClientMessage::Sandbox {
             sequence: 4,
@@ -778,6 +808,97 @@ fn living_trade_possession_rts_and_resume_are_authoritative() {
         .unwrap();
     let messages = pump(&mut host, &mut [&mut alice, &mut bob], 160);
     assert!(!host.sandbox().living.accounts[&owner].possessed);
+    assert!(
+        messages[0]
+            .iter()
+            .any(|message| matches!(message, ServerMessage::SandboxResult { sequence: 4, .. }))
+    );
+    assert!(
+        host.sandbox().living.units[&rover]
+            .position
+            .surface_distance_m(destination)
+            >= 2.
+    );
+    let unit = &host.sandbox().living.units[&rover];
+    let contacts = terra_sandbox::LivingContacts::new(host.sandbox()).unwrap();
+    assert!(
+        contacts
+            .resolve(
+                rover,
+                unit.position,
+                unit.heading_deg,
+                unit.position,
+                unit.heading_deg,
+                [0.; 3]
+            )
+            .unwrap()
+            .contact
+            .is_none()
+    );
+    assert!(
+        contacts
+            .resolve(
+                rover,
+                destination,
+                unit.heading_deg,
+                destination,
+                unit.heading_deg,
+                [0.; 3]
+            )
+            .unwrap()
+            .contact
+            .is_some()
+    );
+    assert_eq!(
+        host.sandbox().living.units[&blocker].position,
+        blocker_position
+    );
+
+    // Reissue an equally short order into clear space. Preserve the original
+    // bounded arrival and save/resume checks for a reachable destination.
+    let destination = LocalFrame::new(host.sandbox().living.units[&rover].position)
+        .to_geo([0., 0., -14.])
+        .unwrap();
+    alice
+        .send(ClientMessage::Sandbox {
+            sequence: 5,
+            command: Command::Living {
+                action: LivingCommand::MoveUnits {
+                    unit_ids: vec![rover],
+                    destination,
+                },
+            },
+        })
+        .unwrap();
+    let mut messages = vec![Vec::new(), Vec::new()];
+    // The shared handling model needs time to steer, accelerate and settle at
+    // the stop. Wait for physical arrival within thirty seconds, preserving
+    // the original distance and authoritative snapshot/resume checks.
+    for _ in 0..1200 {
+        let updates = pump(&mut host, &mut [&mut alice, &mut bob], 1);
+        for (received, update) in messages.iter_mut().zip(updates) {
+            received.extend(update);
+        }
+        let unit = &host.sandbox().living.units[&rover];
+        if matches!(unit.order, terra_sandbox::UnitOrder::Idle)
+            && unit.position.surface_distance_m(destination) < 1.5
+        {
+            break;
+        }
+    }
+    assert!(
+        messages[0]
+            .iter()
+            .any(|message| matches!(message, ServerMessage::SandboxResult { sequence: 5, .. }))
+    );
+    assert!(
+        matches!(
+            host.sandbox().living.units[&rover].order,
+            terra_sandbox::UnitOrder::Idle
+        ),
+        "rover failed to settle at the reachable stop: {:?}",
+        host.sandbox().living.units[&rover]
+    );
     assert!(
         host.sandbox().living.units[&rover]
             .position
@@ -827,6 +948,69 @@ fn living_trade_possession_rts_and_resume_are_authoritative() {
         expected_position.surface_distance_m(restored.sandbox().living.units[&rover].position) < 1.
     );
     assert_eq!(restored.sandbox().players.len(), 2);
+}
+
+#[test]
+fn quoted_personal_trade_over_tcp_rejects_unseen_total_and_prevents_replay() {
+    use terra_sandbox::LivingCommand;
+    let mut host = server();
+    host.enable_living_demo(&[]).unwrap();
+    let mut client = NetClient::connect(host.local_addr().unwrap(), host.config().spawn).unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 8);
+    let (owner, _) = welcome(&messages[0]);
+    let shop = *host.sandbox().living.shops.keys().next().unwrap();
+    let total = host.sandbox().living.shops[&shop].prices["bread"].buy;
+    let cash = host.sandbox().living.accounts[&owner].money;
+    let inventory = host.sandbox().players[&owner].inventory.clone();
+    let command = |quoted_total| Command::Living {
+        action: LivingCommand::TradeQuoted {
+            shop_id: shop,
+            item: "bread".into(),
+            amount: 1,
+            buy: true,
+            quoted_total,
+        },
+    };
+    client
+        .send(ClientMessage::Sandbox {
+            sequence: 1,
+            command: command(total + 1),
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 5);
+    assert!(
+        messages[0]
+            .iter()
+            .any(|message| matches!(message, ServerMessage::SandboxRejected { sequence: 1, .. }))
+    );
+    assert_eq!(host.sandbox().players[&owner].inventory, inventory);
+    assert_eq!(host.sandbox().living.accounts[&owner].money, cash);
+
+    let total = host.sandbox().living.shops[&shop].prices["bread"].buy;
+    let accepted = ClientMessage::Sandbox {
+        sequence: 2,
+        command: command(total),
+    };
+    client.send(accepted.clone()).unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 5);
+    assert!(
+        messages[0]
+            .iter()
+            .any(|message| matches!(message, ServerMessage::SandboxResult { sequence: 2, .. }))
+    );
+    assert_eq!(host.sandbox().living.accounts[&owner].money, cash - total);
+    assert_eq!(
+        host.sandbox().players[&owner].inventory["bread"],
+        inventory.get("bread").copied().unwrap_or(0) + 1
+    );
+    let after = host.sandbox().players[&owner].inventory.clone();
+    client.send(accepted).unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 5);
+    assert!(messages[0].iter().any(|message| matches!(message,
+            ServerMessage::SandboxRejected { sequence: 2, message }
+            if message == "stale sandbox sequence")));
+    assert_eq!(host.sandbox().players[&owner].inventory, after);
+    assert_eq!(host.sandbox().living.accounts[&owner].money, cash - total);
 }
 
 #[test]

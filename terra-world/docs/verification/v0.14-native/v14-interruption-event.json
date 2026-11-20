@@ -1,0 +1,28 @@
+{
+  "release": "0.14.0",
+  "event": "SIGKILL sent only to owned test process",
+  "pid": 22593,
+  "event_utc": "2026-10-28T20:44:34.740105+00:00",
+  "captured_session": "1793220243797-22593-0",
+  "last_capture": {
+    "captured_unix_ms": 1793220273574,
+    "elapsed_seconds": 29.77687365,
+    "last_export_error": null,
+    "periodic_interval_seconds": 2,
+    "prior_write_failures": 0,
+    "sequence": 15,
+    "session": "1793220243797-22593-0",
+    "skipped_busy_captures": 0,
+    "status": "running"
+  },
+  "retained_snapshots": 15,
+  "last_complete_report_sha256": "fcf70ca6477aab5d07a00dfab61905ec57ae9b44dd111a3901e8b479598f66aa",
+  "checks": {
+    "readable_complete_json_after_kill": true,
+    "bounded_history": true,
+    "latest_status_running_not_graceful": true,
+    "all_retained_samples_from_interrupted_run_running": true,
+    "private_file_mode": true
+  },
+  "scope": "Process termination rehearsal, not a physical power cut, crash dump or health promise."
+}

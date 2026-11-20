@@ -1,0 +1,7 @@
+{
+  "action": "Remove stale root delivery manifest after byte-and-mode exact retained copy check",
+  "old_manifest_sha256": "c07805d4c2a2710da70b211071a17d0b51c1bc7c902cf0c7a98f1b1e909d38d1",
+  "retained_copy": "docs/verification/v0.23-review/baseline-delivery-manifest.json",
+  "retained_bytes": 877413,
+  "mode": "0o644"
+}

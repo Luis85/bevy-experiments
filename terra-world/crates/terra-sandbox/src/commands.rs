@@ -9,6 +9,12 @@ use terra_core::GeoPosition;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Command {
+    Transport {
+        action: crate::TransportCommand,
+    },
+    Settlement {
+        action: SettlementCommand,
+    },
     Living {
         action: LivingCommand,
     },
@@ -56,10 +62,31 @@ pub enum Command {
     AcceptFactionInvite {
         faction_id: u64,
     },
+    DeclineFactionInvite {
+        faction_id: u64,
+    },
+    RevokeFactionInvite {
+        faction_id: u64,
+        player_id: u64,
+    },
     SetFactionRole {
         faction_id: u64,
         player_id: u64,
         role: FactionRole,
+    },
+    LeaveFaction {
+        faction_id: u64,
+    },
+    DissolveFaction {
+        faction_id: u64,
+    },
+    RemoveFactionMember {
+        faction_id: u64,
+        player_id: u64,
+    },
+    TransferFactionLeadership {
+        faction_id: u64,
+        player_id: u64,
     },
     TransferPlotToFaction {
         plot_id: u64,
@@ -100,6 +127,11 @@ impl SandboxState {
         command: Command,
         catalog: &Catalog,
     ) -> Result<Outcome, SandboxError> {
+        if self.is_player_dormant(player_id) {
+            return Err(SandboxError::Invalid(
+                "resume the owner's session before issuing commands".into(),
+            ));
+        }
         // Reject oversized/untrusted identifiers before cloning them into an
         // error or response. Catalog/state identifiers use the same bound.
         let identifier = match &command {
@@ -129,9 +161,13 @@ impl SandboxState {
             Ok(())
         };
         match command {
+            Command::Settlement { action } => self.apply_settlement(player_id, action, catalog),
             Command::Living { action } => self.apply_living(player_id, action, catalog),
+            Command::Transport { action } => self.apply_transport(player_id, action, catalog),
             Command::ClaimPlot { center, radius_m } => {
                 require_reach(center)?;
+                self.check_settlement_plot_capacity(player_id, center, radius_m)?;
+                let faction_owner = self.settlement_plot_faction(player_id, center, radius_m)?;
                 if !finite_range(radius_m, 5.0, 100.0) {
                     return Err(SandboxError::Invalid(
                         "claim radius must be 5..100 metres".into(),
@@ -153,7 +189,7 @@ impl SandboxState {
                     LandPlot {
                         id,
                         owner: player_id,
-                        faction_owner: None,
+                        faction_owner,
                         center,
                         radius_m,
                     },
@@ -170,7 +206,8 @@ impl SandboxState {
                     .blueprints
                     .get(&blueprint)
                     .ok_or_else(|| SandboxError::Missing(blueprint.clone()))?;
-                if self.structures.len() >= MAX_ENTITIES {
+                self.check_settlement_land(player_id, position, definition.radius_m)?;
+                if self.structure_count() >= MAX_ENTITIES {
                     return Err(SandboxError::Capacity);
                 }
                 let faction_owner = self
@@ -185,25 +222,12 @@ impl SandboxState {
                     return Err(SandboxError::Overlap);
                 }
                 let height = if definition.housing { 8.0 } else { 2.5 };
-                if self.living.enabled
-                    && self.living.units.values().any(|unit| {
-                        let vertical = unit.position.altitude_m - position.altitude_m;
-                        let body_radius = if matches!(
-                            unit.kind,
-                            terra_core::ActorKind::Vehicle | terra_core::ActorKind::Ship
-                        ) {
-                            1.2
-                        } else {
-                            0.35
-                        };
-                        (-2.0..=height).contains(&vertical)
-                            && unit.position.surface_distance_m(position)
-                                < definition.radius_m + body_radius
-                    })
+                if let Some(actor) =
+                    self.construction_obstruction(position, definition.radius_m, height)?
                 {
-                    return Err(SandboxError::Invalid(
-                        "construction footprint overlaps a living actor".into(),
-                    ));
+                    return Err(SandboxError::Invalid(format!(
+                        "construction footprint overlaps living actor #{actor}; move it before building"
+                    )));
                 }
                 let next_inventory =
                     exchange(&player.inventory, &definition.costs, &BTreeMap::new(), 1)?;
@@ -263,6 +287,7 @@ impl SandboxState {
                 }
             }
             Command::Gather { node_id, amount } => {
+                self.validate_ecology_gather(player_id, &node_id)?;
                 if amount == 0 || amount > 100 {
                     return Err(SandboxError::Invalid("gather amount must be 1..100".into()));
                 }
@@ -271,6 +296,7 @@ impl SandboxState {
                     .get(&node_id)
                     .ok_or_else(|| SandboxError::Missing(node_id.clone()))?;
                 require_reach(node.position)?;
+                self.check_settlement_interact(player_id, node.position)?;
                 if self.plots.values().any(|plot| {
                     !self.may_interact(player_id, plot.faction_owner, plot.owner)
                         && plot.center.surface_distance_m(node.position) <= plot.radius_m
@@ -337,6 +363,7 @@ impl SandboxState {
                 crop,
             } => {
                 require_reach(position)?;
+                self.check_settlement_land(player_id, position, 0.5)?;
                 let plot = self
                     .plots
                     .get(&plot_id)
@@ -350,7 +377,7 @@ impl SandboxState {
                     .crops
                     .get(&crop)
                     .ok_or_else(|| SandboxError::Missing(crop.clone()))?;
-                if self.farms.len() >= MAX_ENTITIES {
+                if self.farm_count() >= MAX_ENTITIES {
                     return Err(SandboxError::Capacity);
                 }
                 if self
@@ -450,13 +477,14 @@ impl SandboxState {
                     ));
                 }
                 require_reach(feature.position)?;
+                self.check_settlement_land(player_id, feature.position, feature.radius_m)?;
                 if !self.owns_area(player_id, feature.position, feature.radius_m) {
                     return Err(SandboxError::NotOwner);
                 }
                 if self.feature_edits.contains(&feature_id) {
                     return Err(SandboxError::Invalid("feature already removed".into()));
                 }
-                if self.feature_edits.len() >= MAX_ENTITIES {
+                if self.feature_edit_count() >= MAX_ENTITIES {
                     return Err(SandboxError::Capacity);
                 }
                 self.feature_edits.insert(feature_id.clone());
@@ -472,15 +500,39 @@ impl SandboxState {
             Command::AcceptFactionInvite { faction_id } => {
                 self.accept_faction(player_id, faction_id)
             }
+            Command::DeclineFactionInvite { faction_id } => {
+                self.decline_faction_invite(player_id, faction_id)
+            }
+            Command::RevokeFactionInvite {
+                faction_id,
+                player_id: invitee,
+            } => self.revoke_faction_invite(player_id, faction_id, invitee),
             Command::SetFactionRole {
                 faction_id,
                 player_id: target,
                 role,
             } => self.set_faction_role(player_id, faction_id, target, role),
+            Command::LeaveFaction { faction_id } => self.leave_faction(player_id, faction_id),
+            Command::DissolveFaction { faction_id } => self.dissolve_faction(player_id, faction_id),
+            Command::RemoveFactionMember {
+                faction_id,
+                player_id: target,
+            } => self.remove_faction_member(player_id, faction_id, target),
+            Command::TransferFactionLeadership {
+                faction_id,
+                player_id: successor,
+            } => self.transfer_faction_leadership(player_id, faction_id, successor),
             Command::TransferPlotToFaction {
                 plot_id,
                 faction_id,
-            } => self.transfer_plot_to_faction(player_id, plot_id, faction_id),
+            } => {
+                let plot = self
+                    .plots
+                    .get(&plot_id)
+                    .ok_or_else(|| SandboxError::Missing(plot_id.to_string()))?;
+                self.check_settlement_transfer(player_id, plot.center, plot.radius_m, faction_id)?;
+                self.transfer_plot_to_faction(player_id, plot_id, faction_id)
+            }
         }
     }
 }

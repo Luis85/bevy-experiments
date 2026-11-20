@@ -1,0 +1,277 @@
+{
+  "schema": 1,
+  "release": "0.17.0",
+  "scope": "Fresh baseline and candidate review only; final accepted confirmations have separate records. Candidate menu game is a supervised child bound by an explicit handoff observation, not the menu PID. Baseline binary is0.16.0.",
+  "artifacts": [
+    {
+      "path": "docs/screenshots/v17-baseline-01-home.png",
+      "sha256": "c75c4cc5dd9cdbc4ebd81f0fbf675b515b2f590b3edd9f823e7a1d33e7edaeb7",
+      "bytes": 409434
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-baseline-01-home-capture.json",
+      "sha256": "b2d10d9c1d6b94f30ea4c232d865056364bdd07bacb72db2ea416acbba8f30e3",
+      "bytes": 804
+    },
+    {
+      "path": "docs/screenshots/v17-baseline-02-settings.png",
+      "sha256": "102e1fbbbb18685b897ed2cbf775b21ec9d5bd8e28c84bd7c20aac445e37f0a6",
+      "bytes": 246926
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-baseline-02-settings-capture.json",
+      "sha256": "bd64fd9a1e252964a4df0b39d47640fdbc9a196360d24afc9918d0ade2a3c138",
+      "bytes": 812
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-settings-top.png",
+      "sha256": "ad0462503e932ddcb09124a6e71be95eed89d7366e2de1c82b66f9c1fd47472e",
+      "bytes": 232113
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-settings-top-capture.json",
+      "sha256": "e3e71dddf84517dea2c83d4ccf3263aa5171d2680c42c35085404791ea69ff02",
+      "bytes": 816
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-settings-diagnostics.png",
+      "sha256": "4083f03299e91c538850af2ba9322648f729da7e1284665f8c9a8c33d9df1362",
+      "bytes": 322578
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-settings-diagnostics-capture.json",
+      "sha256": "615169dfa859b6f55e9bcb2a466e7674c88b680511f010d91bae3f4f183d0659",
+      "bytes": 832
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-settings-choice.png",
+      "sha256": "d9668d0e4f398c4fbae5f65095af319f1cadcdfb0f1d35ebd17b5b595e34ceb2",
+      "bytes": 284886
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-settings-choice-capture.json",
+      "sha256": "0bbf402f17d8ae24e88d86155f608bb37f6a7c4bee743bdbdb2b0ec4d37618e9",
+      "bytes": 822
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-settings-enabled.png",
+      "sha256": "536f783c751c51e8b6bc8b3831bb4f3f98b824ebfc1c9ff815608d034b8f7aec",
+      "bytes": 234049
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-settings-enabled-capture.json",
+      "sha256": "5ecb4c2b296a3b23e08578cc6202136286042082e35b3f4ade105f23dafa45c5",
+      "bytes": 824
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-settings-saved.png",
+      "sha256": "47cec5eeef22ecc879b7da110bd09a5163f931974dbc92332985ed2843f3b292",
+      "bytes": 409310
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-settings-saved-capture.json",
+      "sha256": "cd133d200445b2f3e44a3eafc5ed59c1b5cfce060a28ee4ec3f157f26c3574ba",
+      "bytes": 820
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-world-review.png",
+      "sha256": "64b9692739cf98b6d31c913f94f428e65c7fa868096363496e3bb025d7c5eb59",
+      "bytes": 290464
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-world-review-capture.json",
+      "sha256": "2129040f1884a96d4323a95d05a4c7e020825ff12cb5ec7e9af40f98115cbc7b",
+      "bytes": 816
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-world-opening.png",
+      "sha256": "8e03557160db4de01d8379d87148de0a75d4dedfa6e6cafe4f7f96674742393a",
+      "bytes": 406031
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-world-opening-capture.json",
+      "sha256": "2971a299a9d4e0c487b8dcf96cf2ed7a6ec7f85773920e6d125964816787bc6f",
+      "bytes": 827
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-pause-diagnostics.png",
+      "sha256": "b8d69f0f7b91cf950a00321c6bf64eff368cfedc3513e3d16a2b856d31ee9c65",
+      "bytes": 634785
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-pause-diagnostics-capture.json",
+      "sha256": "4ce60ff12c14fd092118fe02e9485e051cc4c8048d0b3ec8fc18bcdf3cc7dcfe",
+      "bytes": 835
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-pause-small.png",
+      "sha256": "1e2b8911cdcc7d15278f3cde646b6557a6016f18c98328e0a991cce7b348c539",
+      "bytes": 335176
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-pause-small-capture.json",
+      "sha256": "ac4b453019a78fa01ed109460d62a6830821dfe1f8bec992379a5c7eb0697bb9",
+      "bytes": 823
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-performance-top.png",
+      "sha256": "2191bf8dd062331a125ad9bb577c4ef880b8668269d45e4ac38c45360ea615a5",
+      "bytes": 484464
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-performance-top-capture.json",
+      "sha256": "b4e44f1a25b18e625144ad3e3b05bf51d33294a2a02470237f091dbb0cfd0e3f",
+      "bytes": 831
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-performance-local-report.png",
+      "sha256": "2b7b32bcf1e37cde06b76e2d4ce19e77aa832c5d1cb6d220b2ed0897e01c422f",
+      "bytes": 500591
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-performance-local-report-capture.json",
+      "sha256": "6749279a99c6e8b0ec85ea749af15a8fce713ff2d2dcd586202a247609f03d0d",
+      "bytes": 849
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-session-keyboard-save.png",
+      "sha256": "7aa29566e4265e39dc23a9454881f25d8f14bf5dcb4934263119c58336679058",
+      "bytes": 262352
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-session-keyboard-save-capture.json",
+      "sha256": "23120f2ec4e975950dd63704b4732e63810ac6990c44d8cd6b5b6e4245ef4965",
+      "bytes": 843
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-returned-menu.png",
+      "sha256": "d635840adb0d27ba821bed3e591662e84cb245aa8e8ab646ee0ec1268b064f58",
+      "bytes": 610899
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-returned-menu-capture.json",
+      "sha256": "5633fb5f128455fbce4403663296803d601c1b5f1324686e77a2468ac704db4a",
+      "bytes": 818
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-retained-report.png",
+      "sha256": "00e278153501b95f292f5621d80414544443ecdbecb731dd901a55623a103c69",
+      "bytes": 497392
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-retained-report-capture.json",
+      "sha256": "be696f0d0198fdf9de4991100fdc85af623f915c49efcdbb253ffa2b0059378b",
+      "bytes": 822
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-driver-restored.png",
+      "sha256": "e5e22f98f69fb86e7266f1963b0243c9d8cb2345ff208e07a7524842689eb74a",
+      "bytes": 794194
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-driver-restored-capture.json",
+      "sha256": "440fc86f2288fac27e79b2cb0a12bb15aa5ae9fe76806faff6f65ba06523616d",
+      "bytes": 831
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-rental-garage.png",
+      "sha256": "ed833fc1fecb95ff6308eeb7beb091a46316cca1662d63be9a97758fc99d3c85",
+      "bytes": 861987
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-rental-garage-capture.json",
+      "sha256": "6e68315916a0dc14c0066a665a2dcb69c4f55e2eb3558c9fe237f0aacb8cc030",
+      "bytes": 827
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-rental-quote.png",
+      "sha256": "c232223364511ed965a29e2f0012b2aa67d524267efc4726f3a32eb1c69b7146",
+      "bytes": 855778
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-rental-quote-capture.json",
+      "sha256": "b4bcb7ef385f598be05346e68b1872f7e63d1250e1157890922eee791ef9ded5",
+      "bytes": 825
+    },
+    {
+      "path": "docs/screenshots/v17-candidate-driver-save-quit.png",
+      "sha256": "00261aa169a5582eadd3b720da74749250f4063c0c7f1eb69692249dd02ea0b8",
+      "bytes": 564347
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-driver-save-quit-capture.json",
+      "sha256": "2431cb71ac191c5f9b2a9026594edac8ee2f0aae8fe78ae0ee5592a5b11fab11",
+      "bytes": 833
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-baseline-menu-start.json",
+      "sha256": "49ec26bc22b6d9646d46846b55fc498fa6783186115f76ff884b5e400dcd4432",
+      "bytes": 629
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-baseline-menu-process.json",
+      "sha256": "1436a6beb62fbfb22deac39b1f05cf674b5c3c33ff5316b89791e21e5c416faf",
+      "bytes": 956
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-baseline-menu.log",
+      "sha256": "02ebac9c6c88afcfe665a76067d7ede58eed7630318795c4c44da11151362ed5",
+      "bytes": 1324
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-menu-start.json",
+      "sha256": "6f3dcfdc800b0c93e05352fbc02dd43db047d23ec314c060adb32009af6f18b0",
+      "bytes": 553
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-menu-process.json",
+      "sha256": "9d71c61d7bae8cdf117e3784ad78a3db6382ff07b6770eb34d9c4d26595c7b62",
+      "bytes": 777
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-menu.log",
+      "sha256": "6b47993617756e479be4acd8b44ae46e8a321544902d27aac297af0361ea77b7",
+      "bytes": 2727
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-driver-start.json",
+      "sha256": "b37d17525a37f9bdc43ef75bc3c494c2ac4ac6385aa007100f3f0afa8f00ca37",
+      "bytes": 919
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-driver-process.json",
+      "sha256": "4c695b8a25b1c3f23bc6a33fdf454855a134ef5153c93d6b5ba8ce8bc561fbcc",
+      "bytes": 1142
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-driver.log",
+      "sha256": "a0fc2a397d7bd7dd97e31db6289a8cabb0bc13f69a7f9b083a6cafa58f4cb124",
+      "bytes": 1407
+    },
+    {
+      "path": "docs/verification/v0.17-native/candidate-menu-handoff.json",
+      "sha256": "c0d5982816fc78fba7cd29b58120cb346a3bb343f410c56c3b97565df6a9a85c",
+      "bytes": 655
+    },
+    {
+      "path": "docs/verification/v0.17-native/candidate-menu-handoff-completed.json",
+      "sha256": "dc4bfbd07ede49a487e8a7c3b46d030484c52913e0c2f588b5eb806b122d94ad",
+      "bytes": 814
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-paused-telemetry.json",
+      "sha256": "bf507b49e9dae75e40748385e88a997a1c6be88b0d3c54d2316da76c5eeabba6",
+      "bytes": 100935
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-menu-final-telemetry.json",
+      "sha256": "ed0ad972f827853ce4260f02e79e35b0622b2bf12effbb8a8cb5bd01c4d1f6f3",
+      "bytes": 148512
+    },
+    {
+      "path": "docs/verification/v0.17-native/v17-candidate-driver-telemetry.json",
+      "sha256": "8bc2f8fb82efbbf83c77bac5f66245afaa0e78a9f463ec4049d83da3d4ae6204",
+      "bytes": 136225
+    }
+  ]
+}

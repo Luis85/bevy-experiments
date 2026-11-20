@@ -1,0 +1,16 @@
+{
+  "baseline_release": "0.14.0",
+  "status": "expected_failure_reproduced",
+  "test": "autonomous_vehicle_passes_a_cluster_without_moving_parked_bodies_or_losing_its_load",
+  "body_count": 4,
+  "stationary_obstacle_count": 3,
+  "physical_step_seconds": 0.1,
+  "physical_steps": 1200,
+  "elapsed_physical_seconds": 120,
+  "destination_distance_m": 60,
+  "forward_progress_m": 7.302238131635763,
+  "outcome": "Original one-body planner retained repeated retreat points and did not reach the destination. Per-step body, motion and inventory/money assertions passed until the arrival deadline.",
+  "baseline_autonomy_sha256": "6f0363623a397d0e5b0b8778d97503489fb63f77dfdde164aaadf8adc101e276",
+  "log_sha256": "c9537ca51adfcb3fe3cadf1c0a85f815fc3032e2623cd4f21413589d43d15ea6",
+  "scope": "Authored flat SDK case, no roads, NPC reference vehicle. The baseline used unrestricted flat support; final acceptance further bounds support to its declared rectangle and records query work."
+}

@@ -100,29 +100,66 @@ impl ResidentSurface {
             {
                 continue;
             }
-            let Some((a, b)) = feature.points.first().zip(feature.points.last()) else {
+            let Some(deck) = bridge_deck_height(chunk, feature) else {
                 continue;
             };
-            let endpoint_height = |p: GeoPosition| {
-                let [u, v] = key.bounds().uv(p);
-                chunk.heights.sample(u, v) as f64
-            };
-            let layer = feature
-                .properties
-                .get("layer")
-                .and_then(|s| s.parse::<f64>().ok())
-                .filter(|v| v.is_finite())
-                .unwrap_or(1.)
-                .clamp(1., 10.);
-            sample.height_m = sample
-                .height_m
-                .max(endpoint_height(*a).max(endpoint_height(*b)) + 4. * layer);
+            sample.height_m = sample.height_m.max(deck);
             sample.slope_degrees = 0.;
             sample.water = false;
         }
         Some(sample)
     }
+    pub fn vehicle_ground_sample(
+        &self,
+        position: GeoPosition,
+    ) -> Option<terra_core::VehicleGroundSample> {
+        let sample = self.sample(position)?;
+        if sample.water || sample.slope_degrees > 32. {
+            return None;
+        }
+        let key = TileKey::at(position, self.level).ok()?;
+        let chunk = self.chunks.get(&key)?;
+        let road = chunk
+            .features
+            .iter()
+            .filter(|feature| {
+                feature.kind == FeatureKind::Road
+                    && inside_ribbon(position, &feature.points, road_width(feature))
+            })
+            .max_by(|a, b| {
+                bridge_deck_height(chunk, a)
+                    .unwrap_or(f64::NEG_INFINITY)
+                    .total_cmp(&bridge_deck_height(chunk, b).unwrap_or(f64::NEG_INFINITY))
+            });
+        let land = || {
+            chunk.features.iter().find(|feature| {
+                matches!(
+                    feature.kind,
+                    FeatureKind::Grass | FeatureKind::Forest | FeatureKind::Farm
+                ) && inside_polygon(position, &feature.points)
+            })
+        };
+        Some(terra_core::VehicleGroundSample {
+            height_m: sample.height_m,
+            surface: road.or_else(land).map_or(
+                terra_core::VehicleSurface::Unknown,
+                terra_core::VehicleSurface::from_feature,
+            ),
+        })
+    }
     pub fn building_at(&self, position: GeoPosition, radius_m: f64) -> bool {
+        self.building_at_with_clearance(position, radius_m, 8.)
+    }
+    /// Height-aware source footprint admission; min_height is terrain-relative.
+    pub fn building_at_with_clearance(
+        &self,
+        position: GeoPosition,
+        radius_m: f64,
+        body_height_m: f64,
+    ) -> bool {
+        if !body_height_m.is_finite() || !(0.1..=32.).contains(&body_height_m) {
+            return true;
+        }
         let Ok(key) = TileKey::at(position, self.level) else {
             return true;
         };
@@ -130,14 +167,32 @@ impl ResidentSurface {
         key.neighbors(1)
             .into_iter()
             .filter_map(|k| self.chunks.get(&k))
-            .flat_map(|c| &c.features)
-            .filter(|f| f.kind == FeatureKind::Building)
-            .any(|feature| {
+            .flat_map(|chunk| chunk.features.iter().map(move |feature| (chunk, feature)))
+            .filter(|(_, feature)| feature.kind == FeatureKind::Building)
+            .any(|(chunk, feature)| {
+                let ground_at = |p| {
+                    let [u, v] = chunk.key.bounds().uv(p);
+                    f64::from(chunk.heights.sample(u, v))
+                };
+                let ground = feature
+                    .points
+                    .iter()
+                    .map(|p| ground_at(*p))
+                    .min_by(f64::total_cmp);
+                let body_base = position.altitude_m.max(ground_at(position));
                 if feature
                     .properties
                     .get("min_height")
                     .and_then(|v| parse_length(v))
-                    .is_some_and(|h| h > 2.5)
+                    .zip(ground)
+                    .is_some_and(|(height, ground)| {
+                        terra_core::has_underpass_clearance(
+                            ground,
+                            body_base,
+                            body_height_m,
+                            height,
+                        )
+                    })
                 {
                     return false;
                 }
@@ -159,6 +214,25 @@ impl ResidentSurface {
         self.sample(position).is_some_and(|s| {
             !s.water && s.slope_degrees <= 32. && (position.altitude_m - s.height_m).abs() <= 3.
         }) && (!footprint || !self.building_at(position, radius_m))
+    }
+    pub fn vehicle_support(&self, position: GeoPosition) -> Option<GeoPosition> {
+        self.vehicle_support_with_clearance(position, 8.)
+    }
+    pub fn vehicle_support_with_clearance(
+        &self,
+        mut position: GeoPosition,
+        body_height_m: f64,
+    ) -> Option<GeoPosition> {
+        let sample = self.sample(position)?;
+        position.altitude_m = position.altitude_m.max(sample.height_m + 0.025);
+        if sample.water
+            || sample.slope_degrees > 32.
+            || self.building_at_with_clearance(position, 0.2, body_height_m)
+        {
+            return None;
+        }
+        position.altitude_m = sample.height_m + 0.025;
+        Some(position)
     }
     pub fn resolve_movement(
         &self,
@@ -187,7 +261,19 @@ impl ResidentSurface {
                         .to_geo(delta.map(|v| v * i as f64 / samples as f64))
                         .ok()?;
                     let s = self.sample(p)?;
-                    if s.water || s.slope_degrees > slope || self.building_at(p, radius) {
+                    if s.water
+                        || s.slope_degrees > slope
+                        || self.building_at_with_clearance(
+                            p,
+                            radius,
+                            match kind {
+                                ActorKind::Vehicle => 8.,
+                                ActorKind::Animal => 1.3,
+                                ActorKind::Creature => 2.,
+                                _ => 1.8,
+                            },
+                        )
+                    {
                         return None;
                     }
                 }
@@ -205,6 +291,30 @@ impl ResidentSurface {
         }
         Some(candidate)
     }
+}
+
+fn bridge_deck_height(chunk: &WorldChunk, feature: &WorldFeature) -> Option<f64> {
+    if feature.kind != FeatureKind::Road
+        || !feature
+            .properties
+            .get("bridge")
+            .is_some_and(|v| !matches!(v.as_str(), "no" | "false" | "0"))
+    {
+        return None;
+    }
+    let (first, last) = feature.points.first().zip(feature.points.last())?;
+    let endpoint_height = |position| {
+        let [u, v] = chunk.key.bounds().uv(position);
+        f64::from(chunk.heights.sample(u, v))
+    };
+    let layer = feature
+        .properties
+        .get("layer")
+        .and_then(|s| s.parse::<f64>().ok())
+        .filter(|v| v.is_finite())
+        .unwrap_or(1.)
+        .clamp(1., 10.);
+    Some(endpoint_height(*first).max(endpoint_height(*last)) + 4. * layer)
 }
 
 fn parse_length(value: &str) -> Option<f64> {
@@ -293,6 +403,22 @@ fn inside_ribbon(position: GeoPosition, points: &[GeoPosition], width: f64) -> b
 }
 
 impl crate::WorldEnvironment for ResidentSurface {
+    fn vehicle_ground_sample(
+        &self,
+        position: GeoPosition,
+    ) -> Option<terra_core::VehicleGroundSample> {
+        ResidentSurface::vehicle_ground_sample(self, position)
+    }
+    fn vehicle_support_with_clearance(
+        &self,
+        position: GeoPosition,
+        body_height_m: f64,
+    ) -> Option<GeoPosition> {
+        ResidentSurface::vehicle_support_with_clearance(self, position, body_height_m)
+    }
+    fn vehicle_support(&self, position: GeoPosition) -> Option<GeoPosition> {
+        ResidentSurface::vehicle_support(self, position)
+    }
     fn ground_height_m(&self, position: GeoPosition) -> Option<f64> {
         self.terrain_height_m(position)
     }
@@ -475,6 +601,65 @@ mod tests {
             surface
                 .resolve_movement(ActorKind::Helicopter, position, position)
                 .is_some()
+        );
+    }
+    #[test]
+    fn underpasses_distinguish_car_bus_and_current_support_height() {
+        let (mut chunk, mut origin, mut surface) = scene();
+        chunk.heights = terra_core::HeightField::constant(250.);
+        origin.altitude_m = 250.025;
+        let mut ceiling = rectangle(origin, "overhead-part", FeatureKind::Building, 0., 0., 8.);
+        // OSM way geometry commonly carries no measured elevation.
+        for point in &mut ceiling.points {
+            point.altitude_m = 0.;
+        }
+        ceiling
+            .properties
+            .insert("min_height".into(), "240 cm".into());
+        chunk.features.push(ceiling);
+        surface.register_chunk(&chunk);
+        assert!(
+            surface
+                .vehicle_support_with_clearance(origin, 1.55)
+                .is_some()
+        );
+        assert!(
+            surface
+                .vehicle_support_with_clearance(origin, 3.25)
+                .is_none()
+        );
+        assert!(
+            surface.vehicle_support(origin).is_none(),
+            "unknown body height is conservative"
+        );
+        assert!(!surface.building_at_with_clearance(origin, 0.2, 1.55));
+        assert!(surface.building_at_with_clearance(origin, 0.2, 3.25));
+        let elevated = GeoPosition {
+            altitude_m: 252.,
+            ..origin
+        };
+        assert!(
+            surface
+                .vehicle_support_with_clearance(elevated, 1.55)
+                .is_none()
+        );
+        assert!(
+            surface
+                .vehicle_support_with_clearance(origin, f64::NAN)
+                .is_none()
+        );
+        assert!(
+            surface
+                .resolve_movement(ActorKind::Human, origin, origin)
+                .is_some()
+        );
+        chunk.features[0].properties.clear();
+        surface.register_chunk(&chunk);
+        assert!(
+            surface
+                .vehicle_support_with_clearance(origin, 1.55)
+                .is_none(),
+            "missing underside never implies a tunnel"
         );
     }
 }

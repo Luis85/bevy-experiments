@@ -1,0 +1,47 @@
+Terra World — living geographic sandbox
+
+Usage: cargo run -p terra-demo -- [options]
+No arguments opens the native main menu. Explicit options start the game directly.
+  --menu                  Open main menu, character creation and world setup
+  --play                  Direct play with default world settings
+  --world-profile FILE    Resume a world created through the native menu
+  --user-data FOLDER      Menu worlds, preferences and multiplayer identities
+  --config FILE           JSON WorldConfig
+  --quality NAME          performance, balanced (default), or high
+  --no-atmosphere         Disable atmospheric sky on this client
+  --asset-pack FILE       Validate and use a presentation pack JSON
+  --procedural-models     Use geometric actors without external model packs
+  --telemetry FILE        Retain bounded diagnostics and a final exit capture
+  --telemetry-interval-seconds N  Also capture periodically, 1..3600 (16 retained)
+  --lat NUMBER --lon NUMBER  WGS84 geographic focus
+  --live                  Opt in to terrain / OSM / weather demo adapters
+  --no-osm                Skip OpenStreetMap requests
+  --synthetic-weather     Keep deterministic game weather
+  --connect IP:PORT       Join authoritative LAN reference server
+  --tls-ca FILE           Trusted CA certificate PEM for verified TLS
+  --tls-server-name NAME  Hostname on the server certificate
+  --allow-insecure-remote Explicitly allow trusted-network remote plaintext
+  --session FILE          Private resume identity (default terra-session.json)
+  --time-scale NUMBER     Calendar/economy seconds per real second (0 freezes calendar)
+  --radius N              Stream (2N+1)^2 chunks, maximum 5
+  --heightmap FILE        Import georeferenced 8/16-bit grayscale PNG manifest
+  --world-pack FILE       Load an explicitly dated immutable world pack
+  --epoch DATE            Source epoch YYYY-MM-DD or signed Unix seconds
+  --politics FILE         Dated political GeoJSON with provenance
+  --no-default-politics   Keep worlds without an implicit political dataset
+  --atlas                 Start in the political atlas
+  --camp-view             Start close to your player
+  --noon                  Start new worlds at noon; preserve saved clocks
+  --save FILE             Explicit JSON save path (F5 / F9)
+  --region-store FILE     Resume / create a durable regional SQLite world
+  --checkpoint-seconds N  Regional autosave cadence, 1..3600 (default 30)
+  --frames N              Exit after N updates
+  --screenshot FILE       Capture rendered scene
+  --smoke                 Exercise local sandbox automatically
+
+F1 RTS: click/drag select, right-click move. F2 third-person, F3 first-person.
+On foot: WASD move, Shift sprint. Possession: right-drag look, R/F flight altitude, E interact, C view.
+Registered vehicles: W/S throttle/reverse, A/D steer, Shift brake, Space handbrake.
+Escape cancels editing or opens the session menu. J activities, N nature, T territory, V driving, G garage. F6 management focus, F10 world settings, F11 inspector, F12 performance, Tab focus, F5 save, F9 load.
+With --region-store, F5 checkpoints and F9 restores the latest checkpoint.
+Default world is synthetic. --live reports provider and fallback provenance.

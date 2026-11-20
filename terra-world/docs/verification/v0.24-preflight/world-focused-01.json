@@ -1,0 +1,31 @@
+{
+  "command": [
+    "python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-sandbox",
+    "--test",
+    "supply_turnover",
+    "--test",
+    "settlements",
+    "--test",
+    "supply_readiness",
+    "--test",
+    "guidance",
+    "--test",
+    "guidance_commitments",
+    "--test",
+    "guidance_capacity"
+  ],
+  "cwd": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "started_at": "2026-10-30T11:21:48.830251+00:00",
+  "status": "failed",
+  "log": "world-focused-01.log",
+  "exit_code": 101,
+  "finished_at": "2026-10-30T11:23:05.449470+00:00",
+  "elapsed_seconds": 76.61911269899974
+}

@@ -1,0 +1,24 @@
+{
+  "release": "0.17.0",
+  "phase": "candidate",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--menu",
+    "--menu-screen",
+    "settings",
+    "--user-data",
+    "/tmp/terra-native-017/menu-player-data"
+  ],
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+  "started_utc": "2026-10-29T08:49:13.348682+00:00",
+  "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+  "source_input_count": 367,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 80307,
+  "exit_code": 0,
+  "finished_utc": "2026-10-29T09:10:48.403636+00:00",
+  "seconds": 1294.9290559220026,
+  "source_inputs_unchanged": true,
+  "log_sha256": "6b47993617756e479be4acd8b44ae46e8a321544902d27aac297af0361ea77b7"
+}

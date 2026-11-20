@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "phase": "pending",
+  "checked_utc": "2026-10-30T08:39:05.478287+00:00",
+  "status": "pending_canonical_acceptance",
+  "native_confirmation_checks": "passed",
+  "capture_count": 10,
+  "source_input_count": 381,
+  "source_inputs_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+  "source_manifest_sha256": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9",
+  "source_manifest": "docs/verification/v0.23-release-acceptance/source-hashes.json",
+  "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+  "processes": [
+    {
+      "name": "confirmation-recovered",
+      "pid": 14073,
+      "command": [
+        "/tmp/terra023-target/debug/terra-demo",
+        "--world-profile",
+        "/tmp/terra-native023/menu/worlds/recovered-1793348668-11234-1/world.json",
+        "--user-data",
+        "/tmp/terra-native023/menu"
+      ],
+      "started_utc": "2026-10-30T08:29:04.307874+00:00",
+      "finished_utc": "2026-10-30T08:32:32.447792+00:00",
+      "exit_code": 0,
+      "log_sha256": "c318fa6d30b34eaa7484515c3cfb607f0219cbbc1c97f4056c66997389dca1bd",
+      "binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+      "source_inputs_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+      "capture_indices": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76
+      ]
+    },
+    {
+      "name": "confirmation-menu",
+      "pid": 14392,
+      "command": [
+        "/tmp/terra023-target/debug/terra-demo",
+        "--menu",
+        "--user-data",
+        "/tmp/terra-native023/menu"
+      ],
+      "started_utc": "2026-10-30T08:33:08.199152+00:00",
+      "finished_utc": "2026-10-30T08:34:20.233832+00:00",
+      "exit_code": 0,
+      "log_sha256": "9df2a985e23dbe00d73a76cc7cd2b7de473e73d01286ac4ac9a139747ed839b2",
+      "binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+      "source_inputs_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+      "capture_indices": [
+        80,
+        81,
+        82
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "image": "70-confirmation-recovered.png",
+      "receipt": "70-confirmation-recovered-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "85e095518aad105894d7928739d840d65a63817f995cfc6c7cead66dc4a3fd16",
+      "captured_utc": "2026-10-30T08:29:23.148132+00:00"
+    },
+    {
+      "image": "71-confirmation-minimum.png",
+      "receipt": "71-confirmation-minimum-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "0ccbc5f03c749b3c0cbc320a46efd5e9dddf867c4b23ced5ed0965a3d03efea3",
+      "captured_utc": "2026-10-30T08:29:51.181563+00:00"
+    },
+    {
+      "image": "72-confirmation-territory.png",
+      "receipt": "72-confirmation-territory-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "87bea5d2477b0eed7d46324b2c51bd1913dfcb0b890e06370319bf3bcb7caf6d",
+      "captured_utc": "2026-10-30T08:30:04.584464+00:00"
+    },
+    {
+      "image": "73-confirmation-pause.png",
+      "receipt": "73-confirmation-pause-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "a746440ca7b4af67a0b8696b205b4fadcbc6556e9371f43d901d2b85b0968287",
+      "captured_utc": "2026-10-30T08:31:03.978279+00:00"
+    },
+    {
+      "image": "74-confirmation-sky.png",
+      "receipt": "74-confirmation-sky-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "836f035bc04d22384b0725cbfb9f008bd08bf8f53b4b371c6d2513468bf2f2fb",
+      "captured_utc": "2026-10-30T08:31:36.306602+00:00"
+    },
+    {
+      "image": "75-confirmation-pause-return.png",
+      "receipt": "75-confirmation-pause-return-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "64ffc7d5feaf3cffdf331864e20ca866c3be0a4a287f8d113f757e2a969567ec",
+      "captured_utc": "2026-10-30T08:32:00.251374+00:00"
+    },
+    {
+      "image": "76-confirmation-save-quit.png",
+      "receipt": "76-confirmation-save-quit-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "58a3fc1fe216f788c9e36b2f2328c59dc39ea200d4b8ec2fc817f169992069bd",
+      "captured_utc": "2026-10-30T08:32:11.449504+00:00"
+    },
+    {
+      "image": "80-confirmation-menu.png",
+      "receipt": "80-confirmation-menu-capture.json",
+      "pid": 14392,
+      "process": "confirmation-menu",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "1e58b5a1d663176bc2ce3b4e1129afe068e0c90321a71cb33fa23afda361cafa",
+      "captured_utc": "2026-10-30T08:33:15.417121+00:00"
+    },
+    {
+      "image": "81-confirmation-menu-sky.png",
+      "receipt": "81-confirmation-menu-sky-capture.json",
+      "pid": 14392,
+      "process": "confirmation-menu",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "9cfdeb528a566e87d043a1037a9bafbd39088a98cd3a92804d59393b15704910",
+      "captured_utc": "2026-10-30T08:33:42.626472+00:00"
+    },
+    {
+      "image": "82-confirmation-menu-exit.png",
+      "receipt": "82-confirmation-menu-exit-capture.json",
+      "pid": 14392,
+      "process": "confirmation-menu",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "0e03164962e56c364f286c31375dd98b412ed8f138f9e7f335a14ff371d8dce6",
+      "captured_utc": "2026-10-30T08:34:13.096225+00:00"
+    }
+  ],
+  "acceptance": {
+    "status": "pending_terminal_receipt",
+    "terminal_receipt_validated": false
+  },
+  "evidence_sha256": {
+    "docs/verification/v0.23-native/70-confirmation-recovered-capture.json": "f40842cfbde5b1bd86fc96fb7bfd5546b27b1eff28bb0d2b079f0010a862dc90",
+    "docs/verification/v0.23-native/70-confirmation-recovered.png": "85e095518aad105894d7928739d840d65a63817f995cfc6c7cead66dc4a3fd16",
+    "docs/verification/v0.23-native/71-confirmation-minimum-capture.json": "129a6c23978f4213f86789b6f24ee6118db0be7d9a4c8c544de510a9b3ada696",
+    "docs/verification/v0.23-native/71-confirmation-minimum.png": "0ccbc5f03c749b3c0cbc320a46efd5e9dddf867c4b23ced5ed0965a3d03efea3",
+    "docs/verification/v0.23-native/72-confirmation-territory-capture.json": "178f4adcd259939f89ddd4af6a53f1f05e77406d470b4eeaabfa4e9c4f18b597",
+    "docs/verification/v0.23-native/72-confirmation-territory.png": "87bea5d2477b0eed7d46324b2c51bd1913dfcb0b890e06370319bf3bcb7caf6d",
+    "docs/verification/v0.23-native/73-confirmation-pause-capture.json": "62bdb872c3d4e40e951ab13ab8a50890641b950badcb3238d819c183979eae98",
+    "docs/verification/v0.23-native/73-confirmation-pause.png": "a746440ca7b4af67a0b8696b205b4fadcbc6556e9371f43d901d2b85b0968287",
+    "docs/verification/v0.23-native/74-confirmation-sky-capture.json": "90e6dea76931a8923cf11b19e30b0aab9a2e6b8bcd6e14a8c3ecacc8021536dc",
+    "docs/verification/v0.23-native/74-confirmation-sky.png": "836f035bc04d22384b0725cbfb9f008bd08bf8f53b4b371c6d2513468bf2f2fb",
+    "docs/verification/v0.23-native/75-confirmation-pause-return-capture.json": "a7a743a02cb05b16cd246062b5cdc08f7b4816711291aa658069d36f41934e89",
+    "docs/verification/v0.23-native/75-confirmation-pause-return.png": "64ffc7d5feaf3cffdf331864e20ca866c3be0a4a287f8d113f757e2a969567ec",
+    "docs/verification/v0.23-native/76-confirmation-save-quit-capture.json": "a94c7d2517fda0b8e5a12a8e828f72d236e60d2769487388da93f2e7ecb5e12a",
+    "docs/verification/v0.23-native/76-confirmation-save-quit.png": "58a3fc1fe216f788c9e36b2f2328c59dc39ea200d4b8ec2fc817f169992069bd",
+    "docs/verification/v0.23-native/80-confirmation-menu-capture.json": "00722c6d56ecfc866ccf53eb1692be3a98b136cc5a42f373ab6522ff53957ff2",
+    "docs/verification/v0.23-native/80-confirmation-menu.png": "1e58b5a1d663176bc2ce3b4e1129afe068e0c90321a71cb33fa23afda361cafa",
+    "docs/verification/v0.23-native/81-confirmation-menu-sky-capture.json": "72f93ed901ad0b6f721ab285e0307f86e4b4d922e04dbc1e9201f0ee5e56a846",
+    "docs/verification/v0.23-native/81-confirmation-menu-sky.png": "9cfdeb528a566e87d043a1037a9bafbd39088a98cd3a92804d59393b15704910",
+    "docs/verification/v0.23-native/82-confirmation-menu-exit-capture.json": "c4fb55f224c477e69d3d8e107005cba9d49713a2cf4415a3141e2c895a64728f",
+    "docs/verification/v0.23-native/82-confirmation-menu-exit.png": "0e03164962e56c364f286c31375dd98b412ed8f138f9e7f335a14ff371d8dce6",
+    "docs/verification/v0.23-native/confirmation-menu-process.json": "ed65466f3a65c4d68a311ac83ad9dff499b1b815928fb062a5cc8cf2301c2879",
+    "docs/verification/v0.23-native/confirmation-menu-start.json": "59397af20f91f1a716044449620a29f38446bdcb74197401c7c76289363dac41",
+    "docs/verification/v0.23-native/confirmation-menu.log": "9df2a985e23dbe00d73a76cc7cd2b7de473e73d01286ac4ac9a139747ed839b2",
+    "docs/verification/v0.23-native/confirmation-recovered-process.json": "d5cc97034c385c63862744e93ca6aaf6d9790fff213cd184cbbf82f5b5275809",
+    "docs/verification/v0.23-native/confirmation-recovered-start.json": "a14c89dc6dbd1e6e18a90a9817fb5c70348abbebe143b48385dc46564e190705",
+    "docs/verification/v0.23-native/confirmation-recovered.log": "c318fa6d30b34eaa7484515c3cfb607f0219cbbc1c97f4056c66997389dca1bd",
+    "docs/verification/v0.23-release-acceptance/source-hashes.json": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9"
+  },
+  "validator_sha256": "e4a7b3dbac1692e3d61e56b78140c3f682c6bfc1511bb93dfa216120d3825edf",
+  "scope": "Exact recorded direct-process/capture association, current frozen implementation identity and executable bytes. Accepted phase additionally binds the real complete terminal gate evidence. No publisher authentication, device qualification or replay of all earlier candidate gameplay is asserted.",
+  "candidate_limit": "Candidate gameplay PID 12147 retains window observations only; later confirmation does not invent its missing child process/binary/exit association."
+}

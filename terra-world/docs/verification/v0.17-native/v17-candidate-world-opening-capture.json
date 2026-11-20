@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.17.0",
+  "capture_name": "v17-candidate-world-opening",
+  "capture_started_utc": "2026-10-29T08:58:29.551449+00:00",
+  "captured_utc": "2026-10-29T08:58:29.675711+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 80823,
+  "window_pid_status": "available",
+  "window_pid_before": 80823,
+  "window_pid_after": 80823,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "v17-candidate-world-opening.png",
+    "sha256": "8e03557160db4de01d8379d87148de0a75d4dedfa6e6cafe4f7f96674742393a",
+    "bytes": 406031
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

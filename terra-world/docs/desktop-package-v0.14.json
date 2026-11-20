@@ -1,0 +1,338 @@
+{
+  "version": "0.14.0",
+  "status": "passed",
+  "finished_utc": "2026-10-28T20:56:12.213235+00:00",
+  "platform": "linux-x86_64",
+  "build_profile": "dev (opt-level 1)",
+  "native_binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531",
+  "accepted_gate_record_sha256": "76240d8198844e7205088eccad17f617b8366a8814edf57d8559d98ce1c3fbdd",
+  "source_input_count": 347,
+  "package": {
+    "status": "passed",
+    "output": "/workspace/scratch/0fdc9aa7bc4c/output/terra-world-0.14.0-linux-x86_64.zip",
+    "release": "0.14.0",
+    "platform": "linux-x86_64",
+    "build_profile": "dev",
+    "files": 179,
+    "bytes": 38598538,
+    "sha256": "57547e332d40aa532dd6524244736e488f6aa11f48a26cfcee20c83af46a1951",
+    "native_binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531"
+  },
+  "package_manifest": {
+    "path": "docs/verification/v0.14-desktop/package-manifest.json",
+    "sha256": "655f3a96a2823d341a7e04a95c6678e1e55575facc8d3ebd5babc4a777007f8a",
+    "bytes": 21199
+  },
+  "extracted_runs": [
+    {
+      "kind": "launcher",
+      "process": {
+        "release": "0.14.0",
+        "phase": "package_confirmation",
+        "command": [
+          "strace",
+          "-f",
+          "-qq",
+          "-e",
+          "trace=file",
+          "-o",
+          "/tmp/terra-native/v14-desktop-launcher.trace",
+          "/tmp/terra-desktop-014/terra-world-0.14.0-linux-x86_64/start-terra.sh",
+          "--frames",
+          "90",
+          "--screenshot",
+          "/tmp/terra-native/v14-desktop-launcher.png"
+        ],
+        "working_directory": "/tmp/terra-desktop-unrelated-014",
+        "started_utc": "2026-10-28T20:50:06.839544+00:00",
+        "binary_sha256": "73bef2f236d0b6c7a93cc17de86a22d7e85c15ac67a49d7fec9c74a5c71caf61",
+        "source_input_count": 347,
+        "expected_interruption": false,
+        "trace_file": "/tmp/terra-native/v14-desktop-launcher.trace",
+        "pid": 23010,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T20:50:18.112834+00:00",
+        "seconds": 11.273235014999955,
+        "source_inputs_unchanged": true,
+        "log_sha256": "d1836ac0147750df848cafad294f23b5b021edd9fcdf8ec979d11d3c3db490a0",
+        "trace_sha256": "ddf57b4f7bc21cdb8629d451fe2ad018344fcd4ed6ec6e5ffbae3f6bfb803eb4"
+      },
+      "source_checkout_path_mentions": 0,
+      "successful_packaged_connected_manifest_opens": 0,
+      "original_packaged_payload_unchanged_after_both_runs": true,
+      "process_binary_hash_describes": "launcher shell script"
+    },
+    {
+      "kind": "prepared_world",
+      "process": {
+        "release": "0.14.0",
+        "phase": "package_confirmation",
+        "command": [
+          "strace",
+          "-f",
+          "-qq",
+          "-e",
+          "trace=file",
+          "-o",
+          "/tmp/terra-native/v14-desktop-world.trace",
+          "/tmp/terra-desktop-014/terra-world-0.14.0-linux-x86_64/terra-demo",
+          "--play",
+          "--heightmap",
+          "/tmp/terra-desktop-014/terra-world-0.14.0-linux-x86_64/crates/terra-stream/data/heightmap-connected/manifest.json",
+          "--no-default-politics",
+          "--region-store",
+          "/tmp/terra-native/v14-desktop-world.db",
+          "--quality",
+          "performance",
+          "--radius",
+          "1",
+          "--time-scale",
+          "0",
+          "--camp-view",
+          "--noon",
+          "--user-data",
+          "/tmp/terra-native/v14-desktop-user-data",
+          "--telemetry",
+          "/tmp/terra-native/v14-desktop-world-telemetry.json",
+          "--frames",
+          "140",
+          "--screenshot",
+          "/tmp/terra-native/v14-desktop-world.png"
+        ],
+        "working_directory": "/tmp/terra-desktop-unrelated-014",
+        "started_utc": "2026-10-28T20:51:26.503208+00:00",
+        "binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531",
+        "source_input_count": 347,
+        "expected_interruption": false,
+        "trace_file": "/tmp/terra-native/v14-desktop-world.trace",
+        "pid": 23097,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T20:52:00.998898+00:00",
+        "seconds": 34.385400145998574,
+        "source_inputs_unchanged": true,
+        "log_sha256": "255babd56e320b71a6ade0b36c9f9880e8b23b24ca5bbe4c50c3e06c1a513468",
+        "trace_sha256": "db398713d1cbc41254c7e27006fbae1f47e5c9419a4adfeec91af4aa5ec95076"
+      },
+      "source_checkout_path_mentions": 0,
+      "successful_packaged_connected_manifest_opens": 2,
+      "original_packaged_payload_unchanged_after_both_runs": true,
+      "process_binary_hash_describes": "accepted native executable"
+    }
+  ],
+  "source": {
+    "epoch": null,
+    "heightmap": true,
+    "revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+  },
+  "asset_pack": {
+    "failed_models": 0,
+    "fallback_instances": 7,
+    "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+    "last_error": null,
+    "loading_instances": 0,
+    "model_count": 5,
+    "name": "Terra woodland wildlife",
+    "ready_instances": 57,
+    "rejected_instances": 0,
+    "scene_budget": {
+      "deferred_instances": 0,
+      "distant_instances": 7,
+      "draining": false,
+      "eligible_instances": 57,
+      "hidden_instances": 0,
+      "immutable_pack_estimated_bytes": 1553668,
+      "invalid_limits": false,
+      "limits": {
+        "animation_channels": 1024,
+        "animation_nodes": 4096,
+        "concurrent_model_loads": 1,
+        "distance_hysteresis_m": 150.0,
+        "distance_m": 650.0,
+        "estimated_bytes": 134217728,
+        "instances": 64,
+        "primitives": 2048,
+        "texture_pixels": 8388608,
+        "triangles": 200000,
+        "vertices": 400000
+      },
+      "loading_models": 0,
+      "peak_reserved_estimated_bytes": 10067748,
+      "reserved": {
+        "animation_channels": 399,
+        "animation_nodes": 1877,
+        "estimated_bytes": 10067748,
+        "instances": 57,
+        "primitives": 1421,
+        "resident_models": 5,
+        "texture_pixels": 0,
+        "triangles": 92552,
+        "vertices": 277656
+      },
+      "retiring_models": 0,
+      "selected": {
+        "animation_channels": 399,
+        "animation_nodes": 1877,
+        "estimated_bytes": 10067748,
+        "instances": 57,
+        "primitives": 1421,
+        "resident_models": 5,
+        "texture_pixels": 0,
+        "triangles": 92552,
+        "vertices": 277656
+      },
+      "unmetered_instances": 0
+    }
+  },
+  "regional_persistence": {
+    "authority_paused": false,
+    "blocked": false,
+    "checkpoint_stages": {
+      "compose_ms": 1.115677,
+      "deleted_pages": 0,
+      "encode_ms": 0.9526209999999999,
+      "encoded_page_bytes": 133157,
+      "encoded_pages": 4,
+      "install_ms": 0.149696,
+      "reused_page_bytes": 15905,
+      "reused_pages": 7,
+      "select_ms": 0.38264899999999996,
+      "selected_records_validated": 386,
+      "transaction_ms": 6.726621000000001,
+      "validation": {
+        "active_records": 386,
+        "certified_environment_groups": 0,
+        "certified_environment_records": 0,
+        "merged_scope_records": 386
+      }
+    },
+    "committed": {
+      "active_records": 306,
+      "active_regions": 11,
+      "checkpoint_bytes": 174379,
+      "dependency_regions": 0,
+      "dormant_records": 0,
+      "dormant_regions": 0,
+      "generation": 7,
+      "global_records": 80,
+      "pinned_regions": 9
+    },
+    "enabled": true,
+    "last_checkpoint_ms": 9.598393,
+    "last_checkpoint_reason": "Graceful exit",
+    "last_error": null,
+    "last_submission_ms": 0.257219,
+    "pending": false,
+    "restored": false,
+    "seconds_since_checkpoint": 0.0
+  },
+  "telemetry_capture": {
+    "captured_unix_ms": 1793220720720,
+    "elapsed_seconds": 33.878263799,
+    "last_export_error": null,
+    "periodic_interval_seconds": null,
+    "prior_write_failures": 0,
+    "sequence": 1,
+    "session": "1793220686842-23100-0",
+    "skipped_busy_captures": 0,
+    "status": "graceful_exit"
+  },
+  "checks": {
+    "all_zip_entries_crc_and_sha256_valid": true,
+    "accepted_executable_matches_gate_hash": true,
+    "launcher_started_from_unrelated_working_directory": true,
+    "prepared_world_started_from_unrelated_working_directory": true,
+    "recorded_source_checkout_path_mentions_zero": true,
+    "packaged_connected_terrain_opened": true,
+    "embedded_default_pack_loaded_without_failures": true,
+    "all_packaged_payload_unchanged_after_smoke": true,
+    "current_project_payload_matches_package": true,
+    "graceful_checkpoint_and_exit": true,
+    "system_runtime_dependencies_resolved_on_recorded_host": true,
+    "accepted_source_inputs_unchanged": true
+  },
+  "artifacts": [
+    {
+      "path": "docs/verification/v0.14-desktop/package-manifest.json",
+      "sha256": "655f3a96a2823d341a7e04a95c6678e1e55575facc8d3ebd5babc4a777007f8a",
+      "bytes": 21199
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-build.json",
+      "sha256": "1e9a6bf082d973477dd607b9073a6c1a0fd3c819aee2fb05d71480717975f2b6",
+      "bytes": 405
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-extraction.json",
+      "sha256": "c9839d673761b5bcad859489dfdba981ec1ad044570f00bc14ca8040f83168d5",
+      "bytes": 404
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-launcher-process.json",
+      "sha256": "cf7e431a53df345e4478e3981c4db02d8a94eb6549af0d8ed94f0c77962fd619",
+      "bytes": 1030
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-launcher-start.json",
+      "sha256": "bdba8165e607130ea2583a5665a8800cc85233d01b3a706c9802066ae13e29c9",
+      "bytes": 720
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-launcher.log",
+      "sha256": "d1836ac0147750df848cafad294f23b5b021edd9fcdf8ec979d11d3c3db490a0",
+      "bytes": 1460
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-launcher.trace",
+      "sha256": "ddf57b4f7bc21cdb8629d451fe2ad018344fcd4ed6ec6e5ffbae3f6bfb803eb4",
+      "bytes": 84755
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-ldd.txt",
+      "sha256": "fb9fb1ed137555cffdbe6801a0cadfa84785434630c710629c657b6d85036ef5",
+      "bytes": 441
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-world-process.json",
+      "sha256": "c93126cb4386bb7c0bb6ade90aa726f201b8bb8995b403ec455fbd8316bab55f",
+      "bytes": 1535
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-world-start.json",
+      "sha256": "65b7767ec5f68480c04d555724505e8a6d1a041846ee42f676a80bffb3108744",
+      "bytes": 1225
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-world-telemetry.json",
+      "sha256": "7d6c88d334f8e2b6000dbcb138c823eb914e7568df4e88b050f70a2c126b065c",
+      "bytes": 15183
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-world.log",
+      "sha256": "255babd56e320b71a6ade0b36c9f9880e8b23b24ca5bbe4c50c3e06c1a513468",
+      "bytes": 2040
+    },
+    {
+      "path": "docs/verification/v0.14-desktop/v14-desktop-world.trace",
+      "sha256": "db398713d1cbc41254c7e27006fbae1f47e5c9419a4adfeec91af4aa5ec95076",
+      "bytes": 193731
+    },
+    {
+      "path": "docs/screenshots/v14-desktop-launcher.png",
+      "sha256": "ebc09df27e9cd44c475b8bb15db10b8a9fc8e8a2ebc885cd303686b27f27bd63",
+      "bytes": 810648
+    },
+    {
+      "path": "docs/screenshots/v14-desktop-world.png",
+      "sha256": "5b22a76f16ef14a01a47a48e83b9329fe17d8cd0053df1bde5ba5e906c3774a1",
+      "bytes": 1274576
+    }
+  ],
+  "limitations": [
+    "Linux x86-64, Xvfb, Vulkan llvmpipe on the recorded host only; no hardware-performance, universal Linux compatibility, Windows or macOS qualification.",
+    "The two extracted runs cover launcher and a prepared world using embedded default wildlife. The separate accepted-executable native record validates the newly authored external pack.",
+    "Seven distant wildlife retain intentional procedural fallback outside the presentation distance budget; this is not an asset loading failure.",
+    "Source checkout independence is observed for these recorded file-access traces, not an exhaustive proof for every configuration.",
+    "The package contains the accepted optimized-dev review executable, runtime content, current guides and automated gate evidence. Complete developer source and final native/package/release records are in the companion source project.",
+    "System graphics, input and C runtime dependencies are not bundled. Operator and authoring executables are built from the companion source project."
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "gate": "native-procedural",
+  "version": "0.10.0",
+  "recorded_utc": "2026-10-28T12:13:00.194515+00:00",
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world",
+  "environment": {
+    "PATH_prefix": "/tmp/terra-build/rust/bin",
+    "CARGO_HOME": "/tmp/terra-build/cargo",
+    "CARGO_TARGET_DIR": "/tmp/terra-build/target",
+    "CARGO_BUILD_JOBS": "4"
+  },
+  "build": {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "terra-bevy",
+      "--no-default-features",
+      "--locked",
+      "--offline",
+      "--test",
+      "procedural_settlement",
+      "--no-run"
+    ],
+    "exit_code": 0,
+    "log": "docs/verification/v0.10/procedural-build.log",
+    "log_sha256": "1dc00fbb8563ad4b47c5adfa8cfbcd1485b5fa395b78f1c0d3585e194d926abe",
+    "log_completed_utc": "2026-10-28T12:05:09.551644+00:00"
+  },
+  "execution": {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "terra-bevy",
+      "--no-default-features",
+      "--locked",
+      "--offline",
+      "--test",
+      "procedural_settlement",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "exit_code_evidence": "Unified exec session 88872 returned exit_code 0 after completion; Cargo log independently reports one passing test and zero failures.",
+    "test_name": "default_munich_procedural_settlement_produces_and_physically_delivers",
+    "passed_test_executions": 1,
+    "failed": 0,
+    "ignored": 0,
+    "physical_seconds": 180,
+    "fixed_steps": 3600,
+    "test_elapsed_seconds": 197.96,
+    "completed_deliveries": 1,
+    "log": "docs/verification/v0.10/bevy-procedural.log",
+    "log_sha256": "26de78d698fbf14df76892f7c164d079a7c53d72e0b7dfd897f7b2893f6cad66",
+    "log_completed_utc": "2026-10-28T12:10:29.074112+00:00",
+    "recompiled_before_execution": false,
+    "original_log": "/tmp/terra-build/procedural-static-clearance-final.log"
+  },
+  "binary": {
+    "path": "/tmp/terra-build/target/debug/deps/procedural_settlement-4b1af7cfce86216f",
+    "sha256": "446c1024f35a5f1973d4148d2b8ab62c72aa4a0492c4690f7defb8157d1d48ab",
+    "size_bytes": 18376744,
+    "modified_utc": "2026-10-28T12:05:09.475643+00:00"
+  },
+  "compiled_inputs": {
+    "predicate_origin": "/tmp/terra-build/run_release_gates.py",
+    "predicate_ast_sha256": "0b94f01542088b1e2844bacbc470d48933a568b026040d9c54d04390d81aef6a",
+    "manifest": "docs/verification/v0.10/procedural-source-hashes.json",
+    "manifest_sha256": "cf7f006ceff6dd6d1bbb3dd92a1c8440fa13a98117dee35bfeb5c406ee083e9d",
+    "count": 296,
+    "prior_frozen_manifest": "docs/verification/v0.10/procedural-prior-inputs.json",
+    "prior_frozen_manifest_sha256": "81598ba52305b130317b97bfc908df7ebfa9d98821868fc263bb9cdb34dbd452",
+    "changed_since_prior_frozen_gate": [
+      "crates/terra-sandbox/src/living/autonomy.rs",
+      "crates/terra-sandbox/tests/autonomous_driving.rs"
+    ],
+    "added_since_prior_frozen_gate": [],
+    "removed_since_prior_frozen_gate": [],
+    "inputs_modified_after_binary_build": [],
+    "unchanged_from_no_run_through_execution_and_recording": true,
+    "continuity_evidence": [
+      "The only changes against the prior full frozen manifest are the scoped controller correction and its focused regression; both were completed and formatted before the no-run build was launched.",
+      "No compiled source, Cargo/toolchain file, asset, data or configuration was edited after the no-run launch. Subsequent edits were documentation only, excluded by the root runner predicate.",
+      "Every currently hashed input has a filesystem modification time no later than the linked test binary.",
+      "Cargo reused that executable for the passing execution (Finished in 0.19s, with no Compiling line).",
+      "The complete current hash manifest was captured after execution and immediately rechecked unchanged."
+    ],
+    "evidence_limit": "A separate full manifest was not captured immediately before the no-run build. Continuity is established by the prior full baseline, the two known pre-build edits, file modification times, no-rebuild execution, and recorded edit history; this is not represented as a three-way hash comparison."
+  }
+}

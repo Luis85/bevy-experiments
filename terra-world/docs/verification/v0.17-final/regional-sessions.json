@@ -1,0 +1,1095 @@
+{
+  "actual_socket_bytes_received": 501225478,
+  "actual_socket_bytes_sent": 1137872,
+  "advancing_update_ms": {
+    "max_ms": 196.276691,
+    "mean_ms": 35.7837395006198,
+    "p50_ms": 25.179712,
+    "p95_ms": 90.93959699999999,
+    "p99_ms": 108.091037,
+    "samples": 4840
+  },
+  "authority_paused_updates": 2110,
+  "backup_generation": 165,
+  "durable_command_ack_ms": {
+    "max_ms": 110.970063,
+    "mean_ms": 87.13699775781247,
+    "p50_ms": 86.259865,
+    "p95_ms": 105.63792,
+    "p99_ms": 110.23374700000001,
+    "samples": 128
+  },
+  "environment": {
+    "arch": "x86_64",
+    "debug_assertions": true,
+    "os": "linux",
+    "parallelism": 8,
+    "sqlite": "3.53.2"
+  },
+  "final_store": {
+    "active_records": 1567,
+    "active_regions": 27,
+    "checkpoint_bytes": 1680783,
+    "dependency_regions": 0,
+    "dormant_records": 4096,
+    "dormant_regions": 1024,
+    "generation": 169,
+    "global_records": 166,
+    "pinned_regions": 9
+  },
+  "fixed_steps": 4840,
+  "host_update_ms": {
+    "max_ms": 196.276691,
+    "mean_ms": 24.78603921212119,
+    "p50_ms": 10.814293000000001,
+    "p95_ms": 85.306973,
+    "p99_ms": 104.166937,
+    "samples": 7029
+  },
+  "initial_generation": 1,
+  "limitations": [
+    "finite accelerated shared-container workload, not concurrent-player capacity",
+    "no Internet delay/loss, GPU workload, live provider or distributed authority; imported terrain is the explicitly authored local fixture when selected",
+    "RSS belongs to this process including host and client fixtures; finite samples do not establish a long-duration plateau",
+    "one writer and aggregate domain caps remain; storage pauses authority",
+    "distant cold overlay fixture records are outside local prepared terrain and do not extend source coverage or simulate an inhabited world in every region",
+    "temporary synthetic saves and public test TLS key are fixtures; they are not production identity enrollment or credentials"
+  ],
+  "memory_samples": [
+    {
+      "phase": "before measured admission",
+      "process_rss_kib": 37052
+    },
+    {
+      "phase": "source tile unavailable: movement must remain blocked",
+      "process_rss_kib": 52960
+    },
+    {
+      "phase": "source tile restored: physical movement resumes",
+      "process_rss_kib": 53848
+    },
+    {
+      "phase": "cycle 0: all connected overlapping interest",
+      "process_rss_kib": 53924
+    },
+    {
+      "phase": "cycle 0: half disconnected",
+      "process_rss_kib": 70148
+    },
+    {
+      "phase": "cycle 0: after disconnect and restart",
+      "process_rss_kib": 89568
+    },
+    {
+      "phase": "cycle 1: all connected spread interest",
+      "process_rss_kib": 89580
+    },
+    {
+      "phase": "cycle 1: half disconnected",
+      "process_rss_kib": 89580
+    },
+    {
+      "phase": "cycle 1: after disconnect and restart",
+      "process_rss_kib": 90176
+    },
+    {
+      "phase": "cycle 2: all connected overlapping interest",
+      "process_rss_kib": 90188
+    },
+    {
+      "phase": "cycle 2: half disconnected",
+      "process_rss_kib": 90188
+    },
+    {
+      "phase": "cycle 2: after disconnect and restart",
+      "process_rss_kib": 90276
+    },
+    {
+      "phase": "cycle 3: all connected spread interest",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 3: half disconnected",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 3: after disconnect and restart",
+      "process_rss_kib": 90276
+    },
+    {
+      "phase": "cycle 4: all connected overlapping interest",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 4: half disconnected",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 4: after disconnect and restart",
+      "process_rss_kib": 90276
+    },
+    {
+      "phase": "cycle 5: all connected spread interest",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 5: half disconnected",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 5: after disconnect and restart",
+      "process_rss_kib": 90276
+    },
+    {
+      "phase": "cycle 6: all connected overlapping interest",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 6: half disconnected",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 6: after disconnect and restart",
+      "process_rss_kib": 90276
+    },
+    {
+      "phase": "cycle 7: all connected spread interest",
+      "process_rss_kib": 90288
+    },
+    {
+      "phase": "cycle 7: half disconnected",
+      "process_rss_kib": 90292
+    },
+    {
+      "phase": "cycle 7: after disconnect and restart",
+      "process_rss_kib": 90280
+    },
+    {
+      "phase": "after backup recovery and authenticated resume",
+      "process_rss_kib": 100516
+    }
+  ],
+  "per_client_actor_snapshots": [
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020
+  ],
+  "per_client_motion_states": [
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020,
+    2020
+  ],
+  "phases": [
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 240,
+        "entity_removals": 0,
+        "entity_upserts": 4056,
+        "full_snapshot_bytes": 7423061,
+        "keyframes": 32,
+        "resync_requests": 0,
+        "wire_bytes": 3006495
+      },
+      "fixed_ticks": 20,
+      "host_update_ms": {
+        "max_ms": 23.617925000000003,
+        "mean_ms": 3.293841837837838,
+        "p50_ms": 0.524415,
+        "p95_ms": 21.724605,
+        "p99_ms": 23.617925000000003,
+        "samples": 37
+      },
+      "host_updates": 37,
+      "name": "source tile unavailable: movement must remain blocked",
+      "resident": {
+        "active_records": 1403,
+        "active_regions": 27,
+        "checkpoint_bytes": 1620844,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 4,
+        "global_records": 212,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 16,
+        "entity_removals": 0,
+        "entity_upserts": 0,
+        "full_snapshot_bytes": 1941872,
+        "keyframes": 16,
+        "resync_requests": 0,
+        "wire_bytes": 995173
+      },
+      "wall_seconds": 0.23326008
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 480,
+        "entity_removals": 11,
+        "entity_upserts": 10452,
+        "full_snapshot_bytes": 13037299,
+        "keyframes": 32,
+        "resync_requests": 0,
+        "wire_bytes": 5526839
+      },
+      "fixed_ticks": 20,
+      "host_update_ms": {
+        "max_ms": 26.298018,
+        "mean_ms": 7.630047523809524,
+        "p50_ms": 2.2196640000000003,
+        "p95_ms": 23.120040000000003,
+        "p99_ms": 26.298018,
+        "samples": 21
+      },
+      "host_updates": 21,
+      "name": "source tile restored: physical movement resumes",
+      "resident": {
+        "active_records": 1411,
+        "active_regions": 27,
+        "checkpoint_bytes": 1632095,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 5,
+        "global_records": 238,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 240,
+        "entity_removals": 0,
+        "entity_upserts": 4056,
+        "full_snapshot_bytes": 7423061,
+        "keyframes": 32,
+        "resync_requests": 0,
+        "wire_bytes": 3006495
+      },
+      "wall_seconds": 0.259457504
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 5216,
+        "entity_removals": 184,
+        "entity_upserts": 137134,
+        "full_snapshot_bytes": 129459113,
+        "keyframes": 96,
+        "resync_requests": 0,
+        "wire_bytes": 57552266
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 65.308511,
+        "mean_ms": 15.160043761904767,
+        "p50_ms": 3.5456049999999997,
+        "p95_ms": 49.008378,
+        "p99_ms": 62.67117399999999,
+        "samples": 441
+      },
+      "host_updates": 441,
+      "name": "cycle 0: all connected overlapping interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1669537,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 14,
+        "global_records": 248,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 480,
+        "entity_removals": 11,
+        "entity_upserts": 10452,
+        "full_snapshot_bytes": 13037299,
+        "keyframes": 32,
+        "resync_requests": 0,
+        "wire_bytes": 5526839
+      },
+      "wall_seconds": 9.418699219
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 6400,
+        "entity_removals": 254,
+        "entity_upserts": 155220,
+        "full_snapshot_bytes": 157433888,
+        "keyframes": 112,
+        "resync_requests": 0,
+        "wire_bytes": 65899169
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 71.342586,
+        "mean_ms": 15.40856636144578,
+        "p50_ms": 12.155478,
+        "p95_ms": 48.282207,
+        "p99_ms": 62.132633,
+        "samples": 249
+      },
+      "host_updates": 249,
+      "name": "cycle 0: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1675352,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 19,
+        "global_records": 206,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 5216,
+        "entity_removals": 184,
+        "entity_upserts": 137134,
+        "full_snapshot_bytes": 129459113,
+        "keyframes": 96,
+        "resync_requests": 0,
+        "wire_bytes": 57552266
+      },
+      "wall_seconds": 4.689497482
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 11152,
+        "entity_removals": 556,
+        "entity_upserts": 282818,
+        "full_snapshot_bytes": 276642090,
+        "keyframes": 200,
+        "resync_requests": 0,
+        "wire_bytes": 120764204
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 117.79513399999999,
+        "mean_ms": 32.44540424342104,
+        "p50_ms": 25.63381,
+        "p95_ms": 89.197552,
+        "p99_ms": 104.518351,
+        "samples": 456
+      },
+      "host_updates": 456,
+      "name": "cycle 1: all connected spread interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1669140,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 35,
+        "global_records": 246,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 6416,
+        "entity_removals": 254,
+        "entity_upserts": 155220,
+        "full_snapshot_bytes": 160105111,
+        "keyframes": 136,
+        "resync_requests": 0,
+        "wire_bytes": 67527199
+      },
+      "wall_seconds": 17.512019359
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 12336,
+        "entity_removals": 640,
+        "entity_upserts": 303592,
+        "full_snapshot_bytes": 304654694,
+        "keyframes": 216,
+        "resync_requests": 0,
+        "wire_bytes": 130592186
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 106.210949,
+        "mean_ms": 31.722340959016396,
+        "p50_ms": 19.291025,
+        "p95_ms": 88.629765,
+        "p99_ms": 100.969723,
+        "samples": 244
+      },
+      "host_updates": 244,
+      "name": "cycle 1: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1674330,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 40,
+        "global_records": 206,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 11152,
+        "entity_removals": 556,
+        "entity_upserts": 282818,
+        "full_snapshot_bytes": 276642090,
+        "keyframes": 200,
+        "resync_requests": 0,
+        "wire_bytes": 120764204
+      },
+      "wall_seconds": 8.542576804
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 17088,
+        "entity_removals": 847,
+        "entity_upserts": 430309,
+        "full_snapshot_bytes": 423855026,
+        "keyframes": 304,
+        "resync_requests": 0,
+        "wire_bytes": 186104972
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 104.166937,
+        "mean_ms": 35.96692645011083,
+        "p50_ms": 22.757225,
+        "p95_ms": 93.181472,
+        "p99_ms": 98.466254,
+        "samples": 451
+      },
+      "host_updates": 451,
+      "name": "cycle 2: all connected overlapping interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1668621,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 55,
+        "global_records": 248,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 12352,
+        "entity_removals": 640,
+        "entity_upserts": 303592,
+        "full_snapshot_bytes": 307327781,
+        "keyframes": 240,
+        "resync_requests": 0,
+        "wire_bytes": 132221306
+      },
+      "wall_seconds": 18.921147101
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 18272,
+        "entity_removals": 871,
+        "entity_upserts": 448098,
+        "full_snapshot_bytes": 451812684,
+        "keyframes": 320,
+        "resync_requests": 0,
+        "wire_bytes": 194969850
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 95.023844,
+        "mean_ms": 31.432808364705892,
+        "p50_ms": 22.131442,
+        "p95_ms": 83.295164,
+        "p99_ms": 86.453352,
+        "samples": 255
+      },
+      "host_updates": 255,
+      "name": "cycle 2: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1674539,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 60,
+        "global_records": 206,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 17088,
+        "entity_removals": 847,
+        "entity_upserts": 430309,
+        "full_snapshot_bytes": 423855026,
+        "keyframes": 304,
+        "resync_requests": 0,
+        "wire_bytes": 186104972
+      },
+      "wall_seconds": 8.84936361
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 23024,
+        "entity_removals": 994,
+        "entity_upserts": 565618,
+        "full_snapshot_bytes": 571080590,
+        "keyframes": 408,
+        "resync_requests": 0,
+        "wire_bytes": 248547229
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 116.92955500000001,
+        "mean_ms": 29.654091660173144,
+        "p50_ms": 11.186185,
+        "p95_ms": 91.318223,
+        "p99_ms": 99.319304,
+        "samples": 462
+      },
+      "host_updates": 462,
+      "name": "cycle 3: all connected spread interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1667196,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 75,
+        "global_records": 246,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 18288,
+        "entity_removals": 871,
+        "entity_upserts": 448098,
+        "full_snapshot_bytes": 454485584,
+        "keyframes": 344,
+        "resync_requests": 0,
+        "wire_bytes": 196599347
+      },
+      "wall_seconds": 16.596867709
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 24208,
+        "entity_removals": 1041,
+        "entity_upserts": 584485,
+        "full_snapshot_bytes": 599098646,
+        "keyframes": 424,
+        "resync_requests": 0,
+        "wire_bytes": 257720212
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 102.426692,
+        "mean_ms": 31.385370316205528,
+        "p50_ms": 14.25473,
+        "p95_ms": 84.187725,
+        "p99_ms": 92.899592,
+        "samples": 253
+      },
+      "host_updates": 253,
+      "name": "cycle 3: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1673798,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 80,
+        "global_records": 209,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 23024,
+        "entity_removals": 994,
+        "entity_upserts": 565618,
+        "full_snapshot_bytes": 571080590,
+        "keyframes": 408,
+        "resync_requests": 0,
+        "wire_bytes": 248547229
+      },
+      "wall_seconds": 8.762924848
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 28960,
+        "entity_removals": 1189,
+        "entity_upserts": 692960,
+        "full_snapshot_bytes": 718222828,
+        "keyframes": 512,
+        "resync_requests": 0,
+        "wire_bytes": 308685724
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 129.655934,
+        "mean_ms": 33.39860478156313,
+        "p50_ms": 22.927277,
+        "p95_ms": 92.40063799999999,
+        "p99_ms": 113.748539,
+        "samples": 499
+      },
+      "host_updates": 499,
+      "name": "cycle 4: all connected overlapping interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1669013,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 95,
+        "global_records": 248,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 24224,
+        "entity_removals": 1041,
+        "entity_upserts": 584485,
+        "full_snapshot_bytes": 601771239,
+        "keyframes": 448,
+        "resync_requests": 0,
+        "wire_bytes": 259349224
+      },
+      "wall_seconds": 19.508490407
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 30144,
+        "entity_removals": 1215,
+        "entity_upserts": 707920,
+        "full_snapshot_bytes": 746153160,
+        "keyframes": 528,
+        "resync_requests": 0,
+        "wire_bytes": 316435617
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 127.846506,
+        "mean_ms": 39.37153018823528,
+        "p50_ms": 30.075297,
+        "p95_ms": 114.009693,
+        "p99_ms": 122.407024,
+        "samples": 255
+      },
+      "host_updates": 255,
+      "name": "cycle 4: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1674174,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 100,
+        "global_records": 206,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 28960,
+        "entity_removals": 1189,
+        "entity_upserts": 692960,
+        "full_snapshot_bytes": 718222828,
+        "keyframes": 512,
+        "resync_requests": 0,
+        "wire_bytes": 308685724
+      },
+      "wall_seconds": 10.893480086
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 34896,
+        "entity_removals": 1282,
+        "entity_upserts": 815196,
+        "full_snapshot_bytes": 865419997,
+        "keyframes": 616,
+        "resync_requests": 0,
+        "wire_bytes": 366682332
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 114.931282,
+        "mean_ms": 33.28866226190477,
+        "p50_ms": 24.301931,
+        "p95_ms": 85.218692,
+        "p99_ms": 101.62988,
+        "samples": 462
+      },
+      "host_updates": 462,
+      "name": "cycle 5: all connected spread interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1668187,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 115,
+        "global_records": 246,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 30160,
+        "entity_removals": 1215,
+        "entity_upserts": 707920,
+        "full_snapshot_bytes": 748825739,
+        "keyframes": 552,
+        "resync_requests": 0,
+        "wire_bytes": 318064749
+      },
+      "wall_seconds": 18.06845888
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 36080,
+        "entity_removals": 1315,
+        "entity_upserts": 832616,
+        "full_snapshot_bytes": 893443573,
+        "keyframes": 632,
+        "resync_requests": 0,
+        "wire_bytes": 375126795
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 92.374397,
+        "mean_ms": 26.624172824701194,
+        "p50_ms": 13.729139,
+        "p95_ms": 79.80300799999999,
+        "p99_ms": 87.058625,
+        "samples": 251
+      },
+      "host_updates": 251,
+      "name": "cycle 5: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1672925,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 120,
+        "global_records": 208,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 34896,
+        "entity_removals": 1282,
+        "entity_upserts": 815196,
+        "full_snapshot_bytes": 865419997,
+        "keyframes": 616,
+        "resync_requests": 0,
+        "wire_bytes": 366682332
+      },
+      "wall_seconds": 7.499611524
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 40832,
+        "entity_removals": 1408,
+        "entity_upserts": 939345,
+        "full_snapshot_bytes": 1012725156,
+        "keyframes": 720,
+        "resync_requests": 0,
+        "wire_bytes": 425446790
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 162.885566,
+        "mean_ms": 40.12402723451328,
+        "p50_ms": 27.224601,
+        "p95_ms": 102.84251,
+        "p99_ms": 117.42146000000001,
+        "samples": 452
+      },
+      "host_updates": 452,
+      "name": "cycle 6: all connected overlapping interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1669351,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 135,
+        "global_records": 248,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 36096,
+        "entity_removals": 1315,
+        "entity_upserts": 832616,
+        "full_snapshot_bytes": 896117133,
+        "keyframes": 656,
+        "resync_requests": 0,
+        "wire_bytes": 376756200
+      },
+      "wall_seconds": 21.040674417
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 42016,
+        "entity_removals": 1438,
+        "entity_upserts": 954684,
+        "full_snapshot_bytes": 1040709802,
+        "keyframes": 736,
+        "resync_requests": 0,
+        "wire_bytes": 433333204
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 196.276691,
+        "mean_ms": 23.63039993227093,
+        "p50_ms": 9.129369,
+        "p95_ms": 83.965833,
+        "p99_ms": 98.258299,
+        "samples": 251
+      },
+      "host_updates": 251,
+      "name": "cycle 6: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1674909,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 140,
+        "global_records": 208,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 40832,
+        "entity_removals": 1408,
+        "entity_upserts": 939345,
+        "full_snapshot_bytes": 1012725156,
+        "keyframes": 720,
+        "resync_requests": 0,
+        "wire_bytes": 425446790
+      },
+      "wall_seconds": 6.746327779
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 46768,
+        "entity_removals": 1542,
+        "entity_upserts": 1060450,
+        "full_snapshot_bytes": 1160192211,
+        "keyframes": 824,
+        "resync_requests": 0,
+        "wire_bytes": 483702997
+      },
+      "fixed_ticks": 400,
+      "host_update_ms": {
+        "max_ms": 109.234329,
+        "mean_ms": 34.59005748539326,
+        "p50_ms": 25.267332,
+        "p95_ms": 88.845583,
+        "p99_ms": 102.327977,
+        "samples": 445
+      },
+      "host_updates": 445,
+      "name": "cycle 7: all connected spread interest",
+      "resident": {
+        "active_records": 1487,
+        "active_regions": 27,
+        "checkpoint_bytes": 1670056,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 155,
+        "global_records": 248,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 42032,
+        "entity_removals": 1438,
+        "entity_upserts": 954684,
+        "full_snapshot_bytes": 1043380790,
+        "keyframes": 760,
+        "resync_requests": 0,
+        "wire_bytes": 434961400
+      },
+      "wall_seconds": 18.030494451
+    },
+    {
+      "ending_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 47952,
+        "entity_removals": 1577,
+        "entity_upserts": 1078568,
+        "full_snapshot_bytes": 1188333415,
+        "keyframes": 840,
+        "resync_requests": 0,
+        "wire_bytes": 492691137
+      },
+      "fixed_ticks": 200,
+      "host_update_ms": {
+        "max_ms": 91.44685,
+        "mean_ms": 22.538699476744192,
+        "p50_ms": 10.801434,
+        "p95_ms": 75.058723,
+        "p99_ms": 83.631179,
+        "samples": 258
+      },
+      "host_updates": 258,
+      "name": "cycle 7: half disconnected",
+      "resident": {
+        "active_records": 1527,
+        "active_regions": 27,
+        "checkpoint_bytes": 1675438,
+        "dependency_regions": 0,
+        "dormant_records": 4096,
+        "dormant_regions": 1024,
+        "generation": 160,
+        "global_records": 208,
+        "pinned_regions": 9
+      },
+      "starting_replication": {
+        "backpressure_deferrals": 0,
+        "deltas": 46768,
+        "entity_removals": 1542,
+        "entity_upserts": 1060450,
+        "full_snapshot_bytes": 1160192211,
+        "keyframes": 824,
+        "resync_requests": 0,
+        "wire_bytes": 483702997
+      },
+      "wall_seconds": 6.636128789
+    }
+  ],
+  "ping_roundtrip_ms": {
+    "max_ms": 344.04486299999996,
+    "mean_ms": 46.365038482982634,
+    "p50_ms": 34.52682,
+    "p95_ms": 144.534856,
+    "p99_ms": 168.955071,
+    "samples": 6464
+  },
+  "recovery_receipt": {
+    "checkpoint_payload_bytes": 1680783,
+    "copied_pages": 578,
+    "copy_steps": 5,
+    "domain_validated": true,
+    "elapsed_ms": 50.563309000000004,
+    "game_metadata_requires_host_validation": true,
+    "generation": 165,
+    "nonempty_regions": 1051
+  },
+  "release": "0.17.0",
+  "replication": {
+    "backpressure_deferrals": 0,
+    "deltas": 47952,
+    "entity_removals": 1577,
+    "entity_upserts": 1078568,
+    "full_snapshot_bytes": 1189946843,
+    "keyframes": 864,
+    "resync_requests": 0,
+    "wire_bytes": 494305597
+  },
+  "storage_wait_update_ms": {
+    "max_ms": 64.15808200000001,
+    "mean_ms": 0.34919488530805687,
+    "p50_ms": 0.001562,
+    "p95_ms": 0.611417,
+    "p99_ms": 17.629393,
+    "samples": 2110
+  },
+  "transport": "trusted CA + localhost verification, TLS",
+  "verification": {
+    "all_real_sessions_received_snapshots": true,
+    "authenticated_recovered_owner_checks": 16,
+    "backup_full_state_and_private_metadata_exact": true,
+    "backup_generation_exact": true,
+    "backup_source_bytes_unchanged": true,
+    "cargo_conserved": true,
+    "cold_overlay_records_exact": true,
+    "craft_inventory_and_sequences_exact": true,
+    "durable_resume_sequences_exact": true,
+    "exact_offline_owner_checks": 64,
+    "exact_restart_owner_checks": 128,
+    "exact_resume_owner_checks": 64,
+    "expected_storage_failures": 1,
+    "failure_atomic_and_retry_exact": true,
+    "source_unavailable_and_restored_checks": 1
+  },
+  "wall_seconds": 209.745307092,
+  "wire_protocol": 10,
+  "workload": {
+    "active_ticks_per_cycle": 400,
+    "churn_cycles": 8,
+    "cold_overlay_regions": 1024,
+    "cold_overlay_resources": 4096,
+    "flat_authored_surface": false,
+    "full_living_bodies": 182,
+    "generic_actor_records": 0,
+    "initial_owned_placement_checked": true,
+    "offline_ticks_per_cycle": 200,
+    "owned_bodies": 80,
+    "prepared_source_revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+    "real_socket_clients": 16,
+    "renderer": false,
+    "resident_source_chunks": 25,
+    "resource_nodes": 5248,
+    "source_ingestion": true
+  }
+}

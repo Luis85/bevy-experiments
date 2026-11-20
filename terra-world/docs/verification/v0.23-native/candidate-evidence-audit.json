@@ -1,0 +1,1357 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "phase": "candidate_audit",
+  "checked_utc": "2026-10-30T08:29:11.223564+00:00",
+  "status": "passed_with_explicit_association_limits",
+  "scope": "Independent reread of retained candidate capture/process/log bytes and visual inspection of captures 55 through 61. This is not final-binary native acceptance, a new native execution or target-device qualification.",
+  "errors": [],
+  "capture_count": 52,
+  "image_hash_size_format_dimensions_all_match": true,
+  "capture_indices": [
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61
+  ],
+  "dimensions_counts": {
+    "1440x900": 36,
+    "1100x700": 16
+  },
+  "window_pid_counts": {
+    "11234": 29,
+    "12147": 23
+  },
+  "recorded_parent": {
+    "process_record": {
+      "name": "candidate-menu-process.json",
+      "sha256": "209f18524dd93c5e3952c2d5cfe09fb6e12e23cff8e7b2805fc72ab6b21efee1",
+      "bytes": 722
+    },
+    "start_record": {
+      "name": "candidate-menu-start.json",
+      "sha256": "f318926aa2ad9ae0a9bbe6ac3b6b1421aa764e53803bdb6499ccaf8685b1a2d3",
+      "bytes": 498
+    },
+    "start_and_terminal_shared_fields_match": true,
+    "pid": 11234,
+    "exit_code": 0,
+    "recorded_binary_sha256": "700120e44255afe4c482b3416bdcedaad4200d930012418aa0c36cda0281c7f0",
+    "started_utc": "2026-10-30T08:03:23.951543+00:00",
+    "finished_utc": "2026-10-30T08:25:19.042229+00:00",
+    "reported_source_input_count": 381,
+    "reported_source_inputs_unchanged": true,
+    "retained_source_map_or_digest": false,
+    "log": {
+      "name": "candidate-menu.log",
+      "sha256": "3b5fd009a9e9b7aca28a58dc0e2e8f7bc2b3fc994927be30186ee5bc88864fff",
+      "bytes": 2648,
+      "matches_terminal_record": true
+    },
+    "log_severity_counts": {
+      "WARN": 6,
+      "INFO": 10
+    },
+    "log_contains_game_pid_12147": false,
+    "log_contains_panic_marker": false,
+    "log_environment": "Vulkan llvmpipe CPU/software renderer, LLVM 20.1.2, Mesa 25.2.8; warnings include XSETTINGS and XRandR physical-size metadata."
+  },
+  "associations": [
+    {
+      "captures": "10-28 and 52-61",
+      "count": 29,
+      "pid": 11234,
+      "result": "Direct recorded launcher PID association; capture times fall within its recorded lifetime."
+    },
+    {
+      "captures": "29-51",
+      "count": 23,
+      "pid": 12147,
+      "result": "Stable observed gameplay window PID; no retained standalone child process/binary/exit receipt or parent-log child PID association. Parentage, child executable identity and child exit status are not independently established."
+    }
+  ],
+  "limitations": [
+    "The parent zero exit does not establish the child game exit status.",
+    "The candidate record reports 381 unchanged inputs but retains neither the full source map nor its digest, so this audit cannot independently reconstruct the exact candidate implementation map or bind it to later final sources.",
+    "The parent log does not provide a separately retained child runtime log. Its absence of ERROR/panic entries is not proof about all child logs.",
+    "The recorded candidate binary hash is a process-start observation; this audit does not hash a later rebuild at the same path and relabel it as that candidate.",
+    "Pixels show a successful review/listing flow. Equality of recovered durable state belongs to the separate world-state audit; reopening the recovered world belongs to later confirmation.",
+    "The seven inspected backup screens are 1440x900. This visual review does not qualify those specific screens at 1100x700, physical GPUs, Windows, assistive technology or uncoached users."
+  ],
+  "visually_inspected": [
+    {
+      "capture": "55-candidate-rename-entered.png",
+      "observation": "The original world identity, entered My frontier Review23 name, explanation and Back/Save name controls are visible and readable."
+    },
+    {
+      "capture": "56-candidate-renamed.png",
+      "observation": "Rename success names My frontier Review23, retains an Open existing world row and exposes Make backup."
+    },
+    {
+      "capture": "57-candidate-backup.png",
+      "observation": "Backup-ready feedback names My frontier Review23 and checkpoint 23, with a recovery review next step."
+    },
+    {
+      "capture": "58-candidate-backup-list.png",
+      "observation": "The named checkpoint 23 backup can be verified; external-folder verification and private-data/local-copy guidance are readable."
+    },
+    {
+      "capture": "59-candidate-backup-verified.png",
+      "observation": "Recovery review names the source, checkpoint 23, recovered-copy title, character and source; Recover as new world explicitly retains existing worlds and backup."
+    },
+    {
+      "capture": "60-candidate-recovered.png",
+      "observation": "Success feedback and two distinct rows show the recovered copy and original world. Both have separate Rename and Make backup controls."
+    },
+    {
+      "capture": "61-candidate-menu-final.png",
+      "observation": "The main menu offers Continue for the recovered copy. Long status and world names wrap within the panel; Quit and keyboard guidance remain visible."
+    }
+  ],
+  "captures": [
+    {
+      "index": 10,
+      "image": {
+        "name": "10-candidate-menu.png",
+        "sha256": "8bd06e1e3a56a8ddf634dae94a55d9e801e1c9e2685f8ac8f592316c181ab52a",
+        "bytes": 668222,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "10-candidate-menu-capture.json",
+        "sha256": "3cadb3fa3b85aa34d3a0ff1f941e6d19f344c3f33fc9b53128ff354ec07326b1",
+        "bytes": 798
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:03:29.338364+00:00",
+      "captured_utc": "2026-10-30T08:03:29.698505+00:00"
+    },
+    {
+      "index": 11,
+      "image": {
+        "name": "11-candidate-settings.png",
+        "sha256": "24c5dc5312008722bce6e298ca707cea0c7a6a335b7acf1d309d1314244bb0b9",
+        "bytes": 442005,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "11-candidate-settings-capture.json",
+        "sha256": "e490a090e02516fd35378eb00ca975813f3dcbd1b5f01ed8a0b023457e6efe21",
+        "bytes": 806
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:04:02.851348+00:00",
+      "captured_utc": "2026-10-30T08:04:03.039440+00:00"
+    },
+    {
+      "index": 12,
+      "image": {
+        "name": "12-candidate-quality-high.png",
+        "sha256": "a78291e859323f4bd104ea0dd121a3a7910d738ed7b4c9df4ff7e31e72326d7a",
+        "bytes": 441291,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "12-candidate-quality-high-capture.json",
+        "sha256": "f46a5359bc5fe7ab51ce37ba552a6704d82705d303702f3da9c9f29d62d88a40",
+        "bytes": 814
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:04:46.453577+00:00",
+      "captured_utc": "2026-10-30T08:04:46.628443+00:00"
+    },
+    {
+      "index": 13,
+      "image": {
+        "name": "13-candidate-performance.png",
+        "sha256": "cca0fa292f94129447fd674a20dae4fa4d8f1f8c6b60d7c43e67004b2c66e8d8",
+        "bytes": 442209,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "13-candidate-performance-capture.json",
+        "sha256": "cfb34e1def4f5878866c46c50a967e2143acd9daf5ab1b90e9bee254f64e2217",
+        "bytes": 812
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:05:01.271300+00:00",
+      "captured_utc": "2026-10-30T08:05:01.462801+00:00"
+    },
+    {
+      "index": 14,
+      "image": {
+        "name": "14-candidate-controls.png",
+        "sha256": "293060540e2da074cf5f3ad2814d3e482e539ffa6ac09cc44ba5485dfdad9811",
+        "bytes": 359225,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "14-candidate-controls-capture.json",
+        "sha256": "68ca66ce0f7014f067fbb65fb1075683a3a467c01547823c7b5e24a7fc9920dd",
+        "bytes": 806
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:05:14.101507+00:00",
+      "captured_utc": "2026-10-30T08:05:14.292160+00:00"
+    },
+    {
+      "index": 15,
+      "image": {
+        "name": "15-candidate-text115.png",
+        "sha256": "c76f002d7f31c7ff0e1c20c89b35fc3feda00abe17a41753960db0eeb6f1b1e8",
+        "bytes": 371297,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "15-candidate-text115-capture.json",
+        "sha256": "cfa22650f393f91f0134ef095a7cbef8886c8ba7cd36382a0377e42359b9b6a3",
+        "bytes": 804
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:06:07.465188+00:00",
+      "captured_utc": "2026-10-30T08:06:07.623338+00:00"
+    },
+    {
+      "index": 16,
+      "image": {
+        "name": "16-candidate-text130.png",
+        "sha256": "209db7008e5c4fb327a6ef9385e910a64f82b44c93cc9b89d6a99e661d41b235",
+        "bytes": 383216,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "16-candidate-text130-capture.json",
+        "sha256": "d69658ecdbb0f91e38e0819e6f02a74d592d763392c85f3415031c8ff857df61",
+        "bytes": 804
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:08:57.759686+00:00",
+      "captured_utc": "2026-10-30T08:08:57.940776+00:00"
+    },
+    {
+      "index": 17,
+      "image": {
+        "name": "17-candidate-text150.png",
+        "sha256": "c50c8852687150086f886fbba2c12eeeac4b5d88f457cbe2066d7cf0199ad27b",
+        "bytes": 401572,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "17-candidate-text150-capture.json",
+        "sha256": "63fc0f86c92cf4c40c774a13bad1c0e874020f3d99ecc15e487afc67596c55f1",
+        "bytes": 804
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:09:20.667771+00:00",
+      "captured_utc": "2026-10-30T08:09:20.846488+00:00"
+    },
+    {
+      "index": 18,
+      "image": {
+        "name": "18-candidate-controls-saved.png",
+        "sha256": "9688f1cc1b8b8760ec2043a98386ba7ed96a6385c4680fca27704167cd2ed8d8",
+        "bytes": 398292,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "18-candidate-controls-saved-capture.json",
+        "sha256": "4e84b0fb670a6d24791e8ca6555379d07d8f95da8a2151895f6a17881f3a6d09",
+        "bytes": 818
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:09:37.278255+00:00",
+      "captured_utc": "2026-10-30T08:09:37.478354+00:00"
+    },
+    {
+      "index": 19,
+      "image": {
+        "name": "19-candidate-settings-return.png",
+        "sha256": "a77d07472bfba99b7c2052ef408305b83c6e71845c9b06cee7dc6d878b00901f",
+        "bytes": 681191,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "19-candidate-settings-return-capture.json",
+        "sha256": "73d4f6b114a4321a73a51781cbc849c2fe0aaf5f38afbdd2640ae820e0233a1b",
+        "bytes": 820
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:10:01.453622+00:00",
+      "captured_utc": "2026-10-30T08:10:01.785731+00:00"
+    },
+    {
+      "index": 20,
+      "image": {
+        "name": "20-candidate-settings-large.png",
+        "sha256": "49c74257daf18d68c6225a0cd1c170ee34ebbadf3ddb3e4f0fb08f1bf0325ddd",
+        "bytes": 458309,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "20-candidate-settings-large-capture.json",
+        "sha256": "61388517f1eccba77fa73fcc57fc96daaaf5469c04d0738e8d880a67dd2b5296",
+        "bytes": 818
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:10:19.666306+00:00",
+      "captured_utc": "2026-10-30T08:10:19.838615+00:00"
+    },
+    {
+      "index": 21,
+      "image": {
+        "name": "21-candidate-defaults-saved.png",
+        "sha256": "a77d07472bfba99b7c2052ef408305b83c6e71845c9b06cee7dc6d878b00901f",
+        "bytes": 681191,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "21-candidate-defaults-saved-capture.json",
+        "sha256": "6399735b6700a5a03c269b9f03299cfa9412b15102d7a5224309ba11e22d2fea",
+        "bytes": 818
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:10:35.637008+00:00",
+      "captured_utc": "2026-10-30T08:10:35.955562+00:00"
+    },
+    {
+      "index": 22,
+      "image": {
+        "name": "22-candidate-character.png",
+        "sha256": "248f326e1bf7b49e2739450fc965d252eb5996ce1085d5350f12473c17e5d353",
+        "bytes": 420913,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "22-candidate-character-capture.json",
+        "sha256": "a9806c9e87e00961861a2a3528711dbfebb8d2a7e90eb84c3c1d38890aa6f3ed",
+        "bytes": 808
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:10:51.425487+00:00",
+      "captured_utc": "2026-10-30T08:10:51.614767+00:00"
+    },
+    {
+      "index": 23,
+      "image": {
+        "name": "23-candidate-world-settings.png",
+        "sha256": "dfa182551499e622ff578047174f61ecd775f91eaa54e8f87d0fba6c4fc8658d",
+        "bytes": 388672,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "23-candidate-world-settings-capture.json",
+        "sha256": "edddb34ae2aff555f2572bbc17d2eecfc1897a9ae71c6e9fa2db2cdee10e573f",
+        "bytes": 818
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:11:16.818329+00:00",
+      "captured_utc": "2026-10-30T08:11:17.031428+00:00"
+    },
+    {
+      "index": 24,
+      "image": {
+        "name": "24-candidate-region.png",
+        "sha256": "a1dead48128ed812662b10146be8498654a2fbc9fcee2c3b02c106f94f9027fa",
+        "bytes": 388693,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "24-candidate-region-capture.json",
+        "sha256": "30bf3f1c02446728548b64b49ab9a53edeeb56a35ec927ad6179e022de22cd60",
+        "bytes": 802
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:11:33.686497+00:00",
+      "captured_utc": "2026-10-30T08:11:33.871899+00:00"
+    },
+    {
+      "index": 25,
+      "image": {
+        "name": "25-candidate-near-region.png",
+        "sha256": "e8cefc8b4589124acbd04698b9b71a33523ca9e01c64535650e66df01e6f782c",
+        "bytes": 387910,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "25-candidate-near-region-capture.json",
+        "sha256": "394cbc8648c83037aeeebbc62cd5d6b01c5c713f02eed50950cec8865fdc68c6",
+        "bytes": 812
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:11:51.157954+00:00",
+      "captured_utc": "2026-10-30T08:11:51.343063+00:00"
+    },
+    {
+      "index": 26,
+      "image": {
+        "name": "26-candidate-clock.png",
+        "sha256": "ea4b9ae63385d5db039924824ad2bcb9fb075c6405e2ed5ee0027fab4a476249",
+        "bytes": 387952,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "26-candidate-clock-capture.json",
+        "sha256": "0296726b6b4a0fa574fa5feaaa19c3e140c7e91753ef99f62e179b0658e6aafd",
+        "bytes": 800
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:12:18.710167+00:00",
+      "captured_utc": "2026-10-30T08:12:18.911950+00:00"
+    },
+    {
+      "index": 27,
+      "image": {
+        "name": "27-candidate-clock-normal.png",
+        "sha256": "1aa89886ab51ad49f3c12c7cfa01e450cf2d29090c29ab172dd5625e661c0ddb",
+        "bytes": 387172,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "27-candidate-clock-normal-capture.json",
+        "sha256": "ae5e4ad38c4147dd6c7bdc03463dc74525e9cf9f9fb354acd17de5197e692d3f",
+        "bytes": 814
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:12:35.121480+00:00",
+      "captured_utc": "2026-10-30T08:12:35.281879+00:00"
+    },
+    {
+      "index": 28,
+      "image": {
+        "name": "28-candidate-world-review.png",
+        "sha256": "56cab3e466dac4950242e4410727bf4b6bae8319b7c16020a02c8d7f7abd3d95",
+        "bytes": 507025,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "28-candidate-world-review-capture.json",
+        "sha256": "480c4b9a17ea7be33f9997af75f1ee8a2efdd16e4817ecf6ee64c1110ee58ce7",
+        "bytes": 814
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:12:55.582881+00:00",
+      "captured_utc": "2026-10-30T08:12:55.807726+00:00"
+    },
+    {
+      "index": 29,
+      "image": {
+        "name": "29-candidate-create.png",
+        "sha256": "043486ef9002d8567587b8a93f2f6663e93bca8f0b820099713105875ecb1de1",
+        "bytes": 287147,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "29-candidate-create-capture.json",
+        "sha256": "56822f4a28c3680d2acbd0c31c017e90dc72f71c88047867172dfb6ef5935413",
+        "bytes": 811
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:13:12.514572+00:00",
+      "captured_utc": "2026-10-30T08:13:12.614475+00:00"
+    },
+    {
+      "index": 30,
+      "image": {
+        "name": "30-candidate-supply.png",
+        "sha256": "3015efccbad6f142da09581e10fc989e6c4d1d19070884b80b01261c096d7082",
+        "bytes": 1055100,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "30-candidate-supply-capture.json",
+        "sha256": "ae42e83dd3574f58f35291eabfbe5c2d8a769c1c5d119d001ebce81bb38e6cdd",
+        "bytes": 812
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:13:31.773455+00:00",
+      "captured_utc": "2026-10-30T08:13:32.228287+00:00"
+    },
+    {
+      "index": 31,
+      "image": {
+        "name": "31-candidate-accept-ready.png",
+        "sha256": "fec2b2d942c17583b0f535f514362a88395e33eae5e9d4cd2f3be0767bf9ef74",
+        "bytes": 1045415,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "31-candidate-accept-ready-capture.json",
+        "sha256": "97d225d25672fb77ab01aabcfd4b8b804fedbd71d291e1f33f79bf05932a6506",
+        "bytes": 824
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:13:49.949423+00:00",
+      "captured_utc": "2026-10-30T08:13:50.347100+00:00"
+    },
+    {
+      "index": 32,
+      "image": {
+        "name": "32-candidate-guidance-accept.png",
+        "sha256": "81713ee0791b2efe177374997fb45e89a936186fb4f7788966bcbec8304be349",
+        "bytes": 1059607,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "32-candidate-guidance-accept-capture.json",
+        "sha256": "c9d7ae9c34bf71ca2a27c2eca1945c592a96773d28b22f82ad10014efff87d65",
+        "bytes": 830
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:14:08.794632+00:00",
+      "captured_utc": "2026-10-30T08:14:09.215823+00:00"
+    },
+    {
+      "index": 33,
+      "image": {
+        "name": "33-candidate-primary-step.png",
+        "sha256": "8e07412dd4139f0b3bfcc553d8415e625fd88b6f1632096a70af905d122b618c",
+        "bytes": 1046560,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "33-candidate-primary-step-capture.json",
+        "sha256": "9648d50ffecab30cf32cbc4656355f6979e5e0ff4f4dd3b1c499a32505a4a9fd",
+        "bytes": 824
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:14:34.673227+00:00",
+      "captured_utc": "2026-10-30T08:14:35.134288+00:00"
+    },
+    {
+      "index": 34,
+      "image": {
+        "name": "34-candidate-accepted.png",
+        "sha256": "757b904744dec3c08375680729a501fa880ce66a8730161d023761e91b6dfc98",
+        "bytes": 1040793,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "34-candidate-accepted-capture.json",
+        "sha256": "9ea702e3bc5903bb26dec4fc9b582c76b9a77fb06478e0a39395c4fa7f58fb65",
+        "bytes": 816
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:14:53.978601+00:00",
+      "captured_utc": "2026-10-30T08:14:54.358963+00:00"
+    },
+    {
+      "index": 35,
+      "image": {
+        "name": "35-candidate-travel.png",
+        "sha256": "0b19fe9fd6ab32c15db7dd986f33506e28c0e46fee4c4068fb59b8d58a6013b4",
+        "bytes": 1042443,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "35-candidate-travel-capture.json",
+        "sha256": "5d597b4463b33061bbc7b1e724b8f62767777b33af63ce7b94b2ce8608f60776",
+        "bytes": 812
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:15:18.074301+00:00",
+      "captured_utc": "2026-10-30T08:15:18.474665+00:00"
+    },
+    {
+      "index": 36,
+      "image": {
+        "name": "36-candidate-minimum.png",
+        "sha256": "8c13b487c5f13bcf0e6057958eebfeb43f618607afe4ad2dcc7e52b42cbbe210",
+        "bytes": 580820,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "36-candidate-minimum-capture.json",
+        "sha256": "d12197a69219b9bc27aa38e7cd2f4f4c9d24499e301bfc063249173bc854c186",
+        "bytes": 813
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:15:36.639758+00:00",
+      "captured_utc": "2026-10-30T08:15:36.885454+00:00"
+    },
+    {
+      "index": 37,
+      "image": {
+        "name": "37-candidate-nature-minimum.png",
+        "sha256": "0fbd29a59290ae8e8f8075058d1bcd343bf101f4e9ae09278e623af56f4dd797",
+        "bytes": 581198,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "37-candidate-nature-minimum-capture.json",
+        "sha256": "ec9954d11fa6efa4c6a8ee0e6bfad76658c3ea7f884e38913f535d11d839423b",
+        "bytes": 827
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:16:11.408587+00:00",
+      "captured_utc": "2026-10-30T08:16:11.654710+00:00"
+    },
+    {
+      "index": 38,
+      "image": {
+        "name": "38-candidate-consumption-target.png",
+        "sha256": "8ac346344f2a9596202b7ee891f3b1b9742d47ae28d0157774dff338af0b7413",
+        "bytes": 579797,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "38-candidate-consumption-target-capture.json",
+        "sha256": "15d3a27d15435aa4df62208dbfa04b60013964bd15a240d38f5fb9875e21ecf7",
+        "bytes": 835
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:16:29.854769+00:00",
+      "captured_utc": "2026-10-30T08:16:30.114684+00:00"
+    },
+    {
+      "index": 39,
+      "image": {
+        "name": "39-candidate-consumption-disabled.png",
+        "sha256": "44b2c79f0d7e4cd769f3fc14b586b514caa42bc7f6cb9ff6ac1137d67c7e5373",
+        "bytes": 569478,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "39-candidate-consumption-disabled-capture.json",
+        "sha256": "e8b287c8c57fee1000ed3451d79e27875c4a802ec7750af0ee565ca9095dae9f",
+        "bytes": 839
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:16:46.900266+00:00",
+      "captured_utc": "2026-10-30T08:16:47.153816+00:00"
+    },
+    {
+      "index": 40,
+      "image": {
+        "name": "40-candidate-delivery-ready.png",
+        "sha256": "ca4d80c20e36f97a5f38fd3a607ee27a51974bec3fcd6902d342aa910ab0842a",
+        "bytes": 574750,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "40-candidate-delivery-ready-capture.json",
+        "sha256": "706498f54ad7ab1aabc712c510cddcbfd3ac4cf495da7affc415ec734e3b2d67",
+        "bytes": 827
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:17:06.940752+00:00",
+      "captured_utc": "2026-10-30T08:17:07.163506+00:00"
+    },
+    {
+      "index": 41,
+      "image": {
+        "name": "41-candidate-supply-complete.png",
+        "sha256": "4c452b1be068730612d50889e09c85122a1e5a09c9f1c0e6157e3fc9a170bb46",
+        "bytes": 574030,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "41-candidate-supply-complete-capture.json",
+        "sha256": "4e275552cca6c4f681fd2c15f16e7bbb2ef1b5ca6c0d03ea9d5ca12455815e15",
+        "bytes": 829
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:17:25.499379+00:00",
+      "captured_utc": "2026-10-30T08:17:25.722699+00:00"
+    },
+    {
+      "index": 42,
+      "image": {
+        "name": "42-candidate-community.png",
+        "sha256": "8e3416502e2aef74e531872a51f4104e538775e94ca780064e93b9dc24757206",
+        "bytes": 568559,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "42-candidate-community-capture.json",
+        "sha256": "3f5d1b21fb89daf9fed85e91d8e6100650e8ec3787552a754d4705aa4ca3f1ff",
+        "bytes": 817
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:17:55.078501+00:00",
+      "captured_utc": "2026-10-30T08:17:55.320725+00:00"
+    },
+    {
+      "index": 43,
+      "image": {
+        "name": "43-candidate-community-name.png",
+        "sha256": "1249945b1ded51de0716dc7a4c8364a32c8d75bd2a2ee2f7fde4124eda8c6a11",
+        "bytes": 570060,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "43-candidate-community-name-capture.json",
+        "sha256": "3fb786db3a2851b16e7a9de88400870af2fefc4f390cd1139eea2024d732509f",
+        "bytes": 827
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:18:16.206778+00:00",
+      "captured_utc": "2026-10-30T08:18:16.418831+00:00"
+    },
+    {
+      "index": 44,
+      "image": {
+        "name": "44-candidate-community-founded.png",
+        "sha256": "ad160a86cac73a0050ddf03e250638c51945d17b1ab36cd90f603628783a2aee",
+        "bytes": 571056,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "44-candidate-community-founded-capture.json",
+        "sha256": "a99b8269f0d9b490debf88844d2fd7de215a286157bea7b54e5f31edfb094a28",
+        "bytes": 833
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:18:25.854671+00:00",
+      "captured_utc": "2026-10-30T08:18:26.080337+00:00"
+    },
+    {
+      "index": 45,
+      "image": {
+        "name": "45-candidate-territory.png",
+        "sha256": "6f23ad91c04995d528bd5d1a21f24270ebc19853dda3d1f79fc92c4ceb3d4349",
+        "bytes": 579060,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "45-candidate-territory-capture.json",
+        "sha256": "94ce2e66afca791f5891133699a9bf241f24496a99fc59de76a9ac59ce56bb09",
+        "bytes": 817
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:18:44.545208+00:00",
+      "captured_utc": "2026-10-30T08:18:44.770570+00:00"
+    },
+    {
+      "index": 46,
+      "image": {
+        "name": "46-candidate-territory-actions.png",
+        "sha256": "d0a4101066bac2feb4260f48b76afc2cf316cde1d0d247bcc1b8099a12188e93",
+        "bytes": 575895,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "46-candidate-territory-actions-capture.json",
+        "sha256": "39eed7029412f3a70c5e91d22ce074eb37412e848aa236738e6f60629b13daa2",
+        "bytes": 833
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:19:06.134491+00:00",
+      "captured_utc": "2026-10-30T08:19:06.355318+00:00"
+    },
+    {
+      "index": 47,
+      "image": {
+        "name": "47-candidate-fund-target.png",
+        "sha256": "ed04c9e9f74a87fb45b4db0dd48af259b4790050630d1b5031abec553baf094f",
+        "bytes": 577709,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "47-candidate-fund-target-capture.json",
+        "sha256": "5bb593a23499cee439ddcef6092c8fe329a344b0aa1beb41769fad69664e5400",
+        "bytes": 821
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:19:25.374624+00:00",
+      "captured_utc": "2026-10-30T08:19:25.586803+00:00"
+    },
+    {
+      "index": 48,
+      "image": {
+        "name": "48-candidate-funding.png",
+        "sha256": "42616f90ada0e189b7a52198710092b02599410f2e1c3654741dc7d70df33ba8",
+        "bytes": 570918,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "48-candidate-funding-capture.json",
+        "sha256": "f5978664c7315a69243d0c3e5ab80dedf8cee2148c5ebbf4239ba79d85cf95b9",
+        "bytes": 813
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:19:45.658007+00:00",
+      "captured_utc": "2026-10-30T08:19:45.889582+00:00"
+    },
+    {
+      "index": 49,
+      "image": {
+        "name": "49-candidate-funded.png",
+        "sha256": "9242d9b18211ad911a079b75b32b6889ada3682e6c12af7a70a1c1ec9144b732",
+        "bytes": 570375,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "49-candidate-funded-capture.json",
+        "sha256": "7f144ce730bc5d25ff3ab9c337375fa86484d518b87f777f51eda78021fb1f7a",
+        "bytes": 811
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:20:09.528428+00:00",
+      "captured_utc": "2026-10-30T08:20:09.742147+00:00"
+    },
+    {
+      "index": 50,
+      "image": {
+        "name": "50-candidate-pause.png",
+        "sha256": "e71b02a0d12585e401450802c5591c3090de3388ed5e9ab588c9475cc0ae0635",
+        "bytes": 323834,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "50-candidate-pause-capture.json",
+        "sha256": "1f8f1693fedff5c92b661046ba4376edcfab4556c56f6a6cc821bff1f61c3f72",
+        "bytes": 809
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:20:30.309241+00:00",
+      "captured_utc": "2026-10-30T08:20:30.428084+00:00"
+    },
+    {
+      "index": 51,
+      "image": {
+        "name": "51-candidate-save-exit.png",
+        "sha256": "85acced74c48d3b6e5e46b5cdb03ac097ba7749a9c0e5bd56f9409d09e431ef1",
+        "bytes": 297595,
+        "pixels": [
+          1100,
+          700
+        ]
+      },
+      "receipt": {
+        "name": "51-candidate-save-exit-capture.json",
+        "sha256": "974c9c37b2216b65ca20a77d8fa9b43b51884aff73fb706bf233ad99de79d7d8",
+        "bytes": 817
+      },
+      "window_id": "4194306",
+      "observed_window_pid": 12147,
+      "stable_before_after_pid": true,
+      "association": "observed_game_window_pid_without_separate_process_receipt",
+      "capture_started_utc": "2026-10-30T08:20:51.486509+00:00",
+      "captured_utc": "2026-10-30T08:20:51.626384+00:00"
+    },
+    {
+      "index": 52,
+      "image": {
+        "name": "52-candidate-return-menu.png",
+        "sha256": "e7cc49753ccdff4609bb35f7799eef753282ca97e7913aa5ed66734eb83f80fc",
+        "bytes": 610535,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "52-candidate-return-menu-capture.json",
+        "sha256": "2a877250817cdb03e439fe709202e5539d07176fda2dae71ac933bed60995755",
+        "bytes": 812
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:21:26.886666+00:00",
+      "captured_utc": "2026-10-30T08:21:27.164618+00:00"
+    },
+    {
+      "index": 53,
+      "image": {
+        "name": "53-candidate-saved-world.png",
+        "sha256": "ab5317fbdac404beda8bd988385894fc380f3faa4e5d13d114d38314ffc77bff",
+        "bytes": 469661,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "53-candidate-saved-world-capture.json",
+        "sha256": "4c40ac30321e63558b2b991369421cb9bf7138f0ce7ba59a7fdd123dea24a84d",
+        "bytes": 812
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:21:48.548772+00:00",
+      "captured_utc": "2026-10-30T08:21:48.796955+00:00"
+    },
+    {
+      "index": 54,
+      "image": {
+        "name": "54-candidate-rename.png",
+        "sha256": "9e0cb772ec26e17331c0eac275b4a8e0c52da60aebf4e8061004384f7899ec3c",
+        "bytes": 496976,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "54-candidate-rename-capture.json",
+        "sha256": "70195684b403e17a820bfd584ddad20aa465e6691db2f1c1235224710ad8ebb2",
+        "bytes": 802
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:22:08.929239+00:00",
+      "captured_utc": "2026-10-30T08:22:09.150167+00:00"
+    },
+    {
+      "index": 55,
+      "image": {
+        "name": "55-candidate-rename-entered.png",
+        "sha256": "6f259434356573a8a235c341e966b23911234e5279fee4716c46e9b4e3092eeb",
+        "bytes": 501185,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "55-candidate-rename-entered-capture.json",
+        "sha256": "4b1b8dbf6b16f03e8bf604719b9ec34dc333b48dd364fc227d11978478ebd691",
+        "bytes": 818
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:22:44.198895+00:00",
+      "captured_utc": "2026-10-30T08:22:44.443751+00:00"
+    },
+    {
+      "index": 56,
+      "image": {
+        "name": "56-candidate-renamed.png",
+        "sha256": "cd7f9e1ffe121e8549ec622b0da92dbab331b78231c7d397bf283c18cdb2d88b",
+        "bytes": 467676,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "56-candidate-renamed-capture.json",
+        "sha256": "e18a08f78eeab2155e1c07a46be611b35ed6f3d75c20ceb0e910142a8dc54f46",
+        "bytes": 804
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:22:55.286750+00:00",
+      "captured_utc": "2026-10-30T08:22:55.518537+00:00"
+    },
+    {
+      "index": 57,
+      "image": {
+        "name": "57-candidate-backup.png",
+        "sha256": "3b03553c26c1b4d196f8789f587b622e6526b491add9d4d106b1e89c8c05dd3d",
+        "bytes": 471071,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "57-candidate-backup-capture.json",
+        "sha256": "3ae0bf48c70ce4f007ddca09236f5e55b27734dbed300d14d8009ced2c4469dd",
+        "bytes": 802
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:23:18.173239+00:00",
+      "captured_utc": "2026-10-30T08:23:18.433762+00:00"
+    },
+    {
+      "index": 58,
+      "image": {
+        "name": "58-candidate-backup-list.png",
+        "sha256": "5ac42e58a8c8aebd0a3e8bcf880237179282483a16444c58c6b8fa05a664717e",
+        "bytes": 449827,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "58-candidate-backup-list-capture.json",
+        "sha256": "af54698b1522421d5f592f23e737a765e81aaad357d8878a23b8f53f33038403",
+        "bytes": 812
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:23:39.021242+00:00",
+      "captured_utc": "2026-10-30T08:23:39.214003+00:00"
+    },
+    {
+      "index": 59,
+      "image": {
+        "name": "59-candidate-backup-verified.png",
+        "sha256": "242cd008f6940916abb45784c7eb5cf5a0f9863960fe2fc5c4534849985f4077",
+        "bytes": 496219,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "59-candidate-backup-verified-capture.json",
+        "sha256": "d448ab01703ec3de104d99b681ab025e0a6dd558af7b2f2194a90c9266f2fd23",
+        "bytes": 820
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:24:04.814468+00:00",
+      "captured_utc": "2026-10-30T08:24:05.009190+00:00"
+    },
+    {
+      "index": 60,
+      "image": {
+        "name": "60-candidate-recovered.png",
+        "sha256": "22677bb809342e59a2c01be14c9aef611562bdd8b90fd1017fa08f8929619318",
+        "bytes": 434646,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "60-candidate-recovered-capture.json",
+        "sha256": "6e63a34defc2cbf16127ad4f3701fbc2410e7bdd424d07d467454ce4cb05ff8a",
+        "bytes": 808
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:24:31.605194+00:00",
+      "captured_utc": "2026-10-30T08:24:31.804718+00:00"
+    },
+    {
+      "index": 61,
+      "image": {
+        "name": "61-candidate-menu-final.png",
+        "sha256": "dff477333640683e94475c3fd57eaa231741fe2c69d3fdafd6380f85feef1eff",
+        "bytes": 700004,
+        "pixels": [
+          1440,
+          900
+        ]
+      },
+      "receipt": {
+        "name": "61-candidate-menu-final-capture.json",
+        "sha256": "d1d5ae2bfb8e71144bfed7ce07fc754468d53af7d7b0494bbbd0b695131bcafb",
+        "bytes": 810
+      },
+      "window_id": "2097154",
+      "observed_window_pid": 11234,
+      "stable_before_after_pid": true,
+      "association": "recorded_launcher_process",
+      "capture_started_utc": "2026-10-30T08:24:59.125883+00:00",
+      "captured_utc": "2026-10-30T08:24:59.450799+00:00"
+    }
+  ]
+}

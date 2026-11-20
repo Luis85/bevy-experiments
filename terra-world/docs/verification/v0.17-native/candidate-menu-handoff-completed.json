@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "release": "0.17.0",
+  "scope": "Observed candidate launcher handoff, not final acceptance",
+  "observed_utc": "2026-10-29T08:59:43.622587+00:00",
+  "launcher_pid": 80307,
+  "game_pid": 80823,
+  "observed_parent_pid": 80307,
+  "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+  "telemetry_argument": "/tmp/terra-native-017/menu-player-data/diagnostics/latest.json",
+  "interval_seconds": 10,
+  "preferences_enabled": true,
+  "report_session": "1793264306814-80823-0",
+  "report_capture_sequence": 8,
+  "report_release": "0.17.0",
+  "matched_menu_path": true,
+  "matching_game_pid_in_capture": true,
+  "observed_final_capture": {
+    "status": "graceful_exit",
+    "sequence": 53,
+    "committed_generation": 44,
+    "pending": false,
+    "dirty": false
+  }
+}

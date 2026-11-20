@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "name": "Terra Comet transport example",
+  "author": "Terra World contributors",
+  "license": "MIT OR Apache-2.0",
+  "models": [
+    {
+      "id": "comet",
+      "file": "comet.glb",
+      "sha256": "e13f7026ad6bee911f52c664e480cfd5f42a3417d2ecd463ea755b7ce72479c4",
+      "scene": 0
+    }
+  ],
+  "bindings": [
+    {
+      "target": {
+        "type": "vehicle_model",
+        "value": "compact"
+      },
+      "model": "comet",
+      "scale": 1,
+      "ground_offset_m": 0,
+      "yaw_offset_degrees": 0,
+      "animation": {
+        "idle": "parked",
+        "walk": "rolling",
+        "run": "rolling",
+        "feed": "parked",
+        "drink": "parked",
+        "walk_speed_m_s": 2.0,
+        "run_speed_m_s": 10.0,
+        "blend_seconds": 0.18,
+        "vehicle_motion": {
+          "wheel_radius_m": 0.31,
+          "wheels": [
+            "front_left_wheel",
+            "front_right_wheel",
+            "rear_left_wheel",
+            "rear_right_wheel"
+          ],
+          "steering": [
+            "front_left_steer",
+            "front_right_steer"
+          ]
+        }
+      }
+    }
+  ]
+}

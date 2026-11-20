@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "checked_utc": "2026-10-30T13:07:00.234156+00:00",
+  "status": "completed",
+  "all_compared_regions_identical": true,
+  "files_unchanged_during_comparison": true,
+  "images": [
+    {
+      "image": "docs/verification/v0.24-native/208-confirmation-damage-review.png",
+      "png_sha256": "1f33bd1537a5d869ba55561513eb2bb553c3eb164b31ab0eeadd50b3ba176ed3",
+      "png_bytes": 591002,
+      "image_mode": "RGB",
+      "image_dimensions": [
+        1100,
+        700
+      ],
+      "capture_receipt": "docs/verification/v0.24-native/208-confirmation-damage-review-capture.json",
+      "capture_receipt_sha256": "23e077c86690028d807ac01142f938b87b79dfdf68bf120e5531b852c5f55312",
+      "image_matches_receipt": true,
+      "window_pid": 76362,
+      "captured_utc": "2026-10-30T12:43:53.898715+00:00"
+    },
+    {
+      "image": "docs/verification/v0.24-native/209-confirmation-cancel-focus.png",
+      "png_sha256": "beb741e18c8038088a40cab53939675dfc867701e28ebffd36ac347bc9c1b844",
+      "png_bytes": 594028,
+      "image_mode": "RGB",
+      "image_dimensions": [
+        1100,
+        700
+      ],
+      "capture_receipt": "docs/verification/v0.24-native/209-confirmation-cancel-focus-capture.json",
+      "capture_receipt_sha256": "e5318656663a1e06363e373289d04f5da5a4d715eaa4c03986330444c152be6d",
+      "image_matches_receipt": true,
+      "window_pid": 76362,
+      "captured_utc": "2026-10-30T12:44:09.020583+00:00"
+    },
+    {
+      "image": "docs/verification/v0.24-native/219-confirmation-repeat-cancelled.png",
+      "png_sha256": "67a1499bc4822851183712bc601a6f657b5898ab4f6afabff5bdbe9669f6c5fe",
+      "png_bytes": 578307,
+      "image_mode": "RGB",
+      "image_dimensions": [
+        1100,
+        700
+      ],
+      "capture_receipt": "docs/verification/v0.24-native/219-confirmation-repeat-cancelled-capture.json",
+      "capture_receipt_sha256": "2c04f2a5fce14846ee691f5b9cd70aa3ab69e2c754248df35d52a6179c278ff3",
+      "image_matches_receipt": true,
+      "window_pid": 76362,
+      "captured_utc": "2026-10-30T12:47:45.469172+00:00"
+    },
+    {
+      "image": "docs/verification/v0.24-native/220-confirmation-repeat-focus-exited.png",
+      "png_sha256": "43733ddf088495e445a04ef7f6f8fccea6c8a66b5f2f5329511538c1e5ff445e",
+      "png_bytes": 575952,
+      "image_mode": "RGB",
+      "image_dimensions": [
+        1100,
+        700
+      ],
+      "capture_receipt": "docs/verification/v0.24-native/220-confirmation-repeat-focus-exited-capture.json",
+      "capture_receipt_sha256": "45e71b2087007925b6c9d16937c116ef0dd2321373a27e13b00519a6a2a2a5be",
+      "image_matches_receipt": true,
+      "window_pid": 76362,
+      "captured_utc": "2026-10-30T12:47:55.358650+00:00"
+    },
+    {
+      "image": "docs/verification/v0.24-native/310-confirmation-polish-focus-exited.png",
+      "png_sha256": "f1bd37300bfba80a668abee78c356c339b746cc68929bd7f66f5c4085c12d0ad",
+      "png_bytes": 575627,
+      "image_mode": "RGB",
+      "image_dimensions": [
+        1100,
+        700
+      ],
+      "capture_receipt": "docs/verification/v0.24-native/310-confirmation-polish-focus-exited-capture.json",
+      "capture_receipt_sha256": "7b6d643680c005c85c264016914db216111cb8aacba4cf6ad6accb39f24b3b72",
+      "image_matches_receipt": true,
+      "window_pid": 78977,
+      "captured_utc": "2026-10-30T13:02:11.586128+00:00"
+    },
+    {
+      "image": "docs/verification/v0.24-native/311-confirmation-polish-idle-readback.png",
+      "png_sha256": "3f04c49cc346f424c1268526ddedd63f170243d7c1fc5fc30a946f4d235132b2",
+      "png_bytes": 575682,
+      "image_mode": "RGB",
+      "image_dimensions": [
+        1100,
+        700
+      ],
+      "capture_receipt": "docs/verification/v0.24-native/311-confirmation-polish-idle-readback-capture.json",
+      "capture_receipt_sha256": "5e35d2d0def5f918a32e99bff32174b58eed4e8013907f5873cd2fbe82d3819c",
+      "image_matches_receipt": true,
+      "window_pid": 78977,
+      "captured_utc": "2026-10-30T13:02:17.554754+00:00"
+    }
+  ],
+  "comparisons": [
+    {
+      "name": "named_damage_review",
+      "left_image": "208-confirmation-damage-review.png",
+      "right_image": "209-confirmation-cancel-focus.png",
+      "crop_box_left_top_right_bottom": [
+        795,
+        210,
+        1073,
+        386
+      ],
+      "crop_dimensions": [
+        278,
+        176
+      ],
+      "pixel_encoding": "RGB, row-major, 8 bits per channel",
+      "compared_pixels": 48928,
+      "compared_rgb_bytes": 146784,
+      "left_crop_rgb_sha256": "193adaf1435e4a4a56e0af80da2164fc49bc57fb150dc8292232faf1c75735ae",
+      "right_crop_rgb_sha256": "193adaf1435e4a4a56e0af80da2164fc49bc57fb150dc8292232faf1c75735ae",
+      "all_rgb_bytes_equal": true,
+      "different_pixels": 0,
+      "full_png_files_equal": false
+    },
+    {
+      "name": "build_prose_before_and_after_focus_exit",
+      "left_image": "219-confirmation-repeat-cancelled.png",
+      "right_image": "220-confirmation-repeat-focus-exited.png",
+      "crop_box_left_top_right_bottom": [
+        795,
+        213,
+        1073,
+        402
+      ],
+      "crop_dimensions": [
+        278,
+        189
+      ],
+      "pixel_encoding": "RGB, row-major, 8 bits per channel",
+      "compared_pixels": 52542,
+      "compared_rgb_bytes": 157626,
+      "left_crop_rgb_sha256": "effd3954b39bec9c15f5730757302f7f167274c584458f9e3a91b037f97f50ef",
+      "right_crop_rgb_sha256": "effd3954b39bec9c15f5730757302f7f167274c584458f9e3a91b037f97f50ef",
+      "all_rgb_bytes_equal": true,
+      "different_pixels": 0,
+      "full_png_files_equal": false
+    },
+    {
+      "name": "build_prose_original_and_experimental",
+      "left_image": "220-confirmation-repeat-focus-exited.png",
+      "right_image": "310-confirmation-polish-focus-exited.png",
+      "crop_box_left_top_right_bottom": [
+        795,
+        213,
+        1073,
+        402
+      ],
+      "crop_dimensions": [
+        278,
+        189
+      ],
+      "pixel_encoding": "RGB, row-major, 8 bits per channel",
+      "compared_pixels": 52542,
+      "compared_rgb_bytes": 157626,
+      "left_crop_rgb_sha256": "effd3954b39bec9c15f5730757302f7f167274c584458f9e3a91b037f97f50ef",
+      "right_crop_rgb_sha256": "effd3954b39bec9c15f5730757302f7f167274c584458f9e3a91b037f97f50ef",
+      "all_rgb_bytes_equal": true,
+      "different_pixels": 0,
+      "full_png_files_equal": false
+    },
+    {
+      "name": "build_prose_experimental_and_idle_readback",
+      "left_image": "310-confirmation-polish-focus-exited.png",
+      "right_image": "311-confirmation-polish-idle-readback.png",
+      "crop_box_left_top_right_bottom": [
+        795,
+        213,
+        1073,
+        402
+      ],
+      "crop_dimensions": [
+        278,
+        189
+      ],
+      "pixel_encoding": "RGB, row-major, 8 bits per channel",
+      "compared_pixels": 52542,
+      "compared_rgb_bytes": 157626,
+      "left_crop_rgb_sha256": "effd3954b39bec9c15f5730757302f7f167274c584458f9e3a91b037f97f50ef",
+      "right_crop_rgb_sha256": "effd3954b39bec9c15f5730757302f7f167274c584458f9e3a91b037f97f50ef",
+      "all_rgb_bytes_equal": true,
+      "different_pixels": 0,
+      "full_png_files_equal": false
+    }
+  ],
+  "conclusion": "The named damage review region in 208/209 and the Build prose region in 219/220/310/311 are exactly pixel-identical. Earlier full-frame assessments of missing text are incorrect and are withdrawn. These comparisons do not demonstrate a renderer defect or a benefit from the experimental refresh.",
+  "scope": "Independent exact decoded RGB comparison of the specified original PNG regions; no native input/process, implementation change, broad accessibility test or final release authorization."
+}

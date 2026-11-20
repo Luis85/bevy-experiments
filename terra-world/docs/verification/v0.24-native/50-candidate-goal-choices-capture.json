@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "50-candidate-goal-choices",
+  "capture_started_utc": "2026-10-30T12:07:18.855270+00:00",
+  "captured_utc": "2026-10-30T12:07:19.081749+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 59077,
+  "window_pid_status": "available",
+  "window_pid_before": 59077,
+  "window_pid_after": 59077,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "50-candidate-goal-choices.png",
+    "sha256": "5df5141b794694f82d42debc75b7e9660b483569085ca98435db5a78de9abc51",
+    "bytes": 584100
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

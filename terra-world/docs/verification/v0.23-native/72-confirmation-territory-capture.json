@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "capture_name": "72-confirmation-territory",
+  "capture_started_utc": "2026-10-30T08:30:04.366365+00:00",
+  "captured_utc": "2026-10-30T08:30:04.584464+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 14073,
+  "window_pid_status": "available",
+  "window_pid_before": 14073,
+  "window_pid_after": 14073,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "72-confirmation-territory.png",
+    "sha256": "87bea5d2477b0eed7d46324b2c51bd1913dfcb0b890e06370319bf3bcb7caf6d",
+    "bytes": 582713
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "docs/verification/v0.24-native/test_audit_native_024.py"
+  ],
+  "started_utc": "2026-10-30T11:51:17.414395+00:00",
+  "finished_utc": "2026-10-30T11:51:17.651650+00:00",
+  "seconds": 0.23724352399949566,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 4194304,
+    "raw_output_bytes_observed": 2584,
+    "retained_log_bytes": 2584,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "log": "native-audit-fixtures-02.log",
+  "log_sha256": "47e5363077d2e70a25b1d10d9a451f964a01146b0baf6e96b84c15c82d4e6966",
+  "scope": "Native audit structural/negative fixtures after independent schema/duration/future-time review, using temporary synthetic image/process records. No native execution or actual canonical acceptance is claimed."
+}

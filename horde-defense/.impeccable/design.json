@@ -1,0 +1,761 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T20:20:09.754147+00:00",
+  "title": "Design System: Lastlight",
+  "extensions": {
+    "colorMeta": {
+      "amber": {
+        "role": "primary",
+        "displayName": "Warning amber"
+      },
+      "health": {
+        "role": "secondary",
+        "displayName": "Holding-line green"
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Contact danger"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Pine ink canvas"
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Outpost panel"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Parchment text"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted sage"
+      },
+      "black": {
+        "role": "neutral",
+        "displayName": "Primary black"
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Inset field"
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint native surface"
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "Native control"
+      },
+      "button": {
+        "role": "neutral",
+        "displayName": "Inactive button weak fill"
+      },
+      "hover-control": {
+        "role": "neutral",
+        "displayName": "Hovered native control"
+      },
+      "active-control": {
+        "role": "neutral",
+        "displayName": "Active native control"
+      },
+      "graph": {
+        "role": "neutral",
+        "displayName": "Quiet graph ground"
+      },
+      "acquired-node": {
+        "role": "neutral",
+        "displayName": "Acquired upgrade warmth"
+      },
+      "map-water": {
+        "role": "neutral",
+        "displayName": "Geographic water"
+      },
+      "quality-poor": {
+        "role": "semantic",
+        "displayName": "Poor equipment quality",
+        "source": "crates/horde_core/quality.json; ui/armory.rs::quality_color"
+      },
+      "quality-common": {
+        "role": "semantic",
+        "displayName": "Common equipment quality",
+        "source": "crates/horde_core/quality.json; ui/armory.rs::quality_color"
+      },
+      "quality-uncommon": {
+        "role": "semantic",
+        "displayName": "Uncommon equipment quality",
+        "source": "crates/horde_core/quality.json; ui/armory.rs::quality_color"
+      },
+      "quality-rare": {
+        "role": "semantic",
+        "displayName": "Rare equipment quality",
+        "source": "crates/horde_core/quality.json; ui/armory.rs::quality_color"
+      },
+      "quality-epic": {
+        "role": "semantic",
+        "displayName": "Epic equipment quality",
+        "source": "crates/horde_core/quality.json; ui/armory.rs::quality_color"
+      },
+      "quality-legendary": {
+        "role": "semantic",
+        "displayName": "Legendary equipment quality",
+        "source": "crates/horde_core/quality.json; ui/armory.rs::quality_color"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Pixelify Sans - display",
+        "purpose": "Measured single-line identity; 88 is the maximum, not a fixed size."
+      },
+      "result": {
+        "displayName": "Pixelify Sans - result",
+        "purpose": "Outcome title."
+      },
+      "page-title": {
+        "displayName": "Pixelify Sans - page-title",
+        "purpose": "Management page title."
+      },
+      "heading": {
+        "displayName": "Pixelify Sans - heading",
+        "purpose": "Native and progression heading."
+      },
+      "wordmark": {
+        "displayName": "Pixelify Sans - wordmark",
+        "purpose": "Ordinary header; battle and upgrade shell omit this header."
+      },
+      "body": {
+        "displayName": "Pixelify Sans - body",
+        "purpose": "Native body and button styles."
+      },
+      "label": {
+        "displayName": "Pixelify Sans - label",
+        "purpose": "Secondary text and compact action timing."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "native-widget",
+        "value": "0.12 seconds; zero with reduced effects",
+        "purpose": "Native widget state animation."
+      },
+      {
+        "name": "enemy-injury-stop",
+        "value": "6 fixed ticks at 60 Hz",
+        "purpose": "Authoritative positive-injury movement halt; refreshes without accumulating, preserves NPC action cadence."
+      },
+      {
+        "name": "enemy-injury-flash",
+        "value": "Bounded alpha-derived silhouette during injury stop; quiet tint with reduced effects",
+        "purpose": "Positive-injury feedback without modifying source PNG pixels."
+      },
+      {
+        "name": "corpse-history",
+        "value": "Saved per-attempt records; 18 simulated ticks to settle, no fade or age eviction",
+        "purpose": "Persistent resolved appearance/stable identity; settled bodies batch, never block, act or pay again. Reduced effects settles immediately."
+      },
+      {
+        "name": "shot-tracer",
+        "value": "0.12 simulated seconds",
+        "purpose": "Authoritative-event presentation."
+      },
+      {
+        "name": "defender-damage-cue",
+        "value": "0.30 simulated seconds",
+        "purpose": "Shared-contact source lane and defender feedback."
+      },
+      {
+        "name": "checkpoint-scene",
+        "value": "Pure presentation time; static with reduced effects",
+        "purpose": "Cohesive chosen low-ready-pistol menu figure with planted boots/upper breathing at original cabin anchor; quiet scene motion, static reduced pose."
+      },
+      {
+        "name": "source-owned-player-pose",
+        "value": "Immutable tick/aim/action sample, original source segments and authored contact/repair tracks",
+        "purpose": "Actual equipped appearance; shared packet/muzzle/throw sockets and preview; no authoritative mutation. Original bind parity does not approve new poses."
+      },
+      {
+        "name": "banked-loot-flyup",
+        "value": "1.5 real UI seconds; max12 per battle stream",
+        "purpose": "Quality-outlined already-banked item at actual death position rises/fades independently of observation speed."
+      },
+      {
+        "name": "resolved-impact-number",
+        "value": "0.9 real UI seconds; 150ms target aggregation; max24 per battle",
+        "purpose": "Large outlined hit/weak/incoming/status feedback with punch/settle/rise; reduced path has no punch/drift; no authoritative effects"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "native-default",
+        "value": "1440x900 window configuration"
+      },
+      {
+        "name": "native-minimum",
+        "value": "1050x700 window configuration"
+      },
+      {
+        "name": "interface-scale",
+        "value": "0.75 to 1.35"
+      },
+      {
+        "name": "campaign-columns",
+        "value": "900 logical available width"
+      },
+      {
+        "name": "briefing-columns",
+        "value": "820 logical available width"
+      },
+      {
+        "name": "settings-columns",
+        "value": "800 logical available width"
+      },
+      {
+        "name": "compact-menu",
+        "value": "below 680 logical height"
+      },
+      {
+        "name": "history-list-detail",
+        "value": "760 logical available width"
+      },
+      {
+        "name": "history-trends",
+        "value": "660 logical available width"
+      },
+      {
+        "name": "equipment-columns",
+        "value": "920 logical available width"
+      },
+      {
+        "name": "unified-detail-width",
+        "value": "1000 logical available width;290 above/240 below"
+      }
+    ],
+    "nativeRuntime": {
+      "renderer": "Rust / Bevy 0.20 / egui; native components, no HTML/CSS runtime",
+      "componentFormat": "Source-backed native metadata; html/css previews omitted because they would not be the actual game components.",
+      "sources": [
+        "crates/horde_game/src/art.rs",
+        "crates/horde_game/src/visual_assets.rs",
+        "crates/horde_game/src/settings.rs",
+        "crates/horde_game/src/ui.rs",
+        "crates/horde_game/src/ui/battle.rs",
+        "crates/horde_game/src/ui/hud.rs",
+        "crates/horde_game/src/ui/menu.rs",
+        "crates/horde_game/src/ui/camp.rs",
+        "crates/horde_game/src/ui/progression.rs",
+        "crates/horde_game/src/ui/upgrade_graph.rs",
+        "crates/horde_game/src/ui/preferences.rs",
+        "crates/horde_game/src/animation.rs",
+        "crates/horde_game/src/audio.rs",
+        "crates/horde_game/src/atmosphere_audio.rs",
+        "crates/horde_game/src/runner.rs",
+        "crates/horde_game/src/ui/armory.rs",
+        "crates/horde_game/src/ui/briefing.rs",
+        "crates/horde_game/src/ui/loot.rs",
+        "crates/horde_game/src/inspector.rs",
+        "crates/horde_game/src/cursor.rs",
+        "crates/horde_game/src/ui/reticle.rs",
+        "crates/horde_game/src/ui/damage.rs",
+        "crates/horde_game/src/ui/history.rs",
+        "crates/horde_game/src/runner/persistence.rs",
+        "crates/horde_game/src/player_model/mod.rs",
+        "crates/horde_game/src/player_model/startup.rs",
+        "crates/horde_game/src/player_model/source_masks.rs",
+        "crates/horde_game/src/player_model/appearance.rs",
+        "crates/horde_game/src/player_model/equipped_pose.rs",
+        "crates/horde_game/src/player_model/backend_egui.rs",
+        "crates/horde_game/src/defender_presentation.rs",
+        "crates/horde_game/src/ui/review.rs",
+        "crates/horde_game/src/player_model_preview.rs"
+      ],
+      "artCatalogue": {
+        "active": [
+          "assets/art/pixel/walkers-v1.png",
+          "assets/art/pixel/actors-v1.png",
+          "assets/art/pixel/props-v1.png",
+          "assets/art/pixel/terrain-v1.png",
+          "assets/art/pixel/defender-rig-v1.png",
+          "assets/art/pixel/keyart-v2.png",
+          "assets/art/pixel/menu-survivors-v1.png"
+        ],
+        "provenance": "assets/art/pixel/PROVENANCE.json",
+        "sampling": "nearest",
+        "historicalPngs": "Earlier component/canonical generations remain retained; presence on disk does not make an active production body",
+        "upload": "Scene/effect and model sources cached separately as managed premultiplied NEAREST textures; original RGBA retained; actual RenderDevice budget before upload",
+        "textureBudget": "Actual RenderDevice max_texture_dimension_2d sets egui budgets; invalid model content/upload returns explicit failure",
+        "modelManifest": "assets/player_models/manifest.json",
+        "modelSources": "Distinct manifest-declared original/repair/garment/equipment sources; scene/effect loader has seven atlases and may share files with model sources"
+      },
+      "geometry": {
+        "arenaYards": {
+          "width": "Attempt.width_yards, frozen",
+          "height": "Attempt.lane_count, frozen"
+        },
+        "contactX": 1.5,
+        "arenaInsets": {
+          "left": 24,
+          "right": 24,
+          "top": 124,
+          "bottom": 84,
+          "constructionRight": 276
+        },
+        "hudReserve": [
+          322,
+          108
+        ],
+        "portrait": [
+          40,
+          40
+        ],
+        "upgradeMissionMinHeight": 76,
+        "ordinaryMissionMinHeight": 118,
+        "minimumSkillScale": 0.75,
+        "minimumSkillIcon": 48,
+        "legacyLaneDefault": 11,
+        "defenderPosition": "(0.5, lane_count / 2)",
+        "normalGrowth": {
+          "start_lanes": 3,
+          "max_lanes": 17,
+          "lanes_per_step": 2,
+          "lane_level_step": 3,
+          "start_width": 12,
+          "max_width": 30,
+          "width_per_step": 2,
+          "width_level_step": 3
+        },
+        "legacyWidthDefault": 30,
+        "clearing": {
+          "source": "ui/battle.rs::clearing_rect",
+          "scale": "width/30 and min(lanes/11,1), centered within maximum",
+          "minimum": [
+            160,
+            86
+          ],
+          "effects": "Separate bounded effects_clip; true input/world geometry remains the clearing"
+        },
+        "unifiedDetailWidth": {
+          "wideThreshold": 1000,
+          "wide": 290,
+          "compact": 240,
+          "graphMinimum": 180,
+          "gap": 18
+        },
+        "initialMapFooterMinHeight": 98,
+        "compactMap": {
+          "availableWidthBelow": 900,
+          "regionHeight": 260,
+          "projectionHeight": 220,
+          "queryHeight": 28,
+          "dossier": "Collapsed below map, not above"
+        }
+      },
+      "validation": "Final source432 passed/0failed/1ignored (201core231app), fmt/strictClippy/nativebuild; static8 model+6 actual-game PNGs and six24-frame motion clips independently accepted. Focused1x/4x checkpoint timing has partial-target/OS limits. Source docs frozen before packaging; final archive/copy verification external.",
+      "skillGraph": {
+        "nodes": 169,
+        "root": "pistol_training / Survivor foundations",
+        "branches": [
+          "Foundations",
+          "Body development",
+          "Firearms",
+          "Survival",
+          "Ordnance",
+          "Fortification",
+          "Companions and world"
+        ],
+        "selection": "Whole graph, Branch focus camera only; selection never buys",
+        "payments": "Core can_purchase_node/node_payment/purchase_node: Coins or eligible conserved legacy CP",
+        "effects": "BodyDevelopment target floors, Blueprint, StructureRank, FeatureUnlock plus prior effects",
+        "scope": "Fresh personal body/skills/fortifications/features together; NPC advancement/owned item acquisition independent",
+        "labels": "Always-readable truncated one-row names, separate cost/state, full hover; cached routing clears expanded label envelopes",
+        "camera": "Focus control names selected branch; all169 nodes retained"
+      },
+      "menu": {
+        "source": "crates/horde_game/src/ui/menu.rs::checkpoint_scene, survivor_selection",
+        "identities": [
+          "Rook",
+          "June"
+        ],
+        "confirmation": "GameCommand::ChooseSurvivor before first country; preview is presentation-only",
+        "statistics": "Equal starting attributes/pistol; Mara remains the independent NPC companion",
+        "appearance": "Original cohesive low-ready-pistol art; planted boots and upper breathing. Battle/Character use the source-owned equipped-model facade.",
+        "anchor": {
+          "sourceImageFoot": [
+            0.4,
+            0.807
+          ],
+          "sourceHeightFraction": 0.21,
+          "placement": "Same crop/parallax transform as background; original cabin position"
+        }
+      },
+      "ordnance": {
+        "selector": "Fixed Gun/Grenade/Molotov row above arena, short single-line helper with full hover text",
+        "unlockHint": "Ordnance branch of Survival skills",
+        "targetGrid": {
+          "columns": "One-yard cells inside frozen width_yards",
+          "rows": "frozen Attempt.lane_count"
+        },
+        "input": "One Fire press per throw; no held/toggle repeats",
+        "state": "Saved finite charges, cooldowns, projectiles and fire zones; no inventory hot-swap"
+      },
+      "audio": {
+        "provenance": "assets/audio/SURVIVAL_PROVENANCE.json",
+        "newEffectFamilies": 24,
+        "variantsPerFamily": 3,
+        "maxEffectVoices": 6,
+        "maxNewCuesPerUpdate": 2,
+        "validation": "Synthesis/waveform/scheduling checks do not establish human listening or device output."
+      },
+      "viewHierarchy": {
+        "file": "docs/VIEW_HIERARCHY.md",
+        "implementedViews": 69,
+        "statusMeaning": "Source-backed surface inventory; separate from native interaction evidence",
+        "developerViews": 5
+      },
+      "progression": {
+        "contract": "docs/PROGRESSION_SCALING.md",
+        "threat": "Every committed victory including replay, outbreak and parallel/worker wins, once; loss/withdrawal do not",
+        "completionXP": 120,
+        "playerMax": 50,
+        "growthKnee": 50,
+        "numericThreatGuard": 10000,
+        "populationCap": 224,
+        "reservedBossSlots": 1,
+        "itemLevelCap": 30,
+        "level27Victory": 52,
+        "level30Victory": 58,
+        "snapshots": "Current balance/width/lanes stay fixed; missing legacy geometry11/30 and legacy multipliers retained; future settings do not resize active fields",
+        "presentation": "Use core deployment/next-victory/level/lane forecast helpers; quality, instance Lv and unlock tier are separate labels"
+      },
+      "quality": {
+        "source": "crates/horde_core/quality.json",
+        "contract": "docs/ITEM_QUALITY.md",
+        "tiers": [
+          "Poor",
+          "Common",
+          "Uncommon",
+          "Rare",
+          "Epic",
+          "Legendary"
+        ],
+        "compatibility": "None or base quality preserves old levelled stats/value exactly",
+        "randomness": "Independent keyed quality counter; no extra combat RNG draw",
+        "feedback": "Already-banked death-position outlined icon/name; 1.5 real UI seconds, max12 per battle stream, never another award"
+      },
+      "hostileConditions": {
+        "contract": "docs/OVERTAKING_AND_CRITICAL.md",
+        "critical": "Conscious zero/negative-HP NPC may fight under retained GURPS injury rules; explicit labels and signed inspection",
+        "terminal": "Stop/reap/corpse/reward in resolving fixed tick",
+        "passing": "Saved pass_offset within lane; actual Enemy.y() for geometry, targets, AoE, corpses and loot; blockers/contact still queue"
+      },
+      "cursor": {
+        "source": "crates/horde_game/src/cursor.rs::sync_native_cursor",
+        "ownership": "Actual focused arena hover without popup/details",
+        "native": "CursorOptions.visible synchronized after egui ProcessOutput; restored for UI/focus loss/leaving window",
+        "readout": "Exact ammo/charges and authoritative reload/cooldown ticks; max24 pips, reduced12"
+      },
+      "hitFeedback": {
+        "source": "crates/horde_game/src/ui/damage.rs",
+        "lifetimeSeconds": 0.9,
+        "maxBubblesPerBattle": 24,
+        "maxBattleNamespaces": 9,
+        "mergeWindowSeconds": 0.15,
+        "presentation": "One target bubble; resolved values only; punch1.3x, settle, rise38; outlined hit27/weak33/incoming26",
+        "reduced": "Hit23/weak27, no punch or rise",
+        "authority": "No Game injury/reward/RNG mutation"
+      },
+      "balance": {
+        "contract": "docs/BALANCE_AND_RUN_STATS.md",
+        "source": "crates/horde_core/balance.json",
+        "override": "LASTLIGHT_BALANCE",
+        "presets": [
+          "Easy",
+          "Normal",
+          "Hard",
+          "Custom"
+        ],
+        "normalSpeed": 1.25,
+        "state": "Frontend balance_draft until atomic GameCommand::SetBalance; future main/worker deployment only",
+        "validation": "Finite bounded factors/odd lanes/path widths/supply; current fields retain full copied settings"
+      },
+      "stats": {
+        "contract": "docs/BALANCE_AND_RUN_STATS.md",
+        "sources": [
+          "Defender",
+          "Structures",
+          "Ordnance"
+        ],
+        "rollingWindowTicks": 300,
+        "rollingDivisorSeconds": 5,
+        "opening": "Zero-padded",
+        "damage": "Positive resolved post-protection injury, including logged overkill; no misses/absorption/input/graphics",
+        "clock": "Simulation ticks; pause/save/4x invariant",
+        "legacy": "Known totals hydrated; no invented old buckets/peak; incomplete measures identified"
+      },
+      "history": {
+        "source": "crates/horde_game/src/ui/history.rs",
+        "record": "stats::RunRecord",
+        "ownership": "Parent-only untruncated ledger; saved worker outboxes drain once; no cloned parent history",
+        "outcomes": [
+          "Victory",
+          "Defeat",
+          "Withdrawal"
+        ],
+        "retention": "No record-count deletion; explicit64MiB encoded-save bound remains",
+        "trendWindow": 40,
+        "filters": [
+          "mode",
+          "outcome",
+          "front/country"
+        ],
+        "layout": {
+          "listDetailSplit": 760,
+          "trendColumns": 660,
+          "plotHeight": 86,
+          "plotCorner": 3
+        },
+        "navigation": "Menu/Camp History, Results Run analysis; pauses while open, restores prior pause on Back",
+        "authority": "Read-only already-settled records, no rewards or resimulation"
+      },
+      "journey": {
+        "contract": "docs/JOURNEYS.md",
+        "screen": "Existing Results enum is Journey upgrades after every main outcome",
+        "newGame": "Confirmation; full archive before fresh commit; only matching durable ack swaps live Game",
+        "continue": "Try again / Next defense / Choose next country; no automatic purchases; workers separate",
+        "leave": "Durable save/menu, retained progression, not reset",
+        "gates": "Learned features plus victory/liberation requirements; legacy capabilities preserved",
+        "header": "One page-owned heading/wallet/Settings; no global duplicate; rest/train hint deduplicated"
+      },
+      "characterComponents": {
+        "contract": "docs/CHARACTER_COMPONENTS.md",
+        "renderer": "crates/horde_game/src/player_model/mod.rs",
+        "authoring": "assets/player_models/manifest.json; docs/PLAYER_MODEL_AUTHORING.md",
+        "reference": "Original RGBA unchanged; current23 Rook/24 June parts after wrist-owner split. Native black/white confirmation zero differing pixels/bytes/maxchannel; direct opaque checks952/567.",
+        "appearance": "Core EquipmentVisual actual equipped slot definition/level/quality/style plus class; empty fallback remains explicit",
+        "facade": "resolve_appearance / resolve_pose / resolve_equipped_model; resolve_model keeps exact reference",
+        "pose": "PlayerPoseSample tick/aim/action phase/recoil/brace/hit/reduced; actual packets plus sockets/muzzle/throw origin",
+        "integration": "visual_assets facade; defender_presentation historical action/release sampling; bounded source-space ReleaseOrigins",
+        "authority": "No wallet/equip/RNG/clock/extra attack or authoritative defender movement",
+        "repairs": "Unknown newly exposed surfaces explicitly authored; original RGBA preserved; changed poses/new garments are not pixel-identical stills",
+        "startup": "Eager manifest validation/source decoding/cached meshes; absent manifest explicit bundled compatibility; malformed present content fails",
+        "validation": "Accepted:8 model+6 actual-game PNGs,68 matrix cases supported, original bind native0difference; six24-frame motion clips including legal grenade/Molotov/contact-melee release/recovery. Final gate432pass/0fail/1ignored. Near-vertical/head-pitch2D limit retained; no changed-pose pixel-identity/full3D claim.",
+        "developerViews": [
+          "player-model-review",
+          "player-model-parity",
+          "player-model-parts",
+          "player-model-matrix",
+          "player-model-repairs"
+        ],
+        "legacy": "Retired character_rig only under cfg(test), not a production fallback",
+        "releasePersistence": "Optional saved projectile release_cues retains release tick/shot/hit/brace facts after event pruning; old None uses legacy sampling",
+        "poseLimit": "Stylized near-vertical rifles and limited head pitch; exact1:1 claim only original source bind",
+        "motionEvidence": "target/journey-review/source-model-motion/{npc,battle-female,reticle-reload,ordnance,gesture-throws,gesture-melee};24PNG+MP4 each. Gesture clips ticks2338→2430, fixed15fps1.6s playback; not FPS measurement."
+      },
+      "persistence": {
+        "source": "crates/horde_game/src/runner/persistence.rs",
+        "interface": "Runtime.durable_transition_pending / user_save_pending / persistence_metrics",
+        "worker": "One immutable Game+Settings snapshot writer; one in-flight plus latest pending; durable intents retained",
+        "mainFrame": "Snapshot capture/enqueue/poll; no ordinary filesystem writes",
+        "critical": "Queued pause-save barrier blocks later model commands and raw Settings/rebinding; old autosave ack cannot clear newer busy",
+        "reset": "Serialized profile epoch archive/fresh commit barrier; stale old Quit ignored; Quit during reset recaptured after acknowledgment",
+        "evidence": "Current focused source-model checkpoint traces: mainPersistence max0.197ms1x/0.2554ms4x,2background saves0fail each; full decodedGame identical across speeds/prior worker. Partial remaining round, one device, OS/VSync intervals; no universal zero-stutter/minimum-spec claim."
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Primary deployment action",
+      "kind": "button",
+      "description": "Square black action with strong parchment text and a two-unit parchment stroke.",
+      "native": {
+        "file": "crates/horde_game/src/ui.rs",
+        "symbol": "primary",
+        "states": "Native hover/focus/active response; caller-managed enabled state."
+      },
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "description": "Native Button; configured weak fill is distinct from general widget fill.",
+      "native": {
+        "file": "crates/horde_game/src/settings.rs",
+        "symbol": "configure",
+        "states": "Inactive weak fill; hovered foreground amber; native focus/active state."
+      },
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Country search",
+      "kind": "input",
+      "description": "Single-line TextEdit with name-or-country-code hint and bounded requested width.",
+      "native": {
+        "file": "crates/horde_game/src/ui/camp.rs",
+        "symbol": "world_ui",
+        "states": "Native text focus, editing and interaction."
+      },
+      "refersTo": "input"
+    },
+    {
+      "name": "Camp navigation",
+      "kind": "nav",
+      "description": "Secondary preparation/management routes; primary between-round home is Journey upgrades, with learned advanced access.",
+      "native": {
+        "file": "crates/horde_game/src/ui/navigation.rs",
+        "symbol": "camp_navigation",
+        "states": "Native selectable state and amber destination marker; upgrade tabs enter dedicated shell."
+      }
+    },
+    {
+      "name": "Health readout",
+      "kind": "custom",
+      "description": "Square native ProgressBar; battle and boss HP use danger with gamma_multiply(0.45).",
+      "native": {
+        "file": "crates/horde_game/src/ui.rs",
+        "symbol": "progress",
+        "states": "Immediate clamped authoritative value; no cosmetic easing."
+      },
+      "refersTo": "health-bar"
+    },
+    {
+      "name": "Corner combat instruments",
+      "kind": "custom",
+      "description": "Frozen-arena identity, resources, signed critical/active cues, threat/groups/loot metadata and bounded attack selector.",
+      "native": {
+        "file": "crates/horde_game/src/ui/battle.rs",
+        "symbol": "corner_hud",
+        "states": "Action row truncates with full hover text; danger names lane hit, contacts, closing or holding.",
+        "relatedSymbols": [
+          "attack_selector",
+          "ordnance_cursor"
+        ]
+      }
+    },
+    {
+      "name": "Upgrade node",
+      "kind": "custom",
+      "description": "169-node single rooted personal progression DAG, including body/fortification/features; camera focus only.",
+      "native": {
+        "file": "crates/horde_game/src/ui/upgrade_graph.rs",
+        "symbol": "show_contents",
+        "states": "Name always visible/truncated; separate owned/locked/payment caption; full hover and actual selected detail; enlarged route obstacles"
+      },
+      "refersTo": "upgrade-node"
+    },
+    {
+      "name": "Selected upgrade purchase",
+      "kind": "custom",
+      "description": "Actual skill/blueprint/rank cost, ownership, affordability and prerequisite explanation.",
+      "native": {
+        "file": "crates/horde_game/src/ui/progression.rs",
+        "symbol": "skill_detail",
+        "states": "Actual whole-tree requirements, owned state, victory/liberation gates and Coins/LegacyBodyPoints; action above scrolling details."
+      }
+    },
+    {
+      "name": "Journey upgrade home",
+      "kind": "nav",
+      "description": "One page-owned header/wallet/Settings, already-banked outcome, whole tree and named continue/leave; no duplicate retreat hint.",
+      "native": {
+        "file": "crates/horde_game/src/ui/results.rs",
+        "symbol": "results",
+        "states": "Every settled main outcome; Try again/Next defense/Choose next country; no extra reward/auto-buy"
+      }
+    },
+    {
+      "name": "Settings return",
+      "kind": "custom",
+      "description": "Actual return destination plus durable main-menu route.",
+      "native": {
+        "file": "crates/horde_game/src/ui/preferences.rs",
+        "symbol": "settings_ui",
+        "states": "Pending disables return; failure stays visible on Settings; Escape shares durable return intent."
+      }
+    },
+    {
+      "name": "Banked quality loot",
+      "kind": "custom",
+      "description": "Six named quality borders/icons and real-time upward receipts for already-owned items.",
+      "native": {
+        "file": "crates/horde_game/src/ui/loot.rs",
+        "symbol": "draw_for",
+        "states": "1.5 real UI seconds; max12 per stream; cache-only capture replay; no reward or combat RNG mutation"
+      }
+    },
+    {
+      "name": "Ammo and reload reticle",
+      "kind": "custom",
+      "description": "True focused arena aim with a separately clamped resource badge; standard cursor restores for ordinary UI.",
+      "native": {
+        "file": "crates/horde_game/src/ui/reticle.rs",
+        "symbol": "paint",
+        "states": "Ammo/charges, reload/cooldown arc, empty state; up to24 pips or12 reduced; construction hides ring"
+      }
+    },
+    {
+      "name": "Next-run gameplay balance",
+      "kind": "custom",
+      "description": "Preset/custom draft with saved/active/draft previews, validation and explicit future-run commit.",
+      "native": {
+        "file": "crates/horde_game/src/ui/preferences.rs",
+        "symbol": "gameplay_settings",
+        "states": "Unapplied, invalid, valid/changed, committed; active snapshots unchanged"
+      }
+    },
+    {
+      "name": "Saved run analysis",
+      "kind": "custom",
+      "description": "Paused read-only filtered ledger, frozen detail and last40 named metric trends.",
+      "native": {
+        "file": "crates/horde_game/src/ui/history.rs",
+        "symbol": "show",
+        "states": "Empty ledger/filter, selected record, newest-first list, read-only hover/trends, Back restores pause"
+      }
+    }
+  ],
+  "narrative": {
+    "northStar": "The pixel survival outpost",
+    "overview": "Lastlight is a grounded survivor/plague world expressed through crisp pixel figures, muted biome ground, worn improvised defenses and small amber signals. The user's seven reference screenshots and explicit pixel-art survival choice establish the visual world. A full-window battlefield and compact corner instruments make the surrounding place visible while every lane of the deployed arena remains readable.\n\nCombat and visual progression use space generously; management remains compact and practical. Scenery belongs around the combat rectangle, while purchases belong beside the selected upgrade. Pixelify Sans, square controls and the living checkpoint scene carry the same pixel identity. Reduced effects preserves a static checkpoint pose. This document records the implemented native Rust/Bevy/egui system; dated execution evidence and its limits belong in [docs/VALIDATION.md](docs/VALIDATION.md).",
+    "keyCharacteristics": [
+      "Continuous quiet ground connects the arena to peripheral biome scenery.",
+      "Original pixel sprites retain padded silhouettes, grounded feet and nearest sampling.",
+      "Compact corner health, ammunition, action and boss readouts leave the field open.",
+      "One complete connected progression canvas pairs literal requirements with explicit payments.",
+      "Authoritative state drives timing, threat feedback and progression; artwork never resolves combat."
+    ],
+    "rules": [
+      {
+        "name": "The Quiet Ground Rule",
+        "body": "Keep ground contrast below figures and threat information. Use forward-oriented, feathered material patches; do not restore mirrored terrain carpets or a permanent combat grid.",
+        "section": "colors"
+      },
+      {
+        "name": "The Literal Control Rule",
+        "body": "Action labels name the actual operation: reload, build defenses, recall, train, equip and sell. Keep rules explanations close to the decision they explain.",
+        "section": "typography"
+      },
+      {
+        "name": "The Arena Rule",
+        "body": "Fit the arena as a complete tactical surface. Interface scaling may rearrange controls, but it must not crop lane entries or contact positions.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "Do preserve the complete deployment-frozen arena, shared contact line and stable aiming origin.",
+      "Do keep continuous ground quiet and peripheral props outside tactical space.",
+      "Do use Pixelify Sans through the installed native families and measure the single-line menu wordmark.",
+      "Do expose actual upgrade costs, availability and purchase prerequisites beside the selection.",
+      "Do pair color with labels, shape or tactical location and honor reduced-effects preferences.",
+      "Do keep native capture, interaction, listening and package evidence separate from source and headless checks."
+    ],
+    "donts": [
+      "Don't restore painted active assets, permanent combat sidebars or spreadsheet lane grids as the default field.",
+      "Don't mirror ground patches into a carpet or let scenery obscure an entry, contact position or construction cell.",
+      "Don't invent skill dependencies, prices or automatic progression transactions to suit a diagram.",
+      "Don't move the aiming origin or let a visual effect resolve an additional hit.",
+      "Don't replace durable settings return behavior with a label-only or transient success state.",
+      "Don't claim GUI validation from compilation, screenshots from another build or static source extraction."
+    ]
+  }
+}

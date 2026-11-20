@@ -6,15 +6,21 @@
 //! casting to a renderer's `f32` transform.
 
 mod actors;
+mod contacts;
 mod environment;
 mod geo;
 mod tiles;
 mod time;
+mod vehicle;
+mod vehicle_ground;
 mod world;
 
 pub use actors::*;
+pub use contacts::*;
 pub use environment::*;
 pub use geo::*;
 pub use tiles::*;
 pub use time::*;
+pub use vehicle::*;
+pub use vehicle_ground::*;
 pub use world::*;

@@ -68,7 +68,8 @@ pub struct LivingUnit {
     pub needs: Needs,
     pub order: UnitOrder,
     pub home: GeoPosition,
-    /// Current road/foot route. It is a bounded path, not a navigation mesh.
+    /// Current bounded road/foot route. A patrol consumes temporary
+    /// avoidance points from the front, preserving its patrol `path_index`.
     pub path: Vec<GeoPosition>,
     pub path_index: usize,
     pub patrol: Vec<GeoPosition>,
@@ -83,7 +84,7 @@ impl LivingUnit {
             ActorKind::Human => 7.,
             ActorKind::Animal => 6.,
             ActorKind::Creature => 8.,
-            ActorKind::Vehicle => 14.,
+            ActorKind::Vehicle => 40.,
             ActorKind::Ship => 10.,
             ActorKind::Helicopter | ActorKind::Balloon | ActorKind::Airplane => 20.,
         }
@@ -169,12 +170,17 @@ pub struct RoadRoute {
     pub id: String,
     pub points: Vec<GeoPosition>,
     pub width_m: f32,
+    /// Optional provider rules; old authored roads remain two-way and unrestricted.
+    #[serde(default)]
+    pub rules: RoadRules,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryPhase {
     ToPickup,
     ToDropoff,
+    /// Cargo remains on the courier until it physically returns to the source.
+    Returning,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Delivery {
@@ -186,6 +192,12 @@ pub struct Delivery {
     pub item: String,
     pub amount: u32,
     pub phase: DeliveryPhase,
+    #[serde(default)]
+    pub stalled_seconds: f64,
+    #[serde(default)]
+    pub route_retries: u8,
+    #[serde(default)]
+    pub last_position: Option<GeoPosition>,
 }
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LivingMetrics {
@@ -194,6 +206,23 @@ pub struct LivingMetrics {
     pub units_traded: u64,
     pub credits_traded: u64,
     pub npc_purchases: u64,
+    #[serde(default)]
+    pub delivery_replans: u64,
+    #[serde(default)]
+    pub deliveries_returned: u64,
+    /// Broad-phase work actually performed by same-lane vehicle yielding.
+    #[serde(default)]
+    pub traffic_queries: u64,
+    #[serde(default)]
+    pub traffic_candidate_tests: u64,
+    #[serde(default)]
+    pub intersection_grants: u64,
+    #[serde(default)]
+    pub intersection_waits: u64,
+    #[serde(default)]
+    pub intersection_requeues: u64,
+    #[serde(default)]
+    pub blocked_exits: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -206,6 +235,9 @@ pub struct LivingWorld {
     pub producers: BTreeMap<u64, ProductionSite>,
     pub deliveries: Vec<Delivery>,
     pub roads: Vec<RoadRoute>,
+    /// Bounded FIFO reservations use physical time, independent of the calendar.
+    #[serde(default)]
+    pub traffic: TrafficControl,
     pub elapsed_seconds: f64,
     pub dispatch_accumulator: f64,
     pub next_id: u64,
@@ -222,6 +254,7 @@ impl Default for LivingWorld {
             producers: BTreeMap::new(),
             deliveries: vec![],
             roads: vec![],
+            traffic: TrafficControl::default(),
             elapsed_seconds: 0.,
             dispatch_accumulator: 0.,
             next_id: 1_000_000,
@@ -244,6 +277,17 @@ pub struct LivingView {
     pub elapsed_seconds: f64,
     pub metrics: LivingMetrics,
     pub truncated: bool,
+}
+
+/// Read-only personal market offer. A quoted command carries this exact total;
+/// it cannot select a price or bypass the authority's stock and wallet checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersonalTradeQuote {
+    pub shop_id: u64,
+    pub item: String,
+    pub amount: u32,
+    pub buy: bool,
+    pub total_cost: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -277,6 +321,15 @@ pub enum LivingCommand {
         item: String,
         amount: u32,
     },
+    /// Execute only at the total the player reviewed. Legacy Buy/Sell remain
+    /// available to hosts deliberately requesting the current authority price.
+    TradeQuoted {
+        shop_id: u64,
+        item: String,
+        amount: u32,
+        buy: bool,
+        quoted_total: u64,
+    },
     Consume {
         item: String,
     },
@@ -302,13 +355,13 @@ impl LivingWorld {
         })
     }
 
-    pub(super) fn next(&mut self) -> Result<u64, SandboxError> {
+    pub(crate) fn next(&mut self) -> Result<u64, SandboxError> {
         let id = self.next_id;
         self.next_id = self.next_id.checked_add(1).ok_or(SandboxError::Capacity)?;
         Ok(id)
     }
 
-    pub(super) fn make_unit(
+    pub(crate) fn make_unit(
         &mut self,
         name: String,
         kind: ActorKind,

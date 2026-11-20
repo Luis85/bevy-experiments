@@ -1,0 +1,147 @@
+{
+  "version": "0.17.0",
+  "status": "passed",
+  "finished_utc": "2026-10-29T10:03:10.669909+00:00",
+  "scope": "Completed automated, final direct native, extracted Linux package and baseline-preservation acceptance. Source ZIP assembly and the independent final two-archive audit follow this record; their whole-ZIP identities are external to the source archive.",
+  "automated": {
+    "gates": 43,
+    "distinct_passing_rust_tests": 928,
+    "passed_test_executions": 1014,
+    "failed": 0,
+    "ignored": 0,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.17-final/gates.json",
+      "sha256": "539c17efce1d3cf5a452561a1cda5732d34216c3199015699a6bd30208ec2cf4",
+      "bytes": 30682
+    }
+  },
+  "source_freeze": {
+    "inputs": 367,
+    "manifest": {
+      "path": "docs/verification/v0.17-final/source-hashes.json",
+      "sha256": "e1eb6bc59a9f516a8c24e1b1c0e0f52353b3c75ceb9b2108b5c830810bb57f78",
+      "bytes": 43064
+    },
+    "unchanged_through_gates_native_and_package_confirmation": true,
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.17-final/baseline-comparison.json",
+      "sha256": "1493a5c2bb69ce99ff8e8bfe67db14ae8a3c4fd99e58d12615a4b67b56b5074f",
+      "bytes": 163938
+    },
+    "previous_release_paths_retained": 1488,
+    "original_fixture_data_and_asset_inputs_unchanged": 102,
+    "historical_evidence_files_unchanged": 1068,
+    "previous_product_review_and_validation_archived_exactly": true
+  },
+  "native": {
+    "evidence": {
+      "path": "docs/native-v17-verification.json",
+      "sha256": "bfc933e7e35801ca5689fdce6fdbad37abf62b4f7c256989124e2bf33c6d9f23",
+      "bytes": 20151
+    },
+    "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+    "completed_processes": 5,
+    "retained_screenshots": 14,
+    "observed_capture_roles": 14
+  },
+  "desktop": {
+    "evidence": {
+      "path": "docs/desktop-package-v0.17.json",
+      "sha256": "acf6e236ba2de1b7ea5de224d51eed813e3d2e719dd36a5fddf9a625222dfcdd",
+      "bytes": 11372
+    },
+    "accepted_binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+    "completed_extracted_runs": 2,
+    "project_payload_files": 152,
+    "archive_members": 234,
+    "archive_bytes": 39232216,
+    "archive_sha256": "68c7d9acaf2081ac370532e38ddc36e38bfe4f2dc6bac69f454fcfd3768ec184"
+  },
+  "product_records": [
+    {
+      "path": "docs/PRODUCT_REVIEW.md",
+      "sha256": "24dcccafe4ddc051722c34e2249f838e4a151097eb09303f6dd9aa3a696b78e6",
+      "bytes": 13974
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "sha256": "108ccf5823d611b6b9aa04dd66f7bcf2136e40988e8e2d4e794d480fd275ab06",
+      "bytes": 15057
+    },
+    {
+      "path": "docs/REVIEW_GAPS_v0.17.md",
+      "sha256": "6872b3d995115450d91852e6bc59bc04d1cfff97b0388f66358c499ff1020d5d",
+      "bytes": 20068
+    },
+    {
+      "path": "docs/PLAYTESTING.md",
+      "sha256": "9aa75ef5ff08cb7ba3a362b0906446ee6cdd0525d44283ba5cfe15fdd772e8ce",
+      "bytes": 12747
+    }
+  ],
+  "review_records": [
+    {
+      "path": "docs/verification/v0.17-review/final-native-review.md",
+      "sha256": "8364ad1e1fcfc71ecaf7d12de326908d7357607d5777bf39d30a7e4ae360bfbd",
+      "bytes": 6812
+    },
+    {
+      "path": "docs/verification/v0.17-review/final-native-review.json",
+      "sha256": "83743e81cbd862a2c29283773fe6059fbd952cbd6826e7851fc7e91c9d390585",
+      "bytes": 9006
+    },
+    {
+      "path": "docs/verification/v0.17-review/player-journeys.md",
+      "sha256": "2c266a14bebf527ee32049df6c285c44564265c6771dffee11309085f128e66d",
+      "bytes": 13333
+    },
+    {
+      "path": "docs/verification/v0.17-review/diagnostics-implementation.md",
+      "sha256": "1ea1cc2608f845f0a70977596a3af8986652ce53a1f4fab50aed88a703ee63fa",
+      "bytes": 9605
+    },
+    {
+      "path": "docs/verification/v0.17-review/diagnostics-native-ui-review.md",
+      "sha256": "3aeb2c0a9f4ac3f1b26b9335afd245b05cae71ac50708f3827d68a903ccd45e8",
+      "bytes": 11617
+    },
+    {
+      "path": "docs/verification/v0.17-review/reliability-implementation.md",
+      "sha256": "bb611cddb7aa67b95a5f18bdac65d8e951182b6a68a64b13003a7137bb164f6c",
+      "bytes": 5463
+    },
+    {
+      "path": "docs/verification/v0.17-review/product-perspectives-final.md",
+      "sha256": "fdc76782e6344b8ded08fe5d5f576b38e4ca8796bedf5cca15b22de267ba2949",
+      "bytes": 10280
+    }
+  ],
+  "compatibility": {
+    "domain_save": 1,
+    "regional_schema": 1,
+    "wire": 10,
+    "alpn": "terra-world/10",
+    "asset_schema": 1,
+    "human_and_driver_seat_asset_reader": "0.16",
+    "launcher_preference_downgrade": "Pre-0.17 readers can reject the optional playtest_reports field and fall back to graphics defaults with a warning; world saves are separate."
+  },
+  "checks": {
+    "all_declared_final_gates_passed": true,
+    "native_and_desktop_use_the_exact_final_executable": true,
+    "implementation_inputs_remained_unchanged": true,
+    "all_desktop_source_payload_files_match_archive": true,
+    "native_observations_and_process_provenance_retained": true,
+    "save_reopen_preserved_declared_player_subset": true,
+    "baseline_inputs_and_historical_evidence_preserved": true,
+    "current_reports_reconciled_to_actual_acceptance_scope": true
+  },
+  "limits": [
+    "Linux Xvfb/software Vulkan review; no Windows, physical GPU or input-device qualification.",
+    "Expert-operated finite fixtures; no uncoached sustained-play, full-career balance or general dense-traffic qualification.",
+    "Terminal worker-loss and stale rental/assignment protections use explicit source/regression evidence; no native fault injection or completed refund is inferred.",
+    "Diagnostic final samples observe exit requests; completed process records separately establish exit. Final storage operations may still wait.",
+    "Asset reservation totals are estimates; procedural fallback at instance/distance budgets is intentional.",
+    "Local TLS and regional recovery workloads do not establish public-service capacity, deployment RPO/RTO or global architecture.",
+    "The complete G01-G18 remaining acceptance criteria remain documented."
+  ]
+}

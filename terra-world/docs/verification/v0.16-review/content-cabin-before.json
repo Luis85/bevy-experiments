@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "release": "0.16.0",
+  "status": "no_measurement",
+  "scope": "Empty exploratory cabin-review output; not geometry measurements or acceptance evidence.",
+  "original_artifact": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "origin_and_cause": "Unknown. The independent geometry reviewer could not reliably recover the exact invocation or exception from retained context.",
+  "measurements": null,
+  "recorded_result": "The original file contained no JSON or measurements. No before-fit values have been reconstructed.",
+  "documentation_repair": "The zero-byte artifact was replaced with this explicit no-measurement receipt. No geometry review was rerun, and the intermediate and final measurement receipts were left unchanged.",
+  "retained_measurement_receipts": [
+    {
+      "path": "docs/verification/v0.16-review/content-cabin-intermediate.json",
+      "sha256": "07a47aeb9c3bf4fed23f987dd59a6f123690cb384ad1ac3361209732bb78a3e7"
+    },
+    {
+      "path": "docs/verification/v0.16-review/content-cabin-after.json",
+      "sha256": "dfb92f2c622c3268cf42a4b2a0a5469cb9a287a5cf0fd7b93a2319056b1c0999"
+    }
+  ]
+}

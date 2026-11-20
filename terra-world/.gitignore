@@ -3,6 +3,8 @@
 /captures/
 *.tmp
 *.log
+__pycache__/
+*.py[cod]
 
 
 /world-save*.json
@@ -15,3 +17,13 @@
 /sessions/
 /saves/
 /snapshots/
+
+# Regional stores and their live journals contain private world/session state.
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal

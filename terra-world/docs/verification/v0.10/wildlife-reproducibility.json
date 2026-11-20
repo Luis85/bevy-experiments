@@ -1,0 +1,13 @@
+{
+  "version": "0.10.0",
+  "generator": "crates/terra-bevy/assets/wildlife-pack/generate.py",
+  "all_regenerated_bytes_identical": true,
+  "files": {
+    "boar.glb": true,
+    "deer.glb": true,
+    "fox.glb": true,
+    "hare.glb": true,
+    "ibex.glb": true,
+    "pack.json": true
+  }
+}

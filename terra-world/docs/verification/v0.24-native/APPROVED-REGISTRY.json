@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "reviewed_utc": "2026-10-30T13:14:26.144533+00:00",
+  "reviewer": "Root integrator; every selected PNG individually inspected. Original209/220 prose also verified by exact RGB comparison and crop inspection; unsupported disappearance finding withdrawn.",
+  "processes": [
+    {
+      "name": "confirmation-building",
+      "phase": "confirmation",
+      "pid": 76362,
+      "captures": [
+        {
+          "stem": "201-confirmation-building-restore-review",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "cc22a92192ed1a1c3d25d693b75e9373b18350ed57bbd308b10c31222fd9f2be"
+        },
+        {
+          "stem": "202-confirmation-building-restored",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "b1ba829665fd9a2a4e2a1080ad32733a5a3a603e7c64b131c3a1125feb3eea02"
+        },
+        {
+          "stem": "205-confirmation-build-panel",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "5d1518b275fbd4fcd5915db83ed9819ab0ae76936ea2840a6d654cdee51ab14b"
+        },
+        {
+          "stem": "207-confirmation-minimum-property",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "fa75ea09591d6a4f4f9936d9c9d36ba5431da6034da602144e324880f3124ddb"
+        },
+        {
+          "stem": "208-confirmation-damage-review",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "1f33bd1537a5d869ba55561513eb2bb553c3eb164b31ab0eeadd50b3ba176ed3"
+        },
+        {
+          "stem": "209-confirmation-cancel-focus",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "beb741e18c8038088a40cab53939675dfc867701e28ebffd36ac347bc9c1b844"
+        },
+        {
+          "stem": "210-confirmation-keyboard-cancelled",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "37288b5286778068947a5bf0e96c173906b5c1bd7ebce10a4d45df82562b06e6"
+        },
+        {
+          "stem": "216-confirmation-repeat-cancel-focus",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "09618a0cc372c14274ab925109b1852f4f17dc69c0d95349d159207c556191c2"
+        },
+        {
+          "stem": "220-confirmation-repeat-focus-exited",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "43733ddf088495e445a04ef7f6f8fccea6c8a66b5f2f5329511538c1e5ff445e"
+        },
+        {
+          "stem": "221-confirmation-retained-fence",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "584d2b4333398183dcc2041c4157547aaf8844471ac20b8d0ffb3c87f1326e36"
+        },
+        {
+          "stem": "223-confirmation-building-save-exit",
+          "pixels": [
+            1100,
+            700
+          ],
+          "sha256": "33ad311f689bf5830f956ececbf048c87d7be3095eb4eb1f87331e8785b71348"
+        }
+      ]
+    },
+    {
+      "name": "confirmation-final-fleet",
+      "phase": "confirmation",
+      "pid": 79904,
+      "captures": [
+        {
+          "stem": "331-confirmation-final-fleet-restore-review",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "78d618662aa43ddbb0b878dd66ff65306c2dafe227a511c408f2227632773dc4"
+        },
+        {
+          "stem": "332-confirmation-final-fleet-restored",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "b575613f986637298a1b5851b22a189da618a6e6ebbf2e6b0902974e44340fb6"
+        },
+        {
+          "stem": "333-confirmation-final-fleet-resumed",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "c0ecb3a49643740b7410a3e0ffbae3146412f196f87d40ee01e85406383de51e"
+        },
+        {
+          "stem": "334-confirmation-final-fleet-company",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "262871d2e37f30da77b0828a6858da2d04bddec37427ff41d68f8022559254aa"
+        },
+        {
+          "stem": "335-confirmation-final-fleet-drivers",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "b25aaba8ef04bf774ad2bb42070aeb548f5e79f4ddbeaedf663806c70b32b704"
+        },
+        {
+          "stem": "336-confirmation-final-fleet-assignment",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "88da802e221e53e4000cf68963036db82c72dc72593ad2a275e7a820da52e826"
+        },
+        {
+          "stem": "337-confirmation-final-fleet-exit-menu",
+          "pixels": [
+            1440,
+            900
+          ],
+          "sha256": "307a5ac5e542cd80bdbfcf48d22bd2ba6502d21c062f0f7467ba71203c5a40ee"
+        }
+      ]
+    }
+  ]
+}

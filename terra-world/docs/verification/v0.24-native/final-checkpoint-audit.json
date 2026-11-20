@@ -1,0 +1,274 @@
+{
+  "schema": 1,
+  "status": "passed_selected_final_fleet_readback",
+  "started_utc": "2026-10-30T13:16:48.665481+00:00",
+  "finished_utc": "2026-10-30T13:16:48.761701+00:00",
+  "scope": "Actual fresh final Fleet restore/save readback and recorded source/binary association only. Canonical gates are running; no canonical or delivered-package acceptance is asserted.",
+  "original": {
+    "path": "/tmp/terra-native024/candidate-world.json",
+    "sha256": "932413c61bd2ee1cff5b5847eb9597afe5e5af946979e2d4b41d15b16484e516",
+    "bytes": 1776513,
+    "mtime_ns": 1793363528836796139,
+    "mtime_utc": "2026-10-30T12:32:08.836796+00:00"
+  },
+  "restored_and_saved": {
+    "path": "/tmp/terra-native024/confirmation-final-fleet.json",
+    "sha256": "c4405f2c220a7211e68f1d827e8c6876cdb40da7c143215609fb92515e5df1f2",
+    "bytes": 1776921,
+    "mtime_ns": 1793366024258901193,
+    "mtime_utc": "2026-10-30T13:13:44.258901+00:00"
+  },
+  "selected_before": {
+    "wrapper_schema": 1,
+    "domain_version": 1,
+    "world_identity": {
+      "base_data_revision": "terra-procedural-v2",
+      "seed": 42,
+      "chunk_level": 15,
+      "terrain_resolution": 65,
+      "live_data": false,
+      "osm_features": true,
+      "data_epoch_unix": null,
+      "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+    },
+    "player_id": 1,
+    "personal_money_minor": 18613,
+    "inventory": {
+      "planks": 2,
+      "stone": 20,
+      "wheat_seed": 8,
+      "wood": 24
+    },
+    "progress": {
+      "player_id": 1,
+      "experience": 40,
+      "contracts_completed": 1,
+      "settlements_founded": 0
+    },
+    "accepted_supply_ids": [],
+    "fence_2": {
+      "id": 2,
+      "owner": 1,
+      "faction_owner": null,
+      "blueprint": "fence",
+      "position": {
+        "latitude": 48.135177538384454,
+        "longitude": 11.57254442548286,
+        "altitude_m": 160.6080322265625
+      },
+      "hitpoints": 15,
+      "max_hitpoints": 40,
+      "radius_m": 0.7,
+      "housing": false,
+      "workbench": false
+    },
+    "company_name": "Field Service",
+    "company_owner": 1,
+    "company_cash_minor": 3934,
+    "company_revenue_minor": 0,
+    "company_totals_minor": {
+      "payroll": 66,
+      "recruitment": 1000,
+      "owner_deposit": 5000,
+      "owner_paid_registration": 2000
+    },
+    "drivers": [
+      {
+        "id": 1,
+        "name": "Mira",
+        "vehicle_id": 1000053,
+        "route_id": 2,
+        "next_stop": 0,
+        "running": false,
+        "status": "paused",
+        "trip": null,
+        "wages_earned": 66,
+        "wages_spent": 0,
+        "wage_fraction": 0.8999999999999999,
+        "stalled_seconds": 0.0,
+        "deliveries_completed": 0
+      }
+    ],
+    "routes": [
+      {
+        "id": 2,
+        "name": "Town service",
+        "stops": [
+          2,
+          3
+        ],
+        "service": {
+          "type": "passengers",
+          "count": 1
+        }
+      }
+    ]
+  },
+  "selected_after": {
+    "wrapper_schema": 1,
+    "domain_version": 1,
+    "world_identity": {
+      "base_data_revision": "terra-procedural-v2",
+      "seed": 42,
+      "chunk_level": 15,
+      "terrain_resolution": 65,
+      "live_data": false,
+      "osm_features": true,
+      "data_epoch_unix": null,
+      "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+    },
+    "player_id": 1,
+    "personal_money_minor": 18613,
+    "inventory": {
+      "planks": 2,
+      "stone": 20,
+      "wheat_seed": 8,
+      "wood": 24
+    },
+    "progress": {
+      "player_id": 1,
+      "experience": 40,
+      "contracts_completed": 1,
+      "settlements_founded": 0
+    },
+    "accepted_supply_ids": [],
+    "fence_2": {
+      "id": 2,
+      "owner": 1,
+      "faction_owner": null,
+      "blueprint": "fence",
+      "position": {
+        "latitude": 48.135177538384454,
+        "longitude": 11.57254442548286,
+        "altitude_m": 160.6080322265625
+      },
+      "hitpoints": 15,
+      "max_hitpoints": 40,
+      "radius_m": 0.7,
+      "housing": false,
+      "workbench": false
+    },
+    "company_name": "Field Service",
+    "company_owner": 1,
+    "company_cash_minor": 3934,
+    "company_revenue_minor": 0,
+    "company_totals_minor": {
+      "payroll": 66,
+      "recruitment": 1000,
+      "owner_deposit": 5000,
+      "owner_paid_registration": 2000
+    },
+    "drivers": [
+      {
+        "id": 1,
+        "name": "Mira",
+        "vehicle_id": 1000053,
+        "route_id": 2,
+        "next_stop": 0,
+        "running": false,
+        "status": "paused",
+        "trip": null,
+        "wages_earned": 66,
+        "wages_spent": 0,
+        "wage_fraction": 0.8999999999999999,
+        "stalled_seconds": 0.0,
+        "deliveries_completed": 0
+      }
+    ],
+    "routes": [
+      {
+        "id": 2,
+        "name": "Town service",
+        "stops": [
+          2,
+          3
+        ],
+        "service": {
+          "type": "passengers",
+          "count": 1
+        }
+      }
+    ]
+  },
+  "world_time_before": 1793015460.0478656,
+  "world_time_after": 1793015551.1477787,
+  "world_time_delta_seconds": 91.09991312026978,
+  "process_receipt": {
+    "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-native/confirmation-final-fleet-process.json",
+    "sha256": "cb806b461e73709baf9481c458abf2e54395a8fa867f188de1d6ece888bd5d55",
+    "bytes": 1165,
+    "mtime_ns": 1793366024634797045,
+    "mtime_utc": "2026-10-30T13:13:44.634797+00:00",
+    "pid": 79904,
+    "exit_code": 0,
+    "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+    "source_input_count": 390,
+    "source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+    "finished_source_inputs_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+    "source_inputs_unchanged": true
+  },
+  "build_receipt": {
+    "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-preflight/native-final-build-03.json",
+    "sha256": "fc353fdffddbb2232c946a3f844988a8b846aee78ab4356bc36918852c6d98fb",
+    "bytes": 1881,
+    "mtime_ns": 1793365779192396528,
+    "mtime_utc": "2026-10-30T13:09:39.192397+00:00",
+    "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+    "status": "passed"
+  },
+  "source_map": {
+    "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-preflight/native-final-build-03-inputs.json",
+    "sha256": "1b7dc0264668315eba39d8e10acbb9fcb34a9282263413db03085c06c5117407",
+    "bytes": 45656,
+    "mtime_ns": 1793365716133795727,
+    "mtime_utc": "2026-10-30T13:08:36.133796+00:00",
+    "canonical_map_sha256": "37d6c0e5a9e5170959980c86134501c1693a270d6c375253fa94bf642c834aaf",
+    "entries": 390
+  },
+  "process_log": {
+    "path": "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-native/confirmation-final-fleet.log",
+    "sha256": "9df714c6b00a3d092dfd158734dae82867e9505e613d0f8715ae20b6306cdc03",
+    "bytes": 1333,
+    "mtime_ns": 1793366024580017418,
+    "mtime_utc": "2026-10-30T13:13:44.580017+00:00"
+  },
+  "checks": {
+    "wrapper_schema_unchanged": true,
+    "domain_version_unchanged": true,
+    "world_identity_unchanged": true,
+    "player_id_unchanged": true,
+    "personal_money_minor_unchanged": true,
+    "inventory_unchanged": true,
+    "progress_unchanged": true,
+    "accepted_supply_ids_unchanged": true,
+    "fence_2_unchanged": true,
+    "company_name_unchanged": true,
+    "company_owner_unchanged": true,
+    "company_cash_minor_unchanged": true,
+    "company_revenue_minor_unchanged": true,
+    "company_totals_minor_unchanged": true,
+    "drivers_unchanged": true,
+    "routes_unchanged": true,
+    "actual_candidate_hash_retained": true,
+    "fresh_final_process_exit_and_source": true,
+    "process_names_actual_saved_copy": true,
+    "binary_receipts_agree": true,
+    "build_passed": true,
+    "source_map_file_bound_to_build": true,
+    "same_390_inputs_bound_to_process": true,
+    "process_log_bound": true,
+    "expected_final_values": true,
+    "stable_readback:candidate-world.json": true,
+    "stable_readback:confirmation-final-fleet.json": true,
+    "stable_readback:confirmation-final-fleet-process.json": true,
+    "stable_readback:native-final-build-03.json": true,
+    "stable_readback:native-final-build-03-inputs.json": true,
+    "stable_readback:confirmation-final-fleet.log": true
+  },
+  "limits": [
+    "The two saves have different whole-file bytes; normal time, needs and autonomous simulation may advance. Only listed gameplay invariants are asserted unchanged.",
+    "Binary identity is associated through the actual process/build receipts; this audit did not execute or rehash the native executable during canonical work.",
+    "No complete save was copied into the repository, no source or checkpoint was modified, and no Cargo/native process was started by this audit.",
+    "This is selected state evidence, not complete authoritative validation, reconstructed UI event history, final canonical totals, Windows/device qualification or final archive acceptance."
+  ]
+}

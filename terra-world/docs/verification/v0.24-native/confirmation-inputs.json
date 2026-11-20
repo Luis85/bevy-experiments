@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "recorded_utc": "2026-10-30T12:36:55.890757+00:00",
+  "checkpoints": [
+    {
+      "original_checkpoint": "candidate-building-checkpoint.json",
+      "confirmation_copy": "confirmation-building.json",
+      "bytes": 1769411,
+      "sha256": "412f4e8ff1369137e3f459bdd4e94532598a5c742cfdcffa785992f1cbdeacfe",
+      "exact_copy": true
+    },
+    {
+      "original_checkpoint": "candidate-world.json",
+      "confirmation_copy": "confirmation-fleet.json",
+      "bytes": 1776513,
+      "sha256": "932413c61bd2ee1cff5b5847eb9597afe5e5af946979e2d4b41d15b16484e516",
+      "exact_copy": true
+    }
+  ],
+  "building_controls": {
+    "sha256": "42319017ed584642732493bfacdce6006945ecca92334604fc0b034d9ff1f6bb",
+    "text_scale": 1.5,
+    "exact_copy_of_candidate_saved_preferences": true
+  },
+  "scope": "Actual F5/Save-and-quit checkpoints from the candidate; copied without semantic edits. Direct-play JSON requires explicit F9 review/restore. Final confirmation observations are separate."
+}

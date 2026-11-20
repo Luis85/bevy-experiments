@@ -1,0 +1,29 @@
+{
+  "release": "0.16.0",
+  "phase": "candidate",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--play",
+    "--config",
+    "/tmp/terra-native/comet-review-fixture-016/comet-config.json",
+    "--asset-pack",
+    "crates/terra-bevy/assets/character-demo.pack.json",
+    "--quality",
+    "performance",
+    "--no-atmosphere",
+    "--camp-view",
+    "--user-data",
+    "/tmp/terra-native/controls-016",
+    "--telemetry",
+    "/tmp/terra-native/v16-candidate-character-telemetry.json",
+    "--telemetry-interval-seconds",
+    "10"
+  ],
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next",
+  "started_utc": "2026-10-29T04:17:47.973192+00:00",
+  "binary_sha256": "90448c7b042d2d87f811dfbe442005543e696c67f898ff8a9d64db97c1be94db",
+  "source_input_count": 366,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 60092
+}

@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "observed_utc": "2026-10-29T21:33:41.950720+00:00",
+  "status": "passed",
+  "title": "My frontier",
+  "checkpoint_present": true,
+  "integrity": [
+    "ok"
+  ],
+  "generation": 60,
+  "stored_regions": 12,
+  "factions": {},
+  "next_domain_id": 3,
+  "player_id": 1,
+  "account": {
+    "player_id": 1,
+    "money": 25000,
+    "avatar_unit": 1000050,
+    "active_unit": 1000053,
+    "possessed": false
+  },
+  "player_inventory": {
+    "stone": 20,
+    "wheat_seed": 8,
+    "wood": 30
+  },
+  "clock": {
+    "paused": true,
+    "time_scale": 1.0,
+    "unix_seconds": 1793016308.299706
+  },
+  "files": {
+    "profile": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world.json",
+      "bytes": 1883,
+      "sha256": "7b515a043cb3a90c923243bb53a150dcc8a7279270c3cf7c8475a7cba27e55dc",
+      "unix_mode": "0o600"
+    },
+    "witness": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world-started.json",
+      "bytes": 607,
+      "sha256": "2cb7bf921f11e59e1cf7de65ca43d595093bb1535d9ed02f84aef14be48aaf00",
+      "unix_mode": "0o600"
+    },
+    "lease": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world-session.lock",
+      "bytes": 31,
+      "sha256": "0e48f48ce3b23f425253ea43359fcec5aa6bdbb2ad0bc92f6c14cae113315281",
+      "unix_mode": "0o600"
+    },
+    "database": {
+      "path": "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world.db",
+      "bytes": 3235840,
+      "sha256": "7b9206ad884cc4d9697967375d1e0a9a88346ff215f62d619eddb4d8391b8e07",
+      "unix_mode": "0o600"
+    }
+  },
+  "files_unchanged_during_read": true,
+  "scope": "Read-only inspection of a closed isolated native test world; SQLite integrity and observed saved values, not a power-loss or gameplay-balance qualification.",
+  "comparison": {
+    "previous_record_sha256": "d3e5d05e404fc360c094483506f97872b328d4405f20a3f32b53ef1a6f72a06c",
+    "witness_unchanged": true,
+    "lease_marker_unchanged": true,
+    "wallet_unchanged": true,
+    "inventory_unchanged": true,
+    "checkpoint_generation_increased": true,
+    "next_domain_id_not_rewound": true
+  }
+}

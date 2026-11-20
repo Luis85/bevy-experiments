@@ -18,3 +18,12 @@ rasters should be split into two explicitly georeferenced inputs.
 
 `generate.py` documents and regenerates the exact authored fixture using Python
 and Pillow. It is not needed by the Rust runtime.
+
+## Semantic valley bundle
+
+New launcher worlds use `manifest-v2.json`, which adds `features-v2.geojson`
+without changing the original manifest or raster. It contains original synthetic
+woodland, fields, an orchard and specimen trees. `generate_features.py` rebuilds
+these files independently of the v1 elevation generator. Separate attribution
+marks all of this land cover as synthetic. See the [bundle guide](../../../../docs/SOURCE_BUNDLES.md)
+for geometry limits and content-based source identity.

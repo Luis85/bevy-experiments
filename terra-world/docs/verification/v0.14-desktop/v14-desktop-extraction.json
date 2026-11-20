@@ -1,0 +1,10 @@
+{
+  "release": "0.14.0",
+  "package_root": "/tmp/terra-desktop-014/terra-world-0.14.0-linux-x86_64",
+  "archive_sha256": "57547e332d40aa532dd6524244736e488f6aa11f48a26cfcee20c83af46a1951",
+  "files": 179,
+  "all_manifest_files_match": true,
+  "crc_valid": true,
+  "executable_modes_preserved": true,
+  "accepted_native_binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531"
+}

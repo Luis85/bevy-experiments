@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "name": "Terra original Fieldhand character",
+  "author": "Terra World contributors",
+  "license": "MIT OR Apache-2.0",
+  "models": [
+    {
+      "id": "fieldhand",
+      "file": "fieldhand.glb",
+      "sha256": "b5d62261ee73a9a987b754b322ea95ce9d84941ca82e03c87de00568aa759b7e",
+      "scene": 0
+    }
+  ],
+  "bindings": [
+    {
+      "target": {
+        "type": "kind",
+        "value": "human"
+      },
+      "model": "fieldhand",
+      "scale": 1.0,
+      "ground_offset_m": 0.0,
+      "yaw_offset_degrees": 0.0,
+      "animation": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "feed": "idle",
+        "drink": "idle",
+        "walk_speed_m_s": 2.0,
+        "run_speed_m_s": 5.0,
+        "blend_seconds": 0.18,
+        "human": {
+          "seated": "seated",
+          "skin_material": "character_skin",
+          "hair_material": "character_hair",
+          "outfit_material": "character_outfit"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,2455 @@
+{
+  "schema_version": 1,
+  "package_version": "0.9.0",
+  "wire_protocol": 7,
+  "captured_at_utc": "2026-10-27T18:07:59.293987+00:00",
+  "command": "CARGO_BUILD_JOBS=2 cargo test --workspace --exclude terra-demo --exclude terra-bevy --offline --locked",
+  "status": "passed",
+  "distinct_rust_test_cases": 424,
+  "failed": 0,
+  "ignored": 0,
+  "doc_test_harnesses": 6,
+  "doc_test_examples": 0,
+  "by_crate": {
+    "terra-cli": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/main.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "tests::cli_rejects_unknown_and_duplicate_arguments",
+              "status": "ok"
+            },
+            {
+              "name": "tests::repeated_simulation_is_deterministic_and_bad_steps_fail",
+              "status": "ok"
+            },
+            {
+              "name": "tests::sandbox_demonstration_finishes_with_home_and_tool",
+              "status": "ok"
+            },
+            {
+              "name": "tests::complete_demo_save_preserves_every_f64_coordinate_exactly",
+              "status": "ok"
+            }
+          ],
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    "terra-core": {
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "contacts::tests::adjacent_lanes_and_overpass_are_separate",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::seam_and_polar_frames_remain_finite",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::construction_column_uses_oriented_dimensions_and_vertical_clearance",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::turning_corner_sweeps_and_touching_body_can_depart",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::invalid_input_never_returns_a_clear_path",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::initial_overlap_can_escape_but_not_push_deeper",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::invalid_or_zero_steps_never_mutate_state",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::continuous_sweep_stops_fast_body_at_first_contact",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::cornering_and_braking_share_the_available_contact_force",
+              "status": "ok"
+            },
+            {
+              "name": "contacts::tests::slope_vertical_crossing_is_continuous",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::fixed_input_is_deterministic_and_serialized_state_resumes_exactly",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::service_brake_holds_both_slopes_without_creep_and_release_rolls_downhill",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::subnormal_step_cannot_publish_infinite_acceleration_or_partial_state",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle_ground::tests::missing_invalid_and_rough_wheel_support_is_not_flat_pavement",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle_ground::tests::visual_spring_is_partition_stable_bounded_and_does_not_run_while_paused",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::underpass_clearance_uses_body_height_real_terrain_and_a_safety_margin",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::wet_grip_and_mass_affect_stopping_and_acceleration",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::vehicle_support_envelope_retains_model_length_across_heading_and_date_line",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle_ground::tests::four_wheel_support_follows_rotated_slopes_across_date_line",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::reverse_throttle_brakes_first_and_reverse_steering_changes_sign",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle::tests::throttle_accelerates_with_inertia_and_brakes_without_reversing",
+              "status": "ok"
+            }
+          ],
+          "passed": 21,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/domain.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "actors_cross_dateline_preserve_altitude_and_reject_bad_input",
+              "status": "ok"
+            },
+            {
+              "name": "calendar_handles_epoch_negative_time_and_leap_day",
+              "status": "ok"
+            },
+            {
+              "name": "solar_obeys_day_night_longitude_and_polar_seasons",
+              "status": "ok"
+            },
+            {
+              "name": "tiles_cover_poles_dateline_and_hierarchy",
+              "status": "ok"
+            },
+            {
+              "name": "local_frame_axes_and_roundtrip",
+              "status": "ok"
+            },
+            {
+              "name": "coordinate_validation_and_wrap",
+              "status": "ok"
+            },
+            {
+              "name": "height_field_interpolation_orientation_and_invalid_data",
+              "status": "ok"
+            },
+            {
+              "name": "wgs84_roundtrips_across_world_and_altitudes",
+              "status": "ok"
+            },
+            {
+              "name": "clock_pauses_and_rejects_bad_delta",
+              "status": "ok"
+            },
+            {
+              "name": "weather_wind_is_from_not_toward_and_biomes_are_explicit_heuristics",
+              "status": "ok"
+            },
+            {
+              "name": "seasons_are_opposite_and_weather_is_seeded",
+              "status": "ok"
+            },
+            {
+              "name": "domain_transport_roundtrip_preserves_provenance_and_layers",
+              "status": "ok"
+            }
+          ],
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    "terra-history": {
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/history.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "dates_are_utc_and_calendar_checked",
+              "status": "ok"
+            },
+            {
+              "name": "edited_geometry_and_view_bounds_are_checked_before_export_or_query",
+              "status": "ok"
+            },
+            {
+              "name": "exports_keep_holes_properties_faction_links_and_provenance",
+              "status": "ok"
+            },
+            {
+              "name": "holes_and_antimeridian_membership_are_preserved",
+              "status": "ok"
+            },
+            {
+              "name": "catalogs_accept_adjacent_eras_and_reject_ambiguous_coverage",
+              "status": "ok"
+            },
+            {
+              "name": "malformed_or_undated_politics_is_rejected",
+              "status": "ok"
+            },
+            {
+              "name": "pack_symlinks_cannot_escape_root",
+              "status": "ok"
+            },
+            {
+              "name": "pack_file_count_and_bytes_are_bounded",
+              "status": "ok"
+            },
+            {
+              "name": "pack_paths_duplicate_keys_and_false_provenance_are_rejected",
+              "status": "ok"
+            },
+            {
+              "name": "packs_refuse_wrong_epoch_or_missing_chunk_without_current_fallback",
+              "status": "ok"
+            },
+            {
+              "name": "temporal_switch_is_half_open_and_overlap_claims_are_not_arbitrated",
+              "status": "ok"
+            },
+            {
+              "name": "bundled_synthetic_eras_switch_geometry_and_faction_territories",
+              "status": "ok"
+            },
+            {
+              "name": "included_natural_earth_snapshot_is_current_provenanced_and_queries_germany",
+              "status": "ok"
+            }
+          ],
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    "terra-net": {
+      "passed": 111,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "client::tests::failed_resync_queue_admission_does_not_install_a_phantom_request",
+              "status": "ok"
+            },
+            {
+              "name": "prediction::tests::absent_terrain_horizon_body_change_and_pause_fail_closed",
+              "status": "ok"
+            },
+            {
+              "name": "prediction::tests::grounding_allowance_is_shared_by_entire_replay_not_repeated_per_frame",
+              "status": "ok"
+            },
+            {
+              "name": "prediction::tests::malformed_resolver_cannot_change_identity_speed_or_vertical_location",
+              "status": "ok"
+            },
+            {
+              "name": "prediction::tests::reconciles_only_unacknowledged_input_and_ignores_old_snapshots",
+              "status": "ok"
+            },
+            {
+              "name": "prediction::tests::vehicle_preview_uses_shared_dynamics_without_mutating_authority_or_inventory",
+              "status": "ok"
+            },
+            {
+              "name": "prediction::tests::vehicle_replay_resamples_surface_each_step_and_stops_at_unknown_wheels",
+              "status": "ok"
+            },
+            {
+              "name": "protocol::tests::interest_distance_wraps_the_dateline",
+              "status": "ok"
+            },
+            {
+              "name": "protocol::tests::positions_from_deserialization_still_require_validation",
+              "status": "ok"
+            },
+            {
+              "name": "protocol::tests::unknown_command_fields_are_rejected",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::actor_deltas_remove_departed_interest_and_keep_zero_change_heartbeats",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::selection_uses_keyframes_when_delta_is_larger_or_refresh_deadline_is_reached",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::sandbox_delta_roundtrip_preserves_stock_money_order_removals_and_nullable_home",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::missing_base_requests_keyframe_without_advancing_replica",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::actor_budget_and_invalid_values_are_enforced",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::constructed_structure_blocks_fast_authoritative_actor_motion",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::fixed_step_catches_up_with_a_strict_budget",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::invalid_configuration_is_reported_before_binding",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::delta_cannot_grow_collections_past_limits_or_mix_full_and_patch",
+              "status": "ok"
+            },
+            {
+              "name": "protocol::tests::maximum_bounded_sandbox_view_fits_a_single_frame",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::malformed_delta_rejects_atomically_and_cannot_reassign_private_recipient",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::model_sized_vehicle_sweep_honors_source_underpass_clearance_and_legacy_provider",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::vehicle_envelope_rejects_invalid_or_uncovered_returned_corner_support",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::vehicle_envelope_respects_coverage_with_custom_point_support",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::vehicle_source_sweep_cannot_jump_a_thin_wall_between_old_one_metre_samples",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::unchanged_view_delta_reduces_bytes_and_preserves_private_progress",
+              "status": "ok"
+            },
+            {
+              "name": "surface::tests::steep_resident_heightmap_rejects_ground_motion_and_building",
+              "status": "ok"
+            },
+            {
+              "name": "surface::tests::source_buildings_block_swept_motion_and_placement",
+              "status": "ok"
+            },
+            {
+              "name": "surface::tests::underpasses_distinguish_car_bus_and_current_support_height",
+              "status": "ok"
+            },
+            {
+              "name": "surface::tests::water_ship_and_bridge_support_follow_resident_source_geometry",
+              "status": "ok"
+            },
+            {
+              "name": "transport::tests::coalesced_frames_are_separate_messages",
+              "status": "ok"
+            },
+            {
+              "name": "transport::tests::fragmented_header_and_body_decode_once_complete",
+              "status": "ok"
+            },
+            {
+              "name": "transport::tests::malicious_length_is_rejected_before_body_allocation",
+              "status": "ok"
+            },
+            {
+              "name": "transport::tests::receive_buffer_and_serialize_budgets_are_enforced",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::authoritative_manual_vehicle_stops_at_dynamic_body_but_not_an_overpass",
+              "status": "ok"
+            },
+            {
+              "name": "session::tests::identity_is_atomic_bounded_and_pinned_to_server",
+              "status": "ok"
+            },
+            {
+              "name": "replication::tests::individually_small_patches_cannot_accumulate_an_oversized_baseline",
+              "status": "ok"
+            },
+            {
+              "name": "server::backpressure_tests::reliable_command_waits_for_response_headroom_and_executes_once_after_drain",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::vehicle_envelope_missing_coverage_stops_without_collision_wear",
+              "status": "ok"
+            },
+            {
+              "name": "server::tests::living_registration_rejection_leaves_no_player_account_or_session",
+              "status": "ok"
+            }
+          ],
+          "passed": 40,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "unittests src/bin/client.rs",
+          "kind": "rust_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "unittests src/bin/server.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "tests::reference_environment_preserves_wheel_material_and_body_clearance",
+              "status": "ok"
+            },
+            {
+              "name": "tests::spawn_residency_is_preserved_when_all_connected_players_are_far_away",
+              "status": "ok"
+            }
+          ],
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/delta_replication.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "client_detects_an_actual_wire_gap_requests_one_resync_and_recovers",
+              "status": "ok"
+            },
+            {
+              "name": "tcp_interest_removal_reaches_client_without_stale_ghost_actors",
+              "status": "ok"
+            },
+            {
+              "name": "server_reports_encoded_delta_bytes_against_full_snapshot_equivalents",
+              "status": "ok"
+            },
+            {
+              "name": "tcp_delta_views_converge_exactly_and_keep_each_players_wallet_private",
+              "status": "ok"
+            },
+            {
+              "name": "tcp_explicit_resync_installs_both_keyframes_and_rate_limits_repeated_requests",
+              "status": "ok"
+            }
+          ],
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/driving.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "protocol_four_client_is_rejected_before_principal_or_company_allocation",
+              "status": "ok"
+            },
+            {
+              "name": "nonzero_move_cannot_bypass_pedals_and_drive_shares_replay_protection",
+              "status": "ok"
+            },
+            {
+              "name": "tcp_company_ledgers_replicate_privately_and_replayed_transfers_do_not_pay_twice",
+              "status": "ok"
+            },
+            {
+              "name": "drive_cannot_take_over_an_unpossessed_or_other_players_vehicle",
+              "status": "ok"
+            },
+            {
+              "name": "tcp_pedal_intent_accelerates_steers_coasts_and_consumes_authoritative_fuel",
+              "status": "ok"
+            },
+            {
+              "name": "regional_checkpoint_restart_and_reconnect_keep_driver_vehicle_and_funded_job",
+              "status": "ok"
+            },
+            {
+              "name": "public_vehicle_and_hitch_deltas_preserve_other_driver_financial_privacy",
+              "status": "ok"
+            },
+            {
+              "name": "stale_input_timeout_brakes_the_vehicle_and_zero_move_is_an_explicit_stop",
+              "status": "ok"
+            }
+          ],
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/frontier_protocol.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "legacy_protocols_reject_before_allocating_saved_player_or_capability",
+              "status": "ok"
+            },
+            {
+              "name": "host_projects_ecology_onto_resident_heights_before_checking_source_footprints",
+              "status": "ok"
+            },
+            {
+              "name": "unloaded_terrain_defers_ecology_and_retries_after_residency_without_duplicates",
+              "status": "ok"
+            },
+            {
+              "name": "only_the_exact_archived_builtin_is_extended_by_living_opt_in",
+              "status": "ok"
+            },
+            {
+              "name": "exact_prior_living_catalog_upgrades_when_a_saved_living_world_is_resumed",
+              "status": "ok"
+            },
+            {
+              "name": "earlier_living_save_gains_ecology_without_resetting_existing_state_or_policy",
+              "status": "ok"
+            }
+          ],
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/loopback.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "incompatible_data_is_rejected_before_allocating_a_saved_identity",
+              "status": "ok"
+            },
+            {
+              "name": "movement_before_handshake_does_not_create_or_mutate_actor",
+              "status": "ok"
+            },
+            {
+              "name": "historical_epoch_and_political_revision_are_pinned_in_saves",
+              "status": "ok"
+            },
+            {
+              "name": "malformed_save_is_rejected_without_replacing_live_world",
+              "status": "ok"
+            },
+            {
+              "name": "malformed_network_frame_is_dropped_without_killing_server",
+              "status": "ok"
+            },
+            {
+              "name": "custom_game_catalog_and_new_player_equipment_survive_restart",
+              "status": "ok"
+            },
+            {
+              "name": "sandbox_target_requires_authoritative_terrain_support",
+              "status": "ok"
+            },
+            {
+              "name": "sandbox_commands_are_owned_transactional_and_replay_protected",
+              "status": "ok"
+            },
+            {
+              "name": "save_restart_and_resume_preserve_inventory_and_command_sequences",
+              "status": "ok"
+            },
+            {
+              "name": "small_pack_grounds_spawn_and_blocks_movement_outside_coverage",
+              "status": "ok"
+            },
+            {
+              "name": "snapshots_apply_interest_and_explicit_capacity",
+              "status": "ok"
+            },
+            {
+              "name": "resident_source_geometry_rejects_building_and_water_placement_atomically",
+              "status": "ok"
+            },
+            {
+              "name": "shared_faction_permissions_and_demotion_survive_player_resume",
+              "status": "ok"
+            },
+            {
+              "name": "two_clients_receive_one_authoritative_world_and_validated_movement",
+              "status": "ok"
+            },
+            {
+              "name": "disconnect_releases_manual_motion_and_resume_keeps_the_same_body_and_wallet",
+              "status": "ok"
+            },
+            {
+              "name": "delayed_needs_snapshot_clamps_valid_sprint_intent_without_disconnect",
+              "status": "ok"
+            },
+            {
+              "name": "living_trade_possession_rts_and_resume_are_authoritative",
+              "status": "ok"
+            }
+          ],
+          "passed": 17,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/network_conditions.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "conditioned_tcp_slow_reader_catches_up_without_starving_peer_or_losing_private_state",
+              "status": "ok"
+            },
+            {
+              "name": "conditioned_tls_slow_reader_catches_up_then_resumes_exactly_after_restart",
+              "status": "ok"
+            }
+          ],
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/operator_controls.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "provisioning_requires_traversable_resident_spawn_before_consuming_identity",
+              "status": "ok"
+            },
+            {
+              "name": "recovery_identity_requires_an_explicit_usable_client_endpoint_before_mutation",
+              "status": "ok"
+            },
+            {
+              "name": "operator_target_is_exact_and_audit_is_bounded_without_exposing_capabilities",
+              "status": "ok"
+            },
+            {
+              "name": "provisioning_enforces_capacity_and_endpoint_before_any_state_change",
+              "status": "ok"
+            },
+            {
+              "name": "resume_only_host_provisions_a_durable_dormant_principal_without_guest_registration",
+              "status": "ok"
+            },
+            {
+              "name": "resume_only_rejects_guests_invalid_tokens_and_suspended_owners_before_hydration",
+              "status": "ok"
+            },
+            {
+              "name": "suspension_and_rotation_are_durable_private_and_preserve_the_same_principal",
+              "status": "ok"
+            },
+            {
+              "name": "provisioned_dormant_crews_still_count_against_living_capacity",
+              "status": "ok"
+            },
+            {
+              "name": "failed_provisioning_does_not_consume_ids_capabilities_or_change_cold_residency",
+              "status": "ok"
+            },
+            {
+              "name": "failed_operator_commit_preserves_connected_peer_policy_money_and_capability",
+              "status": "ok"
+            }
+          ],
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/owner_dormancy.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "disconnected_owner_retires_bodies_home_and_resumes_exact_identity_after_host_restart",
+              "status": "ok"
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/prediction.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "owner_acknowledges_only_a_completed_step_and_never_another_players_motion",
+              "status": "ok"
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/regional_persistence.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "prepared_source_batch_hydrates_in_background_without_simulating_dormant_records",
+              "status": "ok"
+            },
+            {
+              "name": "complete_export_cannot_overwrite_database_companions_or_file_aliases",
+              "status": "ok"
+            },
+            {
+              "name": "live_connections_prevent_store_replacement",
+              "status": "ok"
+            },
+            {
+              "name": "dormant_source_depletion_and_destruction_survive_export_revisit_and_restart",
+              "status": "ok"
+            },
+            {
+              "name": "already_connected_resume_is_rejected_without_any_hydration_or_checkpoint",
+              "status": "ok"
+            },
+            {
+              "name": "invalid_private_host_metadata_cannot_replace_a_running_world",
+              "status": "ok"
+            },
+            {
+              "name": "source_feature_tombstone_stays_active_until_all_contributing_tiles_evict",
+              "status": "ok"
+            },
+            {
+              "name": "server_json_migration_validates_host_metadata_and_never_overwrites",
+              "status": "ok"
+            },
+            {
+              "name": "store_identity_and_catalog_guards_reject_without_replacing_current_world",
+              "status": "ok"
+            },
+            {
+              "name": "stale_host_checkpoint_cannot_overwrite_committed_regions_or_mutate_live_state",
+              "status": "ok"
+            },
+            {
+              "name": "unauthenticated_commands_and_obsolete_hello_do_not_activate_cold_pages",
+              "status": "ok"
+            },
+            {
+              "name": "regional_restart_preserves_principal_wallet_inventory_clock_and_command_sequence",
+              "status": "ok"
+            },
+            {
+              "name": "continuous_driving_focus_and_ping_advance_without_per_input_storage_barriers",
+              "status": "ok"
+            },
+            {
+              "name": "failed_commit_holds_success_responses_and_blocks_new_input_until_recovery",
+              "status": "ok"
+            }
+          ],
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/tls_transport.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "invalid_or_oversized_tls_configuration_is_rejected_before_binding",
+              "status": "ok"
+            },
+            {
+              "name": "obsolete_protocol_alpn_is_rejected_before_application_admission",
+              "status": "ok"
+            },
+            {
+              "name": "plaintext_peer_cannot_be_admitted_to_tls_listener_and_other_peers_continue",
+              "status": "ok"
+            },
+            {
+              "name": "untrusted_ca_and_wrong_hostname_fail_before_player_admission",
+              "status": "ok"
+            },
+            {
+              "name": "trusted_tls_handshake_supports_commands_and_resume_identity",
+              "status": "ok"
+            }
+          ],
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    "terra-persistence": {
+      "passed": 32,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "tests::aliases_through_symbolic_and_hard_links_are_rejected_before_output_writes",
+              "status": "ok"
+            },
+            {
+              "name": "tests::a_views_only_foreign_database_is_rejected_without_initializing_terra_tables",
+              "status": "ok"
+            },
+            {
+              "name": "tests::a_zero_generation_with_payload_is_corruption_not_a_new_world",
+              "status": "ok"
+            },
+            {
+              "name": "tests::crash_writer_child",
+              "status": "ok"
+            },
+            {
+              "name": "tests::a_committed_deletion_and_cross_region_move_do_not_resurrect_records",
+              "status": "ok"
+            },
+            {
+              "name": "tests::cached_encoding_never_certifies_semantically_forged_external_payloads",
+              "status": "ok"
+            },
+            {
+              "name": "tests::dormant_resident_owned_courier_is_not_assigned_new_public_work",
+              "status": "ok"
+            },
+            {
+              "name": "tests::checkpoint_pages_real_records_and_restart_preserves_depletion_and_ledger",
+              "status": "ok"
+            },
+            {
+              "name": "tests::bounded_worker_keeps_visible_state_and_polling_responsive_while_sqlite_is_locked",
+              "status": "ok"
+            },
+            {
+              "name": "tests::corrupted_payload_is_not_installed_or_silently_recreated",
+              "status": "ok"
+            },
+            {
+              "name": "tests::discarded_restore_result_cannot_make_hydrate_accept_an_old_partial_view",
+              "status": "ok"
+            },
+            {
+              "name": "tests::abrupt_process_exit_recovers_committed_and_uncommitted_transactions",
+              "status": "ok"
+            },
+            {
+              "name": "tests::external_descriptor_edits_cannot_relabel_an_open_authority_or_its_archive",
+              "status": "ok"
+            },
+            {
+              "name": "tests::hydrate_before_registration_does_not_reseed_depleted_nodes",
+              "status": "ok"
+            },
+            {
+              "name": "tests::foreign_world_catalog_level_and_schema_are_rejected_without_resetting_database",
+              "status": "ok"
+            },
+            {
+              "name": "tests::new_database_is_private_and_symlinks_are_rejected",
+              "status": "ok"
+            },
+            {
+              "name": "tests::opening_an_existing_store_requires_restore_before_mutating",
+              "status": "ok"
+            },
+            {
+              "name": "tests::incremental_checkpoint_reuses_unchanged_payloads_and_writes_only_changed_pages",
+              "status": "ok"
+            },
+            {
+              "name": "tests::failed_incremental_commit_keeps_prior_payloads_metrics_and_residency",
+              "status": "ok"
+            },
+            {
+              "name": "tests::output_and_backup_destinations_cannot_alias_database_or_reserved_sidecars",
+              "status": "ok"
+            },
+            {
+              "name": "tests::online_backup_reads_committed_wal_and_refuses_to_replace_existing_files",
+              "status": "ok"
+            },
+            {
+              "name": "tests::bounds_reject_bad_region_keys_and_oversized_metadata_before_mutation",
+              "status": "ok"
+            },
+            {
+              "name": "tests::rejected_host_metadata_preserves_the_old_residency_cursor_for_retry",
+              "status": "ok"
+            },
+            {
+              "name": "tests::transaction_failure_rolls_back_pages_metadata_generation_and_live_state",
+              "status": "ok"
+            },
+            {
+              "name": "tests::portable_operations_preserve_complete_private_world_and_refuse_overwrite",
+              "status": "ok"
+            },
+            {
+              "name": "tests::unexpected_sql_triggers_cannot_turn_a_successful_checkpoint_into_data_loss",
+              "status": "ok"
+            },
+            {
+              "name": "tests::same_generation_edit_after_snapshot_composition_cannot_be_overwritten",
+              "status": "ok"
+            },
+            {
+              "name": "tests::stale_writer_cannot_overwrite_newer_committed_money_or_pages",
+              "status": "ok"
+            },
+            {
+              "name": "tests::worker_drop_drains_submitted_checkpoint_in_order",
+              "status": "ok"
+            },
+            {
+              "name": "tests::verified_partition_cache_skips_repeat_decode_but_not_external_corruption",
+              "status": "ok"
+            },
+            {
+              "name": "tests::worker_failure_preserves_state_and_generation_then_retry_commits",
+              "status": "ok"
+            },
+            {
+              "name": "tests::owned_legacy_courier_retires_with_exact_cargo_and_resumes_without_offline_retries",
+              "status": "ok"
+            }
+          ],
+          "passed": 32,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    "terra-sandbox": {
+      "passed": 206,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "living::contacts::tests::autonomous_vehicle_cannot_tunnel_through_a_parked_vehicle",
+              "status": "ok"
+            },
+            {
+              "name": "living::routing::tests::open_road_patrol_returns_in_opposite_lane_and_closes_without_reversal",
+              "status": "ok"
+            },
+            {
+              "name": "living::routing::tests::opposite_vehicle_directions_use_separate_lanes_and_exact_stops",
+              "status": "ok"
+            },
+            {
+              "name": "living::routing::tests::road_access_projects_to_segment_without_detouring_to_its_endpoint",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::perpendicular_clearance_is_bounded_to_a_stationary_outward_corner",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::updated_bodies_outside_original_index_are_still_obstacles",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::sequentially_moving_sparse_bodies_keep_contact_work_local",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::walking_avatar_can_exit_a_vehicle_overlap_in_any_direction",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::vehicle_clears_its_rear_before_turning_without_bypassing_terrain_or_speed",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::occupied_avatar_is_not_a_vehicle_obstacle_and_parked_bodies_are",
+              "status": "ok"
+            },
+            {
+              "name": "living::contacts::tests::legacy_walking_path_goes_around_a_vehicle_with_bounded_admitted_steps",
+              "status": "ok"
+            }
+          ],
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/companies.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "company_private_replica_rejects_another_owner_and_legacy_saves_add_no_company",
+              "status": "ok"
+            },
+            {
+              "name": "depot_households_create_finite_recurrent_demand_and_return_earned_money_to_services",
+              "status": "ok"
+            },
+            {
+              "name": "driver_paused_before_disconnect_stays_parked_after_hydration",
+              "status": "ok"
+            },
+            {
+              "name": "blocked_route_stops_payroll_with_load_intact_until_explicit_resume",
+              "status": "ok"
+            },
+            {
+              "name": "dismissing_an_employee_preserves_earned_wallet_and_settles_fractional_final_pay",
+              "status": "ok"
+            },
+            {
+              "name": "dormant_owner_freezes_employee_payroll_and_loads_without_catchup",
+              "status": "ok"
+            },
+            {
+              "name": "company_runs_actual_physical_passenger_route_and_conserves_money_and_people",
+              "status": "ok"
+            },
+            {
+              "name": "full_source_retains_cancelled_company_cargo_and_escrow_until_space_exists",
+              "status": "ok"
+            },
+            {
+              "name": "fractional_payroll_is_independent_of_frame_chunking_and_survives_reassignment",
+              "status": "ok"
+            },
+            {
+              "name": "invalid_company_mutations_are_atomic_and_route_names_and_capacity_are_bounded",
+              "status": "ok"
+            },
+            {
+              "name": "issuer_starvation_preserves_source_and_queues_without_hidden_payroll",
+              "status": "ok"
+            },
+            {
+              "name": "owned_depot_waives_only_onsite_callout_and_never_fuel_or_repair_value",
+              "status": "ok"
+            },
+            {
+              "name": "full_mixed_item_producer_preserves_fleet_cargo_and_fare_until_capacity_is_freed",
+              "status": "ok"
+            },
+            {
+              "name": "private_depot_conserves_items_enforces_capacity_and_survives_restore_without_public_exposure",
+              "status": "ok"
+            },
+            {
+              "name": "public_service_contribution_restarts_funded_work_without_creating_currency",
+              "status": "ok"
+            },
+            {
+              "name": "handover_rejects_distance_ownership_capacity_motion_and_duplicate_mutations_atomically",
+              "status": "ok"
+            },
+            {
+              "name": "loaded_pause_finishes_delivery_rejects_takeover_and_survives_json_resume",
+              "status": "ok"
+            },
+            {
+              "name": "roadside_quote_ownership_reach_funds_motion_and_source_denials_are_atomic",
+              "status": "ok"
+            },
+            {
+              "name": "zero_payroll_prevents_motion_and_deposit_resumes_without_minting_wages",
+              "status": "ok"
+            },
+            {
+              "name": "held_loaded_company_returns_physically_and_refunds_exactly_once_after_restore",
+              "status": "ok"
+            },
+            {
+              "name": "nearby_handover_preserves_physical_proof_wallets_and_load_without_moving_bodies",
+              "status": "ok"
+            },
+            {
+              "name": "freight_follows_ordered_waypoint_delivers_real_stock_and_stops_at_finite_demand",
+              "status": "ok"
+            },
+            {
+              "name": "roadside_service_recovers_loaded_fuel_and_repair_failures_without_losing_commitments",
+              "status": "ok"
+            },
+            {
+              "name": "cold_regional_company_restores_passenger_and_freight_escrow_without_offline_payroll",
+              "status": "ok"
+            }
+          ],
+          "passed": 24,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/company_depots.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "capped_buyer_refund_keeps_goods_and_escrow_until_a_real_sale_makes_money_space",
+              "status": "ok"
+            },
+            {
+              "name": "sale_waits_for_real_buyer_funds_and_returns_every_reserved_credit_and_item",
+              "status": "ok"
+            },
+            {
+              "name": "loaded_sale_survives_dormancy_partition_restart_and_rejects_forged_escrow_or_reserved_space",
+              "status": "ok"
+            },
+            {
+              "name": "warehouse_sale_reserves_buyer_cash_refund_space_and_pays_only_after_physical_delivery",
+              "status": "ok"
+            },
+            {
+              "name": "warehouse_handover_moves_buyer_commitment_and_space_reservation_exactly_once",
+              "status": "ok"
+            },
+            {
+              "name": "private_transfer_reserves_mixed_capacity_uses_own_bays_and_has_no_public_fare",
+              "status": "ok"
+            },
+            {
+              "name": "nearby_market_trades_company_cash_and_private_stock_with_exact_quote_rollback",
+              "status": "ok"
+            },
+            {
+              "name": "failed_market_capacity_inventory_and_payer_checks_publish_no_partial_trade",
+              "status": "ok"
+            },
+            {
+              "name": "six_session_warehouse_career_conserves_finite_goods_cash_and_recovers_scarcity",
+              "status": "ok"
+            }
+          ],
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/ecology.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "gathered_regrowing_and_finite_nodes_keep_distinct_lifecycle",
+              "status": "ok"
+            },
+            {
+              "name": "custom_catalog_skips_unknown_and_unharvestable_resource_types",
+              "status": "ok"
+            },
+            {
+              "name": "nearby_seed_creates_distinct_bounded_species_and_natural_nodes",
+              "status": "ok"
+            },
+            {
+              "name": "inactive_hours_rest_and_grazing_replenishes_needs",
+              "status": "ok"
+            },
+            {
+              "name": "chunk_resource_elevation_is_sampled_and_reloads_do_not_refill",
+              "status": "ok"
+            },
+            {
+              "name": "absent_terrain_blocks_new_bodies_and_does_not_commit_empty_starter_seed",
+              "status": "ok"
+            },
+            {
+              "name": "people_trigger_flee_and_undisturbed_wildlife_resume_normal_behavior",
+              "status": "ok"
+            },
+            {
+              "name": "shoreline_and_ore_nodes_require_available_catalog_tools_and_enforce_gathering",
+              "status": "ok"
+            },
+            {
+              "name": "recovery_is_delayed_and_never_exceeds_carrying_capacity",
+              "status": "ok"
+            },
+            {
+              "name": "v2_save_migrates_empty_ecology_and_updated_catalog_example_matches",
+              "status": "ok"
+            },
+            {
+              "name": "malformed_metadata_and_configuration_reject_without_mutation",
+              "status": "ok"
+            },
+            {
+              "name": "tool_admission_is_atomic_and_improved_tool_is_accepted",
+              "status": "ok"
+            },
+            {
+              "name": "thirsty_animals_seek_accessible_water_before_hydrating",
+              "status": "ok"
+            },
+            {
+              "name": "views_only_carry_visible_metadata_and_survive_budget_trimming",
+              "status": "ok"
+            }
+          ],
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/factions.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "faction_snapshot_prioritizes_memberships_and_reports_truncation",
+              "status": "ok"
+            },
+            {
+              "name": "plot_transfer_cannot_expropriate_another_players_property",
+              "status": "ok"
+            },
+            {
+              "name": "faction_rosters_roundtrip_inside_internally_tagged_network_envelopes",
+              "status": "ok"
+            },
+            {
+              "name": "invitations_and_role_grants_prevent_self_join_and_escalation",
+              "status": "ok"
+            },
+            {
+              "name": "additive_faction_fields_keep_personal_v1_saves_readable",
+              "status": "ok"
+            },
+            {
+              "name": "transferring_land_also_transfers_assets_and_roles_control_shared_mutation",
+              "status": "ok"
+            },
+            {
+              "name": "faction_persistence_rejects_invalid_rosters_and_retains_shared_ownership",
+              "status": "ok"
+            }
+          ],
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/gameplay.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "builtin_catalog_roundtrips_and_rejects_unknown_materials",
+              "status": "ok"
+            },
+            {
+              "name": "crafting_failure_is_atomic_and_checked_against_overflow",
+              "status": "ok"
+            },
+            {
+              "name": "farming_requires_ownership_readiness_and_single_harvest",
+              "status": "ok"
+            },
+            {
+              "name": "ownership_and_three_dimensional_reach_prevent_remote_actions",
+              "status": "ok"
+            },
+            {
+              "name": "house_build_home_and_demolition_have_no_refund_duplication",
+              "status": "ok"
+            },
+            {
+              "name": "custom_catalog_registration_checks_equipment_before_registering_player",
+              "status": "ok"
+            },
+            {
+              "name": "owning_a_clipped_source_way_does_not_allow_global_geometry_removal",
+              "status": "ok"
+            },
+            {
+              "name": "resource_counts_survive_reloading_and_regrow_without_tick_loops",
+              "status": "ok"
+            },
+            {
+              "name": "source_removal_is_overlay_only_and_does_not_resurrect",
+              "status": "ok"
+            },
+            {
+              "name": "tool_requires_owned_nearby_workbench",
+              "status": "ok"
+            },
+            {
+              "name": "snapshots_are_interest_filtered_and_hard_bounded",
+              "status": "ok"
+            },
+            {
+              "name": "catalog_aware_restore_rejects_changed_blueprints_and_crop_yields",
+              "status": "ok"
+            },
+            {
+              "name": "persistence_roundtrip_rejects_version_and_broken_ownership",
+              "status": "ok"
+            },
+            {
+              "name": "construction_respects_other_owners_rented_bus_body_and_preserves_clear_space",
+              "status": "ok"
+            }
+          ],
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/living.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "construction_cannot_trap_a_body_and_extreme_rts_altitudes_reject_atomically",
+              "status": "ok"
+            },
+            {
+              "name": "facility_geometry_and_forecourt_routing_match_swept_collision",
+              "status": "ok"
+            },
+            {
+              "name": "a_vehicle_turning_at_a_waypoint_does_not_yield_to_its_previous_following_queue",
+              "status": "ok"
+            },
+            {
+              "name": "parked_owned_rover_is_not_a_same_direction_traffic_queue",
+              "status": "ok"
+            },
+            {
+              "name": "only_owner_may_operate_sites_and_save_rejects_cargo_and_account_tampering",
+              "status": "ok"
+            },
+            {
+              "name": "needs_are_per_body_and_consumption_rest_and_speed_are_connected",
+              "status": "ok"
+            },
+            {
+              "name": "repeated_source_roads_keep_unique_stable_segment_ids_in_saved_and_wire_state",
+              "status": "ok"
+            },
+            {
+              "name": "possession_keeps_identity_inventory_and_original_body",
+              "status": "ok"
+            },
+            {
+              "name": "regional_view_marks_all_supported_entity_and_geometry_reductions",
+              "status": "ok"
+            },
+            {
+              "name": "rts_active_selection_preserves_orders_and_changes_interaction_body",
+              "status": "ok"
+            },
+            {
+              "name": "rts_orders_are_owned_atomic_and_collision_checked_before_progress",
+              "status": "ok"
+            },
+            {
+              "name": "shop_cannot_buy_with_missing_cash_and_amount_overflow_rejects",
+              "status": "ok"
+            },
+            {
+              "name": "v1_save_missing_living_field_migrates_without_minting_anything",
+              "status": "ok"
+            },
+            {
+              "name": "rejected_demo_seed_leaves_the_previous_world_unchanged",
+              "status": "ok"
+            },
+            {
+              "name": "snapshot_is_bounded_hides_other_wallets_and_serializes_in_tagged_envelope",
+              "status": "ok"
+            },
+            {
+              "name": "traffic_starts_are_separated_and_have_valid_forward_waypoints",
+              "status": "ok"
+            },
+            {
+              "name": "untrusted_living_views_reject_duplicates_nonfinite_fields_and_unowned_control",
+              "status": "ok"
+            },
+            {
+              "name": "trading_is_atomic_and_conserves_money_and_stock",
+              "status": "ok"
+            },
+            {
+              "name": "finite_sources_production_and_deliveries_are_material_conserving",
+              "status": "ok"
+            },
+            {
+              "name": "populated_settlement_delivers_with_facility_collision_and_traffic_enabled",
+              "status": "ok"
+            }
+          ],
+          "passed": 20,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/logistics.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "dispatch_reserves_source_stock_across_all_couriers",
+              "status": "ok"
+            },
+            {
+              "name": "stalled_delivery_metadata_is_validated_and_missing_legacy_fields_default",
+              "status": "ok"
+            },
+            {
+              "name": "road_graph_uses_connections_and_repeated_queries_are_deterministic",
+              "status": "ok"
+            },
+            {
+              "name": "stranded_pickup_releases_reservation_without_removing_goods",
+              "status": "ok"
+            },
+            {
+              "name": "dispatch_books_both_service_bays_without_blocking_independent_pairs",
+              "status": "ok"
+            },
+            {
+              "name": "blocked_loaded_courier_physically_returns_cargo_without_loss",
+              "status": "ok"
+            }
+          ],
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/regions.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "cross_region_resource_references_load_as_one_dependency_closed_set",
+              "status": "ok"
+            },
+            {
+              "name": "certified_environment_keeps_cold_construction_dependent_on_current_land_rights",
+              "status": "ok"
+            },
+            {
+              "name": "certified_environment_rejects_duplicate_ids_without_mutating_the_proof",
+              "status": "ok"
+            },
+            {
+              "name": "cold_record_conflict_fails_atomically_and_invalid_interest_is_rejected",
+              "status": "ok"
+            },
+            {
+              "name": "forged_dependency_graph_and_misplaced_or_duplicate_records_are_rejected",
+              "status": "ok"
+            },
+            {
+              "name": "cold_animal_population_reserves_capacity_during_passive_recovery",
+              "status": "ok"
+            },
+            {
+              "name": "certified_environment_preserves_cross_page_source_links_and_excludes_ecology_policy",
+              "status": "ok"
+            },
+            {
+              "name": "empty_requested_regions_are_owned_for_later_seed_and_deletion_persists",
+              "status": "ok"
+            },
+            {
+              "name": "metric_pins_cover_nearby_records_beyond_one_ring_at_high_latitude_and_dateline",
+              "status": "ok"
+            },
+            {
+              "name": "dormant_environment_freezes_while_global_clocks_and_owned_needs_advance",
+              "status": "ok"
+            },
+            {
+              "name": "dormant_owner_bodies_and_home_retire_without_losing_private_references",
+              "status": "ok"
+            },
+            {
+              "name": "geographic_partition_round_trips_every_domain_without_refilling",
+              "status": "ok"
+            },
+            {
+              "name": "homes_ownership_accounts_and_physical_cargo_remain_valid_without_environment",
+              "status": "ok"
+            },
+            {
+              "name": "migrating_actor_merges_with_existing_cold_region_without_duplication",
+              "status": "ok"
+            },
+            {
+              "name": "immutable_partition_proof_matches_checked_paths_and_rejects_forged_dependencies",
+              "status": "ok"
+            },
+            {
+              "name": "polar_metric_pins_keep_physically_overlapping_buildings_at_different_longitudes",
+              "status": "ok"
+            },
+            {
+              "name": "poles_and_date_line_round_trip_without_region_aliasing",
+              "status": "ok"
+            },
+            {
+              "name": "owned_wildlife_pins_its_habitat_and_closes_dependencies",
+              "status": "ok"
+            },
+            {
+              "name": "partial_save_is_rejected_and_serialization_preserves_the_marker",
+              "status": "ok"
+            },
+            {
+              "name": "owned_wildlife_age_and_behavior_freeze_even_when_an_observer_loads_its_habitat",
+              "status": "ok"
+            },
+            {
+              "name": "offline_owned_bodies_remain_frozen_when_a_region_is_hot",
+              "status": "ok"
+            },
+            {
+              "name": "wildlife_crossing_region_boundary_retains_habitat_and_resource_dependencies",
+              "status": "ok"
+            },
+            {
+              "name": "retained_bodies_pin_nearby_environment_when_camera_interest_moves_elsewhere",
+              "status": "ok"
+            },
+            {
+              "name": "private_cold_descriptors_cannot_bypass_complete_save_or_owner_validation",
+              "status": "ok"
+            },
+            {
+              "name": "certified_environment_merge_matches_complete_validation_across_mutation_and_residency",
+              "status": "ok"
+            },
+            {
+              "name": "cold_resources_reserve_total_capacity_before_new_seed_mutates_state",
+              "status": "ok"
+            }
+          ],
+          "passed": 26,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/rentals.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "expired_rental_keeps_loaded_company_trip_until_renewal_and_physical_return",
+              "status": "ok"
+            },
+            {
+              "name": "rental_admission_and_refund_denials_are_atomic_and_owner_private",
+              "status": "ok"
+            },
+            {
+              "name": "rental_expiry_stops_motion_without_repossessing_and_remote_renewal_keeps_identity",
+              "status": "ok"
+            },
+            {
+              "name": "rental_clocks_freeze_during_dormancy_and_survive_cold_region_restoration",
+              "status": "ok"
+            },
+            {
+              "name": "exhausted_fuel_or_rental_capacity_rejects_purchase_without_escrow_or_new_body",
+              "status": "ok"
+            },
+            {
+              "name": "rental_purchase_renewal_and_damaged_return_conserve_bond_money_and_fuel",
+              "status": "ok"
+            },
+            {
+              "name": "rental_refund_full_wallet_or_empty_issuer_preserves_vehicle_and_bond",
+              "status": "ok"
+            }
+          ],
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/scaling.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "persisted_player_does_not_grant_near_priority_without_an_active_observer",
+              "status": "ok"
+            },
+            {
+              "name": "schedule_inputs_reject_atomically_and_clock_rewind_resets_runtime_budget",
+              "status": "ok"
+            },
+            {
+              "name": "interest_index_rejects_other_world_and_rebuild_tracks_removal",
+              "status": "ok"
+            },
+            {
+              "name": "spatial_inputs_and_duplicate_keys_reject_without_unbounded_grid_walks",
+              "status": "ok"
+            },
+            {
+              "name": "far_decision_budget_is_fair_and_avoids_scanning_every_threat",
+              "status": "ok"
+            },
+            {
+              "name": "approaching_observer_and_vehicle_threat_bypass_far_budget",
+              "status": "ok"
+            },
+            {
+              "name": "sphere_grid_matches_scan_across_dateline_poles_and_altitudes",
+              "status": "ok"
+            },
+            {
+              "name": "prior_living_metrics_load_with_zero_spatial_work_counters",
+              "status": "ok"
+            },
+            {
+              "name": "index_reduces_candidates_without_changing_large_point_query_results",
+              "status": "ok"
+            },
+            {
+              "name": "traffic_broad_phase_preserves_yielding_and_bounds_separated_vehicle_work",
+              "status": "ok"
+            },
+            {
+              "name": "indexed_snapshot_matches_all_overlay_layers_and_private_actor_rules",
+              "status": "ok"
+            },
+            {
+              "name": "scheduled_unknown_ground_rejects_targets_and_births",
+              "status": "ok"
+            },
+            {
+              "name": "scheduling_preserves_full_rate_resources_needs_production_and_physical_motion",
+              "status": "ok"
+            }
+          ],
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/settlements.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "contract_capacity_privacy_and_cancel_reopen_are_bounded",
+              "status": "ok"
+            },
+            {
+              "name": "contract_failure_keeps_escrow_and_stock_and_respects_spatial_reach",
+              "status": "ok"
+            },
+            {
+              "name": "faction_builder_can_operate_territory_but_ordinary_member_cannot",
+              "status": "ok"
+            },
+            {
+              "name": "expired_work_reopens_without_refunding_or_minting_escrow",
+              "status": "ok"
+            },
+            {
+              "name": "founding_costs_and_treasury_are_atomic_and_conserved",
+              "status": "ok"
+            },
+            {
+              "name": "neighborhood_to_city_uses_real_infrastructure_and_project_costs",
+              "status": "ok"
+            },
+            {
+              "name": "new_consumables_restore_needs_without_allowing_raw_fish",
+              "status": "ok"
+            },
+            {
+              "name": "funded_resident_pay_requires_productive_activity_and_conserves_money",
+              "status": "ok"
+            },
+            {
+              "name": "contributions_reject_unneeded_or_excess_stock_before_mutation",
+              "status": "ok"
+            },
+            {
+              "name": "personal_territory_cannot_be_bypassed_by_faction_plot_transfer",
+              "status": "ok"
+            },
+            {
+              "name": "optional_resource_prices_follow_custom_catalog_without_refilling_stock",
+              "status": "ok"
+            },
+            {
+              "name": "scarce_prices_are_anchored_and_no_resale_quote_exceeds_lowest_buy_quote",
+              "status": "ok"
+            },
+            {
+              "name": "supply_contract_moves_goods_into_production_and_pays_escrow_once",
+              "status": "ok"
+            },
+            {
+              "name": "territory_blocks_outsider_land_without_confiscating_existing_plots",
+              "status": "ok"
+            },
+            {
+              "name": "settlement_state_and_private_views_survive_serialization_and_reject_corruption",
+              "status": "ok"
+            },
+            {
+              "name": "upgrade_rejects_foreign_property_in_expanded_region_atomically",
+              "status": "ok"
+            },
+            {
+              "name": "territory_extraction_is_personal_or_shared_with_current_faction_members",
+              "status": "ok"
+            },
+            {
+              "name": "territory_plot_capacity_and_shared_plot_inheritance_are_enforced",
+              "status": "ok"
+            }
+          ],
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/traffic.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "directed_graph_connects_clipped_crossings_and_rejects_wrong_way_shortcuts",
+              "status": "ok"
+            },
+            {
+              "name": "cached_road_changes_stale_regional_ids_and_ticket_extremes_are_safe",
+              "status": "ok"
+            },
+            {
+              "name": "grade_separation_and_date_line_geometry_do_not_create_false_intersections",
+              "status": "ok"
+            },
+            {
+              "name": "numeric_speed_limit_is_obeyed_without_accelerated_calendar_motion",
+              "status": "ok"
+            },
+            {
+              "name": "manual_approach_and_occupancy_block_automatic_admission_without_trusting_a_permit",
+              "status": "ok"
+            },
+            {
+              "name": "blocked_exit_does_not_hold_up_an_unrelated_clear_turn",
+              "status": "ok"
+            },
+            {
+              "name": "reverse_one_way_population_uses_reversed_segment_lengths_without_bunching",
+              "status": "ok"
+            },
+            {
+              "name": "supported_source_rules_are_explicit_and_legacy_roads_remain_compatible",
+              "status": "ok"
+            },
+            {
+              "name": "occupied_junction_never_expires_and_large_steps_stay_behind_stop_lines",
+              "status": "ok"
+            },
+            {
+              "name": "stalled_grant_requeues_after_physical_timeout_and_hold_prunes_reservations",
+              "status": "ok"
+            },
+            {
+              "name": "four_way_arrivals_clear_fifo_without_overlapping_and_survive_save_resume",
+              "status": "ok"
+            },
+            {
+              "name": "facility_corner_budget_never_degrades_a_directed_route_into_a_shortcut",
+              "status": "ok"
+            }
+          ],
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/transport.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "all_vehicle_definitions_have_valid_distinct_physical_capabilities",
+              "status": "ok"
+            },
+            {
+              "name": "active_cargo_driver_profile_and_handling_survive_save_and_regional_roundtrip",
+              "status": "ok"
+            },
+            {
+              "name": "expiry_uses_physical_time_and_requires_loaded_payload_return",
+              "status": "ok"
+            },
+            {
+              "name": "expired_uncollected_jobs_refund_without_loss_and_do_not_reset_issuer_capital",
+              "status": "ok"
+            },
+            {
+              "name": "driver_needs_reduce_manual_vehicle_cap_without_changing_fleet_mechanics",
+              "status": "ok"
+            },
+            {
+              "name": "freight_requires_pickup_and_arrival_and_pays_reserved_reward_once",
+              "status": "ok"
+            },
+            {
+              "name": "character_creation_precedes_population_and_legacy_json_adds_no_currency",
+              "status": "ok"
+            },
+            {
+              "name": "bootstrap_is_idempotent_and_registers_late_drivers_without_resetting_ledgers",
+              "status": "ok"
+            },
+            {
+              "name": "fuel_wear_and_rts_share_limits_and_reentry_releases_parking_brake",
+              "status": "ok"
+            },
+            {
+              "name": "freight_cannot_consume_stock_reserved_for_existing_npc_couriers",
+              "status": "ok"
+            },
+            {
+              "name": "ownership_reach_licensing_and_insufficient_funds_reject_atomically",
+              "status": "ok"
+            },
+            {
+              "name": "purchase_refuel_upgrade_paint_and_sale_transfer_finite_money_and_fuel",
+              "status": "ok"
+            },
+            {
+              "name": "loaded_cancellation_preserves_cargo_until_physical_return_and_refunds_once",
+              "status": "ok"
+            },
+            {
+              "name": "passenger_trip_conserves_population_and_unlocks_paid_license",
+              "status": "ok"
+            },
+            {
+              "name": "race_requires_ordered_proximity_mileage_and_positive_time_without_click_rewards",
+              "status": "ok"
+            },
+            {
+              "name": "moving_vehicle_fatigues_its_avatar_in_physical_time_even_with_a_rest_order",
+              "status": "ok"
+            },
+            {
+              "name": "trailer_capacity_coupling_and_loaded_unhitch_are_validated",
+              "status": "ok"
+            },
+            {
+              "name": "manual_freight_and_refunds_respect_mixed_producer_storage_without_losing_escrow",
+              "status": "ok"
+            },
+            {
+              "name": "treasury_shortage_and_post_transfer_overflow_leave_entire_job_unchanged",
+              "status": "ok"
+            },
+            {
+              "name": "transport_views_hide_other_private_ledgers_and_roundtrip_in_tagged_envelopes",
+              "status": "ok"
+            },
+            {
+              "name": "vehicle_purchase_respects_existing_global_body_capacity_including_cold_regions",
+              "status": "ok"
+            },
+            {
+              "name": "dormant_loaded_passenger_and_freight_jobs_keep_cargo_escrow_and_remaining_time",
+              "status": "ok"
+            }
+          ],
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/vehicle_ground.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "authored_road_material_respects_ribbon_without_rewriting_height_or_source_roads",
+              "status": "ok"
+            },
+            {
+              "name": "trailer_and_actual_cargo_are_counted_once_and_change_handling_and_fuel",
+              "status": "ok"
+            },
+            {
+              "name": "reserved_passengers_have_no_mass_until_boarded_and_saved_load_resumes_exactly",
+              "status": "ok"
+            }
+          ],
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    "terra-stream": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "doc_test_examples": 0,
+      "harnesses": [
+        {
+          "harness": "unittests src/lib.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "clip::tests::crossing_segment_is_limited_and_outside_segment_removed",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap::tests::imported_heightmaps_interpolate_share_edges_and_reject_missing_coverage",
+              "status": "ok"
+            },
+            {
+              "name": "clip::tests::polygon_clipping_keeps_closed_boundary",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap_features::tests::disconnected_concave_clip_is_rejected_instead_of_filling_a_false_polygon",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap::tests::heightmap_manifest_requires_provenance_and_contained_paths",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap::tests::semantic_bundle_clips_grounds_attributes_and_pins_actual_content",
+              "status": "ok"
+            },
+            {
+              "name": "procedural::tests::antimeridian_and_poles_are_continuous",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap::tests::semantic_import_rejects_holes_duplicates_wrong_geometry_and_path_escape",
+              "status": "ok"
+            },
+            {
+              "name": "procedural::tests::adjacent_tiles_share_height_samples",
+              "status": "ok"
+            },
+            {
+              "name": "cache::tests::cache_budget_evicts_old_entries_without_touching_unrelated_files",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap_features::tests::line_fragmentation_budgets_attributes_before_duplicating_them",
+              "status": "ok"
+            },
+            {
+              "name": "streamer::tests::invalid_provider_result_is_rejected_with_backoff",
+              "status": "ok"
+            },
+            {
+              "name": "cache::tests::cache_detects_corruption_and_separates_provider_keys",
+              "status": "ok"
+            },
+            {
+              "name": "cache::tests::cached_sources_keep_original_timestamp_and_obey_ttl",
+              "status": "ok"
+            },
+            {
+              "name": "heightmap_features::tests::multipart_properties_cannot_expand_small_sources_past_memory_budgets",
+              "status": "ok"
+            },
+            {
+              "name": "streamer::tests::zero_integration_budget_does_not_load_completed_result",
+              "status": "ok"
+            },
+            {
+              "name": "streamer::tests::teleport_rejects_old_completion_and_evicts_residents",
+              "status": "ok"
+            },
+            {
+              "name": "streamer::tests::repeated_focus_is_deduplicated_and_all_budgets_hold",
+              "status": "ok"
+            }
+          ],
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/http_pipeline.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "http_sources_are_decoded_attributed_clipped_and_cached",
+              "status": "ok"
+            }
+          ],
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "tests/providers.rs",
+          "kind": "rust_test",
+          "test_cases": [
+            {
+              "name": "polar_terrain_does_not_silently_clamp_to_mercator_edge",
+              "status": "ok"
+            },
+            {
+              "name": "osm_features_keep_source_ids_and_reject_invalid_geometry",
+              "status": "ok"
+            },
+            {
+              "name": "osm_semantics_keep_shops_roofs_lanes_bridges_and_physical_units",
+              "status": "ok"
+            },
+            {
+              "name": "documented_terrarium_encoding_decodes_exactly",
+              "status": "ok"
+            },
+            {
+              "name": "offline_mode_requires_no_cache_directory_or_network",
+              "status": "ok"
+            },
+            {
+              "name": "weather_keeps_units_and_timestamp_without_inventing_missing_values",
+              "status": "ok"
+            }
+          ],
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "harness": "doc-tests",
+          "kind": "doc_test",
+          "test_cases": [],
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    }
+  },
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "raw_log": "/tmp/terra-v9-final-headless.log",
+  "raw_log_sha256": "52412017c5d8dadb76263adf64a13a5b11bb294d73eaf60476121f5f15430424",
+  "source_verification": {
+    "files_checked": 193,
+    "mismatches": [],
+    "tracking_scope": "Workspace Rust sources, tests and examples, all nine crate Cargo manifests, workspace Cargo.toml and Cargo.lock; separate data fixture and executable reports retain their own provenance.",
+    "sha256_by_file": {
+      "Cargo.lock": "6cd157dc19e189b5ed0ac3840045bb09da4733dc1ec7eba8c796145505361e07",
+      "Cargo.toml": "8264355a6ba772d3e3390d0fabb1bf8e9d124f69092ce9b87e76a405f7681510",
+      "crates/terra-bevy/Cargo.toml": "02dbea0fe1d361f4d58c176301722d402b14b64018d312c59c072950d4c89909",
+      "crates/terra-bevy/examples/custom_provider.rs": "19d98321c128515ac4b2e1e30854d370746a22bd5004e238701c3b0f105226f3",
+      "crates/terra-bevy/examples/headless.rs": "eca33eea0f8cca421edf74d70d3f2d28e8c14721e18baae279e45e9e00d8080d",
+      "crates/terra-bevy/src/bin/terra-worldctl.rs": "6d86f2550afd180f9fd26a59577ad5a883abbff027effbd7edbebc15ba11f847",
+      "crates/terra-bevy/src/config.rs": "2f210d0591399217a54906c7a3f6072d8bf14617cf68105db9eb4e1c828fa148",
+      "crates/terra-bevy/src/environment.rs": "9918027dfc641b7e75626b733a305cc853383c8a1f2f482a6f1bd22c2135b7cd",
+      "crates/terra-bevy/src/geometry.rs": "55bc78e6ac70d350236e26c58bfa9def255fb7c1671affa035fc6c3d5780eeb0",
+      "crates/terra-bevy/src/history.rs": "8b4af8e3fcd491a2aba297509eabd7e64b70a766482ec5be10ee10320c170201",
+      "crates/terra-bevy/src/lib.rs": "ef2213ab452fec3f58817a9148f2606b1b625c80a04694ed432cb1c88a585109",
+      "crates/terra-bevy/src/living.rs": "c79ae44b8b3dc989ad63f50f5bb72165b296b101e1720be051518f57010c0cf5",
+      "crates/terra-bevy/src/network.rs": "9371f62913d9c1ed205eb0be84d3a24d8e4ad35144996343789f9097dc04c5c5",
+      "crates/terra-bevy/src/politics.rs": "06c2d3a09ca0e0191a569f440fab515fcce75a5fcc22a09877cbd349d2cac847",
+      "crates/terra-bevy/src/prediction.rs": "d7e4b9b8133e77c99ea8541d05c5f267d592dfd1b8e0d0465fc602fa859b424f",
+      "crates/terra-bevy/src/regions.rs": "1cd44fe63d6b8480866e9f7c37ce303eaf8c111c18a10fe5aaa5d474a207cebd",
+      "crates/terra-bevy/src/render.rs": "a97c3652a29a1b9cdf62930d2c1aea641708a1844dbcabfef736532f773001ee",
+      "crates/terra-bevy/src/render_detail.rs": "6f0c6e96148cf39be6980c050126fdb9145ddbb60cfc226499ea1143778b6593",
+      "crates/terra-bevy/src/render_materials.rs": "30fa5eb9837d1a3138d5f08b8eaa3c64f8b5c437e85420610739ff0c33abaf1c",
+      "crates/terra-bevy/src/render_quality.rs": "2498a4aec6a10de21cd9cc42c595af72f0a13714ce0c102c42c565b127976e7e",
+      "crates/terra-bevy/src/render_scenes.rs": "f905e56e5c487bdb997ce94ce52273420a97a8b117410a41462fd6f634147085",
+      "crates/terra-bevy/src/render_wildlife.rs": "6e672bdb0f3cbd6ffa6cca52f9865d97bf32cbaffc1a4f1b69507e241af477d9",
+      "crates/terra-bevy/src/sandbox.rs": "df863cebcf0240adbde48fa553b6372cd42f4dbfe4c0d705295ad547d4c45750",
+      "crates/terra-bevy/src/simulation.rs": "9952caa061ce81f6dc70b170162007791626d61fcf557ef217f38da0fc46915c",
+      "crates/terra-bevy/src/telemetry.rs": "b18a72a394cd1e5ff9f96b38bbde2cfd4cfad8fd404befd293d47d3745083646",
+      "crates/terra-bevy/tests/frontier_validation.rs": "d45c1dbdd2687e963c95ebad9a3cb0c70f348d5210f5614b2b27782c9b8315cc",
+      "crates/terra-bevy/tests/frontier_world.rs": "7322c44dcc3d43f36318e2da42d11b0f7d3b7c124e2b46afe42ed7b00274cd24",
+      "crates/terra-bevy/tests/headless.rs": "1c780cd19ebc50cde74d5de08877cc294fc318182e2e3f171e5c2336c055dc21",
+      "crates/terra-bevy/tests/living_world.rs": "f289f12934c175c1da0342b633618297e102128297bafc83180b706baef0da12",
+      "crates/terra-bevy/tests/procedural_settlement.rs": "a19c4e6faa2237b84a58d3560a80ede256f4cff12aa29e56b81741c7aab1c392",
+      "crates/terra-bevy/tests/regional_persistence.rs": "8c0826f49953ff8da3fb0717c47e28f6b86d031a78f529accd30fccd797c3d67",
+      "crates/terra-bevy/tests/worldctl.rs": "8842ea77e525bf02e966fa9e47415211793ad7828fd858a5a7393ac313b285cd",
+      "crates/terra-cli/Cargo.toml": "bd99a1973a079685bfa6643cad2b9a21f8955ba2564d5707567eeea21357af9a",
+      "crates/terra-cli/src/main.rs": "7104e1196da994189175313eec6100bf458254656cc3bfbfff80e76e22c7cbf8",
+      "crates/terra-core/Cargo.toml": "5e74af4781ed529f07b859590dc5acb1cbc877e4122b09e6ba98bd7f886ba2dd",
+      "crates/terra-core/src/actors.rs": "2d5e0effbe95d10fecbf85a853a68e8046ba01a286ae37648d3c2a5e35468bea",
+      "crates/terra-core/src/contacts.rs": "3ab137a1db12058b4c1d6495c086b222f78f9a34af1ba09300b5ba35bc09f31a",
+      "crates/terra-core/src/environment.rs": "7168f451eab7951fe7907d1d343dc6171ca86e1b92a5aae357a1d3fa9027deb4",
+      "crates/terra-core/src/geo.rs": "83436dc6dae60e2dfa4952a0b146ab540f43dab41fa8f28d2c5dd2da9576ed9f",
+      "crates/terra-core/src/lib.rs": "bc22e3d0d80471bbc14b6f699489ce1ee64103150417bc416aaf9b04bec50c22",
+      "crates/terra-core/src/tiles.rs": "6a002d70433b2e1e652d00f5d2b621c0977f65ddf3487edc025ce03c486dfdf8",
+      "crates/terra-core/src/time.rs": "6c29ed559227a756878c2e996524fafd9170f996fac03823c4f1f2a1d82a148c",
+      "crates/terra-core/src/vehicle.rs": "96574ce6f518022ccf47d3902b35e04acfab1e68f14a509517932ce658e64c73",
+      "crates/terra-core/src/vehicle_ground.rs": "701376e3783831eac83cd1e6a15a15c1f9f53703d4a6ca3c14a97bb40cacc1dd",
+      "crates/terra-core/src/world.rs": "b289bb141460129dfdaa2011b571700cd8a2ec533ae8b76bd2cc6d608b7a9d8d",
+      "crates/terra-core/tests/domain.rs": "4ed00a817c17d18dbe7b42318ef88f60cbe92c4c7fb39df8d38055b5af8e7294",
+      "crates/terra-demo/Cargo.toml": "7e05161d0d00f68d440a4461d55923ad95eb18d2eeca244e633b963feeb2943a",
+      "crates/terra-demo/src/accessibility.rs": "642af8508ddaebebca117437bf5558372464a8daa4b29e0928ce9ab68424fb76",
+      "crates/terra-demo/src/camera.rs": "f2256e0a3d79d56fbe57a904d6de2bf81c98bdc0f18acd6cdca0292ff33613a7",
+      "crates/terra-demo/src/character.rs": "002a353fa1a98a4b09b93a925c3ff32a9a8be89e1d0d372a7cf2995520034a69",
+      "crates/terra-demo/src/command_input.rs": "40a688377f443ea4431057bbe343dccd401a2bfe47f019b89901a06644cefdc7",
+      "crates/terra-demo/src/control.rs": "315d59a85565e41c6927cba5c6127537c8f6e0d8bff698c31f63a19aa934508b",
+      "crates/terra-demo/src/driving.rs": "a3b39fc9e8d401de1bd91014722dc8354d9fd8b023ee5309cca297ac79b9c33a",
+      "crates/terra-demo/src/fleet.rs": "d543bbb9c5ec07da7af8cb7b1aa7e144d0484197e4bbfbadeb04b88d703ee828",
+      "crates/terra-demo/src/flow.rs": "21639787ecd45ec156990381fa809f4a3da7ae549d6c791900c44367d2411a31",
+      "crates/terra-demo/src/frontier.rs": "91012a4c0b4d7334100df5f0ad4bd04b3a1c3b8fc21ff29258a20da9a4cb919a",
+      "crates/terra-demo/src/interaction.rs": "a55d1b44722dbe6030b510cff026c7f7675407154d7c4f7c027cd2e4e3f42391",
+      "crates/terra-demo/src/interface.rs": "79617b067fb4aee930fd3a06602ff085d2470f1cacf30b931882951f848d561d",
+      "crates/terra-demo/src/launcher/mod.rs": "fd5aae85bb5149b2a3e6446cdf91aa69a081aedf221b063e626758f01b4e2c3b",
+      "crates/terra-demo/src/launcher/model.rs": "1caae0ef57144244a5b33f561e0bb81a317b64f01a259a3545df0d70b2110bcc",
+      "crates/terra-demo/src/launcher/preview.rs": "e62a3a21882f74e94e307c20454852919dacda494b2d88d9c1bd0a75f9317b84",
+      "crates/terra-demo/src/launcher/ui.rs": "4be63b63385273af9282301c8163c2d26db62026e6051d7a1e367285621f10cc",
+      "crates/terra-demo/src/main.rs": "622972587cee71cdfa04ce1837929c78f1e0015246992577bb783bb1699d00b8",
+      "crates/terra-demo/src/output.rs": "e2c18898d21d7747569e5d90d60e5709125851ffd4cc7eefccf1d8ee3c56b235",
+      "crates/terra-demo/src/performance.rs": "742c4630ad8346a8321d8b0858d772c55aaa39116fae85881ef0b909ffdb4e05",
+      "crates/terra-demo/src/player_input.rs": "a5eab54a1a0084ae5a6b93982e3a82ae52d494f6bfbacfb7557756b8d3ffd3e1",
+      "crates/terra-demo/src/remote.rs": "ae864e164e12ff31763eb56f092f6ccecfa5e3707c15f7a927fdcfac572c1d4d",
+      "crates/terra-demo/src/road_presentation.rs": "b5f373d604e2dadf716d1096ad1933b49003b2f764882667d159089359635c96",
+      "crates/terra-demo/src/vehicle_models.rs": "7cf22c1f95a365d7650ddc76d3154033ed1667dcd0f9537e7119a404070c495a",
+      "crates/terra-demo/src/vehicle_presentation.rs": "2962e30dbb16287a9f3bdb1743fb3c9aadf1850db36b9f9eb9a062c566291b16",
+      "crates/terra-demo/src/wheel_input.rs": "c5c307d5db7f23e2a52bf48eb6e5be7275eef16771756f73f555e0d1201bebe2",
+      "crates/terra-history/Cargo.toml": "87ef3da27bcdafa57a0c54b2dafc8c66e84f2dbec59290f7856e489b382f210d",
+      "crates/terra-history/src/lib.rs": "b7f0435c39128b7af9679899917db5fd779593bfe61e7cb32bb0733ed37564e5",
+      "crates/terra-history/src/pack.rs": "66790f75839b69944d67adc421a5c128e00a84a6f22347fa164366726b99e70a",
+      "crates/terra-history/src/politics.rs": "e895ae3991e1e11ebc1716e4e9919b457c57db20b2717f050b395a5bbd4b18a6",
+      "crates/terra-history/src/time.rs": "a7b6b0c191838ce38ce469c4a104ed1aa0f79f1a84fe9f493c9da2fbea88081b",
+      "crates/terra-history/tests/history.rs": "de31add653272a311bcb755ea62f82f66f5ee50e91deab7d44d34b858f87fd71",
+      "crates/terra-net/Cargo.toml": "8bd665456ca33a5c5522b0469dbf1f824f4618b5a647d41515d7859d8e9d61d2",
+      "crates/terra-net/examples/network_conditions.rs": "3eabd5c859cd333c66eeb2860f3ccc96f3b8196e068bd040f079dfd2383378ae",
+      "crates/terra-net/examples/regional_session_load.rs": "8a25baf50e8f759a49521fe63c4e2dd8ca922a0d644f2b478a3b046a95bb194b",
+      "crates/terra-net/examples/replication_load.rs": "9c386a840ba3def29df3a3e74a6a3ed9bc3f45c320c22c7dc2495592ad57253c",
+      "crates/terra-net/examples/support/conditioned_link.rs": "f2d1fd342b4e0d25e1695f7ab152af119ea4f82033f9e174f0c67f2ff65cc22f",
+      "crates/terra-net/examples/support/network_acceptance.rs": "485acea12f67fb909f1fce3193e781afa7e58e76c6c9be1ddf39836ec26fa531",
+      "crates/terra-net/src/bin/client.rs": "e407678570b4e7e999c31a86caa9c301e3702eb3fd4040c225d7b4541bc32af4",
+      "crates/terra-net/src/bin/server.rs": "386dec721d48275a6145519e1a2a480a45d236bf2855c37ccb0b46e6109b316f",
+      "crates/terra-net/src/client.rs": "bb4562292bb91ebee12c65f3d9e4ed183dccd074a7ca0142e1d59f0f03754312",
+      "crates/terra-net/src/lib.rs": "bc51c569801608be93bd6f20a3aa62384c2adaada68330a556c8a6589e207dc3",
+      "crates/terra-net/src/operator.rs": "f10412d475dc44df04332c04beb41dde04a128a3ae48a0f83400b16cd6526c70",
+      "crates/terra-net/src/prediction.rs": "96815cdd736cde6e5a3d8ada686e2ebcd047e92df05c82b2633673b54abfca57",
+      "crates/terra-net/src/protocol.rs": "090e3f284fd589f09fdaf66a2af142562d8b0a68bd7966c19489600efb8bea4b",
+      "crates/terra-net/src/replication.rs": "42e078fd25b0c1c063a4186fe8ecd793571e10da72e0498592519603a4d20e9b",
+      "crates/terra-net/src/server.rs": "ea802dd6f460de933b91c6c5d595609a72786c8e3c233e6de96dc91d62511746",
+      "crates/terra-net/src/server_backpressure_tests.rs": "f63d03388b8efb5e48bb1e7c5d760d627cbb9d14066fda17d2ab69a5d3fe368f",
+      "crates/terra-net/src/session.rs": "2aa6bffcda87cc34b48ff96320288023532a6a6f3a0086a526e58baaede986b9",
+      "crates/terra-net/src/surface.rs": "ab3c3e5eeedae4b03a354e63f25390c6494d81848729378c94b840995ec94623",
+      "crates/terra-net/src/tls.rs": "2df8e3c0e4c15d554fdb2207b7110fc0f4d37a6c19d02126e3feee56e75928ca",
+      "crates/terra-net/src/transport.rs": "18457914c471898ffd97b58a0a4ed0cedc540715e65d4ccb58ea3bf87d6ddf14",
+      "crates/terra-net/tests/delta_replication.rs": "ecd565acef66161798ffe30a4d7a46f2de235ae8387cb8f231d385efef0893ff",
+      "crates/terra-net/tests/driving.rs": "da261cf5f06b5248589201c02ec44e779352e0c3f001736dd346f6ee97db180c",
+      "crates/terra-net/tests/frontier_protocol.rs": "6ff4983a6973390cceadb594e99e20ca80a7f336b999637a1231850f683f32c4",
+      "crates/terra-net/tests/loopback.rs": "13a9a4c531531e267688357da58de361cac6afe31c1c7e0084de862383672230",
+      "crates/terra-net/tests/network_conditions.rs": "5a75ab95e3f4e52754381cc021a16c50813a982a7783105942e29b6357815746",
+      "crates/terra-net/tests/operator_controls.rs": "d4d94a0886b047376bd54fc52498f536cdeb7becba92dfd47f8226cea3146319",
+      "crates/terra-net/tests/owner_dormancy.rs": "2a0ba86e277a44904ce1ef7aa9472ab71c5678b4c88a27feb219ae9859b036f5",
+      "crates/terra-net/tests/prediction.rs": "4071aeca1f6abed7ff398b1fa935f809d00e59f9383bbc0d51dc3d48674cadce",
+      "crates/terra-net/tests/regional_persistence.rs": "5f966561c32e769c67cb239418b475b72abf1b57ca0b33f62f207d9dbfb55eae",
+      "crates/terra-net/tests/tls_transport.rs": "d8b12e0f42b58b83fef0a31bb42b3986f2706e5f9b08df11d13d232f87a1c10c",
+      "crates/terra-persistence/Cargo.toml": "f7ed2442f813b8ca16ae700553efe7608443a2866fef40a2619b19ab4999e5f4",
+      "crates/terra-persistence/examples/regional_probe.rs": "70fd8296c5cf379960e654fa29a621964ff7ca0ed0c6bc3d10e8123f54204f73",
+      "crates/terra-persistence/src/lib.rs": "c120e77c9062ededcc66e302743ec75c1aba53d522aff412df8b53d01894873a",
+      "crates/terra-persistence/src/operations.rs": "38cd7f23652be0c93e945e3262f41d4be0b24b1dcb8fef77f6e27b308d0f1564",
+      "crates/terra-persistence/src/tests.rs": "ab710cc43e1376491980e63d53f52576a7c8604250b755fc56458fd7aefa1dfa",
+      "crates/terra-persistence/src/worker.rs": "4301309e968a94d4a8eb226ea38468c7a619f953b4cba4d4ad521e5da2a468b5",
+      "crates/terra-sandbox/Cargo.toml": "800fc58ef2db891f393837a46076bde9e5611c8d0eb7d261d02303d063f1c687",
+      "crates/terra-sandbox/examples/scaling_probe.rs": "090442abf15d6b412f744776eb725446a1f11a602e4eb92fecec66ba7970bd46",
+      "crates/terra-sandbox/src/catalog.rs": "ae9d84f216ff77e79889fae594f1dcc5fb4d92ee4e65277558f27d8470e628ac",
+      "crates/terra-sandbox/src/commands.rs": "e2c504ed1fbbb6de155ae511460d14f99c4f4ad69019a619402fad2bc7ca73d5",
+      "crates/terra-sandbox/src/dormancy.rs": "87f3782351a155ae333358c517b12e32d767013caf6fe820d6b4d3040e153496",
+      "crates/terra-sandbox/src/ecology/mod.rs": "18aa0414a381b296e570a53cc5f9338373182bd1dd43b664986a0a65880f7390",
+      "crates/terra-sandbox/src/ecology/model.rs": "b5028c5e19bfbba1da646d48169a2a97e69063279dd211b117128eea06d3e1ba",
+      "crates/terra-sandbox/src/ecology/schedule.rs": "4b6f0347bba68820d25857a9e67a207ff0a2ac6953ff91361d17fda249bb8c9d",
+      "crates/terra-sandbox/src/ecology/seed.rs": "bae5afa21812e56d1e253a83b4c3c5abf2853fdb43ca4165dc8bf07d212e6a10",
+      "crates/terra-sandbox/src/ecology/simulation.rs": "92f7c9f9ba4c6adde1eca04179a570b66cf4e6bbbb9c897cdb52f648e6be2296",
+      "crates/terra-sandbox/src/ecology/validation.rs": "21f4b69bd8ec55d79d7c60129d6474e23d45c1feb28a561eb8578247a9bc3568",
+      "crates/terra-sandbox/src/factions.rs": "6b55ba5fc38e4cddc8bb6b76f92517326de955b3f9dd4cef62afdb961224ed3b",
+      "crates/terra-sandbox/src/interest.rs": "0e976ec40394af01f914055e73658e30e1f4565244e20ff37d361135362f5ad1",
+      "crates/terra-sandbox/src/lib.rs": "2012a58c99d468fb318dc91c12a0e60edbf89a86a3d142a4880aeefc9961ae72",
+      "crates/terra-sandbox/src/living/commands.rs": "97b8ea694c8b9793a077fc030f48ed898ace9f6f93583936cc7a998a3079b322",
+      "crates/terra-sandbox/src/living/contacts.rs": "ca953e6b07776e92ef54c0714abef258cd9607463d2c5e75e30349fe6e5b6f3e",
+      "crates/terra-sandbox/src/living/mod.rs": "7d1e37373cd9f8a2d021d40cf077d17d14e77429bc2b6bce9bdacf2556091582",
+      "crates/terra-sandbox/src/living/model.rs": "a119a4bde9047a1610a2cfc8b2e089c18e96f4a066ed0c3186474f7314711867",
+      "crates/terra-sandbox/src/living/road_network.rs": "510f35707b083759aa36b6e535a2fdfe66b336036338aea9f4b45a86de5a2353",
+      "crates/terra-sandbox/src/living/routing.rs": "b02d7c8e8e45819e9d1001cfe5bb02873e39db06c3a20df7ab7eba773af82fa1",
+      "crates/terra-sandbox/src/living/seed.rs": "80b8a591ebec06d49d73ab3ecb9113a79b8b416e148a7205d6132ea98215484b",
+      "crates/terra-sandbox/src/living/simulation.rs": "b58ba64e53d9cd5810fd72b05994d60a342e95398d5f6329ec436e36785853f8",
+      "crates/terra-sandbox/src/living/traffic.rs": "850ae85e23310bcb7c881bee5157199e3f5648e25cd415411b8062e1af8977dc",
+      "crates/terra-sandbox/src/living/validation.rs": "ccf8abce337851cd5853c670e497b853bda45d752066efb94f256dce6b2e72b5",
+      "crates/terra-sandbox/src/living/view.rs": "88e745f81d0f392b2f97203a80a5027e1aa22b83aebabf2d82de2ba36db88510",
+      "crates/terra-sandbox/src/persistence.rs": "8ad5c89e56ebf0d3dd85c28ac0be424bbf2733c22f05d8f65f9d72e3a67c5a6e",
+      "crates/terra-sandbox/src/regions.rs": "37ac56f6cafdde1da8ae647c12eab59d83ee697f0909ff06b01695124f89e3b8",
+      "crates/terra-sandbox/src/settlement/commands.rs": "5bbf523f70529b7804c286131533dd2acd7164375d92d330577bdcdd3221cf01",
+      "crates/terra-sandbox/src/settlement/economy.rs": "5517d76e6372418342d48313bc079b3f2569cbaf5835eb6aef39f3a034fab2bc",
+      "crates/terra-sandbox/src/settlement/mod.rs": "a35991bc6901d74bb7a48f22ad84e7a54d1367fd92b6f0ae304a5662905f7de6",
+      "crates/terra-sandbox/src/settlement/model.rs": "accd9e35beac55c33d1203e2a5f72050febad0b019b4ada438a9031c36ad227a",
+      "crates/terra-sandbox/src/settlement/validation.rs": "26eade9532a96f34d8d512ed28731d41844f8f1b61aac25a51c127e9c2fa17cf",
+      "crates/terra-sandbox/src/spatial.rs": "533604c7a270e54c4804f25a2a83907f85e635f524952d66c4369ab1399b34e6",
+      "crates/terra-sandbox/src/state.rs": "e648b61051af1ba1ad3b15aff43a28458aff4ecd2716f6373fcd3dd08be762d9",
+      "crates/terra-sandbox/src/transport/actions.rs": "e4bed1e90670ab7bc716829a69dbd007351d4b0b49cf9acc72460f9fb3e22bca",
+      "crates/terra-sandbox/src/transport/company/commands.rs": "f6c5cb2dd6daa7d9f40b92760b22d3defce7dcfac1674b4d59e77b5baeae30c9",
+      "crates/terra-sandbox/src/transport/company/depots.rs": "628677c59f327e27ca304d012237274b86f467160670f287d45598b1f291050c",
+      "crates/terra-sandbox/src/transport/company/economy.rs": "6e22a91c74595129a46c3040c3dac9acca133f62ebf8a062ae3e3cac2a10fe03",
+      "crates/terra-sandbox/src/transport/company/lifecycle.rs": "9e95f328a7f0fd3fbd12106589926181ea560c5dfbbbc8e835cd29fd8599c6e5",
+      "crates/terra-sandbox/src/transport/company/market.rs": "2db081f027297f52c0628d44f9757650782119fbea307291269e72b0e8ff2c48",
+      "crates/terra-sandbox/src/transport/company/mod.rs": "e1095c8fbbf15937ea1ffe3d793e72e8fa8d436cd1f6fcc476a95c1a89b4d3a4",
+      "crates/terra-sandbox/src/transport/company/model.rs": "7d747ed710f146674a11f21cb150afc08073b0d3ee234d2708e92d8693dfbc1b",
+      "crates/terra-sandbox/src/transport/company/roadside.rs": "022722b820d7e0fea49afd38509f2e741b9d3db29f362ab09bf374ae4915d180",
+      "crates/terra-sandbox/src/transport/company/simulation.rs": "9d95963a62773d27e5e95806690b70f1eeb4ced831cf83367c3415273c489c8c",
+      "crates/terra-sandbox/src/transport/company/validation.rs": "2bb21d27875ea7022eddb371c254eade0a0c5a403431394ea8011b21ad891928",
+      "crates/terra-sandbox/src/transport/mechanics.rs": "952c647bb1a1cfb3ebafb6a43391fdac6e3569ae5befdf1fb3aeb2466c5c95ec",
+      "crates/terra-sandbox/src/transport/mod.rs": "d5d1fd8ae90d025288cdfbeac82e71139fb0679ee7773a033f57cdecee7af635",
+      "crates/terra-sandbox/src/transport/model.rs": "cd541dba962a9d691fbdbaea595a7186823f5424f5c0b927e0df439be3282d78",
+      "crates/terra-sandbox/src/transport/rentals.rs": "f86c3e0ba6e3f0b5443071889d668423ba9e8f299dda521aedbda2b3140d2534",
+      "crates/terra-sandbox/src/transport/seed.rs": "74f2764cdf36feedff04f570efc39a512994d1f79b69464a166fff200ee9221f",
+      "crates/terra-sandbox/src/transport/simulation.rs": "34415242eac60a5a2c95e579d3209ca6a8de613ae58caba6bf72e156cb5cb7fa",
+      "crates/terra-sandbox/src/transport/validation.rs": "be26d633d5281f1375b53b8bfc2bd94bd88542ab0104773945db89614d2d8402",
+      "crates/terra-sandbox/src/transport/view.rs": "d9102b1fba2dac7f9e215b3cb17681385bee9314af4bdd336a54c3f278833cf2",
+      "crates/terra-sandbox/tests/companies.rs": "9716ba2b519be2cde67d47482e5af57cd10297be1573062407c33ffde576da8c",
+      "crates/terra-sandbox/tests/company_depots.rs": "2256553975e9711fbb615e60540acd3d9d2ce089f97e18ef48eb2bf81916fac8",
+      "crates/terra-sandbox/tests/ecology.rs": "33e7cc943897735333be5f383cc2e6f6569fec79cc8db04357ca6c589ab61bd2",
+      "crates/terra-sandbox/tests/factions.rs": "b63317c6f801dbdceaf5212b86e143af63a43f642d0cbd29bb1b174039ddacd5",
+      "crates/terra-sandbox/tests/gameplay.rs": "37cf3882b6fbdf6192d091ab02bf394146395fdd776eed162d548e6fe107cc20",
+      "crates/terra-sandbox/tests/living.rs": "db811fc08ace9cb245ad572fb6f8d7446695ee0fc7ff9019a4c9e6ec8bef6abf",
+      "crates/terra-sandbox/tests/logistics.rs": "a4c142899eaf2f00e79857eadee03fbbbe4410e04f0982b54c2fc98d9d4c6c71",
+      "crates/terra-sandbox/tests/regions.rs": "3ec47938f5831fd0a63445dc14522826ba25790f32224abc2738792b7d1f7e6c",
+      "crates/terra-sandbox/tests/rentals.rs": "f7b2ae8a60a47e106a7cb956bbe0644b1691548a63e0c31cc51833a2ec2e214c",
+      "crates/terra-sandbox/tests/scaling.rs": "c49a5745552c9dac9e2a519b6a87baf658687279a553da7a830c0715653e913a",
+      "crates/terra-sandbox/tests/settlements.rs": "92a4ff73570bacd862660c20d505d342fa41e0c4ed99a244bf3f5c4cc74dc01c",
+      "crates/terra-sandbox/tests/traffic.rs": "1b37b41d9001fad8095c16ee24cfba498cff15c25ca7d1b16ebede8e8705995f",
+      "crates/terra-sandbox/tests/transport.rs": "b7cc621ec9d66bc477a1be9d6408a9138ef715093d23a719f6b26fbfcfdac2a4",
+      "crates/terra-sandbox/tests/vehicle_ground.rs": "04ef17dd6d2c8dd7f861098c3539c3dd4968a70de411e643b44a6c0477e7f056",
+      "crates/terra-stream/Cargo.toml": "c16548c9337917c1226a4060359c00cca4a20309083090392af5c5e2a64927ab",
+      "crates/terra-stream/examples/probe.rs": "f812cd1aadd0ad4f17096e2f8efaea7db702e16f7a36c4066dee420dc31253f3",
+      "crates/terra-stream/src/cache.rs": "2444afc05a7bc52142874985f8452fa9cd86ce0ee32efd47b3fee21e3b7f4809",
+      "crates/terra-stream/src/clip.rs": "c0feaafe55216e8c965c2186590e2f45aba70b2ced9c4da664dd20d6944845f3",
+      "crates/terra-stream/src/config.rs": "6cf4dbe27b76dead142d7235e17f73da3771117341dff06a852600e3cf667a28",
+      "crates/terra-stream/src/heightmap.rs": "d4133cbf84d10e93b9976b43cd9079f0113b09cc056f06b018139edff3813ceb",
+      "crates/terra-stream/src/heightmap_features.rs": "2582947bb5c58a10fab4dd98326aeebb88207de399eb84c3410888e800c26fc3",
+      "crates/terra-stream/src/lib.rs": "ed07ffedba6a8a91c660425d8abc81728bc1f74b4b75760c36444edf2dd35620",
+      "crates/terra-stream/src/procedural.rs": "86322dda05b9dea21c55b7c372b05c374cb05642e15bbff3ad75aab07c09735e",
+      "crates/terra-stream/src/providers.rs": "7bcea005c08114a7cb28f47d670c12a174a0b7c05b8a11d376725e6dd3cfbb4f",
+      "crates/terra-stream/src/streamer.rs": "848ca30f731d8d4cd505efe7b9a959743c80a4b4339cc002e6f64cf0296694a2",
+      "crates/terra-stream/tests/http_pipeline.rs": "ca273bb84df2968d6c8bfbc72a8feaef6e4139e5d3c293ed4a82436c63a3b269",
+      "crates/terra-stream/tests/providers.rs": "a67395d7a36201a86228f5d99af046488dfdf76ffae188be16570dc8358c6261"
+    }
+  },
+  "isolated_native_demo_revalidation": {
+    "source_changes": {
+      "crates/terra-demo/src/command_input.rs": {
+        "initial_gate_sha256": "ebf39c433b8bfd625f66309765c1b33d31ddfc9ed988d2cf8fa7475042013c3e",
+        "final_sha256": "40a688377f443ea4431057bbe343dccd401a2bfe47f019b89901a06644cefdc7"
+      },
+      "crates/terra-demo/src/driving.rs": {
+        "initial_gate_sha256": "bd11539a057093c3ec6e93f131ddb62bc76903dd37d8c1c5c572f17f095e6d77",
+        "final_sha256": "a3b39fc9e8d401de1bd91014722dc8354d9fd8b023ee5309cca297ac79b9c33a"
+      },
+      "crates/terra-demo/src/interface.rs": {
+        "initial_gate_sha256": "1c2f1df5a68e5a7030ca53a988eb759f7c0f910703802660fcb90afbea2cbe05",
+        "final_sha256": "79617b067fb4aee930fd3a06602ff085d2470f1cacf30b931882951f848d561d"
+      }
+    },
+    "headless_and_bevy_inputs_unchanged": true,
+    "reason": "Final small-viewport/150%-text native passes identified footer layout and nested inspector focus reveal defects. Only the listed native-demo source files changed. The non-Bevy workspace gate explicitly excludes terra-demo, and the Bevy library/integration gates do not depend on terra-demo. Their tested source inputs remain unchanged. The demo tests, native executable and final formatting gate are revalidated after the isolated UI polish."
+  },
+  "counting_policy": "One complete final non-Bevy workspace gate. Each successful (crate, harness, case) appears once. Targeted reruns, Bevy/demo tests, examples, process smoke checks, historical reports and empty doctest harnesses add no cases.",
+  "scope": "Bounded correctness and actual localhost TCP/TLS/SQLite fixtures, including warehouse reservation/conservation, source support, semantic input limits, queue backpressure, closed-host provisioning and recovery. No GPU, Internet-service, real-device or distributed-MMO capacity claim."
+}

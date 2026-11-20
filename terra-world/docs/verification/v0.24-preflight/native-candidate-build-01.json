@@ -1,0 +1,46 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo"
+  ],
+  "started_utc": "2026-10-30T11:47:17.935785+00:00",
+  "finished_utc": "2026-10-30T11:48:35.757822+00:00",
+  "seconds": 77.8220352770004,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 162,
+    "retained_log_bytes": 162,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "input_count": 390,
+  "source_inputs": "native-candidate-build-01-inputs.json",
+  "source_inputs_sha256": "2f612d3f7adb6e1dd3b83d39cab1d0fbf727ba9ab5d2cc780e957b77b9c362c2",
+  "changed_inputs": [],
+  "log": "native-candidate-build-01.log",
+  "log_sha256": "030b4cd6aad06c01e5003aa7b06222a5538148f07c55e94b5f2cd7739006bfad",
+  "binary": "/tmp/terra023-target/debug/terra-demo",
+  "binary_sha256": "b269b894d00f311ea66200f04b1dfff1d0863353e00b263d42761a40bd34ef8a"
+}

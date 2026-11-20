@@ -1,0 +1,8 @@
+{
+  "phase": "frozen-source candidate build; final canonical gates still in progress",
+  "release": "0.19.0",
+  "captured_utc": "2026-10-29T15:16:08.524777+00:00",
+  "executable": "/tmp/terra-build/target/debug/terra-demo",
+  "sha256": "b86ad4bc44685780b55c6f3eb8f32f88af4330f6f055d9f7d8d71e54339fe704",
+  "source_manifest": "/workspace/scratch/1c0c5a298a25/project/terra-world/docs/verification/v0.19-final-acceptance/source-hashes.json"
+}

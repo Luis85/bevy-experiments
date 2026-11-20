@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "terra-sandbox",
+    "--test",
+    "supply_readiness",
+    "--test",
+    "guidance_capacity",
+    "--test",
+    "guidance",
+    "--test",
+    "guidance_commitments",
+    "--test",
+    "settlements"
+  ],
+  "exit_code": 0,
+  "passed": 70,
+  "suites": 5,
+  "log_sha256": "0ee9785441e845229f90aa6fa124c4c49cab14728ccb70376228794b984a33b0",
+  "scope": "Focused candidate tests only; source edits elsewhere continued. Final canonical acceptance is separate."
+}

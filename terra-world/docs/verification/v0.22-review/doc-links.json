@@ -1,0 +1,4552 @@
+{
+  "schema_version": 1,
+  "scope": "Bounded current-handoff local Markdown destinations and heading anchors; evidence only.",
+  "started_utc": "2026-10-29T21:05:02.171352+00:00",
+  "finished_utc": "2026-10-29T21:05:02.297038+00:00",
+  "status": "passed",
+  "helper_sha256": "0d7a5871ebbb840f2f899c1eec0cd7f53ddf1216d0cbf1e0b25140a79846c98c",
+  "network_requests": 0,
+  "input_documents": 23,
+  "optional_pending_documents": [
+    "docs/verification/v0.22-native/README.md"
+  ],
+  "unique_existing_local_destinations": 125,
+  "link_status_counts": {
+    "external_skipped": 27,
+    "valid_anchor": 17,
+    "valid_destination": 243
+  },
+  "broken_or_unparsed": [],
+  "changed_inputs_during_audit": [],
+  "documents": [
+    {
+      "path": "README.md",
+      "sha256": "3d4392cab99375e9c7a318e1e00cbd461110b0f255d16c497c2c1582f9782b23",
+      "bytes": 33152,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World 0.22",
+          "anchor": "terra-world-022"
+        },
+        {
+          "line": 24,
+          "level": 2,
+          "title": "New in 0.22",
+          "anchor": "new-in-022"
+        },
+        {
+          "line": 55,
+          "level": 2,
+          "title": "Start here",
+          "anchor": "start-here"
+        },
+        {
+          "line": 85,
+          "level": 3,
+          "title": "1. Verify construction, farming and faction rules without a window",
+          "anchor": "1-verify-construction-farming-and-faction-rules-without-a-window"
+        },
+        {
+          "line": 104,
+          "level": 3,
+          "title": "2. Play the native world",
+          "anchor": "2-play-the-native-world"
+        },
+        {
+          "line": 211,
+          "level": 3,
+          "title": "3. Import a heightmap",
+          "anchor": "3-import-a-heightmap"
+        },
+        {
+          "line": 225,
+          "level": 3,
+          "title": "4. Inspect real data explicitly",
+          "anchor": "4-inspect-real-data-explicitly"
+        },
+        {
+          "line": 240,
+          "level": 2,
+          "title": "What is implemented",
+          "anchor": "what-is-implemented"
+        },
+        {
+          "line": 258,
+          "level": 2,
+          "title": "Workspace map",
+          "anchor": "workspace-map"
+        },
+        {
+          "line": 280,
+          "level": 2,
+          "title": "Native demo gallery",
+          "anchor": "native-demo-gallery"
+        },
+        {
+          "line": 282,
+          "level": 3,
+          "title": "Archived 0.12 captures",
+          "anchor": "archived-012-captures"
+        },
+        {
+          "line": 316,
+          "level": 3,
+          "title": "Archived 0.11 captures",
+          "anchor": "archived-011-captures"
+        },
+        {
+          "line": 332,
+          "level": 3,
+          "title": "Archived 0.10 captures",
+          "anchor": "archived-010-captures"
+        },
+        {
+          "line": 345,
+          "level": 3,
+          "title": "Archived 0.9 captures",
+          "anchor": "archived-09-captures"
+        },
+        {
+          "line": 386,
+          "level": 2,
+          "title": "Historical and political scenarios",
+          "anchor": "historical-and-political-scenarios"
+        },
+        {
+          "line": 415,
+          "level": 2,
+          "title": "Multiplayer",
+          "anchor": "multiplayer"
+        },
+        {
+          "line": 452,
+          "level": 2,
+          "title": "Configure and reuse",
+          "anchor": "configure-and-reuse"
+        },
+        {
+          "line": 484,
+          "level": 2,
+          "title": "Verification and project notes",
+          "anchor": "verification-and-project-notes"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 42,
+          "kind": "link",
+          "label": "Product review",
+          "target": "docs/PRODUCT_REVIEW.md",
+          "resolved_path": "docs/PRODUCT_REVIEW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 43,
+          "kind": "link",
+          "label": "Research",
+          "target": "docs/RESEARCH_v0.22.md",
+          "resolved_path": "docs/RESEARCH_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 44,
+          "kind": "link",
+          "label": "Implementation plan",
+          "target": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 45,
+          "kind": "link",
+          "label": "Full gap register",
+          "target": "docs/REVIEW_GAPS_v0.22.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 46,
+          "kind": "link",
+          "label": "Validation",
+          "target": "docs/VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 47,
+          "kind": "link",
+          "label": "Playtesting",
+          "target": "docs/PLAYTESTING.md",
+          "resolved_path": "docs/PLAYTESTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 48,
+          "kind": "link",
+          "label": "Desktop delivery",
+          "target": "docs/DESKTOP_DELIVERY.md",
+          "resolved_path": "docs/DESKTOP_DELIVERY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 52,
+          "kind": "link",
+          "label": "Earlier release overviews",
+          "target": "docs/RELEASE_HISTORY.md",
+          "resolved_path": "docs/RELEASE_HISTORY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 53,
+          "kind": "link",
+          "label": "changelog",
+          "target": "CHANGELOG.md",
+          "resolved_path": "CHANGELOG.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 82,
+          "kind": "link",
+          "label": "desktop delivery guide",
+          "target": "docs/DESKTOP_DELIVERY.md",
+          "resolved_path": "docs/DESKTOP_DELIVERY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 191,
+          "kind": "link",
+          "label": "gameplay guide",
+          "target": "docs/GAMEPLAY.md",
+          "resolved_path": "docs/GAMEPLAY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 223,
+          "kind": "link",
+          "label": "graphics and map formats",
+          "target": "docs/GRAPHICS_AND_MAPS.md",
+          "resolved_path": "docs/GRAPHICS_AND_MAPS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 237,
+          "kind": "link",
+          "label": "data sources and terms",
+          "target": "docs/DATA.md",
+          "resolved_path": "docs/DATA.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 262,
+          "kind": "link",
+          "label": "            ",
+          "target": "crates/terra-core/README.md",
+          "resolved_path": "crates/terra-core/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 263,
+          "kind": "link",
+          "label": "              ",
+          "target": "crates/terra-stream/README.md",
+          "resolved_path": "crates/terra-stream/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 265,
+          "kind": "link",
+          "label": "               ",
+          "target": "crates/terra-sandbox/README.md",
+          "resolved_path": "crates/terra-sandbox/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 266,
+          "kind": "link",
+          "label": "                   ",
+          "target": "crates/terra-persistence/README.md",
+          "resolved_path": "crates/terra-persistence/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 267,
+          "kind": "link",
+          "label": "           ",
+          "target": "crates/terra-net/README.md",
+          "resolved_path": "crates/terra-net/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 274,
+          "kind": "link",
+          "label": "Integration contracts",
+          "target": "docs/INTEGRATION.md",
+          "resolved_path": "docs/INTEGRATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 276,
+          "kind": "link",
+          "label": "architecture",
+          "target": "docs/ARCHITECTURE.md",
+          "resolved_path": "docs/ARCHITECTURE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 277,
+          "kind": "link",
+          "label": "MMORPG foundation guide",
+          "target": "docs/MMORPG_FOUNDATION.md",
+          "resolved_path": "docs/MMORPG_FOUNDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 293,
+          "kind": "link",
+          "label": "0.12 native record",
+          "target": "docs/native-v12-verification.json",
+          "resolved_path": "docs/native-v12-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 295,
+          "kind": "link",
+          "label": "20-gate release run",
+          "target": "docs/verification/v0.12-final/gates.json",
+          "resolved_path": "docs/verification/v0.12-final/gates.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 308,
+          "kind": "link",
+          "label": "0.12 validation record",
+          "target": "docs/VALIDATION_v0.12.md",
+          "resolved_path": "docs/VALIDATION_v0.12.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 309,
+          "kind": "link",
+          "label": "0.12 product review",
+          "target": "docs/PRODUCT_REVIEW_v0.12.md",
+          "resolved_path": "docs/PRODUCT_REVIEW_v0.12.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 312,
+          "kind": "image",
+          "label": "Archived 0.12 Fleet financial result at 1100 by 700 with 150 percent text",
+          "target": "docs/screenshots/v12-confirm-finances-small-result.png",
+          "resolved_path": "docs/screenshots/v12-confirm-finances-small-result.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 314,
+          "kind": "image",
+          "label": "Reopened player goals and saved community progress at enlarged text size",
+          "target": "docs/screenshots/v12-resume-activities.png",
+          "resolved_path": "docs/screenshots/v12-resume-activities.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 323,
+          "kind": "link",
+          "label": "0.11 native record",
+          "target": "docs/native-v11-verification.json",
+          "resolved_path": "docs/native-v11-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 326,
+          "kind": "link",
+          "label": "0.11 validation record",
+          "target": "docs/VALIDATION_v0.11.md",
+          "resolved_path": "docs/VALIDATION_v0.11.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 328,
+          "kind": "image",
+          "label": "Market quantity totals, stock and keyboard focus at 1100 by 700 with 150 percent text",
+          "target": "docs/screenshots/v11-market-keyboard-focus.png",
+          "resolved_path": "docs/screenshots/v11-market-keyboard-focus.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 330,
+          "kind": "image",
+          "label": "Mira beside the parked pickup after the supported native dismount",
+          "target": "docs/screenshots/v11-safe-exit.png",
+          "resolved_path": "docs/screenshots/v11-safe-exit.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 337,
+          "kind": "link",
+          "label": "final native record",
+          "target": "docs/native-v10-verification.json",
+          "resolved_path": "docs/native-v10-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 341,
+          "kind": "image",
+          "label": "Urgent driver guidance with its primary action visible at enlarged text size",
+          "target": "docs/screenshots/v10-final-guidance.png",
+          "resolved_path": "docs/screenshots/v10-final-guidance.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 343,
+          "kind": "image",
+          "label": "Mira Vale after gathering and drinking water, with the housing goal restored and animated wildlife nearby",
+          "target": "docs/screenshots/v10-final-water-restored.png",
+          "resolved_path": "docs/screenshots/v10-final-water-restored.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 353,
+          "kind": "image",
+          "label": "Possessed character in the heightmap valley, with a shop, roads and source-fed woodland",
+          "target": "docs/screenshots/v9-third-person.png",
+          "resolved_path": "docs/screenshots/v9-third-person.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 355,
+          "kind": "image",
+          "label": "Management focus at 1100 by 700 with 150 percent text and a fully visible status footer",
+          "target": "docs/screenshots/v9-management-small.png",
+          "resolved_path": "docs/screenshots/v9-management-small.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 357,
+          "kind": "image",
+          "label": "Owned pickup after driving over the sampled heightmap, with parked-state and route guidance",
+          "target": "docs/screenshots/v9-driving.png",
+          "resolved_path": "docs/screenshots/v9-driving.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 359,
+          "kind": "link",
+          "label": "main menu",
+          "target": "docs/screenshots/v9-main-menu.png",
+          "resolved_path": "docs/screenshots/v9-main-menu.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 360,
+          "kind": "link",
+          "label": "character creation",
+          "target": "docs/screenshots/v9-character.png",
+          "resolved_path": "docs/screenshots/v9-character.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 361,
+          "kind": "link",
+          "label": "heightmap world settings",
+          "target": "docs/screenshots/v9-world-settings.png",
+          "resolved_path": "docs/screenshots/v9-world-settings.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 362,
+          "kind": "link",
+          "label": "review and creation",
+          "target": "docs/screenshots/v9-world-review.png",
+          "resolved_path": "docs/screenshots/v9-world-review.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 363,
+          "kind": "link",
+          "label": "multiplayer source selection",
+          "target": "docs/screenshots/v9-multiplayer-source.png",
+          "resolved_path": "docs/screenshots/v9-multiplayer-source.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 364,
+          "kind": "link",
+          "label": "company text entry",
+          "target": "docs/screenshots/v9-company-keyboard.png",
+          "resolved_path": "docs/screenshots/v9-company-keyboard.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 365,
+          "kind": "link",
+          "label": "warehouse purchase",
+          "target": "docs/screenshots/v9-warehouse-buy.png",
+          "resolved_path": "docs/screenshots/v9-warehouse-buy.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 366,
+          "kind": "link",
+          "label": "warehouse sale",
+          "target": "docs/screenshots/v9-warehouse-sale.png",
+          "resolved_path": "docs/screenshots/v9-warehouse-sale.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 367,
+          "kind": "link",
+          "label": "keyboard focus revealing a scrolled action",
+          "target": "docs/screenshots/v9-focus-reveal.png",
+          "resolved_path": "docs/screenshots/v9-focus-reveal.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 368,
+          "kind": "link",
+          "label": "first-person actor view",
+          "target": "docs/screenshots/v9-first-person.png",
+          "resolved_path": "docs/screenshots/v9-first-person.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 369,
+          "kind": "link",
+          "label": "first-person cockpit",
+          "target": "docs/screenshots/v9-cockpit.png",
+          "resolved_path": "docs/screenshots/v9-cockpit.png",
+          "status": "valid_destination"
+        },
+        {
+          "line": 371,
+          "kind": "link",
+          "label": "Native evidence",
+          "target": "docs/native-v9-verification.json",
+          "resolved_path": "docs/native-v9-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 373,
+          "kind": "link",
+          "label": "validation record",
+          "target": "docs/VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 376,
+          "kind": "link",
+          "label": "v0.8 native evidence",
+          "target": "docs/native-v8-verification.json",
+          "resolved_path": "docs/native-v8-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 378,
+          "kind": "link",
+          "label": "v0.7 native evidence",
+          "target": "docs/native-v7-verification.json",
+          "resolved_path": "docs/native-v7-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 380,
+          "kind": "link",
+          "label": "v0.6 evidence",
+          "target": "docs/native-v6-verification.json",
+          "resolved_path": "docs/native-v6-verification.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 382,
+          "kind": "link",
+          "label": "v0.8",
+          "target": "docs/VALIDATION_v0.8.md",
+          "resolved_path": "docs/VALIDATION_v0.8.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 382,
+          "kind": "link",
+          "label": "v0.7",
+          "target": "docs/VALIDATION_v0.7.md",
+          "resolved_path": "docs/VALIDATION_v0.7.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 382,
+          "kind": "link",
+          "label": "v0.6",
+          "target": "docs/VALIDATION_v0.6.md",
+          "resolved_path": "docs/VALIDATION_v0.6.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 383,
+          "kind": "link",
+          "label": "v0.5",
+          "target": "docs/VALIDATION_v0.5.md",
+          "resolved_path": "docs/VALIDATION_v0.5.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 383,
+          "kind": "link",
+          "label": "v0.4",
+          "target": "docs/VALIDATION_v0.4.md",
+          "resolved_path": "docs/VALIDATION_v0.4.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 404,
+          "kind": "link",
+          "label": "historical formats and provenance",
+          "target": "docs/HISTORY.md",
+          "resolved_path": "docs/HISTORY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 446,
+          "kind": "link",
+          "label": "regional persistence",
+          "target": "docs/REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 448,
+          "kind": "link",
+          "label": "multiplayer operation",
+          "target": "docs/MULTIPLAYER.md",
+          "resolved_path": "docs/MULTIPLAYER.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 463,
+          "kind": "link",
+          "label": "         ",
+          "target": "configs",
+          "resolved_path": "configs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 473,
+          "kind": "link",
+          "label": "                      ",
+          "target": "crates/terra-sandbox/catalog.example.json",
+          "resolved_path": "crates/terra-sandbox/catalog.example.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 516,
+          "kind": "link",
+          "label": "validation record",
+          "target": "docs/VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 517,
+          "kind": "link",
+          "label": "product review",
+          "target": "docs/PRODUCT_REVIEW.md",
+          "resolved_path": "docs/PRODUCT_REVIEW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 519,
+          "kind": "link",
+          "label": "living-world rules",
+          "target": "docs/LIVING_WORLD.md",
+          "resolved_path": "docs/LIVING_WORLD.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 519,
+          "kind": "link",
+          "label": "graphics/data guide",
+          "target": "docs/GRAPHICS_AND_MAPS.md",
+          "resolved_path": "docs/GRAPHICS_AND_MAPS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 523,
+          "kind": "link",
+          "label": "third-party notices",
+          "target": "THIRD_PARTY_NOTICES.md",
+          "resolved_path": "THIRD_PARTY_NOTICES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 524,
+          "kind": "link",
+          "label": "data documentation",
+          "target": "docs/DATA.md",
+          "resolved_path": "docs/DATA.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "PRODUCT.md",
+      "sha256": "37070333bfab1f72917dfe9dbd93bb7f3c1826880d63a6765468e7b00d923cc9",
+      "bytes": 19729,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World",
+          "anchor": "terra-world"
+        },
+        {
+          "line": 5,
+          "level": 2,
+          "title": "Current iteration: a complete session and a connected driving economy",
+          "anchor": "current-iteration-a-complete-session-and-a-connected-driving-economy"
+        },
+        {
+          "line": 51,
+          "level": 2,
+          "title": "Authority and truth",
+          "anchor": "authority-and-truth"
+        },
+        {
+          "line": 55,
+          "level": 2,
+          "title": "Supported experience",
+          "anchor": "supported-experience"
+        },
+        {
+          "line": 59,
+          "level": 2,
+          "title": "Priorities",
+          "anchor": "priorities"
+        },
+        {
+          "line": 74,
+          "level": 2,
+          "title": "0.7: shared roads and a working fleet",
+          "anchor": "07-shared-roads-and-a-working-fleet"
+        },
+        {
+          "line": 93,
+          "level": 2,
+          "title": "0.9: sources, productive depots and input continuity",
+          "anchor": "09-sources-productive-depots-and-input-continuity"
+        },
+        {
+          "line": 115,
+          "level": 2,
+          "title": "0.10: continuous goals, shared motion and recoverable content",
+          "anchor": "010-continuous-goals-shared-motion-and-recoverable-content"
+        },
+        {
+          "line": 139,
+          "level": 2,
+          "title": "0.11: reliable handoffs and reproducible acceptance",
+          "anchor": "011-reliable-handoffs-and-reproducible-acceptance"
+        },
+        {
+          "line": 169,
+          "level": 2,
+          "title": "0.12 continuation and production boundaries",
+          "anchor": "012-continuation-and-production-boundaries"
+        },
+        {
+          "line": 188,
+          "level": 2,
+          "title": "0.13: managed careers and durable communities",
+          "anchor": "013-managed-careers-and-durable-communities"
+        },
+        {
+          "line": 212,
+          "level": 2,
+          "title": "0.14: continuing services and complete local handoff",
+          "anchor": "014-continuing-services-and-complete-local-handoff"
+        },
+        {
+          "line": 225,
+          "level": 2,
+          "title": "0.15: reachable recovery and representative vehicle content",
+          "anchor": "015-reachable-recovery-and-representative-vehicle-content"
+        },
+        {
+          "line": 250,
+          "level": 2,
+          "title": "0.16: recognizable commitments, people and recovery copies",
+          "anchor": "016-recognizable-commitments-people-and-recovery-copies"
+        },
+        {
+          "line": 278,
+          "level": 2,
+          "title": "0.19: integrity across SDK, presentation and delivery boundaries",
+          "anchor": "019-integrity-across-sdk-presentation-and-delivery-boundaries"
+        },
+        {
+          "line": 299,
+          "level": 2,
+          "title": "0.20: deliberate restore and bounded failure recovery",
+          "anchor": "020-deliberate-restore-and-bounded-failure-recovery"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 14,
+          "kind": "link",
+          "label": "current gaps",
+          "target": "docs/REVIEW_GAPS_v0.22.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 15,
+          "kind": "link",
+          "label": "researched implementation plan",
+          "target": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 16,
+          "kind": "link",
+          "label": "Playtesting",
+          "target": "docs/PLAYTESTING.md",
+          "resolved_path": "docs/PLAYTESTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 166,
+          "kind": "link",
+          "label": "the 0.12 gap register",
+          "target": "docs/REVIEW_GAPS_v0.12.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.12.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 247,
+          "kind": "link",
+          "label": "0.15 gap register",
+          "target": "docs/REVIEW_GAPS_v0.15.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.15.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 275,
+          "kind": "link",
+          "label": "current gap register",
+          "target": "docs/REVIEW_GAPS_v0.16.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.16.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "DESIGN.md",
+      "sha256": "a5fb82458652fe4d39eae892e44fd8930fad7fe52a3bccd3284cecd896f3ad20",
+      "bytes": 20302,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World native interface",
+          "anchor": "terra-world-native-interface"
+        },
+        {
+          "line": 3,
+          "level": 2,
+          "title": "Direction",
+          "anchor": "direction"
+        },
+        {
+          "line": 7,
+          "level": 2,
+          "title": "Tokens",
+          "anchor": "tokens"
+        },
+        {
+          "line": 19,
+          "level": 2,
+          "title": "Surface composition",
+          "anchor": "surface-composition"
+        },
+        {
+          "line": 53,
+          "level": 2,
+          "title": "Workflow rules",
+          "anchor": "workflow-rules"
+        },
+        {
+          "line": 73,
+          "level": 2,
+          "title": "Verification",
+          "anchor": "verification"
+        },
+        {
+          "line": 86,
+          "level": 2,
+          "title": "0.7 operating surfaces",
+          "anchor": "07-operating-surfaces"
+        },
+        {
+          "line": 111,
+          "level": 2,
+          "title": "0.9 source and depot workflows",
+          "anchor": "09-source-and-depot-workflows"
+        },
+        {
+          "line": 124,
+          "level": 2,
+          "title": "0.10 guidance and compact presentation",
+          "anchor": "010-guidance-and-compact-presentation"
+        },
+        {
+          "line": 143,
+          "level": 2,
+          "title": "0.11 market and action handoffs",
+          "anchor": "011-market-and-action-handoffs"
+        },
+        {
+          "line": 164,
+          "level": 2,
+          "title": "0.12 Fleet finances and section navigation",
+          "anchor": "012-fleet-finances-and-section-navigation"
+        },
+        {
+          "line": 182,
+          "level": 2,
+          "title": "0.13 route decisions and community review",
+          "anchor": "013-route-decisions-and-community-review"
+        },
+        {
+          "line": 200,
+          "level": 2,
+          "title": "0.14 continuing Company guidance",
+          "anchor": "014-continuing-company-guidance"
+        },
+        {
+          "line": 212,
+          "level": 2,
+          "title": "0.15 recovery and model-specific presentation",
+          "anchor": "015-recovery-and-model-specific-presentation"
+        },
+        {
+          "line": 241,
+          "level": 2,
+          "title": "0.16 commitments and recognizable copies",
+          "anchor": "016-commitments-and-recognizable-copies"
+        },
+        {
+          "line": 264,
+          "level": 2,
+          "title": "0.21 supply requests, startup and source edits",
+          "anchor": "021-supply-requests-startup-and-source-edits"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 36,
+          "kind": "link",
+          "label": "shared layout",
+          "target": "crates/terra-demo/src/interface.rs",
+          "resolved_path": "crates/terra-demo/src/interface.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 266,
+          "kind": "link",
+          "label": "Supply maintenance",
+          "target": "crates/terra-sandbox/src/settlement/economy.rs",
+          "resolved_path": "crates/terra-sandbox/src/settlement/economy.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 277,
+          "kind": "link",
+          "label": "Population bootstrap",
+          "target": "crates/terra-bevy/src/living.rs",
+          "resolved_path": "crates/terra-bevy/src/living.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 278,
+          "kind": "link",
+          "label": "native loading",
+          "target": "crates/terra-demo/src/flow.rs",
+          "resolved_path": "crates/terra-demo/src/flow.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 291,
+          "kind": "link",
+          "label": "Mesh integration",
+          "target": "crates/terra-bevy/src/render.rs",
+          "resolved_path": "crates/terra-bevy/src/render.rs",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "6847cf50e53357bf36f06688300c9db2a3bead8b220dda00bcecfd6c039ceb61",
+      "bytes": 38106,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Changelog",
+          "anchor": "changelog"
+        },
+        {
+          "line": 3,
+          "level": 2,
+          "title": "0.22.0 \u2014 2026-10-29",
+          "anchor": "0220--2026-10-29"
+        },
+        {
+          "line": 40,
+          "level": 2,
+          "title": "0.21.0 \u2014 2026-10-29",
+          "anchor": "0210--2026-10-29"
+        },
+        {
+          "line": 65,
+          "level": 2,
+          "title": "0.20.0 \u2014 2026-10-29",
+          "anchor": "0200--2026-10-29"
+        },
+        {
+          "line": 76,
+          "level": 2,
+          "title": "0.19.0 \u2014 2026-10-29",
+          "anchor": "0190--2026-10-29"
+        },
+        {
+          "line": 93,
+          "level": 2,
+          "title": "0.18.0 \u2014 2026-10-29",
+          "anchor": "0180--2026-10-29"
+        },
+        {
+          "line": 106,
+          "level": 2,
+          "title": "0.16.0",
+          "anchor": "0160"
+        },
+        {
+          "line": 128,
+          "level": 2,
+          "title": "0.15.0 \u2014 Obstacle clusters, an animated Comet and native recovery",
+          "anchor": "0150--obstacle-clusters-an-animated-comet-and-native-recovery"
+        },
+        {
+          "line": 149,
+          "level": 2,
+          "title": "0.14.0 \u2014 Continuing company goals, authoring and local recovery",
+          "anchor": "0140--continuing-company-goals-authoring-and-local-recovery"
+        },
+        {
+          "line": 171,
+          "level": 2,
+          "title": "0.13.0 \u2014 Local routes, community lifecycle and commercial decisions",
+          "anchor": "0130--local-routes-community-lifecycle-and-commercial-decisions"
+        },
+        {
+          "line": 189,
+          "level": 2,
+          "title": "0.12.0 \u2014 Cash accounting, supported routes and bounded presentation",
+          "anchor": "0120--cash-accounting-supported-routes-and-bounded-presentation"
+        },
+        {
+          "line": 227,
+          "level": 2,
+          "title": "0.11.0 \u2014 Documentation-led reliability and product polish",
+          "anchor": "0110--documentation-led-reliability-and-product-polish"
+        },
+        {
+          "line": 241,
+          "level": 2,
+          "title": "0.10.0 \u2014 Continuing goals, animated packs and shared autonomous handling",
+          "anchor": "0100--continuing-goals-animated-packs-and-shared-autonomous-handling"
+        },
+        {
+          "line": 254,
+          "level": 2,
+          "title": "0.8.0 \u2014 Recoverable commerce, coordinated roads and certified regional work",
+          "anchor": "080--recoverable-commerce-coordinated-roads-and-certified-regional-work"
+        },
+        {
+          "line": 270,
+          "level": 2,
+          "title": "0.7.0 \u2014 Commercial fleets, occupied roads and owner dormancy",
+          "anchor": "070--commercial-fleets-occupied-roads-and-owner-dormancy"
+        },
+        {
+          "line": 288,
+          "level": 2,
+          "title": "0.6.0 \u2014 Driving, complete game flow and bounded storage work",
+          "anchor": "060--driving-complete-game-flow-and-bounded-storage-work"
+        },
+        {
+          "line": 305,
+          "level": 2,
+          "title": "0.5.0 \u2014 Durable regional state and recovery",
+          "anchor": "050--durable-regional-state-and-recovery"
+        },
+        {
+          "line": 323,
+          "level": 2,
+          "title": "0.4.0 \u2014 Measured regional scaling and presentation",
+          "anchor": "040--measured-regional-scaling-and-presentation"
+        },
+        {
+          "line": 343,
+          "level": 2,
+          "title": "0.3.0 \u2014 Wildlife, resources and community progression",
+          "anchor": "030--wildlife-resources-and-community-progression"
+        },
+        {
+          "line": 358,
+          "level": 2,
+          "title": "0.2.0 \u2014 Living world and native game pass",
+          "anchor": "020--living-world-and-native-game-pass"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 303,
+          "kind": "link",
+          "label": "the capability matrix",
+          "target": "docs/MOTORTOWN_PARITY.md",
+          "resolved_path": "docs/MOTORTOWN_PARITY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 320,
+          "kind": "link",
+          "label": "regional persistence",
+          "target": "docs/REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 321,
+          "kind": "link",
+          "label": "validation",
+          "target": "docs/VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 321,
+          "kind": "link",
+          "label": "product review",
+          "target": "docs/PRODUCT_REVIEW.md",
+          "resolved_path": "docs/PRODUCT_REVIEW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 340,
+          "kind": "link",
+          "label": "validation",
+          "target": "docs/VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 341,
+          "kind": "link",
+          "label": "scaling",
+          "target": "docs/SCALING.md",
+          "resolved_path": "docs/SCALING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 341,
+          "kind": "link",
+          "label": "replication",
+          "target": "docs/NETWORK_REPLICATION.md",
+          "resolved_path": "docs/NETWORK_REPLICATION.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/PRODUCT_REVIEW.md",
+      "sha256": "80fae70cc200fae9c0842128e2c6f2538c7ac4610ca0a7f332ff7ba312c4ed03",
+      "bytes": 17907,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World 0.22 \u2014 comprehensive product review",
+          "anchor": "terra-world-022--comprehensive-product-review"
+        },
+        {
+          "line": 10,
+          "level": 2,
+          "title": "Product assessment",
+          "anchor": "product-assessment"
+        },
+        {
+          "line": 31,
+          "level": 2,
+          "title": "Review method and independent ownership",
+          "anchor": "review-method-and-independent-ownership"
+        },
+        {
+          "line": 48,
+          "level": 2,
+          "title": "Assessment across product perspectives",
+          "anchor": "assessment-across-product-perspectives"
+        },
+        {
+          "line": 72,
+          "level": 2,
+          "title": "Implemented design decisions",
+          "anchor": "implemented-design-decisions"
+        },
+        {
+          "line": 74,
+          "level": 3,
+          "title": "1. Actor context belongs beside the current task",
+          "anchor": "1-actor-context-belongs-beside-the-current-task"
+        },
+        {
+          "line": 96,
+          "level": 3,
+          "title": "2. Close an unused community without inventing public-asset policy",
+          "anchor": "2-close-an-unused-community-without-inventing-public-asset-policy"
+        },
+        {
+          "line": 111,
+          "level": 3,
+          "title": "3. Report the stage of persistence failure honestly",
+          "anchor": "3-report-the-stage-of-persistence-failure-honestly"
+        },
+        {
+          "line": 128,
+          "level": 3,
+          "title": "4. Own a managed session until its final write",
+          "anchor": "4-own-a-managed-session-until-its-final-write"
+        },
+        {
+          "line": 142,
+          "level": 3,
+          "title": "5. Inspect the extracted handoff independently",
+          "anchor": "5-inspect-the-extracted-handoff-independently"
+        },
+        {
+          "line": 156,
+          "level": 2,
+          "title": "Cross-review corrections",
+          "anchor": "cross-review-corrections"
+        },
+        {
+          "line": 171,
+          "level": 2,
+          "title": "Native flow evidence",
+          "anchor": "native-flow-evidence"
+        },
+        {
+          "line": 188,
+          "level": 2,
+          "title": "Compatibility, preservation and remaining priorities",
+          "anchor": "compatibility-preservation-and-remaining-priorities"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 6,
+          "kind": "link",
+          "label": "plan",
+          "target": "IMPLEMENTATION_PLAN_v0.22.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 7,
+          "kind": "link",
+          "label": "research synthesis",
+          "target": "RESEARCH_v0.22.md",
+          "resolved_path": "docs/RESEARCH_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 8,
+          "kind": "link",
+          "label": "Validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 35,
+          "kind": "link",
+          "label": "Player findings",
+          "target": "verification/v0.22-review/player-experience.md",
+          "resolved_path": "docs/verification/v0.22-review/player-experience.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 36,
+          "kind": "link",
+          "label": "World findings",
+          "target": "verification/v0.22-review/world-framework.md",
+          "resolved_path": "docs/verification/v0.22-review/world-framework.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 37,
+          "kind": "link",
+          "label": "Reliability findings",
+          "target": "verification/v0.22-review/reliability-delivery.md",
+          "resolved_path": "docs/verification/v0.22-review/reliability-delivery.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 94,
+          "kind": "link",
+          "label": "Controls",
+          "target": "CONTROLS.md",
+          "resolved_path": "docs/CONTROLS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 94,
+          "kind": "link",
+          "label": "Game flow",
+          "target": "GAME_FLOW.md",
+          "resolved_path": "docs/GAME_FLOW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 166,
+          "kind": "link",
+          "label": "community/UX",
+          "target": "verification/v0.22-review/world-cross-review.md",
+          "resolved_path": "docs/verification/v0.22-review/world-cross-review.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 167,
+          "kind": "link",
+          "label": "storage/recovery",
+          "target": "verification/v0.22-review/reliability-cross-review.md",
+          "resolved_path": "docs/verification/v0.22-review/reliability-cross-review.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 168,
+          "kind": "link",
+          "label": "delivery",
+          "target": "verification/v0.22-review/delivery-cross-review.md",
+          "resolved_path": "docs/verification/v0.22-review/delivery-cross-review.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 202,
+          "kind": "link",
+          "label": "G01\u2013G18 register",
+          "target": "REVIEW_GAPS_v0.22.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.22.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+      "sha256": "cd693ebe16c0d4f3a3e8a96d3d83974dc2698397b9e695fdf77730b4cbef3ed8",
+      "bytes": 16433,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World 0.22 \u2014 researched improvement and polishing plan",
+          "anchor": "terra-world-022--researched-improvement-and-polishing-plan"
+        },
+        {
+          "line": 11,
+          "level": 2,
+          "title": "Outcome and product constraints",
+          "anchor": "outcome-and-product-constraints"
+        },
+        {
+          "line": 26,
+          "level": 2,
+          "title": "Review and ownership",
+          "anchor": "review-and-ownership"
+        },
+        {
+          "line": 45,
+          "level": 2,
+          "title": "Applied research",
+          "anchor": "applied-research"
+        },
+        {
+          "line": 61,
+          "level": 2,
+          "title": "Dispatched implementation packages",
+          "anchor": "dispatched-implementation-packages"
+        },
+        {
+          "line": 63,
+          "level": 3,
+          "title": "WP01 \u2014 truthful actor context",
+          "anchor": "wp01--truthful-actor-context"
+        },
+        {
+          "line": 80,
+          "level": 3,
+          "title": "WP02 \u2014 HUD, action-target and accessibility polish",
+          "anchor": "wp02--hud-action-target-and-accessibility-polish"
+        },
+        {
+          "line": 97,
+          "level": 3,
+          "title": "WP03 \u2014 safe dissolution of an unused solo community",
+          "anchor": "wp03--safe-dissolution-of-an-unused-solo-community"
+        },
+        {
+          "line": 119,
+          "level": 3,
+          "title": "WP04 \u2014 dormant ecology observer consistency",
+          "anchor": "wp04--dormant-ecology-observer-consistency"
+        },
+        {
+          "line": 130,
+          "level": 3,
+          "title": "WP05 \u2014 explicit durable-publication outcomes",
+          "anchor": "wp05--explicit-durable-publication-outcomes"
+        },
+        {
+          "line": 152,
+          "level": 3,
+          "title": "WP06 \u2014 one cooperative writer per managed world",
+          "anchor": "wp06--one-cooperative-writer-per-managed-world"
+        },
+        {
+          "line": 170,
+          "level": 3,
+          "title": "WP07 \u2014 independent desktop-package inspection",
+          "anchor": "wp07--independent-desktop-package-inspection"
+        },
+        {
+          "line": 185,
+          "level": 3,
+          "title": "WP08 \u2014 compatibility and release integration",
+          "anchor": "wp08--compatibility-and-release-integration"
+        },
+        {
+          "line": 199,
+          "level": 3,
+          "title": "WP09 \u2014 cross-review, complete native journey and final polish",
+          "anchor": "wp09--cross-review-complete-native-journey-and-final-polish"
+        },
+        {
+          "line": 213,
+          "level": 3,
+          "title": "WP10 \u2014 product closeout and preserved handoff",
+          "anchor": "wp10--product-closeout-and-preserved-handoff"
+        },
+        {
+          "line": 227,
+          "level": 2,
+          "title": "Sequence and change control",
+          "anchor": "sequence-and-change-control"
+        },
+        {
+          "line": 248,
+          "level": 2,
+          "title": "Explicit remaining qualification",
+          "anchor": "explicit-remaining-qualification"
+        },
+        {
+          "line": 257,
+          "level": 2,
+          "title": "Closeout",
+          "anchor": "closeout"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 9,
+          "kind": "link",
+          "label": "Validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 34,
+          "kind": "link",
+          "label": "Player experience",
+          "target": "verification/v0.22-review/player-experience.md",
+          "resolved_path": "docs/verification/v0.22-review/player-experience.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 35,
+          "kind": "link",
+          "label": "World/framework",
+          "target": "verification/v0.22-review/world-framework.md",
+          "resolved_path": "docs/verification/v0.22-review/world-framework.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 36,
+          "kind": "link",
+          "label": "Reliability/delivery",
+          "target": "verification/v0.22-review/reliability-delivery.md",
+          "resolved_path": "docs/verification/v0.22-review/reliability-delivery.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/RESEARCH_v0.22.md",
+      "sha256": "3b107d7c166eceee2c91e20b46fd741d887437fc4e267868c1329fc8ab40b99b",
+      "bytes": 13662,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World 0.22 \u2014 research and design decisions",
+          "anchor": "terra-world-022--research-and-design-decisions"
+        },
+        {
+          "line": 9,
+          "level": 2,
+          "title": "User goals and research questions",
+          "anchor": "user-goals-and-research-questions"
+        },
+        {
+          "line": 28,
+          "level": 2,
+          "title": "Player comprehension and accessibility",
+          "anchor": "player-comprehension-and-accessibility"
+        },
+        {
+          "line": 30,
+          "level": 3,
+          "title": "Make current context available at the point of action",
+          "anchor": "make-current-context-available-at-the-point-of-action"
+        },
+        {
+          "line": 50,
+          "level": 3,
+          "title": "Preserve readable information and predictable navigation",
+          "anchor": "preserve-readable-information-and-predictable-navigation"
+        },
+        {
+          "line": 72,
+          "level": 2,
+          "title": "Authoritative gameplay and framework compatibility",
+          "anchor": "authoritative-gameplay-and-framework-compatibility"
+        },
+        {
+          "line": 74,
+          "level": 3,
+          "title": "Separate repeated requests from changing authority",
+          "anchor": "separate-repeated-requests-from-changing-authority"
+        },
+        {
+          "line": 93,
+          "level": 3,
+          "title": "Preserve fixed authority and explicit compatibility boundaries",
+          "anchor": "preserve-fixed-authority-and-explicit-compatibility-boundaries"
+        },
+        {
+          "line": 110,
+          "level": 2,
+          "title": "Publication, recovery and writer ownership",
+          "anchor": "publication-recovery-and-writer-ownership"
+        },
+        {
+          "line": 112,
+          "level": 3,
+          "title": "File visibility and synchronization are different boundaries",
+          "anchor": "file-visibility-and-synchronization-are-different-boundaries"
+        },
+        {
+          "line": 141,
+          "level": 3,
+          "title": "Hold a session lease, not a stale PID marker",
+          "anchor": "hold-a-session-lease-not-a-stale-pid-marker"
+        },
+        {
+          "line": 162,
+          "level": 3,
+          "title": "Preserve transactional backup and complete ownership data",
+          "anchor": "preserve-transactional-backup-and-complete-ownership-data"
+        },
+        {
+          "line": 175,
+          "level": 2,
+          "title": "Delivery integrity and its limits",
+          "anchor": "delivery-integrity-and-its-limits"
+        },
+        {
+          "line": 195,
+          "level": 2,
+          "title": "Real-world data and content provenance",
+          "anchor": "real-world-data-and-content-provenance"
+        },
+        {
+          "line": 213,
+          "level": 2,
+          "title": "Decisions intentionally left open",
+          "anchor": "decisions-intentionally-left-open"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 4,
+          "kind": "link",
+          "label": "implementation plan",
+          "target": "IMPLEMENTATION_PLAN_v0.22.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 5,
+          "kind": "link",
+          "label": "product review",
+          "target": "PRODUCT_REVIEW.md",
+          "resolved_path": "docs/PRODUCT_REVIEW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 32,
+          "kind": "link",
+          "label": "XAG 109: Objective clarity",
+          "target": "https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/109",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 34,
+          "kind": "link",
+          "label": "XAG 114: UI context",
+          "target": "https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/114",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 52,
+          "kind": "link",
+          "label": "XAG 101: Text display",
+          "target": "https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/101",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 54,
+          "kind": "link",
+          "label": "XAG 103: Additional channels",
+          "target": "https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/103",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 56,
+          "kind": "link",
+          "label": "XAG 112: UI navigation",
+          "target": "https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/112",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 76,
+          "kind": "link",
+          "label": "PlayFab transaction and retry guidance",
+          "target": "https://learn.microsoft.com/en-us/xbox/playfab/economy-monetization/economy-v2/tutorials/idempotent-transactions-and-retries",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 95,
+          "kind": "link",
+          "label": "official Bevy fixed-timestep example",
+          "target": "https://bevy.org/examples/movement/physics-in-fixed-timestep/",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 97,
+          "kind": "link",
+          "label": "Cargo SemVer reference",
+          "target": "https://doc.rust-lang.org/cargo/reference/semver.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 99,
+          "kind": "link",
+          "label": "Rust non-exhaustive reference",
+          "target": "https://doc.rust-lang.org/reference/attributes/type_system.html#the-non_exhaustive-attribute",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 114,
+          "kind": "link",
+          "label": "Linux fsync manual",
+          "target": "https://man7.org/linux/man-pages/man2/fsync.2.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 117,
+          "kind": "link",
+          "label": "ReplaceFileW documentation",
+          "target": "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 119,
+          "kind": "link",
+          "label": "Windows buffer-flush documentation",
+          "target": "https://learn.microsoft.com/en-us/windows/win32/fileio/flushing-system-buffered-i-o-data-to-disk",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 143,
+          "kind": "link",
+          "label": "Rust File locking",
+          "target": "https://doc.rust-lang.org/std/fs/struct.File.html#method.try_lock",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 146,
+          "kind": "link",
+          "label": "Microsoft LockFileEx",
+          "target": "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 164,
+          "kind": "link",
+          "label": "SQLite's online-backup API",
+          "target": "https://sqlite.org/backup.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 165,
+          "kind": "link",
+          "label": "SQLite WAL documentation",
+          "target": "https://sqlite.org/wal.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 177,
+          "kind": "link",
+          "label": "Python pathlib",
+          "target": "https://docs.python.org/3/library/pathlib.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 179,
+          "kind": "link",
+          "label": "GitHub secure-use guidance",
+          "target": "https://docs.github.com/en/actions/reference/security/secure-use",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 197,
+          "kind": "link",
+          "label": "RFC 7946",
+          "target": "https://www.rfc-editor.org/rfc/rfc7946.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 199,
+          "kind": "link",
+          "label": "OpenStreetMap's copyright page",
+          "target": "https://www.openstreetmap.org/copyright",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 200,
+          "kind": "link",
+          "label": "OSMF attribution guidance",
+          "target": "https://osmfoundation.org/wiki/Attribution_Guidelines",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 223,
+          "kind": "link",
+          "label": "Validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/REVIEW_GAPS_v0.22.md",
+      "sha256": "2f6ebb5cb215d84bfae43886f03328a73ea0330b260c306bb8facceeb8fecbb0",
+      "bytes": 12374,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Terra World 0.22 \u2014 complete product gap register",
+          "anchor": "terra-world-022--complete-product-gap-register"
+        },
+        {
+          "line": 10,
+          "level": 2,
+          "title": "Selected increment and acceptance conditions",
+          "anchor": "selected-increment-and-acceptance-conditions"
+        },
+        {
+          "line": 26,
+          "level": 2,
+          "title": "Complete remaining-gap register",
+          "anchor": "complete-remaining-gap-register"
+        },
+        {
+          "line": 49,
+          "level": 2,
+          "title": "Prioritized next increments",
+          "anchor": "prioritized-next-increments"
+        },
+        {
+          "line": 69,
+          "level": 2,
+          "title": "Managed continuity boundaries",
+          "anchor": "managed-continuity-boundaries"
+        },
+        {
+          "line": 84,
+          "level": 2,
+          "title": "Evidence and preservation",
+          "anchor": "evidence-and-preservation"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 4,
+          "kind": "link",
+          "label": "product review",
+          "target": "PRODUCT_REVIEW.md",
+          "resolved_path": "docs/PRODUCT_REVIEW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 4,
+          "kind": "link",
+          "label": "research",
+          "target": "RESEARCH_v0.22.md",
+          "resolved_path": "docs/RESEARCH_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 5,
+          "kind": "link",
+          "label": "dispatched implementation plan",
+          "target": "IMPLEMENTATION_PLAN_v0.22.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 6,
+          "kind": "link",
+          "label": "validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/COMPATIBILITY.md",
+      "sha256": "eaee5581c25dcf1233caf8b9147fc0c56d076367501baaebb055a96a119719cf",
+      "bytes": 12153,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Current compatibility contract",
+          "anchor": "current-compatibility-contract"
+        },
+        {
+          "line": 20,
+          "level": 2,
+          "title": "Executables and transport",
+          "anchor": "executables-and-transport"
+        },
+        {
+          "line": 30,
+          "level": 2,
+          "title": "Saves, sources and content",
+          "anchor": "saves-sources-and-content"
+        },
+        {
+          "line": 44,
+          "level": 2,
+          "title": "Presentation and recovery formats",
+          "anchor": "presentation-and-recovery-formats"
+        },
+        {
+          "line": 74,
+          "level": 2,
+          "title": "File publication and SDK error compatibility",
+          "anchor": "file-publication-and-sdk-error-compatibility"
+        },
+        {
+          "line": 123,
+          "level": 2,
+          "title": "Managed launch and checkpoint compatibility",
+          "anchor": "managed-launch-and-checkpoint-compatibility"
+        },
+        {
+          "line": 192,
+          "level": 2,
+          "title": "Fleet navigation",
+          "anchor": "fleet-navigation"
+        },
+        {
+          "line": 198,
+          "level": 2,
+          "title": "Qualification",
+          "anchor": "qualification"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 50,
+          "kind": "link",
+          "label": "asset-pack contract",
+          "target": "ASSET_PACKS.md",
+          "resolved_path": "docs/ASSET_PACKS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 51,
+          "kind": "link",
+          "label": "authoring guide",
+          "target": "ASSET_AUTHORING.md",
+          "resolved_path": "docs/ASSET_AUTHORING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 66,
+          "kind": "link",
+          "label": "Recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 120,
+          "kind": "link",
+          "label": "file-publication outcomes",
+          "target": "OPERATIONS.md#file-publication-outcomes",
+          "resolved_path": "docs/OPERATIONS.md",
+          "fragment": "file-publication-outcomes",
+          "anchor_document": "docs/OPERATIONS.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 121,
+          "kind": "link",
+          "label": "recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 181,
+          "kind": "link",
+          "label": "Desktop delivery",
+          "target": "DESKTOP_DELIVERY.md#upgrade-and-recovery",
+          "resolved_path": "docs/DESKTOP_DELIVERY.md",
+          "fragment": "upgrade-and-recovery",
+          "anchor_document": "docs/DESKTOP_DELIVERY.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 200,
+          "kind": "link",
+          "label": "current validation record",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 201,
+          "kind": "link",
+          "label": "desktop delivery guide",
+          "target": "DESKTOP_DELIVERY.md",
+          "resolved_path": "docs/DESKTOP_DELIVERY.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/DESKTOP_DELIVERY.md",
+      "sha256": "b02df007843da9637612988aa071bf530f68ced4c77c5810a70257036657bfb9",
+      "bytes": 21879,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Desktop builds, packages and qualification",
+          "anchor": "desktop-builds-packages-and-qualification"
+        },
+        {
+          "line": 9,
+          "level": 2,
+          "title": "Build and verify from source",
+          "anchor": "build-and-verify-from-source"
+        },
+        {
+          "line": 61,
+          "level": 2,
+          "title": "Start an extracted desktop package",
+          "anchor": "start-an-extracted-desktop-package"
+        },
+        {
+          "line": 63,
+          "level": 3,
+          "title": "Inspect before launching",
+          "anchor": "inspect-before-launching"
+        },
+        {
+          "line": 92,
+          "level": 3,
+          "title": "Start the game",
+          "anchor": "start-the-game"
+        },
+        {
+          "line": 136,
+          "level": 2,
+          "title": "Upgrade and recovery",
+          "anchor": "upgrade-and-recovery"
+        },
+        {
+          "line": 172,
+          "level": 3,
+          "title": "Managed starts and interrupted first sessions",
+          "anchor": "managed-starts-and-interrupted-first-sessions"
+        },
+        {
+          "line": 209,
+          "level": 3,
+          "title": "Private saves and protected export paths",
+          "anchor": "private-saves-and-protected-export-paths"
+        },
+        {
+          "line": 240,
+          "level": 2,
+          "title": "Optional original model packs",
+          "anchor": "optional-original-model-packs"
+        },
+        {
+          "line": 242,
+          "level": 3,
+          "title": "Original animated Comet example",
+          "anchor": "original-animated-comet-example"
+        },
+        {
+          "line": 263,
+          "level": 3,
+          "title": "Fieldhand with a Comet cabin variant",
+          "anchor": "fieldhand-with-a-comet-cabin-variant"
+        },
+        {
+          "line": 313,
+          "level": 2,
+          "title": "Troubleshooting",
+          "anchor": "troubleshooting"
+        },
+        {
+          "line": 324,
+          "level": 2,
+          "title": "Remaining platform acceptance",
+          "anchor": "remaining-platform-acceptance"
+        },
+        {
+          "line": 338,
+          "level": 2,
+          "title": "Terminal receipt publication",
+          "anchor": "terminal-receipt-publication"
+        },
+        {
+          "line": 346,
+          "level": 2,
+          "title": "Bounded verification commands (0.21)",
+          "anchor": "bounded-verification-commands-021"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 5,
+          "kind": "link",
+          "label": "validation record",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 15,
+          "kind": "link",
+          "label": "MSVC target documentation",
+          "target": "https://doc.rust-lang.org/rustc/platform-support/windows-msvc.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 94,
+          "kind": "link",
+          "label": "Playtesting",
+          "target": "PLAYTESTING.md",
+          "resolved_path": "docs/PLAYTESTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 106,
+          "kind": "link",
+          "label": "official Visual C++ redistributable guidance",
+          "target": "https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist/",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 142,
+          "kind": "link",
+          "label": "self-contained recovery bundle",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 165,
+          "kind": "link",
+          "label": "Compatibility",
+          "target": "COMPATIBILITY.md",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 168,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 219,
+          "kind": "link",
+          "label": "Compatibility",
+          "target": "COMPATIBILITY.md",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 219,
+          "kind": "link",
+          "label": "Recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 261,
+          "kind": "link",
+          "label": "Asset packs",
+          "target": "ASSET_PACKS.md",
+          "resolved_path": "docs/ASSET_PACKS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 261,
+          "kind": "link",
+          "label": "Authoring",
+          "target": "ASSET_AUTHORING.md",
+          "resolved_path": "docs/ASSET_AUTHORING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 286,
+          "kind": "link",
+          "label": "Game flow",
+          "target": "GAME_FLOW.md",
+          "resolved_path": "docs/GAME_FLOW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 308,
+          "kind": "link",
+          "label": "character example",
+          "target": "../crates/terra-bevy/assets/character-pack/README.md",
+          "resolved_path": "crates/terra-bevy/assets/character-pack/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 309,
+          "kind": "link",
+          "label": "human authoring handoff",
+          "target": "ASSET_AUTHORING.md#preview-the-original-customized-human-and-driver-handoff",
+          "resolved_path": "docs/ASSET_AUTHORING.md",
+          "fragment": "preview-the-original-customized-human-and-driver-handoff",
+          "anchor_document": "docs/ASSET_AUTHORING.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 321,
+          "kind": "link",
+          "label": "Playtesting recovery",
+          "target": "PLAYTESTING.md#when-a-session-goes-wrong",
+          "resolved_path": "docs/PLAYTESTING.md",
+          "fragment": "when-a-session-goes-wrong",
+          "anchor_document": "docs/PLAYTESTING.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 322,
+          "kind": "link",
+          "label": "Diagnostics",
+          "target": "DIAGNOSTICS.md",
+          "resolved_path": "docs/DIAGNOSTICS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 334,
+          "kind": "link",
+          "label": "baseline gaps report",
+          "target": "OPEN_GAPS_REPORT_v0.12.md",
+          "resolved_path": "docs/OPEN_GAPS_REPORT_v0.12.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 335,
+          "kind": "link",
+          "label": "current follow-up",
+          "target": "REVIEW_GAPS_v0.22.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.22.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/CONTROLS.md",
+      "sha256": "9b6697d670cebcdf9c13f47dd43839d251b2a5116c4e65d0ab625e46a91ecde6",
+      "bytes": 17528,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Native controls and input configuration",
+          "anchor": "native-controls-and-input-configuration"
+        },
+        {
+          "line": 10,
+          "level": 2,
+          "title": "Keyboard and mouse",
+          "anchor": "keyboard-and-mouse"
+        },
+        {
+          "line": 53,
+          "level": 2,
+          "title": "Gamepad",
+          "anchor": "gamepad"
+        },
+        {
+          "line": 61,
+          "level": 3,
+          "title": "Menus and character creation",
+          "anchor": "menus-and-character-creation"
+        },
+        {
+          "line": 94,
+          "level": 3,
+          "title": "In-game management and text",
+          "anchor": "in-game-management-and-text"
+        },
+        {
+          "line": 112,
+          "level": 3,
+          "title": "RTS terrain cursor and construction",
+          "anchor": "rts-terrain-cursor-and-construction"
+        },
+        {
+          "line": 134,
+          "level": 3,
+          "title": "Movement and driving",
+          "anchor": "movement-and-driving"
+        },
+        {
+          "line": 153,
+          "level": 2,
+          "title": "Wheel and joystick driving",
+          "anchor": "wheel-and-joystick-driving"
+        },
+        {
+          "line": 211,
+          "level": 2,
+          "title": "Input safety and lifecycle",
+          "anchor": "input-safety-and-lifecycle"
+        },
+        {
+          "line": 213,
+          "level": 3,
+          "title": "Actor context and command targets (0.22)",
+          "anchor": "actor-context-and-command-targets-022"
+        },
+        {
+          "line": 269,
+          "level": 3,
+          "title": "Standard gamepad handoff safety (0.18)",
+          "anchor": "standard-gamepad-handoff-safety-018"
+        },
+        {
+          "line": 280,
+          "level": 2,
+          "title": "Reviewed restore (0.20)",
+          "anchor": "reviewed-restore-020"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": []
+    },
+    {
+      "path": "docs/GAME_FLOW.md",
+      "sha256": "a7350d338757f3b8a4da0f5e2924c6208989452f494e76e2c46251ed588310bc",
+      "bytes": 31105,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Native game flow",
+          "anchor": "native-game-flow"
+        },
+        {
+          "line": 3,
+          "level": 2,
+          "title": "Actor context in 0.22",
+          "anchor": "actor-context-in-022"
+        },
+        {
+          "line": 31,
+          "level": 2,
+          "title": "Continuation and finances in 0.12",
+          "anchor": "continuation-and-finances-in-012"
+        },
+        {
+          "line": 57,
+          "level": 2,
+          "title": "Reviewed handoffs retained from 0.11",
+          "anchor": "reviewed-handoffs-retained-from-011"
+        },
+        {
+          "line": 91,
+          "level": 2,
+          "title": "New local world",
+          "anchor": "new-local-world"
+        },
+        {
+          "line": 127,
+          "level": 3,
+          "title": "Loading recovery (0.21)",
+          "anchor": "loading-recovery-021"
+        },
+        {
+          "line": 137,
+          "level": 3,
+          "title": "Source choices and their limits",
+          "anchor": "source-choices-and-their-limits"
+        },
+        {
+          "line": 152,
+          "level": 3,
+          "title": "Storage choices",
+          "anchor": "storage-choices"
+        },
+        {
+          "line": 173,
+          "level": 2,
+          "title": "A continuing player journey",
+          "anchor": "a-continuing-player-journey"
+        },
+        {
+          "line": 197,
+          "level": 2,
+          "title": "Continue and world selection",
+          "anchor": "continue-and-world-selection"
+        },
+        {
+          "line": 217,
+          "level": 3,
+          "title": "Back up and recover a world",
+          "anchor": "back-up-and-recover-a-world"
+        },
+        {
+          "line": 260,
+          "level": 2,
+          "title": "Session menu",
+          "anchor": "session-menu"
+        },
+        {
+          "line": 306,
+          "level": 2,
+          "title": "Multiplayer join",
+          "anchor": "multiplayer-join"
+        },
+        {
+          "line": 348,
+          "level": 2,
+          "title": "Controls",
+          "anchor": "controls"
+        },
+        {
+          "line": 379,
+          "level": 2,
+          "title": "Files and lifecycle",
+          "anchor": "files-and-lifecycle"
+        },
+        {
+          "line": 410,
+          "level": 2,
+          "title": "Verification entry points",
+          "anchor": "verification-entry-points"
+        },
+        {
+          "line": 440,
+          "level": 2,
+          "title": "Flow foundations introduced in 0.9",
+          "anchor": "flow-foundations-introduced-in-09"
+        },
+        {
+          "line": 479,
+          "level": 2,
+          "title": "Reviewed restore (0.20)",
+          "anchor": "reviewed-restore-020"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 178,
+          "kind": "link",
+          "label": "Company guidance",
+          "target": "GUIDANCE.md#company-decisions-after-the-first-jobs",
+          "resolved_path": "docs/GUIDANCE.md",
+          "fragment": "company-decisions-after-the-first-jobs",
+          "anchor_document": "docs/GUIDANCE.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 194,
+          "kind": "link",
+          "label": "GUIDANCE.md",
+          "target": "GUIDANCE.md",
+          "resolved_path": "docs/GUIDANCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 213,
+          "kind": "link",
+          "label": "Compatibility",
+          "target": "COMPATIBILITY.md#managed-launch-and-checkpoint-compatibility",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "fragment": "managed-launch-and-checkpoint-compatibility",
+          "anchor_document": "docs/COMPATIBILITY.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 240,
+          "kind": "link",
+          "label": "Recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 263,
+          "kind": "link",
+          "label": "Playtesting",
+          "target": "PLAYTESTING.md",
+          "resolved_path": "docs/PLAYTESTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 447,
+          "kind": "link",
+          "label": "CONTROLS.md",
+          "target": "CONTROLS.md",
+          "resolved_path": "docs/CONTROLS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 453,
+          "kind": "link",
+          "label": "COMPANIES.md",
+          "target": "COMPANIES.md",
+          "resolved_path": "docs/COMPANIES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 469,
+          "kind": "link",
+          "label": "CONTROLS.md",
+          "target": "CONTROLS.md",
+          "resolved_path": "docs/CONTROLS.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/PLAYTESTING.md",
+      "sha256": "b3df88af8ae8da89a116031bb4d089470dcf66d923bb18fcd2bec4747869c077",
+      "bytes": 24162,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Playtesting Terra World 0.22",
+          "anchor": "playtesting-terra-world-022"
+        },
+        {
+          "line": 11,
+          "level": 2,
+          "title": "Before opening a world",
+          "anchor": "before-opening-a-world"
+        },
+        {
+          "line": 32,
+          "level": 2,
+          "title": "Optional local playtest reports",
+          "anchor": "optional-local-playtest-reports"
+        },
+        {
+          "line": 91,
+          "level": 2,
+          "title": "First session: observe, act, save, return",
+          "anchor": "first-session-observe-act-save-return"
+        },
+        {
+          "line": 135,
+          "level": 2,
+          "title": "Focused 0.22 reliability and delivery scenarios",
+          "anchor": "focused-022-reliability-and-delivery-scenarios"
+        },
+        {
+          "line": 144,
+          "level": 3,
+          "title": "Two managed processes, clean closure and interrupted closure",
+          "anchor": "two-managed-processes-clean-closure-and-interrupted-closure"
+        },
+        {
+          "line": 175,
+          "level": 3,
+          "title": "Published output with uncertain durability",
+          "anchor": "published-output-with-uncertain-durability"
+        },
+        {
+          "line": 207,
+          "level": 3,
+          "title": "Recovery completion markers and retained artifacts",
+          "anchor": "recovery-completion-markers-and-retained-artifacts"
+        },
+        {
+          "line": 231,
+          "level": 3,
+          "title": "Extracted package: passive inspection and explicit execution",
+          "anchor": "extracted-package-passive-inspection-and-explicit-execution"
+        },
+        {
+          "line": 261,
+          "level": 2,
+          "title": "Targeted 0.21 world checks",
+          "anchor": "targeted-021-world-checks"
+        },
+        {
+          "line": 268,
+          "level": 3,
+          "title": "Different merchant assortments",
+          "anchor": "different-merchant-assortments"
+        },
+        {
+          "line": 281,
+          "level": 3,
+          "title": "Polar loading and supported ground",
+          "anchor": "polar-loading-and-supported-ground"
+        },
+        {
+          "line": 294,
+          "level": 3,
+          "title": "Local edits in a larger resident region",
+          "anchor": "local-edits-in-a-larger-resident-region"
+        },
+        {
+          "line": 313,
+          "level": 2,
+          "title": "Focused follow-up matrix",
+          "anchor": "focused-follow-up-matrix"
+        },
+        {
+          "line": 332,
+          "level": 2,
+          "title": "When a session goes wrong",
+          "anchor": "when-a-session-goes-wrong"
+        },
+        {
+          "line": 354,
+          "level": 2,
+          "title": "Issue template",
+          "anchor": "issue-template"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 5,
+          "kind": "link",
+          "label": "Validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 15,
+          "kind": "link",
+          "label": "Desktop delivery",
+          "target": "DESKTOP_DELIVERY.md",
+          "resolved_path": "docs/DESKTOP_DELIVERY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 22,
+          "kind": "link",
+          "label": "Recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 228,
+          "kind": "link",
+          "label": "Recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 258,
+          "kind": "link",
+          "label": "Desktop delivery",
+          "target": "DESKTOP_DELIVERY.md",
+          "resolved_path": "docs/DESKTOP_DELIVERY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 372,
+          "kind": "link",
+          "label": "0.22 implementation plan",
+          "target": "IMPLEMENTATION_PLAN_v0.22.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.22.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 373,
+          "kind": "link",
+          "label": "Validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/OPERATIONS.md",
+      "sha256": "a3bd51aa3fd38a484e6046139714b8be530d287f8bfb8979840e150cfed53eb9",
+      "bytes": 33286,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "World storage operations",
+          "anchor": "world-storage-operations"
+        },
+        {
+          "line": 9,
+          "level": 2,
+          "title": "Complete local recovery sets",
+          "anchor": "complete-local-recovery-sets"
+        },
+        {
+          "line": 23,
+          "level": 2,
+          "title": "Build and inspect",
+          "anchor": "build-and-inspect"
+        },
+        {
+          "line": 44,
+          "level": 2,
+          "title": "Back up a running database",
+          "anchor": "back-up-a-running-database"
+        },
+        {
+          "line": 63,
+          "level": 2,
+          "title": "Portable regional archives",
+          "anchor": "portable-regional-archives"
+        },
+        {
+          "line": 85,
+          "level": 2,
+          "title": "Local version-one JSON saves",
+          "anchor": "local-version-one-json-saves"
+        },
+        {
+          "line": 116,
+          "level": 2,
+          "title": "Server version-one JSON saves",
+          "anchor": "server-version-one-json-saves"
+        },
+        {
+          "line": 145,
+          "level": 2,
+          "title": "File-publication outcomes",
+          "anchor": "file-publication-outcomes"
+        },
+        {
+          "line": 184,
+          "level": 2,
+          "title": "Pending work and recovery",
+          "anchor": "pending-work-and-recovery"
+        },
+        {
+          "line": 219,
+          "level": 2,
+          "title": "Current scale boundary",
+          "anchor": "current-scale-boundary"
+        },
+        {
+          "line": 235,
+          "level": 2,
+          "title": "TLS transport and player capabilities",
+          "anchor": "tls-transport-and-player-capabilities"
+        },
+        {
+          "line": 286,
+          "level": 3,
+          "title": "Owner lifecycle during import and restart",
+          "anchor": "owner-lifecycle-during-import-and-restart"
+        },
+        {
+          "line": 304,
+          "level": 2,
+          "title": "Exact-principal operator controls",
+          "anchor": "exact-principal-operator-controls"
+        },
+        {
+          "line": 358,
+          "level": 3,
+          "title": "Resume-only admission",
+          "anchor": "resume-only-admission"
+        },
+        {
+          "line": 384,
+          "level": 3,
+          "title": "Provision a new principal without opening guests",
+          "anchor": "provision-a-new-principal-without-opening-guests"
+        },
+        {
+          "line": 433,
+          "level": 2,
+          "title": "Atomic verified backups and recovery at regional scale",
+          "anchor": "atomic-verified-backups-and-recovery-at-regional-scale"
+        },
+        {
+          "line": 487,
+          "level": 2,
+          "title": "Exercise recovery with real sessions before deployment",
+          "anchor": "exercise-recovery-with-real-sessions-before-deployment"
+        },
+        {
+          "line": 546,
+          "level": 3,
+          "title": "Poisoned store locks (0.18)",
+          "anchor": "poisoned-store-locks-018"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 11,
+          "kind": "link",
+          "label": "Recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 18,
+          "kind": "link",
+          "label": "Retained native diagnostics",
+          "target": "DIAGNOSTICS.md",
+          "resolved_path": "docs/DIAGNOSTICS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 174,
+          "kind": "link",
+          "label": "recovery bundles",
+          "target": "RECOVERY_BUNDLES.md",
+          "resolved_path": "docs/RECOVERY_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 177,
+          "kind": "link",
+          "label": "Linux fsync contract",
+          "target": "https://man7.org/linux/man-pages/man2/fsync.2.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 424,
+          "kind": "link",
+          "label": "0.8 admission process smoke",
+          "target": "server-admission-v0.8.json",
+          "resolved_path": "docs/server-admission-v0.8.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 427,
+          "kind": "link",
+          "label": "final headless gate",
+          "target": "headless-verification-v0.8.json",
+          "resolved_path": "docs/headless-verification-v0.8.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 431,
+          "kind": "link",
+          "label": "real-session workload",
+          "target": "PERFORMANCE.md#08-actual-regional-session-churn",
+          "resolved_path": "docs/PERFORMANCE.md",
+          "fragment": "08-actual-regional-session-churn",
+          "anchor_document": "docs/PERFORMANCE.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 489,
+          "kind": "link",
+          "label": "completed 0.12 workload",
+          "target": "verification/v0.12-final/regional-sessions.json",
+          "resolved_path": "docs/verification/v0.12-final/regional-sessions.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 492,
+          "kind": "link",
+          "label": "Scaling",
+          "target": "SCALING.md#012-combined-prepared-terrain-and-cold-world-acceptance",
+          "resolved_path": "docs/SCALING.md",
+          "fragment": "012-combined-prepared-terrain-and-cold-world-acceptance",
+          "anchor_document": "docs/SCALING.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 528,
+          "kind": "link",
+          "label": "storage-only report",
+          "target": "verification/v0.12-final/recovery.json",
+          "resolved_path": "docs/verification/v0.12-final/recovery.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 535,
+          "kind": "link",
+          "label": "final gate report",
+          "target": "verification/v0.12-final/gates.json",
+          "resolved_path": "docs/verification/v0.12-final/gates.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 538,
+          "kind": "link",
+          "label": "0.12 validation",
+          "target": "VALIDATION_v0.12.md#earlier-incomplete-attempts",
+          "resolved_path": "docs/VALIDATION_v0.12.md",
+          "fragment": "earlier-incomplete-attempts",
+          "anchor_document": "docs/VALIDATION_v0.12.md",
+          "status": "valid_anchor"
+        }
+      ]
+    },
+    {
+      "path": "docs/RECOVERY_BUNDLES.md",
+      "sha256": "81a4673e775b87ba7280833d6df784b85ce6a142ffe03f192e02dcc2c957f67c",
+      "bytes": 18567,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Recover a local world with its terrain and configuration",
+          "anchor": "recover-a-local-world-with-its-terrain-and-configuration"
+        },
+        {
+          "line": 15,
+          "level": 2,
+          "title": "Supported worlds",
+          "anchor": "supported-worlds"
+        },
+        {
+          "line": 49,
+          "level": 2,
+          "title": "Make and recover a backup from the native menu",
+          "anchor": "make-and-recover-a-backup-from-the-native-menu"
+        },
+        {
+          "line": 137,
+          "level": 2,
+          "title": "Create a recovery directory with the operator tool",
+          "anchor": "create-a-recovery-directory-with-the-operator-tool"
+        },
+        {
+          "line": 190,
+          "level": 2,
+          "title": "Verify a retained copy",
+          "anchor": "verify-a-retained-copy"
+        },
+        {
+          "line": 230,
+          "level": 2,
+          "title": "Restore without touching the incident world",
+          "anchor": "restore-without-touching-the-incident-world"
+        },
+        {
+          "line": 265,
+          "level": 2,
+          "title": "Rehearse and record the boundary",
+          "anchor": "rehearse-and-record-the-boundary"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 38,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 298,
+          "kind": "link",
+          "label": "Regional persistence",
+          "target": "REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 299,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 299,
+          "kind": "link",
+          "label": "Source distribution",
+          "target": "SOURCE_BUNDLES.md",
+          "resolved_path": "docs/SOURCE_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 300,
+          "kind": "link",
+          "label": "Compatibility",
+          "target": "COMPATIBILITY.md",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/REGIONAL_PERSISTENCE.md",
+      "sha256": "92646d6dd3579f67cacf7b1e4225a030877aa8a130c7537c24ddc6ab027db3cf",
+      "bytes": 28413,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Durable regional state",
+          "anchor": "durable-regional-state"
+        },
+        {
+          "line": 21,
+          "level": 2,
+          "title": "Run it",
+          "anchor": "run-it"
+        },
+        {
+          "line": 69,
+          "level": 2,
+          "title": "What sleeps, and what remains resident",
+          "anchor": "what-sleeps-and-what-remains-resident"
+        },
+        {
+          "line": 101,
+          "level": 2,
+          "title": "Owner disconnect, cold records and resume",
+          "anchor": "owner-disconnect-cold-records-and-resume"
+        },
+        {
+          "line": 149,
+          "level": 2,
+          "title": "Transaction and failure model",
+          "anchor": "transaction-and-failure-model"
+        },
+        {
+          "line": 173,
+          "level": 3,
+          "title": "Certified environmental dependency groups",
+          "anchor": "certified-environmental-dependency-groups"
+        },
+        {
+          "line": 284,
+          "level": 2,
+          "title": "Library lifecycle",
+          "anchor": "library-lifecycle"
+        },
+        {
+          "line": 354,
+          "level": 2,
+          "title": "Backup, recovery and migration",
+          "anchor": "backup-recovery-and-migration"
+        },
+        {
+          "line": 388,
+          "level": 2,
+          "title": "Measured limits and next structural work",
+          "anchor": "measured-limits-and-next-structural-work"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 67,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 276,
+          "kind": "link",
+          "label": "operations",
+          "target": "OPERATIONS.md#file-publication-outcomes",
+          "resolved_path": "docs/OPERATIONS.md",
+          "fragment": "file-publication-outcomes",
+          "anchor_document": "docs/OPERATIONS.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 380,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 405,
+          "kind": "link",
+          "label": "v0.8 report",
+          "target": "regional-probe-v0.8.json",
+          "resolved_path": "docs/regional-probe-v0.8.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 426,
+          "kind": "link",
+          "label": "SQLite WAL",
+          "target": "https://www.sqlite.org/wal.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 427,
+          "kind": "link",
+          "label": "synchronization policy",
+          "target": "https://www.sqlite.org/pragma.html#pragma_synchronous",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 428,
+          "kind": "link",
+          "label": "rusqlite transactions",
+          "target": "https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Connection.html",
+          "status": "external_skipped",
+          "scheme": "https"
+        },
+        {
+          "line": 429,
+          "kind": "link",
+          "label": "store implementation",
+          "target": "../crates/terra-persistence/src/lib.rs",
+          "resolved_path": "crates/terra-persistence/src/lib.rs",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/GAMEPLAY.md",
+      "sha256": "6cad64b80644e09ab7ff1cdc929c08648e67443ce68816af29cdd6fac9e6c5cd",
+      "bytes": 44262,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Playing and building on Terra World",
+          "anchor": "playing-and-building-on-terra-world"
+        },
+        {
+          "line": 10,
+          "level": 2,
+          "title": "A first session",
+          "anchor": "a-first-session"
+        },
+        {
+          "line": 69,
+          "level": 3,
+          "title": "Command a crew or take control",
+          "anchor": "command-a-crew-or-take-control"
+        },
+        {
+          "line": 104,
+          "level": 3,
+          "title": "Buy supplies and maintain needs",
+          "anchor": "buy-supplies-and-maintain-needs"
+        },
+        {
+          "line": 128,
+          "level": 3,
+          "title": "Watch production and delivery",
+          "anchor": "watch-production-and-delivery"
+        },
+        {
+          "line": 163,
+          "level": 3,
+          "title": "Gather, fish and observe wildlife",
+          "anchor": "gather-fish-and-observe-wildlife"
+        },
+        {
+          "line": 206,
+          "level": 3,
+          "title": "Complete funded supply work",
+          "anchor": "complete-funded-supply-work"
+        },
+        {
+          "line": 238,
+          "level": 3,
+          "title": "Build your first home",
+          "anchor": "build-your-first-home"
+        },
+        {
+          "line": 266,
+          "level": 3,
+          "title": "Continue the resource loop",
+          "anchor": "continue-the-resource-loop"
+        },
+        {
+          "line": 283,
+          "level": 2,
+          "title": "Recipes and construction costs",
+          "anchor": "recipes-and-construction-costs"
+        },
+        {
+          "line": 314,
+          "level": 2,
+          "title": "Farming and time",
+          "anchor": "farming-and-time"
+        },
+        {
+          "line": 345,
+          "level": 2,
+          "title": "Ownership, damage and source edits",
+          "anchor": "ownership-damage-and-source-edits"
+        },
+        {
+          "line": 366,
+          "level": 2,
+          "title": "Factions and shared gameplay property",
+          "anchor": "factions-and-shared-gameplay-property"
+        },
+        {
+          "line": 380,
+          "level": 3,
+          "title": "Share a settlement with a second player",
+          "anchor": "share-a-settlement-with-a-second-player"
+        },
+        {
+          "line": 421,
+          "level": 3,
+          "title": "Leaving, removing members and handing over leadership",
+          "anchor": "leaving-removing-members-and-handing-over-leadership"
+        },
+        {
+          "line": 484,
+          "level": 2,
+          "title": "Found a neighborhood and grow a community",
+          "anchor": "found-a-neighborhood-and-grow-a-community"
+        },
+        {
+          "line": 545,
+          "level": 2,
+          "title": "Geographic exploration and layers",
+          "anchor": "geographic-exploration-and-layers"
+        },
+        {
+          "line": 585,
+          "level": 2,
+          "title": "Historical worlds and political editing",
+          "anchor": "historical-worlds-and-political-editing"
+        },
+        {
+          "line": 619,
+          "level": 2,
+          "title": "Save formats and recovery",
+          "anchor": "save-formats-and-recovery"
+        },
+        {
+          "line": 658,
+          "level": 2,
+          "title": "Common reasons an action is rejected",
+          "anchor": "common-reasons-an-action-is-rejected"
+        },
+        {
+          "line": 687,
+          "level": 2,
+          "title": "Management by keyboard and controller",
+          "anchor": "management-by-keyboard-and-controller"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 19,
+          "kind": "link",
+          "label": "GAME_FLOW.md",
+          "target": "GAME_FLOW.md",
+          "resolved_path": "docs/GAME_FLOW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 66,
+          "kind": "link",
+          "label": "TRANSPORT.md",
+          "target": "TRANSPORT.md",
+          "resolved_path": "docs/TRANSPORT.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 67,
+          "kind": "link",
+          "label": "COMPANIES.md",
+          "target": "COMPANIES.md",
+          "resolved_path": "docs/COMPANIES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 160,
+          "kind": "link",
+          "label": "COMPANIES.md",
+          "target": "COMPANIES.md",
+          "resolved_path": "docs/COMPANIES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 161,
+          "kind": "link",
+          "label": "LIVING_WORLD.md",
+          "target": "LIVING_WORLD.md",
+          "resolved_path": "docs/LIVING_WORLD.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 285,
+          "kind": "link",
+          "label": "                  ",
+          "target": "../crates/terra-sandbox/src/catalog.rs",
+          "resolved_path": "crates/terra-sandbox/src/catalog.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 286,
+          "kind": "link",
+          "label": "                      ",
+          "target": "../crates/terra-sandbox/catalog.example.json",
+          "resolved_path": "crates/terra-sandbox/catalog.example.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 476,
+          "kind": "link",
+          "label": "COMPATIBILITY.md",
+          "target": "COMPATIBILITY.md",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 645,
+          "kind": "link",
+          "label": "GAME_FLOW.md",
+          "target": "GAME_FLOW.md",
+          "resolved_path": "docs/GAME_FLOW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 645,
+          "kind": "link",
+          "label": "REGIONAL_PERSISTENCE.md",
+          "target": "REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 681,
+          "kind": "link",
+          "label": "integration",
+          "target": "INTEGRATION.md",
+          "resolved_path": "docs/INTEGRATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 682,
+          "kind": "link",
+          "label": "MMORPG foundation guide",
+          "target": "MMORPG_FOUNDATION.md",
+          "resolved_path": "docs/MMORPG_FOUNDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 682,
+          "kind": "link",
+          "label": "multiplayer",
+          "target": "MULTIPLAYER.md",
+          "resolved_path": "docs/MULTIPLAYER.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 683,
+          "kind": "link",
+          "label": "data",
+          "target": "DATA.md",
+          "resolved_path": "docs/DATA.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 683,
+          "kind": "link",
+          "label": "historical formats",
+          "target": "HISTORY.md",
+          "resolved_path": "docs/HISTORY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 684,
+          "kind": "link",
+          "label": "validation record",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 700,
+          "kind": "link",
+          "label": "CONTROLS.md",
+          "target": "CONTROLS.md",
+          "resolved_path": "docs/CONTROLS.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/LIVING_WORLD.md",
+      "sha256": "4e8163860febfb27f44bb480e5647a40985f6ea550fb6a419792dde66d7a716f",
+      "bytes": 24091,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Living world, ecology, territory and economy",
+          "anchor": "living-world-ecology-territory-and-economy"
+        },
+        {
+          "line": 21,
+          "level": 2,
+          "title": "Principal, body and inventory",
+          "anchor": "principal-body-and-inventory"
+        },
+        {
+          "line": 71,
+          "level": 2,
+          "title": "Credits, prices and funded activity",
+          "anchor": "credits-prices-and-funded-activity"
+        },
+        {
+          "line": 104,
+          "level": 3,
+          "title": "Supply contracts",
+          "anchor": "supply-contracts"
+        },
+        {
+          "line": 137,
+          "level": 2,
+          "title": "Food, water and energy",
+          "anchor": "food-water-and-energy"
+        },
+        {
+          "line": 157,
+          "level": 2,
+          "title": "Wildlife and renewable/finite resources",
+          "anchor": "wildlife-and-renewablefinite-resources"
+        },
+        {
+          "line": 220,
+          "level": 2,
+          "title": "Production chains",
+          "anchor": "production-chains"
+        },
+        {
+          "line": 244,
+          "level": 2,
+          "title": "Physical deliveries and road traffic",
+          "anchor": "physical-deliveries-and-road-traffic"
+        },
+        {
+          "line": 283,
+          "level": 2,
+          "title": "Territory, faction rights and public works",
+          "anchor": "territory-faction-rights-and-public-works"
+        },
+        {
+          "line": 315,
+          "level": 2,
+          "title": "Source placement and graphics",
+          "anchor": "source-placement-and-graphics"
+        },
+        {
+          "line": 331,
+          "level": 2,
+          "title": "Authoritative hosting and persistence",
+          "anchor": "authoritative-hosting-and-persistence"
+        },
+        {
+          "line": 380,
+          "level": 2,
+          "title": "Multiplayer views and practical limits",
+          "anchor": "multiplayer-views-and-practical-limits"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 15,
+          "kind": "link",
+          "label": "living model",
+          "target": "../crates/terra-sandbox/src/living/model.rs",
+          "resolved_path": "crates/terra-sandbox/src/living/model.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 16,
+          "kind": "link",
+          "label": "ecology definitions",
+          "target": "../crates/terra-sandbox/src/ecology/model.rs",
+          "resolved_path": "crates/terra-sandbox/src/ecology/model.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 17,
+          "kind": "link",
+          "label": "settlement model",
+          "target": "../crates/terra-sandbox/src/settlement/model.rs",
+          "resolved_path": "crates/terra-sandbox/src/settlement/model.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 18,
+          "kind": "link",
+          "label": "economy maintenance",
+          "target": "../crates/terra-sandbox/src/settlement/economy.rs",
+          "resolved_path": "crates/terra-sandbox/src/settlement/economy.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 19,
+          "kind": "link",
+          "label": "catalog",
+          "target": "../crates/terra-sandbox/src/catalog.rs",
+          "resolved_path": "crates/terra-sandbox/src/catalog.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 46,
+          "kind": "link",
+          "label": "transport-company layer",
+          "target": "COMPANIES.md",
+          "resolved_path": "docs/COMPANIES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 155,
+          "kind": "link",
+          "label": "TRANSPORT.md",
+          "target": "TRANSPORT.md",
+          "resolved_path": "docs/TRANSPORT.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 201,
+          "kind": "link",
+          "label": "GAMEPLAY.md",
+          "target": "GAMEPLAY.md#recipes-and-construction-costs",
+          "resolved_path": "docs/GAMEPLAY.md",
+          "fragment": "recipes-and-construction-costs",
+          "anchor_document": "docs/GAMEPLAY.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 206,
+          "kind": "link",
+          "label": "Regional persistence",
+          "target": "REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 275,
+          "kind": "link",
+          "label": "CONTACTS_AND_ROUTING.md",
+          "target": "CONTACTS_AND_ROUTING.md",
+          "resolved_path": "docs/CONTACTS_AND_ROUTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 329,
+          "kind": "link",
+          "label": "GRAPHICS_AND_MAPS.md",
+          "target": "GRAPHICS_AND_MAPS.md",
+          "resolved_path": "docs/GRAPHICS_AND_MAPS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 378,
+          "kind": "link",
+          "label": "GAMEPLAY.md",
+          "target": "GAMEPLAY.md#save-formats-and-recovery",
+          "resolved_path": "docs/GAMEPLAY.md",
+          "fragment": "save-formats-and-recovery",
+          "anchor_document": "docs/GAMEPLAY.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 411,
+          "kind": "link",
+          "label": "MMORPG foundation guide",
+          "target": "MMORPG_FOUNDATION.md",
+          "resolved_path": "docs/MMORPG_FOUNDATION.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/SETTLEMENTS_AND_ECONOMY.md",
+      "sha256": "a818c6a48906dd7434cfd62b6660ee3d1b8f483432f85d17b43157d99b74787e",
+      "bytes": 19209,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Settlements, public works and the economy",
+          "anchor": "settlements-public-works-and-the-economy"
+        },
+        {
+          "line": 7,
+          "level": 2,
+          "title": "A practical player loop",
+          "anchor": "a-practical-player-loop"
+        },
+        {
+          "line": 17,
+          "level": 2,
+          "title": "Territory progression",
+          "anchor": "territory-progression"
+        },
+        {
+          "line": 31,
+          "level": 2,
+          "title": "Ownership and regional permissions",
+          "anchor": "ownership-and-regional-permissions"
+        },
+        {
+          "line": 41,
+          "level": 2,
+          "title": "Persistent community membership",
+          "anchor": "persistent-community-membership"
+        },
+        {
+          "line": 105,
+          "level": 2,
+          "title": "Funded supply contracts",
+          "anchor": "funded-supply-contracts"
+        },
+        {
+          "line": 122,
+          "level": 2,
+          "title": "Market pricing and resident income",
+          "anchor": "market-pricing-and-resident-income"
+        },
+        {
+          "line": 141,
+          "level": 2,
+          "title": "Company cash records and economic scope",
+          "anchor": "company-cash-records-and-economic-scope"
+        },
+        {
+          "line": 162,
+          "level": 2,
+          "title": "Physical logistics and failure recovery",
+          "anchor": "physical-logistics-and-failure-recovery"
+        },
+        {
+          "line": 178,
+          "level": 2,
+          "title": "Integration hooks",
+          "anchor": "integration-hooks"
+        },
+        {
+          "line": 198,
+          "level": 2,
+          "title": "Verification",
+          "anchor": "verification"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 88,
+          "kind": "link",
+          "label": "GAMEPLAY.md",
+          "target": "GAMEPLAY.md#leaving-removing-members-and-handing-over-leadership",
+          "resolved_path": "docs/GAMEPLAY.md",
+          "fragment": "leaving-removing-members-and-handing-over-leadership",
+          "anchor_document": "docs/GAMEPLAY.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 89,
+          "kind": "link",
+          "label": "COMPATIBILITY.md",
+          "target": "COMPATIBILITY.md",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 160,
+          "kind": "link",
+          "label": "COMPANIES.md",
+          "target": "COMPANIES.md#cash-accounting-and-the-finances-report",
+          "resolved_path": "docs/COMPANIES.md",
+          "fragment": "cash-accounting-and-the-finances-report",
+          "anchor_document": "docs/COMPANIES.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 176,
+          "kind": "link",
+          "label": "CONTACTS_AND_ROUTING.md",
+          "target": "CONTACTS_AND_ROUTING.md",
+          "resolved_path": "docs/CONTACTS_AND_ROUTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 217,
+          "kind": "link",
+          "label": "Validation",
+          "target": "VALIDATION.md",
+          "resolved_path": "docs/VALIDATION.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/INTEGRATION.md",
+      "sha256": "fcd0974b92acb6eadaf8d53a7332017d22cbf2ce79d8346c264e6bdf086621eb",
+      "bytes": 49468,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Integrating Terra World into a game",
+          "anchor": "integrating-terra-world-into-a-game"
+        },
+        {
+          "line": 5,
+          "level": 2,
+          "title": "Choose the smallest dependency surface",
+          "anchor": "choose-the-smallest-dependency-surface"
+        },
+        {
+          "line": 53,
+          "level": 2,
+          "title": "Coordinates and precision",
+          "anchor": "coordinates-and-precision"
+        },
+        {
+          "line": 74,
+          "level": 3,
+          "title": "Height datums",
+          "anchor": "height-datums"
+        },
+        {
+          "line": 78,
+          "level": 2,
+          "title": "Load your own data",
+          "anchor": "load-your-own-data"
+        },
+        {
+          "line": 88,
+          "level": 3,
+          "title": "Import a raster heightmap",
+          "anchor": "import-a-raster-heightmap"
+        },
+        {
+          "line": 114,
+          "level": 2,
+          "title": "Schedule your systems",
+          "anchor": "schedule-your-systems"
+        },
+        {
+          "line": 131,
+          "level": 3,
+          "title": "Measure the host and client separately",
+          "anchor": "measure-the-host-and-client-separately"
+        },
+        {
+          "line": 150,
+          "level": 2,
+          "title": "Query terrain and environment",
+          "anchor": "query-terrain-and-environment"
+        },
+        {
+          "line": 187,
+          "level": 2,
+          "title": "Configure presentation and game-owned models",
+          "anchor": "configure-presentation-and-game-owned-models"
+        },
+        {
+          "line": 253,
+          "level": 3,
+          "title": "Validated animated packs",
+          "anchor": "validated-animated-packs"
+        },
+        {
+          "line": 272,
+          "level": 2,
+          "title": "Add the living simulation",
+          "anchor": "add-the-living-simulation"
+        },
+        {
+          "line": 369,
+          "level": 2,
+          "title": "Gameplay and content catalogs",
+          "anchor": "gameplay-and-content-catalogs"
+        },
+        {
+          "line": 371,
+          "level": 3,
+          "title": "Ecology and settlement extension points",
+          "anchor": "ecology-and-settlement-extension-points"
+        },
+        {
+          "line": 450,
+          "level": 2,
+          "title": "Reuse geographic interest work",
+          "anchor": "reuse-geographic-interest-work"
+        },
+        {
+          "line": 485,
+          "level": 2,
+          "title": "Persistence and networking",
+          "anchor": "persistence-and-networking"
+        },
+        {
+          "line": 564,
+          "level": 3,
+          "title": "Headless source-surface policy",
+          "anchor": "headless-source-surface-policy"
+        },
+        {
+          "line": 592,
+          "level": 2,
+          "title": "Embed driving and the native session flow",
+          "anchor": "embed-driving-and-the-native-session-flow"
+        },
+        {
+          "line": 631,
+          "level": 2,
+          "title": "Production expansion order",
+          "anchor": "production-expansion-order"
+        },
+        {
+          "line": 643,
+          "level": 2,
+          "title": "Current integration contracts",
+          "anchor": "current-integration-contracts"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 70,
+          "kind": "link",
+          "label": "large-region preset",
+          "target": "../configs/large-region.json",
+          "resolved_path": "configs/large-region.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 97,
+          "kind": "link",
+          "label": "SOURCE_BUNDLES.md",
+          "target": "SOURCE_BUNDLES.md",
+          "resolved_path": "docs/SOURCE_BUNDLES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 112,
+          "kind": "link",
+          "label": "GRAPHICS_AND_MAPS.md",
+          "target": "GRAPHICS_AND_MAPS.md",
+          "resolved_path": "docs/GRAPHICS_AND_MAPS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 147,
+          "kind": "link",
+          "label": "PERFORMANCE.md",
+          "target": "PERFORMANCE.md",
+          "resolved_path": "docs/PERFORMANCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 166,
+          "kind": "link",
+          "label": "VEHICLE_DYNAMICS.md",
+          "target": "VEHICLE_DYNAMICS.md",
+          "resolved_path": "docs/VEHICLE_DYNAMICS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 215,
+          "kind": "link",
+          "label": "GRAPHICS_AND_MAPS.md",
+          "target": "GRAPHICS_AND_MAPS.md",
+          "resolved_path": "docs/GRAPHICS_AND_MAPS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 270,
+          "kind": "link",
+          "label": "ASSET_PACKS.md",
+          "target": "ASSET_PACKS.md",
+          "resolved_path": "docs/ASSET_PACKS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 364,
+          "kind": "link",
+          "label": "LIVING_WORLD.md",
+          "target": "LIVING_WORLD.md",
+          "resolved_path": "docs/LIVING_WORLD.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 431,
+          "kind": "link",
+          "label": "SCALING.md",
+          "target": "SCALING.md",
+          "resolved_path": "docs/SCALING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 440,
+          "kind": "link",
+          "label": "ECOLOGY.md",
+          "target": "ECOLOGY.md",
+          "resolved_path": "docs/ECOLOGY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 440,
+          "kind": "link",
+          "label": "SETTLEMENTS_AND_ECONOMY.md",
+          "target": "SETTLEMENTS_AND_ECONOMY.md",
+          "resolved_path": "docs/SETTLEMENTS_AND_ECONOMY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 440,
+          "kind": "link",
+          "label": "MMORPG_FOUNDATION.md",
+          "target": "MMORPG_FOUNDATION.md",
+          "resolved_path": "docs/MMORPG_FOUNDATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 444,
+          "kind": "link",
+          "label": "GAMEPLAY.md",
+          "target": "GAMEPLAY.md",
+          "resolved_path": "docs/GAMEPLAY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 444,
+          "kind": "link",
+          "label": "catalog example",
+          "target": "../crates/terra-sandbox/catalog.example.json",
+          "resolved_path": "crates/terra-sandbox/catalog.example.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 448,
+          "kind": "link",
+          "label": "HISTORY.md",
+          "target": "HISTORY.md",
+          "resolved_path": "docs/HISTORY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 481,
+          "kind": "link",
+          "label": "SCALING.md",
+          "target": "SCALING.md",
+          "resolved_path": "docs/SCALING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 489,
+          "kind": "link",
+          "label": "REGIONAL_PERSISTENCE.md",
+          "target": "REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 516,
+          "kind": "link",
+          "label": "OPERATIONS.md",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 538,
+          "kind": "link",
+          "label": "CLIENT_PREDICTION.md",
+          "target": "CLIENT_PREDICTION.md",
+          "resolved_path": "docs/CLIENT_PREDICTION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 552,
+          "kind": "link",
+          "label": "NETWORK_REPLICATION.md",
+          "target": "NETWORK_REPLICATION.md",
+          "resolved_path": "docs/NETWORK_REPLICATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 556,
+          "kind": "link",
+          "label": "MULTIPLAYER.md",
+          "target": "MULTIPLAYER.md",
+          "resolved_path": "docs/MULTIPLAYER.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 557,
+          "kind": "link",
+          "label": "NETWORK_REPLICATION.md",
+          "target": "NETWORK_REPLICATION.md",
+          "resolved_path": "docs/NETWORK_REPLICATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 561,
+          "kind": "link",
+          "label": "PERFORMANCE.md",
+          "target": "PERFORMANCE.md",
+          "resolved_path": "docs/PERFORMANCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 590,
+          "kind": "link",
+          "label": "CONTACTS_AND_ROUTING.md",
+          "target": "CONTACTS_AND_ROUTING.md",
+          "resolved_path": "docs/CONTACTS_AND_ROUTING.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 602,
+          "kind": "link",
+          "label": "TRANSPORT.md",
+          "target": "TRANSPORT.md",
+          "resolved_path": "docs/TRANSPORT.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 628,
+          "kind": "link",
+          "label": "GAME_FLOW.md",
+          "target": "GAME_FLOW.md",
+          "resolved_path": "docs/GAME_FLOW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 651,
+          "kind": "link",
+          "label": "COMPANIES.md",
+          "target": "COMPANIES.md",
+          "resolved_path": "docs/COMPANIES.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 664,
+          "kind": "link",
+          "label": "CONTACTS_AND_ROUTING.md",
+          "target": "CONTACTS_AND_ROUTING.md",
+          "resolved_path": "docs/CONTACTS_AND_ROUTING.md",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/MULTIPLAYER.md",
+      "sha256": "7453016c1068a3cfc0a5dac94b50bf48a0ab2bd9b1fb62a468e231b40e189999",
+      "bytes": 34534,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Multiplayer host and integration guide",
+          "anchor": "multiplayer-host-and-integration-guide"
+        },
+        {
+          "line": 13,
+          "level": 2,
+          "title": "Start a shared world",
+          "anchor": "start-a-shared-world"
+        },
+        {
+          "line": 95,
+          "level": 2,
+          "title": "Save and resume the host",
+          "anchor": "save-and-resume-the-host"
+        },
+        {
+          "line": 97,
+          "level": 3,
+          "title": "Transactional regional storage",
+          "anchor": "transactional-regional-storage"
+        },
+        {
+          "line": 188,
+          "level": 3,
+          "title": "Portable JSON snapshots",
+          "anchor": "portable-json-snapshots"
+        },
+        {
+          "line": 212,
+          "level": 2,
+          "title": "Historical terrain and political geography",
+          "anchor": "historical-terrain-and-political-geography"
+        },
+        {
+          "line": 253,
+          "level": 2,
+          "title": "Sandbox, living and faction authority",
+          "anchor": "sandbox-living-and-faction-authority"
+        },
+        {
+          "line": 255,
+          "level": 3,
+          "title": "Frontier commands and saves",
+          "anchor": "frontier-commands-and-saves"
+        },
+        {
+          "line": 346,
+          "level": 2,
+          "title": "Integrate another game",
+          "anchor": "integrate-another-game"
+        },
+        {
+          "line": 434,
+          "level": 2,
+          "title": "Revisioned replication and observability",
+          "anchor": "revisioned-replication-and-observability"
+        },
+        {
+          "line": 491,
+          "level": 2,
+          "title": "Budgets and current deployment limits",
+          "anchor": "budgets-and-current-deployment-limits"
+        },
+        {
+          "line": 533,
+          "level": 2,
+          "title": "Reproduce the network checks",
+          "anchor": "reproduce-the-network-checks"
+        },
+        {
+          "line": 558,
+          "level": 2,
+          "title": "Trusted provisioning and conditioned transport acceptance",
+          "anchor": "trusted-provisioning-and-conditioned-transport-acceptance"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 40,
+          "kind": "link",
+          "label": "client prediction",
+          "target": "CLIENT_PREDICTION.md",
+          "resolved_path": "docs/CLIENT_PREDICTION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 176,
+          "kind": "link",
+          "label": "OPERATIONS.md",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 488,
+          "kind": "link",
+          "label": "NETWORK_REPLICATION.md",
+          "target": "NETWORK_REPLICATION.md",
+          "resolved_path": "docs/NETWORK_REPLICATION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 526,
+          "kind": "link",
+          "label": "client prediction",
+          "target": "CLIENT_PREDICTION.md",
+          "resolved_path": "docs/CLIENT_PREDICTION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 567,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md#provision-a-new-principal-without-opening-guests",
+          "resolved_path": "docs/OPERATIONS.md",
+          "fragment": "provision-a-new-principal-without-opening-guests",
+          "anchor_document": "docs/OPERATIONS.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 573,
+          "kind": "link",
+          "label": "the condition bounds and interpretation",
+          "target": "NETWORK_REPLICATION.md#reproduce-delayed-fragmented-and-stalled-connections",
+          "resolved_path": "docs/NETWORK_REPLICATION.md",
+          "fragment": "reproduce-delayed-fragmented-and-stalled-connections",
+          "anchor_document": "docs/NETWORK_REPLICATION.md",
+          "status": "valid_anchor"
+        }
+      ]
+    },
+    {
+      "path": "docs/NETWORK_REPLICATION.md",
+      "sha256": "3faf6178afaed31ad73a30be25091c7b5fbff17744e6a133f2923368a67b92b8",
+      "bytes": 30217,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Network protocol 11, replication and transport",
+          "anchor": "network-protocol-11-replication-and-transport"
+        },
+        {
+          "line": 27,
+          "level": 2,
+          "title": "Connection and authoritative control",
+          "anchor": "connection-and-authoritative-control"
+        },
+        {
+          "line": 61,
+          "level": 2,
+          "title": "Streams and lifecycle",
+          "anchor": "streams-and-lifecycle"
+        },
+        {
+          "line": 111,
+          "level": 2,
+          "title": "Entity patches and bounds",
+          "anchor": "entity-patches-and-bounds"
+        },
+        {
+          "line": 141,
+          "level": 2,
+          "title": "Public appearance and private records",
+          "anchor": "public-appearance-and-private-records"
+        },
+        {
+          "line": 183,
+          "level": 2,
+          "title": "Interest and scheduling",
+          "anchor": "interest-and-scheduling"
+        },
+        {
+          "line": 199,
+          "level": 2,
+          "title": "Regional persistence and durable outcomes",
+          "anchor": "regional-persistence-and-durable-outcomes"
+        },
+        {
+          "line": 230,
+          "level": 2,
+          "title": "Verified TLS and deployment policy",
+          "anchor": "verified-tls-and-deployment-policy"
+        },
+        {
+          "line": 267,
+          "level": 2,
+          "title": "Metrics and integrations",
+          "anchor": "metrics-and-integrations"
+        },
+        {
+          "line": 305,
+          "level": 2,
+          "title": "Current correctness evidence",
+          "anchor": "current-correctness-evidence"
+        },
+        {
+          "line": 332,
+          "level": 2,
+          "title": "Reproduce delayed, fragmented and stalled connections",
+          "anchor": "reproduce-delayed-fragmented-and-stalled-connections"
+        },
+        {
+          "line": 370,
+          "level": 2,
+          "title": "Reproduce a finite loopback workload",
+          "anchor": "reproduce-a-finite-loopback-workload"
+        },
+        {
+          "line": 397,
+          "level": 2,
+          "title": "Archived v0.4 performance run",
+          "anchor": "archived-v04-performance-run"
+        },
+        {
+          "line": 437,
+          "level": 2,
+          "title": "SDK handshake and wire/event admission",
+          "anchor": "sdk-handshake-and-wireevent-admission"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 20,
+          "kind": "link",
+          "label": "CLIENT_PREDICTION.md",
+          "target": "CLIENT_PREDICTION.md",
+          "resolved_path": "docs/CLIENT_PREDICTION.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 24,
+          "kind": "link",
+          "label": "Compatibility",
+          "target": "COMPATIBILITY.md",
+          "resolved_path": "docs/COMPATIBILITY.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 59,
+          "kind": "link",
+          "label": "Transport",
+          "target": "TRANSPORT.md",
+          "resolved_path": "docs/TRANSPORT.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 173,
+          "kind": "link",
+          "label": "TLS lifecycle regression",
+          "target": "../crates/terra-net/tests/faction_lifecycle_tls.rs",
+          "resolved_path": "crates/terra-net/tests/faction_lifecycle_tls.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 227,
+          "kind": "link",
+          "label": "Regional persistence",
+          "target": "REGIONAL_PERSISTENCE.md",
+          "resolved_path": "docs/REGIONAL_PERSISTENCE.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 227,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md",
+          "resolved_path": "docs/OPERATIONS.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 264,
+          "kind": "link",
+          "label": "Operations",
+          "target": "OPERATIONS.md#tls-transport-and-player-capabilities",
+          "resolved_path": "docs/OPERATIONS.md",
+          "fragment": "tls-transport-and-player-capabilities",
+          "anchor_document": "docs/OPERATIONS.md",
+          "status": "valid_anchor"
+        },
+        {
+          "line": 314,
+          "kind": "link",
+          "label": "Driving tests",
+          "target": "../crates/terra-net/tests/driving.rs",
+          "resolved_path": "crates/terra-net/tests/driving.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 318,
+          "kind": "link",
+          "label": "Regional tests",
+          "target": "../crates/terra-net/tests/regional_persistence.rs",
+          "resolved_path": "crates/terra-net/tests/regional_persistence.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 322,
+          "kind": "link",
+          "label": "TLS tests",
+          "target": "../crates/terra-net/tests/tls_transport.rs",
+          "resolved_path": "crates/terra-net/tests/tls_transport.rs",
+          "status": "valid_destination"
+        },
+        {
+          "line": 399,
+          "kind": "link",
+          "label": "complete JSON result",
+          "target": "network-load-v0.4.json",
+          "resolved_path": "docs/network-load-v0.4.json",
+          "status": "valid_destination"
+        }
+      ]
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "sha256": "4cb03983edb4f8b4bd6be92678020933833b1a4cac546cc88fe9d1f4809b79e6",
+      "bytes": 10533,
+      "headings": [
+        {
+          "line": 1,
+          "level": 1,
+          "title": "Validation \u2014 Terra World 0.21.0",
+          "anchor": "validation--terra-world-0210"
+        },
+        {
+          "line": 6,
+          "level": 2,
+          "title": "Direct final acceptance",
+          "anchor": "direct-final-acceptance"
+        },
+        {
+          "line": 50,
+          "level": 2,
+          "title": "Executed coverage",
+          "anchor": "executed-coverage"
+        },
+        {
+          "line": 80,
+          "level": 2,
+          "title": "Candidate evidence and corrections",
+          "anchor": "candidate-evidence-and-corrections"
+        },
+        {
+          "line": 108,
+          "level": 2,
+          "title": "Fresh native inspection",
+          "anchor": "fresh-native-inspection"
+        },
+        {
+          "line": 142,
+          "level": 2,
+          "title": "Reviews, documentation and preservation",
+          "anchor": "reviews-documentation-and-preservation"
+        },
+        {
+          "line": 166,
+          "level": 2,
+          "title": "Platform, compatibility and remaining limits",
+          "anchor": "platform-compatibility-and-remaining-limits"
+        }
+      ],
+      "heading_level_jumps": [],
+      "parse_findings": [],
+      "links": [
+        {
+          "line": 22,
+          "kind": "link",
+          "label": "completed receipt",
+          "target": "verification/v0.21-final-acceptance/completed-gates.json",
+          "resolved_path": "docs/verification/v0.21-final-acceptance/completed-gates.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 44,
+          "kind": "link",
+          "label": "source manifest",
+          "target": "verification/v0.21-final-acceptance/source-hashes.json",
+          "resolved_path": "docs/verification/v0.21-final-acceptance/source-hashes.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 45,
+          "kind": "link",
+          "label": "distinct identities",
+          "target": "verification/v0.21-final-acceptance/distinct-tests.json",
+          "resolved_path": "docs/verification/v0.21-final-acceptance/distinct-tests.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 62,
+          "kind": "link",
+          "label": "report",
+          "target": "verification/v0.21-final-acceptance/regional-sessions.json",
+          "resolved_path": "docs/verification/v0.21-final-acceptance/regional-sessions.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 112,
+          "kind": "link",
+          "label": "native record",
+          "target": "verification/v0.21-native/README.md",
+          "resolved_path": "docs/verification/v0.21-native/README.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 133,
+          "kind": "link",
+          "label": "input association",
+          "target": "verification/v0.21-native/confirmation-input-association.json",
+          "resolved_path": "docs/verification/v0.21-native/confirmation-input-association.json",
+          "status": "valid_destination"
+        },
+        {
+          "line": 145,
+          "kind": "link",
+          "label": "plan",
+          "target": "IMPLEMENTATION_PLAN_v0.21.md",
+          "resolved_path": "docs/IMPLEMENTATION_PLAN_v0.21.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 146,
+          "kind": "link",
+          "label": "current review",
+          "target": "PRODUCT_REVIEW.md",
+          "resolved_path": "docs/PRODUCT_REVIEW.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 147,
+          "kind": "link",
+          "label": "complete G01\u2013G18 register",
+          "target": "REVIEW_GAPS_v0.21.md",
+          "resolved_path": "docs/REVIEW_GAPS_v0.21.md",
+          "status": "valid_destination"
+        },
+        {
+          "line": 151,
+          "kind": "link",
+          "label": "preservation audit",
+          "target": "verification/v0.21-review/preservation.md",
+          "resolved_path": "docs/verification/v0.21-review/preservation.md",
+          "status": "valid_destination"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "No HTTP/external fetching and no target content correctness review.",
+    "Local links are checked one hop; linked historical documents are not recursively audited.",
+    "GitHub-style ATX/Setext/duplicate heading slugs and explicit HTML IDs are supported; not a full CommonMark renderer.",
+    "Fenced/inline code and HTML comments are excluded; complex custom HTML, MDX, multiline reference definitions and indented code require manual inspection.",
+    "Non-Markdown fragments other than source line ranges are explicitly reported unchecked.",
+    "Root-leading local paths are resolved relative to the repository root; no read outside that root.",
+    "This active-tree audit is not final native, canonical test or packaged-archive acceptance."
+  ]
+}

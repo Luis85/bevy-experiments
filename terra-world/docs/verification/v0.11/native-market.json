@@ -1,0 +1,31 @@
+{
+  "version": "0.11.0",
+  "source": "observed native UI actions and complete committed snapshots",
+  "purchase": {
+    "item": "water",
+    "quantity": 5,
+    "displayed_total_minor": 410,
+    "wallet_before_minor": 20568,
+    "wallet_after_minor": 20158,
+    "shop_before_units": 37,
+    "shop_after_units": 32,
+    "carried_after_units": 5
+  },
+  "sale": {
+    "item": "water",
+    "quantity": 1,
+    "displayed_total_minor": 30,
+    "wallet_after_minor": 20188,
+    "shop_after_units": 33,
+    "carried_after_units": 4
+  },
+  "exact_exchange": {
+    "combined_money_before_minor": 94238,
+    "combined_money_after_minor": 94238,
+    "combined_water_before_units": 37,
+    "combined_water_after_units": 37
+  },
+  "checkpoint_generation": 167,
+  "progress_unchanged": true,
+  "simulation_paused_during_trades": true
+}

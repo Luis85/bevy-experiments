@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "315-confirmation-polish-repeat-cancelled",
+  "capture_started_utc": "2026-10-30T13:06:21.857242+00:00",
+  "captured_utc": "2026-10-30T13:06:22.085436+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 78977,
+  "window_pid_status": "available",
+  "window_pid_before": 78977,
+  "window_pid_after": 78977,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "315-confirmation-polish-repeat-cancelled.png",
+    "sha256": "2b438c0504173a1f466fe43feefa4942e29fbc6ad71382fcf61d58426a4d8f4d",
+    "bytes": 578237
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

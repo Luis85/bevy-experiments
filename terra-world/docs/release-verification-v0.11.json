@@ -1,0 +1,112 @@
+{
+  "version": "0.11.0",
+  "recorded_utc": "2026-10-28T14:10:43.398573+00:00",
+  "status": "fresh release gates and final native confirmation passed",
+  "compatibility": {
+    "wire_protocol": 8,
+    "tls_alpn": "terra-world/8",
+    "domain_save": 1,
+    "regional_schema": 1,
+    "mixed_executable_versions_certified": false
+  },
+  "automated": {
+    "distinct_passing_rust_tests": 700,
+    "by_crate": {
+      "terra-bevy": 99,
+      "terra-cli": 4,
+      "terra-core": 33,
+      "terra-demo": 100,
+      "terra-history": 13,
+      "terra-net": 117,
+      "terra-persistence": 35,
+      "terra-sandbox": 266,
+      "terra-stream": 33
+    },
+    "failed": 0,
+    "ignored": 0,
+    "all_commands_executed_fresh": true,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.11/gates.json",
+      "sha256": "73a6677f46354bdfcf251bdee37842615ed97ede2a398990b85467ce8d877e26",
+      "bytes": 7183
+    },
+    "test_identities": {
+      "path": "docs/verification/v0.11/distinct-tests.json",
+      "sha256": "84e8aba0f84b97c5c2cb44c77044a5ab92248591b6202ffe2ae388672818188b",
+      "bytes": 108658
+    },
+    "capture_review": {
+      "path": "docs/verification/v0.11/verifier-capture-review.log",
+      "sha256": "7fd4b025ff8c9aaa1b44003e7e039f913d9cb04e121a21966a275dc14ba9f946",
+      "bytes": 587
+    }
+  },
+  "source_freeze": {
+    "inputs": 313,
+    "unchanged_through_gates_and_native_confirmation": true,
+    "manifest": {
+      "path": "docs/verification/v0.11/source-hashes.json",
+      "sha256": "36da4f58f519681ba8a1b359e7a497cd3426e78a187b66d751997abaa7b942af",
+      "bytes": 36532
+    },
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.11/baseline-comparison.json",
+      "sha256": "14dd63770de6ecbcab9319160066147a10ab4774f5643865678819372267de95",
+      "bytes": 5109
+    }
+  },
+  "native": {
+    "binary_sha256": "a1e3391a81327c2a05b9e31bd442d8e9cb27b0b99cd09b6bc1f8e84cc5f15107",
+    "evidence": {
+      "path": "docs/native-v11-verification.json",
+      "sha256": "1aedc1b9e46154b565e5668a148eeca8953c3a3ea57361046a02c03cc5afb020",
+      "bytes": 18592
+    }
+  },
+  "asset_acceptance": {
+    "path": "docs/verification/v0.11/asset-pack.json",
+    "sha256": "31263b030331e41bc622f5ca356ba24e2a3bf1442916ffb3dc3f3179abf504df",
+    "bytes": 2301
+  },
+  "recovery_probe": {
+    "path": "docs/verification/v0.11/recovery.json",
+    "sha256": "29dc2c284b825d22149cf5de6909302185881a4070bedc42bf55bf86779efc06",
+    "bytes": 1882
+  },
+  "finite_career": {
+    "path": "docs/verification/v0.11/career-report.json",
+    "sha256": "6f3734892879bf2dd73ac8ee9f7c52c0b461e317ada7283e6737f28e00a673f7",
+    "bytes": 909
+  },
+  "prior_failed_capture": {
+    "accepted_as_release_evidence": false,
+    "record": {
+      "path": "docs/verification/v0.11-incomplete-capture/gates.json",
+      "sha256": "798650bb48474784e335e30cb4c0a3c2476187506aacb46da51465e044cd9b64",
+      "bytes": 2960
+    }
+  },
+  "product_review": {
+    "path": "docs/PRODUCT_REVIEW.md",
+    "sha256": "fb97613fe9ad15bbeb0ffb9113ca7619c330e2b1bb6381d591d645c1e861584e",
+    "bytes": 13145
+  },
+  "gap_register": {
+    "path": "docs/REVIEW_GAPS_v0.11.md",
+    "sha256": "bf0a1a3e7a13c5b017a1b7588d25014ec0113e17615ef971a7b63212652611c9",
+    "bytes": 23786
+  },
+  "validation_narrative": {
+    "path": "docs/VALIDATION.md",
+    "sha256": "4168b587a3109bfd246770e88f94d461c52f4267cdf826d478f8de62a3ebf688",
+    "bytes": 14340
+  },
+  "remaining_acceptance": [
+    "Complete expense history and representative long-career balance; finite career still reports -4.69 credits excluding owner transfers.",
+    "Dense navigation and saved-queue recovery remain bounded; the historical occupied-exit diagnostic was not claimed solved.",
+    "Importer budgets are per model; no total-scene GPU or streaming budget is certified.",
+    "Prepared coverage is regional authored data, without a global/licensed historical-world completeness claim.",
+    "The larger recovery probe is storage-only with zero clients; representative live capacity and distributed operation remain unmeasured.",
+    "Native review is Linux/X11 software Vulkan with keyboard/mouse; other platforms, physical devices, localization and assistive technologies need acceptance."
+  ]
+}

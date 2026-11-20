@@ -1,0 +1,32 @@
+{
+  "release": "0.14.0",
+  "phase": "confirmation",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--config",
+    "/tmp/terra-native/v14-prepared-recovery-restored/world-config.json",
+    "--no-default-politics",
+    "--quality",
+    "performance",
+    "--camp-view",
+    "--asset-pack",
+    "/tmp/terra-native/v14-authored-pack/pack.json",
+    "--user-data",
+    "/tmp/terra-native/v14-confirm-user-data",
+    "--telemetry",
+    "/tmp/terra-native/v14-interruption-history.json",
+    "--telemetry-interval-seconds",
+    "2"
+  ],
+  "working_directory": "/tmp/terra-native",
+  "started_utc": "2026-10-28T20:44:03.571635+00:00",
+  "binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531",
+  "source_input_count": 347,
+  "expected_interruption": true,
+  "pid": 22593,
+  "exit_code": -9,
+  "finished_utc": "2026-10-28T20:44:33.784467+00:00",
+  "seconds": 30.09938929600321,
+  "source_inputs_unchanged": true,
+  "log_sha256": "7931ce4808b6f849963ef1ec6c25e1019ab0e2ca73e2dfa3452ef5f9f763f09d"
+}

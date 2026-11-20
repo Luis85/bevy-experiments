@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "18-candidate-time-120",
+  "capture_started_utc": "2026-10-29T21:03:38.994254+00:00",
+  "captured_utc": "2026-10-29T21:03:39.129233+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Main menu",
+  "window_pid": 207201,
+  "window_pid_status": "available",
+  "window_pid_before": 207201,
+  "window_pid_after": 207201,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "18-candidate-time-120.png",
+    "sha256": "fd209a7e0066886f9b112cba9a09eece20bf87112046968e82b3acb7188423a2",
+    "bytes": 214200
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

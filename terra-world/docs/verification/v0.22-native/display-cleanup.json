@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "stopped_utc": "2026-10-29T21:38:46.003149+00:00",
+  "owned_display_pid": 184504,
+  "display": ":103",
+  "signal": "SIGTERM",
+  "native_processes_already_exited": [
+    207201,
+    210688,
+    212865
+  ]
+}

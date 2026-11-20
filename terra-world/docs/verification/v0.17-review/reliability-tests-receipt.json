@@ -1,0 +1,31 @@
+{
+  "scope": "Terra World 0.17 candidate persistence worker contract; not full release or native acceptance",
+  "recorded_at_utc": "2026-10-29T08:38:24.794663+00:00",
+  "command": "cargo test -p terra-persistence --lib --locked -- --nocapture",
+  "environment": "/tmp/terra-build/environment.sh",
+  "exit_code": 0,
+  "tests": {
+    "passed": 38,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0
+  },
+  "log": "docs/verification/v0.17-review/persistence-worker-tests-final.log",
+  "log_sha256": "f2054b995c34842508b33b7b05625e85b7df18f0de0894eba0ec3b4febbf29a6",
+  "worker_sources_sha256": {
+    "crates/terra-persistence/src/worker.rs": "46cff619d2bdc31c042d7904a30a03e28da095c2b496bcf0dcd98d453a8e8a9d",
+    "crates/terra-persistence/src/worker_tests.rs": "2d211aa2d0d92a1a8683024ee075673ad6dbe61b7e0e4cda1fac2dbaa543334f"
+  },
+  "adapter_source_reviewed_not_compiled_by_this_command": [
+    "crates/terra-bevy/src/regions.rs",
+    "crates/terra-bevy/src/sandbox.rs"
+  ],
+  "new_regressions": [
+    "worker::tests::lost_checkpoint_completion_stops_waiting_and_reopen_recovers_the_exact_commit",
+    "worker::tests::lost_hydration_completion_fails_finish_and_preserves_the_checkpoint",
+    "worker::tests::disconnected_idle_worker_rejects_submission_and_later_finish"
+  ],
+  "ordinary_failure_retry_unchanged": "tests::worker_failure_preserves_state_and_generation_then_retry_commits",
+  "public_failpoint_added": false,
+  "schemas_or_authority_changed": false
+}

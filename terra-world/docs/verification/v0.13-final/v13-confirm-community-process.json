@@ -1,0 +1,24 @@
+{
+  "release": "0.13.0",
+  "phase": "confirmation",
+  "kind": "community",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--config",
+    "/tmp/terra-native/v13-community-config.json",
+    "--user-data",
+    "/tmp/terra-native/v13-confirm-user-data",
+    "--camp-view",
+    "--quality",
+    "performance",
+    "--telemetry",
+    "/tmp/terra-native/v13-confirm-community-telemetry.json"
+  ],
+  "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+  "source_input_count": 338,
+  "started_utc": "2026-10-28T18:34:36.057447+00:00",
+  "pid": 130813,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T18:35:57.432531+00:00",
+  "source_inputs_unchanged": true
+}

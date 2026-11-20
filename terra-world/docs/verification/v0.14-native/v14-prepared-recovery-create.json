@@ -1,0 +1,31 @@
+{
+  "bundle_identity": "sha256:d062719256f5238561c1d486a83d82fff21ab293bc4c832d40e1fbe6a4467765",
+  "source_generation": 31,
+  "region_level": 15,
+  "file_count": 11,
+  "total_bytes": 336233,
+  "prepared_source": true,
+  "political_source": false,
+  "domain_validated": true,
+  "local_host_metadata_validated": true,
+  "catalog_exact": true,
+  "source_dependencies_validated": true,
+  "inspection": {
+    "database_schema": 1,
+    "generation": 31,
+    "region_level": 15,
+    "nonempty_regions": 14,
+    "paged_records": 251,
+    "global_records": 86,
+    "checkpoint_payload_bytes": 153627,
+    "checkpoint_limit_bytes": 67108864,
+    "checkpoint_remaining_bytes": 66955237,
+    "region_limit": 4096,
+    "players": 1,
+    "living_bodies": 65,
+    "resources": 67,
+    "structures": 0,
+    "domain_validated": true,
+    "game_metadata_requires_host_validation": false
+  }
+}

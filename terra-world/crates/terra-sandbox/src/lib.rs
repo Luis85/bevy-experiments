@@ -2,15 +2,31 @@
 
 mod catalog;
 mod commands;
+mod dormancy;
+mod ecology;
 mod factions;
+mod guidance;
+mod interest;
 mod living;
 mod persistence;
+pub mod publication;
+mod regions;
+mod settlement;
+mod spatial;
 mod state;
+mod transport;
 
 pub use catalog::*;
 pub use commands::*;
+pub use ecology::*;
+pub use guidance::*;
+pub use interest::*;
 pub use living::*;
+pub use regions::*;
+pub use settlement::*;
+pub use spatial::*;
 pub use state::*;
+pub use transport::*;
 
 use thiserror::Error;
 
@@ -54,6 +70,8 @@ pub enum SandboxError {
     Data(#[from] terra_core::WorldDataError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Publication(#[from] publication::PublicationError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }

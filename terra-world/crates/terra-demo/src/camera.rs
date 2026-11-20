@@ -53,9 +53,10 @@ fn setup_camera(
     mut runtime: ResMut<WorldRuntime>,
     options: Res<crate::DemoOptions>,
     mut politics: ResMut<PoliticalWorld>,
+    persistence: Res<terra_bevy::RegionalPersistence>,
 ) {
     politics.atlas = options.atlas;
-    if options.noon && !runtime.network_authority {
+    if options.noon && !runtime.network_authority && !persistence.restored {
         runtime.clock.unix_seconds = (runtime.clock.unix_seconds / 86400.).floor() * 86400.
             + ((12. - runtime.focus.longitude / 15.).rem_euclid(24.)) * 3600.;
     }
@@ -79,6 +80,8 @@ fn setup_camera(
     commands.spawn((
         ExplorerCamera,
         Camera3d::default(),
+        bevy::camera::Exposure { ev100: 10.8 },
+        bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
         Projection::Perspective(PerspectiveProjection {
             far: 50_000.,
             near: 0.1,
@@ -188,17 +191,53 @@ fn control_camera(
     window: Single<&Window>,
     control: Res<PlayerControl>,
     mut locomotion: ResMut<LivingMotion>,
-    mut net: Option<ResMut<NetworkStatus>>,
+    session: (
+        Option<ResMut<NetworkStatus>>,
+        Option<Res<crate::flow::GameFlow>>,
+        Res<crate::player_input::PlayerInput>,
+        Res<crate::player_input::InputSettings>,
+    ),
     viewport: Res<WorldViewport>,
     sandbox: Res<SandboxRuntime>,
 ) {
+    let (mut net, flow, input, settings) = session;
     let in_view = window
         .cursor_position()
         .is_some_and(|p| viewport.contains(&window, p, politics.atlas));
     locomotion.active = false;
     locomotion.velocity_enu_m_s = [0.; 3];
+    locomotion.drive = None;
     if let Some(net) = net.as_mut() {
         net.desired_velocity_enu_m_s = [0.; 3];
+        net.desired_drive = None;
+    }
+    let controlled_vehicle = sandbox
+        .state
+        .living
+        .active_unit(sandbox.player_id)
+        .filter(|u| sandbox.state.transport.vehicles.contains_key(&u.id))
+        .filter(|_| {
+            sandbox
+                .state
+                .living
+                .accounts
+                .get(&sandbox.player_id)
+                .is_some_and(|a| a.possessed)
+        });
+    if controlled_vehicle.is_some()
+        && (input.world_blocked()
+            || politics.atlas
+            || ui.editing_gps
+            || flow.as_ref().is_some_and(|f| f.blocks_input()))
+    {
+        locomotion.active = true;
+        locomotion.drive = Some(terra_core::DriveInput::stopped());
+        if let Some(net) = net.as_mut() {
+            net.desired_drive = locomotion.drive;
+        }
+    }
+    if input.world_blocked() || flow.as_ref().is_some_and(|f| f.blocks_input()) {
+        return;
     }
     if politics.atlas {
         if !ui.editing_gps && in_view {
@@ -218,104 +257,142 @@ fn control_camera(
         }
         return;
     }
-    if control.mode.is_possessed()
-        && let Some(unit) = control
+    if control.mode.is_possessed() {
+        if let Some(unit) = control
             .possessed
             .and_then(|id| sandbox.state.living.units.get(&id))
-    {
-        let entering = rig.last_mode == ControlMode::Rts;
-        rig.last_mode = control.mode;
-        rig.needs_grounding = false;
-        if !ui.editing_gps {
-            if buttons.pressed(MouseButton::Right) && in_view {
-                rig.yaw -= mouse.delta.x * 0.003;
-                rig.pitch = (rig.pitch - mouse.delta.y * 0.003).clamp(-1.35, 1.25);
-            }
-            if in_view && control.mode == ControlMode::ThirdPerson {
-                rig.follow_distance = (rig.follow_distance - scroll.delta.y * 0.75).clamp(2.5, 14.);
-            }
-            let direction = Vec2::new(
-                (keys.pressed(KeyCode::KeyD) as u8 as f32)
-                    - (keys.pressed(KeyCode::KeyA) as u8 as f32),
-                (keys.pressed(KeyCode::KeyS) as u8 as f32)
-                    - (keys.pressed(KeyCode::KeyW) as u8 as f32),
-            );
-            let air = unit.kind.travel_mode() == TravelMode::Air;
-            let vertical = if air {
-                (keys.pressed(KeyCode::KeyR) as u8 as f32)
-                    - (keys.pressed(KeyCode::KeyF) as u8 as f32)
-            } else {
-                0.
-            };
-            let sprint = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-            let capability = unit.speed_limit_m_s();
-            let speed = if sprint {
-                capability
-            } else {
-                capability
-                    * if unit.kind == ActorKind::Human {
-                        0.60
-                    } else {
-                        0.72
-                    }
-            };
-            let velocity = movement_velocity(direction, rig.yaw, vertical, speed);
-            let accepted = sandbox
-                .state
-                .living
-                .accounts
-                .get(&sandbox.player_id)
-                .is_some_and(|a| a.possessed && a.active_unit == unit.id);
-            if accepted {
-                locomotion.active = true;
-                locomotion.velocity_enu_m_s = velocity;
-                locomotion.heading_deg = if velocity[0].hypot(velocity[1]) > 0.001 {
-                    velocity[0].atan2(velocity[1]).to_degrees() as f32
+        {
+            let (display_position, display_heading) = net
+                .as_ref()
+                .and_then(|net| net.predicted_actor.as_ref())
+                .filter(|actor| actor.id == unit.id)
+                .map_or((unit.position, unit.heading_deg), |actor| {
+                    (actor.position, actor.heading_deg)
+                });
+            let entering = rig.last_mode == ControlMode::Rts;
+            rig.last_mode = control.mode;
+            rig.needs_grounding = false;
+            if !ui.editing_gps {
+                if buttons.pressed(MouseButton::Right) && in_view {
+                    rig.yaw -= mouse.delta.x * 0.003 * settings.mouse_sensitivity;
+                    rig.pitch = (rig.pitch
+                        - mouse.delta.y
+                            * 0.003
+                            * settings.mouse_sensitivity
+                            * if settings.invert_y { -1. } else { 1. })
+                    .clamp(-1.35, 1.25);
+                }
+                if in_view && control.mode == ControlMode::ThirdPerson {
+                    rig.follow_distance =
+                        (rig.follow_distance - scroll.delta.y * 0.75).clamp(2.5, 14.);
+                }
+                rig.yaw -= input.look.x * 2.0 * time.delta_secs().min(0.1);
+                rig.pitch = (rig.pitch
+                    + input.look.y
+                        * 1.6
+                        * time.delta_secs().min(0.1)
+                        * if settings.invert_y { -1. } else { 1. })
+                .clamp(-1.35, 1.25);
+                let direction = input.movement;
+                let air = unit.kind.travel_mode() == TravelMode::Air;
+                let vertical = if air { input.vertical } else { 0. };
+                let sprint = input.sprint;
+                let capability = unit.speed_limit_m_s();
+                let speed = if sprint {
+                    capability
                 } else {
-                    -rig.yaw.to_degrees()
+                    capability
+                        * if unit.kind == ActorKind::Human {
+                            0.60
+                        } else {
+                            0.72
+                        }
                 };
-                if let Some(net) = net.as_mut() {
-                    net.desired_velocity_enu_m_s = velocity;
-                    net.follow_player = false;
+                let velocity = movement_velocity(direction, rig.yaw, vertical, speed);
+                let accepted = sandbox
+                    .state
+                    .living
+                    .accounts
+                    .get(&sandbox.player_id)
+                    .is_some_and(|a| a.possessed && a.active_unit == unit.id);
+                if accepted {
+                    locomotion.active = true;
+                    locomotion.velocity_enu_m_s = velocity;
+                    locomotion.heading_deg = if velocity[0].hypot(velocity[1]) > 0.001 {
+                        velocity[0].atan2(velocity[1]).to_degrees() as f32
+                    } else {
+                        -rig.yaw.to_degrees()
+                    };
+                    if let Some(net) = net.as_mut() {
+                        net.desired_velocity_enu_m_s = velocity;
+                        net.follow_player = false;
+                    }
+                    if sandbox.state.transport.vehicles.contains_key(&unit.id) {
+                        let drive = input.drive;
+                        locomotion.velocity_enu_m_s = [0.; 3];
+                        locomotion.drive = Some(drive);
+                        if let Some(net) = net.as_mut() {
+                            net.desired_drive = Some(drive);
+                            net.desired_velocity_enu_m_s = [0.; 3];
+                        }
+                        if settings.driving_auto_center
+                            && !buttons.pressed(MouseButton::Right)
+                            && input.look.length_squared() < 0.0001
+                        {
+                            let target = -display_heading.to_radians();
+                            let delta = (target - rig.yaw + std::f32::consts::PI)
+                                .rem_euclid(std::f32::consts::TAU)
+                                - std::f32::consts::PI;
+                            rig.yaw += delta * (1. - (-5. * time.delta_secs().min(0.25)).exp());
+                        }
+                    }
                 }
             }
-        }
-        let (eye_height, distance) = chase_offsets(unit.kind, rig.follow_distance);
-        let mut eye = unit.position;
-        eye.altitude_m += eye_height as f64;
-        let desired = if control.mode == ControlMode::FirstPerson {
-            eye
-        } else {
-            let rotation = Quat::from_euler(EulerRot::YXZ, rig.yaw, rig.pitch, 0.);
-            let offset = rotation * Vec3::Z * distance + Vec3::Y * 0.55;
-            let position = LocalFrame::new(eye)
-                .to_geo(offset.to_array().map(|x| x as f64))
-                .unwrap_or(eye);
-            clear_chase_position(eye, position, &resident, &sandbox)
-        };
-        if entering || rig.position.surface_distance_m(desired) > 150. {
-            rig.position = desired;
-        } else {
-            let frame = LocalFrame::new(rig.position);
-            let delta = frame.to_local(desired);
-            let rate = if control.mode == ControlMode::FirstPerson {
-                30.
+            let (mut eye_height, distance) = chase_offsets(unit.kind, rig.follow_distance);
+            if let Some(vehicle) = sandbox.state.transport.vehicles.get(&unit.id) {
+                use terra_bevy::rules::VehicleModel;
+                eye_height = match vehicle.model {
+                    VehicleModel::Compact | VehicleModel::Taxi => 1.25,
+                    VehicleModel::Pickup | VehicleModel::Ambulance => 1.8,
+                    _ => 2.35,
+                };
+            }
+            let mut eye = display_position;
+            eye.altitude_m += eye_height as f64;
+            let desired = if control.mode == ControlMode::FirstPerson {
+                eye
             } else {
-                12.
+                let rotation = Quat::from_euler(EulerRot::YXZ, rig.yaw, rig.pitch, 0.);
+                let offset = rotation * Vec3::Z * distance + Vec3::Y * 0.55;
+                let position = LocalFrame::new(eye)
+                    .to_geo(offset.to_array().map(|x| x as f64))
+                    .unwrap_or(eye);
+                clear_chase_position(eye, position, &resident, &sandbox)
             };
-            let blend = 1. - (-rate * time.delta_secs_f64().min(0.25)).exp();
-            let blended = frame.to_geo(delta.map(|x| x * blend)).unwrap_or(desired);
-            rig.position = if control.mode == ControlMode::FirstPerson {
-                blended
+            if entering || rig.position.surface_distance_m(desired) > 150. {
+                rig.position = desired;
             } else {
-                clear_chase_position(eye, blended, &resident, &sandbox)
+                let frame = LocalFrame::new(rig.position);
+                let delta = frame.to_local(desired);
+                let rate = if control.mode == ControlMode::FirstPerson {
+                    30.
+                } else {
+                    12.
+                };
+                let blend = 1. - (-rate * time.delta_secs_f64().min(0.25)).exp();
+                let blended = frame.to_geo(delta.map(|x| x * blend)).unwrap_or(desired);
+                rig.position = if control.mode == ControlMode::FirstPerson {
+                    blended
+                } else {
+                    clear_chase_position(eye, blended, &resident, &sandbox)
+                };
+            }
+            runtime.focus = GeoPosition {
+                altitude_m: 0.,
+                ..unit.position
             };
+            return;
         }
-        runtime.focus = GeoPosition {
-            altitude_m: 0.,
-            ..unit.position
-        };
-        return;
     }
     rig.last_mode = ControlMode::Rts;
     if let Some(position) = rig.teleport.take() {
@@ -326,51 +403,49 @@ fn control_camera(
             ..position
         };
     }
-    if rig.needs_grounding
-        && let Some(ground) = resident.terrain_height(rig.position)
-    {
-        rig.position.altitude_m = ground + rig.altitude_offset;
-        rig.needs_grounding = false;
+    if rig.needs_grounding {
+        if let Some(ground) = resident.terrain_height(rig.position) {
+            rig.position.altitude_m = ground + rig.altitude_offset;
+            rig.needs_grounding = false;
+        }
     }
     if !ui.editing_gps {
         let rotating = buttons.pressed(MouseButton::Middle)
             || buttons.pressed(MouseButton::Right)
                 && (keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight));
         if rotating && in_view {
-            rig.yaw -= mouse.delta.x * 0.003;
-            rig.pitch = (rig.pitch - mouse.delta.y * 0.003).clamp(-1.45, -0.08);
+            rig.yaw -= mouse.delta.x * 0.003 * settings.mouse_sensitivity;
+            rig.pitch = (rig.pitch
+                - mouse.delta.y
+                    * 0.003
+                    * settings.mouse_sensitivity
+                    * if settings.invert_y { -1. } else { 1. })
+            .clamp(-1.45, -0.08);
         }
         let direction = if keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight)
         {
             Vec2::ZERO
         } else {
-            Vec2::new(
-                keys.pressed(KeyCode::KeyD) as u8 as f32 - keys.pressed(KeyCode::KeyA) as u8 as f32,
-                keys.pressed(KeyCode::KeyS) as u8 as f32 - keys.pressed(KeyCode::KeyW) as u8 as f32,
-            )
+            input.movement
         };
         let altitude = resident
             .terrain_height(rig.position)
             .map(|h| rig.position.altitude_m - h)
             .unwrap_or(95.);
-        let speed = (altitude * 0.75).clamp(18., 900.)
-            * if keys.pressed(KeyCode::ShiftLeft) {
-                3.
-            } else {
-                1.
-            };
-        let velocity = movement_velocity(
-            direction,
-            rig.yaw,
-            keys.pressed(KeyCode::KeyR) as u8 as f32 - keys.pressed(KeyCode::KeyF) as u8 as f32,
-            speed,
-        );
+        let speed = (altitude * 0.75).clamp(18., 900.) * if input.sprint { 3. } else { 1. };
+        let velocity = movement_velocity(direction, rig.yaw, input.vertical, speed);
         let dt = time.delta_secs_f64().min(0.1);
         let mut delta = [velocity[0] * dt, velocity[2] * dt, -velocity[1] * dt];
-        if in_view && scroll.delta.y != 0. {
+        let zoom_input = if in_view { scroll.delta.y } else { 0. }
+            + if input.pad_available {
+                input.pad_zoom * time.delta_secs().min(0.1) * 8.
+            } else {
+                0.
+            };
+        if zoom_input != 0. {
             let rotation = Quat::from_euler(EulerRot::YXZ, rig.yaw, rig.pitch, 0.);
             let zoom =
-                rotation * Vec3::NEG_Z * scroll.delta.y * (altitude as f32 * 0.11).clamp(2., 180.);
+                rotation * Vec3::NEG_Z * zoom_input * (altitude as f32 * 0.11).clamp(2., 180.);
             for (d, z) in delta.iter_mut().zip(zoom.to_array()) {
                 *d += z as f64;
             }
@@ -385,25 +460,26 @@ fn control_camera(
         }
         // The legacy reference player stays operable when joining a host that
         // explicitly disabled its living layer.
-        if let Some(net) = net.as_mut()
-            && !sandbox.state.living.enabled
-        {
-            net.desired_velocity_enu_m_s = [
-                (keys.pressed(KeyCode::ArrowRight) as u8 as f64
-                    - keys.pressed(KeyCode::ArrowLeft) as u8 as f64)
-                    * 5.,
-                (keys.pressed(KeyCode::ArrowUp) as u8 as f64
-                    - keys.pressed(KeyCode::ArrowDown) as u8 as f64)
-                    * 5.,
-                0.,
-            ];
-            if net.follow_player
-                && let Some(actor) = net.actor_id.and_then(|id| net.actors.get(&id))
-                && let Ok(pos) = LocalFrame::new(actor.position).to_geo([15., 22., 32.])
-            {
-                rig.position = pos;
-                rig.yaw = 0.42;
-                rig.pitch = -0.52;
+        if let Some(net) = net.as_mut() {
+            if !sandbox.state.living.enabled {
+                net.desired_velocity_enu_m_s = [
+                    (keys.pressed(KeyCode::ArrowRight) as u8 as f64
+                        - keys.pressed(KeyCode::ArrowLeft) as u8 as f64)
+                        * 5.,
+                    (keys.pressed(KeyCode::ArrowUp) as u8 as f64
+                        - keys.pressed(KeyCode::ArrowDown) as u8 as f64)
+                        * 5.,
+                    0.,
+                ];
+                if net.follow_player {
+                    if let Some(actor) = net.actor_id.and_then(|id| net.actors.get(&id)) {
+                        if let Ok(pos) = LocalFrame::new(actor.position).to_geo([15., 22., 32.]) {
+                            rig.position = pos;
+                            rig.yaw = 0.42;
+                            rig.pitch = -0.52;
+                        }
+                    }
+                }
             }
         }
     }
@@ -418,21 +494,35 @@ fn control_camera(
 }
 
 fn sync_camera(
-    rig: Res<CameraRig>,
+    mut rig: ResMut<CameraRig>,
     runtime: Res<WorldRuntime>,
     politics: Res<PoliticalWorld>,
     control: Res<PlayerControl>,
+    settings: Res<crate::player_input::InputSettings>,
     viewport: Res<WorldViewport>,
     window: Single<&Window>,
+    resident: Res<ResidentChunks>,
     mut camera: Query<(&mut Transform, &mut Projection), With<ExplorerCamera>>,
 ) {
+    // Grounding is presentation synchronization, independent of input capture.
+    // A panel opened during streaming must not leave the camera under new land.
+    if !politics.atlas && control.mode == ControlMode::Rts {
+        if let Some(ground) = resident.terrain_height(rig.position) {
+            if rig.needs_grounding {
+                rig.position.altitude_m = ground + rig.altitude_offset.max(3.);
+                rig.needs_grounding = false;
+            } else {
+                rig.position.altitude_m = rig.position.altitude_m.max(ground + 3.);
+            }
+        }
+    }
     if let Ok((mut transform, mut projection)) = camera.single_mut() {
         if let Projection::Perspective(perspective) = &mut *projection {
             perspective.fov = if politics.atlas {
                 std::f32::consts::FRAC_PI_4
             } else {
                 match control.mode {
-                    ControlMode::FirstPerson => 78_f32.to_radians(),
+                    ControlMode::FirstPerson => settings.first_person_fov.to_radians(),
                     ControlMode::ThirdPerson => 65_f32.to_radians(),
                     ControlMode::Rts => 56_f32.to_radians(),
                 }
@@ -456,6 +546,76 @@ fn sync_camera(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn streamed_ground_settles_rts_presentation_without_world_input() {
+        use bevy::ecs::system::RunSystemOnce;
+        use terra_core::{HeightField, WorldChunk};
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(terra_bevy::TerraWorldPlugin::new(terra_bevy::WorldConfig {
+                chunk_radius: 0,
+                ..Default::default()
+            }))
+            .init_resource::<PlayerControl>()
+            .init_resource::<WorldViewport>()
+            .init_resource::<crate::player_input::InputSettings>()
+            .init_resource::<crate::player_input::PlayerInput>();
+        let position = app.world().resource::<WorldRuntime>().focus;
+        app.insert_resource(CameraRig {
+            position,
+            yaw: 0.,
+            pitch: -0.5,
+            needs_grounding: true,
+            teleport: None,
+            altitude_offset: 24.,
+            follow_distance: 5.5,
+            last_mode: ControlMode::Rts,
+        });
+        app.world_mut()
+            .resource_mut::<crate::player_input::PlayerInput>()
+            .ui_navigation = true;
+        app.world_mut().spawn(Window::default());
+        let camera = app
+            .world_mut()
+            .spawn((ExplorerCamera, Transform::default(), Projection::default()))
+            .id();
+        app.world_mut().run_system_once(sync_camera).unwrap();
+        assert!(
+            app.world().resource::<CameraRig>().needs_grounding,
+            "missing coverage must not invent ground"
+        );
+        let key = TileKey::at(position, 15).unwrap();
+        app.world_mut()
+            .resource_mut::<ResidentChunks>()
+            .chunks
+            .insert(
+                key,
+                std::sync::Arc::new(WorldChunk {
+                    key,
+                    heights: HeightField::constant(600.),
+                    features: vec![],
+                    sources: vec![],
+                    warnings: vec![],
+                }),
+            );
+        app.world_mut().run_system_once(sync_camera).unwrap();
+        let rig = app.world().resource::<CameraRig>();
+        assert_eq!(rig.position.altitude_m, 624.);
+        assert!(!rig.needs_grounding);
+        assert!(app.world().get::<Transform>(camera).unwrap().translation.y > 600.);
+        assert!(
+            app.world()
+                .resource::<crate::player_input::PlayerInput>()
+                .world_blocked()
+        );
+        assert_eq!(
+            app.world()
+                .resource::<crate::player_input::PlayerInput>()
+                .drive
+                .throttle,
+            0.
+        );
+    }
     #[test]
     fn possession_input_uses_camera_yaw_without_diagonal_speed_gain() {
         let north = movement_velocity(Vec2::new(0., -1.), 0., 0., 4.);

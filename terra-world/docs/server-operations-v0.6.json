@@ -1,0 +1,15 @@
+{
+  "package_version": "0.6.0",
+  "captured_at_utc": "2026-10-27T11:22:06.190988+00:00",
+  "status": "passed",
+  "server_json_cli_exact_roundtrip": true,
+  "import_refuses_overwrite": true,
+  "export_refuses_overwrite": true,
+  "remote_plaintext_server_and_client_guard": true,
+  "tls_listener_cli_starts": true,
+  "server_binary_sha256": "ccd3bc8e6b3b9cde296efcc869afa8c697dd4272be824712dd94f0efe031575f",
+  "client_binary_sha256": "36f1d3e968f060934811763aab08cc467c7e6b9c457bf1a8f35dd4776d93bd4a",
+  "source": "Temporary synthetic reference world; actual listener tests used localhost only. Non-loopback plaintext flags rejected before network setup.",
+  "scope": "Refresh of the five existing server CLI smoke scenarios against locked 0.6 binaries. TLS handshake verification is covered separately by the Rust tls_transport suite; this CLI smoke only verifies TLS listener configuration/startup.",
+  "rust_test_count_contribution": 0
+}

@@ -371,6 +371,7 @@ fn finite_sources_production_and_deliveries_are_material_conserving() {
         world.advance_living(0.5, 0., &catalog).unwrap();
     }
     assert_eq!(total(&world), before);
+
     assert!(world.living.metrics.deliveries_completed > 0);
 }
 
@@ -731,7 +732,11 @@ fn regional_view_marks_all_supported_entity_and_geometry_reductions() {
 #[test]
 fn a_vehicle_turning_at_a_waypoint_does_not_yield_to_its_previous_following_queue() {
     let (mut state, catalog) = world();
-    let origin = state.living.origin.unwrap();
+    // Keep the queue geometry clear of the settlement's parked avatars and
+    // junctions: this tests following admission, not recovery from an overlap.
+    let origin = LocalFrame::new(state.living.origin.unwrap())
+        .to_geo([1000., 0., 1000.])
+        .unwrap();
     let frame = LocalFrame::new(origin);
     let couriers: Vec<_> = state
         .living
@@ -760,14 +765,33 @@ fn a_vehicle_turning_at_a_waypoint_does_not_yield_to_its_previous_following_queu
     };
     follower.path = vec![origin];
     follower.path_index = 0;
+    let mut parked_follower = state.clone();
+    parked_follower
+        .living
+        .units
+        .get_mut(&couriers[1])
+        .unwrap()
+        .order = UnitOrder::Idle;
     state.advance_living(0.1, 0., &catalog).unwrap();
+    parked_follower.advance_living(0.1, 0., &catalog).unwrap();
+    let leader = &state.living.units[&couriers[0]];
+    let moved = leader.position.surface_distance_m(origin);
+    // Both cases retain identical body contacts. An active follower behind
+    // the leader must not cap its first bounded acceleration/steering step.
+    assert_eq!(
+        leader.position,
+        parked_follower.living.units[&couriers[0]].position
+    );
+    assert_eq!(
+        leader.heading_deg,
+        parked_follower.living.units[&couriers[0]].heading_deg
+    );
     assert!(
-        state.living.units[&couriers[0]]
-            .position
-            .surface_distance_m(origin)
-            > 0.5,
+        (0.001..0.05).contains(&moved),
         "the leader must turn away instead of deadlocking against its following queue"
     );
+    let yaw = (f64::from(leader.heading_deg) - 315. + 540.).rem_euclid(360.) - 180.;
+    assert!(yaw.abs() > 0. && yaw.abs() < 2., "bounded turn: {yaw}");
 }
 
 #[test]
@@ -787,6 +811,7 @@ fn populated_settlement_delivers_with_facility_collision_and_traffic_enabled() {
             .unwrap();
     }
     assert!(state.living.metrics.production_cycles > 0);
+
     assert!(
         state.living.metrics.deliveries_completed > 0,
         "traffic and physical footprints must not deadlock all couriers"
@@ -830,13 +855,31 @@ fn parked_owned_rover_is_not_a_same_direction_traffic_queue() {
     parked.heading_deg = 0.;
     parked.order = UnitOrder::Idle;
     parked.velocity_enu_m_s = [0.; 3];
+    let mut active_rover = state.clone();
+    let active = active_rover.living.units.get_mut(&rover).unwrap();
+    active.order = UnitOrder::Move {
+        destination: origin,
+    };
+    active.path = vec![origin];
+    active.path_index = 0;
     state.advance_living(0.1, 0., &catalog).unwrap();
+    active_rover.advance_living(0.1, 0., &catalog).unwrap();
+    let unit = &state.living.units[&courier];
+    let moved = unit.position.surface_distance_m(start);
+    // The parked body still participates in collision and detour planning.
+    // Only its queue eligibility changes; an active rover at the same pose
+    // must make the courier yield instead of taking this acceleration step.
     assert!(
-        state.living.units[&courier]
+        (0.001..0.05).contains(&moved),
+        "a parked, differently oriented body must not freeze a same-lane traffic queue"
+    );
+    assert!(unit.velocity_enu_m_s[0].hypot(unit.velocity_enu_m_s[1]) < 0.5);
+    assert!(
+        active_rover.living.units[&courier]
             .position
             .surface_distance_m(start)
-            > 0.5,
-        "a parked, differently oriented body must not freeze a same-lane traffic queue"
+            < 1e-6,
+        "the same body with an active route must retain following priority"
     );
 }
 
@@ -862,4 +905,33 @@ fn rejected_demo_seed_leaves_the_previous_world_unchanged() {
         );
         assert_eq!(state, before);
     }
+}
+
+#[test]
+fn dormant_controlled_motion_cannot_move_or_reposition_bodies_until_resume() {
+    let (mut world, catalog) = world();
+    let active = world.living.accounts[&1].active_unit;
+    let original = world.players[&1].position;
+    let moved = LocalFrame::new(original).to_geo([8., 0., 0.]).unwrap();
+    world.set_player_dormant(1, true).unwrap();
+    world.validate_with_catalog(&catalog).unwrap();
+    let before = serde_json::to_vec(&world).unwrap();
+    for velocity in [[1., 0., 0.], [0.; 3]] {
+        let result = world.set_controlled_motion(1, moved, velocity, 90.);
+        assert!(
+            matches!(result, Err(SandboxError::Invalid(ref message)) if message.contains("resume"))
+        );
+        assert_eq!(serde_json::to_vec(&world).unwrap(), before);
+        assert_eq!(world.players[&1].position, original);
+        assert_eq!(world.living.units[&active].position, original);
+        world.validate_with_catalog(&catalog).unwrap();
+    }
+    world.set_player_dormant(1, false).unwrap();
+    world
+        .set_controlled_motion(1, moved, [1., 0., 0.], 90.)
+        .unwrap();
+    assert_eq!(world.players[&1].position, moved);
+    assert_eq!(world.living.units[&active].position, moved);
+    assert_eq!(world.living.units[&active].velocity_enu_m_s, [1., 0., 0.]);
+    world.validate_with_catalog(&catalog).unwrap();
 }

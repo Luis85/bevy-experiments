@@ -1,0 +1,102 @@
+{
+  "version": "0.19.0",
+  "started_utc": "2026-10-29T15:01:33.324421+00:00",
+  "status": "failed",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.12.14",
+    "cargo_build_jobs": "3",
+    "cargo_build_target_environment": null,
+    "offline": true
+  },
+  "scope": "Local TCP/TLS with prepared terrain and 1024 cold overlay regions; bounded autonomous geometry including narrow corridors and restored support, live owner commitments, finite commercial careers, named managed and complete local recovery, portable sources, original animated human/vehicle/wildlife packs, retained diagnostics, native code and build. Native interaction, hardware/platform qualification and uncoached player experience require separate review.",
+  "source_inputs": 369,
+  "gates": [
+    {
+      "name": "compatibility",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "scripts/check_compatibility.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.055,
+      "log": "compatibility.log",
+      "log_sha256": "9b0562f0aa4d8aa09e06da8a247b7f4ae401456537ef29fa7a4d9d221e078993",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "desktop-packaging-tests",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts",
+        "-p",
+        "test_package_desktop.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.331,
+      "log": "desktop-packaging-tests.log",
+      "log_sha256": "5a044ed2cedb0d95253f53dc123097a1942acc89d8b8d5e30605d2c7a8955bb6",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.566,
+      "log": "format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "headless",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--exclude",
+        "terra-demo",
+        "--exclude",
+        "terra-bevy",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 370.456,
+      "log": "headless.log",
+      "log_sha256": "9025b923b4b0419abd3eae768280b5ad9f156b93b0746b6bb90940fad60dd423",
+      "passed_test_executions": 215,
+      "failed_tests": 1,
+      "ignored_tests": 0
+    }
+  ],
+  "evidence_artifacts": {
+    "source-hashes.json": "4d4481d20a4583234ecbdbb4dbb6ecae4188358c4cbeefc7fd0355fbc07c975f",
+    "distinct-tests.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "finished_utc": "2026-10-29T15:07:45.800284+00:00",
+  "source_inputs_unchanged": true,
+  "distinct_tests_by_crate": {},
+  "distinct_passing_rust_tests": 0,
+  "published_reports_unchanged": true,
+  "published_logs_unchanged": true,
+  "passing_rust_test_executions": 215
+}

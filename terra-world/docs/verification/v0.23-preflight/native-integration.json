@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "terra-demo"
+  ],
+  "exit_code": 0,
+  "passed": 238,
+  "suites": 1,
+  "log_sha256": "4ababa4d3cab09ef988f93994a176fdd0dffb1456359b17e78053440c264b07d",
+  "scope": "Full native candidate test suite; current0.23 production and tests after sharedformat. Finalcanonicalacceptance separate."
+}

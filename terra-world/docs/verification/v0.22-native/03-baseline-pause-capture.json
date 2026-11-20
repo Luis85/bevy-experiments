@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "03-baseline-pause",
+  "capture_started_utc": "2026-10-29T20:31:35.088313+00:00",
+  "captured_utc": "2026-10-29T20:31:35.329101+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 184817,
+  "window_pid_status": "available",
+  "window_pid_before": 184817,
+  "window_pid_after": 184817,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "03-baseline-pause.png",
+    "sha256": "6d724cfc1065532266d7c9e43dc284f43c65cfcb6c58d0ceb90cf49f70082593",
+    "bytes": 727645
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

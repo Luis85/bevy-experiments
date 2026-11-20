@@ -1,0 +1,385 @@
+{
+  "version": "0.14.0",
+  "status": "passed",
+  "finished_utc": "2026-10-28T20:57:20.481563+00:00",
+  "scope": "Regional SDK/reference-game increment: frozen-source automated gates, accepted-executable native confirmation and extracted Linux review-package smoke. No Windows, hardware-performance, WAN, public-service or global-architecture qualification.",
+  "compatibility": {
+    "wire_protocol": 10,
+    "tls_alpn": "terra-world/10",
+    "domain_save": 1,
+    "regional_schema": 1
+  },
+  "automated": {
+    "gates": 26,
+    "distinct_passing_rust_tests": 828,
+    "passed_test_executions": 895,
+    "by_crate": {
+      "terra-bevy": 126,
+      "terra-cli": 4,
+      "terra-core": 33,
+      "terra-demo": 131,
+      "terra-history": 13,
+      "terra-net": 121,
+      "terra-persistence": 35,
+      "terra-sandbox": 320,
+      "terra-stream": 45
+    },
+    "failed": 0,
+    "ignored": 0,
+    "all_gate_commands_executed_fresh": true,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.14-final/gates.json",
+      "sha256": "76240d8198844e7205088eccad17f617b8366a8814edf57d8559d98ce1c3fbdd",
+      "bytes": 18402
+    },
+    "test_identities": {
+      "path": "docs/verification/v0.14-final/distinct-tests.json",
+      "sha256": "0feadc63e23d1dd4dea92cae81c86e6fe4bc7d7ab4ab714b675fa63add6f40f8",
+      "bytes": 130067
+    },
+    "reports_and_logs_match_captured_hashes": true
+  },
+  "source_freeze": {
+    "inputs": 347,
+    "unchanged_through_gates_native_and_package_confirmation": true,
+    "manifest": {
+      "path": "docs/verification/v0.14-final/source-hashes.json",
+      "sha256": "3a31f6cfd3eafbdb8a525b1f6fa34539b12d17aeb714ce1878fc808239eb2069",
+      "bytes": 40603
+    },
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.14-final/baseline-comparison.json",
+      "sha256": "f54cb6e9bd450a1fa43449c12c5889a8aabb4e6e4fc77774f9f63892ae8e27c0",
+      "bytes": 97523
+    },
+    "previous_release_paths_retained": 834,
+    "original_fixture_data_and_asset_inputs_unchanged": 90,
+    "historical_evidence_files_unchanged": 447,
+    "previous_product_review_and_validation_archived_exactly": true
+  },
+  "native": {
+    "binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531",
+    "evidence": {
+      "path": "docs/native-v14-verification.json",
+      "sha256": "6e7f7a64642c1fc50a1d9af087ce0b2d23af33425cac6a2352cefcf1c6039ed8",
+      "bytes": 16722
+    },
+    "accepted_runs": 4,
+    "graceful_exits": 3,
+    "controlled_SIGKILL_runs": 1,
+    "candidate_runs": 2,
+    "all_evidence_hashes_rechecked": true
+  },
+  "desktop": {
+    "evidence": {
+      "path": "docs/desktop-package-v0.14.json",
+      "sha256": "4bd1efd8e18131d56f4fbafa2f54c7d0438e7c0341e06c9adc88fc42b1a7c70a",
+      "bytes": 12688
+    },
+    "platform": "linux-x86_64",
+    "build_profile": "dev (opt-level 1)",
+    "archive": {
+      "filename": "terra-world-0.14.0-linux-x86_64.zip",
+      "bytes": 38598538,
+      "sha256": "57547e332d40aa532dd6524244736e488f6aa11f48a26cfcee20c83af46a1951",
+      "files": 179
+    },
+    "accepted_binary_sha256": "836521f99cbfb714fc23214d760f43af4bef1495d2c5007a1d53e879c5e8f531",
+    "extracted_runs": 2,
+    "all_evidence_hashes_rechecked": true,
+    "windows_executed": false
+  },
+  "measured_cases": {
+    "career_report": {
+      "path": "docs/verification/v0.14-final/career-report.json",
+      "sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "bytes": 12948
+    },
+    "purchased_career_report": {
+      "path": "docs/verification/v0.14-final/purchased-career-report.json",
+      "sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "bytes": 12966
+    },
+    "novice_career_report": {
+      "path": "docs/verification/v0.14-final/novice-career-report.json",
+      "sha256": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+      "bytes": 14379
+    },
+    "traffic_recovery": {
+      "path": "docs/verification/v0.14-final/traffic-recovery.json",
+      "sha256": "0f78fb3565db55773ee4ebb281d9bbda71d3a9a6c134533fa15c6bb45e5d4e7c",
+      "bytes": 1665
+    },
+    "asset_pack": {
+      "path": "docs/verification/v0.14-final/asset-pack.json",
+      "sha256": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+      "bytes": 3261
+    },
+    "asset_inspect": {
+      "path": "docs/verification/v0.14-final/asset-inspect.json",
+      "sha256": "1b32560ff1fd3f9c0404a93b7e9a6084e20be4caf74e10142552d9016f09c263",
+      "bytes": 2255
+    },
+    "asset_build": {
+      "path": "docs/verification/v0.14-final/asset-build.json",
+      "sha256": "4cd0441839d53596ce918722ff2182fd3376beaf3709e3cf51147530e2424354",
+      "bytes": 12819
+    },
+    "asset_authored_validate": {
+      "path": "docs/verification/v0.14-final/asset-authored-validate.json",
+      "sha256": "6e924ee63c4e273d0d6863be589b417ab4df9bcd1bc9246b481fd6566815d8b8",
+      "bytes": 3270
+    },
+    "source_inspection": {
+      "path": "docs/verification/v0.14-final/source-inspection.json",
+      "sha256": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+      "bytes": 4169
+    },
+    "source_export": {
+      "path": "docs/verification/v0.14-final/source-export.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "source_install": {
+      "path": "docs/verification/v0.14-final/source-install.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "source_verify": {
+      "path": "docs/verification/v0.14-final/source-verify.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "recovery": {
+      "path": "docs/verification/v0.14-final/recovery.json",
+      "sha256": "e6c9a45262b38d00217fccf311ed6f13bf64d7c0dee95bafb4785f66f7ea4511",
+      "bytes": 1873
+    },
+    "recovery_bundle": {
+      "path": "docs/verification/v0.14-final/recovery-bundle.json",
+      "sha256": "93febcf34d5028ebcba9b3bf40fb976370877c63b15013a9e9c22e279119283e",
+      "bytes": 3197
+    },
+    "regional_sessions": {
+      "path": "docs/verification/v0.14-final/regional-sessions.json",
+      "sha256": "27e7e0bc8b204cd997a5213ecb6864b32ac503b783aeb9558c1cadbcfd62bccf",
+      "bytes": 30546
+    }
+  },
+  "final_current_documents": [
+    {
+      "path": "README.md",
+      "sha256": "46d146d07b47570d93ba976404b8e0ab0d7b3f3bd0c26d6796719f5f1bfc74c5",
+      "bytes": 45553
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "1e24301727a691823ff0333cd0689995946e8dd8969974f647393b08fc75fc36",
+      "bytes": 28839
+    },
+    {
+      "path": "DESIGN.md",
+      "sha256": "205eaf462a5b9032d0cc5c194efbfc2bd32c310d8448f36589beb1697825a362",
+      "bytes": 13746
+    },
+    {
+      "path": "PRODUCT.md",
+      "sha256": "d9f7e1e4107cafab3e5c67ba8e34543f49b7b7a265aabd7b4fefe5fdf626e56a",
+      "bytes": 13505
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "c472e20d85eb72a66c5048b2af3772abd6e4fcecf9fb42292dc65b0c66436831",
+      "bytes": 3575
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "sha256": "1e34271f0606a82b839a4d2cb78476b2ff78592d8017264620c06365914607ec",
+      "bytes": 25098
+    },
+    {
+      "path": "docs/ASSET_AUTHORING.md",
+      "sha256": "bae95df1939e85f7f9126426b0061882bf9ae621e651e76410f001200b660385",
+      "bytes": 10640
+    },
+    {
+      "path": "docs/ASSET_PACKS.md",
+      "sha256": "025f019cceceab2cf1ab092eaefc9fdc3829ccc7029cd236fcb90f2002d1fd03",
+      "bytes": 18492
+    },
+    {
+      "path": "docs/CLIENT_PREDICTION.md",
+      "sha256": "29198991d663a7f7196773c1901d765325d3da418765eb661d3f89ab1e6e2aa3",
+      "bytes": 5956
+    },
+    {
+      "path": "docs/COMPANIES.md",
+      "sha256": "063953aaf92cc8c792011762c24f777154dff3d4fbc88a99fd4b7a0a0d97c1bc",
+      "bytes": 44696
+    },
+    {
+      "path": "docs/COMPATIBILITY.md",
+      "sha256": "ac43c3a0c3a7c9984a392a9f4247f756354c6ae235e6c31261a4398f3ecddfe6",
+      "bytes": 2469
+    },
+    {
+      "path": "docs/CONTACTS_AND_ROUTING.md",
+      "sha256": "d51a9e50373578cbaf40add5b68ca1d2e086993ef4ba34fa92e37d896e130665",
+      "bytes": 33182
+    },
+    {
+      "path": "docs/CONTROLS.md",
+      "sha256": "c9e93918db676cdba08dc1f165b87125b5fff8c528389094f57b088ae7f623f4",
+      "bytes": 11534
+    },
+    {
+      "path": "docs/DATA.md",
+      "sha256": "10a51567e606655827617d634431c25b982d544cdedd331205349f485de83344",
+      "bytes": 16428
+    },
+    {
+      "path": "docs/DESKTOP_DELIVERY.md",
+      "sha256": "fcd7a12093f4cf765fed4f3c52e5e9f37b6533c8c29dd3ad7c50ae6bccb64185",
+      "bytes": 8374
+    },
+    {
+      "path": "docs/DIAGNOSTICS.md",
+      "sha256": "e46bee340be8fb5ba0ae7f05912c23d6b1f0fdecd459725f69c68937e125d5a5",
+      "bytes": 5181
+    },
+    {
+      "path": "docs/ECOLOGY.md",
+      "sha256": "e791466ceffd8ef495986dc5e110c279d3f7c23c32ba7865022f6e6dd0b89394",
+      "bytes": 7160
+    },
+    {
+      "path": "docs/GAMEPLAY.md",
+      "sha256": "89a9d3fbfd3bcdb236b1a8552465ce253cf6dec59dc1be0170d6216d677ef33e",
+      "bytes": 42860
+    },
+    {
+      "path": "docs/GAME_FLOW.md",
+      "sha256": "37093980d1012336cf17af5b3ff5d7dbb8f1dc17bd836e3325fe964e8433539b",
+      "bytes": 21611
+    },
+    {
+      "path": "docs/GRAPHICS_AND_MAPS.md",
+      "sha256": "633f34996a9adebc1cb374bdbe9aa89994e0a5b22d9fa75243fdd8265741c655",
+      "bytes": 23381
+    },
+    {
+      "path": "docs/GUIDANCE.md",
+      "sha256": "8e06ebf0524f28c90212bed66f30536672583387fb9da26fa652e1bb1154b3eb",
+      "bytes": 14613
+    },
+    {
+      "path": "docs/HISTORY.md",
+      "sha256": "513e81207b94b1e55182951b6cc314e9e1a0269685ed06e7b73fbfd586d965b8",
+      "bytes": 11219
+    },
+    {
+      "path": "docs/INTEGRATION.md",
+      "sha256": "cf5325ae282b12a101c94a14181c7fb5f9f01e1715090a75b899900ac9c1b9ac",
+      "bytes": 49468
+    },
+    {
+      "path": "docs/LIVING_WORLD.md",
+      "sha256": "09b792b5916e30a0f2e85140672f1f4ebc686c08b327bb0e26f89f86d2e82651",
+      "bytes": 23491
+    },
+    {
+      "path": "docs/MMORPG_FOUNDATION.md",
+      "sha256": "03257b12db6cb51812aee8a50641eea78fced23d37907adb6d3d2e98ff919c2a",
+      "bytes": 37151
+    },
+    {
+      "path": "docs/MOTORTOWN_PARITY.md",
+      "sha256": "98a74431a65e5873405890c650aea9fb333cddb5707c117d0f414073b04db946",
+      "bytes": 35296
+    },
+    {
+      "path": "docs/MULTIPLAYER.md",
+      "sha256": "7ab55e4f3c5e876c984043821e30ec79f9c38302bc9bc606257f20e2d5088e59",
+      "bytes": 34487
+    },
+    {
+      "path": "docs/NETWORK_REPLICATION.md",
+      "sha256": "3af5183e31ed0ea984cc0747267d2ce983b29dfb3aaa9d87daf4ef11da5bbde3",
+      "bytes": 28938
+    },
+    {
+      "path": "docs/OPERATIONS.md",
+      "sha256": "db8a3637d9ecd8940346e8af4ec818bbba45dd31bedcfb48f1bf66661bc881ea",
+      "bytes": 29270
+    },
+    {
+      "path": "docs/PERFORMANCE.md",
+      "sha256": "5db18fed1392c57ba2f56ad0404299619e1ad7d177c3d24bf9bce985bfd030a9",
+      "bytes": 29450
+    },
+    {
+      "path": "docs/PRODUCT_REVIEW.md",
+      "sha256": "ca5768e7c628cbd39f91515c7c05a5df8aa3d9c2cc70b01da9d8436c2bfc88f9",
+      "bytes": 22735
+    },
+    {
+      "path": "docs/RECOVERY_BUNDLES.md",
+      "sha256": "ffe812e8380e4bd2b1dc3f8d734199bb446997189c786b04425c846ae3044001",
+      "bytes": 10156
+    },
+    {
+      "path": "docs/REGIONAL_PERSISTENCE.md",
+      "sha256": "418c3f30ca6fbdbe286e5d91c1ee3170e22f25133d16822a3700f8d58e70f27c",
+      "bytes": 26816
+    },
+    {
+      "path": "docs/SCALING.md",
+      "sha256": "91faada5164299c27f3e9a99f4cf5878776cd6d742006643a19bab3e592d10b1",
+      "bytes": 26775
+    },
+    {
+      "path": "docs/SETTLEMENTS_AND_ECONOMY.md",
+      "sha256": "c30aabdfc34b80fbd7399885dbd8cba34c29c39f35b1c3dbdde433b9b5562a5f",
+      "bytes": 17511
+    },
+    {
+      "path": "docs/SOURCE_BUNDLES.md",
+      "sha256": "330a16ffd0db9fa639804d0217556513db6362739082182c4a81c22e8224e629",
+      "bytes": 20216
+    },
+    {
+      "path": "docs/TRANSPORT.md",
+      "sha256": "26b84a28a37d16a535b53a6fe14c1c839904ff57179bf607e8c0a6bff108a0f2",
+      "bytes": 20612
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "sha256": "983d9cd3db08dddd18bd1d54b21943a7a56d2840b2b1dacee966c8e6df883e3e",
+      "bytes": 18633
+    },
+    {
+      "path": "docs/VEHICLE_DYNAMICS.md",
+      "sha256": "6f3f5514747e1346a4902d897b8ac9fd670d136d160814f7c2629acd306ee4a6",
+      "bytes": 20333
+    },
+    {
+      "path": "docs/REVIEW_GAPS_v0.14.md",
+      "sha256": "e5449e02ec2e6d4ce2975180b913e7d463c68fc58a95e3c2b33bf2de30d7dcb7",
+      "bytes": 23728
+    }
+  ],
+  "current_document_pending_markers_absent": true,
+  "source_archive_assembly": {
+    "manifest": "docs/source-archive-manifest-v0.14.json",
+    "external_delivery_record": "terra-world-0.14.0-source-record.json",
+    "scope": "Created after this release record. The archive manifest hashes all packaged source and evidence except itself; the external delivery record binds the complete ZIP SHA-256 and entry verification. This record does not contain a circular source-archive hash."
+  },
+  "known_limits": [
+    "Remaining G01\u2013G18 closure criteria are retained in docs/REVIEW_GAPS_v0.14.md; scoped improvements narrow G04, G05, G09, G16 and G17.",
+    "The previous generation-251 walking replay is historical and was not rerun; ordinary walking and traffic regression gates did execute.",
+    "Native interaction uses scripted preparation and observed interface actions, not an uncoached human study.",
+    "Process interruption verifies completed retained samples and restart; it is not a machine-power-loss or health-certification claim.",
+    "Recovery covers supported local reference-host worlds and retained content dependencies, not arbitrary server/live/historical/custom-catalog deployments.",
+    "Finite shared-container local TLS, source coverage and recovery measurements do not establish WAN capacity, production RPO/RTO or target GPU performance."
+  ]
+}

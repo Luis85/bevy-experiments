@@ -1,0 +1,11 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "existing_files": 43,
+  "all_existing_files_unchanged": true,
+  "new_profile": "/tmp/terra-native/launcher-review-fixture-016/player-data/worlds/recovered-1793249019-61469-0/world.json",
+  "new_title": "Valley - autumn recovery",
+  "profiles_after_restore": 2,
+  "original_world_and_inputs_absent": true,
+  "scope": "Native verified backup, edited copy name and explicit restore; preserved previously renamed world and both backups. Opening is a later separate action."
+}

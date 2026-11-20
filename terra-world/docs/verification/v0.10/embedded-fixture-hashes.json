@@ -1,0 +1,14 @@
+{
+  "recorded_utc": "2026-10-28T11:49:54.176326+00:00",
+  "baseline_commit": "13c335c1403f0bdc0f4fc9141ce12b5a2aa39a0b",
+  "all_equal_to_imported_baseline": true,
+  "files": {
+    "crates/terra-net/tests/fixtures/tls/ca.pem": "2e0538fd2ffddbe874cb3167729905206c1e5b79c2ad99f0d2e01809b0414280",
+    "crates/terra-net/tests/fixtures/tls/fixture-key.pem": "63a37e3f512b63e06af17930a93f6c458bf5365fe0d67eec293b6408a0401496",
+    "crates/terra-net/tests/fixtures/tls/server.pem": "bb44da96b2a0d731ccdb0c436f66a544484ed20b44071afaa39c6899a7a697d5",
+    "crates/terra-net/tests/fixtures/tls/untrusted-ca.pem": "47ab0c870f0d2706fa5610f87f80520729283b770dd022d868562a5bd81ea862",
+    "crates/terra-sandbox/catalog.example.json": "1d111d446463a1d3362291455e3b6c5bd9cdbeafc1900477dea31aaabcec5a0b",
+    "crates/terra-stream/tests/fixtures/overpass.json": "cd54913bca225d29b73a064f0216e2001c41e64066a537cc95f467be380d7ec6",
+    "crates/terra-stream/tests/fixtures/weather.json": "456a9b75bb33c744f85fc3ed53e80c4b16710226cf94fe97dd3bc77c1df72d11"
+  }
+}

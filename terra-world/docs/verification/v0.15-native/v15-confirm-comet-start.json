@@ -1,0 +1,31 @@
+{
+  "release": "0.15.0",
+  "phase": "confirmation",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--config",
+    "/tmp/terra-native/comet-confirmation-015/comet-config.json",
+    "--asset-pack",
+    "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-next/crates/terra-bevy/assets/transport-demo.pack.json",
+    "--quality",
+    "performance",
+    "--no-atmosphere",
+    "--no-default-politics",
+    "--camp-view",
+    "--controls-json",
+    "{\"text_scale\":1.5}",
+    "--user-data",
+    "/tmp/terra-native/comet-confirmation-015/player-data",
+    "--telemetry",
+    "/tmp/terra-native/v15-confirm-comet-telemetry.json",
+    "--telemetry-interval-seconds",
+    "5"
+  ],
+  "working_directory": "/tmp/terra-native",
+  "started_utc": "2026-10-28T23:03:50.322371+00:00",
+  "binary_sha256": "c12970d499bd2f9045cad0f9c106cdc870dddd64ef7804fd496d8b37c96cc504",
+  "source_input_count": 356,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 48790
+}

@@ -1,0 +1,24 @@
+{
+  "release": "0.13.0",
+  "kind": "launcher",
+  "command": [
+    "/tmp/terra-native/v13-desktop-extracted/terra-world-0.13.0-linux-x86_64/start-terra.sh"
+  ],
+  "instrumentation": [
+    "strace",
+    "-f",
+    "-qq",
+    "-e",
+    "trace=open,openat"
+  ],
+  "working_directory": "/tmp",
+  "native_binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+  "started_utc": "2026-10-28T18:40:07.271118+00:00",
+  "pid": 131194,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T18:41:01.590559+00:00",
+  "source_checkout_file_opens": 0,
+  "opened_packaged_connected_manifest": false,
+  "opened_packaged_wildlife_pack": false,
+  "original_packaged_members_unchanged": true
+}

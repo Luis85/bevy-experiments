@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "59-candidate-leave-management-focus",
+  "capture_started_utc": "2026-10-29T21:18:16.068670+00:00",
+  "captured_utc": "2026-10-29T21:18:16.321094+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 210688,
+  "window_pid_status": "available",
+  "window_pid_before": 210688,
+  "window_pid_after": 210688,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "59-candidate-leave-management-focus.png",
+    "sha256": "4611b818c25a7921b0cd9337895f2dadec4e0c1a4a880be25e7212fa4b264da4",
+    "bytes": 607998
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

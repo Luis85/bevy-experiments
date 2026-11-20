@@ -1,15 +1,23 @@
 {
   "items": [
-    "wood",
-    "stone",
+    "berries",
+    "bread",
+    "cooked_fish",
+    "fiber",
+    "fish",
+    "fishing_rod",
+    "flour",
+    "iron_ingot",
+    "iron_ore",
+    "iron_tool",
     "planks",
+    "stone",
     "stone_blocks",
     "tool",
-    "wheat_seed",
+    "water",
     "wheat",
-    "flour",
-    "bread",
-    "water"
+    "wheat_seed",
+    "wood"
   ],
   "recipes": {
     "planks": {
@@ -65,6 +73,46 @@
       },
       "outputs": {
         "bread": 4
+      },
+      "requires_workbench": true
+    },
+    "fishing_rod": {
+      "inputs": {
+        "planks": 2,
+        "fiber": 4
+      },
+      "outputs": {
+        "fishing_rod": 1
+      },
+      "requires_workbench": false
+    },
+    "iron_ingot": {
+      "inputs": {
+        "iron_ore": 3,
+        "wood": 2
+      },
+      "outputs": {
+        "iron_ingot": 1
+      },
+      "requires_workbench": true
+    },
+    "iron_tool": {
+      "inputs": {
+        "iron_ingot": 2,
+        "planks": 2
+      },
+      "outputs": {
+        "iron_tool": 1
+      },
+      "requires_workbench": true
+    },
+    "cooked_fish": {
+      "inputs": {
+        "fish": 2,
+        "wood": 1
+      },
+      "outputs": {
+        "cooked_fish": 2
       },
       "requires_workbench": true
     }

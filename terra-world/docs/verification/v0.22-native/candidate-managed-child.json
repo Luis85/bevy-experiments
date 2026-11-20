@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "phase": "candidate",
+  "observed_utc": "2026-10-29T21:08:56.356645+00:00",
+  "pid": 210688,
+  "parent_pid": 207201,
+  "command": [
+    "/tmp/terra-target/debug/terra-demo",
+    "--play",
+    "--world-profile",
+    "/tmp/terra-native022/menu/worlds/world-1793308067442-207201-0/world.json",
+    "--user-data",
+    "/tmp/terra-native022/menu",
+    "--controls-json",
+    "{\"schema_version\":1,\"bindings\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],\"mouse_sensitivity\":1.0,\"gamepad_sensitivity\":1.0,\"deadzone\":0.15,\"invert_y\":false,\"gamepad_enabled\":true,\"text_scale\":1.5,\"first_person_fov\":78.0,\"driving_auto_center\":true,\"wheel\":{\"enabled\":false,\"device\":null,\"steering\":{\"source\":{\"type\":\"left_x\"},\"minimum\":-1.0,\"center\":0.0,\"maximum\":1.0,\"inverted\":false},\"accelerator\":{\"source\":{\"type\":\"right_pedal\"},\"minimum\":0.0,\"center\":0.5,\"maximum\":1.0,\"inverted\":false},\"brake\":{\"source\":{\"type\":\"left_pedal\"},\"minimum\":0.0,\"center\":0.5,\"maximum\":1.0,\"inverted\":false},\"combined_pedals\":false,\"deadzone\":0.05,\"steering_calibrated\":false,\"accelerator_calibrated\":false,\"brake_calibrated\":false}}",
+    "--menu-supervised"
+  ],
+  "executable": "/tmp/terra-target/debug/terra-demo",
+  "binary_sha256": "c85effd3dca3a374798e30f1b2e77dbab6515a748cf61e8fe6c8edb8d4904dda",
+  "source_inputs_sha256": "47fde098dafaa042fd8fd3a240714187fb7622620a4d4ab2a2b017f8736ef455",
+  "source_input_count": 378,
+  "scope": "Observed managed child identity while running. Parent launch supervision and later direct final confirmation are separate evidence."
+}

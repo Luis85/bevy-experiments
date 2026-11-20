@@ -1,0 +1,141 @@
+{
+  "release": "0.3.0",
+  "source": "actual native UI and local save",
+  "player": 1,
+  "gather": {
+    "item": "berries",
+    "inventory_after": 5,
+    "player_position": {
+      "latitude": 48.13727852004537,
+      "longitude": 11.575473335162616,
+      "altitude_m": 168.49014892578126
+    },
+    "resource_node_samples": [
+      {
+        "id": "ecology:starter:berries",
+        "remaining": 31,
+        "capacity": 36
+      }
+    ]
+  },
+  "baseline_money": 25000,
+  "claim": {
+    "name": "Willow Reach",
+    "tier": "neighborhood",
+    "position": {
+      "latitude": 48.13727852004537,
+      "longitude": 11.575473335162616,
+      "altitude_m": 168.49014892578126
+    },
+    "player_wallet_after": 20000,
+    "treasury": 5000,
+    "wood_after": 10,
+    "stone_after": 10,
+    "experience": 10
+  },
+  "satisfied_food_rejection": {
+    "inventory_unchanged": true,
+    "food_at_later_save": 0.97496605,
+    "observation": "Earlier full-food consume attempt reported that the need was satisfied and kept all five berries."
+  },
+  "accepted_contract": {
+    "id": 2000000,
+    "item": "wood",
+    "amount": 4,
+    "reward": 613,
+    "experience": 40,
+    "target_site": 1000004,
+    "claimed_by": 1
+  },
+  "contract_travel_order": {
+    "type": "move",
+    "destination": {
+      "latitude": 48.13568541591545,
+      "longitude": 11.576468631047055,
+      "altitude_m": 168.79623413085938
+    }
+  },
+  "completed_contract": {
+    "id": 2000000,
+    "offer_removed": true,
+    "wood_before": 10,
+    "wood_after": 6,
+    "experience_after": 50,
+    "contracts_completed": 1,
+    "observed_reward_minor_units": 613,
+    "observed_experience_reward": 40,
+    "wallet_after_minor_units": 20613
+  },
+  "saved_and_resumed_before_fulfillment": true,
+  "consumption": {
+    "item": "berries",
+    "inventory_before": 5,
+    "inventory_after": 4,
+    "food_before_ui_percent": 90,
+    "needs_after_saved": {
+      "food": 0.99943674,
+      "water": 0.891872,
+      "energy": 1.0
+    },
+    "active_body": 1000050
+  },
+  "control_confirmation": {
+    "third_person": true,
+    "first_person": true,
+    "strategy_return": true,
+    "physical_movement": true
+  },
+  "native_network": {
+    "wire_protocol": 2,
+    "transport": "local framed TCP",
+    "client": "terra-demo",
+    "host": "terra-server",
+    "connected_player": 1,
+    "visible_body_count": 64,
+    "visible_wildlife_count": 28,
+    "snapshot_tick_at_capture": 10200,
+    "renderer_chunks": 9,
+    "host_owned_persistence": true,
+    "private_session_excluded": true
+  },
+  "visual_review": {
+    "result": "accepted",
+    "native_runtime": "Linux X11 / Mesa software Vulkan",
+    "gameplay_session": {
+      "window": [
+        1440,
+        900
+      ],
+      "resident_chunks": 9,
+      "source_vertices_displayed": "1.04 million",
+      "bodies": 107,
+      "managed_wildlife": 64
+    },
+    "minimum_window": [
+      1100,
+      700
+    ],
+    "captures": [
+      "v3-activities-overview.png",
+      "v3-nature-resources.png",
+      "v3-wildlife.png",
+      "v3-territory-charter.png",
+      "v3-industry-logistics.png",
+      "v3-third-person.png",
+      "v3-first-person.png",
+      "v3-minimum-window.png"
+    ],
+    "performance_claim": false
+  },
+  "heightmap_confirmation": {
+    "source": "bundled explicitly synthetic 16-bit grayscale heightmap",
+    "resident_chunks": 49,
+    "rendered_chunks": 49,
+    "pending_chunks": 0,
+    "source_vertices_displayed": "0.21 million",
+    "bodies": 107,
+    "managed_wildlife": 64,
+    "time_scale": 0,
+    "capture": "v3-heightmap-landscape.png"
+  }
+}

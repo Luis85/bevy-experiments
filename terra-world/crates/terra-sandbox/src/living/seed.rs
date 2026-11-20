@@ -91,6 +91,7 @@ impl SandboxState {
                 world.roads.push(RoadRoute {
                     id,
                     points,
+                    rules: RoadRules::from_properties(&feature.properties),
                     width_m: feature
                         .properties
                         .get("width")
@@ -127,6 +128,7 @@ impl SandboxState {
                     .map(|p| frame.to_geo(p).unwrap())
                     .collect(),
                 width_m: 6.,
+                rules: RoadRules::default(),
             });
             world.roads.push(RoadRoute {
                 id: "authored:market-lane".into(),
@@ -136,6 +138,7 @@ impl SandboxState {
                     frame.to_geo([120., 0., 0.])?,
                 ],
                 width_m: 5.,
+                rules: RoadRules::default(),
             });
         }
         let place = |predicate: &dyn Fn(&WorldFeature) -> bool, fallback: [f64; 3]| {
@@ -166,7 +169,7 @@ impl SandboxState {
             },
             [10., 0., -10.],
         );
-        let prices = BTreeMap::from([
+        let mut prices = BTreeMap::from([
             (
                 "bread".into(),
                 TradePrice {
@@ -201,6 +204,27 @@ impl SandboxState {
                 },
             ),
         ]);
+        // Optional resource markets follow the host catalog. These are finite
+        // authored starting stocks, never refilled when a chunk reloads.
+        let mut natural_stock = Inventory::new();
+        for (item, buy, sell, stock) in [
+            ("berries", 90, 45, 12),
+            ("fiber", 80, 40, 16),
+            ("fish", 180, 95, 8),
+            ("cooked_fish", 320, 170, 6),
+            ("iron_ore", 220, 120, 0),
+            ("iron_ingot", 480, 260, 0),
+            ("fishing_rod", 900, 450, 4),
+            ("iron_tool", 1800, 900, 2),
+            ("stone_blocks", 240, 120, 20),
+        ] {
+            if catalog.items.contains(item) {
+                prices.insert(item.into(), TradePrice { buy, sell });
+                if stock > 0 {
+                    natural_stock.insert(item.into(), stock);
+                }
+            }
+        }
         let shop_id = world.next()?;
         world.shops.insert(
             shop_id,
@@ -225,6 +249,12 @@ impl SandboxState {
                 authored: true,
             },
         );
+        world
+            .shops
+            .get_mut(&shop_id)
+            .unwrap()
+            .stock
+            .extend(natural_stock);
         let specs = [
             (
                 ProductionKind::Farm,
@@ -358,7 +388,7 @@ impl SandboxState {
             let mut route = vec![];
             let mut from = position;
             for target in destinations {
-                route.extend(world.route_between(from, target));
+                route.extend(world.pedestrian_route_between(from, target));
                 from = target;
             }
             let unit = world.units.get_mut(&id).unwrap();
@@ -371,6 +401,9 @@ impl SandboxState {
             .roads
             .iter()
             .map(|road| {
+                if !road.rules.motor_access {
+                    return 0.;
+                }
                 road.points
                     .windows(2)
                     .map(|p| p[0].surface_distance_m(p[1]))
@@ -388,17 +421,27 @@ impl SandboxState {
                 road_index += 1;
             }
             let road = &world.roads[road_index];
+            let ordered_points = if road.rules.direction == RoadDirection::Reverse {
+                road.points.iter().rev().copied().collect::<Vec<_>>()
+            } else {
+                road.points.clone()
+            };
             let mut segment = 0;
-            while segment + 2 < road.points.len() {
-                let length = road.points[segment].surface_distance_m(road.points[segment + 1]);
+            while segment + 2 < ordered_points.len() {
+                let length =
+                    ordered_points[segment].surface_distance_m(ordered_points[segment + 1]);
                 if along <= length {
                     break;
                 }
                 along -= length;
                 segment += 1;
             }
-            let a = road.points[segment];
-            let b = road.points[segment + 1];
+            let route = super::routing::traffic_lane_patrol(road);
+            if route.len() < 2 {
+                continue;
+            }
+            let a = route[segment];
+            let b = route[segment + 1];
             let delta = LocalFrame::new(a).to_local(b);
             let length = a.surface_distance_m(b).max(0.001);
             let t = (along / length).clamp(0., 1.);
@@ -410,7 +453,16 @@ impl SandboxState {
                 continue;
             }
             traffic_positions.push(position);
-            let route = road.points.clone();
+            // Interpolate on the outgoing lane, not the source centreline.
+            let lane_frame = LocalFrame::new(route[segment]);
+            let lane_delta = lane_frame.to_local(route[segment + 1]);
+            let position = lane_frame.to_geo(lane_delta.map(|v| v * t))?;
+            let open_one_way = road.rules.direction != RoadDirection::Both
+                && route
+                    .first()
+                    .unwrap()
+                    .surface_distance_m(*route.last().unwrap())
+                    >= 2.;
             let id = world.make_unit(
                 format!("Traffic {:02}", n + 1),
                 ActorKind::Vehicle,
@@ -419,10 +471,17 @@ impl SandboxState {
                 position,
             )?;
             let unit = world.units.get_mut(&id).unwrap();
-            unit.patrol = route;
             unit.path_index = segment + 1;
             unit.heading_deg = delta[0].atan2(-delta[2]).to_degrees().rem_euclid(360.) as f32;
-            unit.order = UnitOrder::Patrol;
+            if open_one_way {
+                unit.order = UnitOrder::Move {
+                    destination: *route.last().unwrap(),
+                };
+                unit.path = route;
+            } else {
+                unit.patrol = route;
+                unit.order = UnitOrder::Patrol;
+            }
         }
         for n in 0..6 {
             let position = frame.to_geo([15. + n as f64 * 4., 0., 16.])?;
@@ -450,12 +509,16 @@ impl SandboxState {
         let mut prepared = SandboxState {
             players: self.players.clone(),
             living: world,
+            transport: crate::TransportWorld {
+                profiles: self.transport.profiles.clone(),
+                ..crate::TransportWorld::default()
+            },
             ..SandboxState::default()
         };
         for id in self.players.keys().copied() {
             prepared.ensure_living_player(id)?;
         }
-        prepared.living.validate(&prepared.players, Some(catalog))?;
+        prepared.living.validate(&prepared, Some(catalog))?;
         self.living = prepared.living;
         Ok(())
     }
@@ -470,7 +533,7 @@ impl SandboxState {
             .ok_or(SandboxError::PlayerMissing)?
             .position;
         validate_living_position(position)?;
-        if self.living.units.len().saturating_add(STARTER_UNIT_COUNT) > MAX_LIVING_UNITS
+        if self.living_unit_count().saturating_add(STARTER_UNIT_COUNT) > MAX_LIVING_UNITS
             || self
                 .living
                 .next_id
@@ -484,7 +547,10 @@ impl SandboxState {
         let frame = LocalFrame::new(position);
         let crew = [
             (
-                format!("Explorer {player_id}"),
+                self.transport
+                    .profiles
+                    .get(&player_id)
+                    .map_or_else(|| format!("Explorer {player_id}"), |p| p.name.clone()),
                 ActorKind::Human,
                 UnitRole::Player,
                 position,

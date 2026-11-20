@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "status": "passed_with_documented_scope_limits",
+  "scope": "Independent read-only review of six native QA regional exports and the safe-exit screenshot. Compiled sources were unchanged; no broad tests were rerun. Private exports are not included in this evidence artifact.",
+  "input_snapshots": [
+    {
+      "file": "v11-before-drive.region.json",
+      "sha256": "0b0e3e46e1a5dbbbccef1ca56622ffc6be8c08a69c7e012964da8dac71353408",
+      "source_generation": 196,
+      "format_version": 1,
+      "state_version": 1
+    },
+    {
+      "file": "v11-after-drive.region.json",
+      "sha256": "011a06cde4c97fdb2c7ad8563972c8f95c42965b910201cf08a20cb21af52ba0",
+      "source_generation": 197,
+      "format_version": 1,
+      "state_version": 1
+    },
+    {
+      "file": "v11-after-exit.region.json",
+      "sha256": "6d00ce87251c01fce06ea8f3fb30550301c3fa78e99b8fe971c85311a5b17918",
+      "source_generation": 200,
+      "format_version": 1,
+      "state_version": 1
+    },
+    {
+      "file": "v11-first-exit.region.json",
+      "sha256": "b92c1007421fe3b9af7d948243df853b04c99efc8401c5e9122b19851521f562",
+      "source_generation": 209,
+      "format_version": 1,
+      "state_version": 1
+    },
+    {
+      "file": "v11-resumed-checkpoint.region.json",
+      "sha256": "3f9c2c49c4bdeed004e674367f53847b68166fd1b79e257c69fad6eb04f2c1d8",
+      "source_generation": 227,
+      "format_version": 1,
+      "state_version": 1
+    },
+    {
+      "file": "v11-final.region.json",
+      "sha256": "4af3b397a7a751a16241dfa8350a004806ac15f62b63873c8f581551f6005d17",
+      "source_generation": 230,
+      "format_version": 1,
+      "state_version": 1
+    }
+  ],
+  "screenshot": {
+    "file": "v11-safe-exit.png",
+    "sha256": "d29d04e07a99fb7a94ec6908aef3b7577f6c65cc22ea3ea9b215e2c0ab6f5461",
+    "observation": "The avatar stands visibly beside the pickup; the native HUD says ON FOOT and offers Enter vehicle while Exit on foot is disabled."
+  },
+  "source_inputs": [
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/manifest.json",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/manifest.json",
+      "sha256": "5be2aa55117ea771ad8aa2b3a151b2ac76a11a2ed5d2099890724bf83d081139"
+    },
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/west.json",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/west.json",
+      "sha256": "5bc6cabf9802f07832cc1c1bcdb1decc00388b837423646bd10b89522144b50c"
+    },
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/east.json",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/east.json",
+      "sha256": "cd0c9a7be84b07a33c2f356ac584dc1c72fdb7956bf677c09226ca1e1593e3b1"
+    },
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/west.png",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/west.png",
+      "sha256": "6d7e8bbaffb57b3e01730dbdb1fdc5ec32e99730ef0d9271852db23eb72874f5"
+    },
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/east.png",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/east.png",
+      "sha256": "5b2ab8ae8a04afeea99fa0de1f4bb10afee3df56d24750c122bd42e0df61200f"
+    },
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/west.geojson",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/west.geojson",
+      "sha256": "a31f9a48fd6936a91a22d56561a71f01642a9fdae42cad6e7de5541dd0149963"
+    },
+    {
+      "path": "crates/terra-stream/data/heightmap-connected/east.geojson",
+      "absolute_path_during_review": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world/crates/terra-stream/data/heightmap-connected/east.geojson",
+      "sha256": "14f87645e509a83ede40f2a1dc2b57247a6838cd120b33b0b8e6b9245e63dcd6"
+    }
+  ],
+  "source_configuration": {
+    "base_data_revision": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+    "chunk_level": 15,
+    "terrain_resolution": 65,
+    "synthetic": true,
+    "support_bundle_at_both_bodies": "east.json"
+  },
+  "computation_method": {
+    "execution": "Python standard-library math/struct/json/hashlib plus Pillow for read-only 16-bit PNG decoding; calculations independently reconstruct the checked-in source contracts.",
+    "reference_sources": [
+      "crates/terra-core/src/geo.rs",
+      "crates/terra-core/src/tiles.rs",
+      "crates/terra-core/src/world.rs",
+      "crates/terra-core/src/contacts.rs",
+      "crates/terra-stream/src/heightmap.rs",
+      "crates/terra-stream/src/heightmap_set.rs",
+      "crates/terra-bevy/src/environment.rs",
+      "crates/terra-sandbox/src/living/contacts.rs",
+      "crates/terra-sandbox/src/transport/model.rs"
+    ],
+    "ground": "Decode grayscale PNG samples as min_height + pixel/65535 * height_span, round each to f32, bilinearly sample the source at level-15 geographic tile knots for a 65x65 height field, then bilinearly sample the four enclosing tile knots and round to f32. This reproduces the native resident terrain-height path. The authored source features contain no bridge, water or building replacement at these positions.",
+    "support": "Transform the avatar centre, four 0.275 m half-width corners and four edge midpoints through the WGS84 local frame, then sample the reconstructed resident height. Approximate native slope from five-metre east/west and north/south height differences.",
+    "clearance": "Transform saved positions through the WGS84 ECEF/local-frame equations. Test projected oriented-rectangle intervals on both bodies horizontal axes plus the explicit ground-base vertical interval, using actual registered model dimensions and the living reference dimensions for other actor kinds. Human contact footprints use the current axis-aligned reference mapping. The avatar is excluded from its own occupancy query.",
+    "distance": "Surface separation uses terra-core mean-radius great-circle distance; local tangent centre distance is also reported because it is a different metric.",
+    "invariants": "Compare parsed JSON records directly across after-exit, first-exit, resumed-checkpoint and final; permit ordinary clock and needs progression."
+  },
+  "grounded_exit": {
+    "avatar_id": 1000050,
+    "vehicle_id": 1000053,
+    "vehicle_model": "pickup",
+    "avatar_heading_deg": 0.0,
+    "vehicle_heading_deg": 0.0,
+    "avatar_source_height_m": 166.95323181152344,
+    "avatar_saved_altitude_m": 166.97823181152344,
+    "avatar_ground_clearance_m": 0.025,
+    "vehicle_source_height_m": 166.8577117919922,
+    "vehicle_saved_altitude_m": 166.8827117919922,
+    "vehicle_ground_clearance_m": 0.025,
+    "avatar_support_samples": 9,
+    "all_avatar_support_points_covered": true,
+    "support_minimum_height_m": 166.9361572265625,
+    "support_maximum_height_m": 166.97052001953125,
+    "maximum_support_difference_from_centre_m": 0.0172882080078125,
+    "local_slope_degrees_approx": 2.918849803277563,
+    "avatar_right_of_vehicle_m": -1.6639087544041355,
+    "avatar_forward_of_vehicle_m": 1.275000018913371,
+    "pickup_dimensions_m": [
+      2.05,
+      1.95,
+      5.1
+    ],
+    "avatar_dimensions_m": [
+      0.55,
+      1.8,
+      0.55
+    ],
+    "lateral_footprint_clearance_m": 0.363909,
+    "mean_radius_surface_centre_separation_m": 2.0922732083059103,
+    "local_tangent_centre_separation_m": 2.0962388365109867,
+    "other_resident_bodies_checked": 106,
+    "overlapping_resident_bodies": 0,
+    "active_unit_is_avatar": true,
+    "possessed": true,
+    "vehicle_velocity_enu_m_s": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "vehicle_speed_m_s": 0.0,
+    "vehicle_lateral_speed_m_s": 0.0,
+    "vehicle_parking_brake": true,
+    "vehicle_autopilot": false,
+    "persisted_engine_rpm": 800.0
+  },
+  "native_drive_observation": {
+    "before_to_after_drive_surface_displacement_m": 17.261321093701984,
+    "before_to_after_drive_odometer_delta_m": 17.26136527545441,
+    "before_to_after_drive_fuel_delta_l": -0.005363750181231808,
+    "owner_wallet_and_inventory_unchanged": true,
+    "avatar_position_unchanged_while_driving": true
+  },
+  "save_resume_invariants": {
+    "first-exit": {
+      "pickup_vehicle_record_exactly_preserved": true,
+      "pickup_body_record_exactly_preserved": true,
+      "player_record_exactly_preserved": true,
+      "account_exactly_preserved": true,
+      "character_profile_exactly_preserved": true,
+      "driver_record_exactly_preserved": true,
+      "source_identity_exactly_preserved": true,
+      "avatar_pose_and_control_order_exactly_preserved": true,
+      "only_changed_avatar_fields": [
+        "needs"
+      ],
+      "parked_fuel_delta_l": 0.0,
+      "parked_odometer_delta_m": 0.0
+    },
+    "resumed-checkpoint": {
+      "pickup_vehicle_record_exactly_preserved": true,
+      "pickup_body_record_exactly_preserved": true,
+      "player_record_exactly_preserved": true,
+      "account_exactly_preserved": true,
+      "character_profile_exactly_preserved": true,
+      "driver_record_exactly_preserved": true,
+      "source_identity_exactly_preserved": true,
+      "avatar_pose_and_control_order_exactly_preserved": true,
+      "only_changed_avatar_fields": [
+        "needs"
+      ],
+      "parked_fuel_delta_l": 0.0,
+      "parked_odometer_delta_m": 0.0
+    },
+    "final": {
+      "pickup_vehicle_record_exactly_preserved": true,
+      "pickup_body_record_exactly_preserved": true,
+      "player_record_exactly_preserved": true,
+      "account_exactly_preserved": true,
+      "character_profile_exactly_preserved": true,
+      "driver_record_exactly_preserved": true,
+      "source_identity_exactly_preserved": true,
+      "avatar_pose_and_control_order_exactly_preserved": true,
+      "only_changed_avatar_fields": [
+        "needs"
+      ],
+      "parked_fuel_delta_l": 0.0,
+      "parked_odometer_delta_m": 0.0
+    }
+  },
+  "post_exit_observed_simulation_seconds": 77.04992651939392,
+  "limitations": [
+    "Both saved headings are zero degrees. The footprint calculation uses the general oriented-body geometry, but this native journey independently proves the observed straight-heading exit and does not establish oblique-heading cases.",
+    "Persisted RPM is 800 rather than zero after exit. The ordinary idle/parked autonomy step calls VehicleKinematics::stop(), which assigns the 800 RPM idle value. All post-exit snapshots retain zero vehicle motion and exactly unchanged fuel/odometer. Evidence therefore claims parked zero motion/fuel use, not a persisted engine-off RPM state.",
+    "Snapshots are separated by active simulation time. The after-drive to after-exit interval includes additional physical movement and fuel use before the parked checkpoint; these exports cannot attribute that interval to the ExitVehicle transaction itself.",
+    "Whole-world JSON is not expected to remain identical during continued simulation. Avatar needs and world time progress; the listed owner, pose and parked-vehicle invariants remain exact."
+  ]
+}

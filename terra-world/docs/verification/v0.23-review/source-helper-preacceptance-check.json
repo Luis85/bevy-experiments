@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "checked_utc": "2026-10-30T08:04:22.736463+00:00",
+  "scenario": "Actual current source helper refuses packaging before final 0.23 terminal acceptance exists.",
+  "helper_sha256": "df3184eefeee94abee03c710819f61d8dd0aea65c7eccc321904133791f5b43b",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.23-delivery/package_source_023.py",
+    "--root",
+    "/workspace/scratch/96f1d170dd13/source/terra-world",
+    "--original",
+    "/workspace/scratch/96f1d170dd13/baseline/terra-world-0.22.0.zip",
+    "--output",
+    "/tmp/terra023-source-review-b_d9hk6f/must-not-exist.zip",
+    "--report",
+    "/tmp/terra023-source-review-b_d9hk6f/must-not-exist.json"
+  ],
+  "observed_exit_code": 1,
+  "terminal_receipt_absent_before_run": true,
+  "output_zip_created": false,
+  "success_report_created": false,
+  "stdout_bytes": 0,
+  "stderr_sha256": "8fccb1d868e696b22740ce0843a39d7f156d2b75414233d4f5c26a8a6c53163f",
+  "failure_tail": [
+    "  File \"/workspace/scratch/96f1d170dd13/source/terra-world/scripts/package_desktop.py\", line 41, in contained_file",
+    "    raise ValueError(f\"Missing or escaped payload file: {name}\")",
+    "ValueError: Missing or escaped payload file: completed-gates.json"
+  ],
+  "scope": "Negative admission check only. No successful canonical acceptance or distributable archive is asserted."
+}

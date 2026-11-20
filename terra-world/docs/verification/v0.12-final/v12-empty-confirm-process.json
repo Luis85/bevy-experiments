@@ -1,0 +1,20 @@
+{
+  "phase": "0.12 native confirmation",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--world-profile",
+    "/tmp/terra-native/v12-empty-user-data/worlds/world-review-empty/world.json",
+    "--user-data",
+    "/tmp/terra-native/v12-empty-user-data",
+    "--quality",
+    "performance",
+    "--telemetry",
+    "/tmp/terra-native/v12-empty-confirm-telemetry.json"
+  ],
+  "binary_sha256": "4b1a7ae522a51e321dad33fbfb7e3b83f098c3dd3d1b025825f39034ada2de95",
+  "source_input_count": 327,
+  "started_utc": "2026-10-28T16:24:42.066128+00:00",
+  "pid": 113465,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T16:27:32.801197+00:00"
+}

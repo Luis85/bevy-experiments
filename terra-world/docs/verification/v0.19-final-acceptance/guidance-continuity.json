@@ -1,0 +1,33 @@
+{
+  "accepted_contracts": 3,
+  "calendar_seconds": 86401.0,
+  "case": "three_obligations_return_expiry_physical_delivery_resume",
+  "community_xp": 40,
+  "delivered_item": "wood",
+  "delivered_quantity": 4,
+  "explicit_returns": 1,
+  "final_personal_wallet_minor": 25568,
+  "gross_reward_minor": 568,
+  "maximum_walk_step_m": 0.4500000022018353,
+  "missed_deadlines": 1,
+  "paid_deliveries": 1,
+  "physical_walk_seconds": 70.80000000000025,
+  "remaining_accepted_supply": 0,
+  "scope": "Authored flat SDK support; a 24-world-hour fixture deadline with calendar and physical movement advanced separately. Uses ordinary starting inventory, paid escrow and commands. Not prepared-terrain, human-comprehension, career-profitability or hardware evidence.",
+  "starting_personal_wallet_minor": 25000,
+  "verification": {
+    "complete_catalog_validation": true,
+    "duplicate_payment_rejected_without_mutation": true,
+    "duplicate_return_rejected_without_mutation": true,
+    "earliest_deadline_order": true,
+    "exact_completed_save_resume": true,
+    "exact_inventory_and_reserved_payment": true,
+    "exact_open_obligations_after_resume": true,
+    "expired_request_returns_to_board": true,
+    "physical_delivery_without_position_override": true,
+    "remaining_obligation_preserved": true,
+    "return_preserves_goods_and_wallet": true,
+    "stale_obligation_requires_review": true
+  },
+  "walk_distance_m": 315.8999999087415
+}

@@ -1,0 +1,587 @@
+{
+  "additional_owner_deposits_minor_credits": 0,
+  "bond_posted_minor_credits": 4500,
+  "bond_returned_minor_credits": 4437,
+  "cash_and_escrow_conserved_minor_credits": 1365000,
+  "deliveries": 65,
+  "ecology_clock_seconds": 0,
+  "final_company_minor_credits": 84089,
+  "final_issuer_minor_credits": 923481,
+  "final_owner_minor_credits": 10359,
+  "fuel_cash_net_of_return_refund_minor_credits": 238,
+  "fuel_consumed_litres": 1.5821795951006639,
+  "gross_public_fares_minor_credits": 82160,
+  "initial_issuer_minor_credits": 1000000,
+  "initial_owner_minor_credits": 25000,
+  "limits": [
+    "finite one-hour public-service scenario",
+    "repeated journeys circulate existing passenger queues",
+    "not indefinite treasury sustainability",
+    "not a human playtest or every terrain layout"
+  ],
+  "net_after_all_known_cash_costs_minor_credits": 69448,
+  "owner_deposits_minor_credits": 10000,
+  "passengers_conserved": 160,
+  "payroll_minor_credits": 7071,
+  "persisted_accounting": {
+    "capital": {
+      "payments": 0,
+      "receipts": 0
+    },
+    "cash": 84089,
+    "cash_result_after_known_owner_costs": 69929,
+    "cash_result_before_financing": 74089,
+    "coverage": "since_registration",
+    "expected_cash": 84089,
+    "financing": {
+      "payments": 0,
+      "receipts": 10000
+    },
+    "known_owner_funding": 14160,
+    "monetary_entry_count": 7151,
+    "opening_cash": 0,
+    "opening_payroll": 0,
+    "opening_revenue": 0,
+    "operating": {
+      "payments": 8071,
+      "receipts": 82160
+    },
+    "owner_paid_capital": 2000,
+    "owner_paid_operating": 2160,
+    "personal_vehicle_used": true,
+    "recent_entries": [
+      {
+        "amount": 1,
+        "cash_after": 82887,
+        "category": "payroll",
+        "elapsed_seconds": 3571.75,
+        "sequence": 7088
+      },
+      {
+        "amount": 1,
+        "cash_after": 82886,
+        "category": "payroll",
+        "elapsed_seconds": 3572.25,
+        "sequence": 7089
+      },
+      {
+        "amount": 1,
+        "cash_after": 82885,
+        "category": "payroll",
+        "elapsed_seconds": 3572.75,
+        "sequence": 7090
+      },
+      {
+        "amount": 1,
+        "cash_after": 82884,
+        "category": "payroll",
+        "elapsed_seconds": 3573.25,
+        "sequence": 7091
+      },
+      {
+        "amount": 1,
+        "cash_after": 82883,
+        "category": "payroll",
+        "elapsed_seconds": 3573.75,
+        "sequence": 7092
+      },
+      {
+        "amount": 1,
+        "cash_after": 82882,
+        "category": "payroll",
+        "elapsed_seconds": 3574.25,
+        "sequence": 7093
+      },
+      {
+        "amount": 1,
+        "cash_after": 82881,
+        "category": "payroll",
+        "elapsed_seconds": 3574.75,
+        "sequence": 7094
+      },
+      {
+        "amount": 1,
+        "cash_after": 82880,
+        "category": "payroll",
+        "elapsed_seconds": 3575.25,
+        "sequence": 7095
+      },
+      {
+        "amount": 1,
+        "cash_after": 82879,
+        "category": "payroll",
+        "elapsed_seconds": 3575.75,
+        "sequence": 7096
+      },
+      {
+        "amount": 1,
+        "cash_after": 82878,
+        "category": "payroll",
+        "elapsed_seconds": 3576.25,
+        "sequence": 7097
+      },
+      {
+        "amount": 1,
+        "cash_after": 82877,
+        "category": "payroll",
+        "elapsed_seconds": 3576.75,
+        "sequence": 7098
+      },
+      {
+        "amount": 1,
+        "cash_after": 82876,
+        "category": "payroll",
+        "elapsed_seconds": 3577.25,
+        "sequence": 7099
+      },
+      {
+        "amount": 1,
+        "cash_after": 82875,
+        "category": "payroll",
+        "elapsed_seconds": 3577.75,
+        "sequence": 7100
+      },
+      {
+        "amount": 1,
+        "cash_after": 82874,
+        "category": "payroll",
+        "elapsed_seconds": 3578.25,
+        "sequence": 7101
+      },
+      {
+        "amount": 1,
+        "cash_after": 82873,
+        "category": "payroll",
+        "elapsed_seconds": 3578.75,
+        "sequence": 7102
+      },
+      {
+        "amount": 1,
+        "cash_after": 82872,
+        "category": "payroll",
+        "elapsed_seconds": 3579.25,
+        "sequence": 7103
+      },
+      {
+        "amount": 1,
+        "cash_after": 82871,
+        "category": "payroll",
+        "elapsed_seconds": 3579.75,
+        "sequence": 7104
+      },
+      {
+        "amount": 1,
+        "cash_after": 82870,
+        "category": "payroll",
+        "elapsed_seconds": 3580.25,
+        "sequence": 7105
+      },
+      {
+        "amount": 1,
+        "cash_after": 82869,
+        "category": "payroll",
+        "elapsed_seconds": 3580.75,
+        "sequence": 7106
+      },
+      {
+        "amount": 1,
+        "cash_after": 82868,
+        "category": "payroll",
+        "elapsed_seconds": 3581.25,
+        "sequence": 7107
+      },
+      {
+        "amount": 1,
+        "cash_after": 82867,
+        "category": "payroll",
+        "elapsed_seconds": 3581.75,
+        "sequence": 7108
+      },
+      {
+        "amount": 1,
+        "cash_after": 82866,
+        "category": "payroll",
+        "elapsed_seconds": 3582.25,
+        "sequence": 7109
+      },
+      {
+        "amount": 1,
+        "cash_after": 82865,
+        "category": "payroll",
+        "elapsed_seconds": 3582.75,
+        "sequence": 7110
+      },
+      {
+        "amount": 1,
+        "cash_after": 82864,
+        "category": "payroll",
+        "elapsed_seconds": 3583.25,
+        "sequence": 7111
+      },
+      {
+        "amount": 1,
+        "cash_after": 82863,
+        "category": "payroll",
+        "elapsed_seconds": 3583.75,
+        "sequence": 7112
+      },
+      {
+        "amount": 1,
+        "cash_after": 82862,
+        "category": "payroll",
+        "elapsed_seconds": 3584.25,
+        "sequence": 7113
+      },
+      {
+        "amount": 1,
+        "cash_after": 82861,
+        "category": "payroll",
+        "elapsed_seconds": 3584.75,
+        "sequence": 7114
+      },
+      {
+        "amount": 1,
+        "cash_after": 82860,
+        "category": "payroll",
+        "elapsed_seconds": 3585.25,
+        "sequence": 7115
+      },
+      {
+        "amount": 1,
+        "cash_after": 82859,
+        "category": "payroll",
+        "elapsed_seconds": 3585.75,
+        "sequence": 7116
+      },
+      {
+        "amount": 1,
+        "cash_after": 82858,
+        "category": "payroll",
+        "elapsed_seconds": 3586.25,
+        "sequence": 7117
+      },
+      {
+        "amount": 1,
+        "cash_after": 82857,
+        "category": "payroll",
+        "elapsed_seconds": 3586.75,
+        "sequence": 7118
+      },
+      {
+        "amount": 1,
+        "cash_after": 82856,
+        "category": "payroll",
+        "elapsed_seconds": 3587.25,
+        "sequence": 7119
+      },
+      {
+        "amount": 1,
+        "cash_after": 82855,
+        "category": "payroll",
+        "elapsed_seconds": 3587.75,
+        "sequence": 7120
+      },
+      {
+        "amount": 1,
+        "cash_after": 82854,
+        "category": "payroll",
+        "elapsed_seconds": 3588.25,
+        "sequence": 7121
+      },
+      {
+        "amount": 1,
+        "cash_after": 82853,
+        "category": "payroll",
+        "elapsed_seconds": 3588.75,
+        "sequence": 7122
+      },
+      {
+        "amount": 1,
+        "cash_after": 82852,
+        "category": "payroll",
+        "elapsed_seconds": 3589.25,
+        "sequence": 7123
+      },
+      {
+        "amount": 1,
+        "cash_after": 82851,
+        "category": "payroll",
+        "elapsed_seconds": 3589.75,
+        "sequence": 7124
+      },
+      {
+        "amount": 1,
+        "cash_after": 82850,
+        "category": "payroll",
+        "elapsed_seconds": 3590.25,
+        "sequence": 7125
+      },
+      {
+        "amount": 1,
+        "cash_after": 82849,
+        "category": "payroll",
+        "elapsed_seconds": 3590.75,
+        "sequence": 7126
+      },
+      {
+        "amount": 1,
+        "cash_after": 82848,
+        "category": "payroll",
+        "elapsed_seconds": 3591.25,
+        "sequence": 7127
+      },
+      {
+        "amount": 1,
+        "cash_after": 82847,
+        "category": "payroll",
+        "elapsed_seconds": 3591.75,
+        "sequence": 7128
+      },
+      {
+        "amount": 1,
+        "cash_after": 82846,
+        "category": "payroll",
+        "elapsed_seconds": 3592.25,
+        "sequence": 7129
+      },
+      {
+        "amount": 1,
+        "cash_after": 82845,
+        "category": "payroll",
+        "elapsed_seconds": 3592.75,
+        "sequence": 7130
+      },
+      {
+        "amount": 1,
+        "cash_after": 82844,
+        "category": "payroll",
+        "elapsed_seconds": 3593.25,
+        "sequence": 7131
+      },
+      {
+        "amount": 1,
+        "cash_after": 82843,
+        "category": "payroll",
+        "elapsed_seconds": 3593.75,
+        "sequence": 7132
+      },
+      {
+        "amount": 1,
+        "cash_after": 82842,
+        "category": "payroll",
+        "elapsed_seconds": 3594.25,
+        "sequence": 7133
+      },
+      {
+        "amount": 1,
+        "cash_after": 82841,
+        "category": "payroll",
+        "elapsed_seconds": 3594.75,
+        "sequence": 7134
+      },
+      {
+        "amount": 1,
+        "cash_after": 82840,
+        "category": "payroll",
+        "elapsed_seconds": 3595.25,
+        "sequence": 7135
+      },
+      {
+        "amount": 1,
+        "cash_after": 82839,
+        "category": "payroll",
+        "elapsed_seconds": 3595.75,
+        "sequence": 7136
+      },
+      {
+        "amount": 1,
+        "cash_after": 82838,
+        "category": "payroll",
+        "elapsed_seconds": 3596.25,
+        "sequence": 7137
+      },
+      {
+        "amount": 1,
+        "cash_after": 82837,
+        "category": "payroll",
+        "elapsed_seconds": 3596.75,
+        "sequence": 7138
+      },
+      {
+        "amount": 1,
+        "cash_after": 82836,
+        "category": "payroll",
+        "elapsed_seconds": 3597.25,
+        "sequence": 7139
+      },
+      {
+        "amount": 1,
+        "cash_after": 82835,
+        "category": "payroll",
+        "elapsed_seconds": 3597.75,
+        "sequence": 7140
+      },
+      {
+        "amount": 1,
+        "cash_after": 82834,
+        "category": "payroll",
+        "elapsed_seconds": 3598.25,
+        "sequence": 7141
+      },
+      {
+        "amount": 1,
+        "cash_after": 82833,
+        "category": "payroll",
+        "elapsed_seconds": 3598.75,
+        "sequence": 7142
+      },
+      {
+        "amount": 1,
+        "cash_after": 82832,
+        "category": "payroll",
+        "elapsed_seconds": 3599.25,
+        "sequence": 7143
+      },
+      {
+        "amount": 1,
+        "cash_after": 82831,
+        "category": "payroll",
+        "elapsed_seconds": 3599.75,
+        "sequence": 7144
+      },
+      {
+        "amount": 1,
+        "cash_after": 82830,
+        "category": "payroll",
+        "elapsed_seconds": 3600.25,
+        "sequence": 7145
+      },
+      {
+        "amount": 1,
+        "cash_after": 82829,
+        "category": "payroll",
+        "elapsed_seconds": 3600.75,
+        "sequence": 7146
+      },
+      {
+        "amount": 1,
+        "cash_after": 82828,
+        "category": "payroll",
+        "elapsed_seconds": 3601.25,
+        "sequence": 7147
+      },
+      {
+        "amount": 1,
+        "cash_after": 82827,
+        "category": "payroll",
+        "elapsed_seconds": 3601.75,
+        "sequence": 7148
+      },
+      {
+        "amount": 1,
+        "cash_after": 82826,
+        "category": "payroll",
+        "elapsed_seconds": 3602.25,
+        "sequence": 7149
+      },
+      {
+        "amount": 1,
+        "cash_after": 82825,
+        "category": "payroll",
+        "elapsed_seconds": 3602.75,
+        "sequence": 7150
+      },
+      {
+        "amount": 1264,
+        "cash_after": 84089,
+        "category": "public_fares",
+        "elapsed_seconds": 3603.0,
+        "sequence": 7151
+      }
+    ],
+    "reconciled": true,
+    "recorded_since_elapsed_seconds": 0.0,
+    "totals": {
+      "owner_deposit": 10000,
+      "owner_paid_lease": 2160,
+      "owner_paid_registration": 2000,
+      "payroll": 7071,
+      "public_fares": 82160,
+      "recruitment": 1000
+    },
+    "unpriced_stock_in_units": 0,
+    "unpriced_stock_out_units": 0
+  },
+  "recruitment_minor_credits": 1000,
+  "regional_accounting_resume_exact": true,
+  "registration_minor_credits": 2000,
+  "rental_damage_minor_credits": 63,
+  "rental_lease_minor_credits": 2340,
+  "rental_renewals": 12,
+  "road_holds_waited_10_seconds_then_resumed": [
+    516.0,
+    2564.75,
+    2590.0,
+    2615.25,
+    2640.5
+  ],
+  "save_resume_checkpoints": [
+    {
+      "company_cash_minor_credits": 19202,
+      "deliveries": 9,
+      "issuer_cash_minor_credits": 992400,
+      "operating_net_minor_credits": 9202,
+      "owner_wallet_minor_credits": 6460,
+      "physical_seconds": 600.0
+    },
+    {
+      "company_cash_minor_credits": 33176,
+      "deliveries": 21,
+      "issuer_cash_minor_credits": 977592,
+      "operating_net_minor_credits": 23176,
+      "owner_wallet_minor_credits": 6100,
+      "physical_seconds": 1200.0
+    },
+    {
+      "company_cash_minor_credits": 45885,
+      "deliveries": 32,
+      "issuer_cash_minor_credits": 964048,
+      "operating_net_minor_credits": 35885,
+      "owner_wallet_minor_credits": 5740,
+      "physical_seconds": 1800.0
+    },
+    {
+      "company_cash_minor_credits": 57330,
+      "deliveries": 42,
+      "issuer_cash_minor_credits": 951768,
+      "operating_net_minor_credits": 47330,
+      "owner_wallet_minor_credits": 5380,
+      "physical_seconds": 2400.0
+    },
+    {
+      "company_cash_minor_credits": 70122,
+      "deliveries": 53,
+      "issuer_cash_minor_credits": 938224,
+      "operating_net_minor_credits": 60122,
+      "owner_wallet_minor_credits": 5020,
+      "physical_seconds": 3000.0
+    },
+    {
+      "company_cash_minor_credits": 82831,
+      "deliveries": 64,
+      "issuer_cash_minor_credits": 924680,
+      "operating_net_minor_credits": 72831,
+      "owner_wallet_minor_credits": 4660,
+      "physical_seconds": 3600.0
+    }
+  ],
+  "scenario": "seeded_settlement_compact_rental_passenger_company",
+  "service_physical_seconds": 3600,
+  "total_physical_seconds_including_completion_and_return": 3649.5,
+  "unpriced": [
+    "owner planning and management time",
+    "owner living costs outside the frozen ecology clock"
+  ],
+  "unpriced_starter_vehicle_unused": true,
+  "vehicle_distance_metres": 15726.1194160505
+}

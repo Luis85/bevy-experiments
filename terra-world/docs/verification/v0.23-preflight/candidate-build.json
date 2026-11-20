@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "exit_code": 0,
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-p",
+    "terra-demo"
+  ],
+  "profile": "dev opt-level1",
+  "binary": "/tmp/terra023-target/debug/terra-demo",
+  "native_binary_sha256": "700120e44255afe4c482b3416bdcedaad4200d930012418aa0c36cda0281c7f0",
+  "log_sha256": "f7df6838b4bd19929b0bcf5d4e40611907e4f6f381a8391424bae2dccedb15af",
+  "scope": "Candidate native build; final frozen acceptance separate."
+}

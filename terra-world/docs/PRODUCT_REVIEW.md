@@ -1,98 +1,94 @@
-# Terra World 0.2 product review and polishing pass
+# Terra World 0.24 — comprehensive product review
 
-This pass reviewed the native game and the reusable system together: player onboarding, actor control, construction/farming, economic behavior, map fidelity, historical provenance, multiplayer authority, persistence, performance, integration and maintainability. Independent agents implemented separate subsystems and then reviewed their combined behavior. The acceptance evidence is the executable suite, actual native operation, saved-state inspection and screenshots; feature declarations alone were not treated as proof.
+Review began **30 October 2026** against the exact delivered **0.23.0**. The [implementation plan](IMPLEMENTATION_PLAN_v0.24.md) was written before dedicated implementation dispatch; [research](RESEARCH_v0.24.md) records primary-source patterns and explicit product policy. Actual acceptance is recorded in [Validation](VALIDATION.md); pending work is not passed work.
 
-## Outcome
+## Product assessment
 
-The reference game now has a connected loop: select an owned actor in RTS mode, order it to a service or possess it in first/third person, buy or sell finite stock with the same principal inventory and wallet, consume supplies, gather/craft/build/farm, and watch producers and couriers move actual materials through the settlement. The world clock drives environmental conditions and metabolism; physical locomotion remains measured in real simulation seconds. The same rules and commands run in the authoritative host.
+The framework connects streamed geography, RTS and possession, needs, finite trade and production, communities, transport, persistence and authoritative multiplayer. The next increment strengthens continued useful work and predictable operations across these existing systems.
 
-The implementation remains a bounded, stylized demonstration and a reusable SDK. It is not presented as a complete planetary digital twin, a photorealistic game, or a production MMO service.
+The review found public supply offers that can become obsolete while retaining board slots forever, new offers exceeding useful demand or receiver capacity, native operations that can resolve a different target after activation, unnamed building damage, a cross-platform file-alias omission, and a verification runner that can accept while an ordinary child is still writing.
 
-## Significant findings and fixes
+The selected pass addresses these failures through explicit lifecycle and interaction rules. Existing visual identity, source/catalog identity, finite funds, compatible saved shapes and historical evidence remain protected. The [G01–G18 register](REVIEW_GAPS_v0.24.md) retains wider production requirements and the proof needed to close them.
 
-| Perspective | Finding | Resolution and evidence |
+## Dedicated ownership
+
+| Owner | Review and implementation |
+|---|---|
+| Player specialist | Native Industry, Fleet, Build and faction interaction; reviewed targets, labels, destructive review, focus and input. |
+| World specialist | Supply demand/capacity, public escrow lifecycle, accepted promises, determinism, conservation and continued careers. |
+| Reliability specialist | Protected file identity, process/log bounds, extracted desktop verification and CI. |
+| Integrator | Product breadth, research/policy, plan/version/docs, native audit, acceptance, preservation and complete delivery. |
+
+Specialists cross-review other streams before final acceptance. Source findings, executed regressions and rendered observations are separate evidence.
+
+## Assessment across product perspectives
+
+| Perspective | Finding and selected response | Remaining qualification |
 |---|---|---|
-| Player / logistics | Production worked in isolated tests, but every courier stopped at a turn. | The queue check combined a new waypoint direction with an old actor heading. It now compares the desired heading. A turning-queue regression and the real Bevy workflow complete deliveries. |
-| Actual map gameplay | The flat fixture passed while the real procedural settlement still delivered nothing. | Nearby roads are ranked before the 32-route bound; routing uses the full bounded graph. Parked idle vehicles no longer masquerade as moving traffic queues. The 49-chunk source-world test completes 4 deliveries and 42 resident purchases after 180 seconds. |
-| Multiplayer fairness | The host initially enforced less geography than local play. | A bounded resident-surface adapter now governs terrain support, water, slopes, source buildings, bridges and raised underpasses. Authored structures and fallback facilities participate in swept collision checks. Actual TCP regressions cover hostile placement and physical movement. |
-| New player / operator | The new helicopter increased the starter crew to 5 while admission still reserved 4 slots. | Shared capacity constants, prepared crew allocation and atomic commit/rollback prevent partially allocated principals, units and tokens. ID/capacity and seed-failure cases are tested. |
-| Returning player | Disconnect could leave an offline body possessed with stale velocity, draining walking energy indefinitely. | Disconnect releases manual control and clears velocity while preserving body/account state. RTS orders continue on the host. Real-socket lifecycle and resume tests cover the change. |
-| World operator | Distant players could evict spawn terrain and prevent later joins. | Spawn remains in the CLI's bounded source interest union. A residency regression retains the admission surface. |
-| Data integrator | Duplicate imported road IDs could pass complete-state validation but fail public-view validation. | Identical segments deduplicate; distinct segments receive stable bounded identities. Validation and snapshot tests cover reusable provider/historical inputs. |
-| Data fidelity | Physical road width normalization could be discarded during living-world seeding. | Normalized source width is retained when a raw tag uses physical units. The host also accepts centimetre-tagged raised underpasses consistently. |
-| Replica consumer | Partial living views could silently omit roads/sites, and faster pose updates could erase their truncation flag. | All supported reductions mark incompleteness. Actor and sandbox completeness are tracked independently and combined across their different update rates. A mixed-message regression checks both directions. |
-| Player / error recovery | Rejected possession and invalid RTS input wrote an internal status that no UI displayed. | The HUD publishes changed control status, while domain/server outcomes retain precedence. Ownership text distinguishes a controllable actor from an inspected NPC. |
-| Player / pause state | Pausing with the World drawer closed could look like broken movement. | The footer gives a persistent pause/resume hint. |
-| Airborne player | Horizontal market distance could imply eligibility while 3D reach checks rejected trading. | Market display, interaction feedback and production management use spatial distance. |
-| Production manager | Enabled sites were always called running, even when blocked on input or storage. | The inspector reports working, missing inputs, depleted source, full storage, disabled production or paused time, and explains management reach. |
-| Visual usability | Long labels wrapped awkwardly, and translucent panels revealed moving geometry behind text. | Shorter mode/quantity labels and opaque surfaces improve scanning and contrast. The minimum window retains bounded scrolling instead of allowing content to overlap the footer. |
-| Source honesty | An imported sample heightmap could appear to be observed Munich terrain. | The included fixture is labeled synthetic in its manifest, source records, documentation and visible source banner. Authored economy/people remain distinct from mapped features. |
+| Product fit/scope | Strengthen useful existing careers and reference-game operations. | Measured target-player/product success criteria. |
+| First-session onboarding | Activities offers a goal, but new funded work can already exceed receiving capacity. | Uncoached first useful action and comprehension. |
+| Returning-player continuity | Obsolete requests can hold all board slots indefinitely. | Long careers and return after extended absence. |
+| Interaction/consent | Routine Industry/Fleet operations and damage lack the stronger context retention used by Market/Frontier. | Device and latency coverage as surfaces grow. |
+| Information architecture | Keep compact panels and provide deliberate browse/review recovery. | Comparative task-discovery evidence. |
+| Accessibility/input | Generic pause/resume and unnamed damage obscure consequences. | Full 200% reflow, narration, contrast, localization and physical devices. |
+| Progression | Capacity-fitting small requests and turnover support continued work. | Measured stalls across Supply, Home/Community and Road/Company. |
+| Finite economy | Retirement must return exact escrow to the original issuer within the money cap. | Sustained balance and labor/capital/living costs. |
+| Community/property | Keep exact explicit faction selection and conservative existing dissolution. | Absent-leader succession and populated/asset-owning dissolution policy. |
+| World simulation | Deterministic bounded board maintenance and accepted commitments. | Density/endurance and simulation budgets. |
+| Navigation/vehicles | Preserve exact targets in Fleet operational handoffs. | Traffic/obstacle endurance and physical handling. |
+| Geography/data | Preserve source identity and partial-view uncertainty. | Licensed shipping data, datum/topology/NoData and constrained placement. |
+| Rendering/performance | Check legibility with existing renderer and settings. | Physical GPU frame/loading/residency tails. |
+| Content/art/audio | Preserve original assets, examples, rights notices and authoring inputs. | Production animation/equipment/audio and art budgets. |
+| SDK/developer experience | Shared demand queries, typed blockers and compatible saved shapes. | External integrator feedback and future API evolution. |
+| Multiplayer/authority | Commands revalidate authority; replica absence is not deletion. | WAN latency/loss/soak and deployment capacity. |
+| Security/privacy | Portable protected-file identity and passive package checks before execution. | Public-service threat model and signed updates. |
+| Recovery/concurrency | Preserve leases, publication outcomes and rejected-operation value. | Target-filesystem power-loss and offsite rehearsal. |
+| Delivery/support | Fresh extraction/startup checks become part of CI. | Actual Windows/clean-machine and upgrade/rollback acceptance. |
+| Observability/operations | Bound logs and process lifetime before accepting a gate. | Retention, alerting, crash diagnosis and responsible operators. |
 
-## Player and creator experience
+## Prioritized findings
 
-The main interaction model is explicit. F1 gives RTS control; click, Shift selection, drag selection and group commands operate owned bodies. F2 and F3 request possession through the domain and wait for confirmation. WASD movement is camera-relative; R/F controls aircraft altitude. Release preserves the current active body, so trading/building reach does not jump to another avatar. Explicit geographic camera navigation releases control before moving the view.
+1. **P1: obsolete public supply work never retires.** Expiry renews requests, holding escrow and a finite slot. Retire confirmed obsolete public work only after exact issuer credit. Honor accepted promises.
+2. **P1: posting can create excessive or impossible work.** The previous minimum-four clamp exceeds small shortages and omits capacity checks. Derive a useful admissible amount before funding.
+3. **P1: routine native operations can change target or meaning after activation.** Explicit missing Industry/Fleet selectors fall back, and a toggle derives its desired state at dispatch. Retain stable reviewed operands and recheck eligibility.
+4. **P1: building damage lacks a named consequence review.** The generic action resolves a nearby structure later. Name the exact target and health effect with cancel/confirm.
+5. **P1: canonical gate success can precede child completion.** The reviewer reproduced a child publishing output and a marker after reported leader success. Bound output, EOF and owned-process completion.
+6. **P1: protected output checks omit non-Unix hard links.** Resolve portable file identity and existing aliased ancestors.
+7. **P2: CI uploads desktops without testing a fresh extracted tree.** Add safe extraction, passive verification and bounded startup.
+8. **P2: a missing explicit faction can silently become another membership.** Require deliberate browsing.
 
-The inspector separates Command, Build, Market, Industry and Factions tasks. The World drawer and inspector can be hidden independently, leaving more landscape visible. The interface shows the player ID needed by faction invitations. Existing housing, workbench access, plot/faction roles, gathering, farming, destruction, saves and the atlas remain available alongside the new controls.
+## Fresh native baseline
 
-Native operation verified physical movement, mode switching, a market movement order and an actual bread purchase. Saved state confirmed player identity remained 1 and the wallet changed from 250.00 to 247.50 credits while inventory gained one bread. The market exposed the matching buy/sell prices, shop stock, own quantity and till. The player did not receive a separate inventory merely by possessing a worker or vehicle.
+The exact accepted 0.23 executable, SHA-256 `432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f`, ran on Linux/X11 with software Vulkan. It saved and quit normally, exit 0. Screenshots below were captured and visually inspected during this review.
 
-The final multiplayer pass repeated possession and the purchase as player 2.
-The authoritative host retained the same owned worker, 247.50 credits and one
-bread after closing and reopening the native client. The Industry panel showed
-12 completed deliveries and a producer waiting for inputs; the next minimum-size
-capture showed replenished inputs, resumed work and 13 completed deliveries.
-This confirms that the visible state follows the authoritative economy. The
-[native verification record](native-v2-verification.json) includes the selected
-state evidence and explicitly records its smaller 9-chunk visual working set.
+| Step | Observation and health | Capture |
+|---|---|---|
+| 1 — Activities | Useful visible objective, actor and reward explanation. Long-term offer usefulness requires domain tests. | [Activities](verification/v0.24-native/01-baseline-activities.png) |
+| 2 — Industry | Facility, stock and reach are visible; generic “Pause / resume owned production” obscures the next operation. | [Industry](verification/v0.24-native/03-baseline-industry-complete.png) |
+| 3 — Build entry | Claiming, materials and recipes are grouped and scrollable. | [Build](verification/v0.24-native/04-baseline-build.png) |
+| 4 — Fleet entry | Registration and personal/company finances are distinct. Target replacement findings are source evidence. | [Fleet](verification/v0.24-native/05-baseline-fleet.png) |
+| 5 — Property actions | “Damage permitted structure −25” is unnamed and enabled with no player structures. | [Damage entry](verification/v0.24-native/07-baseline-build-damage.png) |
+| 6 — Save/quit | Pause explains JSON semantics and exposes Save and quit; normal exit succeeded. | [Session menu](verification/v0.24-native/08-baseline-session-menu.png) |
 
-## Graphics, geography and provenance
+![Baseline Industry: generic combined operation](verification/v0.24-native/03-baseline-industry-complete.png)
 
-The default requested neighborhood grew to 49 chunks with 65×65 heightfields. Smooth indexed meshes, shared normals, UVs/tangents and authored ground-detail textures improve terrain presentation. Source tags affect building height/parts, roofs, windows, colors/materials, shops, road width/lanes/bridges, water, fields, orchards and tree types. Rendering has finite feature budgets, asynchronous mesh construction and hysteresis between detail tiers. Full terrain remains present in every tier.
+![Baseline property action: unnamed damage control](verification/v0.24-native/07-baseline-build-damage.png)
 
-The default scene regression measured 1,464,403 source vertices. That is a bounded geometry result, not a claim of a particular frame rate on gaming hardware. Actual native captures show the wider RTS landscape, first/third-person body visibility, a heightmap settlement with draped roads, and the revised political atlas.
+An intermediate PNG 02 was incomplete and rejected; its bytes and original receipt remain failed evidence. Fresh complete capture 03 supplies the accepted Industry observation. Capture publication now atomically exposes complete bytes. The initial process helper mislabeled the baseline release field as 0.24; the pinned binary, starting source map and rendered 0.23 title identify the actual baseline. The original receipt remains unchanged and the helper was corrected. The checkout changed during parallel implementation, so its ending map is not claimed as baseline or final accepted source.
 
-The PNG importer preserves declared WGS84 bounds, elevation scaling and source attribution, validates regular contained files, and refuses unsupported coverage instead of silently inventing missing elevation. An elevation-only import does not imply observed buildings, roads or businesses; its fallback game settlement is authored. The bundled heightmap and dated example packs remain explicitly fictional. Current Natural Earth country data retains capture-date and boundary-policy text.
+## Implementation and final review
 
-## Economy and simulation integrity
+The three implementation streams completed the selected domain, interaction and reliability work. Supply posting now follows useful demand and admission capacity; confirmed obsolete public requests release their scarce slot only after exact original-issuer credit is possible. Accepted promises retain their terms. Industry and thirteen routine Fleet operations retain stable reviewed context through real activation and dispatch, while missing explicit selections stay unavailable. Building damage names the exact structure, health change and consequences, with safe cancellation and one-use confirmation.
 
-Money uses integer minor credit units. Transactions validate quantity, price direction, stock, funds, reach and overflow before committing. Wallets and tills are finite; production consumes actual inputs or finite extraction reserves. Couriers collect stock into cargo and deposit it at their destination. Production may stop when deliveries or resources are unavailable. Tests verify that failed commands remain atomic and materials/money are not silently duplicated.
+Protected outputs use portable existing-file identity and canonical existing ancestors. Canonical subprocesses have explicit output/lifetime/EOF/cleanup bounds, and ordinary surviving POSIX groups prevent success. Desktop archives are safely extracted and passively verified before optional startup; the configured Linux and Windows CI paths perform this qualification before upload. Actual Windows execution remains unclaimed.
 
-The actual-map test was the decisive integration gate: with loaded roads/buildings/farms/forests and collision enabled, 47 bodies and 7 sites produced 626 cycles, 4 completed deliveries and 42 resident purchases in the recorded 180-second run. It exposed defects that the initial isolated economy tests and flat-terrain integration did not reveal.
+Rotated reviews closed rental countdown overbinding, incomplete current receipt admission, ambiguous Windows unresolved aliases, and changes after a preservation checkpoint. Failed attempts remain retained. The actual native candidate completed supply delivery, named Industry pause/resume, plot/craft/build/damage review, company registration/funding/recruitment, route assignment and start/pause, followed by save and restoration. Independent checkpoint audits reconciled the resulting money, inventory, progression, fence, company and paused assignment. [The native record](verification/v0.24-native/README.md) distinguishes the actual sequence, saved-state proof and platform limits.
 
-Needs are attached to bodies, while inventory/wallet/permissions belong to the principal. Food, water and energy influence movement limits. The host clamps otherwise valid delayed movement intent against current needs, avoiding false rejection when exhaustion changes between input and processing.
+Final polish shortened two damage labels at the minimum window. A later visual assessment incorrectly reported missing inspector paragraphs. Independent pixel comparisons proved the named-consequence region in 208/209 and the Build prose in 219/220 were byte-for-byte identical and present. The finding was withdrawn and its experimental rendering workaround and regression removed exactly. Original images, attempted-build receipts and the correction record remain available; no unsupported renderer fix is shipped. [The independent comparison](verification/v0.24-review/pixel-comparison.md) documents the evidence.
 
-## Reuse, authority and operations
+Final proof belongs in [Validation](VALIDATION.md) and the [execution ledger](IMPLEMENTATION_PLAN_v0.24.md#execution-ledger).
 
-Pure geographic, streaming, history and sandbox/economy crates remain independent of the renderer. `TerraLivingPlugin` is opt-in for embedding applications, and its settings can disable reference population seeding or advancement. Games can provide their own data provider, population, renderer, catalog and environment resolver. The domain modules were split by responsibility rather than kept as one large economy implementation.
+## Evidence limits
 
-Clients submit intent. The host owns mutation, collision, interaction reach, identity, sequencing and persistence. A public partial replica is not a writable complete save. Views are bounded under the transport frame limit, privacy-sensitive account data is scoped to the requesting player, and capability-based resume retains the principal across reconnects. The new living state participates in the existing atomic save/restore envelope.
+This is a framework/reference-game increment. It does not establish Windows runtime, physical GPU/device performance, uncoached usability, blanket accessibility, public-service readiness or distributed MMORPG capacity. Those requirements remain explicit in the gap register.
 
-The independent host/client process runner passed procedural two-client operation, restart/resume, a matching historical/political session, mismatched world rejection, invalid historical configuration and special-file input checks. The final source verification has 168 distinct passing tests; see [VALIDATION.md](VALIDATION.md) for the counts and commands.
-
-## Native visual acceptance
-
-The independent reviewer inspected the real application at 1440×900 and 1100×700. No blocking overlap or unreadable primary controls were found in the reviewed Command, Market, Industry, heightmap and atlas flows. The source banner, mode controls, wallet, quantities, numeric needs, source attribution and navigation guidance remain visible. Overflow stays inside scrollable panels.
-
-The completed-purchase capture has state evidence behind it. Earlier Industry images with zero deliveries are retained only as review-before evidence; the final release image uses the corrected simulation. Early screenshots also lagged the issued action under software rendering, so final images are labeled by their actual visible mode.
-
-The final [RTS overview](screenshots/v2-rts-overview.png) confirms all 49 chunks
-rendered, five selected owned bodies and the persistent pause hint. The final
-[heightmap capture](screenshots/v2-heightmap-settlement.png) confirms the synthetic
-source banner and terrain-draped roads. The independent reviewer accepted these
-along with the final opaque-panel possession, trade, logistics and minimum-size
-captures without requesting another blocking change.
-
-Accessibility was partially reviewed for visual contrast, text/numeric cues, viewport exclusion and the minimum window. Keyboard-only traversal, screen readers, user UI scaling and color-vision testing remain unverified. The intended accepted target is a mouse-and-keyboard desktop demonstration.
-
-## Current limits
-
-- The default world, population and economic behavior are authored simulation content. Public inputs have bounded coverage and separate update/licensing policies. A successful live Overpass fetch was not observed in this environment; its local HTTP and semantic paths are tested.
-- Movement is a kinematic surface controller with bounded routing, following and local obstacle handling. It is not a complete navmesh, signal/lane-change system, rigid-body vehicle model or aerodynamic simulation. RTS aircraft orders are horizontal; direct possession provides altitude input.
-- Prices are fixed reference prices. There are no wages, taxation, dynamic price discovery or comprehensive national economies. Production ownership is personal; existing factions govern shared plots/housing/farms/workbenches.
-- One reference settlement is seeded around the scenario start. Continuous regional population generation, ecology and economic partitioning across the planet are hosting-game extensions.
-- Source geometry is immutable input. Mutable construction, crops, resources and supported source-feature edits are an overlay; arbitrary sourced-building fracture is not implemented.
-- Multiplayer is bounded single-process TCP for trusted local development/LAN use. Public accounts, encrypted production transport, predictive movement and distributed authority remain host concerns.
-- The graphical atlas is a flat geographic view. Source claims and authored faction territories do not arbitrate sovereignty. Current captures are not historical truth, and missing past data is not synthesized as fact.
-- Save envelopes pin world/source/catalog assumptions. The v2 procedural revision deliberately rejects incompatible v1 native-world geometry; deliberate migration is required for such worlds.
-
-The [earlier product review](PRODUCT_REVIEW_v0.1.md) remains available as historical evidence for the foundation. It is not used to claim that the new workflows were already verified in that release.

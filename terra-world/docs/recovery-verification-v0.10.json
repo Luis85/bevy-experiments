@@ -1,0 +1,62 @@
+{
+  "backup": {
+    "checkpoint_payload_bytes": 1709231,
+    "copied_pages": 544,
+    "copy_steps": 5,
+    "domain_validated": true,
+    "elapsed_ms": 42.614946,
+    "game_metadata_requires_host_validation": true,
+    "generation": 2,
+    "nonempty_regions": 1027
+  },
+  "environment": {
+    "arch": "x86_64",
+    "os": "linux",
+    "profile": "optimized dev",
+    "sqlite": "3.53.2"
+  },
+  "fixture": "original synthetic 1024-region storage recovery",
+  "limits": "Single bounded authority. Times include this fixture on this machine; they are not multiplayer throughput or a latency guarantee. Copy retry deadlines do not preempt filesystem I/O or full validation. Host-specific metadata still requires its application validator.",
+  "recovery": {
+    "checkpoint_payload_bytes": 1709231,
+    "copied_pages": 544,
+    "copy_steps": 5,
+    "domain_validated": true,
+    "elapsed_ms": 42.432435999999996,
+    "game_metadata_requires_host_validation": true,
+    "generation": 2,
+    "nonempty_regions": 1027
+  },
+  "restore_ms": 26.144735999999998,
+  "scope": {
+    "active_resource_nodes": 6,
+    "complete_living_bodies": 47,
+    "complete_nonempty_regions": 1027,
+    "complete_resource_nodes": 6144,
+    "connected_clients": 0,
+    "renderer": false,
+    "requested_regions": 1,
+    "terrain_import": false
+  },
+  "status": {
+    "active_records": 42,
+    "active_regions": 4,
+    "checkpoint_bytes": 1709231,
+    "dependency_regions": 0,
+    "dormant_records": 6138,
+    "dormant_regions": 1023,
+    "generation": 2,
+    "global_records": 23,
+    "pinned_regions": 4
+  },
+  "two_checkpoints_ms": 41.12524,
+  "verification": {
+    "backup_source_bytes_unchanged": true,
+    "corrupt_source_rejected_without_output": true,
+    "dormant_records_preserved": true,
+    "full_state_exact": true,
+    "generation_preserved": true,
+    "private_metadata_exact": true
+  },
+  "version": "0.10.0"
+}

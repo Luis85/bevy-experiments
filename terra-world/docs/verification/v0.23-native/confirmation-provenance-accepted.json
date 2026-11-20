@@ -1,0 +1,310 @@
+{
+  "schema": 1,
+  "release": "0.23.0",
+  "phase": "accepted",
+  "checked_utc": "2026-10-30T09:06:42.597469+00:00",
+  "status": "passed",
+  "native_confirmation_checks": "passed",
+  "capture_count": 10,
+  "source_input_count": 381,
+  "source_inputs_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+  "source_manifest_sha256": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9",
+  "source_manifest": "docs/verification/v0.23-release-acceptance/source-hashes.json",
+  "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+  "processes": [
+    {
+      "name": "confirmation-recovered",
+      "pid": 14073,
+      "command": [
+        "/tmp/terra023-target/debug/terra-demo",
+        "--world-profile",
+        "/tmp/terra-native023/menu/worlds/recovered-1793348668-11234-1/world.json",
+        "--user-data",
+        "/tmp/terra-native023/menu"
+      ],
+      "started_utc": "2026-10-30T08:29:04.307874+00:00",
+      "finished_utc": "2026-10-30T08:32:32.447792+00:00",
+      "exit_code": 0,
+      "log_sha256": "c318fa6d30b34eaa7484515c3cfb607f0219cbbc1c97f4056c66997389dca1bd",
+      "binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+      "source_inputs_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+      "capture_indices": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76
+      ]
+    },
+    {
+      "name": "confirmation-menu",
+      "pid": 14392,
+      "command": [
+        "/tmp/terra023-target/debug/terra-demo",
+        "--menu",
+        "--user-data",
+        "/tmp/terra-native023/menu"
+      ],
+      "started_utc": "2026-10-30T08:33:08.199152+00:00",
+      "finished_utc": "2026-10-30T08:34:20.233832+00:00",
+      "exit_code": 0,
+      "log_sha256": "9df2a985e23dbe00d73a76cc7cd2b7de473e73d01286ac4ac9a139747ed839b2",
+      "binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+      "source_inputs_sha256": "dd6d40911a1defed04d39a3a4287ae01ced1cfde27fdcbf0575caa404c39c5d5",
+      "capture_indices": [
+        80,
+        81,
+        82
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "image": "70-confirmation-recovered.png",
+      "receipt": "70-confirmation-recovered-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "85e095518aad105894d7928739d840d65a63817f995cfc6c7cead66dc4a3fd16",
+      "captured_utc": "2026-10-30T08:29:23.148132+00:00"
+    },
+    {
+      "image": "71-confirmation-minimum.png",
+      "receipt": "71-confirmation-minimum-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "0ccbc5f03c749b3c0cbc320a46efd5e9dddf867c4b23ced5ed0965a3d03efea3",
+      "captured_utc": "2026-10-30T08:29:51.181563+00:00"
+    },
+    {
+      "image": "72-confirmation-territory.png",
+      "receipt": "72-confirmation-territory-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "87bea5d2477b0eed7d46324b2c51bd1913dfcb0b890e06370319bf3bcb7caf6d",
+      "captured_utc": "2026-10-30T08:30:04.584464+00:00"
+    },
+    {
+      "image": "73-confirmation-pause.png",
+      "receipt": "73-confirmation-pause-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "a746440ca7b4af67a0b8696b205b4fadcbc6556e9371f43d901d2b85b0968287",
+      "captured_utc": "2026-10-30T08:31:03.978279+00:00"
+    },
+    {
+      "image": "74-confirmation-sky.png",
+      "receipt": "74-confirmation-sky-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "836f035bc04d22384b0725cbfb9f008bd08bf8f53b4b371c6d2513468bf2f2fb",
+      "captured_utc": "2026-10-30T08:31:36.306602+00:00"
+    },
+    {
+      "image": "75-confirmation-pause-return.png",
+      "receipt": "75-confirmation-pause-return-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "64ffc7d5feaf3cffdf331864e20ca866c3be0a4a287f8d113f757e2a969567ec",
+      "captured_utc": "2026-10-30T08:32:00.251374+00:00"
+    },
+    {
+      "image": "76-confirmation-save-quit.png",
+      "receipt": "76-confirmation-save-quit-capture.json",
+      "pid": 14073,
+      "process": "confirmation-recovered",
+      "pixels": [
+        1100,
+        700
+      ],
+      "image_sha256": "58a3fc1fe216f788c9e36b2f2328c59dc39ea200d4b8ec2fc817f169992069bd",
+      "captured_utc": "2026-10-30T08:32:11.449504+00:00"
+    },
+    {
+      "image": "80-confirmation-menu.png",
+      "receipt": "80-confirmation-menu-capture.json",
+      "pid": 14392,
+      "process": "confirmation-menu",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "1e58b5a1d663176bc2ce3b4e1129afe068e0c90321a71cb33fa23afda361cafa",
+      "captured_utc": "2026-10-30T08:33:15.417121+00:00"
+    },
+    {
+      "image": "81-confirmation-menu-sky.png",
+      "receipt": "81-confirmation-menu-sky-capture.json",
+      "pid": 14392,
+      "process": "confirmation-menu",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "9cfdeb528a566e87d043a1037a9bafbd39088a98cd3a92804d59393b15704910",
+      "captured_utc": "2026-10-30T08:33:42.626472+00:00"
+    },
+    {
+      "image": "82-confirmation-menu-exit.png",
+      "receipt": "82-confirmation-menu-exit-capture.json",
+      "pid": 14392,
+      "process": "confirmation-menu",
+      "pixels": [
+        1440,
+        900
+      ],
+      "image_sha256": "0e03164962e56c364f286c31375dd98b412ed8f138f9e7f335a14ff371d8dce6",
+      "captured_utc": "2026-10-30T08:34:13.096225+00:00"
+    }
+  ],
+  "acceptance": {
+    "status": "passed",
+    "terminal_receipt_validated": true,
+    "receipt": "docs/verification/v0.23-release-acceptance/completed-gates.json",
+    "receipt_sha256": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+    "gates": 44,
+    "accepted_evidence_artifacts": 36,
+    "distinct_passing_rust_tests": 1070,
+    "passing_rust_test_executions": 1171,
+    "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+    "source_manifest_sha256": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9"
+  },
+  "evidence_sha256": {
+    "docs/verification/v0.23-native/70-confirmation-recovered-capture.json": "f40842cfbde5b1bd86fc96fb7bfd5546b27b1eff28bb0d2b079f0010a862dc90",
+    "docs/verification/v0.23-native/70-confirmation-recovered.png": "85e095518aad105894d7928739d840d65a63817f995cfc6c7cead66dc4a3fd16",
+    "docs/verification/v0.23-native/71-confirmation-minimum-capture.json": "129a6c23978f4213f86789b6f24ee6118db0be7d9a4c8c544de510a9b3ada696",
+    "docs/verification/v0.23-native/71-confirmation-minimum.png": "0ccbc5f03c749b3c0cbc320a46efd5e9dddf867c4b23ced5ed0965a3d03efea3",
+    "docs/verification/v0.23-native/72-confirmation-territory-capture.json": "178f4adcd259939f89ddd4af6a53f1f05e77406d470b4eeaabfa4e9c4f18b597",
+    "docs/verification/v0.23-native/72-confirmation-territory.png": "87bea5d2477b0eed7d46324b2c51bd1913dfcb0b890e06370319bf3bcb7caf6d",
+    "docs/verification/v0.23-native/73-confirmation-pause-capture.json": "62bdb872c3d4e40e951ab13ab8a50890641b950badcb3238d819c183979eae98",
+    "docs/verification/v0.23-native/73-confirmation-pause.png": "a746440ca7b4af67a0b8696b205b4fadcbc6556e9371f43d901d2b85b0968287",
+    "docs/verification/v0.23-native/74-confirmation-sky-capture.json": "90e6dea76931a8923cf11b19e30b0aab9a2e6b8bcd6e14a8c3ecacc8021536dc",
+    "docs/verification/v0.23-native/74-confirmation-sky.png": "836f035bc04d22384b0725cbfb9f008bd08bf8f53b4b371c6d2513468bf2f2fb",
+    "docs/verification/v0.23-native/75-confirmation-pause-return-capture.json": "a7a743a02cb05b16cd246062b5cdc08f7b4816711291aa658069d36f41934e89",
+    "docs/verification/v0.23-native/75-confirmation-pause-return.png": "64ffc7d5feaf3cffdf331864e20ca866c3be0a4a287f8d113f757e2a969567ec",
+    "docs/verification/v0.23-native/76-confirmation-save-quit-capture.json": "a94c7d2517fda0b8e5a12a8e828f72d236e60d2769487388da93f2e7ecb5e12a",
+    "docs/verification/v0.23-native/76-confirmation-save-quit.png": "58a3fc1fe216f788c9e36b2f2328c59dc39ea200d4b8ec2fc817f169992069bd",
+    "docs/verification/v0.23-native/80-confirmation-menu-capture.json": "00722c6d56ecfc866ccf53eb1692be3a98b136cc5a42f373ab6522ff53957ff2",
+    "docs/verification/v0.23-native/80-confirmation-menu.png": "1e58b5a1d663176bc2ce3b4e1129afe068e0c90321a71cb33fa23afda361cafa",
+    "docs/verification/v0.23-native/81-confirmation-menu-sky-capture.json": "72f93ed901ad0b6f721ab285e0307f86e4b4d922e04dbc1e9201f0ee5e56a846",
+    "docs/verification/v0.23-native/81-confirmation-menu-sky.png": "9cfdeb528a566e87d043a1037a9bafbd39088a98cd3a92804d59393b15704910",
+    "docs/verification/v0.23-native/82-confirmation-menu-exit-capture.json": "c4fb55f224c477e69d3d8e107005cba9d49713a2cf4415a3141e2c895a64728f",
+    "docs/verification/v0.23-native/82-confirmation-menu-exit.png": "0e03164962e56c364f286c31375dd98b412ed8f138f9e7f335a14ff371d8dce6",
+    "docs/verification/v0.23-native/confirmation-menu-process.json": "ed65466f3a65c4d68a311ac83ad9dff499b1b815928fb062a5cc8cf2301c2879",
+    "docs/verification/v0.23-native/confirmation-menu-start.json": "59397af20f91f1a716044449620a29f38446bdcb74197401c7c76289363dac41",
+    "docs/verification/v0.23-native/confirmation-menu.log": "9df2a985e23dbe00d73a76cc7cd2b7de473e73d01286ac4ac9a139747ed839b2",
+    "docs/verification/v0.23-native/confirmation-recovered-process.json": "d5cc97034c385c63862744e93ca6aaf6d9790fff213cd184cbbf82f5b5275809",
+    "docs/verification/v0.23-native/confirmation-recovered-start.json": "a14c89dc6dbd1e6e18a90a9817fb5c70348abbebe143b48385dc46564e190705",
+    "docs/verification/v0.23-native/confirmation-recovered.log": "c318fa6d30b34eaa7484515c3cfb607f0219cbbc1c97f4056c66997389dca1bd",
+    "docs/verification/v0.23-release-acceptance/asset-authored-validate.json": "6e924ee63c4e273d0d6863be589b417ab4df9bcd1bc9246b481fd6566815d8b8",
+    "docs/verification/v0.23-release-acceptance/asset-authored-validate.log": "892d03f4d250a797a10ce0b99345c4427e0997cfc4fc3b2ef591d572ba79af72",
+    "docs/verification/v0.23-release-acceptance/asset-build.json": "4cd0441839d53596ce918722ff2182fd3376beaf3709e3cf51147530e2424354",
+    "docs/verification/v0.23-release-acceptance/asset-build.log": "0f4189da3862dac123da18e4249aaeff26d8318a0ddc77420ca2bf26732008a2",
+    "docs/verification/v0.23-release-acceptance/asset-inspect.json": "1b32560ff1fd3f9c0404a93b7e9a6084e20be4caf74e10142552d9016f09c263",
+    "docs/verification/v0.23-release-acceptance/asset-inspect.log": "c6b3f2dd101e3374c35864ca3c094e6a0831609a632dbd8f800d921bdc8934a2",
+    "docs/verification/v0.23-release-acceptance/asset-pack.json": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+    "docs/verification/v0.23-release-acceptance/asset-pack.log": "6e49b7b50c49564d53cbf2590a6770334d2498c2b4747d08c5f08b56872a13e8",
+    "docs/verification/v0.23-release-acceptance/bevy-headless.log": "4a9998964d9ee844c136c8125176c5483e0db6afd580606ad4e3505c3276de97",
+    "docs/verification/v0.23-release-acceptance/bevy-render.log": "88682184047140ba672b588927af5cce6067d472cb223674411c3169499ae18b",
+    "docs/verification/v0.23-release-acceptance/career-report.json": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+    "docs/verification/v0.23-release-acceptance/career-report.log": "10e29f72beda1618e800a6a2fad803447865e808de3a0f69d679618c1785614a",
+    "docs/verification/v0.23-release-acceptance/character-asset-build.json": "d26ce353915d4f114755e146239baaf9476059a702d5cf8ecc08420416c3d3e4",
+    "docs/verification/v0.23-release-acceptance/character-asset-build.log": "6bba3c0a5e2d7b68a24afaca006eae42486bf96d0572943d56159cc54a14dd4f",
+    "docs/verification/v0.23-release-acceptance/character-authored-validate.json": "3aaaedf689bbf483295a7aebb60697c0cb133d716fada1445332c31d1e120baf",
+    "docs/verification/v0.23-release-acceptance/character-authored-validate.log": "30b785afe3acf660a7d61257105cc9338df172983a787ded90490795f4578836",
+    "docs/verification/v0.23-release-acceptance/character-demo-pack.json": "7d1a3d5cab0fe8f32affc88f1b86a0bd8c70f38639c6cba2db45aa8dc6e38363",
+    "docs/verification/v0.23-release-acceptance/character-demo-pack.log": "c4631716d172f3e2266c9a7d5fa17879f3739011e2df349b4d3f540aadd3619d",
+    "docs/verification/v0.23-release-acceptance/character-generator.json": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+    "docs/verification/v0.23-release-acceptance/character-generator.log": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+    "docs/verification/v0.23-release-acceptance/character-inspect.json": "2e3a70ab38a5c1675068f23614a3c2e4114d28bffe2e0b23b1a470940d8d83a7",
+    "docs/verification/v0.23-release-acceptance/character-inspect.log": "7ddfbbc88f0e9020e3c2f37efe36ce47d6ec40175f702aea5de98e9e7e42a9af",
+    "docs/verification/v0.23-release-acceptance/character-pack.json": "3928168d402dd15595352c5e64ac1d509707337b277dd8800a0140862e7214ca",
+    "docs/verification/v0.23-release-acceptance/character-pack.log": "2da4a26bdf2da96d4da8afb6d3802ad3401683ddf748ad99d0822ec07a0b865e",
+    "docs/verification/v0.23-release-acceptance/compatibility.log": "8e71b89ed5d502f9bcd06ede7a726618b5ab3295f3d530375128b7024ba9e130",
+    "docs/verification/v0.23-release-acceptance/completed-gates.json": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+    "docs/verification/v0.23-release-acceptance/custom-provider-example.log": "e1277a8639bcc625bb7ed5718c7be0e697fe7a684da2a766b6707a48adbde8a1",
+    "docs/verification/v0.23-release-acceptance/demo-check.log": "821ec5a57da280bfabb113e0784bce41affc26c2dbb737e959c4f55c1504332c",
+    "docs/verification/v0.23-release-acceptance/demo.log": "075a51b3cdb2a11a04bf7c38f6c07cd38bcf26b08d7cbe222458750b569d0b0d",
+    "docs/verification/v0.23-release-acceptance/desktop-packaging-tests.log": "ab21650d4a78923aff5e07f4b50357508ba32f418650a533156c2268f010d9a3",
+    "docs/verification/v0.23-release-acceptance/distinct-tests.json": "cf0498e3b82dd4f8ae2ccc6ade60fd49fab9142439e15ab35daf8e6012ea759c",
+    "docs/verification/v0.23-release-acceptance/format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/verification/v0.23-release-acceptance/gates.json": "12b4a3f72591c7431bbc0aeda6fe189c5650b81da29d29c7fa8ef955c903cfa0",
+    "docs/verification/v0.23-release-acceptance/guidance-continuity.json": "b1f7720a11daa681e4d8863a6a461663760ded8d1139f1378402a3fa43b89257",
+    "docs/verification/v0.23-release-acceptance/guidance-continuity.log": "c2a6a24a65008e6b981df591904c9a08899aefb820b3aac1e3ed4ee438dd8cc5",
+    "docs/verification/v0.23-release-acceptance/headless-example.log": "a95d1003235b7c797f69084ac8e98b7ad1c0be10c5d3a519a9eb7184b7dc1343",
+    "docs/verification/v0.23-release-acceptance/headless.log": "adb943d8a7a408e2db714dd264ebf8700dc44f94b9258c18aaf32198f9e6e585",
+    "docs/verification/v0.23-release-acceptance/launcher-recovery.json": "0f28a6461cc8710a6e381f5ba606760059bc8dc42b404129a8c18910f5a885a2",
+    "docs/verification/v0.23-release-acceptance/launcher-recovery.log": "985884056445e4c2052a6bab5e95a458a82f801486e69091ccec9ca8ef02b188",
+    "docs/verification/v0.23-release-acceptance/launcher-world-names.json": "83a561d29d951186fdcd7b703942537bb0924f8184d3358e706d9cc591036e8c",
+    "docs/verification/v0.23-release-acceptance/launcher-world-names.log": "7c24e12ffb5de7d086bde31502eb94f44cdfb6d36c45bfb86be3a0f8b888f011",
+    "docs/verification/v0.23-release-acceptance/native-build.log": "5dd2925987595dde1ced55f796ef76bc6050d1226b10b825b39b1d9c2aed900e",
+    "docs/verification/v0.23-release-acceptance/navigation-cluster.json": "951606748eeb349eefa598cef8b098eab176047598de37f846dac44c279a4595",
+    "docs/verification/v0.23-release-acceptance/navigation-cluster.log": "802389ca63c94f589ab781935ed946148b4348a2eb6f85f437628671870a03bf",
+    "docs/verification/v0.23-release-acceptance/navigation-geometry.json": "ef7c3e110dec36ed0413f060c1ce60994b255814889fcacc74005067d4622fd1",
+    "docs/verification/v0.23-release-acceptance/navigation-geometry.log": "9008822b65d4dfc76508a4ea439e15d8cafaa92ea743819f595e76590b2324b8",
+    "docs/verification/v0.23-release-acceptance/novice-career-report.json": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+    "docs/verification/v0.23-release-acceptance/novice-career-report.log": "51dfbe791ae90b8f57451ac3cdc1c31baa24d0e970b46600ce1bf583e574da3b",
+    "docs/verification/v0.23-release-acceptance/purchased-career-report.json": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+    "docs/verification/v0.23-release-acceptance/purchased-career-report.log": "ce42225ca2cd06740e364e27ac5a5e5f19df4f7acde1a4788ea2287ea71ceea5",
+    "docs/verification/v0.23-release-acceptance/recovery-bundle.json": "a118c634d1a28061c4639abdc72af5a295efab253bda407952ea5dca5faaac3d",
+    "docs/verification/v0.23-release-acceptance/recovery-bundle.log": "34071159bb782575906b21b89f78f464167ba5ebf2ebb2f12adf31488c623995",
+    "docs/verification/v0.23-release-acceptance/recovery-probe.log": "8d6db09f257e213d6ea45a7b3fd6ee9e4d6f2fbc4b7e2f84f0d7d45fc992c18b",
+    "docs/verification/v0.23-release-acceptance/recovery.json": "9af53f246335f7c7dfed6b5c00d5a47a860bcc4527aafbc3236cf5bde3bcb401",
+    "docs/verification/v0.23-release-acceptance/regional-sessions.json": "46c6d9fb4dc1e5f1a218f75e5abf6f98db745a0a9647512a3bd2bbffdd0034be",
+    "docs/verification/v0.23-release-acceptance/regional-sessions.log": "2f6d74b0d4ddfcba014c5f7325236e2eb9761271238f61139d5cc432455196a0",
+    "docs/verification/v0.23-release-acceptance/session-probe-checks.log": "43714e60d681fddd0b965373bdab59067e22ce12bd2f61e96fbb957bb9057442",
+    "docs/verification/v0.23-release-acceptance/source-export.json": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+    "docs/verification/v0.23-release-acceptance/source-export.log": "d30c2ace262bc6f571639a124d31af52160b68e88a9ec9b8205a56e132e72d57",
+    "docs/verification/v0.23-release-acceptance/source-hashes.json": "2bd91532f6c201568f23eb683a43bc4c3c02d55da043a340ec0827fb5ccbe4d9",
+    "docs/verification/v0.23-release-acceptance/source-inspect.log": "e951a80c4d302555e77ed1337784ff6b2512b083eec3cecdb982f409d1ebcce4",
+    "docs/verification/v0.23-release-acceptance/source-inspection.json": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+    "docs/verification/v0.23-release-acceptance/source-install.json": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+    "docs/verification/v0.23-release-acceptance/source-install.log": "a06223b28b74d616c562ada59d4afbbded222e887d26b5e527bc60afb3b137fa",
+    "docs/verification/v0.23-release-acceptance/source-verify.json": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+    "docs/verification/v0.23-release-acceptance/source-verify.log": "da8512c49fa013ae4ab696ac8ffbc650aaa056be957ce0f83b22fc87210c4113",
+    "docs/verification/v0.23-release-acceptance/startup-metadata.log": "51970de8a32a2a34f159983cdb841c765ad994584ac9f4e6292bc5ac554c55b4",
+    "docs/verification/v0.23-release-acceptance/startup-toolchain.log": "55cd0529c005d3f62869ea6e2271bfa9d5196f56dc65a8be00a371af114a4a98",
+    "docs/verification/v0.23-release-acceptance/traffic-recovery.json": "14dc943629496a36f4b1d05cdb1d4fdceb52001314298bc58fa7e7649b7830f2",
+    "docs/verification/v0.23-release-acceptance/traffic-recovery.log": "bcc6640a2742e63e8050d353a7aa314e4abed5eba8cce699b833926b7c99ebd0",
+    "docs/verification/v0.23-release-acceptance/vehicle-asset-build.json": "41ebf45320d5a9eb898f5a3500882959b7f02ba75649c7a6a09fb111661a7e65",
+    "docs/verification/v0.23-release-acceptance/vehicle-asset-build.log": "0248f948d7152b3c7a7e3a007d33dee863c38fb02f708b4cd6bea7a7ef4b267c",
+    "docs/verification/v0.23-release-acceptance/vehicle-authored-validate.json": "76eabb2a3d042c10d9dc5b03e5a3ef3a432f24d963f9ba0f4eb69a10d71c3f07",
+    "docs/verification/v0.23-release-acceptance/vehicle-authored-validate.log": "9c21bf8fcf0d016ee9d8a4829dbf6f273bb88dfd5588600b7e68afdb2dfc78e3",
+    "docs/verification/v0.23-release-acceptance/vehicle-demo-pack.json": "1b54e95fa9fd90215ccb4dc298b62dd100dec1c07d8060acc19a9ffab86638ab",
+    "docs/verification/v0.23-release-acceptance/vehicle-demo-pack.log": "dc5e751cc8770490c3e62bd6fa1cf0770ac2ea046f3d590e2b353995c3bc2d75",
+    "docs/verification/v0.23-release-acceptance/vehicle-generator.json": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+    "docs/verification/v0.23-release-acceptance/vehicle-generator.log": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+    "docs/verification/v0.23-release-acceptance/vehicle-inspect.json": "3e5f342ad5f090c9abd53d0dbe51e43d16a927642b02ba2a1fa3d0a448e65d9b",
+    "docs/verification/v0.23-release-acceptance/vehicle-inspect.log": "b7d9b335576de5f76ddd90b3672c5112b81a09ddbe7381758a8be769eccdb9b0",
+    "docs/verification/v0.23-release-acceptance/vehicle-pack.json": "7fe712cf059b7b846b22a1364dd9d35d037f3538bd318307fe38fd7a4a259625",
+    "docs/verification/v0.23-release-acceptance/vehicle-pack.log": "1130f3746fe1da356d2d6334437939cfefe54fdb8a58ae53146a5bd050627458"
+  },
+  "validator_sha256": "e4a7b3dbac1692e3d61e56b78140c3f682c6bfc1511bb93dfa216120d3825edf",
+  "scope": "Exact recorded direct-process/capture association, current frozen implementation identity and executable bytes. Accepted phase additionally binds the real complete terminal gate evidence. No publisher authentication, device qualification or replay of all earlier candidate gameplay is asserted.",
+  "candidate_limit": "Candidate gameplay PID 12147 retains window observations only; later confirmation does not invent its missing child process/binary/exit association."
+}

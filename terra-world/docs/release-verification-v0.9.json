@@ -1,0 +1,1318 @@
+{
+  "schema_version": 1,
+  "release": "0.9.0",
+  "status": "passed",
+  "validation_date": "2026-10-27",
+  "captured_at_utc": "2026-10-27T18:07:59.293987+00:00",
+  "wire_protocol": 7,
+  "tls_alpn": "terra-world/7",
+  "domain_save_version": 1,
+  "regional_schema_version": 1,
+  "distinct_rust_tests": 582,
+  "failed_final_tests": 0,
+  "ignored_final_tests": 0,
+  "by_crate": {
+    "terra-bevy": 72,
+    "terra-cli": 4,
+    "terra-core": 33,
+    "terra-demo": 86,
+    "terra-history": 13,
+    "terra-net": 111,
+    "terra-persistence": 32,
+    "terra-sandbox": 206,
+    "terra-stream": 25
+  },
+  "test_components": {
+    "headless": 424,
+    "bevy_render_library": 51,
+    "bevy_no_default_library_overlap": 31,
+    "bevy_integrations": 21,
+    "native_demo": 86
+  },
+  "gates": {
+    "headless_workspace": "passed",
+    "bevy_no_default_features": "passed",
+    "bevy_render_library": "passed",
+    "native_demo_tests": "passed",
+    "native_demo_typecheck": "passed",
+    "native_executable_build": "passed",
+    "headless_example": "passed",
+    "custom_provider_example": "passed",
+    "cargo_fmt_check": "passed",
+    "server_cli_admission": "passed",
+    "native_confirmation": "passed"
+  },
+  "counting_policy": "424 non-Bevy tests + 51 Bevy renderer-library tests + 21 Bevy integration tests + 86 native demo tests. The 31 no-default library cases also appear in the renderer library and count once. Empty doctest harnesses, targeted reruns, examples, process smoke checks, native interactions and historical reports add no Rust cases.",
+  "additional_rust_test_harnesses_by_gate": {
+    "bevy-headless": [
+      {
+        "crate": "terra-bevy",
+        "harness": "unittests src/lib.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "config::tests::config_budgets_cover_the_requested_neighborhood",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::bridge_support_and_width_follow_the_same_source_geometry",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::source_underpass_uses_model_height_and_terrain_instead_of_zero_source_elevation",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::real_negative_elevation_needs_a_water_mask",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::slope_at_a_chunk_edge_uses_neighbor_or_inward_samples",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::date_line_polygon_does_not_cover_the_other_side_of_earth",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::vehicle_wheel_material_support_matches_host_on_land_roads_bridges_and_missing_edges",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::manual_vehicle_stops_before_pedestrian_without_repeated_resting_damage",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::unknown_terrain_and_static_footprints_reject_surface_motion",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::water_blocks_a_person_but_accepts_a_boat",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::base_world_checks_pin_geometry_epoch_and_political_revision",
+            "status": "ok"
+          },
+          {
+            "name": "history::tests::historical_bridge_rejects_a_misdeclared_grid_before_streaming",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::heightmap_admission_pins_semantic_bundle_identity",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::vehicle_on_loaded_heightmap_holds_service_and_parking_brakes_then_rolls_on_release",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::rts_motion_uses_resolver_before_reaching_destination",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::mixed_snapshot_rates_preserve_each_views_completeness",
+            "status": "ok"
+          },
+          {
+            "name": "politics::tests::atlas_frames_a_small_historical_region_and_keeps_missing_dates_explicit",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::replica_view_is_owned_and_checks_faction_rosters",
+            "status": "ok"
+          },
+          {
+            "name": "politics::tests::drawing_closes_a_faction_boundary_and_exports_a_new_revision",
+            "status": "ok"
+          },
+          {
+            "name": "politics::tests::self_intersecting_drafts_leave_the_dataset_untouched",
+            "status": "ok"
+          },
+          {
+            "name": "sandbox::tests::invalid_saved_player_is_rejected",
+            "status": "ok"
+          },
+          {
+            "name": "sandbox::tests::local_save_keeps_clock_and_rejects_another_era",
+            "status": "ok"
+          },
+          {
+            "name": "prediction::tests::predicted_envelope_requires_loaded_terrain_and_cannot_cross_a_source_building",
+            "status": "ok"
+          },
+          {
+            "name": "telemetry::tests::rolling_evidence_drops_startup_spikes_and_rejects_invalid_samples",
+            "status": "ok"
+          },
+          {
+            "name": "simulation::geo_tests::whole_world_distance_does_not_collapse_at_antipodes",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::missing_vehicle_corner_stops_without_wear_but_solid_obstacle_causes_impact",
+            "status": "ok"
+          },
+          {
+            "name": "sandbox::tests::placement_feedback_uses_the_same_oriented_bus_footprint_as_authority",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::absent_manual_input_brakes_possessed_vehicle_but_true_pause_freezes_it",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::late_network_intents_and_bounded_backlog_reach_the_authoritative_server",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::queued_snapshots_recover_an_expired_frame_deadline_but_silence_still_times_out",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::saved_loaded_fleet_clears_perpendicular_traffic_and_delivers_on_imported_heightmap",
+            "status": "ok"
+          }
+        ],
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "unittests src/bin/terra-worldctl.rs",
+        "kind": "rust_test",
+        "test_cases": [],
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/frontier_validation.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "malformed_ecology_references_and_another_players_progress_are_rejected_atomically",
+            "status": "ok"
+          },
+          {
+            "name": "owned_wildlife_is_accepted_and_native_replica_never_runs_host_ecology",
+            "status": "ok"
+          }
+        ],
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/frontier_world.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "ecology_gather_charter_supply_contract_and_exact_restore_share_one_app",
+            "status": "ok"
+          }
+        ],
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/headless.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "disabling_weather_uses_calm_conditions_without_destroying_the_source_sample",
+            "status": "ok"
+          },
+          {
+            "name": "a_paused_focus_jump_refreshes_synthetic_weather_for_the_new_region",
+            "status": "ok"
+          },
+          {
+            "name": "queued_sandbox_commands_commit_success_and_leave_rejections_atomic",
+            "status": "ok"
+          },
+          {
+            "name": "custom_catalog_streaming_preserves_metadata_without_seeding_unsupported_items",
+            "status": "ok"
+          },
+          {
+            "name": "whole_world_focus_jumps_rebase_and_dateline_moves_stay_finite",
+            "status": "ok"
+          },
+          {
+            "name": "headless_plugin_streams_a_chunk_and_advances_then_pauses_its_clock",
+            "status": "ok"
+          }
+        ],
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/living_world.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "inhabit_trade_command_produce_deliver_and_restore_in_one_actual_app",
+            "status": "ok"
+          }
+        ],
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/procedural_settlement.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "default_munich_procedural_settlement_produces_and_physically_delivers",
+            "status": "ok"
+          }
+        ],
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/regional_persistence.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "a_visible_source_tree_keeps_its_boundary_tombstone_active_without_nearby_bodies",
+            "status": "ok"
+          },
+          {
+            "name": "paused_autosave_uses_real_time_even_when_bevy_virtual_time_clamps_a_slow_frame",
+            "status": "ok"
+          },
+          {
+            "name": "explicit_restore_rewinds_inventory_and_clock_without_overwriting_legacy_json",
+            "status": "ok"
+          },
+          {
+            "name": "source_mismatch_exits_without_mutating_the_committed_world",
+            "status": "ok"
+          },
+          {
+            "name": "checkpoint_recovery_replays_skipped_source_and_clears_the_error_without_resuming_time",
+            "status": "ok"
+          },
+          {
+            "name": "graceful_exit_commits_last_changes_and_failed_commit_returns_error",
+            "status": "ok"
+          },
+          {
+            "name": "eviction_return_and_restart_preserve_depleted_resources_and_inventory",
+            "status": "ok"
+          },
+          {
+            "name": "commands_resolve_a_dormant_workbench_when_the_player_returns",
+            "status": "ok"
+          },
+          {
+            "name": "stale_background_result_cannot_replace_a_newer_game_owned_revision",
+            "status": "ok"
+          }
+        ],
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "tests/worldctl.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "actual_operations_cli_roundtrips_local_and_portable_worlds_without_overwriting",
+            "status": "ok"
+          }
+        ],
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "crate": "terra-bevy",
+        "harness": "doc-tests",
+        "kind": "doc_test",
+        "test_cases": [],
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "bevy-render": [
+      {
+        "crate": "terra-bevy",
+        "harness": "unittests src/lib.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "config::tests::config_budgets_cover_the_requested_neighborhood",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::date_line_polygon_does_not_cover_the_other_side_of_earth",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::bridge_support_and_width_follow_the_same_source_geometry",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::concave_polygon_does_not_fill_the_notch",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::degenerate_polygon_is_rejected",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::source_underpass_uses_model_height_and_terrain_instead_of_zero_source_elevation",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::authored_terrain_material_is_continuous_at_the_date_line",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::vehicle_wheel_material_support_matches_host_on_land_roads_bridges_and_missing_edges",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::slope_at_a_chunk_edge_uses_neighbor_or_inward_samples",
+            "status": "ok"
+          },
+          {
+            "name": "environment::tests::real_negative_elevation_needs_a_water_mask",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::heightfield_uses_shared_vertices_smooth_normals_and_detail_uvs",
+            "status": "ok"
+          },
+          {
+            "name": "history::tests::historical_bridge_rejects_a_misdeclared_grid_before_streaming",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::manual_vehicle_stops_before_pedestrian_without_repeated_resting_damage",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::unknown_terrain_and_static_footprints_reject_surface_motion",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::rts_motion_uses_resolver_before_reaching_destination",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::missing_vehicle_corner_stops_without_wear_but_solid_obstacle_causes_impact",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::water_blocks_a_person_but_accepts_a_boat",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::base_world_checks_pin_geometry_epoch_and_political_revision",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::heightmap_admission_pins_semantic_bundle_identity",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::enriched_source_geometry_is_finite_and_stays_within_render_budget",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::vehicle_on_loaded_heightmap_holds_service_and_parking_brakes_then_rolls_on_release",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::replica_view_is_owned_and_checks_faction_rosters",
+            "status": "ok"
+          },
+          {
+            "name": "politics::tests::atlas_frames_a_small_historical_region_and_keeps_missing_dates_explicit",
+            "status": "ok"
+          },
+          {
+            "name": "politics::tests::drawing_closes_a_faction_boundary_and_exports_a_new_revision",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::terrain_palette_exposes_relief_and_water_has_tangent_space_detail",
+            "status": "ok"
+          },
+          {
+            "name": "politics::tests::self_intersecting_drafts_leave_the_dataset_untouched",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::absent_manual_input_brakes_possessed_vehicle_but_true_pause_freezes_it",
+            "status": "ok"
+          },
+          {
+            "name": "prediction::tests::predicted_envelope_requires_loaded_terrain_and_cannot_cross_a_source_building",
+            "status": "ok"
+          },
+          {
+            "name": "render::cache_tests::feature_lod_hysteresis_preserves_detail_at_nearby_tile_edges",
+            "status": "ok"
+          },
+          {
+            "name": "render::cache_tests::inventory_and_resource_quantity_do_not_rebuild_visible_geometry",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::mixed_snapshot_rates_preserve_each_views_completeness",
+            "status": "ok"
+          },
+          {
+            "name": "render::cache_tests::plot_boundaries_drape_to_updated_heightmaps_and_never_join_missing_pages",
+            "status": "ok"
+          },
+          {
+            "name": "render::cache_tests::authored_actor_and_facility_meshes_have_bounded_finite_geometry",
+            "status": "ok"
+          },
+          {
+            "name": "render::detail::tests::territory_lines_require_resident_height_and_drape_to_it",
+            "status": "ok"
+          },
+          {
+            "name": "render::quality::tests::profiles_have_bounded_gpu_cost_and_an_explicit_compatibility_path",
+            "status": "ok"
+          },
+          {
+            "name": "render::detail::tests::ground_cover_is_bounded_and_never_fills_water_or_unknown_coverage",
+            "status": "ok"
+          },
+          {
+            "name": "render::scenes::tests::scene_registry_validates_scale_and_preserves_specific_species_precedence",
+            "status": "ok"
+          },
+          {
+            "name": "render::detail::tests::resource_depletion_changes_readable_geometry_with_bounded_palette",
+            "status": "ok"
+          },
+          {
+            "name": "render::wildlife::tests::species_pose_palette_has_distinct_finite_bounded_grounded_geometry",
+            "status": "ok"
+          },
+          {
+            "name": "geometry::tests::distant_terrain_reduces_interiors_without_cracks_or_changed_source_heights",
+            "status": "ok"
+          },
+          {
+            "name": "sandbox::tests::invalid_saved_player_is_rejected",
+            "status": "ok"
+          },
+          {
+            "name": "sandbox::tests::local_save_keeps_clock_and_rejects_another_era",
+            "status": "ok"
+          },
+          {
+            "name": "simulation::geo_tests::whole_world_distance_does_not_collapse_at_antipodes",
+            "status": "ok"
+          },
+          {
+            "name": "telemetry::tests::rolling_evidence_drops_startup_spikes_and_rejects_invalid_samples",
+            "status": "ok"
+          },
+          {
+            "name": "living::tests::saved_loaded_fleet_clears_perpendicular_traffic_and_delivers_on_imported_heightmap",
+            "status": "ok"
+          },
+          {
+            "name": "sandbox::tests::placement_feedback_uses_the_same_oriented_bus_footprint_as_authority",
+            "status": "ok"
+          },
+          {
+            "name": "render::scenes::tests::actual_scene_ready_replaces_fallback_and_removal_restores_the_same_body",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::late_network_intents_and_bounded_backlog_reach_the_authoritative_server",
+            "status": "ok"
+          },
+          {
+            "name": "network::tests::queued_snapshots_recover_an_expired_frame_deadline_but_silence_still_times_out",
+            "status": "ok"
+          },
+          {
+            "name": "render::surface_materials::tests::authored_materials_have_complete_bounded_mips_and_normal_encoding",
+            "status": "ok"
+          },
+          {
+            "name": "render::cache_tests::default_land_neighborhood_stays_below_two_million_source_vertices",
+            "status": "ok"
+          }
+        ],
+        "passed": 51,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "demo-tests": [
+      {
+        "crate": "terra-demo",
+        "harness": "unittests src/main.rs",
+        "kind": "rust_test",
+        "test_cases": [
+          {
+            "name": "camera::tests::chase_distance_matches_actor_scale_and_is_bounded",
+            "status": "ok"
+          },
+          {
+            "name": "accessibility::tests::controller_keyboard_is_bounded_filtered_and_cancel_drops_the_draft",
+            "status": "ok"
+          },
+          {
+            "name": "camera::tests::possession_input_uses_camera_yaw_without_diagonal_speed_gain",
+            "status": "ok"
+          },
+          {
+            "name": "command_input::tests::direction_repeat_and_pointer_edges_do_not_replay_stale_actions",
+            "status": "ok"
+          },
+          {
+            "name": "accessibility::tests::disabled_text_and_focus_loss_do_not_open_or_replay_queued_edits",
+            "status": "ok"
+          },
+          {
+            "name": "command_input::tests::focused_action_reveals_through_non_scrolling_page_and_horizontal_wrapper",
+            "status": "ok"
+          },
+          {
+            "name": "command_input::tests::command_navigation_skips_hidden_disabled_actions_and_reveals_actual_scroll_bounds",
+            "status": "ok"
+          },
+          {
+            "name": "control::tests::hit_testing_is_nearest_bounded_and_tie_stable",
+            "status": "ok"
+          },
+          {
+            "name": "accessibility::tests::text_preference_applies_once_to_new_controls_and_reverses_without_drift",
+            "status": "ok"
+          },
+          {
+            "name": "accessibility::tests::controller_text_apply_uses_real_editor_and_back_never_commits",
+            "status": "ok"
+          },
+          {
+            "name": "command_input::tests::management_capture_isolates_driving_and_escape_then_restores_rts_cursor",
+            "status": "ok"
+          },
+          {
+            "name": "control::tests::viewport_excludes_drawers_toolbar_and_caption",
+            "status": "ok"
+          },
+          {
+            "name": "driving::tests::blocked_source_routes_have_a_reason_and_never_draw_a_direct_navigation_line",
+            "status": "ok"
+          },
+          {
+            "name": "driving::tests::refuel_offer_respects_cash_tank_station_and_whole_litres",
+            "status": "ok"
+          },
+          {
+            "name": "driving::tests::route_map_clips_distant_geometry_and_navigation_uses_geographic_bearings",
+            "status": "ok"
+          },
+          {
+            "name": "accessibility::tests::world_keyboard_commits_one_action_and_preserves_conflicting_or_busy_drafts",
+            "status": "ok"
+          },
+          {
+            "name": "camera::tests::streamed_ground_settles_rts_presentation_without_world_input",
+            "status": "ok"
+          },
+          {
+            "name": "driving::tests::course_navigation_exists_before_a_race_and_garage_can_replace_it",
+            "status": "ok"
+          },
+          {
+            "name": "driving::tests::rental_ui_reviews_costs_renews_expiry_and_returns_with_authoritative_refund",
+            "status": "ok"
+          },
+          {
+            "name": "fleet::tests::depot_market_ui_uses_visible_quote_and_authority_rejects_a_changed_price",
+            "status": "ok"
+          },
+          {
+            "name": "driving::tests::vehicle_controls_follow_authority_even_with_stale_showroom_selection",
+            "status": "ok"
+          },
+          {
+            "name": "fleet::tests::depot_route_shortcuts_create_distinct_owner_scoped_sale_and_transfer_contracts",
+            "status": "ok"
+          },
+          {
+            "name": "control::tests::possession_round_trip_keeps_identity_and_explicit_spectator_destination",
+            "status": "ok"
+          },
+          {
+            "name": "control::tests::focus_loss_cancels_pending_rts_drag_without_selecting_or_issuing_orders",
+            "status": "ok"
+          },
+          {
+            "name": "fleet::tests::native_route_builder_bounds_draft_and_rejects_invalid_freight_endpoints",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::app_run_retains_final_handoff_after_consuming_the_world",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::manual_exit_waits_for_real_save_acknowledgement",
+            "status": "ok"
+          },
+          {
+            "name": "fleet::tests::recovery_ui_holds_loaded_trip_and_confirms_physical_return_without_free_payment",
+            "status": "ok"
+          },
+          {
+            "name": "fleet::tests::suggested_native_route_uses_real_stops_and_all_commands_share_authority",
+            "status": "ok"
+          },
+          {
+            "name": "control::tests::restored_possession_is_adopted_once_and_ordinary_revisions_do_not_undo_rts",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::multiplayer_overlay_never_pauses_simulation_time",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::escape_cancels_the_immediate_edit_before_pausing_and_consumes_its_frame",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::clean_portable_exit_restores_the_saved_character_clock_and_failure_is_non_destructive",
+            "status": "ok"
+          },
+          {
+            "name": "frontier::tests::final_city_tool_contribution_submits_only_the_remaining_three",
+            "status": "ok"
+          },
+          {
+            "name": "interaction::tests::gathering_skips_nearer_forbidden_and_vertically_unreachable_nodes",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::local_menu_pause_preserves_saved_clock_and_prior_virtual_pause",
+            "status": "ok"
+          },
+          {
+            "name": "flow::tests::binding_capture_cannot_restore_and_leaving_controls_cancels_capture",
+            "status": "ok"
+          },
+          {
+            "name": "frontier::tests::partial_replica_does_not_block_host_building_requirements_but_keeps_known_costs",
+            "status": "ok"
+          },
+          {
+            "name": "interface::immersion_tests::persistence_recovery_keys_replace_resume_until_the_block_is_cleared",
+            "status": "ok"
+          },
+          {
+            "name": "interface::immersion_tests::possession_recedes_once_and_preserves_deliberate_context_opening",
+            "status": "ok"
+          },
+          {
+            "name": "interface::immersion_tests::text_entry_and_explicit_keep_panels_preference_are_respected",
+            "status": "ok"
+          },
+          {
+            "name": "interaction::tests::atlas_draft_cannot_consume_management_or_suppressed_keys",
+            "status": "ok"
+          },
+          {
+            "name": "interaction::tests::quick_gather_skips_an_unplotted_protected_territory_at_its_boundary",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::coverage_uses_geographic_dimensions_with_latitude_and_pole_clipping",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::join_session_names_cannot_escape_the_managed_folder",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::invalid_world_input_does_not_create_or_overwrite_files",
+            "status": "ok"
+          },
+          {
+            "name": "interface::layout_tests::enlarged_inspector_tabs_keep_actions_scroll_state_and_outer_bounds",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::join_source_configuration_is_checked_before_session_creation_and_roundtrips",
+            "status": "ok"
+          },
+          {
+            "name": "interface::layout_tests::scaled_footer_reserves_the_same_world_panel_and_floating_hud_bounds",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::tests::menu_handoff_is_explicit_and_preserves_optional_failure_notice",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::tests::menu_return_keeps_valid_session_controls_and_rejects_malformed_handoffs",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::remote_join_requires_verified_tls_or_an_explicit_insecure_choice",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::ui::text_tests::captured_space_does_not_reactivate_the_native_binding_button_but_mouse_back_works",
+            "status": "ok"
+          },
+          {
+            "name": "output::tests::derived_political_export_is_also_protected",
+            "status": "ok"
+          },
+          {
+            "name": "output::tests::distinct_artifacts_pass_without_creating_any_output",
+            "status": "ok"
+          },
+          {
+            "name": "output::tests::screenshot_cannot_target_the_database",
+            "status": "ok"
+          },
+          {
+            "name": "output::tests::telemetry_cannot_overwrite_the_database_or_its_sidecar_before_a_window_opens",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::ui::text_tests::native_named_space_and_shift_space_preserve_words_without_duplicate_insertion",
+            "status": "ok"
+          },
+          {
+            "name": "performance::tests::failed_requested_export_overrides_successful_window_exit",
+            "status": "ok"
+          },
+          {
+            "name": "performance::tests::normal_window_exit_exports_in_the_same_final_update",
+            "status": "ok"
+          },
+          {
+            "name": "player_input::tests::gamepad_disconnect_and_focus_loss_release_drive_and_do_not_replay_actions",
+            "status": "ok"
+          },
+          {
+            "name": "player_input::tests::radial_deadzone_rejects_noise_nonfinite_values_and_keeps_diagonals_bounded",
+            "status": "ok"
+          },
+          {
+            "name": "player_input::tests::rebinding_rejects_conflicts_reserved_keys_and_invalid_saved_settings",
+            "status": "ok"
+          },
+          {
+            "name": "player_input::tests::control_file_roundtrip_is_independent_of_world_and_defaults_are_compatible",
+            "status": "ok"
+          },
+          {
+            "name": "player_input::tests::session_handoff_keeps_unsaved_choices_without_capturing_or_writing_a_key",
+            "status": "ok"
+          },
+          {
+            "name": "remote::road_presentation::tests::directed_paint_uses_loaded_ground_and_topology_without_inventing_tunnel_markings",
+            "status": "ok"
+          },
+          {
+            "name": "remote::tests::authored_roads_drape_heightmaps_and_require_loaded_ground",
+            "status": "ok"
+          },
+          {
+            "name": "remote::tests::heading_interpolation_uses_short_route_across_north",
+            "status": "ok"
+          },
+          {
+            "name": "vehicle_models::tests::all_reference_models_fit_shared_collision_dimensions_and_have_bounded_meshes",
+            "status": "ok"
+          },
+          {
+            "name": "vehicle_models::tests::profile_palettes_match_character_creation_and_body_scales_are_distinct",
+            "status": "ok"
+          },
+          {
+            "name": "player_input::tests::selected_wheel_is_not_sampled_as_a_gamepad_and_focus_loss_requires_neutral",
+            "status": "ok"
+          },
+          {
+            "name": "interaction::tests::regional_demo_seed_waits_while_blocked_and_checkpoints_valid_fresh_initialization",
+            "status": "ok"
+          },
+          {
+            "name": "vehicle_presentation::tests::restored_model_rebuilds_wheels_and_lamps_without_losing_other_children",
+            "status": "ok"
+          },
+          {
+            "name": "vehicle_presentation::tests::autonomous_and_remote_wheels_steer_from_motion_manual_wheels_use_actuator",
+            "status": "ok"
+          },
+          {
+            "name": "wheel_input::tests::combined_pedal_axis_calibrates_neutral_brake_accelerator_and_splits_exclusively",
+            "status": "ok"
+          },
+          {
+            "name": "wheel_input::tests::invalid_or_cancelled_calibration_preserves_valid_profile_and_settings_bounds",
+            "status": "ok"
+          },
+          {
+            "name": "wheel_input::tests::dedicated_wheel_does_not_override_keyboard_and_other_axis_selection_is_bounded",
+            "status": "ok"
+          },
+          {
+            "name": "wheel_input::tests::missing_nonfinite_disconnected_and_reconnected_axes_release_and_require_neutral_again",
+            "status": "ok"
+          },
+          {
+            "name": "wheel_input::tests::profile_handoff_preserves_bounded_calibration_but_never_devices_or_pending_capture",
+            "status": "ok"
+          },
+          {
+            "name": "wheel_input::tests::wheel_calibration_measures_asymmetric_steering_and_inverted_pedal_endpoints",
+            "status": "ok"
+          },
+          {
+            "name": "interaction::tests::regional_demo_seed_waits_for_source_hydration_before_checking_dormant_starter_ids",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::portable_world_and_screenshot_paths_cannot_replace_profiles_or_databases",
+            "status": "ok"
+          },
+          {
+            "name": "vehicle_presentation::tests::wheel_springs_use_loaded_height_samples_and_never_mutate_authority",
+            "status": "ok"
+          },
+          {
+            "name": "interaction::tests::regional_demo_seed_preserves_restored_airborne_actor_and_resource_history",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::all_bundled_world_choices_resolve_to_valid_source_configuration",
+            "status": "ok"
+          },
+          {
+            "name": "launcher::model::tests::same_named_worlds_have_distinct_private_stores_and_roundtrip_the_character",
+            "status": "ok"
+          }
+        ],
+        "passed": 86,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ]
+  },
+  "final_gate_log_digests": {
+    "headless": {
+      "command": "CARGO_BUILD_JOBS=2 cargo test --workspace --exclude terra-demo --exclude terra-bevy --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-headless.log",
+      "sha256": "52412017c5d8dadb76263adf64a13a5b11bb294d73eaf60476121f5f15430424",
+      "bytes": 44552,
+      "passed_harness_counts": [
+        4,
+        21,
+        12,
+        0,
+        13,
+        40,
+        0,
+        2,
+        5,
+        8,
+        6,
+        17,
+        2,
+        10,
+        1,
+        1,
+        14,
+        5,
+        32,
+        11,
+        24,
+        9,
+        14,
+        7,
+        14,
+        20,
+        6,
+        26,
+        7,
+        13,
+        18,
+        12,
+        22,
+        3,
+        18,
+        1,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "bevy-headless": {
+      "command": "CARGO_BUILD_JOBS=2 cargo test -p terra-bevy --no-default-features --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-bevy-headless.log",
+      "sha256": "eedc74a7e7ebe55997d256b7bff38a25c917af0c8e29bd811649ae92945aec16",
+      "bytes": 7413,
+      "passed_harness_counts": [
+        31,
+        0,
+        2,
+        1,
+        6,
+        1,
+        1,
+        9,
+        1,
+        0
+      ]
+    },
+    "bevy-render": {
+      "command": "CARGO_BUILD_JOBS=2 cargo test -p terra-bevy --lib --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-bevy-render.log",
+      "sha256": "a9f134c333036becbb3693564c94ba0e73b36f1825e87c22f0c26eee347220b1",
+      "bytes": 5201,
+      "passed_harness_counts": [
+        51
+      ]
+    },
+    "demo-tests": {
+      "command": "CARGO_BUILD_JOBS=2 cargo test -p terra-demo --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-demo-tests.log",
+      "sha256": "1ef968213f1b6bb9068244f9f30ec91d89e78500e8e36cc6cea57ccbb9224508",
+      "bytes": 8861,
+      "passed_harness_counts": [
+        86
+      ]
+    },
+    "demo-check": {
+      "command": "CARGO_BUILD_JOBS=2 cargo check -p terra-demo --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-demo-check.log",
+      "sha256": "10300fe2b6acae84b5e8868c6b8d827eb9a8ab7af4dd4fa7eb6c5a8d07450113",
+      "bytes": 153,
+      "passed_harness_counts": []
+    },
+    "native-build": {
+      "command": "CARGO_BUILD_JOBS=2 cargo build -p terra-demo --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-native-build.log",
+      "sha256": "4920913eedc504c5dc418fa3cd6c16f0a5fa814a7ab514ee74531452f3adea40",
+      "bytes": 154,
+      "passed_harness_counts": []
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "raw_log": "/tmp/terra-v9-final-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "passed_harness_counts": []
+    },
+    "example-headless": {
+      "command": "CARGO_BUILD_JOBS=2 cargo run -p terra-bevy --no-default-features --example headless --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-example-headless.log",
+      "sha256": "7622c05047ccd9c970f830768aef4e703516b041d4805057859014fdfa53b258",
+      "bytes": 230,
+      "passed_harness_counts": []
+    },
+    "example-provider": {
+      "command": "CARGO_BUILD_JOBS=2 cargo run -p terra-bevy --no-default-features --example custom_provider --offline --locked",
+      "raw_log": "/tmp/terra-v9-final-example-provider.log",
+      "sha256": "d48c11bb84fccd7160c184d6b12e7d0fbc6e838a496876fe7ba1c28c6bca968b",
+      "bytes": 168,
+      "passed_harness_counts": []
+    }
+  },
+  "source_freeze": {
+    "tracked_source_and_manifest_files": 193,
+    "hashes_unchanged_after_final_gates": true,
+    "sha256_by_path": {
+      "Cargo.lock": "6cd157dc19e189b5ed0ac3840045bb09da4733dc1ec7eba8c796145505361e07",
+      "Cargo.toml": "8264355a6ba772d3e3390d0fabb1bf8e9d124f69092ce9b87e76a405f7681510",
+      "crates/terra-bevy/Cargo.toml": "02dbea0fe1d361f4d58c176301722d402b14b64018d312c59c072950d4c89909",
+      "crates/terra-bevy/examples/custom_provider.rs": "19d98321c128515ac4b2e1e30854d370746a22bd5004e238701c3b0f105226f3",
+      "crates/terra-bevy/examples/headless.rs": "eca33eea0f8cca421edf74d70d3f2d28e8c14721e18baae279e45e9e00d8080d",
+      "crates/terra-bevy/src/bin/terra-worldctl.rs": "6d86f2550afd180f9fd26a59577ad5a883abbff027effbd7edbebc15ba11f847",
+      "crates/terra-bevy/src/config.rs": "2f210d0591399217a54906c7a3f6072d8bf14617cf68105db9eb4e1c828fa148",
+      "crates/terra-bevy/src/environment.rs": "9918027dfc641b7e75626b733a305cc853383c8a1f2f482a6f1bd22c2135b7cd",
+      "crates/terra-bevy/src/geometry.rs": "55bc78e6ac70d350236e26c58bfa9def255fb7c1671affa035fc6c3d5780eeb0",
+      "crates/terra-bevy/src/history.rs": "8b4af8e3fcd491a2aba297509eabd7e64b70a766482ec5be10ee10320c170201",
+      "crates/terra-bevy/src/lib.rs": "ef2213ab452fec3f58817a9148f2606b1b625c80a04694ed432cb1c88a585109",
+      "crates/terra-bevy/src/living.rs": "c79ae44b8b3dc989ad63f50f5bb72165b296b101e1720be051518f57010c0cf5",
+      "crates/terra-bevy/src/network.rs": "9371f62913d9c1ed205eb0be84d3a24d8e4ad35144996343789f9097dc04c5c5",
+      "crates/terra-bevy/src/politics.rs": "06c2d3a09ca0e0191a569f440fab515fcce75a5fcc22a09877cbd349d2cac847",
+      "crates/terra-bevy/src/prediction.rs": "d7e4b9b8133e77c99ea8541d05c5f267d592dfd1b8e0d0465fc602fa859b424f",
+      "crates/terra-bevy/src/regions.rs": "1cd44fe63d6b8480866e9f7c37ce303eaf8c111c18a10fe5aaa5d474a207cebd",
+      "crates/terra-bevy/src/render.rs": "a97c3652a29a1b9cdf62930d2c1aea641708a1844dbcabfef736532f773001ee",
+      "crates/terra-bevy/src/render_detail.rs": "6f0c6e96148cf39be6980c050126fdb9145ddbb60cfc226499ea1143778b6593",
+      "crates/terra-bevy/src/render_materials.rs": "30fa5eb9837d1a3138d5f08b8eaa3c64f8b5c437e85420610739ff0c33abaf1c",
+      "crates/terra-bevy/src/render_quality.rs": "2498a4aec6a10de21cd9cc42c595af72f0a13714ce0c102c42c565b127976e7e",
+      "crates/terra-bevy/src/render_scenes.rs": "f905e56e5c487bdb997ce94ce52273420a97a8b117410a41462fd6f634147085",
+      "crates/terra-bevy/src/render_wildlife.rs": "6e672bdb0f3cbd6ffa6cca52f9865d97bf32cbaffc1a4f1b69507e241af477d9",
+      "crates/terra-bevy/src/sandbox.rs": "df863cebcf0240adbde48fa553b6372cd42f4dbfe4c0d705295ad547d4c45750",
+      "crates/terra-bevy/src/simulation.rs": "9952caa061ce81f6dc70b170162007791626d61fcf557ef217f38da0fc46915c",
+      "crates/terra-bevy/src/telemetry.rs": "b18a72a394cd1e5ff9f96b38bbde2cfd4cfad8fd404befd293d47d3745083646",
+      "crates/terra-bevy/tests/frontier_validation.rs": "d45c1dbdd2687e963c95ebad9a3cb0c70f348d5210f5614b2b27782c9b8315cc",
+      "crates/terra-bevy/tests/frontier_world.rs": "7322c44dcc3d43f36318e2da42d11b0f7d3b7c124e2b46afe42ed7b00274cd24",
+      "crates/terra-bevy/tests/headless.rs": "1c780cd19ebc50cde74d5de08877cc294fc318182e2e3f171e5c2336c055dc21",
+      "crates/terra-bevy/tests/living_world.rs": "f289f12934c175c1da0342b633618297e102128297bafc83180b706baef0da12",
+      "crates/terra-bevy/tests/procedural_settlement.rs": "a19c4e6faa2237b84a58d3560a80ede256f4cff12aa29e56b81741c7aab1c392",
+      "crates/terra-bevy/tests/regional_persistence.rs": "8c0826f49953ff8da3fb0717c47e28f6b86d031a78f529accd30fccd797c3d67",
+      "crates/terra-bevy/tests/worldctl.rs": "8842ea77e525bf02e966fa9e47415211793ad7828fd858a5a7393ac313b285cd",
+      "crates/terra-cli/Cargo.toml": "bd99a1973a079685bfa6643cad2b9a21f8955ba2564d5707567eeea21357af9a",
+      "crates/terra-cli/src/main.rs": "7104e1196da994189175313eec6100bf458254656cc3bfbfff80e76e22c7cbf8",
+      "crates/terra-core/Cargo.toml": "5e74af4781ed529f07b859590dc5acb1cbc877e4122b09e6ba98bd7f886ba2dd",
+      "crates/terra-core/src/actors.rs": "2d5e0effbe95d10fecbf85a853a68e8046ba01a286ae37648d3c2a5e35468bea",
+      "crates/terra-core/src/contacts.rs": "3ab137a1db12058b4c1d6495c086b222f78f9a34af1ba09300b5ba35bc09f31a",
+      "crates/terra-core/src/environment.rs": "7168f451eab7951fe7907d1d343dc6171ca86e1b92a5aae357a1d3fa9027deb4",
+      "crates/terra-core/src/geo.rs": "83436dc6dae60e2dfa4952a0b146ab540f43dab41fa8f28d2c5dd2da9576ed9f",
+      "crates/terra-core/src/lib.rs": "bc22e3d0d80471bbc14b6f699489ce1ee64103150417bc416aaf9b04bec50c22",
+      "crates/terra-core/src/tiles.rs": "6a002d70433b2e1e652d00f5d2b621c0977f65ddf3487edc025ce03c486dfdf8",
+      "crates/terra-core/src/time.rs": "6c29ed559227a756878c2e996524fafd9170f996fac03823c4f1f2a1d82a148c",
+      "crates/terra-core/src/vehicle.rs": "96574ce6f518022ccf47d3902b35e04acfab1e68f14a509517932ce658e64c73",
+      "crates/terra-core/src/vehicle_ground.rs": "701376e3783831eac83cd1e6a15a15c1f9f53703d4a6ca3c14a97bb40cacc1dd",
+      "crates/terra-core/src/world.rs": "b289bb141460129dfdaa2011b571700cd8a2ec533ae8b76bd2cc6d608b7a9d8d",
+      "crates/terra-core/tests/domain.rs": "4ed00a817c17d18dbe7b42318ef88f60cbe92c4c7fb39df8d38055b5af8e7294",
+      "crates/terra-demo/Cargo.toml": "7e05161d0d00f68d440a4461d55923ad95eb18d2eeca244e633b963feeb2943a",
+      "crates/terra-demo/src/accessibility.rs": "642af8508ddaebebca117437bf5558372464a8daa4b29e0928ce9ab68424fb76",
+      "crates/terra-demo/src/camera.rs": "f2256e0a3d79d56fbe57a904d6de2bf81c98bdc0f18acd6cdca0292ff33613a7",
+      "crates/terra-demo/src/character.rs": "002a353fa1a98a4b09b93a925c3ff32a9a8be89e1d0d372a7cf2995520034a69",
+      "crates/terra-demo/src/command_input.rs": "40a688377f443ea4431057bbe343dccd401a2bfe47f019b89901a06644cefdc7",
+      "crates/terra-demo/src/control.rs": "315d59a85565e41c6927cba5c6127537c8f6e0d8bff698c31f63a19aa934508b",
+      "crates/terra-demo/src/driving.rs": "a3b39fc9e8d401de1bd91014722dc8354d9fd8b023ee5309cca297ac79b9c33a",
+      "crates/terra-demo/src/fleet.rs": "d543bbb9c5ec07da7af8cb7b1aa7e144d0484197e4bbfbadeb04b88d703ee828",
+      "crates/terra-demo/src/flow.rs": "21639787ecd45ec156990381fa809f4a3da7ae549d6c791900c44367d2411a31",
+      "crates/terra-demo/src/frontier.rs": "91012a4c0b4d7334100df5f0ad4bd04b3a1c3b8fc21ff29258a20da9a4cb919a",
+      "crates/terra-demo/src/interaction.rs": "a55d1b44722dbe6030b510cff026c7f7675407154d7c4f7c027cd2e4e3f42391",
+      "crates/terra-demo/src/interface.rs": "79617b067fb4aee930fd3a06602ff085d2470f1cacf30b931882951f848d561d",
+      "crates/terra-demo/src/launcher/mod.rs": "fd5aae85bb5149b2a3e6446cdf91aa69a081aedf221b063e626758f01b4e2c3b",
+      "crates/terra-demo/src/launcher/model.rs": "1caae0ef57144244a5b33f561e0bb81a317b64f01a259a3545df0d70b2110bcc",
+      "crates/terra-demo/src/launcher/preview.rs": "e62a3a21882f74e94e307c20454852919dacda494b2d88d9c1bd0a75f9317b84",
+      "crates/terra-demo/src/launcher/ui.rs": "4be63b63385273af9282301c8163c2d26db62026e6051d7a1e367285621f10cc",
+      "crates/terra-demo/src/main.rs": "622972587cee71cdfa04ce1837929c78f1e0015246992577bb783bb1699d00b8",
+      "crates/terra-demo/src/output.rs": "e2c18898d21d7747569e5d90d60e5709125851ffd4cc7eefccf1d8ee3c56b235",
+      "crates/terra-demo/src/performance.rs": "742c4630ad8346a8321d8b0858d772c55aaa39116fae85881ef0b909ffdb4e05",
+      "crates/terra-demo/src/player_input.rs": "a5eab54a1a0084ae5a6b93982e3a82ae52d494f6bfbacfb7557756b8d3ffd3e1",
+      "crates/terra-demo/src/remote.rs": "ae864e164e12ff31763eb56f092f6ccecfa5e3707c15f7a927fdcfac572c1d4d",
+      "crates/terra-demo/src/road_presentation.rs": "b5f373d604e2dadf716d1096ad1933b49003b2f764882667d159089359635c96",
+      "crates/terra-demo/src/vehicle_models.rs": "7cf22c1f95a365d7650ddc76d3154033ed1667dcd0f9537e7119a404070c495a",
+      "crates/terra-demo/src/vehicle_presentation.rs": "2962e30dbb16287a9f3bdb1743fb3c9aadf1850db36b9f9eb9a062c566291b16",
+      "crates/terra-demo/src/wheel_input.rs": "c5c307d5db7f23e2a52bf48eb6e5be7275eef16771756f73f555e0d1201bebe2",
+      "crates/terra-history/Cargo.toml": "87ef3da27bcdafa57a0c54b2dafc8c66e84f2dbec59290f7856e489b382f210d",
+      "crates/terra-history/src/lib.rs": "b7f0435c39128b7af9679899917db5fd779593bfe61e7cb32bb0733ed37564e5",
+      "crates/terra-history/src/pack.rs": "66790f75839b69944d67adc421a5c128e00a84a6f22347fa164366726b99e70a",
+      "crates/terra-history/src/politics.rs": "e895ae3991e1e11ebc1716e4e9919b457c57db20b2717f050b395a5bbd4b18a6",
+      "crates/terra-history/src/time.rs": "a7b6b0c191838ce38ce469c4a104ed1aa0f79f1a84fe9f493c9da2fbea88081b",
+      "crates/terra-history/tests/history.rs": "de31add653272a311bcb755ea62f82f66f5ee50e91deab7d44d34b858f87fd71",
+      "crates/terra-net/Cargo.toml": "8bd665456ca33a5c5522b0469dbf1f824f4618b5a647d41515d7859d8e9d61d2",
+      "crates/terra-net/examples/network_conditions.rs": "3eabd5c859cd333c66eeb2860f3ccc96f3b8196e068bd040f079dfd2383378ae",
+      "crates/terra-net/examples/regional_session_load.rs": "8a25baf50e8f759a49521fe63c4e2dd8ca922a0d644f2b478a3b046a95bb194b",
+      "crates/terra-net/examples/replication_load.rs": "9c386a840ba3def29df3a3e74a6a3ed9bc3f45c320c22c7dc2495592ad57253c",
+      "crates/terra-net/examples/support/conditioned_link.rs": "f2d1fd342b4e0d25e1695f7ab152af119ea4f82033f9e174f0c67f2ff65cc22f",
+      "crates/terra-net/examples/support/network_acceptance.rs": "485acea12f67fb909f1fce3193e781afa7e58e76c6c9be1ddf39836ec26fa531",
+      "crates/terra-net/src/bin/client.rs": "e407678570b4e7e999c31a86caa9c301e3702eb3fd4040c225d7b4541bc32af4",
+      "crates/terra-net/src/bin/server.rs": "386dec721d48275a6145519e1a2a480a45d236bf2855c37ccb0b46e6109b316f",
+      "crates/terra-net/src/client.rs": "bb4562292bb91ebee12c65f3d9e4ed183dccd074a7ca0142e1d59f0f03754312",
+      "crates/terra-net/src/lib.rs": "bc51c569801608be93bd6f20a3aa62384c2adaada68330a556c8a6589e207dc3",
+      "crates/terra-net/src/operator.rs": "f10412d475dc44df04332c04beb41dde04a128a3ae48a0f83400b16cd6526c70",
+      "crates/terra-net/src/prediction.rs": "96815cdd736cde6e5a3d8ada686e2ebcd047e92df05c82b2633673b54abfca57",
+      "crates/terra-net/src/protocol.rs": "090e3f284fd589f09fdaf66a2af142562d8b0a68bd7966c19489600efb8bea4b",
+      "crates/terra-net/src/replication.rs": "42e078fd25b0c1c063a4186fe8ecd793571e10da72e0498592519603a4d20e9b",
+      "crates/terra-net/src/server.rs": "ea802dd6f460de933b91c6c5d595609a72786c8e3c233e6de96dc91d62511746",
+      "crates/terra-net/src/server_backpressure_tests.rs": "f63d03388b8efb5e48bb1e7c5d760d627cbb9d14066fda17d2ab69a5d3fe368f",
+      "crates/terra-net/src/session.rs": "2aa6bffcda87cc34b48ff96320288023532a6a6f3a0086a526e58baaede986b9",
+      "crates/terra-net/src/surface.rs": "ab3c3e5eeedae4b03a354e63f25390c6494d81848729378c94b840995ec94623",
+      "crates/terra-net/src/tls.rs": "2df8e3c0e4c15d554fdb2207b7110fc0f4d37a6c19d02126e3feee56e75928ca",
+      "crates/terra-net/src/transport.rs": "18457914c471898ffd97b58a0a4ed0cedc540715e65d4ccb58ea3bf87d6ddf14",
+      "crates/terra-net/tests/delta_replication.rs": "ecd565acef66161798ffe30a4d7a46f2de235ae8387cb8f231d385efef0893ff",
+      "crates/terra-net/tests/driving.rs": "da261cf5f06b5248589201c02ec44e779352e0c3f001736dd346f6ee97db180c",
+      "crates/terra-net/tests/frontier_protocol.rs": "6ff4983a6973390cceadb594e99e20ca80a7f336b999637a1231850f683f32c4",
+      "crates/terra-net/tests/loopback.rs": "13a9a4c531531e267688357da58de361cac6afe31c1c7e0084de862383672230",
+      "crates/terra-net/tests/network_conditions.rs": "5a75ab95e3f4e52754381cc021a16c50813a982a7783105942e29b6357815746",
+      "crates/terra-net/tests/operator_controls.rs": "d4d94a0886b047376bd54fc52498f536cdeb7becba92dfd47f8226cea3146319",
+      "crates/terra-net/tests/owner_dormancy.rs": "2a0ba86e277a44904ce1ef7aa9472ab71c5678b4c88a27feb219ae9859b036f5",
+      "crates/terra-net/tests/prediction.rs": "4071aeca1f6abed7ff398b1fa935f809d00e59f9383bbc0d51dc3d48674cadce",
+      "crates/terra-net/tests/regional_persistence.rs": "5f966561c32e769c67cb239418b475b72abf1b57ca0b33f62f207d9dbfb55eae",
+      "crates/terra-net/tests/tls_transport.rs": "d8b12e0f42b58b83fef0a31bb42b3986f2706e5f9b08df11d13d232f87a1c10c",
+      "crates/terra-persistence/Cargo.toml": "f7ed2442f813b8ca16ae700553efe7608443a2866fef40a2619b19ab4999e5f4",
+      "crates/terra-persistence/examples/regional_probe.rs": "70fd8296c5cf379960e654fa29a621964ff7ca0ed0c6bc3d10e8123f54204f73",
+      "crates/terra-persistence/src/lib.rs": "c120e77c9062ededcc66e302743ec75c1aba53d522aff412df8b53d01894873a",
+      "crates/terra-persistence/src/operations.rs": "38cd7f23652be0c93e945e3262f41d4be0b24b1dcb8fef77f6e27b308d0f1564",
+      "crates/terra-persistence/src/tests.rs": "ab710cc43e1376491980e63d53f52576a7c8604250b755fc56458fd7aefa1dfa",
+      "crates/terra-persistence/src/worker.rs": "4301309e968a94d4a8eb226ea38468c7a619f953b4cba4d4ad521e5da2a468b5",
+      "crates/terra-sandbox/Cargo.toml": "800fc58ef2db891f393837a46076bde9e5611c8d0eb7d261d02303d063f1c687",
+      "crates/terra-sandbox/examples/scaling_probe.rs": "090442abf15d6b412f744776eb725446a1f11a602e4eb92fecec66ba7970bd46",
+      "crates/terra-sandbox/src/catalog.rs": "ae9d84f216ff77e79889fae594f1dcc5fb4d92ee4e65277558f27d8470e628ac",
+      "crates/terra-sandbox/src/commands.rs": "e2c504ed1fbbb6de155ae511460d14f99c4f4ad69019a619402fad2bc7ca73d5",
+      "crates/terra-sandbox/src/dormancy.rs": "87f3782351a155ae333358c517b12e32d767013caf6fe820d6b4d3040e153496",
+      "crates/terra-sandbox/src/ecology/mod.rs": "18aa0414a381b296e570a53cc5f9338373182bd1dd43b664986a0a65880f7390",
+      "crates/terra-sandbox/src/ecology/model.rs": "b5028c5e19bfbba1da646d48169a2a97e69063279dd211b117128eea06d3e1ba",
+      "crates/terra-sandbox/src/ecology/schedule.rs": "4b6f0347bba68820d25857a9e67a207ff0a2ac6953ff91361d17fda249bb8c9d",
+      "crates/terra-sandbox/src/ecology/seed.rs": "bae5afa21812e56d1e253a83b4c3c5abf2853fdb43ca4165dc8bf07d212e6a10",
+      "crates/terra-sandbox/src/ecology/simulation.rs": "92f7c9f9ba4c6adde1eca04179a570b66cf4e6bbbb9c897cdb52f648e6be2296",
+      "crates/terra-sandbox/src/ecology/validation.rs": "21f4b69bd8ec55d79d7c60129d6474e23d45c1feb28a561eb8578247a9bc3568",
+      "crates/terra-sandbox/src/factions.rs": "6b55ba5fc38e4cddc8bb6b76f92517326de955b3f9dd4cef62afdb961224ed3b",
+      "crates/terra-sandbox/src/interest.rs": "0e976ec40394af01f914055e73658e30e1f4565244e20ff37d361135362f5ad1",
+      "crates/terra-sandbox/src/lib.rs": "2012a58c99d468fb318dc91c12a0e60edbf89a86a3d142a4880aeefc9961ae72",
+      "crates/terra-sandbox/src/living/commands.rs": "97b8ea694c8b9793a077fc030f48ed898ace9f6f93583936cc7a998a3079b322",
+      "crates/terra-sandbox/src/living/contacts.rs": "ca953e6b07776e92ef54c0714abef258cd9607463d2c5e75e30349fe6e5b6f3e",
+      "crates/terra-sandbox/src/living/mod.rs": "7d1e37373cd9f8a2d021d40cf077d17d14e77429bc2b6bce9bdacf2556091582",
+      "crates/terra-sandbox/src/living/model.rs": "a119a4bde9047a1610a2cfc8b2e089c18e96f4a066ed0c3186474f7314711867",
+      "crates/terra-sandbox/src/living/road_network.rs": "510f35707b083759aa36b6e535a2fdfe66b336036338aea9f4b45a86de5a2353",
+      "crates/terra-sandbox/src/living/routing.rs": "b02d7c8e8e45819e9d1001cfe5bb02873e39db06c3a20df7ab7eba773af82fa1",
+      "crates/terra-sandbox/src/living/seed.rs": "80b8a591ebec06d49d73ab3ecb9113a79b8b416e148a7205d6132ea98215484b",
+      "crates/terra-sandbox/src/living/simulation.rs": "b58ba64e53d9cd5810fd72b05994d60a342e95398d5f6329ec436e36785853f8",
+      "crates/terra-sandbox/src/living/traffic.rs": "850ae85e23310bcb7c881bee5157199e3f5648e25cd415411b8062e1af8977dc",
+      "crates/terra-sandbox/src/living/validation.rs": "ccf8abce337851cd5853c670e497b853bda45d752066efb94f256dce6b2e72b5",
+      "crates/terra-sandbox/src/living/view.rs": "88e745f81d0f392b2f97203a80a5027e1aa22b83aebabf2d82de2ba36db88510",
+      "crates/terra-sandbox/src/persistence.rs": "8ad5c89e56ebf0d3dd85c28ac0be424bbf2733c22f05d8f65f9d72e3a67c5a6e",
+      "crates/terra-sandbox/src/regions.rs": "37ac56f6cafdde1da8ae647c12eab59d83ee697f0909ff06b01695124f89e3b8",
+      "crates/terra-sandbox/src/settlement/commands.rs": "5bbf523f70529b7804c286131533dd2acd7164375d92d330577bdcdd3221cf01",
+      "crates/terra-sandbox/src/settlement/economy.rs": "5517d76e6372418342d48313bc079b3f2569cbaf5835eb6aef39f3a034fab2bc",
+      "crates/terra-sandbox/src/settlement/mod.rs": "a35991bc6901d74bb7a48f22ad84e7a54d1367fd92b6f0ae304a5662905f7de6",
+      "crates/terra-sandbox/src/settlement/model.rs": "accd9e35beac55c33d1203e2a5f72050febad0b019b4ada438a9031c36ad227a",
+      "crates/terra-sandbox/src/settlement/validation.rs": "26eade9532a96f34d8d512ed28731d41844f8f1b61aac25a51c127e9c2fa17cf",
+      "crates/terra-sandbox/src/spatial.rs": "533604c7a270e54c4804f25a2a83907f85e635f524952d66c4369ab1399b34e6",
+      "crates/terra-sandbox/src/state.rs": "e648b61051af1ba1ad3b15aff43a28458aff4ecd2716f6373fcd3dd08be762d9",
+      "crates/terra-sandbox/src/transport/actions.rs": "e4bed1e90670ab7bc716829a69dbd007351d4b0b49cf9acc72460f9fb3e22bca",
+      "crates/terra-sandbox/src/transport/company/commands.rs": "f6c5cb2dd6daa7d9f40b92760b22d3defce7dcfac1674b4d59e77b5baeae30c9",
+      "crates/terra-sandbox/src/transport/company/depots.rs": "628677c59f327e27ca304d012237274b86f467160670f287d45598b1f291050c",
+      "crates/terra-sandbox/src/transport/company/economy.rs": "6e22a91c74595129a46c3040c3dac9acca133f62ebf8a062ae3e3cac2a10fe03",
+      "crates/terra-sandbox/src/transport/company/lifecycle.rs": "9e95f328a7f0fd3fbd12106589926181ea560c5dfbbbc8e835cd29fd8599c6e5",
+      "crates/terra-sandbox/src/transport/company/market.rs": "2db081f027297f52c0628d44f9757650782119fbea307291269e72b0e8ff2c48",
+      "crates/terra-sandbox/src/transport/company/mod.rs": "e1095c8fbbf15937ea1ffe3d793e72e8fa8d436cd1f6fcc476a95c1a89b4d3a4",
+      "crates/terra-sandbox/src/transport/company/model.rs": "7d747ed710f146674a11f21cb150afc08073b0d3ee234d2708e92d8693dfbc1b",
+      "crates/terra-sandbox/src/transport/company/roadside.rs": "022722b820d7e0fea49afd38509f2e741b9d3db29f362ab09bf374ae4915d180",
+      "crates/terra-sandbox/src/transport/company/simulation.rs": "9d95963a62773d27e5e95806690b70f1eeb4ced831cf83367c3415273c489c8c",
+      "crates/terra-sandbox/src/transport/company/validation.rs": "2bb21d27875ea7022eddb371c254eade0a0c5a403431394ea8011b21ad891928",
+      "crates/terra-sandbox/src/transport/mechanics.rs": "952c647bb1a1cfb3ebafb6a43391fdac6e3569ae5befdf1fb3aeb2466c5c95ec",
+      "crates/terra-sandbox/src/transport/mod.rs": "d5d1fd8ae90d025288cdfbeac82e71139fb0679ee7773a033f57cdecee7af635",
+      "crates/terra-sandbox/src/transport/model.rs": "cd541dba962a9d691fbdbaea595a7186823f5424f5c0b927e0df439be3282d78",
+      "crates/terra-sandbox/src/transport/rentals.rs": "f86c3e0ba6e3f0b5443071889d668423ba9e8f299dda521aedbda2b3140d2534",
+      "crates/terra-sandbox/src/transport/seed.rs": "74f2764cdf36feedff04f570efc39a512994d1f79b69464a166fff200ee9221f",
+      "crates/terra-sandbox/src/transport/simulation.rs": "34415242eac60a5a2c95e579d3209ca6a8de613ae58caba6bf72e156cb5cb7fa",
+      "crates/terra-sandbox/src/transport/validation.rs": "be26d633d5281f1375b53b8bfc2bd94bd88542ab0104773945db89614d2d8402",
+      "crates/terra-sandbox/src/transport/view.rs": "d9102b1fba2dac7f9e215b3cb17681385bee9314af4bdd336a54c3f278833cf2",
+      "crates/terra-sandbox/tests/companies.rs": "9716ba2b519be2cde67d47482e5af57cd10297be1573062407c33ffde576da8c",
+      "crates/terra-sandbox/tests/company_depots.rs": "2256553975e9711fbb615e60540acd3d9d2ce089f97e18ef48eb2bf81916fac8",
+      "crates/terra-sandbox/tests/ecology.rs": "33e7cc943897735333be5f383cc2e6f6569fec79cc8db04357ca6c589ab61bd2",
+      "crates/terra-sandbox/tests/factions.rs": "b63317c6f801dbdceaf5212b86e143af63a43f642d0cbd29bb1b174039ddacd5",
+      "crates/terra-sandbox/tests/gameplay.rs": "37cf3882b6fbdf6192d091ab02bf394146395fdd776eed162d548e6fe107cc20",
+      "crates/terra-sandbox/tests/living.rs": "db811fc08ace9cb245ad572fb6f8d7446695ee0fc7ff9019a4c9e6ec8bef6abf",
+      "crates/terra-sandbox/tests/logistics.rs": "a4c142899eaf2f00e79857eadee03fbbbe4410e04f0982b54c2fc98d9d4c6c71",
+      "crates/terra-sandbox/tests/regions.rs": "3ec47938f5831fd0a63445dc14522826ba25790f32224abc2738792b7d1f7e6c",
+      "crates/terra-sandbox/tests/rentals.rs": "f7b2ae8a60a47e106a7cb956bbe0644b1691548a63e0c31cc51833a2ec2e214c",
+      "crates/terra-sandbox/tests/scaling.rs": "c49a5745552c9dac9e2a519b6a87baf658687279a553da7a830c0715653e913a",
+      "crates/terra-sandbox/tests/settlements.rs": "92a4ff73570bacd862660c20d505d342fa41e0c4ed99a244bf3f5c4cc74dc01c",
+      "crates/terra-sandbox/tests/traffic.rs": "1b37b41d9001fad8095c16ee24cfba498cff15c25ca7d1b16ebede8e8705995f",
+      "crates/terra-sandbox/tests/transport.rs": "b7cc621ec9d66bc477a1be9d6408a9138ef715093d23a719f6b26fbfcfdac2a4",
+      "crates/terra-sandbox/tests/vehicle_ground.rs": "04ef17dd6d2c8dd7f861098c3539c3dd4968a70de411e643b44a6c0477e7f056",
+      "crates/terra-stream/Cargo.toml": "c16548c9337917c1226a4060359c00cca4a20309083090392af5c5e2a64927ab",
+      "crates/terra-stream/examples/probe.rs": "f812cd1aadd0ad4f17096e2f8efaea7db702e16f7a36c4066dee420dc31253f3",
+      "crates/terra-stream/src/cache.rs": "2444afc05a7bc52142874985f8452fa9cd86ce0ee32efd47b3fee21e3b7f4809",
+      "crates/terra-stream/src/clip.rs": "c0feaafe55216e8c965c2186590e2f45aba70b2ced9c4da664dd20d6944845f3",
+      "crates/terra-stream/src/config.rs": "6cf4dbe27b76dead142d7235e17f73da3771117341dff06a852600e3cf667a28",
+      "crates/terra-stream/src/heightmap.rs": "d4133cbf84d10e93b9976b43cd9079f0113b09cc056f06b018139edff3813ceb",
+      "crates/terra-stream/src/heightmap_features.rs": "2582947bb5c58a10fab4dd98326aeebb88207de399eb84c3410888e800c26fc3",
+      "crates/terra-stream/src/lib.rs": "ed07ffedba6a8a91c660425d8abc81728bc1f74b4b75760c36444edf2dd35620",
+      "crates/terra-stream/src/procedural.rs": "86322dda05b9dea21c55b7c372b05c374cb05642e15bbff3ad75aab07c09735e",
+      "crates/terra-stream/src/providers.rs": "7bcea005c08114a7cb28f47d670c12a174a0b7c05b8a11d376725e6dd3cfbb4f",
+      "crates/terra-stream/src/streamer.rs": "848ca30f731d8d4cd505efe7b9a959743c80a4b4339cc002e6f64cf0296694a2",
+      "crates/terra-stream/tests/http_pipeline.rs": "ca273bb84df2968d6c8bfbc72a8feaef6e4139e5d3c293ed4a82436c63a3b269",
+      "crates/terra-stream/tests/providers.rs": "a67395d7a36201a86228f5d99af046488dfdf76ffae188be16570dc8358c6261"
+    }
+  },
+  "isolated_native_demo_revalidation": {
+    "source_changes": {
+      "crates/terra-demo/src/command_input.rs": {
+        "initial_gate_sha256": "ebf39c433b8bfd625f66309765c1b33d31ddfc9ed988d2cf8fa7475042013c3e",
+        "final_sha256": "40a688377f443ea4431057bbe343dccd401a2bfe47f019b89901a06644cefdc7"
+      },
+      "crates/terra-demo/src/driving.rs": {
+        "initial_gate_sha256": "bd11539a057093c3ec6e93f131ddb62bc76903dd37d8c1c5c572f17f095e6d77",
+        "final_sha256": "a3b39fc9e8d401de1bd91014722dc8354d9fd8b023ee5309cca297ac79b9c33a"
+      },
+      "crates/terra-demo/src/interface.rs": {
+        "initial_gate_sha256": "1c2f1df5a68e5a7030ca53a988eb759f7c0f910703802660fcb90afbea2cbe05",
+        "final_sha256": "79617b067fb4aee930fd3a06602ff085d2470f1cacf30b931882951f848d561d"
+      }
+    },
+    "headless_and_bevy_inputs_unchanged": true,
+    "reason": "Final small-viewport/150%-text native passes identified footer layout and nested inspector focus reveal defects. Only the listed native-demo source files changed. The non-Bevy workspace gate explicitly excludes terra-demo, and the Bevy library/integration gates do not depend on terra-demo. Their tested source inputs remain unchanged. The demo tests, native executable and final formatting gate are revalidated after the isolated UI polish."
+  },
+  "evidence": [
+    "headless-verification-v0.9.json",
+    "server-admission-v0.9.json",
+    "native-v9-verification.json"
+  ],
+  "evidence_sha256_by_file": {
+    "headless-verification-v0.9.json": "5a05bd558dddef6d81c7c35b4b2a1a4d1ee812805b03e55516a4c39482bf5ae7",
+    "server-admission-v0.9.json": "de66184130022adbe51d013c69a72a7dadb17959fa3b4734f550319438a4b9df",
+    "native-v9-verification.json": "71d524380dc48e4ee0b826c770ce7c43d30246a7e106c2dc6f7244a04fdbc06d"
+  },
+  "process_smoke_checks": {
+    "passed": 11,
+    "included_in_rust_test_total": false
+  },
+  "native_evidence_summary": {
+    "observed_checks_passed": 10,
+    "persisted_state_checks_passed": 12,
+    "verified_png_captures": 16,
+    "distinct_capture_build_stages": 4,
+    "included_in_rust_test_total": false,
+    "provenance": "Each capture retains its actual review-stage executable hash. Earlier gameplay/world-creation captures are not relabeled as the final nested-scroll confirmation build."
+  },
+  "native_binary_sha256": "00d46588a66d07a7c7c5040de1f177058fd389e833d01a552536bc7be9e2fd3a",
+  "measurement_provenance": "Final Rust validation references the final frozen formatted source and exact gate log digests. Isolated native-demo polish after the initial gate snapshot is recorded with both input hashes and explicit revalidation; retained headless/Bevy gates have unchanged applicable source inputs. The separately recorded server process smoke retains its own binary, script and bundle hashes; its prior executable is not silently relabeled as the final renderer build. Versioned 0.8 checkpoint/session timings remain historical measurements and are excluded from 0.9 test totals. Correctness tests ran while native review work was in progress; their durations are not performance or concurrency benchmarks.",
+  "scope": "Bounded Rust correctness, actual localhost TCP/TLS and SQLite recovery, plus separately recorded Linux/X11 native interaction with Mesa software Vulkan. No full Motor Town parity, AAA art/rigid-body physics, gaming-GPU frame-time certification, physical device certification, public-account hosting, distributed authority or MMORPG concurrent-player claim."
+}

@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "output": "/workspace/scratch/d5dec1debc6b/terra-world-0.18.0-linux-x86_64.zip",
+  "release": "0.18.0",
+  "platform": "linux-x86_64",
+  "build_profile": "dev",
+  "files": 239,
+  "bytes": 39255905,
+  "sha256": "4f2fffea8081d4928569d670ea403a05a74b619a06b8fc3e7a96ff54558455bb",
+  "native_binary_sha256": "e16c25fabf30d8e96ff6b68cea99766ea1f4cc4d67afc1fbaeaff4433ffa8881"
+}

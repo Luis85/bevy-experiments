@@ -1,0 +1,94 @@
+{
+  "accepted": true,
+  "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+  "models": [
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 135992,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 28804,
+        "nodes": 30,
+        "runtime_animation_keys": 1190,
+        "scene_triangles": 1468,
+        "scene_vertices": 4404,
+        "texture_pixels": 0,
+        "triangles": 1468,
+        "vertices": 4404
+      },
+      "id": "boar"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 163620,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 34780,
+        "nodes": 37,
+        "runtime_animation_keys": 1190,
+        "scene_triangles": 1800,
+        "scene_vertices": 5400,
+        "texture_pixels": 0,
+        "triangles": 1800,
+        "vertices": 5400
+      },
+      "id": "deer"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 135308,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 28732,
+        "nodes": 29,
+        "runtime_animation_keys": 1190,
+        "scene_triangles": 1464,
+        "scene_vertices": 4392,
+        "texture_pixels": 0,
+        "triangles": 1464,
+        "vertices": 4392
+      },
+      "id": "fox"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 135360,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 28732,
+        "nodes": 29,
+        "runtime_animation_keys": 1190,
+        "scene_triangles": 1464,
+        "scene_vertices": 4392,
+        "texture_pixels": 0,
+        "triangles": 1464,
+        "vertices": 4392
+      },
+      "id": "hare"
+    },
+    {
+      "budget": {
+        "animation_keys": 1190,
+        "bytes": 156324,
+        "channels": 35,
+        "clips": 5,
+        "decoded_scalars": 33268,
+        "nodes": 35,
+        "runtime_animation_keys": 1190,
+        "scene_triangles": 1716,
+        "scene_vertices": 5148,
+        "texture_pixels": 0,
+        "triangles": 1716,
+        "vertices": 5148
+      },
+      "id": "ibex"
+    }
+  ],
+  "name": "Terra woodland wildlife",
+  "schema_version": 1,
+  "scope": "Validated source bytes and supported format; native renderer readiness is checked at runtime"
+}

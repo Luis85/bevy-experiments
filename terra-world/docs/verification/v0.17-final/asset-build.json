@@ -1,0 +1,465 @@
+{
+  "schema_version": 1,
+  "accepted": true,
+  "name": "Terra woodland authoring example",
+  "identity": "sha256:58e4c7203eaea18b5cc337243d70a0918211a2770fc7c172fa5b0b9a71143634",
+  "recipe_sha256": "b6c6b0663d062178667bbc54ac46129f4f0819f8bdcf3a7932cd3b05cea40ca6",
+  "sources": [
+    {
+      "id": "deer",
+      "source": "wildlife-pack/deer.glb",
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art.",
+      "output": "models/49629810d8e3280764dfa35aed39e8885ce6779e4b9320c6e003ab87de133f80.glb",
+      "inspection": {
+        "sha256": "49629810d8e3280764dfa35aed39e8885ce6779e4b9320c6e003ab87de133f80",
+        "scene": 0,
+        "budget": {
+          "nodes": 37,
+          "vertices": 5400,
+          "triangles": 1800,
+          "scene_vertices": 5400,
+          "scene_triangles": 1800,
+          "renderer_vertices": 5400,
+          "scene_renderer_vertices": 5400,
+          "primitives": 29,
+          "scene_primitives": 29,
+          "materials": 6,
+          "clips": 5,
+          "channels": 35,
+          "animation_keys": 1190,
+          "runtime_animation_keys": 1190,
+          "decoded_scalars": 34780,
+          "texture_pixels": 0,
+          "texture_slot_pixels": 0,
+          "bytes": 163620
+        },
+        "nodes": [
+          "animal",
+          "body",
+          "torso",
+          "chest",
+          "head",
+          "neck",
+          "skull",
+          "muzzle",
+          "nose",
+          "eye--1",
+          "ear--1",
+          "ear-inner--1",
+          "horn--1-0",
+          "horn--1-1",
+          "horn--1-2",
+          "antler-tine--1",
+          "eye-1",
+          "ear-1",
+          "ear-inner-1",
+          "horn-1-0",
+          "horn-1-1",
+          "horn-1-2",
+          "antler-tine-1",
+          "front_left",
+          "front_left-limb",
+          "front_left-foot",
+          "front_right",
+          "front_right-limb",
+          "front_right-foot",
+          "rear_left",
+          "rear_left-limb",
+          "rear_left-foot",
+          "rear_right",
+          "rear_right-limb",
+          "rear_right-foot",
+          "tail",
+          "tail-fur"
+        ],
+        "clips": [
+          {
+            "name": "drink",
+            "duration_seconds": 2.8,
+            "channels": 7
+          },
+          {
+            "name": "feed",
+            "duration_seconds": 2.6,
+            "channels": 7
+          },
+          {
+            "name": "idle",
+            "duration_seconds": 3.0,
+            "channels": 7
+          },
+          {
+            "name": "run",
+            "duration_seconds": 0.68,
+            "channels": 7
+          },
+          {
+            "name": "walk",
+            "duration_seconds": 1.15,
+            "channels": 7
+          }
+        ]
+      }
+    },
+    {
+      "id": "ibex",
+      "source": "wildlife-pack/ibex.glb",
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art.",
+      "output": "models/758abe4583ad3cfc048c729afc6bc69144f8c6521b1a05faa2c3a6622be8c694.glb",
+      "inspection": {
+        "sha256": "758abe4583ad3cfc048c729afc6bc69144f8c6521b1a05faa2c3a6622be8c694",
+        "scene": 0,
+        "budget": {
+          "nodes": 35,
+          "vertices": 5148,
+          "triangles": 1716,
+          "scene_vertices": 5148,
+          "scene_triangles": 1716,
+          "renderer_vertices": 5148,
+          "scene_renderer_vertices": 5148,
+          "primitives": 27,
+          "scene_primitives": 27,
+          "materials": 5,
+          "clips": 5,
+          "channels": 35,
+          "animation_keys": 1190,
+          "runtime_animation_keys": 1190,
+          "decoded_scalars": 33268,
+          "texture_pixels": 0,
+          "texture_slot_pixels": 0,
+          "bytes": 156324
+        },
+        "nodes": [
+          "animal",
+          "body",
+          "torso",
+          "chest",
+          "head",
+          "neck",
+          "skull",
+          "muzzle",
+          "nose",
+          "eye--1",
+          "ear--1",
+          "ear-inner--1",
+          "horn--1-0",
+          "horn--1-1",
+          "horn--1-2",
+          "eye-1",
+          "ear-1",
+          "ear-inner-1",
+          "horn-1-0",
+          "horn-1-1",
+          "horn-1-2",
+          "front_left",
+          "front_left-limb",
+          "front_left-foot",
+          "front_right",
+          "front_right-limb",
+          "front_right-foot",
+          "rear_left",
+          "rear_left-limb",
+          "rear_left-foot",
+          "rear_right",
+          "rear_right-limb",
+          "rear_right-foot",
+          "tail",
+          "tail-fur"
+        ],
+        "clips": [
+          {
+            "name": "drink",
+            "duration_seconds": 2.8,
+            "channels": 7
+          },
+          {
+            "name": "feed",
+            "duration_seconds": 2.6,
+            "channels": 7
+          },
+          {
+            "name": "idle",
+            "duration_seconds": 3.0,
+            "channels": 7
+          },
+          {
+            "name": "run",
+            "duration_seconds": 0.68,
+            "channels": 7
+          },
+          {
+            "name": "walk",
+            "duration_seconds": 1.15,
+            "channels": 7
+          }
+        ]
+      }
+    },
+    {
+      "id": "boar",
+      "source": "wildlife-pack/boar.glb",
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art.",
+      "output": "models/3f96fda99dc8f9178435c659561a004dc1d6d82873bd2131aef839f88712f28f.glb",
+      "inspection": {
+        "sha256": "3f96fda99dc8f9178435c659561a004dc1d6d82873bd2131aef839f88712f28f",
+        "scene": 0,
+        "budget": {
+          "nodes": 30,
+          "vertices": 4404,
+          "triangles": 1468,
+          "scene_vertices": 4404,
+          "scene_triangles": 1468,
+          "renderer_vertices": 4404,
+          "scene_renderer_vertices": 4404,
+          "primitives": 22,
+          "scene_primitives": 22,
+          "materials": 5,
+          "clips": 5,
+          "channels": 35,
+          "animation_keys": 1190,
+          "runtime_animation_keys": 1190,
+          "decoded_scalars": 28804,
+          "texture_pixels": 0,
+          "texture_slot_pixels": 0,
+          "bytes": 135992
+        },
+        "nodes": [
+          "animal",
+          "body",
+          "torso",
+          "chest",
+          "head",
+          "skull",
+          "muzzle",
+          "nose",
+          "eye--1",
+          "ear--1",
+          "ear-inner--1",
+          "tusk--1",
+          "eye-1",
+          "ear-1",
+          "ear-inner-1",
+          "tusk-1",
+          "front_left",
+          "front_left-limb",
+          "front_left-foot",
+          "front_right",
+          "front_right-limb",
+          "front_right-foot",
+          "rear_left",
+          "rear_left-limb",
+          "rear_left-foot",
+          "rear_right",
+          "rear_right-limb",
+          "rear_right-foot",
+          "tail",
+          "tail-fur"
+        ],
+        "clips": [
+          {
+            "name": "drink",
+            "duration_seconds": 2.8,
+            "channels": 7
+          },
+          {
+            "name": "feed",
+            "duration_seconds": 2.6,
+            "channels": 7
+          },
+          {
+            "name": "idle",
+            "duration_seconds": 3.0,
+            "channels": 7
+          },
+          {
+            "name": "run",
+            "duration_seconds": 0.68,
+            "channels": 7
+          },
+          {
+            "name": "walk",
+            "duration_seconds": 1.15,
+            "channels": 7
+          }
+        ]
+      }
+    },
+    {
+      "id": "fox",
+      "source": "wildlife-pack/fox.glb",
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art.",
+      "output": "models/85c4421d02116bfc2a6a0af701b0fcb944d667a585824482b0a92a13c26ba048.glb",
+      "inspection": {
+        "sha256": "85c4421d02116bfc2a6a0af701b0fcb944d667a585824482b0a92a13c26ba048",
+        "scene": 0,
+        "budget": {
+          "nodes": 29,
+          "vertices": 4392,
+          "triangles": 1464,
+          "scene_vertices": 4392,
+          "scene_triangles": 1464,
+          "renderer_vertices": 4392,
+          "scene_renderer_vertices": 4392,
+          "primitives": 21,
+          "scene_primitives": 21,
+          "materials": 5,
+          "clips": 5,
+          "channels": 35,
+          "animation_keys": 1190,
+          "runtime_animation_keys": 1190,
+          "decoded_scalars": 28732,
+          "texture_pixels": 0,
+          "texture_slot_pixels": 0,
+          "bytes": 135308
+        },
+        "nodes": [
+          "animal",
+          "body",
+          "torso",
+          "chest",
+          "head",
+          "skull",
+          "muzzle",
+          "nose",
+          "eye--1",
+          "ear--1",
+          "ear-inner--1",
+          "eye-1",
+          "ear-1",
+          "ear-inner-1",
+          "front_left",
+          "front_left-limb",
+          "front_left-foot",
+          "front_right",
+          "front_right-limb",
+          "front_right-foot",
+          "rear_left",
+          "rear_left-limb",
+          "rear_left-foot",
+          "rear_right",
+          "rear_right-limb",
+          "rear_right-foot",
+          "tail",
+          "tail-fur",
+          "tail-tip"
+        ],
+        "clips": [
+          {
+            "name": "drink",
+            "duration_seconds": 2.8,
+            "channels": 7
+          },
+          {
+            "name": "feed",
+            "duration_seconds": 2.6,
+            "channels": 7
+          },
+          {
+            "name": "idle",
+            "duration_seconds": 3.0,
+            "channels": 7
+          },
+          {
+            "name": "run",
+            "duration_seconds": 0.68,
+            "channels": 7
+          },
+          {
+            "name": "walk",
+            "duration_seconds": 1.15,
+            "channels": 7
+          }
+        ]
+      }
+    },
+    {
+      "id": "hare",
+      "source": "wildlife-pack/hare.glb",
+      "provenance": "Original Terra World contributors model and animation, deterministically authored by wildlife-pack/generate.py; MIT OR Apache-2.0. No third-party art.",
+      "output": "models/e27b4e4a838329bd86d3f20957c179475e018258436dd15313d03a6503d4eb3f.glb",
+      "inspection": {
+        "sha256": "e27b4e4a838329bd86d3f20957c179475e018258436dd15313d03a6503d4eb3f",
+        "scene": 0,
+        "budget": {
+          "nodes": 29,
+          "vertices": 4392,
+          "triangles": 1464,
+          "scene_vertices": 4392,
+          "scene_triangles": 1464,
+          "renderer_vertices": 4392,
+          "scene_renderer_vertices": 4392,
+          "primitives": 21,
+          "scene_primitives": 21,
+          "materials": 5,
+          "clips": 5,
+          "channels": 35,
+          "animation_keys": 1190,
+          "runtime_animation_keys": 1190,
+          "decoded_scalars": 28732,
+          "texture_pixels": 0,
+          "texture_slot_pixels": 0,
+          "bytes": 135360
+        },
+        "nodes": [
+          "animal",
+          "body",
+          "torso",
+          "chest",
+          "head",
+          "skull",
+          "muzzle",
+          "nose",
+          "eye--1",
+          "ear--1",
+          "ear-inner--1",
+          "eye-1",
+          "ear-1",
+          "ear-inner-1",
+          "front_left",
+          "front_left-limb",
+          "front_left-foot",
+          "front_right",
+          "front_right-limb",
+          "front_right-foot",
+          "rear_left",
+          "rear_left-limb",
+          "rear_left-foot",
+          "rear_right",
+          "rear_right-limb",
+          "rear_right-foot",
+          "tail",
+          "tail-fur",
+          "tail-light"
+        ],
+        "clips": [
+          {
+            "name": "drink",
+            "duration_seconds": 2.8,
+            "channels": 7
+          },
+          {
+            "name": "feed",
+            "duration_seconds": 2.6,
+            "channels": 7
+          },
+          {
+            "name": "idle",
+            "duration_seconds": 3.0,
+            "channels": 7
+          },
+          {
+            "name": "run",
+            "duration_seconds": 0.68,
+            "channels": 7
+          },
+          {
+            "name": "walk",
+            "duration_seconds": 1.15,
+            "channels": 7
+          }
+        ]
+      }
+    }
+  ],
+  "scope": "Exact runtime importer acceptance of immutable source bytes and binding policies. Author-declared provenance is retained, not legally verified. Units, axes, foot placement, visual quality and native readiness require a playthrough."
+}

@@ -1,0 +1,400 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "west-ridge-wood",
+      "properties": {
+        "name": "West Ridge Wood",
+        "landuse": "forest",
+        "leaf_type": "needleleaved",
+        "height": 12
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.5602539063,
+              48.1507141113
+            ],
+            [
+              11.5575299258,
+              48.1468900452
+            ],
+            [
+              11.5526700439,
+              48.1447457036
+            ],
+            [
+              11.5473999023,
+              48.1423095703
+            ],
+            [
+              11.5415513306,
+              48.1440906344
+            ],
+            [
+              11.5382717493,
+              48.1472682495
+            ],
+            [
+              11.5345458984,
+              48.1507141113
+            ],
+            [
+              11.5372698789,
+              48.1545381775
+            ],
+            [
+              11.5421297607,
+              48.1566825191
+            ],
+            [
+              11.5473999023,
+              48.1591186523
+            ],
+            [
+              11.5532484741,
+              48.1573375882
+            ],
+            [
+              11.5565280554,
+              48.1541599731
+            ],
+            [
+              11.5602539063,
+              48.1507141113
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "western-foothills",
+      "properties": {
+        "name": "Western Foothills",
+        "landuse": "forest",
+        "leaf_type": "mixed",
+        "height": 9
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.5642089844,
+              48.1343994141
+            ],
+            [
+              11.5619040779,
+              48.1312501831
+            ],
+            [
+              11.5577918701,
+              48.1294842547
+            ],
+            [
+              11.5533325195,
+              48.1274780273
+            ],
+            [
+              11.548383728,
+              48.128944786
+            ],
+            [
+              11.5456086977,
+              48.1315616455
+            ],
+            [
+              11.5424560547,
+              48.1343994141
+            ],
+            [
+              11.5447609612,
+              48.137548645
+            ],
+            [
+              11.5488731689,
+              48.1393145734
+            ],
+            [
+              11.5533325195,
+              48.1413208008
+            ],
+            [
+              11.558281311,
+              48.1398540421
+            ],
+            [
+              11.5610563413,
+              48.1372371826
+            ],
+            [
+              11.5642089844,
+              48.1343994141
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "south-valley-wood",
+      "properties": {
+        "name": "South Valley Wood",
+        "landuse": "forest",
+        "leaf_type": "broadleaved",
+        "height": 9
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.5740966796875,
+              48.118084716801455
+            ],
+            [
+              11.5668984375,
+              48.1189228646
+            ],
+            [
+              11.5628620298,
+              48.1204182129
+            ],
+            [
+              11.5582763672,
+              48.1220397949
+            ],
+            [
+              11.5616289585,
+              48.1238393555
+            ],
+            [
+              11.5676103516,
+              48.1248484574
+            ],
+            [
+              11.5740966796875,
+              48.12599487299779
+            ],
+            [
+              11.5740966796875,
+              48.118084716801455
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "south-wheat-field",
+      "properties": {
+        "name": "South Wheat Field",
+        "landuse": "farmland",
+        "crop": "wheat"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.569152832,
+              48.1343994141
+            ],
+            [
+              11.5726135254,
+              48.1343994141
+            ],
+            [
+              11.5726135254,
+              48.132520752
+            ],
+            [
+              11.569152832,
+              48.132520752
+            ],
+            [
+              11.569152832,
+              48.1343994141
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "south-barley-field",
+      "properties": {
+        "name": "South Barley Field",
+        "landuse": "farmland",
+        "crop": "barley"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.5731079102,
+              48.1319274902
+            ],
+            [
+              11.5740966796875,
+              48.1319274902
+            ],
+            [
+              11.5740966796875,
+              48.1299499512
+            ],
+            [
+              11.5731079102,
+              48.1299499512
+            ],
+            [
+              11.5731079102,
+              48.1319274902
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "west-pasture",
+      "properties": {
+        "name": "West Pasture",
+        "landuse": "meadow",
+        "crop": "grass"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.5642089844,
+              48.1403320312
+            ],
+            [
+              11.5674719238,
+              48.1403320312
+            ],
+            [
+              11.5674719238,
+              48.1378601074
+            ],
+            [
+              11.5642089844,
+              48.1378601074
+            ],
+            [
+              11.5642089844,
+              48.1403320312
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "valley-meadow",
+      "properties": {
+        "name": "Valley Meadow",
+        "landuse": "meadow",
+        "crop": "grass"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.569152832,
+              48.1284667969
+            ],
+            [
+              11.5740966796875,
+              48.1284667969
+            ],
+            [
+              11.5740966796875,
+              48.125994873
+            ],
+            [
+              11.569152832,
+              48.125994873
+            ],
+            [
+              11.569152832,
+              48.1284667969
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "valley-tree-0",
+      "properties": {
+        "natural": "tree",
+        "leaf_type": "broadleaved",
+        "height": 8
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.573404541,
+          48.1380084229
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "valley-tree-1",
+      "properties": {
+        "natural": "tree",
+        "leaf_type": "broadleaved",
+        "height": 9
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.5738000488,
+          48.1378106689
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "valley-tree-4",
+      "properties": {
+        "natural": "tree",
+        "leaf_type": "broadleaved",
+        "height": 9
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.5720202637,
+          48.1361297607
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "valley-tree-5",
+      "properties": {
+        "natural": "tree",
+        "leaf_type": "broadleaved",
+        "height": 10
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.5716247559,
+          48.1359320068
+        ]
+      }
+    }
+  ]
+}

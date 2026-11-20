@@ -1,0 +1,72 @@
+[
+  {
+    "every_step_conservation_exact": true,
+    "fixture": "rear-trap",
+    "goods_by_item": {
+      "berries": 12,
+      "bread": 40,
+      "cooked_fish": 6,
+      "fiber": 16,
+      "fish": 8,
+      "fishing_rod": 4,
+      "flour": 50,
+      "iron_tool": 2,
+      "planks": 40,
+      "stone": 100,
+      "stone_blocks": 20,
+      "tool": 8,
+      "water": 148,
+      "wheat": 60,
+      "wheat_seed": 136,
+      "wood": 120
+    },
+    "goods_total": 770,
+    "initial_physical_seconds": 300.0,
+    "money_total_minor_credits": 150000,
+    "original_delivery": {
+      "amount": 12,
+      "id": 1000060,
+      "item": "wood"
+    },
+    "replay_window_seconds": 120,
+    "return_elapsed_physical_seconds": 334.0,
+    "return_physical_seconds": 34.0,
+    "save_resume_exact": true,
+    "source_return_transfer_exact": true
+  },
+  {
+    "every_step_conservation_exact": true,
+    "fixture": "occupied-exit",
+    "goods_by_item": {
+      "berries": 12,
+      "bread": 40,
+      "cooked_fish": 6,
+      "fiber": 16,
+      "fish": 8,
+      "fishing_rod": 4,
+      "flour": 50,
+      "iron_tool": 2,
+      "planks": 40,
+      "stone": 100,
+      "stone_blocks": 20,
+      "tool": 8,
+      "water": 148,
+      "wheat": 60,
+      "wheat_seed": 136,
+      "wood": 120
+    },
+    "goods_total": 770,
+    "initial_physical_seconds": 420.0,
+    "money_total_minor_credits": 150000,
+    "original_delivery": {
+      "amount": 12,
+      "id": 1000060,
+      "item": "wood"
+    },
+    "replay_window_seconds": 120,
+    "return_elapsed_physical_seconds": 469.5,
+    "return_physical_seconds": 49.5,
+    "save_resume_exact": true,
+    "source_return_transfer_exact": true
+  }
+]

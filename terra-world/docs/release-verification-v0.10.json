@@ -1,0 +1,112 @@
+{
+  "version": "0.10.0",
+  "recorded_utc": "2026-10-28T12:29:53.521006+00:00",
+  "status": "all final gates and final native confirmation passed",
+  "compatibility": {
+    "wire_protocol": 7,
+    "tls_alpn": "terra-world/7",
+    "domain_save": 1,
+    "regional_schema": 1,
+    "mixed_executable_versions_certified": false
+  },
+  "automated": {
+    "distinct_passing_rust_tests": 655,
+    "by_crate": {
+      "terra-bevy": 90,
+      "terra-cli": 4,
+      "terra-core": 33,
+      "terra-demo": 91,
+      "terra-history": 13,
+      "terra-net": 115,
+      "terra-persistence": 35,
+      "terra-sandbox": 242,
+      "terra-stream": 32
+    },
+    "failures": 0,
+    "ignored": 0,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.10/gates.json",
+      "sha256": "390e2f8835925a3490bf5458fdf7533451801e6cf1c7374c1a8600f95767adaf",
+      "bytes": 6535
+    },
+    "identities": {
+      "path": "docs/verification/v0.10/distinct-tests.json",
+      "sha256": "ad991bfb31b70a7c4f976235ca4ef18e90abb9f71b308c5b49797013667c78f8",
+      "bytes": 101425
+    }
+  },
+  "source_freeze": {
+    "compiled_config_data_asset_inputs": 296,
+    "unchanged_through_gates_and_native_confirmation": true,
+    "manifest": {
+      "path": "docs/verification/v0.10/source-hashes.json",
+      "sha256": "cf7f006ceff6dd6d1bbb3dd92a1c8440fa13a98117dee35bfeb5c406ee083e9d",
+      "bytes": 34588
+    }
+  },
+  "native": {
+    "binary_sha256": "b4add5c97c124f8edfc278c5bd63ce7b9632a22e0ee3bfa2119c65b3b6407405",
+    "final": {
+      "path": "docs/native-v10-verification.json",
+      "sha256": "5b7cb4e349573c5f8d59313a4f95b468944ca4d7d53a69c16e4e20248f0a77b8",
+      "bytes": 10453
+    },
+    "earlier_development_scope": {
+      "path": "docs/verification/v0.10/native-review.json",
+      "sha256": "a7eb1b195a1917748a93a0c02f600c136799f7729b1d13cfef999f10f67e768f",
+      "bytes": 7051
+    },
+    "limitations": "Linux/X11 software Vulkan, keyboard/mouse. No gaming-GPU benchmark or physical-controller, Windows/macOS, localization or screen-reader certification."
+  },
+  "embedded_fixtures": {
+    "files": 7,
+    "unchanged_from_imported_baseline_and_after_final_native": true,
+    "manifest": {
+      "path": "docs/verification/v0.10/embedded-fixture-hashes.json",
+      "sha256": "c21888c686a053f6218ff1209cc2ad7ef406ab95a87413c558cafb23a352caec",
+      "bytes": 1040
+    }
+  },
+  "standalone_procedural_provenance": {
+    "path": "docs/verification/v0.10/procedural-standalone.json",
+    "sha256": "447309e6b237280ff7e0ee956239485c6086435eef3b28bc1a897c4795fae9dc",
+    "bytes": 4151
+  },
+  "finite_career": {
+    "path": "docs/verification/v0.10/career-report.json",
+    "sha256": "6f3734892879bf2dd73ac8ee9f7c52c0b461e317ada7283e6737f28e00a673f7",
+    "bytes": 909
+  },
+  "bounded_traffic_recovery_limit": {
+    "path": "docs/verification/v0.10/traffic-exit-limit.json",
+    "sha256": "17af424ab70595f50ac4326a4d5611c1eda0e10f4c189b516f945205e515fd17",
+    "bytes": 1131
+  },
+  "recovery_probe": {
+    "path": "docs/recovery-verification-v0.10.json",
+    "sha256": "72f8b2d9aabec851bb011164b97ad76fd8c5dff1eee7086d798c7848235d1b79",
+    "bytes": 1891
+  },
+  "wildlife_reproducibility": {
+    "path": "docs/verification/v0.10/wildlife-reproducibility.json",
+    "sha256": "2bd5afbb65676e79f1530d62ec673ceb78c9eae8000be45f4710b277ec9b894f",
+    "bytes": 287
+  },
+  "product_review": {
+    "path": "docs/PRODUCT_REVIEW.md",
+    "sha256": "b86e83d3c50b7e2e156f21d2742a737cdefc0dfda21b522b81831ae976ad3475",
+    "bytes": 17370
+  },
+  "validation_narrative": {
+    "path": "docs/VALIDATION.md",
+    "sha256": "ff9db1dda7abc28ffd4c8591a76f798ed9988a7a6b1b9dc7129c1b6e9e62453e",
+    "bytes": 19430
+  },
+  "limits": [
+    "Bounded local detours and loaded support; no unrestricted navigation guarantee.",
+    "Reference vehicle handling, not full tire/suspension or articulated-trailer physics.",
+    "Finite warehouse operating change is -4.69 credits; long-career balance remains acceptance work.",
+    "Original regional terrain and five wildlife models do not establish global coverage or AAA art/audio.",
+    "The 1027-region recovery probe is storage-only with zero clients; no populated-world or MMORPG capacity claim."
+  ]
+}

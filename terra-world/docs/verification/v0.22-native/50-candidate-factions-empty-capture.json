@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "50-candidate-factions-empty",
+  "capture_started_utc": "2026-10-29T21:14:44.068286+00:00",
+  "captured_utc": "2026-10-29T21:14:44.336558+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 210688,
+  "window_pid_status": "available",
+  "window_pid_before": 210688,
+  "window_pid_after": 210688,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "50-candidate-factions-empty.png",
+    "sha256": "ec94fffc7c6a1eeb56509700eac0c1eb7d98c65f0c6fe24175cc93579704cd36",
+    "bytes": 601042
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

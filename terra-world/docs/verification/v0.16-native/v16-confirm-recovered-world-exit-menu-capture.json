@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.16.0",
+  "capture_name": "v16-confirm-recovered-world-exit-menu",
+  "capture_started_utc": "2026-10-29T05:44:43.445053+00:00",
+  "captured_utc": "2026-10-29T05:44:43.642009+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 73099,
+  "window_pid_status": "available",
+  "window_pid_before": 73099,
+  "window_pid_after": 73099,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "v16-confirm-recovered-world-exit-menu.png",
+    "sha256": "a474e68a579dfa19e9ac97675beecc375e35b400a671c16ebd18df43784e7470",
+    "bytes": 502616
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

@@ -40,6 +40,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut session_path = None::<PathBuf>;
     let mut command_path = None::<PathBuf>;
     let mut expected_manifest_path = None::<PathBuf>;
+    let mut tls_ca = None::<PathBuf>;
+    let mut tls_name = None::<String>;
+    let mut allow_insecure_remote = false;
     let mut args = std::env::args().skip(1);
     while let Some(argument) = args.next() {
         let mut value = || {
@@ -56,14 +59,27 @@ fn run() -> Result<(), Box<dyn Error>> {
             "--session" => session_path = Some(value()?.into()),
             "--command" => command_path = Some(value()?.into()),
             "--expect-manifest" => expected_manifest_path = Some(value()?.into()),
+            "--tls-ca" => tls_ca = Some(value()?.into()),
+            "--tls-server-name" => tls_name = Some(value()?),
+            "--allow-insecure-remote" => allow_insecure_remote = true,
             "--help" | "-h" => {
                 println!(
-                    "Terra reference client\n\n  --connect ADDRESS:PORT  default 127.0.0.1:7777\n  --seconds N             default 10\n  --east N --north N      movement intent in m/s\n  --lat N --lon N         spectator interest only\n  --session PATH          store/reuse this server's player resume token\n  --command PATH          submit one sandbox Command JSON after handshake\n  --expect-manifest PATH  reject any different base-world manifest\n\nDo not share the session file: it controls this player's saved claims and inventory."
+                    "Terra reference client\n\n  --connect ADDRESS:PORT  default 127.0.0.1:7777\n  --tls-ca PATH           trusted CA PEM (requires server name)\n  --tls-server-name NAME  certificate DNS name or IP SAN\n  --allow-insecure-remote explicitly allow non-loopback plaintext\n  --seconds N             default 10\n  --east N --north N      movement intent in m/s\n  --lat N --lon N         spectator interest only\n  --session PATH          store/reuse this server's player resume token\n  --command PATH          submit one sandbox Command JSON after handshake\n  --expect-manifest PATH  reject any different base-world manifest\n\nDo not share the session file: it controls this player's saved claims and inventory."
                 );
                 return Ok(());
             }
             _ => return Err(format!("unknown argument: {argument}").into()),
         }
+    }
+    if tls_ca.is_some() != tls_name.is_some() {
+        return Err("--tls-ca and --tls-server-name must be supplied together".into());
+    }
+    if !address.ip().is_loopback() && tls_ca.is_none() && !allow_insecure_remote {
+        return Err("non-loopback plaintext connection requires --allow-insecure-remote; configure --tls-ca and --tls-server-name to protect player capabilities".into());
+    }
+    #[cfg(not(feature = "tls"))]
+    if tls_ca.is_some() {
+        return Err("this build does not enable terra-net/tls".into());
     }
     if !seconds.is_finite() || !(0.1..=86_400.0).contains(&seconds) {
         return Err("seconds must be finite and within [0.1, 86400]".into());
@@ -88,7 +104,23 @@ fn run() -> Result<(), Box<dyn Error>> {
     } else {
         None
     };
-    let mut client = if let Some(expected) = &expected_manifest {
+    #[cfg(feature = "tls")]
+    let secure_client = match (tls_ca, tls_name) {
+        (Some(ca), Some(name)) => Some(NetClient::connect_tls(
+            address,
+            interest,
+            token.clone(),
+            expected_manifest.clone(),
+            terra_net::ClientTlsConfig::from_ca_pem_file(ca, name)?,
+            Duration::from_secs(3),
+        )?),
+        _ => None,
+    };
+    #[cfg(not(feature = "tls"))]
+    let secure_client = None;
+    let mut client = if let Some(client) = secure_client {
+        client
+    } else if let Some(expected) = &expected_manifest {
         NetClient::connect_with_manifest(address, interest, token, expected.clone())?
     } else {
         NetClient::connect_with_token(address, interest, token)?

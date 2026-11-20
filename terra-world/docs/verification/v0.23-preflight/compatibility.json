@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "contract": {
+    "release": "0.23.0",
+    "wire_protocol": 11,
+    "tls_alpn": "terra-world/11",
+    "domain_save": 1,
+    "regional_schema": 1,
+    "rust_minimum": "1.97.1",
+    "rust_acceptance": "1.99.1"
+  },
+  "workspace_packages": 9,
+  "current_documents_sha256": {
+    "README.md": "9632022e150e226a9dc7f467ef6b05a51999289f99c6975ff51b4c5c1ac2b2de",
+    "crates/terra-net/README.md": "0b28100ee4cefd9ccad7bd604de4a4491bcc77f08aabbadeb53c2d1422c2eb7b",
+    "docs/MULTIPLAYER.md": "4cf4dc0021215a2462a0008464597c75e25ef9f83057204e8c008806fd08c0b2",
+    "docs/NETWORK_REPLICATION.md": "3faf6178afaed31ad73a30be25091c7b5fbff17744e6a133f2923368a67b92b8",
+    "docs/INTEGRATION.md": "fcd0974b92acb6eadaf8d53a7332017d22cbf2ce79d8346c264e6bdf086621eb",
+    "docs/OPERATIONS.md": "a3bd51aa3fd38a484e6046139714b8be530d287f8bfb8979840e150cfed53eb9",
+    "docs/COMPATIBILITY.md": "f943bf8e6ec60ff5c36d2ecb40fdd839e93d9d16954b759298ccfc1f88b14224"
+  },
+  "scope": "Current handoff statements and workspace lock; historical versions preserved."
+}

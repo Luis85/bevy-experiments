@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "release": "0.17.0",
+  "status": "passed",
+  "before": {
+    "schema": 1,
+    "release": "0.17.0",
+    "captured_utc": "2026-10-29T09:47:13.918507+00:00",
+    "process": "v17-confirm-managed",
+    "runtime_database_path": "/tmp/terra-native-017/save-reopen-private/before.db",
+    "sha256": "27a1cbe8c8763f8d07b53fe2bd568c38b028ff05112b2926c6718d81b9de28e2",
+    "runtime_profile_path": "/tmp/terra-native-017/save-reopen-private/before-profile.json",
+    "profile_sha256": "6b4b1aadfaf558a5e435996058131de9d9691dfaf33d85d46d6aa794ed0ba4ee",
+    "generation": 68,
+    "region_count": 56,
+    "identity_sha256": "afbb1ba15987be48c13757711d643e7ed309df2ef9212d2f0f20cf445507e8b0",
+    "catalog_sha256": "d44cd17d8e3569eb4123d53ba177e81bfc7709e5e8b8f55379f0985737baf55d",
+    "player_id": 1,
+    "inventory_sha256": "d617853e08bf4a6b7c89553f1bffa8db6553ce2ff4740b6c4c590a4c0d2f57aa",
+    "personal_money_minor": 25000,
+    "avatar_unit": 1000050,
+    "avatar_owner": 1,
+    "avatar_name": "Playtest 017",
+    "profile_character": {
+      "name": "Playtest 017",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 1
+    },
+    "clock": {
+      "paused": false,
+      "time_scale": 60.0
+    },
+    "position": {
+      "latitude": 48.13706183797418,
+      "longitude": 11.575000000000003,
+      "altitude_m": 167.29891052246094
+    }
+  },
+  "after": {
+    "schema": 1,
+    "release": "0.17.0",
+    "captured_utc": "2026-10-29T09:48:30.243427+00:00",
+    "process": "v17-confirm-reopen",
+    "runtime_database_path": "/tmp/terra-native-017/save-reopen-private/after.db",
+    "sha256": "c2424a91f03ab7a565ae30ffd60ecdd6865d21adc651b74d68a83d4339d7e280",
+    "runtime_profile_path": "/tmp/terra-native-017/save-reopen-private/after-profile.json",
+    "profile_sha256": "f7bf461b6a39b81ba44f846a16226441d0eae98fa43da6dfe76e2fd3d6839d9a",
+    "generation": 85,
+    "region_count": 56,
+    "identity_sha256": "afbb1ba15987be48c13757711d643e7ed309df2ef9212d2f0f20cf445507e8b0",
+    "catalog_sha256": "d44cd17d8e3569eb4123d53ba177e81bfc7709e5e8b8f55379f0985737baf55d",
+    "player_id": 1,
+    "inventory_sha256": "d617853e08bf4a6b7c89553f1bffa8db6553ce2ff4740b6c4c590a4c0d2f57aa",
+    "personal_money_minor": 25000,
+    "avatar_unit": 1000050,
+    "avatar_owner": 1,
+    "avatar_name": "Playtest 017",
+    "profile_character": {
+      "name": "Playtest 017",
+      "body_style": 0,
+      "skin": 2,
+      "hair": 1,
+      "outfit": 1
+    },
+    "clock": {
+      "paused": false,
+      "time_scale": 60.0
+    },
+    "position": {
+      "latitude": 48.13706183797418,
+      "longitude": 11.575000000000003,
+      "altitude_m": 167.29891052246094
+    }
+  },
+  "checks": {
+    "identity_sha256": true,
+    "catalog_sha256": true,
+    "player_id": true,
+    "inventory_sha256": true,
+    "personal_money_minor": true,
+    "avatar_unit": true,
+    "avatar_owner": true,
+    "avatar_name": true,
+    "profile_character": true,
+    "clock": true,
+    "generation_non_decreasing": true
+  },
+  "scope": "Private SQLite backups after two ordered normal save-and-quit processes. Stable player/inventory/money/identity/appearance/clock subset compared; advancing time, needs, environment and generations are allowed. Raw private state excluded from deliverables."
+}

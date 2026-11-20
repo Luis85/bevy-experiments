@@ -1,0 +1,963 @@
+{
+  "scope": "Focused implementation/review evidence. Full frozen release acceptance is the root release gate record.",
+  "command": "cargo test --offline --locked -p terra-sandbox --lib --test navigation_geometry --test navigation_clusters --test autonomous_driving --test traffic --test traffic_recovery --test company_career -- --nocapture",
+  "exit_code": 0,
+  "test_target_counts": [
+    {
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "passed_tests": 63,
+  "failed_tests": 0,
+  "ignored_tests": 0,
+  "recorded_source_sha256": {
+    "crates/terra-sandbox/src/living/autonomy.rs": "6ea99cba961a0d2b841589c5329ea8bcc4e1a36f5bd938480bb990d4405c549d",
+    "crates/terra-sandbox/src/living/contacts.rs": "cb8f03ead4edc9d6ef51f125d2b66d0b3c57d10968e8a536fc92a6d4516ebc69",
+    "crates/terra-sandbox/tests/navigation_geometry.rs": "a5fb9b86967418c82b3ee1a3d5f48942a194e26c840f94d1508be68588576026"
+  },
+  "log_sha256": "32b884bdb153082daf1cda564b336ea00f083a9db6a8ec177acb14f48daec77f",
+  "reports": {
+    "NOVICE_PASSENGER_CAREER_REPORT": [
+      {
+        "additional_owner_deposits_minor_credits": 0,
+        "bond_posted_minor_credits": 4500,
+        "bond_returned_minor_credits": 4437,
+        "cash_and_escrow_conserved_minor_credits": 1365000,
+        "deliveries": 65,
+        "ecology_clock_seconds": 0,
+        "final_company_minor_credits": 84089,
+        "final_issuer_minor_credits": 923481,
+        "final_owner_minor_credits": 10359,
+        "fuel_cash_net_of_return_refund_minor_credits": 238,
+        "fuel_consumed_litres": 1.5821795951006639,
+        "gross_public_fares_minor_credits": 82160,
+        "initial_issuer_minor_credits": 1000000,
+        "initial_owner_minor_credits": 25000,
+        "limits": [
+          "finite one-hour public-service scenario",
+          "repeated journeys circulate existing passenger queues",
+          "not indefinite treasury sustainability",
+          "not a human playtest or every terrain layout"
+        ],
+        "net_after_all_known_cash_costs_minor_credits": 69448,
+        "owner_deposits_minor_credits": 10000,
+        "passengers_conserved": 160,
+        "payroll_minor_credits": 7071,
+        "persisted_accounting": {
+          "capital": {
+            "payments": 0,
+            "receipts": 0
+          },
+          "cash": 84089,
+          "cash_result_after_known_owner_costs": 69929,
+          "cash_result_before_financing": 74089,
+          "coverage": "since_registration",
+          "expected_cash": 84089,
+          "financing": {
+            "payments": 0,
+            "receipts": 10000
+          },
+          "known_owner_funding": 14160,
+          "monetary_entry_count": 7151,
+          "opening_cash": 0,
+          "opening_payroll": 0,
+          "opening_revenue": 0,
+          "operating": {
+            "payments": 8071,
+            "receipts": 82160
+          },
+          "owner_paid_capital": 2000,
+          "owner_paid_operating": 2160,
+          "personal_vehicle_used": true,
+          "recent_entries": [
+            {
+              "amount": 1,
+              "cash_after": 82887,
+              "category": "payroll",
+              "elapsed_seconds": 3571.75,
+              "sequence": 7088
+            },
+            {
+              "amount": 1,
+              "cash_after": 82886,
+              "category": "payroll",
+              "elapsed_seconds": 3572.25,
+              "sequence": 7089
+            },
+            {
+              "amount": 1,
+              "cash_after": 82885,
+              "category": "payroll",
+              "elapsed_seconds": 3572.75,
+              "sequence": 7090
+            },
+            {
+              "amount": 1,
+              "cash_after": 82884,
+              "category": "payroll",
+              "elapsed_seconds": 3573.25,
+              "sequence": 7091
+            },
+            {
+              "amount": 1,
+              "cash_after": 82883,
+              "category": "payroll",
+              "elapsed_seconds": 3573.75,
+              "sequence": 7092
+            },
+            {
+              "amount": 1,
+              "cash_after": 82882,
+              "category": "payroll",
+              "elapsed_seconds": 3574.25,
+              "sequence": 7093
+            },
+            {
+              "amount": 1,
+              "cash_after": 82881,
+              "category": "payroll",
+              "elapsed_seconds": 3574.75,
+              "sequence": 7094
+            },
+            {
+              "amount": 1,
+              "cash_after": 82880,
+              "category": "payroll",
+              "elapsed_seconds": 3575.25,
+              "sequence": 7095
+            },
+            {
+              "amount": 1,
+              "cash_after": 82879,
+              "category": "payroll",
+              "elapsed_seconds": 3575.75,
+              "sequence": 7096
+            },
+            {
+              "amount": 1,
+              "cash_after": 82878,
+              "category": "payroll",
+              "elapsed_seconds": 3576.25,
+              "sequence": 7097
+            },
+            {
+              "amount": 1,
+              "cash_after": 82877,
+              "category": "payroll",
+              "elapsed_seconds": 3576.75,
+              "sequence": 7098
+            },
+            {
+              "amount": 1,
+              "cash_after": 82876,
+              "category": "payroll",
+              "elapsed_seconds": 3577.25,
+              "sequence": 7099
+            },
+            {
+              "amount": 1,
+              "cash_after": 82875,
+              "category": "payroll",
+              "elapsed_seconds": 3577.75,
+              "sequence": 7100
+            },
+            {
+              "amount": 1,
+              "cash_after": 82874,
+              "category": "payroll",
+              "elapsed_seconds": 3578.25,
+              "sequence": 7101
+            },
+            {
+              "amount": 1,
+              "cash_after": 82873,
+              "category": "payroll",
+              "elapsed_seconds": 3578.75,
+              "sequence": 7102
+            },
+            {
+              "amount": 1,
+              "cash_after": 82872,
+              "category": "payroll",
+              "elapsed_seconds": 3579.25,
+              "sequence": 7103
+            },
+            {
+              "amount": 1,
+              "cash_after": 82871,
+              "category": "payroll",
+              "elapsed_seconds": 3579.75,
+              "sequence": 7104
+            },
+            {
+              "amount": 1,
+              "cash_after": 82870,
+              "category": "payroll",
+              "elapsed_seconds": 3580.25,
+              "sequence": 7105
+            },
+            {
+              "amount": 1,
+              "cash_after": 82869,
+              "category": "payroll",
+              "elapsed_seconds": 3580.75,
+              "sequence": 7106
+            },
+            {
+              "amount": 1,
+              "cash_after": 82868,
+              "category": "payroll",
+              "elapsed_seconds": 3581.25,
+              "sequence": 7107
+            },
+            {
+              "amount": 1,
+              "cash_after": 82867,
+              "category": "payroll",
+              "elapsed_seconds": 3581.75,
+              "sequence": 7108
+            },
+            {
+              "amount": 1,
+              "cash_after": 82866,
+              "category": "payroll",
+              "elapsed_seconds": 3582.25,
+              "sequence": 7109
+            },
+            {
+              "amount": 1,
+              "cash_after": 82865,
+              "category": "payroll",
+              "elapsed_seconds": 3582.75,
+              "sequence": 7110
+            },
+            {
+              "amount": 1,
+              "cash_after": 82864,
+              "category": "payroll",
+              "elapsed_seconds": 3583.25,
+              "sequence": 7111
+            },
+            {
+              "amount": 1,
+              "cash_after": 82863,
+              "category": "payroll",
+              "elapsed_seconds": 3583.75,
+              "sequence": 7112
+            },
+            {
+              "amount": 1,
+              "cash_after": 82862,
+              "category": "payroll",
+              "elapsed_seconds": 3584.25,
+              "sequence": 7113
+            },
+            {
+              "amount": 1,
+              "cash_after": 82861,
+              "category": "payroll",
+              "elapsed_seconds": 3584.75,
+              "sequence": 7114
+            },
+            {
+              "amount": 1,
+              "cash_after": 82860,
+              "category": "payroll",
+              "elapsed_seconds": 3585.25,
+              "sequence": 7115
+            },
+            {
+              "amount": 1,
+              "cash_after": 82859,
+              "category": "payroll",
+              "elapsed_seconds": 3585.75,
+              "sequence": 7116
+            },
+            {
+              "amount": 1,
+              "cash_after": 82858,
+              "category": "payroll",
+              "elapsed_seconds": 3586.25,
+              "sequence": 7117
+            },
+            {
+              "amount": 1,
+              "cash_after": 82857,
+              "category": "payroll",
+              "elapsed_seconds": 3586.75,
+              "sequence": 7118
+            },
+            {
+              "amount": 1,
+              "cash_after": 82856,
+              "category": "payroll",
+              "elapsed_seconds": 3587.25,
+              "sequence": 7119
+            },
+            {
+              "amount": 1,
+              "cash_after": 82855,
+              "category": "payroll",
+              "elapsed_seconds": 3587.75,
+              "sequence": 7120
+            },
+            {
+              "amount": 1,
+              "cash_after": 82854,
+              "category": "payroll",
+              "elapsed_seconds": 3588.25,
+              "sequence": 7121
+            },
+            {
+              "amount": 1,
+              "cash_after": 82853,
+              "category": "payroll",
+              "elapsed_seconds": 3588.75,
+              "sequence": 7122
+            },
+            {
+              "amount": 1,
+              "cash_after": 82852,
+              "category": "payroll",
+              "elapsed_seconds": 3589.25,
+              "sequence": 7123
+            },
+            {
+              "amount": 1,
+              "cash_after": 82851,
+              "category": "payroll",
+              "elapsed_seconds": 3589.75,
+              "sequence": 7124
+            },
+            {
+              "amount": 1,
+              "cash_after": 82850,
+              "category": "payroll",
+              "elapsed_seconds": 3590.25,
+              "sequence": 7125
+            },
+            {
+              "amount": 1,
+              "cash_after": 82849,
+              "category": "payroll",
+              "elapsed_seconds": 3590.75,
+              "sequence": 7126
+            },
+            {
+              "amount": 1,
+              "cash_after": 82848,
+              "category": "payroll",
+              "elapsed_seconds": 3591.25,
+              "sequence": 7127
+            },
+            {
+              "amount": 1,
+              "cash_after": 82847,
+              "category": "payroll",
+              "elapsed_seconds": 3591.75,
+              "sequence": 7128
+            },
+            {
+              "amount": 1,
+              "cash_after": 82846,
+              "category": "payroll",
+              "elapsed_seconds": 3592.25,
+              "sequence": 7129
+            },
+            {
+              "amount": 1,
+              "cash_after": 82845,
+              "category": "payroll",
+              "elapsed_seconds": 3592.75,
+              "sequence": 7130
+            },
+            {
+              "amount": 1,
+              "cash_after": 82844,
+              "category": "payroll",
+              "elapsed_seconds": 3593.25,
+              "sequence": 7131
+            },
+            {
+              "amount": 1,
+              "cash_after": 82843,
+              "category": "payroll",
+              "elapsed_seconds": 3593.75,
+              "sequence": 7132
+            },
+            {
+              "amount": 1,
+              "cash_after": 82842,
+              "category": "payroll",
+              "elapsed_seconds": 3594.25,
+              "sequence": 7133
+            },
+            {
+              "amount": 1,
+              "cash_after": 82841,
+              "category": "payroll",
+              "elapsed_seconds": 3594.75,
+              "sequence": 7134
+            },
+            {
+              "amount": 1,
+              "cash_after": 82840,
+              "category": "payroll",
+              "elapsed_seconds": 3595.25,
+              "sequence": 7135
+            },
+            {
+              "amount": 1,
+              "cash_after": 82839,
+              "category": "payroll",
+              "elapsed_seconds": 3595.75,
+              "sequence": 7136
+            },
+            {
+              "amount": 1,
+              "cash_after": 82838,
+              "category": "payroll",
+              "elapsed_seconds": 3596.25,
+              "sequence": 7137
+            },
+            {
+              "amount": 1,
+              "cash_after": 82837,
+              "category": "payroll",
+              "elapsed_seconds": 3596.75,
+              "sequence": 7138
+            },
+            {
+              "amount": 1,
+              "cash_after": 82836,
+              "category": "payroll",
+              "elapsed_seconds": 3597.25,
+              "sequence": 7139
+            },
+            {
+              "amount": 1,
+              "cash_after": 82835,
+              "category": "payroll",
+              "elapsed_seconds": 3597.75,
+              "sequence": 7140
+            },
+            {
+              "amount": 1,
+              "cash_after": 82834,
+              "category": "payroll",
+              "elapsed_seconds": 3598.25,
+              "sequence": 7141
+            },
+            {
+              "amount": 1,
+              "cash_after": 82833,
+              "category": "payroll",
+              "elapsed_seconds": 3598.75,
+              "sequence": 7142
+            },
+            {
+              "amount": 1,
+              "cash_after": 82832,
+              "category": "payroll",
+              "elapsed_seconds": 3599.25,
+              "sequence": 7143
+            },
+            {
+              "amount": 1,
+              "cash_after": 82831,
+              "category": "payroll",
+              "elapsed_seconds": 3599.75,
+              "sequence": 7144
+            },
+            {
+              "amount": 1,
+              "cash_after": 82830,
+              "category": "payroll",
+              "elapsed_seconds": 3600.25,
+              "sequence": 7145
+            },
+            {
+              "amount": 1,
+              "cash_after": 82829,
+              "category": "payroll",
+              "elapsed_seconds": 3600.75,
+              "sequence": 7146
+            },
+            {
+              "amount": 1,
+              "cash_after": 82828,
+              "category": "payroll",
+              "elapsed_seconds": 3601.25,
+              "sequence": 7147
+            },
+            {
+              "amount": 1,
+              "cash_after": 82827,
+              "category": "payroll",
+              "elapsed_seconds": 3601.75,
+              "sequence": 7148
+            },
+            {
+              "amount": 1,
+              "cash_after": 82826,
+              "category": "payroll",
+              "elapsed_seconds": 3602.25,
+              "sequence": 7149
+            },
+            {
+              "amount": 1,
+              "cash_after": 82825,
+              "category": "payroll",
+              "elapsed_seconds": 3602.75,
+              "sequence": 7150
+            },
+            {
+              "amount": 1264,
+              "cash_after": 84089,
+              "category": "public_fares",
+              "elapsed_seconds": 3603.0,
+              "sequence": 7151
+            }
+          ],
+          "reconciled": true,
+          "recorded_since_elapsed_seconds": 0.0,
+          "totals": {
+            "owner_deposit": 10000,
+            "owner_paid_lease": 2160,
+            "owner_paid_registration": 2000,
+            "payroll": 7071,
+            "public_fares": 82160,
+            "recruitment": 1000
+          },
+          "unpriced_stock_in_units": 0,
+          "unpriced_stock_out_units": 0
+        },
+        "recruitment_minor_credits": 1000,
+        "regional_accounting_resume_exact": true,
+        "registration_minor_credits": 2000,
+        "rental_damage_minor_credits": 63,
+        "rental_lease_minor_credits": 2340,
+        "rental_renewals": 12,
+        "road_holds_waited_10_seconds_then_resumed": [
+          516.0,
+          2564.75,
+          2590.0,
+          2615.25,
+          2640.5
+        ],
+        "save_resume_checkpoints": [
+          {
+            "company_cash_minor_credits": 19202,
+            "deliveries": 9,
+            "issuer_cash_minor_credits": 992400,
+            "operating_net_minor_credits": 9202,
+            "owner_wallet_minor_credits": 6460,
+            "physical_seconds": 600.0
+          },
+          {
+            "company_cash_minor_credits": 33176,
+            "deliveries": 21,
+            "issuer_cash_minor_credits": 977592,
+            "operating_net_minor_credits": 23176,
+            "owner_wallet_minor_credits": 6100,
+            "physical_seconds": 1200.0
+          },
+          {
+            "company_cash_minor_credits": 45885,
+            "deliveries": 32,
+            "issuer_cash_minor_credits": 964048,
+            "operating_net_minor_credits": 35885,
+            "owner_wallet_minor_credits": 5740,
+            "physical_seconds": 1800.0
+          },
+          {
+            "company_cash_minor_credits": 57330,
+            "deliveries": 42,
+            "issuer_cash_minor_credits": 951768,
+            "operating_net_minor_credits": 47330,
+            "owner_wallet_minor_credits": 5380,
+            "physical_seconds": 2400.0
+          },
+          {
+            "company_cash_minor_credits": 70122,
+            "deliveries": 53,
+            "issuer_cash_minor_credits": 938224,
+            "operating_net_minor_credits": 60122,
+            "owner_wallet_minor_credits": 5020,
+            "physical_seconds": 3000.0
+          },
+          {
+            "company_cash_minor_credits": 82831,
+            "deliveries": 64,
+            "issuer_cash_minor_credits": 924680,
+            "operating_net_minor_credits": 72831,
+            "owner_wallet_minor_credits": 4660,
+            "physical_seconds": 3600.0
+          }
+        ],
+        "scenario": "seeded_settlement_compact_rental_passenger_company",
+        "service_physical_seconds": 3600,
+        "total_physical_seconds_including_completion_and_return": 3649.5,
+        "unpriced": [
+          "owner planning and management time",
+          "owner living costs outside the frozen ecology clock"
+        ],
+        "unpriced_starter_vehicle_unused": true,
+        "vehicle_distance_metres": 15726.1194160505
+      }
+    ],
+    "NAVIGATION_CLUSTER_REPORT": [
+      {
+        "case": "three_parked_bodies",
+        "distance_travelled_m": 75.48865786078075,
+        "elapsed_limit_seconds": 120,
+        "elapsed_physical_seconds": 14.5,
+        "exact_resumed_steps": 143,
+        "farthest_lateral_distance_m": 18.65694611943519,
+        "fixture_source_query_ceiling_per_step": 16384,
+        "max_heading_delta_deg": 3.367809295654297,
+        "max_path_waypoints": 3,
+        "max_source_queries_per_step": 5760,
+        "max_step_distance_m": 0.80000000156063,
+        "obstacle_count": 3,
+        "physical_step_seconds": 0.1,
+        "physical_steps": 145,
+        "remaining_goal_distance_m": 0.26763031676563404,
+        "scope": "Authored flat SDK fixture; no world coverage, hardware performance, company profitability or general traffic-flow guarantee.",
+        "source_queries": 10512,
+        "verification": {
+          "body_sweeps_clear": true,
+          "bounded_steps_and_steering": true,
+          "complete_state_valid": true,
+          "exact_save_resume": true,
+          "goods_and_money_conserved": true,
+          "parked_bodies_unchanged": true,
+          "path_bound_retained": true,
+          "physical_arrival": true,
+          "source_work_bounded": true,
+          "supported_complete_envelopes": true
+        }
+      }
+    ],
+    "NAVIGATION_GEOMETRY_REPORT": [
+      {
+        "arrived": true,
+        "case": "two_moving_crossings",
+        "crossings_physically_cleared": 2,
+        "exact_resume": true,
+        "goods_money_preserved": true,
+        "limits": {
+          "driver_max_heading_delta_deg": 16.05,
+          "driver_max_step_m": 0.801,
+          "extra_corridor_admissions_per_vehicle_update": 12,
+          "fixture_source_queries_per_update": 32768,
+          "max_path_waypoints": 129,
+          "physical_step_seconds": 0.1
+        },
+        "metrics": {
+          "driver_max_heading_delta_deg": 3.6617393561755307e-09,
+          "driver_max_step_m": 0.8000000013572631,
+          "driver_travelled_m": 59.73550983290629,
+          "elapsed_physical_seconds": 10.100000000000001,
+          "exact_resumed_steps": 90,
+          "max_path_waypoints": 1,
+          "max_source_queries_per_update": 132,
+          "physical_steps": 101,
+          "source_queries": 6216
+        },
+        "physical_seconds": 10.100000000000001,
+        "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+        "supported_envelopes": true,
+        "swept_contacts_clear": true,
+        "verification": {
+          "body_sweeps_clear": true,
+          "bounded_motion": true,
+          "complete_state_valid": true,
+          "exact_save_resume": true,
+          "goods_and_money_conserved": true,
+          "physical_arrival": true,
+          "source_work_bounded": true,
+          "supported_complete_envelopes": true
+        }
+      },
+      {
+        "arrived": true,
+        "case": "parked_body_narrow_corridor",
+        "exact_resume": true,
+        "goods_money_preserved": true,
+        "limits": {
+          "driver_max_heading_delta_deg": 16.05,
+          "driver_max_step_m": 0.801,
+          "extra_corridor_admissions_per_vehicle_update": 12,
+          "fixture_source_queries_per_update": 32768,
+          "max_path_waypoints": 129,
+          "physical_step_seconds": 0.1
+        },
+        "max_lateral_m": 3.6000097206732913,
+        "max_source_queries_per_step": 2538,
+        "metrics": {
+          "driver_max_heading_delta_deg": 2.510385513305664,
+          "driver_max_step_m": 0.8000000017710824,
+          "driver_travelled_m": 60.51131080872048,
+          "elapsed_physical_seconds": 17.400000000000002,
+          "exact_resumed_steps": 172,
+          "max_path_waypoints": 3,
+          "max_source_queries_per_update": 2538,
+          "physical_steps": 174,
+          "source_queries": 8661
+        },
+        "physical_seconds": 17.400000000000002,
+        "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+        "source_queries": 8661,
+        "support_width_m": 9.5,
+        "supported_envelopes": true,
+        "swept_contacts_clear": true,
+        "travelled_m": 60.51131080872048,
+        "verification": {
+          "body_sweeps_clear": true,
+          "bounded_motion": true,
+          "complete_state_valid": true,
+          "exact_save_resume": true,
+          "goods_and_money_conserved": true,
+          "physical_arrival": true,
+          "source_work_bounded": true,
+          "supported_complete_envelopes": true
+        }
+      },
+      {
+        "arrived": true,
+        "blocked_seconds": 12.0,
+        "case": "blocked_narrow_junction",
+        "exact_resume": true,
+        "goods_money_preserved": true,
+        "limits": {
+          "driver_max_heading_delta_deg": 16.05,
+          "driver_max_step_m": 0.801,
+          "extra_corridor_admissions_per_vehicle_update": 12,
+          "fixture_source_queries_per_update": 32768,
+          "max_path_waypoints": 129,
+          "physical_step_seconds": 0.1
+        },
+        "metrics": {
+          "driver_max_heading_delta_deg": 2.7395427227020264,
+          "driver_max_step_m": 0.8000000018217692,
+          "driver_travelled_m": 59.76269716265106,
+          "elapsed_physical_seconds": 20.5,
+          "exact_resumed_steps": 85,
+          "max_path_waypoints": 4,
+          "max_source_queries_per_update": 88,
+          "physical_steps": 205,
+          "source_queries": 10598
+        },
+        "queue_crossed_only_after_exit_available": true,
+        "road_width_m": 9.5,
+        "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+        "seconds_after_physical_clear_order": 8.5,
+        "supported_envelopes": true,
+        "swept_contacts_clear": true,
+        "unrelated_exit_completed_while_blocked": true,
+        "verification": {
+          "body_sweeps_clear": true,
+          "bounded_motion": true,
+          "complete_state_valid": true,
+          "exact_save_resume": true,
+          "goods_and_money_conserved": true,
+          "physical_arrival": true,
+          "source_work_bounded": true,
+          "supported_complete_envelopes": true
+        }
+      },
+      {
+        "arrived": true,
+        "case": "unavailable_reconnection",
+        "exact_resume": true,
+        "goods_money_preserved": true,
+        "limits": {
+          "driver_max_heading_delta_deg": 16.05,
+          "driver_max_step_m": 0.801,
+          "extra_corridor_admissions_per_vehicle_update": 12,
+          "fixture_source_queries_per_update": 32768,
+          "max_path_waypoints": 129,
+          "physical_step_seconds": 0.1
+        },
+        "metrics": {
+          "driver_max_heading_delta_deg": 4.5421600341796875,
+          "driver_max_step_m": 0.8000000011353536,
+          "driver_travelled_m": 101.27674545120027,
+          "elapsed_physical_seconds": 21.8,
+          "exact_resumed_steps": 198,
+          "max_path_waypoints": 5,
+          "max_source_queries_per_update": 7700,
+          "physical_steps": 218,
+          "source_queries": 137416
+        },
+        "partial_proposals_rejected": true,
+        "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+        "seconds_after_restoration": 19.8,
+        "supported_envelopes": true,
+        "swept_contacts_clear": true,
+        "unavailable_strip_m": [
+          -38,
+          -32
+        ],
+        "unsupported_seconds": 2.0,
+        "verification": {
+          "body_sweeps_clear": true,
+          "bounded_motion": true,
+          "complete_state_valid": true,
+          "exact_save_resume": true,
+          "goods_and_money_conserved": true,
+          "physical_arrival": true,
+          "source_work_bounded": true,
+          "supported_complete_envelopes": true
+        }
+      },
+      {
+        "arrived": true,
+        "case": "flank_unavailable_then_restored",
+        "exact_resume": true,
+        "goods_money_preserved": true,
+        "limits": {
+          "driver_max_heading_delta_deg": 16.05,
+          "driver_max_step_m": 0.801,
+          "extra_corridor_admissions_per_vehicle_update": 12,
+          "fixture_source_queries_per_update": 32768,
+          "max_path_waypoints": 129,
+          "physical_step_seconds": 0.1
+        },
+        "metrics": {
+          "driver_max_heading_delta_deg": 2.458446502685547,
+          "driver_max_step_m": 0.8000000017780948,
+          "driver_travelled_m": 1482.4198489090313,
+          "elapsed_physical_seconds": 619.7,
+          "exact_resumed_steps": 197,
+          "max_path_waypoints": 4,
+          "max_source_queries_per_update": 3362,
+          "physical_steps": 6197,
+          "source_queries": 179235
+        },
+        "restored_width_m": 9.5,
+        "scope": "Bounded authored flat SDK geometry, 100 ms physical steps and frozen calendar. No general road-flow, world-coverage, hardware-capacity or profitability claim.",
+        "seconds_after_restoration": 19.700000000000003,
+        "supported_envelopes": true,
+        "swept_contacts_clear": true,
+        "unavailable_width_m": 5.0,
+        "unsupported_seconds": 600,
+        "verification": {
+          "body_sweeps_clear": true,
+          "bounded_motion": true,
+          "complete_state_valid": true,
+          "exact_save_resume": true,
+          "goods_and_money_conserved": true,
+          "physical_arrival": true,
+          "source_work_bounded": true,
+          "supported_complete_envelopes": true
+        }
+      }
+    ],
+    "TRAFFIC_RECOVERY_REPORT": [
+      {
+        "every_step_conservation_exact": true,
+        "fixture": "rear-trap",
+        "goods_by_item": {
+          "berries": 12,
+          "bread": 40,
+          "cooked_fish": 6,
+          "fiber": 16,
+          "fish": 8,
+          "fishing_rod": 4,
+          "flour": 50,
+          "iron_tool": 2,
+          "planks": 40,
+          "stone": 100,
+          "stone_blocks": 20,
+          "tool": 8,
+          "water": 148,
+          "wheat": 60,
+          "wheat_seed": 136,
+          "wood": 120
+        },
+        "goods_total": 770,
+        "initial_physical_seconds": 300.0,
+        "money_total_minor_credits": 150000,
+        "original_delivery": {
+          "amount": 12,
+          "id": 1000060,
+          "item": "wood"
+        },
+        "replay_window_seconds": 120,
+        "return_elapsed_physical_seconds": 334.0,
+        "return_physical_seconds": 34.0,
+        "save_resume_exact": true,
+        "source_return_transfer_exact": true
+      },
+      {
+        "every_step_conservation_exact": true,
+        "fixture": "occupied-exit",
+        "goods_by_item": {
+          "berries": 12,
+          "bread": 40,
+          "cooked_fish": 6,
+          "fiber": 16,
+          "fish": 8,
+          "fishing_rod": 4,
+          "flour": 50,
+          "iron_tool": 2,
+          "planks": 40,
+          "stone": 100,
+          "stone_blocks": 20,
+          "tool": 8,
+          "water": 148,
+          "wheat": 60,
+          "wheat_seed": 136,
+          "wood": 120
+        },
+        "goods_total": 770,
+        "initial_physical_seconds": 420.0,
+        "money_total_minor_credits": 150000,
+        "original_delivery": {
+          "amount": 12,
+          "id": 1000060,
+          "item": "wood"
+        },
+        "replay_window_seconds": 120,
+        "return_elapsed_physical_seconds": 469.5,
+        "return_physical_seconds": 49.5,
+        "save_resume_exact": true,
+        "source_return_transfer_exact": true
+      }
+    ]
+  }
+}

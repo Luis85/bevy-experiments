@@ -1,0 +1,65 @@
+{
+  "release": "0.3.0",
+  "validation_date": "2026-10-26",
+  "toolchain": {
+    "rust": "1.99.1",
+    "bevy": "0.20.0",
+    "platform": "Linux / X11 / Mesa software Vulkan"
+  },
+  "distinct_passing_tests": {
+    "core": 12,
+    "history": 13,
+    "cli": 4,
+    "stream": 20,
+    "sandbox": 77,
+    "network": 41,
+    "bevy_library_with_rendering": 33,
+    "bevy_integration": 11,
+    "native_demo": 10
+  },
+  "total_distinct_passing_tests": 221,
+  "independent_process_smoke_groups_passed": 6,
+  "headless_examples_passed": [
+    "headless",
+    "custom_provider"
+  ],
+  "procedural_fixture": {
+    "coordinates": [
+      48.137,
+      11.575
+    ],
+    "seed": 42,
+    "chunks": 49,
+    "heightfield_edge_samples": 65,
+    "real_simulation_seconds": 180,
+    "fixed_hz": 20,
+    "calendar_scale": 60,
+    "bodies": 107,
+    "managed_animals": 64,
+    "ecology_resources": 180,
+    "funded_contracts": 16,
+    "production_cycles": 627,
+    "physical_deliveries": 6,
+    "route_replans": 2,
+    "npc_purchases": 42,
+    "wages_paid": 0,
+    "last_simulation_error": null
+  },
+  "source_mesh_budget": {
+    "measured_vertices": 1650487,
+    "asserted_limit": 2000000,
+    "near_middle_far_chunks": [
+      6,
+      20,
+      23
+    ],
+    "excludes": "separate actor, mutable overlay and nearby detail meshes"
+  },
+  "limitations": [
+    "software rendering is not a gaming hardware benchmark",
+    "bounded regional in-memory gameplay",
+    "no production public-Internet or distributed MMO load test",
+    "default source, wildlife, resources and economy are authored content"
+  ],
+  "wire_protocol": 2
+}

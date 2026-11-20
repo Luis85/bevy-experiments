@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "scripts",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "started_utc": "2026-10-30T11:25:50.357411+00:00",
+  "finished_utc": "2026-10-30T11:25:59.586293+00:00",
+  "seconds": 9.228887507000763,
+  "exit_code": 0,
+  "log": "reliability-python-initial.log",
+  "log_sha256": "3aeba3d17271d97ebb83edfcb48d646cf7d27f102ac68e2350588e66a17a1f45",
+  "scope": "Focused Python tooling; no Rust, Windows host, native-window or device qualification."
+}

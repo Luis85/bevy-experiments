@@ -113,8 +113,23 @@ pub struct FeatureReference {
 /// refreshed independently. Keys in `feature_edits` are persistent tombstones.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SandboxState {
+    /// Cold regional records reserve world-wide capacity. This private marker
+    /// can only be removed by reassembling the regional world, never by saving
+    /// an otherwise structurally valid partial working set as a complete save.
+    #[serde(default, skip_serializing_if = "crate::DormantReservations::is_empty")]
+    pub(crate) dormant: crate::DormantReservations,
+    /// Trusted host session policy. Offline ownership stays durable; its bodies
+    /// stop advancing and no longer pin their surrounding geographic pages.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub(crate) dormant_players: BTreeSet<u64>,
+    #[serde(default)]
+    pub ecology: crate::EcologyWorld,
+    #[serde(default)]
+    pub settlements: crate::SettlementWorld,
     #[serde(default)]
     pub living: crate::LivingWorld,
+    #[serde(default)]
+    pub transport: crate::TransportWorld,
     pub version: u32,
     pub tick_seconds: f64,
     pub next_id: u64,
@@ -132,8 +147,13 @@ pub struct SandboxState {
 impl Default for SandboxState {
     fn default() -> Self {
         Self {
+            dormant: crate::DormantReservations::default(),
+            dormant_players: BTreeSet::new(),
             version: SAVE_VERSION,
+            ecology: crate::EcologyWorld::default(),
+            settlements: crate::SettlementWorld::default(),
             living: crate::LivingWorld::default(),
+            transport: crate::TransportWorld::default(),
             tick_seconds: 0.0,
             next_id: 1,
             players: BTreeMap::new(),
@@ -151,7 +171,13 @@ impl Default for SandboxState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SandboxView {
     #[serde(default)]
+    pub ecology: crate::EcologyView,
+    #[serde(default)]
+    pub settlements: crate::SettlementView,
+    #[serde(default)]
     pub living: crate::LivingView,
+    #[serde(default)]
+    pub transport: crate::TransportView,
     pub version: u32,
     pub tick_seconds: f64,
     pub player: PlayerState,
@@ -225,8 +251,12 @@ impl SandboxState {
         Ok(())
     }
 
-    /// Only a trusted simulation/server calls this after movement validation.
-    /// Player commands cannot change their own authoritative position.
+    /// Trusted host placement for validated movement, provisioning or restore.
+    /// Dormant owners are deliberately allowed so the host can install their
+    /// authoritative position without resuming the session. This does not admit
+    /// player input or change velocity; use `set_controlled_motion` for manual
+    /// input, which requires an active session and validated movement.
+    /// Player commands cannot supply their own authoritative position.
     pub fn set_player_position(
         &mut self,
         id: u64,
@@ -237,10 +267,10 @@ impl SandboxState {
             .get_mut(&id)
             .ok_or(SandboxError::PlayerMissing)?
             .position = position;
-        if let Some(account) = self.living.accounts.get(&id)
-            && let Some(unit) = self.living.units.get_mut(&account.active_unit)
-        {
-            unit.position = position;
+        if let Some(account) = self.living.accounts.get(&id) {
+            if let Some(unit) = self.living.units.get_mut(&account.active_unit) {
+                unit.position = position;
+            }
         }
         Ok(())
     }
@@ -256,7 +286,7 @@ impl SandboxState {
                 continue;
             };
             if !self.world_features.contains_key(&feature.id)
-                && self.world_features.len() < MAX_ENTITIES
+                && self.world_feature_count() < MAX_ENTITIES
             {
                 let radius_m = feature
                     .points
@@ -276,7 +306,7 @@ impl SandboxState {
                 && self.world_features.contains_key(&feature.id)
                 && !self.feature_edits.contains(&feature.id)
                 && !self.resource_nodes.contains_key(&feature.id)
-                && self.resource_nodes.len() < MAX_ENTITIES
+                && self.resource_node_count() < MAX_ENTITIES
             {
                 self.resource_nodes.insert(
                     feature.id.clone(),
@@ -317,7 +347,7 @@ impl SandboxState {
         if self.resource_nodes.contains_key(&id) {
             return Err(SandboxError::Invalid("resource already exists".into()));
         }
-        if self.resource_nodes.len() >= MAX_ENTITIES {
+        if self.resource_node_count() >= MAX_ENTITIES {
             return Err(SandboxError::Capacity);
         }
         self.resource_nodes.insert(
@@ -381,6 +411,32 @@ impl SandboxState {
     }
 
     pub fn snapshot_for(&self, player_id: u64, radius_m: f64) -> Result<SandboxView, SandboxError> {
+        self.snapshot_selected(player_id, radius_m, None)
+    }
+
+    /// Equivalent to `snapshot_for`, reusing one immutable index across peers.
+    /// An index borrowed from another state is rejected rather than silently
+    /// selecting a stale or unrelated region.
+    pub fn snapshot_for_indexed(
+        &self,
+        player_id: u64,
+        radius_m: f64,
+        index: &crate::SandboxInterestIndex<'_>,
+    ) -> Result<SandboxView, SandboxError> {
+        if !std::ptr::eq(self, index.state) {
+            return Err(SandboxError::Invalid(
+                "interest index world mismatch".into(),
+            ));
+        }
+        self.snapshot_selected(player_id, radius_m, Some(index))
+    }
+
+    fn snapshot_selected(
+        &self,
+        player_id: u64,
+        radius_m: f64,
+        index: Option<&crate::SandboxInterestIndex<'_>>,
+    ) -> Result<SandboxView, SandboxError> {
         let player = self
             .players
             .get(&player_id)
@@ -392,30 +448,90 @@ impl SandboxState {
         let radius = radius_m.min(5_000.0);
         let near = |point| player.position.surface_distance_m(point) <= radius;
         let mut truncated = false;
-        let plots = take_bounded(
-            self.plots.values().filter(|p| near(p.center)),
-            &mut truncated,
-        );
-        let structures = take_bounded(
-            self.structures.values().filter(|s| near(s.position)),
-            &mut truncated,
-        );
-        let resource_nodes = take_bounded(
-            self.resource_nodes.values().filter(|n| near(n.position)),
-            &mut truncated,
-        );
-        let farms = take_bounded(
-            self.farms.values().filter(|f| near(f.position)),
-            &mut truncated,
-        );
-        let feature_edits = take_bounded(
-            self.feature_edits.iter().filter(|id| {
-                self.world_features
-                    .get(*id)
-                    .is_some_and(|f| near(f.position))
-            }),
-            &mut truncated,
-        );
+        let plots = if let Some(index) = index {
+            take_bounded(
+                index
+                    .plots
+                    .query(player.position, radius)?
+                    .ids
+                    .into_iter()
+                    .filter_map(|id| self.plots.get(&id)),
+                &mut truncated,
+            )
+        } else {
+            take_bounded(
+                self.plots.values().filter(|p| near(p.center)),
+                &mut truncated,
+            )
+        };
+        let structures = if let Some(index) = index {
+            take_bounded(
+                index
+                    .structures
+                    .query(player.position, radius)?
+                    .ids
+                    .into_iter()
+                    .filter_map(|id| self.structures.get(&id)),
+                &mut truncated,
+            )
+        } else {
+            take_bounded(
+                self.structures.values().filter(|s| near(s.position)),
+                &mut truncated,
+            )
+        };
+        let resource_nodes = if let Some(index) = index {
+            take_bounded(
+                index
+                    .resources
+                    .query(player.position, radius)?
+                    .ids
+                    .into_iter()
+                    .filter_map(|id| self.resource_nodes.get(id)),
+                &mut truncated,
+            )
+        } else {
+            take_bounded(
+                self.resource_nodes.values().filter(|n| near(n.position)),
+                &mut truncated,
+            )
+        };
+        let farms = if let Some(index) = index {
+            take_bounded(
+                index
+                    .farms
+                    .query(player.position, radius)?
+                    .ids
+                    .into_iter()
+                    .filter_map(|id| self.farms.get(&id)),
+                &mut truncated,
+            )
+        } else {
+            take_bounded(
+                self.farms.values().filter(|f| near(f.position)),
+                &mut truncated,
+            )
+        };
+        let feature_edits = if let Some(index) = index {
+            take_bounded(
+                index
+                    .edits
+                    .query(player.position, radius)?
+                    .ids
+                    .into_iter()
+                    .filter_map(|id| self.feature_edits.get(id)),
+                &mut truncated,
+            )
+        } else {
+            take_bounded(
+                self.feature_edits.iter().filter(|id| {
+                    self.world_features
+                        .get(*id)
+                        .is_some_and(|f| near(f.position))
+                }),
+                &mut truncated,
+            )
+        };
         // Prioritize the player's own memberships/invitations over nearby
         // ownership. Eight full rosters keep the snapshot under network bounds.
         let mut relevant_factions: Vec<&Faction> = self
@@ -434,9 +550,23 @@ impl SandboxState {
             truncated = true;
         }
         let factions = relevant_factions.into_iter().take(8).cloned().collect();
+        let living = if let Some(index) = index {
+            self.living
+                .snapshot_indexed(player_id, player.position, radius, &index.living)?
+        } else {
+            self.living.snapshot(player_id, player.position, radius)
+        };
+        let ecology = self.ecology.snapshot(&living, &resource_nodes);
+        let transport = self.transport.snapshot(player_id, &living);
+        let settlements = self
+            .settlements
+            .snapshot(player_id, player.position, radius);
         let mut view = SandboxView {
             version: self.version,
-            living: self.living.snapshot(player_id, player.position, radius),
+            living,
+            transport,
+            ecology,
+            settlements,
             tick_seconds: self.tick_seconds,
             player,
             factions,
@@ -454,7 +584,9 @@ impl SandboxState {
     pub fn validate_with_catalog(&self, catalog: &Catalog) -> Result<(), SandboxError> {
         self.validate()?;
         catalog.validate()?;
-        self.living.validate(&self.players, Some(catalog))?;
+        self.living.validate(self, Some(catalog))?;
+        self.settlements.validate(self, Some(catalog))?;
+        self.transport.validate(self, Some(catalog))?;
         if self
             .players
             .values()
@@ -507,7 +639,12 @@ impl SandboxState {
     }
 
     pub fn validate(&self) -> Result<(), SandboxError> {
-        self.living.validate(&self.players, None)?;
+        self.validate_reservations()?;
+        self.validate_owner_dormancy()?;
+        self.living.validate(self, None)?;
+        self.ecology.validate(&self.living, &self.resource_nodes)?;
+        self.settlements.validate(self, None)?;
+        self.transport.validate(self, None)?;
         if self.version != SAVE_VERSION {
             return Err(SandboxError::SaveVersion(self.version));
         }
@@ -571,9 +708,8 @@ impl SandboxState {
             }
             if player.home.is_some_and(|id| {
                 !self
-                    .structures
-                    .get(&id)
-                    .is_some_and(|s| self.may_use(player.id, s.faction_owner, s.owner) && s.housing)
+                    .home_reference(id)
+                    .is_some_and(|(owner, faction)| self.may_use(player.id, faction, owner))
             }) {
                 return Err(SandboxError::Invalid("home reference".into()));
             }
@@ -831,13 +967,21 @@ impl SandboxView {
     /// inventories fit a frame without dropping the active player or body.
     /// `truncated` explicitly marks omitted regional entities.
     pub fn enforce_wire_budget(&mut self) -> Result<(), SandboxError> {
-        self.truncated |= self.living.truncated;
+        self.truncated |= self.living.truncated
+            || self.ecology.truncated
+            || self.settlements.truncated
+            || self.transport.truncated;
         for _ in 0..8 {
             if serde_json::to_vec(self)?.len() <= MAX_SANDBOX_VIEW_BYTES {
                 return Ok(());
             }
             self.truncated = true;
             self.living.truncated = true;
+            self.ecology.truncated = true;
+            self.settlements.truncated = true;
+            self.settlements
+                .territories
+                .truncate(self.settlements.territories.len() / 2);
             self.plots.truncate(self.plots.len() / 2);
             self.structures.truncate(self.structures.len() / 2);
             self.resource_nodes.truncate(self.resource_nodes.len() / 2);
@@ -863,6 +1007,9 @@ impl SandboxView {
                 ordinal += 1;
                 ordinal <= keep || protected.is_some_and(|p| p.contains(&u.id))
             });
+            self.ecology
+                .retain_visible(&self.living, &self.resource_nodes);
+            self.transport.retain_visible(&self.living);
         }
         if serde_json::to_vec(self)?.len() <= MAX_SANDBOX_VIEW_BYTES {
             Ok(())

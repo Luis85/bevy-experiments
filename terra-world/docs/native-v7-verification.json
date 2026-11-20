@@ -1,0 +1,279 @@
+{
+  "release": "0.7.0",
+  "captured_at_utc": "2026-10-27T13:56:06.719950+00:00",
+  "status": "passed",
+  "environment": {
+    "os": "Linux x86_64",
+    "display": "Private X11 virtual display without a window manager; focus explicitly supplied to new game windows",
+    "renderer": "Mesa software Vulkan (lavapipe)",
+    "sizes": [
+      [
+        1440,
+        900
+      ],
+      [
+        1100,
+        700
+      ]
+    ],
+    "performance_claim": false
+  },
+  "review_policy": "One initial batched native review and one combined confirmation. Confirmation exposed a concrete loaded-turn blocker; a narrow movement correction and regression were required before resuming the same saved world. Independent review inspected the existing captures without another rendering/style cycle.",
+  "final_native_binary_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+  "actual_interactions": [
+    "Changed Forward from Up arrow to I without saving; entered a new native world with the active I binding while controls.json still held Up arrow.",
+    "Created Mika Rivers and Mika Freight Valley with spaces, the authored georeferenced heightmap, 1x calendar, regional checkpoints and approximately 5.7 x 4.3 km requested terrain coverage.",
+    "Registered Valley Transit for 20 personal credits, deposited 50, hired Ari Lane for 10 company credits, and created the editable Town service passenger route from Town to Hillside.",
+    "Assigned the owned pickup; reviewed and bought 10 litres of roadside fuel for 30 company credits, including the 15-credit callout. Garage stock decreased by exactly 10 litres.",
+    "Loaded a passenger. Initial native confirmation exposed a turn-clearance blocker; payroll stopped after the progress timeout. Saved and returned without discarding the passenger or 8.64-credit fare escrow.",
+    "Inspected session Controls at 1100 x 700, fixed Back/Save footer, and reserved F9 during capture. Escape cancelled capture; return to launcher retained unsaved I. Explicit Save then persisted I.",
+    "Continued that same loaded world using the corrected final binary; company, vehicle, character, account and inventory matched the prior saved state exactly before resume.",
+    "Used Start/resume; the pickup physically delivered at Hillside and earned 8.64 credits, then loaded the return passenger.",
+    "A later crossing pedestrian caused an intentional route stop. Pause safely retried and completed Town, leaving two paid deliveries, 17.28 credits revenue, 1.46 wages and 25.82 company cash. Released the now-empty vehicle.",
+    "Entered the released pickup two metres away; drove with saved I, braked, engaged parking brake, and switched between third-person and cockpit views. Route guidance and the north-up local map were visible.",
+    "Saved and returned to the menu, continued again, and verified the same possessed parked pickup, exact company/account/profile/inventory, position, mileage, fuel and condition.",
+    "Used Save and quit; no Terra World game processes remained. The earlier separate world retained its generation and exact global/metadata hashes."
+  ],
+  "persisted_state_checks": {
+    "unsaved_controls_not_written": true,
+    "explicit_control_save_kept_binding": true,
+    "roadside_quote_matches_cash_reconciliation": true,
+    "roadside_consumed_exact_station_stock": true,
+    "roadside_personal_wallet_unchanged": true,
+    "loaded_company_exact_on_resume": true,
+    "loaded_vehicle_exact_on_resume": true,
+    "loaded_profile_account_inventory_exact": true,
+    "two_physical_deliveries_paid": true,
+    "company_account_reconciled": true,
+    "loaded_pause_finished_before_release": true,
+    "manual_driving_advanced_odometer": true,
+    "parked_company_profile_account_inventory_exact": true,
+    "parked_position_condition_odometer_exact": true,
+    "parked_fuel_exact": true,
+    "possessed_vehicle_restored": true,
+    "parking_brake_preserved": true,
+    "saved_binding_kept_after_restart": true,
+    "generation_advanced": true,
+    "earlier_world_unchanged": true,
+    "no_retained_game_processes": true
+  },
+  "confirmed_progress": {
+    "character": "Mika Rivers",
+    "world": "Mika Freight Valley",
+    "company": "Valley Transit",
+    "employee": "Ari Lane",
+    "personal_money_minor_credits": 18000,
+    "company_money_minor_credits": 2582,
+    "fares_earned_minor_credits": 1728,
+    "employee_wages_minor_credits": 146,
+    "fleet_deliveries": 2,
+    "roadside_service_minor_credits": 3000,
+    "roadside_fuel_l": 10,
+    "parked_odometer_m": 563.4715093030702,
+    "manual_odometer_increase_m": 147.12202924256178,
+    "generation_after_loaded_return": 50,
+    "generation_after_loaded_resume": 67,
+    "generation_after_parked_return": 97,
+    "generation_after_parked_resume": 110,
+    "generation_after_save_and_quit": 118
+  },
+  "roadside_confirmation": {
+    "company_cash_before": 4000,
+    "company_cash_at_dispatched_checkpoint": 969,
+    "wages_at_dispatched_checkpoint": 31,
+    "quoted_service_minor_credits": 3000,
+    "accounted_service_minor_credits": 3000,
+    "fuel_before_l": 48.75,
+    "fuel_after_dispatch_l": 58.74698499999964,
+    "odometer_after_dispatch_m": 5.9999999967479685,
+    "garage_stock_before_l": 5000.0,
+    "garage_stock_after_l": 4990.0,
+    "garage_stock_delta_l": -10.0,
+    "route_unchanged": true,
+    "post_service_observation": "Checkpoint captured after dispatch; cash is reconciled including earned wages, and vehicle fuel includes actual driving consumption.",
+    "personal_wallet_unchanged": true,
+    "personal_wallet_minor_credits": 18000
+  },
+  "control_handoff_confirmation": {
+    "disk_forward_before_explicit_save": 20,
+    "expected_preexisting_up_arrow": 20,
+    "new_session_i": 17,
+    "unsaved_disk_unchanged": true,
+    "disk_forward_after_explicit_save": 17,
+    "explicit_save_kept_i": true
+  },
+  "loaded_resume_confirmation": {
+    "generation_before_return": 50,
+    "generation_after_resume": 67,
+    "company_exact": true,
+    "vehicle_exact": true,
+    "profile_exact": true,
+    "account_exact": true,
+    "inventory_exact": true,
+    "company_name": "Valley Transit",
+    "employee_name": "Ari Lane",
+    "loaded_passengers": 1,
+    "reserved_fare_minor_credits": 864
+  },
+  "parked_resume_confirmation": {
+    "generation_before_return": 97,
+    "generation_after_resume": 110,
+    "company_exact": true,
+    "profile_exact": true,
+    "account_exact": true,
+    "inventory_exact": true,
+    "vehicle_model_exact": true,
+    "parked": true,
+    "odometer_exact": true,
+    "parked_position_exact": true,
+    "condition_exact": true,
+    "possessed_vehicle_exact": true,
+    "saved_binding_kept_i": true,
+    "personal_money_minor_credits": 18000,
+    "company_money_minor_credits": 2582,
+    "fares_earned_minor_credits": 1728,
+    "employee_wages_minor_credits": 146,
+    "fleet_deliveries": 2,
+    "parked_odometer_m": 563.4715093030702,
+    "fuel_after_resume_l": 58.671105633975806,
+    "fuel_before_return_l": 58.671105633975806
+  },
+  "captures": [
+    {
+      "file": "screenshots/v7-controls.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "9ea3da1a32c4b480ec79a22ec1d38f33767a7fa58206a7b75a04ad9dbb02475c",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-character.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "aa867e6a322924b695d62b59a0d3c3223e5113dfc5ebd74226f267db1b1cd913",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-world-settings.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a4315f2a54dfc91b9e93890c259b93d82041a86733e194c0b1accb7af3aee722",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-world-review.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "a1195f8b49b4a7114c9be0a380f887e16f7244e3b8242a916e387d856444950f",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-fleet-company.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "c0976d19e63c19e95ca99ddc916341748e46ed770a9b0e93f467b90120ac2e4f",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-fleet-route.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "3d642d2f78bbdc67511628df1c08f1296bcbc2a096c1c6c62d00aa44acacb501",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-fleet-roadside.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "ac8374ef753abdaab04330c56620e6108ca7d6368573c8ad54da48a8d3c93336",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-session-controls-small.png",
+      "width": 1100,
+      "height": 700,
+      "sha256": "aeb6ac46dabfa8d8bbb53cff3dcf85145bc7104bb2d5242b6978894363eb5f91",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-controls-returned.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "39381e4f136179d01f2f77875479608b3b5a74e37caaedd4c861f08a8c82fd18",
+      "capture_build_sha256": "1d43b3e9fd32feb2bccbdb424ef11be2360472fd10fde25c7ebc6637fead899d",
+      "phase": "Native confirmation; UI source unchanged by subsequent narrow route correction"
+    },
+    {
+      "file": "screenshots/v7-main-menu.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "d0aa915cdb259745a8e47e566079c1e7a52e76bf311ebc9c6df52bbbfb12b468",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    },
+    {
+      "file": "screenshots/v7-fleet-dispatch.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "0d7209d4a3d460b66c3b06086f575f4f2abdf1278499f43394925c9a0006fafe",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    },
+    {
+      "file": "screenshots/v7-fleet-paused.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "5d7b84773cc7f0d63a22ff9e82edead5f82b63adece3bdde4980ef08a0ba3184",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    },
+    {
+      "file": "screenshots/v7-fleet-release.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "986956e39d8bd13f6f05fed7a9eae7566fb51726b15d7dfd436c23fbccb6c002",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    },
+    {
+      "file": "screenshots/v7-driving.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "d9976f9577b91d113fb144ee624b05f591c6a0c2200dd911c5620887bde94036",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    },
+    {
+      "file": "screenshots/v7-cockpit.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "2f55bb69771669fee9b71d0f4b4008c9896a5f77696c8e5babae4cd04c5a4744",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    },
+    {
+      "file": "screenshots/v7-restored.png",
+      "width": 1440,
+      "height": 900,
+      "sha256": "ffe61166a8de8ee89ce1b9b846467a968a79b5188d76c3dfd17be3e27cf91d53",
+      "capture_build_sha256": "104eef1c276d6bece0eb8370925a2163e53b97616171db9e52186c556de424f9",
+      "phase": "Final required movement correction; continued native confirmation"
+    }
+  ],
+  "limitations": [
+    "Geometric prototype assets and sparse/repeated environment detail; no AAA visual claim.",
+    "Ground contacts use bounded kinematic stop/yield. Transient pedestrian or traffic blockage can stop a route and require explicit resume or a safe finishing pause; arbitrary congestion recovery is not guaranteed.",
+    "Roadside native flow exercised refueling; depleted-condition/zero-fuel recovery and rejection cases are established by domain/UI tests.",
+    "Native controller input was not certified on hardware. Virtual input tests do not establish gamepad-only menus or wheel support.",
+    "Real TCP/TLS, private company replication and cold-owner activation are covered by the automated localhost suites, not by these single-player images.",
+    "No gaming-GPU, Windows/macOS, public-account service, distributed authority or MMORPG concurrent-player capacity certification."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "release": "0.24.0",
+  "phase": "confirmation",
+  "command": [
+    "/tmp/terra023-target/debug/terra-demo",
+    "--play",
+    "--camp-view",
+    "--quality",
+    "performance",
+    "--no-atmosphere",
+    "--time-scale",
+    "1",
+    "--radius",
+    "1",
+    "--user-data",
+    "/tmp/terra-native024/confirmation-polish-user",
+    "--save",
+    "/tmp/terra-native024/confirmation-polish.json"
+  ],
+  "working_directory": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "started_utc": "2026-10-30T12:58:43.340329+00:00",
+  "binary_sha256": "092484f4ffbfc9f89b4950f7b55a935864117e5a7c96e83744224e07f53cb87d",
+  "source_input_count": 390,
+  "expected_interruption": false,
+  "trace_file": null,
+  "schema": 1,
+  "source_inputs_sha256": "3812fc72e7cd03c6794fe516f9e518aabe0e7186f1991adb1c3cd2aa6af20caf",
+  "pid": 78977
+}

@@ -1,0 +1,855 @@
+{
+  "version": "0.13.0",
+  "reviewed_utc": "2026-10-28T18:36:27.746618+00:00",
+  "final_confirmation_passed": true,
+  "clean_save_quit": true,
+  "source_inputs_unchanged": true,
+  "source_inputs_count": 338,
+  "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+  "environment": {
+    "display": "Xvfb 1440x900, resized to 1100 \u00d7 700",
+    "renderer": "Vulkan llvmpipe software rendering",
+    "interface_text_scale_percent": 150,
+    "quality": "Performance"
+  },
+  "sessions": [
+    {
+      "process": {
+        "release": "0.13.0",
+        "phase": "confirmation",
+        "kind": "company",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v13-confirm-user-data/worlds/world-review-013/world.json",
+          "--user-data",
+          "/tmp/terra-native/v13-confirm-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v13-confirm-company-telemetry.json"
+        ],
+        "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "source_input_count": 338,
+        "started_utc": "2026-10-28T18:31:29.980385+00:00",
+        "pid": 130313,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:33:08.616018+00:00",
+        "source_inputs_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-confirm-company.log",
+          "sha256": "4e1ba343c71eb5f056b186efc05d80ccb4d0ef94e826c2fd68a42d065aaac0c1",
+          "bytes": 2726
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.13-final/v13-confirm-company-telemetry.json",
+          "sha256": "ea5eee93f25e2fd2319beec35bdf34e8734372f8221568c8d4d00040212eea4f",
+          "bytes": 5388
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-confirm-company-process.json",
+          "sha256": "847e1ba7ab8a335a17de6ba2d55c7f3bbb58fed37ebd5f8b65fc2e5bb154c691",
+          "bytes": 720
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 5,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 59,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 5,
+          "draining": false,
+          "eligible_instances": 59,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10183060,
+          "reserved": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 12.205812,
+          "deleted_pages": 0,
+          "encode_ms": 9.830062999999999,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 6.05107,
+          "reused_page_bytes": 215277,
+          "reused_pages": 38,
+          "select_ms": 3.9321470000000005,
+          "selected_records_validated": 693,
+          "transaction_ms": 1.535609,
+          "validation": {
+            "active_records": 693,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 719
+          }
+        },
+        "committed": {
+          "active_records": 555,
+          "active_regions": 34,
+          "checkpoint_bytes": 1628952,
+          "dependency_regions": 0,
+          "dormant_records": 26,
+          "dormant_regions": 4,
+          "generation": 401,
+          "global_records": 138,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 33.65127,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 14.399569,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    },
+    {
+      "process": {
+        "release": "0.13.0",
+        "phase": "confirmation",
+        "kind": "company",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v13-confirm-user-data/worlds/world-review-013/world.json",
+          "--user-data",
+          "/tmp/terra-native/v13-confirm-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v13-resume-company-telemetry.json"
+        ],
+        "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "source_input_count": 338,
+        "started_utc": "2026-10-28T18:33:23.706143+00:00",
+        "pid": 130590,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:34:15.998591+00:00",
+        "source_inputs_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-resume-company.log",
+          "sha256": "20735fdc89b5f3fbe6ee314e0ff70aa4347b2dd508d5f5be77b286890823a87a",
+          "bytes": 2725
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.13-final/v13-resume-company-telemetry.json",
+          "sha256": "6cd8cb374e596896a44dffac14084cbc6c7cd258aa1aacff02d3abc451e867f1",
+          "bytes": 5350
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-resume-company-process.json",
+          "sha256": "a2331f91f9998c0ce2231d4429f68cbf1e2fb08e0ce4cb40578512a4fb98fe6c",
+          "bytes": 719
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 5,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 59,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 5,
+          "draining": false,
+          "eligible_instances": 59,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10183060,
+          "reserved": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 12.276052,
+          "deleted_pages": 0,
+          "encode_ms": 8.846187,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 5.5849,
+          "reused_page_bytes": 215277,
+          "reused_pages": 38,
+          "select_ms": 5.155117,
+          "selected_records_validated": 693,
+          "transaction_ms": 1.937356,
+          "validation": {
+            "active_records": 693,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 719
+          }
+        },
+        "committed": {
+          "active_records": 555,
+          "active_regions": 34,
+          "checkpoint_bytes": 1628952,
+          "dependency_regions": 0,
+          "dormant_records": 26,
+          "dormant_regions": 4,
+          "generation": 422,
+          "global_records": 138,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 33.952225000000006,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 16.773109,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    },
+    {
+      "process": {
+        "release": "0.13.0",
+        "phase": "confirmation",
+        "kind": "community",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--config",
+          "/tmp/terra-native/v13-community-config.json",
+          "--user-data",
+          "/tmp/terra-native/v13-confirm-user-data",
+          "--camp-view",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v13-confirm-community-telemetry.json"
+        ],
+        "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "source_input_count": 338,
+        "started_utc": "2026-10-28T18:34:36.057447+00:00",
+        "pid": 130813,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:35:57.432531+00:00",
+        "source_inputs_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-confirm-community.log",
+          "sha256": "2a1985e12b6dc0382782210ffab24be9d889ff38dbd5594a35a27e191ecb8938",
+          "bytes": 2728
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.13-final/v13-confirm-community-telemetry.json",
+          "sha256": "e3da4482806e87ccc7a0652e7bd77c22f4961fd8a74f85297c2425913de54f4a",
+          "bytes": 5811
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-confirm-community-process.json",
+          "sha256": "c5ff206bc7a5878267c89a9689fe8b5e8b0bf56fd58f1b37cfc0ad48cf06cf73",
+          "bytes": 705
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 7,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 57,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 7,
+          "draining": false,
+          "eligible_instances": 57,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10067748,
+          "reserved": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 0.0,
+          "deleted_pages": 0,
+          "encode_ms": 0.0,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 0.0,
+          "reused_page_bytes": 0,
+          "reused_pages": 0,
+          "select_ms": 0.0,
+          "selected_records_validated": 0,
+          "transaction_ms": 0.0,
+          "validation": {
+            "active_records": 0,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 0
+          }
+        },
+        "committed": null,
+        "enabled": false,
+        "last_checkpoint_ms": 0.0,
+        "last_checkpoint_reason": "",
+        "last_error": null,
+        "last_submission_ms": 0.0,
+        "pending": false,
+        "restored": false,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    }
+  ],
+  "candidate_review_sessions": [
+    {
+      "process": {
+        "release": "0.13.0",
+        "phase": "review",
+        "kind": "company",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--world-profile",
+          "/tmp/terra-native/v13-review-user-data/worlds/world-review-013/world.json",
+          "--user-data",
+          "/tmp/terra-native/v13-review-user-data",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v13-review-company-telemetry.json"
+        ],
+        "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "source_input_count": 338,
+        "started_utc": "2026-10-28T18:05:53.899922+00:00",
+        "pid": 125568,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:10:56.390158+00:00",
+        "source_inputs_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-review-company.log",
+          "sha256": "29dcec627dbfb042e91be359d01d326cc294a4b8ae9a541b3db6e1e17984e29d",
+          "bytes": 2725
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.13-final/v13-review-company-telemetry.json",
+          "sha256": "911b4fd23e7f78ca737b4b4ed2ca1c8d1e241630f5a03d4047a2cab4839ce3bd",
+          "bytes": 5363
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-review-company-process.json",
+          "sha256": "78a5af6c72c58a123c6f9ca0b1a8a478bc7560ba8adc5d54251e3280789c24e5",
+          "bytes": 711
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 5,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 59,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 5,
+          "draining": false,
+          "eligible_instances": 59,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10183060,
+          "reserved": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 413,
+            "animation_nodes": 1935,
+            "estimated_bytes": 10183060,
+            "instances": 59,
+            "primitives": 1463,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 95480,
+            "vertices": 286440
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 10.89692,
+          "deleted_pages": 0,
+          "encode_ms": 8.148665,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 8.443147999999999,
+          "reused_page_bytes": 215277,
+          "reused_pages": 38,
+          "select_ms": 6.813505,
+          "selected_records_validated": 693,
+          "transaction_ms": 1.963888,
+          "validation": {
+            "active_records": 693,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 719
+          }
+        },
+        "committed": {
+          "active_records": 555,
+          "active_regions": 34,
+          "checkpoint_bytes": 1628952,
+          "dependency_regions": 0,
+          "dormant_records": 26,
+          "dormant_regions": 4,
+          "generation": 376,
+          "global_records": 138,
+          "pinned_regions": 9
+        },
+        "enabled": true,
+        "last_checkpoint_ms": 36.487242,
+        "last_checkpoint_reason": "Graceful exit",
+        "last_error": null,
+        "last_submission_ms": 21.724738000000002,
+        "pending": false,
+        "restored": true,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    },
+    {
+      "process": {
+        "release": "0.13.0",
+        "phase": "review",
+        "kind": "community",
+        "command": [
+          "/tmp/terra-build/target/debug/terra-demo",
+          "--config",
+          "/tmp/terra-native/v13-community-config.json",
+          "--user-data",
+          "/tmp/terra-native/v13-review-user-data",
+          "--camp-view",
+          "--quality",
+          "performance",
+          "--telemetry",
+          "/tmp/terra-native/v13-review-community-telemetry.json"
+        ],
+        "binary_sha256": "2c9fafc225c5e817785a6f6ef9f9ec087d0dd3c0b597fc722b2327c8bd6b49d0",
+        "source_input_count": 338,
+        "started_utc": "2026-10-28T18:11:09.434517+00:00",
+        "pid": 126119,
+        "exit_code": 0,
+        "finished_utc": "2026-10-28T18:15:31.168080+00:00",
+        "source_inputs_unchanged": true
+      },
+      "retained": {
+        ".log": {
+          "path": "docs/verification/v0.13-final/v13-review-community.log",
+          "sha256": "75232f4cdb102dd347195b7e4a122eb2dc85fccf9eba4206dfc0e675a126282a",
+          "bytes": 2837
+        },
+        "-telemetry.json": {
+          "path": "docs/verification/v0.13-final/v13-review-community-telemetry.json",
+          "sha256": "625d772f178ef17f97111633027a7fbef8e64b7756900e0c75cecbcc7db68918",
+          "bytes": 5831
+        },
+        "-process.json": {
+          "path": "docs/verification/v0.13-final/v13-review-community-process.json",
+          "sha256": "ff3f992c6352319007aee8b55810ef8723328938b1704ec03e4cf021cb1aecb8",
+          "bytes": 697
+        }
+      },
+      "asset_pack": {
+        "failed_models": 0,
+        "fallback_instances": 7,
+        "identity": "sha256:406c12494416b472ca5bee80a809e0ef30a45e382240cab01faa9081cd838d6d",
+        "last_error": null,
+        "loading_instances": 0,
+        "model_count": 5,
+        "name": "Terra woodland wildlife",
+        "ready_instances": 57,
+        "rejected_instances": 0,
+        "scene_budget": {
+          "deferred_instances": 0,
+          "distant_instances": 7,
+          "draining": false,
+          "eligible_instances": 57,
+          "hidden_instances": 0,
+          "immutable_pack_estimated_bytes": 1553668,
+          "invalid_limits": false,
+          "limits": {
+            "animation_channels": 1024,
+            "animation_nodes": 4096,
+            "concurrent_model_loads": 1,
+            "distance_hysteresis_m": 150.0,
+            "distance_m": 650.0,
+            "estimated_bytes": 134217728,
+            "instances": 64,
+            "primitives": 2048,
+            "texture_pixels": 8388608,
+            "triangles": 200000,
+            "vertices": 400000
+          },
+          "loading_models": 0,
+          "peak_reserved_estimated_bytes": 10067748,
+          "reserved": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "retiring_models": 0,
+          "selected": {
+            "animation_channels": 399,
+            "animation_nodes": 1877,
+            "estimated_bytes": 10067748,
+            "instances": 57,
+            "primitives": 1421,
+            "resident_models": 5,
+            "texture_pixels": 0,
+            "triangles": 92552,
+            "vertices": 277656
+          },
+          "unmetered_instances": 0
+        }
+      },
+      "regional_persistence": {
+        "authority_paused": false,
+        "blocked": false,
+        "checkpoint_stages": {
+          "compose_ms": 0.0,
+          "deleted_pages": 0,
+          "encode_ms": 0.0,
+          "encoded_page_bytes": 0,
+          "encoded_pages": 0,
+          "install_ms": 0.0,
+          "reused_page_bytes": 0,
+          "reused_pages": 0,
+          "select_ms": 0.0,
+          "selected_records_validated": 0,
+          "transaction_ms": 0.0,
+          "validation": {
+            "active_records": 0,
+            "certified_environment_groups": 0,
+            "certified_environment_records": 0,
+            "merged_scope_records": 0
+          }
+        },
+        "committed": null,
+        "enabled": false,
+        "last_checkpoint_ms": 0.0,
+        "last_checkpoint_reason": "",
+        "last_error": null,
+        "last_submission_ms": 0.0,
+        "pending": false,
+        "restored": false,
+        "seconds_since_checkpoint": 0.0
+      },
+      "last_world_error": null,
+      "last_simulation_error": null
+    }
+  ],
+  "captures": [
+    {
+      "path": "docs/screenshots/v13-review-company-start.png",
+      "sha256": "75bedf46303f7548eb8c3a60b584b93da805820dbaa6bbce120dfe3c773dffae",
+      "bytes": 1024481,
+      "phase": "candidate",
+      "description": "Saved-world Activities guidance and prepared-world presentation at 1440 \u00d7 900."
+    },
+    {
+      "path": "docs/screenshots/v13-review-fleet.png",
+      "sha256": "eb6702c4d148da80c2d7ff6eb99051cb0cfb477efafa8b58994595da8d1fdf8c",
+      "bytes": 1018396,
+      "phase": "candidate",
+      "description": "Company cash, employee/route counts and six Fleet sections at 150% text."
+    },
+    {
+      "path": "docs/screenshots/v13-review-small-quote.png",
+      "sha256": "2464236aa90830322284622dc6c3c87de77227e8f3620faec62f60f571f2788b",
+      "bytes": 579593,
+      "phase": "candidate",
+      "description": "Three-passenger request, full-load receipt and delivery qualification at 1100 \u00d7 700 / 150% text."
+    },
+    {
+      "path": "docs/screenshots/v13-review-community-confirm.png",
+      "sha256": "ae782d96dbae6cb83c197fd4c42820b83483fa8cbc5dffc4c4850c80947d6833",
+      "bytes": 599357,
+      "phase": "candidate",
+      "description": "Named successor, Builder consequence and retained communal property above focused Confirm."
+    },
+    {
+      "path": "docs/screenshots/v13-review-community-cancel-focus.png",
+      "sha256": "488f7c0d603084baa732195c71629f8dc6d29d44f0c388f67c9de75d7d05cbaa",
+      "bytes": 595043,
+      "phase": "candidate",
+      "description": "Tab reaches Cancel and scrolls it into the compact inspector."
+    },
+    {
+      "path": "docs/screenshots/v13-review-community-cancelled.png",
+      "sha256": "b5bc99bd92bff05d8d984ecd2073ffa3edf081279ecec33739205f96f0f8639b",
+      "bytes": 587215,
+      "phase": "candidate",
+      "description": "Cancelled review reports no command sent and retains leader #1."
+    },
+    {
+      "path": "docs/screenshots/v13-review-community-handed-over.png",
+      "sha256": "32d7769fc1c17138b63030120cc315f7808aa3fb01ad834b76cb7236b145e2cb",
+      "bytes": 588249,
+      "phase": "candidate",
+      "description": "F5/F9 restores leader #2 and former leader as Builder."
+    },
+    {
+      "path": "docs/screenshots/v13-review-controls.png",
+      "sha256": "6bb0cdd521da1b633bceeac2faab9d49d9bb8c110da7bc0c230f8b26a5884125",
+      "bytes": 389246,
+      "phase": "candidate",
+      "description": "Controls retains 150% interface text and visible Save controls footer."
+    },
+    {
+      "path": "docs/screenshots/v13-confirm-fleet-route.png",
+      "sha256": "46727d9f0f367e3d4850ea5a4f042e0ceeec147416074996701fcf69ceb6d625",
+      "bytes": 1011912,
+      "phase": "final",
+      "description": "Accepted gate-built executable reopens Town service with 3 passengers per leg."
+    },
+    {
+      "path": "docs/screenshots/v13-confirm-finances.png",
+      "sha256": "19439d6b0fd3b067a040a8beb3402ae8ea7bfa5565184f8b1ab6a81fe32b26b8",
+      "bytes": 1027854,
+      "phase": "final",
+      "description": "Accepted executable shows 40.00 company cash and reconciled recorded cash movements."
+    },
+    {
+      "path": "docs/screenshots/v13-confirm-community-small.png",
+      "sha256": "5ae56956575ae2ae0dd5afe040890294ef77aea6c1eeeeaedf1df216bbaa0214",
+      "bytes": 584056,
+      "phase": "final",
+      "description": "Final accepted executable restores leader #2 and current player as Builder at 1100 \u00d7 700 / 150% text."
+    }
+  ],
+  "save_resume": {
+    "selected_durable_fields_exact": [
+      "world_identity",
+      "player_identity",
+      "politics",
+      "company_and_accounting",
+      "owner_account",
+      "player_inventory_and_record",
+      "avatar",
+      "character",
+      "progression",
+      "territories",
+      "owned_vehicle",
+      "owned_vehicle_body"
+    ],
+    "company_cash_minor_credits": 4000,
+    "owner_cash_minor_credits": 13188,
+    "routes": 1,
+    "private_exports_retained": false
+  },
+  "community_authority": {
+    "fixture": "Isolated two-member world constructed through normal domain commands; not live multiplayer UI",
+    "cancel_preserved_leader": 1,
+    "confirmed_and_restored_leader": 2,
+    "former_leader_role": "builder",
+    "handover_changed_only_expected_roles": true,
+    "full_domain_state_exact_after_final_native_restore": true,
+    "private_saves_retained": false
+  },
+  "observed": {
+    "native_three_passenger_choice_and_creation": true,
+    "saved_three_passenger_route_reopened": true,
+    "route_receipt_qualified_by_funded_delivery": true,
+    "compact_inspector_and_footer_do_not_overlap": true,
+    "enlarged_text_and_scroll_reachable": true,
+    "named_handover_consequences_visible": true,
+    "tab_reaches_cancel_without_implicit_confirmation": true,
+    "cancel_preserves_leadership": true,
+    "handover_saved_and_restored": true,
+    "controls_text_scale_retained": true,
+    "keyboard_save_and_quit": true,
+    "no_additional_material_native_issue_found": true
+  },
+  "limitations": [
+    "Linux software rendering in a virtual X11 display; no target GPU/frame-time or actual GPU memory qualification.",
+    "Specific keyboard/mouse paths exercised; no physical controller/wheel, assistive-technology, localization or complete keyboard-only qualification.",
+    "The native community fixture was constructed through domain commands; actual two-principal TLS is a separate automated acceptance test.",
+    "The exact shorter walking route is measured by the prepared-source replay, not presented as a native human playtest.",
+    "Private saved worlds and resume capabilities are excluded; native evidence retains aggregate results and precise scoped comparisons."
+  ]
+}

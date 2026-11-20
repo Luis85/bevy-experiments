@@ -395,6 +395,138 @@ fn tool_requires_owned_nearby_workbench() {
 }
 
 #[test]
+fn construction_respects_other_owners_rented_bus_body_and_preserves_clear_space() {
+    let (mut world, catalog) = setup();
+    world.add_player(2, position()).unwrap();
+    world.seed_living_demo(position(), &[], &catalog).unwrap();
+    world.ensure_transport_demo(&catalog).unwrap();
+    let garage = world
+        .transport
+        .facilities
+        .values()
+        .find(|facility| facility.kind == TransportFacilityKind::Garage)
+        .unwrap()
+        .clone();
+    world
+        .transport
+        .drivers
+        .get_mut(&1)
+        .unwrap()
+        .licenses
+        .insert(DriverLicense::Passenger);
+    world.set_player_position(1, garage.position).unwrap();
+    let bus = world
+        .apply(
+            1,
+            Command::Transport {
+                action: TransportCommand::RentVehicle {
+                    model: VehicleModel::Bus,
+                    facility_id: garage.id,
+                },
+            },
+            &catalog,
+        )
+        .unwrap()
+        .created_id
+        .unwrap();
+    let unit = world.living.units.get_mut(&bus).unwrap();
+    unit.position = offset(500., 500.);
+    unit.heading_deg = 90.;
+    world.set_player_position(2, offset(490., 500.)).unwrap();
+    world
+        .apply(
+            2,
+            Command::ClaimPlot {
+                center: offset(500., 500.),
+                radius_m: 30.,
+            },
+            &catalog,
+        )
+        .unwrap();
+    world
+        .apply(
+            2,
+            Command::Craft {
+                recipe: "planks".into(),
+                count: 2,
+            },
+            &catalog,
+        )
+        .unwrap();
+    world.validate_with_catalog(&catalog).unwrap();
+
+    // Four metres ahead clears the former 1.2 m centre-radius test, but lies
+    // inside this east-facing bus's 5.4 m half-length. The other player's land
+    // permission must not authorize building through the parked rental.
+    let before = world.clone();
+    let error = world
+        .apply(
+            2,
+            Command::Build {
+                blueprint: "fence".into(),
+                position: offset(504., 500.),
+            },
+            &catalog,
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains(&format!("living actor #{bus}")));
+    assert_eq!(
+        world, before,
+        "rejected construction changed goods, rental bond or body"
+    );
+    assert!(world.transport.vehicles[&bus].rental.is_some());
+
+    // The narrow side really is clear; using a bus-sized bounding circle would
+    // incorrectly deny this valid workbench, within reach of the builder.
+    let built = world
+        .apply(
+            2,
+            Command::Build {
+                blueprint: "workbench".into(),
+                position: offset(500., 503.),
+            },
+            &catalog,
+        )
+        .unwrap()
+        .created_id
+        .unwrap();
+    assert_eq!(world.structures[&built].owner, 2);
+    assert_eq!(
+        world.players[&2].inventory["planks"],
+        before.players[&2].inventory["planks"] - 4
+    );
+    world.validate_with_catalog(&catalog).unwrap();
+
+    // Known reference animals have a longer body than the old generic 0.35 m
+    // point radius too. Construction uses their existing contact dimensions.
+    let animal = world
+        .living
+        .units
+        .values()
+        .find(|unit| unit.kind == ActorKind::Animal)
+        .unwrap()
+        .id;
+    world.living.units.get_mut(&animal).unwrap().position = offset(500., 512.);
+    let before = world.clone();
+    let error = world
+        .apply(
+            2,
+            Command::Build {
+                blueprint: "fence".into(),
+                position: offset(500., 513.2),
+            },
+            &catalog,
+        )
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("living actor #{animal}"))
+    );
+    assert_eq!(world, before);
+}
+
+#[test]
 fn resource_counts_survive_reloading_and_regrow_without_tick_loops() {
     let (mut world, catalog) = setup();
     let chunk = tree_chunk();

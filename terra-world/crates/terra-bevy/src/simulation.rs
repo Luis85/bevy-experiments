@@ -16,6 +16,7 @@ pub enum WorldSet {
     Stream,
     Simulate,
     Sandbox,
+    Persistence,
     Render,
 }
 
@@ -75,11 +76,9 @@ pub struct GeoAnchor(pub GeoPosition);
 #[derive(Component, Clone, Debug)]
 pub struct GeoActor(pub ActorState);
 
-type WeatherResponse = (GeoPosition, Result<WeatherSample, String>);
-
 #[derive(Resource, Default)]
 struct WeatherTask {
-    receiver: Option<Mutex<mpsc::Receiver<WeatherResponse>>>,
+    receiver: Option<Mutex<mpsc::Receiver<(GeoPosition, Result<WeatherSample, String>)>>>,
     last_requested: Option<GeoPosition>,
     last_fetch: Option<Instant>,
     last_sim_bucket: i64,
@@ -117,10 +116,8 @@ impl Plugin for TerraWorldPlugin {
             .validate()
             .expect("invalid Terra World configuration");
         let mut config = self.config.clone();
-        let mut clock = WorldClock {
-            time_scale: config.time_scale,
-            ..WorldClock::default()
-        };
+        let mut clock = WorldClock::default();
+        clock.time_scale = config.time_scale;
         if config.live_data {
             clock.unix_seconds = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -169,12 +166,22 @@ impl Plugin for TerraWorldPlugin {
                 chunks: BTreeMap::new(),
             })
             .init_resource::<WeatherTask>()
+            .init_resource::<crate::WorldDiagnostics>()
+            .init_resource::<crate::RegionalPersistence>()
+            .add_systems(Last, crate::telemetry::measure_frame)
+            .add_systems(PreStartup, crate::regions::initialize_regions)
             .insert_resource(SandboxRuntime::new(config.focus))
             .insert_resource(politics)
             .init_resource::<crate::sandbox::SandboxQueue>()
             .configure_sets(
                 Update,
-                (WorldSet::Stream, WorldSet::Sandbox, WorldSet::Render).chain(),
+                (
+                    WorldSet::Stream,
+                    WorldSet::Sandbox,
+                    WorldSet::Persistence,
+                    WorldSet::Render,
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
@@ -186,7 +193,18 @@ impl Plugin for TerraWorldPlugin {
             .add_systems(
                 Update,
                 crate::sandbox::apply_sandbox_commands.in_set(WorldSet::Sandbox),
-            );
+            )
+            .add_systems(
+                Update,
+                crate::regions::checkpoint_regions.in_set(WorldSet::Persistence),
+            )
+            .add_systems(PreUpdate, crate::regions::poll_regions);
+        let exit_system = crate::regions::checkpoint_on_exit
+            .in_set(bevy::app::OnAppExitSystems)
+            .in_set(crate::RegionPersistenceSet::FinalCheckpoint);
+        #[cfg(feature = "render")]
+        let exit_system = exit_system.after(bevy::window::ExitSystems);
+        app.add_systems(Last, exit_system);
     }
 }
 
@@ -196,6 +214,8 @@ fn stream_world(
     mut resident: ResMut<ResidentChunks>,
     mut queue: Option<ResMut<RenderQueue>>,
     mut sandbox: ResMut<SandboxRuntime>,
+    mut timings: ResMut<crate::WorldDiagnostics>,
+    mut persistence: ResMut<crate::RegionalPersistence>,
 ) {
     let start = Instant::now();
     if runtime.frame.origin.surface_distance_m(runtime.focus) > runtime.config.rebase_distance_m {
@@ -217,23 +237,53 @@ fn stream_world(
     ) {
         runtime.last_error = Some(e.to_string());
     }
-    for event in s.poll(runtime.config.integrate_per_frame) {
+    let events = s.poll(runtime.config.integrate_per_frame);
+    let mut can_register =
+        !runtime.network_authority && !persistence.blocked() && !persistence.pending();
+    if can_register
+        && (persistence.source_replay_pending
+            || events
+                .iter()
+                .any(|event| matches!(event, StreamEvent::Loaded(_))))
+    {
+        match persistence.hydrate(&mut sandbox) {
+            Ok(true) => {}
+            Ok(false) => {
+                can_register = false;
+                persistence.source_replay_pending = true;
+            }
+            Err(error) => {
+                persistence.fail(error.clone(), &mut runtime);
+                sandbox.last_message = format!("Region activation failed. World paused: {error}");
+                can_register = false;
+            }
+        }
+    }
+    if can_register && persistence.source_replay_pending {
+        // Geometry can finish loading while persistence is blocked. Those
+        // chunks will not emit another Loaded event after retry or restore.
+        // Replay only once against the complete hydrated overlay, so recovery
+        // supplies their gameplay records without refilling depleted resources.
+        for chunk in resident.chunks.values() {
+            register_source_chunk(&mut runtime, &mut sandbox, chunk);
+        }
+        persistence.source_replay_pending = false;
+        persistence.residency_changed();
+    }
+    for event in events {
         match &event {
             StreamEvent::Loaded(chunk) => {
                 resident.chunks.insert(chunk.key, chunk.clone());
-                if !runtime.network_authority {
-                    let SandboxRuntime { state, catalog, .. } = &mut *sandbox;
-                    state.register_chunk(chunk);
-                    // Tree-to-wood is the sample catalog's mapping, not a
-                    // requirement imposed on a hosting game's item vocabulary.
-                    // Preserve source metadata but never seed unsupported items.
-                    state
-                        .resource_nodes
-                        .retain(|_, node| catalog.items.contains(&node.item));
+                persistence.residency_changed();
+                if can_register {
+                    register_source_chunk(&mut runtime, &mut sandbox, chunk);
+                } else if !runtime.network_authority && persistence.enabled {
+                    persistence.source_replay_pending = true;
                 }
             }
             StreamEvent::Evicted(key) => {
                 resident.chunks.remove(key);
+                persistence.residency_changed();
             }
             StreamEvent::Failed { error, .. } => {
                 runtime.last_error = Some(error.to_string());
@@ -245,6 +295,24 @@ fn stream_world(
     }
     runtime.stream_stats = s.stats();
     runtime.stream_poll_ms = start.elapsed().as_secs_f64() * 1000.0;
+    timings.record(crate::WorldStage::Streaming, runtime.stream_poll_ms);
+}
+
+fn register_source_chunk(
+    runtime: &mut WorldRuntime,
+    sandbox: &mut SandboxRuntime,
+    chunk: &WorldChunk,
+) {
+    let SandboxRuntime { state, catalog, .. } = sandbox;
+    state.register_chunk(chunk);
+    if let Err(error) = state.register_ecology_chunk(chunk, catalog) {
+        runtime.last_error = Some(format!("Ecology chunk: {error}"));
+    }
+    // Tree-to-wood is the sample mapping. Keep source metadata while avoiding
+    // resources that a hosting game's catalog cannot represent.
+    state
+        .resource_nodes
+        .retain(|_, node| catalog.items.contains(&node.item));
 }
 
 fn advance_world(
@@ -253,18 +321,20 @@ fn advance_world(
     resident: Res<ResidentChunks>,
     mut actors: Query<&mut GeoActor>,
     mut sandbox: ResMut<SandboxRuntime>,
+    mut timings: ResMut<crate::WorldDiagnostics>,
+    persistence: Res<crate::RegionalPersistence>,
 ) {
     let start = Instant::now();
     let dt = time.delta_secs_f64();
     let weather = runtime.effective_weather();
-    if !runtime.network_authority {
+    if !runtime.network_authority && !persistence.authority_paused() {
         let before = runtime.clock.unix_seconds;
         runtime.clock.advance(dt);
         let elapsed = runtime.clock.unix_seconds - before;
-        if elapsed > 0.0
-            && let Err(e) = sandbox.state.advance(elapsed, &weather)
-        {
-            runtime.last_error = Some(e.to_string());
+        if elapsed > 0.0 {
+            if let Err(e) = sandbox.state.advance(elapsed, &weather) {
+                runtime.last_error = Some(e.to_string());
+            }
         }
         if runtime.config.layers.contains(Layer::Actors) && !runtime.clock.paused {
             for mut actor in &mut actors {
@@ -319,6 +389,9 @@ fn advance_world(
         }
     }
     runtime.simulation_ms = start.elapsed().as_secs_f64() * 1000.0;
+    if !runtime.network_authority {
+        timings.record(crate::WorldStage::BaseWorld, runtime.simulation_ms);
+    }
 }
 
 fn update_weather(mut runtime: ResMut<WorldRuntime>, mut task: ResMut<WeatherTask>) {

@@ -182,9 +182,81 @@ pub fn physical_surface(
     Some(sample)
 }
 
-/// Static source-building footprint check for the reference controller. An
-/// elevated building part with explicit min_height does not block its underpass.
+/// Memory-only wheel support. Source tags select authored reference grip;
+/// unavailable/water/steep support cannot silently turn into a flat road.
+pub fn vehicle_ground_sample(
+    resident: &ResidentChunks,
+    position: GeoPosition,
+    weather: &WeatherSample,
+) -> Option<terra_core::VehicleGroundSample> {
+    let sample = physical_surface(resident, position, weather)?;
+    if sample.water || sample.slope_degrees > 32. {
+        return None;
+    }
+    let key = TileKey::at(position, resident.level).ok()?;
+    let chunk = resident.chunks.get(&key)?;
+    // Roads take precedence over underlying land-use polygons. The same
+    // normalized feature order and coverage policy are used by the host.
+    let road = chunk
+        .features
+        .iter()
+        .filter(|feature| {
+            feature.kind == FeatureKind::Road
+                && inside_ribbon(position, &feature.points, road_width_m(feature))
+        })
+        .max_by(|a, b| {
+            road_deck_height(chunk, a)
+                .unwrap_or(f64::NEG_INFINITY)
+                .total_cmp(&road_deck_height(chunk, b).unwrap_or(f64::NEG_INFINITY))
+        });
+    let land = || {
+        chunk.features.iter().find(|feature| {
+            matches!(
+                feature.kind,
+                FeatureKind::Grass | FeatureKind::Forest | FeatureKind::Farm
+            ) && inside_polygon(position, &feature.points)
+        })
+    };
+    Some(terra_core::VehicleGroundSample {
+        height_m: sample.terrain_height_m,
+        surface: road.or_else(land).map_or(
+            terra_core::VehicleSurface::Unknown,
+            terra_core::VehicleSurface::from_feature,
+        ),
+    })
+}
+
+pub fn vehicle_ground_support(
+    resident: &ResidentChunks,
+    position: GeoPosition,
+    heading_deg: f64,
+    wheelbase_m: f64,
+    width_m: f64,
+    weather: &WeatherSample,
+) -> Option<terra_core::VehicleGroundSupport> {
+    terra_core::sample_vehicle_ground(position, heading_deg, wheelbase_m, width_m * 0.86, |p| {
+        vehicle_ground_sample(resident, p, weather)
+    })
+    .ok()
+}
+
+/// Static source-building footprint with a conservative unknown body height.
+/// Call the model-sized helper when an actor's actual height is known.
 pub fn source_building_at(resident: &ResidentChunks, position: GeoPosition, radius_m: f64) -> bool {
+    source_building_at_with_clearance(resident, position, radius_m, 8.)
+}
+
+/// The complete model height, current support elevation and explicit underside
+/// determine clearance; a car and a bus can therefore receive different results.
+pub fn source_building_at_with_clearance(
+    resident: &ResidentChunks,
+    position: GeoPosition,
+    radius_m: f64,
+    body_height_m: f64,
+) -> bool {
+    if !body_height_m.is_finite() || !(0.1..=32.).contains(&body_height_m) {
+        return true;
+    }
     let Some(key) = TileKey::at(position, resident.level).ok() else {
         return true;
     };
@@ -193,30 +265,49 @@ pub fn source_building_at(resident: &ResidentChunks, position: GeoPosition, radi
     key.neighbors(1)
         .into_iter()
         .filter_map(|k| resident.chunks.get(&k))
-        .flat_map(|chunk| &chunk.features)
-        .filter(|feature| feature.kind == FeatureKind::Building)
-        .any(|feature| {
-            if feature
+        .flat_map(|chunk| chunk.features.iter().map(move |feature| (chunk, feature)))
+        .filter(|(_, feature)| feature.kind == FeatureKind::Building)
+        .any(|(chunk, feature)| {
+            let overlaps = inside_polygon(position, &feature.points)
+                || feature
+                    .points
+                    .iter()
+                    .zip(feature.points.iter().cycle().skip(1))
+                    .take(feature.points.len())
+                    .any(|(a, b)| {
+                        let a = frame.to_local(*a);
+                        let b = frame.to_local(*b);
+                        segment_distance_squared([a[0], a[2]], [b[0], b[2]]) < radius_sq
+                    });
+            if !overlaps {
+                return false;
+            }
+            // Most buildings neither overlap this body point nor declare an
+            // underside. Only a possible underpass needs the repeated vertex
+            // elevation samples used to compare the complete model height.
+            let Some(height) = feature
                 .properties
                 .get("min_height")
                 .and_then(|s| terra_stream::providers::parse_osm_length(s))
-                .is_some_and(|h| h > 2.5)
-            {
-                return false;
-            }
-            if inside_polygon(position, &feature.points) {
+            else {
                 return true;
-            }
-            feature
+            };
+            let ground = feature
                 .points
                 .iter()
-                .zip(feature.points.iter().cycle().skip(1))
-                .take(feature.points.len())
-                .any(|(a, b)| {
-                    let a = frame.to_local(*a);
-                    let b = frame.to_local(*b);
-                    segment_distance_squared([a[0], a[2]], [b[0], b[2]]) < radius_sq
-                })
+                .map(|p| sample_chunk_height(chunk, *p))
+                .min_by(f64::total_cmp);
+            let body_base = position
+                .altitude_m
+                .max(sample_chunk_height(chunk, position));
+            !ground.is_some_and(|ground| {
+                terra_core::has_underpass_clearance(
+                    ground,
+                    body_base,
+                    body_height_m,
+                    f64::from(height),
+                )
+            })
         })
 }
 
@@ -401,6 +492,96 @@ mod tests {
     }
 
     #[test]
+    fn vehicle_wheel_material_support_matches_host_on_land_roads_bridges_and_missing_edges() {
+        use terra_core::{VehicleSurface, sample_vehicle_ground};
+        let origin = GeoPosition::new(48.137, 11.575, 10.).unwrap();
+        let frame = LocalFrame::new(origin);
+        let key = TileKey::at(origin, 15).unwrap();
+        let mut data = chunk(key, 10.);
+        data.features = vec![
+            WorldFeature {
+                id: "grass".into(),
+                kind: FeatureKind::Grass,
+                height_m: 0.,
+                points: [
+                    [-40., 0., -40.],
+                    [40., 0., -40.],
+                    [40., 0., 40.],
+                    [-40., 0., 40.],
+                ]
+                .map(|p| frame.to_geo(p).unwrap())
+                .to_vec(),
+                properties: BTreeMap::new(),
+            },
+            WorldFeature {
+                id: "track".into(),
+                kind: FeatureKind::Road,
+                height_m: 0.,
+                points: vec![
+                    frame.to_geo([-30., 0., 0.]).unwrap(),
+                    frame.to_geo([30., 0., 0.]).unwrap(),
+                ],
+                properties: [
+                    ("surface".into(), "gravel".into()),
+                    ("width".into(), "6".into()),
+                ]
+                .into(),
+            },
+            WorldFeature {
+                id: "deck".into(),
+                kind: FeatureKind::Road,
+                height_m: 0.,
+                points: vec![
+                    frame.to_geo([0., 0., -30.]).unwrap(),
+                    frame.to_geo([0., 0., 30.]).unwrap(),
+                ],
+                properties: [
+                    ("surface".into(), "concrete".into()),
+                    ("width".into(), "6".into()),
+                    ("bridge".into(), "yes".into()),
+                ]
+                .into(),
+            },
+        ];
+        let resident = ResidentChunks {
+            level: 15,
+            chunks: [(key, Arc::new(data.clone()))].into(),
+        };
+        let mut host = terra_net::ResidentSurface::new(15);
+        host.register_chunk(&data);
+        let weather = WeatherSample::default();
+        for (offset, material, height) in [
+            ([0., 0., 0.], VehicleSurface::Paved, 14.),
+            ([15., 0., 0.], VehicleSurface::Gravel, 10.),
+            ([15., 0., 15.], VehicleSurface::Grass, 10.),
+        ] {
+            let position = frame.to_geo(offset).unwrap();
+            let local =
+                vehicle_ground_support(&resident, position, 0., 2.65, 2., &weather).unwrap();
+            let authority =
+                sample_vehicle_ground(position, 0., 2.65, 1.72, |p| host.vehicle_ground_sample(p))
+                    .unwrap();
+            assert_eq!(local, authority);
+            assert_eq!(local.surfaces, [material; 4]);
+            assert_eq!(local.height_m, height);
+        }
+        let bounds = key.bounds();
+        let edge = GeoPosition::new(
+            (bounds.north + bounds.south) * 0.5,
+            bounds.east - 1e-10,
+            10.,
+        )
+        .unwrap();
+        assert!(vehicle_ground_support(&resident, edge, 0., 2.65, 2., &weather).is_none());
+        assert!(
+            sample_vehicle_ground(edge, 0., 2.65, 1.72, |p| host.vehicle_ground_sample(p)).is_err()
+        );
+        let missing = frame.to_geo([3000., 0., 0.]).unwrap();
+        assert_eq!(vehicle_ground_sample(&resident, missing, &weather), None);
+        assert_eq!(host.vehicle_ground_sample(missing), None);
+    }
+
+    #[test]
     fn real_negative_elevation_needs_a_water_mask() {
         let position = geo(52., 5.);
         let key = TileKey::at(position, 15).unwrap();
@@ -472,5 +653,56 @@ mod tests {
             .unwrap()
             .slope_degrees;
         assert!((slope - 45.).abs() < 0.3, "cross-tile slope={slope}");
+    }
+    #[test]
+    fn source_underpass_uses_model_height_and_terrain_instead_of_zero_source_elevation() {
+        let origin = GeoPosition::new(48.137, 11.575, 250.025).unwrap();
+        let key = TileKey::at(origin, 15).unwrap();
+        let frame = LocalFrame::new(origin);
+        let mut points = [[-8., 0., -8.], [8., 0., -8.], [8., 0., 8.], [-8., 0., 8.]]
+            .map(|offset| frame.to_geo(offset).unwrap())
+            .to_vec();
+        for point in &mut points {
+            point.altitude_m = 0.;
+        }
+        let chunk = WorldChunk {
+            key,
+            heights: terra_core::HeightField::constant(250.),
+            features: vec![terra_core::WorldFeature {
+                id: "overhead-part".into(),
+                kind: FeatureKind::Building,
+                points,
+                height_m: 8.,
+                properties: [("min_height".into(), "240 cm".into())].into(),
+            }],
+            sources: vec![],
+            warnings: vec![],
+        };
+        let resident = ResidentChunks {
+            level: 15,
+            chunks: [(key, std::sync::Arc::new(chunk))].into(),
+        };
+        assert!(!source_building_at_with_clearance(
+            &resident, origin, 0.2, 1.55
+        ));
+        assert!(source_building_at_with_clearance(
+            &resident, origin, 0.2, 3.25
+        ));
+        assert!(source_building_at(&resident, origin, 0.2));
+        assert!(source_building_at_with_clearance(
+            &resident,
+            GeoPosition {
+                altitude_m: 252.,
+                ..origin
+            },
+            0.2,
+            1.55
+        ));
+        assert!(source_building_at_with_clearance(
+            &resident,
+            origin,
+            0.2,
+            f64::NAN
+        ));
     }
 }

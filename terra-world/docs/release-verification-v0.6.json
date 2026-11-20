@@ -1,0 +1,42 @@
+{
+  "release": "0.6.0",
+  "validation_date": "2026-10-27",
+  "wire_protocol": 4,
+  "domain_save_version": 1,
+  "regional_schema_version": 1,
+  "distinct_rust_tests": 393,
+  "failed_final_tests": 0,
+  "ignored_final_tests": 0,
+  "by_crate": {
+    "terra-cli": 4,
+    "terra-core": 19,
+    "terra-history": 13,
+    "terra-net": 79,
+    "terra-persistence": 26,
+    "terra-sandbox": 127,
+    "terra-stream": 20,
+    "terra-bevy": 63,
+    "terra-demo": 42
+  },
+  "counting_policy": "288 non-Bevy tests plus 42 demo tests plus 42 Bevy render-library tests plus 21 Bevy integrations. The 23 headless-library cases are also in the render-library suite and counted once. Earlier attempts, targeted reruns, examples, CLI smoke and native interactions are excluded from the Rust total.",
+  "gates": {
+    "headless_workspace": "passed",
+    "bevy_no_default_features": "passed",
+    "bevy_render_library": "passed",
+    "native_demo_tests": "passed",
+    "headless_example": "passed",
+    "custom_provider_example": "passed",
+    "native_executable_build": "passed",
+    "cargo_fmt_check": "passed",
+    "server_cli_operations": "passed",
+    "native_confirmation": "passed"
+  },
+  "evidence": [
+    "headless-verification-v0.6.json",
+    "server-operations-v0.6.json",
+    "regional-probe-v0.6.json",
+    "native-v6-verification.json"
+  ],
+  "native_binary_sha256": "d9d54a955e3c8cb37bdfcb7fe5674c7720e712ca11280084109eaa6c4d418f8e",
+  "scope": "Bounded local correctness, actual localhost TCP/TLS, regional SQLite recovery, and Linux/X11 native interaction with Mesa software Vulkan. No full Motor Town parity, AAA quality, gaming-GPU performance, public authentication, distributed authority, or MMORPG concurrency certification."
+}

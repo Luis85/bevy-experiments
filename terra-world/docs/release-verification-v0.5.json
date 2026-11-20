@@ -1,0 +1,72 @@
+{
+  "release": "0.5.0",
+  "validation_date": "2026-10-27",
+  "toolchain": {
+    "rust": "1.99.1",
+    "bevy": "0.20.0",
+    "rusqlite": "0.40.2",
+    "bundled_sqlite": "3.53.2"
+  },
+  "distinct_rust_tests": 320,
+  "test_gate_totals": {
+    "non_bevy": 239,
+    "bevy_no_default": 40,
+    "bevy_render_library": 40,
+    "native_demo": 22
+  },
+  "shared_tests_counted_once": 21,
+  "suite_counts": {
+    "core": 12,
+    "history": 13,
+    "cli": 4,
+    "stream": 20,
+    "sandbox": 107,
+    "network": 63,
+    "persistence": 20,
+    "bevy_render_library": 40,
+    "bevy_integration": 19,
+    "demo": 22
+  },
+  "process_groups": {
+    "procedural_two_clients": true,
+    "save_restart_two_identities": true,
+    "regional_restart_identity_and_export": true,
+    "ambiguous_restore_modes_rejected": true,
+    "regional_export_aliases_rejected_before_open": true,
+    "historical_pack_politics_client": true,
+    "mismatched_epoch_pack_politics_rejected": true,
+    "invalid_history_startup_and_resume_rejected": true,
+    "special_file_inputs_rejected_without_blocking": true
+  },
+  "compiled_native_output_preflight": [
+    {
+      "case": "telemetry_database",
+      "exit_code": 1,
+      "rejected_before_window": true
+    },
+    {
+      "case": "telemetry_journal",
+      "exit_code": 1,
+      "rejected_before_window": true
+    },
+    {
+      "case": "screenshot_database",
+      "exit_code": 1,
+      "rejected_before_window": true
+    },
+    {
+      "case": "political_export_database",
+      "exit_code": 1,
+      "rejected_before_window": true
+    }
+  ],
+  "headless_examples": {
+    "headless": true,
+    "custom_provider": true
+  },
+  "native_build": true,
+  "native_sessions_passed": 3,
+  "regional_probe": "regional-probe-v0.5.json",
+  "native_evidence": "native-v5-verification.json",
+  "scope": "Actual local tests and finite fixtures; no production concurrency, GPU frame-rate or distributed durability claim."
+}

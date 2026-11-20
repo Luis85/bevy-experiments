@@ -1,0 +1,14 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "original_files": 43,
+  "changed_files": [
+    "worlds/recovered-1793247357-59872-1/world.json"
+  ],
+  "new_name": "Valley - retained copy",
+  "cancel_preserved_all_43_files": true,
+  "rename_changed_only_selected_profile": true,
+  "backup_and_database_bytes_unchanged": true,
+  "no_new_profile": true,
+  "exact_title_only_change_verified": true
+}

@@ -1,0 +1,15 @@
+{
+  "status": "source_review_passed",
+  "scope": "Independent source adaptation review only; not final archive or canonical release execution.",
+  "helper": "docs/verification/v0.23-delivery/package_source_023.py",
+  "helper_sha256": "df3184eefeee94abee03c710819f61d8dd0aea65c7eccc321904133791f5b43b",
+  "historical_helper": "docs/verification/v0.22-delivery/package_source_022.py",
+  "historical_helper_sha256": "2eac485e50749c7822375550edfc011b058a732341f65d4a259eff6328c7b7fd",
+  "syntax_accepted": true,
+  "only_intended_release_baseline_and_evidence_path_substitutions": true,
+  "baseline_sha256": "54ba5420db937056ba62e1f7861308a4ea540112f52ae500af10e92e897a739e",
+  "baseline_regular_members": 2790,
+  "release": "0.23.0",
+  "actual_final_acceptance_required": true,
+  "final_archive_execution": "pending_integrator"
+}

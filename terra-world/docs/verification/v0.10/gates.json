@@ -1,0 +1,271 @@
+{
+  "version": "0.10.0",
+  "started_utc": "2026-10-28T12:14:47.378948+00:00",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "jobs": 3,
+  "network_tests": "Actual localhost TCP/TLS; runner outside restricted socket sandbox.",
+  "gates": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.334,
+      "log": "docs/verification/v0.10/format.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    },
+    {
+      "name": "headless",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--exclude",
+        "terra-demo",
+        "--exclude",
+        "terra-bevy",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 88.802,
+      "log": "docs/verification/v0.10/headless.log",
+      "passed_test_executions": 474,
+      "ignored": 0
+    },
+    {
+      "name": "career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_depots",
+        "six_session_warehouse_career_conserves_finite_goods_cash_and_recovers_scarcity",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 35.269,
+      "log": "docs/verification/v0.10/career-report.log",
+      "passed_test_executions": 1,
+      "ignored": 0
+    },
+    {
+      "name": "bevy-procedural",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--locked",
+        "--offline",
+        "--test",
+        "procedural_settlement",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 197.96,
+      "log": "docs/verification/v0.10/bevy-procedural.log",
+      "passed_test_executions": 1,
+      "ignored": 0,
+      "timing_scope": "Standalone Rust test execution; Cargo build overhead excluded",
+      "execution_scope": "Previously completed on identical frozen inputs; source continuity and binary identity verified before consolidated run",
+      "cargo_build_jobs": 4,
+      "provenance": "docs/verification/v0.10/procedural-standalone.json"
+    },
+    {
+      "name": "bevy-headless",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--locked",
+        "--offline",
+        "--",
+        "--skip",
+        "default_munich_procedural_settlement_produces_and_physically_delivers"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.334,
+      "log": "docs/verification/v0.10/bevy-headless.log",
+      "passed_test_executions": 63,
+      "ignored": 0
+    },
+    {
+      "name": "bevy-render",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-bevy",
+        "--lib",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 61.939,
+      "log": "docs/verification/v0.10/bevy-render.log",
+      "passed_test_executions": 68,
+      "ignored": 0
+    },
+    {
+      "name": "demo",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-demo",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 65.261,
+      "log": "docs/verification/v0.10/demo.log",
+      "passed_test_executions": 91,
+      "ignored": 0
+    },
+    {
+      "name": "demo-check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "terra-demo",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 86.467,
+      "log": "docs/verification/v0.10/demo-check.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    },
+    {
+      "name": "headless-example",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--example",
+        "headless",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.515,
+      "log": "docs/verification/v0.10/headless-example.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    },
+    {
+      "name": "custom-provider-example",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--example",
+        "custom_provider",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.531,
+      "log": "docs/verification/v0.10/custom-provider-example.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    },
+    {
+      "name": "asset-pack",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "crates/terra-bevy/assets/wildlife-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.322,
+      "log": "docs/verification/v0.10/asset-pack.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    },
+    {
+      "name": "recovery-probe",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-persistence",
+        "--example",
+        "recovery_probe",
+        "--locked",
+        "--offline",
+        "--",
+        "--output",
+        "docs/recovery-verification-v0.10.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 10.03,
+      "log": "docs/verification/v0.10/recovery-probe.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    },
+    {
+      "name": "native-build",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "terra-demo",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 53.15,
+      "log": "docs/verification/v0.10/native-build.log",
+      "passed_test_executions": 0,
+      "ignored": 0
+    }
+  ],
+  "finished_utc": "2026-10-28T12:21:37.352921+00:00",
+  "native_binary_sha256": "b4add5c97c124f8edfc278c5bd63ce7b9632a22e0ee3bfa2119c65b3b6407405",
+  "compiled_inputs_unchanged": true,
+  "distinct_tests_by_crate": {
+    "terra-bevy": 90,
+    "terra-cli": 4,
+    "terra-core": 33,
+    "terra-demo": 91,
+    "terra-history": 13,
+    "terra-net": 115,
+    "terra-persistence": 35,
+    "terra-sandbox": 242,
+    "terra-stream": 32
+  },
+  "distinct_passing_rust_tests": 655
+}

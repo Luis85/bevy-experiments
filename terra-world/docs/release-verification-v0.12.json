@@ -1,0 +1,161 @@
+{
+  "version": "0.12.0",
+  "recorded_utc": "2026-10-28T16:45:49.355118+00:00",
+  "status": "fresh release gates and final native confirmation passed",
+  "compatibility": {
+    "wire_protocol": 9,
+    "tls_alpn": "terra-world/9",
+    "domain_save": 1,
+    "regional_schema": 1,
+    "mixed_executable_versions_certified": false
+  },
+  "automated": {
+    "gate_count": 20,
+    "distinct_passing_rust_tests": 747,
+    "by_crate": {
+      "terra-bevy": 107,
+      "terra-cli": 4,
+      "terra-core": 33,
+      "terra-demo": 102,
+      "terra-history": 13,
+      "terra-net": 119,
+      "terra-persistence": 35,
+      "terra-sandbox": 290,
+      "terra-stream": 44
+    },
+    "failed": 0,
+    "ignored": 0,
+    "all_commands_executed_fresh": true,
+    "commands_and_logs": {
+      "path": "docs/verification/v0.12-final/gates.json",
+      "sha256": "f58f15ac7de414cdbd81afc67bbfc5f6bd868684a008bf13c86dee34247bf261",
+      "bytes": 14087
+    },
+    "test_identities": {
+      "path": "docs/verification/v0.12-final/distinct-tests.json",
+      "sha256": "a8906ab44a4820b80379c65d1aa60b082d5ec2a7fbe8b86aaa41c59076a56809",
+      "bytes": 116659
+    }
+  },
+  "source_freeze": {
+    "inputs": 327,
+    "unchanged_through_gates_and_native_confirmation": true,
+    "manifest": {
+      "path": "docs/verification/v0.12-final/source-hashes.json",
+      "sha256": "fca6ddead76de3c0b9d8957e5a4c4454db27e378c748137bee82eeca09880cec",
+      "bytes": 38282
+    },
+    "previous_release_comparison": {
+      "path": "docs/verification/v0.12-final/baseline-comparison.json",
+      "sha256": "3183cb79ff683f72616a0886c676e93b8742a8de01dfff611ac8cc19f116be30",
+      "bytes": 27608
+    }
+  },
+  "native": {
+    "binary_sha256": "4b1a7ae522a51e321dad33fbfb7e3b83f098c3dd3d1b025825f39034ada2de95",
+    "evidence": {
+      "path": "docs/native-v12-verification.json",
+      "sha256": "4c8a646669f20fa096d1ec2f03a76dd810a7dafc5895bad335a9e311231ae699",
+      "bytes": 28599
+    }
+  },
+  "acceptance_reports": {
+    "contributed_stock_career": {
+      "path": "docs/verification/v0.12-final/career-report.json",
+      "sha256": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+      "bytes": 12948
+    },
+    "purchased_stock_career": {
+      "path": "docs/verification/v0.12-final/purchased-career-report.json",
+      "sha256": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+      "bytes": 12966
+    },
+    "historical_traffic_recovery": {
+      "path": "docs/verification/v0.12-final/traffic-recovery.json",
+      "sha256": "0f78fb3565db55773ee4ebb281d9bbda71d3a9a6c134533fa15c6bb45e5d4e7c",
+      "bytes": 1665
+    },
+    "asset_pack": {
+      "path": "docs/verification/v0.12-final/asset-pack.json",
+      "sha256": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+      "bytes": 3261
+    },
+    "source_inspection": {
+      "path": "docs/verification/v0.12-final/source-inspection.json",
+      "sha256": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+      "bytes": 4169
+    },
+    "source_export": {
+      "path": "docs/verification/v0.12-final/source-export.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "source_install": {
+      "path": "docs/verification/v0.12-final/source-install.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "source_verification": {
+      "path": "docs/verification/v0.12-final/source-verify.json",
+      "sha256": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+      "bytes": 4528
+    },
+    "storage_recovery": {
+      "path": "docs/verification/v0.12-final/recovery.json",
+      "sha256": "7930b4d741d5b3b8e91bdafb8ccf0ee8ffe9777191ce6384b37c7c35b1f1d362",
+      "bytes": 1884
+    },
+    "prepared_terrain_live_recovery": {
+      "path": "docs/verification/v0.12-final/regional-sessions.json",
+      "sha256": "46804aec8455fde72c00e4ef33d81b28756243682fed0fb53dce403d016a41f2",
+      "bytes": 30543
+    }
+  },
+  "historical_traffic_baseline": {
+    "path": "docs/verification/v0.12-final/traffic-v0.11-baseline.log",
+    "sha256": "404613f728fd4e1e0c47d83f58c406bafaa657c608be188fe4044a4aac9f3500",
+    "bytes": 12148
+  },
+  "prior_incomplete_attempts": [
+    {
+      "accepted_as_release_evidence": false,
+      "reason": "Compiler output volume filled; only disposable incremental build cache was removed before a fresh run.",
+      "record": {
+        "path": "docs/verification/v0.12-incomplete-disk-space/gates.json",
+        "sha256": "60a066a0fe285db43c0602e8fc4731aff9533783c5c93fe810475116f4b2721c",
+        "bytes": 1979
+      }
+    },
+    {
+      "accepted_as_release_evidence": false,
+      "reason": "An older household fixture omitted its known payroll journal entry; the fixture and two depot boundary setups were corrected without weakening production validation.",
+      "record": {
+        "path": "docs/verification/v0.12-incomplete-household-fixture/gates.json",
+        "sha256": "43f6be424ef86bcdc534252bc63fdb2965d945d85103db14971408b060d7eff4",
+        "bytes": 1982
+      }
+    }
+  ],
+  "product_review": {
+    "path": "docs/PRODUCT_REVIEW.md",
+    "sha256": "2036e2c0d3c3eced9f014a994446f2699ff34dec43d0ccc12922d28367bd1b1c",
+    "bytes": 24033
+  },
+  "gap_register": {
+    "path": "docs/REVIEW_GAPS_v0.12.md",
+    "sha256": "ecdb3f7f9aae5b54bec7b8211ddcd01a96e85f674dca910f42a85c9204143ea5",
+    "bytes": 18297
+  },
+  "validation_narrative": {
+    "path": "docs/VALIDATION.md",
+    "sha256": "4bdb8d8877a28127ca19379b7a56da74b42549b860617d2db5f54476ae1e9ce8",
+    "bytes": 26876
+  },
+  "remaining_qualification": [
+    "Campaign-length balance and a complete game-defined cost basis for contributed inputs, vehicle capital and player labor.",
+    "General dense-network recovery and new obstacle-corner planning beyond admitted existing-waypoint walking shortcuts.",
+    "Licensed real-world source preparation, update/distribution policy and worldwide coverage.",
+    "Long-duration active populations, Internet conditions, deployment measurements and distributed authority.",
+    "Physical GPU memory/frame-time behavior, physical controllers/wheels, screen readers, localization and non-Linux platforms."
+  ]
+}

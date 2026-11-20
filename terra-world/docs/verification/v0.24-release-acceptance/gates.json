@@ -1,0 +1,2020 @@
+{
+  "version": "0.24.0",
+  "started_utc": "2026-10-30T13:13:54.011453+00:00",
+  "status": "passed",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.12.14",
+    "cargo_build_jobs": "3",
+    "cargo_build_target_environment": null,
+    "offline": true,
+    "gate_timeout_seconds": 3600.0,
+    "gate_output_limit_bytes": 67108864
+  },
+  "scope": "Local TCP/TLS with prepared terrain and 1024 cold overlay regions; bounded autonomous geometry including narrow corridors and restored support, live owner commitments, finite commercial careers, named managed and complete local recovery, portable sources, original animated human/vehicle/wildlife packs, retained diagnostics, native code and build. Native interaction, hardware/platform qualification and uncoached player experience require separate review.",
+  "source_inputs": 390,
+  "gates": [
+    {
+      "name": "compatibility",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "scripts/check_compatibility.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.062,
+      "log": "compatibility.log",
+      "log_sha256": "5cde5260a0aff895ae2fc062dbe56b16b3ae339e6e90af2b79b92221e9a95151",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1066,
+        "retained_log_bytes": 1066,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "desktop-packaging-tests",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.398,
+      "log": "desktop-packaging-tests.log",
+      "log_sha256": "4d5d3aec8b5c5e710c5ad6156cd444e59e81f505c63cc14f22de4634ff37c530",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 12810,
+        "retained_log_bytes": 12810,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.125,
+      "log": "format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 0,
+        "retained_log_bytes": 0,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "headless",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--exclude",
+        "terra-demo",
+        "--exclude",
+        "terra-bevy",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 527.791,
+      "log": "headless.log",
+      "log_sha256": "b0d790ab44cd3320dd5770928efbb275a702b4f9a2b9cec5c07839ab6c8938eb",
+      "passed_test_executions": 668,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 71110,
+        "retained_log_bytes": 71110,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_depots",
+        "six_session_warehouse_career_conserves_finite_goods_cash_and_recovers_scarcity",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 23.518,
+      "log": "career-report.log",
+      "log_sha256": "6ffa9da6af90bc66bfaa98f54384bc116ec7d3a851d04e97988533940a647a70",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 8937,
+        "retained_log_bytes": 8937,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "purchased-career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_depots",
+        "purchased_stock_career_accounts_for_acquisition_setup_and_recovery_without_inventing_profit",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.662,
+      "log": "purchased-career-report.log",
+      "log_sha256": "9d0d942d49df4cfe738806bf0de1c16ed211f90ec7c1f3116104701f93e2187d",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 8860,
+        "retained_log_bytes": 8860,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "novice-career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_career",
+        "finite_novice_passenger_career_prices_rental_costs_and_resumes_for_one_physical_hour",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 73.627,
+      "log": "novice-career-report.log",
+      "log_sha256": "446c18decd3f660b7a2f0223a1d11e9ee2adb2d2659e72315e835b0c270a7e31",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 9988,
+        "retained_log_bytes": 9988,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "traffic-recovery",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "traffic_recovery",
+        "--locked",
+        "--offline",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 17.697,
+      "log": "traffic-recovery.log",
+      "log_sha256": "a76c92428d647c04f3ad7d89f232a31aeee9de5782ab47d7ac7b17af5802038d",
+      "passed_test_executions": 3,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1895,
+        "retained_log_bytes": 1895,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "navigation-cluster",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "navigation_clusters",
+        "autonomous_vehicle_passes_a_cluster_without_moving_parked_bodies_or_losing_its_load",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.792,
+      "log": "navigation-cluster.log",
+      "log_sha256": "a02f6cf328e6cf4c94c7fdd79014e9a6c75ba1f885871cc344b5b1599c01fb8d",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1488,
+        "retained_log_bytes": 1488,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "navigation-geometry",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "navigation_geometry",
+        "--locked",
+        "--offline",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 24.63,
+      "log": "navigation-geometry.log",
+      "log_sha256": "e34ab28d270531fb84d7a8d2b04a9cc0562916d45860a06d8eb6579d23d774ad",
+      "passed_test_executions": 10,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 7854,
+        "retained_log_bytes": 7854,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "guidance-continuity",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "guidance_commitments",
+        "continuing_guidance_journey_preserves_obligations_and_rebuilds_after_resume",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.399,
+      "log": "guidance-continuity.log",
+      "log_sha256": "4befc08469093a1f169f15de866da5fbcb4d7c369367f11506b70f7b6c5c69ba",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1684,
+        "retained_log_bytes": 1684,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "bevy-headless",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 305.753,
+      "log": "bevy-headless.log",
+      "log_sha256": "6b80b90a2c475b2b4dcbc31ca7a94d65f7b1a09fb99056132ef489d7eaebd82e",
+      "passed_test_executions": 121,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 15326,
+        "retained_log_bytes": 15326,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "bevy-render",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-bevy",
+        "--lib",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 83.647,
+      "log": "bevy-render.log",
+      "log_sha256": "e749d75808d56c4f723feb9d4b57f9bd0a5a2dee7b7925d533a419a24a112044",
+      "passed_test_executions": 140,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 14381,
+        "retained_log_bytes": 14381,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "demo",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-demo",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 77.225,
+      "log": "demo.log",
+      "log_sha256": "28a33223415f64ffa9bb052cdc63043a9a33ce8094aa8098c53234c71d3e22e3",
+      "passed_test_executions": 250,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 26270,
+        "retained_log_bytes": 26270,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "launcher-recovery",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-demo",
+        "launcher::recovery::tests::managed_recovery_journey_preserves_complete_world_after_original_loss",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.938,
+      "log": "launcher-recovery.log",
+      "log_sha256": "43f5c6efed5a118cbb1e69e47aad0e6035e2ffbaeab1a3802c7732104527ea35",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1001,
+        "retained_log_bytes": 1001,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "launcher-world-names",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-demo",
+        "launcher::recovery::tests::named_recovery_copies_and_rename_preserve_progress_and_survive_relisting",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.427,
+      "log": "launcher-world-names.log",
+      "log_sha256": "210ecb00004bf121edd4b6e158d2ae92c5d9bc391c0a68cb7ef34a4d6841ff41",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1004,
+        "retained_log_bytes": 1004,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "demo-check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "terra-demo",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 13.249,
+      "log": "demo-check.log",
+      "log_sha256": "425e2ff46139c90021a64c185c9d060f2e7e60fdf8078be5cbf7a3cecfdfedbe",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 941,
+        "retained_log_bytes": 941,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "headless-example",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--example",
+        "headless",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.52,
+      "log": "headless-example.log",
+      "log_sha256": "ad14de5ca3e86c62bc2250d1a074a4d07b8ff89eeb18c445e8eb44122cc9f646",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 221,
+        "retained_log_bytes": 221,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "custom-provider-example",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--example",
+        "custom_provider",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.509,
+      "log": "custom-provider-example.log",
+      "log_sha256": "0c3febf43af6a100cec849711730e627f3d1b6659410f4b1eae160a9d95853b0",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 159,
+        "retained_log_bytes": 159,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "asset-pack",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "crates/terra-bevy/assets/wildlife-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.277,
+      "log": "asset-pack.log",
+      "log_sha256": "4dc492d4dc4383b53cba21c7fc6f2a78980cae27322cf6e66535ff563f35690c",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 3432,
+        "retained_log_bytes": 3432,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "asset-inspect",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "inspect",
+        "crates/terra-bevy/assets/wildlife-pack/deer.glb"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.286,
+      "log": "asset-inspect.log",
+      "log_sha256": "61869b7decc9c569bfe03c132fa5a4861efa580791ca9509f044d1fe0a135cc8",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 2424,
+        "retained_log_bytes": 2424,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "asset-build",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "build",
+        "crates/terra-bevy/assets/wildlife-authoring.recipe.json",
+        "/tmp/terra-verified-sources-c9p7v2dw/authored-pack"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.255,
+      "log": "asset-build.log",
+      "log_sha256": "d876188d259355ce7638fb4323d7aa4666648b5bcdf0720de907958397dfa698",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 13045,
+        "retained_log_bytes": 13045,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "asset-authored-validate",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "/tmp/terra-verified-sources-c9p7v2dw/authored-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.245,
+      "log": "asset-authored-validate.log",
+      "log_sha256": "c123938340b718333612ebd161b51bac583cdc2e9cfe70468a220fbab6efb4fa",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 3453,
+        "retained_log_bytes": 3453,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "vehicle-generator",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "crates/terra-bevy/assets/transport-pack/generate.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.053,
+      "log": "vehicle-generator.log",
+      "log_sha256": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 178,
+        "retained_log_bytes": 178,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "vehicle-inspect",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "inspect",
+        "crates/terra-bevy/assets/transport-pack/comet.glb"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.236,
+      "log": "vehicle-inspect.log",
+      "log_sha256": "ac55aef9d1d95e43b0204aad5b0f16e4541de8db8b5dc2c8a23ee019c21c82d3",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 3715,
+        "retained_log_bytes": 3715,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "vehicle-pack",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "crates/terra-bevy/assets/transport-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.255,
+      "log": "vehicle-pack.log",
+      "log_sha256": "cbf5270e0b205eb4d6609fa25cc36a5d6887f776c6060ec720058892d50e5af0",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1067,
+        "retained_log_bytes": 1067,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "vehicle-demo-pack",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "crates/terra-bevy/assets/transport-demo.pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.266,
+      "log": "vehicle-demo-pack.log",
+      "log_sha256": "dc5e751cc8770490c3e62bd6fa1cf0770ac2ea046f3d590e2b353995c3bc2d75",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4031,
+        "retained_log_bytes": 4031,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "vehicle-asset-build",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "build",
+        "crates/terra-bevy/assets/transport-authoring.recipe.json",
+        "/tmp/terra-verified-sources-c9p7v2dw/vehicle-authored-pack"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.266,
+      "log": "vehicle-asset-build.log",
+      "log_sha256": "53b90aa257e9c770fb3106eadf887a43c514c2d2f37c975d9853ae82ee5c508d",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 17197,
+        "retained_log_bytes": 17197,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "vehicle-authored-validate",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "/tmp/terra-verified-sources-c9p7v2dw/vehicle-authored-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.298,
+      "log": "vehicle-authored-validate.log",
+      "log_sha256": "ecdcbd1124f6d3521fef0d27eeb5bafd38433f068a349f3faebc616d87b32534",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4063,
+        "retained_log_bytes": 4063,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "character-generator",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "crates/terra-bevy/assets/character-pack/generate.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.094,
+      "log": "character-generator.log",
+      "log_sha256": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 858,
+        "retained_log_bytes": 858,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "character-inspect",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "inspect",
+        "crates/terra-bevy/assets/character-pack/fieldhand.glb"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.338,
+      "log": "character-inspect.log",
+      "log_sha256": "84c2c51020f86426aad93fe1dd52d5857d0d101fb811d2693cb62cddc3931217",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 2357,
+        "retained_log_bytes": 2357,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "character-pack",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "crates/terra-bevy/assets/character-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.287,
+      "log": "character-pack.log",
+      "log_sha256": "442e2382781c323095eb309a7da9eeea4a5c72c7c1ec0b92f531a4a4eee4a3f9",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 1078,
+        "retained_log_bytes": 1078,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "character-demo-pack",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "crates/terra-bevy/assets/character-demo.pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.265,
+      "log": "character-demo-pack.log",
+      "log_sha256": "c4631716d172f3e2266c9a7d5fa17879f3739011e2df349b4d3f540aadd3619d",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4647,
+        "retained_log_bytes": 4647,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "character-asset-build",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "build",
+        "crates/terra-bevy/assets/character-authoring.recipe.json",
+        "/tmp/terra-verified-sources-c9p7v2dw/character-authored-pack"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.245,
+      "log": "character-asset-build.log",
+      "log_sha256": "aeb90b1d020741d3a148f0c033d6262a2304cc4aaf3a776c6530fb5af0e45618",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 19452,
+        "retained_log_bytes": 19452,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "character-authored-validate",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--bin",
+        "terra-assets",
+        "--locked",
+        "--offline",
+        "--",
+        "validate",
+        "/tmp/terra-verified-sources-c9p7v2dw/character-authored-pack/pack.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.246,
+      "log": "character-authored-validate.log",
+      "log_sha256": "1d7eda2146d7c2514796ebfc64adc71a1189938a6a464db37a8896f46c1d351f",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4668,
+        "retained_log_bytes": 4668,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "source-inspect",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-stream",
+        "--bin",
+        "terra-sources",
+        "--locked",
+        "--offline",
+        "--",
+        "inspect",
+        "crates/terra-stream/data/heightmap-connected/manifest.json",
+        "--require-complete"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.085,
+      "log": "source-inspect.log",
+      "log_sha256": "50126a508198a81e52ac2aa91296d62a0a5a567f7f8eeb264e61d23237bb5173",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4476,
+        "retained_log_bytes": 4476,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "source-export",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-stream",
+        "--bin",
+        "terra-sources",
+        "--locked",
+        "--offline",
+        "--",
+        "export",
+        "crates/terra-stream/data/heightmap-connected/manifest.json",
+        "/tmp/terra-verified-sources-c9p7v2dw/exported",
+        "--require-complete"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.185,
+      "log": "source-export.log",
+      "log_sha256": "b228c7ea146e87b37bb415c93975e28f9cec4e9e8feecf50302f9f2e13b1d881",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4773,
+        "retained_log_bytes": 4773,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "source-install",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-stream",
+        "--bin",
+        "terra-sources",
+        "--locked",
+        "--offline",
+        "--",
+        "install",
+        "/tmp/terra-verified-sources-c9p7v2dw/exported",
+        "/tmp/terra-verified-sources-c9p7v2dw/installed",
+        "--require-complete",
+        "--expect-package",
+        "blake3:3b32bc568e5a06f630d0eedf77ada455d1806985250cafc349becb8ce7cf3c76",
+        "--expect-source",
+        "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.185,
+      "log": "source-install.log",
+      "log_sha256": "2b244c65bf843c4eefa367f30fb5186b46c7246d3b0d893a58da90ba9c4b5115",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4953,
+        "retained_log_bytes": 4953,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "source-verify",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-stream",
+        "--bin",
+        "terra-sources",
+        "--locked",
+        "--offline",
+        "--",
+        "verify",
+        "/tmp/terra-verified-sources-c9p7v2dw/installed",
+        "--require-complete",
+        "--expect-package",
+        "blake3:3b32bc568e5a06f630d0eedf77ada455d1806985250cafc349becb8ce7cf3c76",
+        "--expect-source",
+        "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.165,
+      "log": "source-verify.log",
+      "log_sha256": "9ab376f847f536ad61efd4c3bab47744353bdab70f877faa9b0d5dfbe150c274",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 4906,
+        "retained_log_bytes": 4906,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "recovery-probe",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-persistence",
+        "--example",
+        "recovery_probe",
+        "--locked",
+        "--offline",
+        "--",
+        "--output",
+        "docs/verification/v0.24-release-acceptance/recovery.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.377,
+      "log": "recovery-probe.log",
+      "log_sha256": "bd3f3d0e949e19ac6de1e3957161313eac98faa927743dd31e04aa732d98e4f5",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 2074,
+        "retained_log_bytes": 2074,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "recovery-bundle",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--example",
+        "recovery_bundle_probe",
+        "--locked",
+        "--offline",
+        "--",
+        "--output",
+        "docs/verification/v0.24-release-acceptance/recovery-bundle.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.166,
+      "log": "recovery-bundle.log",
+      "log_sha256": "3510dbb5328503a705f0bd1b5f6f1fa3073225e101086d8c55b3b89697f2beba",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 3417,
+        "retained_log_bytes": 3417,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "session-probe-checks",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-net",
+        "--example",
+        "regional_session_load",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.529,
+      "log": "session-probe-checks.log",
+      "log_sha256": "050b37d71904a3ce8df1811ff440375cfe6764eb9c263d3933a5ebc1bc388b0b",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 488,
+        "retained_log_bytes": 488,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "regional-sessions",
+      "command": [
+        "cargo",
+        "run",
+        "-p",
+        "terra-net",
+        "--example",
+        "regional_session_load",
+        "--locked",
+        "--offline",
+        "--",
+        "--clients",
+        "16",
+        "--cycles",
+        "8",
+        "--ticks",
+        "400",
+        "--cold-regions",
+        "1024",
+        "--transport",
+        "tls",
+        "--heightmap",
+        "crates/terra-stream/data/heightmap-connected/manifest.json",
+        "--output",
+        "docs/verification/v0.24-release-acceptance/regional-sessions.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 225.446,
+      "log": "regional-sessions.log",
+      "log_sha256": "316660418d0b97ca1b9ac92a4098ab4efa4fbbf2f1878515d44c6ed0ac58c7cb",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 30918,
+        "retained_log_bytes": 30918,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "native-build",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "terra-demo",
+        "--message-format=json",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.37,
+      "log": "native-build.log",
+      "log_sha256": "412dce016ce2dd82023b83ff146e9243b7c3bfed9676bced9bfd885b85e98958",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0,
+      "timed_out": false,
+      "timeout_seconds": 3600.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 395916,
+        "retained_log_bytes": 395916,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    }
+  ],
+  "evidence_artifacts": {
+    "startup-metadata.log": "748a624e897b9dbf6e0e48a4f1c8b8866c81c444b9bb4624e69af2d3c7c70f02",
+    "startup-toolchain.log": "55cd0529c005d3f62869ea6e2271bfa9d5196f56dc65a8be00a371af114a4a98",
+    "source-hashes.json": "1b7dc0264668315eba39d8e10acbb9fcb34a9282263413db03085c06c5117407",
+    "career-report.json": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+    "purchased-career-report.json": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+    "novice-career-report.json": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+    "traffic-recovery.json": "14dc943629496a36f4b1d05cdb1d4fdceb52001314298bc58fa7e7649b7830f2",
+    "navigation-cluster.json": "951606748eeb349eefa598cef8b098eab176047598de37f846dac44c279a4595",
+    "navigation-geometry.json": "ef7c3e110dec36ed0413f060c1ce60994b255814889fcacc74005067d4622fd1",
+    "guidance-continuity.json": "b1f7720a11daa681e4d8863a6a461663760ded8d1139f1378402a3fa43b89257",
+    "launcher-recovery.json": "0f28a6461cc8710a6e381f5ba606760059bc8dc42b404129a8c18910f5a885a2",
+    "launcher-world-names.json": "83a561d29d951186fdcd7b703942537bb0924f8184d3358e706d9cc591036e8c",
+    "asset-pack.json": "81ff19ab56ffae1ea3f98c12886a2576dc85e2279c10f9a5f332684d9638e42c",
+    "asset-inspect.json": "1b32560ff1fd3f9c0404a93b7e9a6084e20be4caf74e10142552d9016f09c263",
+    "asset-build.json": "4cd0441839d53596ce918722ff2182fd3376beaf3709e3cf51147530e2424354",
+    "asset-authored-validate.json": "6e924ee63c4e273d0d6863be589b417ab4df9bcd1bc9246b481fd6566815d8b8",
+    "vehicle-generator.json": "b0b4066ed576f0f2241b77b205eb5420ccfba8a16d4a65e8994e40c483742488",
+    "vehicle-inspect.json": "3e5f342ad5f090c9abd53d0dbe51e43d16a927642b02ba2a1fa3d0a448e65d9b",
+    "vehicle-pack.json": "7fe712cf059b7b846b22a1364dd9d35d037f3538bd318307fe38fd7a4a259625",
+    "vehicle-demo-pack.json": "1b54e95fa9fd90215ccb4dc298b62dd100dec1c07d8060acc19a9ffab86638ab",
+    "vehicle-asset-build.json": "41ebf45320d5a9eb898f5a3500882959b7f02ba75649c7a6a09fb111661a7e65",
+    "vehicle-authored-validate.json": "76eabb2a3d042c10d9dc5b03e5a3ef3a432f24d963f9ba0f4eb69a10d71c3f07",
+    "character-generator.json": "a08d562cb1c8dd48c1e7f9548d0b61c0e196022dd74e42cd2153191b350688c8",
+    "character-inspect.json": "2e3a70ab38a5c1675068f23614a3c2e4114d28bffe2e0b23b1a470940d8d83a7",
+    "character-pack.json": "3928168d402dd15595352c5e64ac1d509707337b277dd8800a0140862e7214ca",
+    "character-demo-pack.json": "7d1a3d5cab0fe8f32affc88f1b86a0bd8c70f38639c6cba2db45aa8dc6e38363",
+    "character-asset-build.json": "d26ce353915d4f114755e146239baaf9476059a702d5cf8ecc08420416c3d3e4",
+    "character-authored-validate.json": "3aaaedf689bbf483295a7aebb60697c0cb133d716fada1445332c31d1e120baf",
+    "source-inspection.json": "d6f576c93e524969af1fc8a1dccbc9808ff8a837eb25c35e73588e0422bfe457",
+    "source-export.json": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+    "source-install.json": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+    "source-verify.json": "defe9faffb32723b72359db4702f5b01ec11141c374d33d2c756950b02aefda0",
+    "recovery.json": "14c0b080277898014f85e8ef56b1771f2f178b5e12c68977f9046fee8e270f46",
+    "recovery-bundle.json": "cc6e159b043976478deb928b30d12b2466ca6ac879bb83ee0e97a85a819aa28a",
+    "regional-sessions.json": "2e6c82b377cfd303d3ab0f71a3e26a1722eeb429dd95e609e80348585039a2da",
+    "distinct-tests.json": "aa619e54f6d12b9e7545c2c90a44f5b481903e2fa481e9fb1a0733ef842aa1e7"
+  },
+  "startup_probes": [
+    {
+      "name": "metadata",
+      "command": [
+        "cargo",
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.042,
+      "log": "startup-metadata.log",
+      "log_sha256": "748a624e897b9dbf6e0e48a4f1c8b8866c81c444b9bb4624e69af2d3c7c70f02",
+      "timed_out": false,
+      "timeout_seconds": 120.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 42720,
+        "retained_log_bytes": 42720,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    },
+    {
+      "name": "toolchain",
+      "command": [
+        "rustc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.042,
+      "log": "startup-toolchain.log",
+      "log_sha256": "55cd0529c005d3f62869ea6e2271bfa9d5196f56dc65a8be00a371af114a4a98",
+      "timed_out": false,
+      "timeout_seconds": 120.0,
+      "execution": {
+        "status": "passed",
+        "process_platform": "posix",
+        "failure_reason": null,
+        "output_limit_bytes": 67108864,
+        "raw_output_bytes_observed": 36,
+        "retained_log_bytes": 36,
+        "output_overflow": false,
+        "output_complete": true,
+        "leader_exit_observed": true,
+        "descendant_check": {
+          "status": "owned_process_group_absent"
+        },
+        "cleanup": {
+          "status": "not_needed"
+        },
+        "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+      }
+    }
+  ],
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "native_binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+  "native_executable": "/tmp/terra023-target/debug/terra-demo",
+  "finished_utc": "2026-10-30T13:37:40.812703+00:00",
+  "source_inputs_unchanged": true,
+  "distinct_tests_by_crate": {
+    "terra-bevy": 180,
+    "terra-cli": 4,
+    "terra-core": 33,
+    "terra-demo": 250,
+    "terra-history": 13,
+    "terra-net": 128,
+    "terra-persistence": 53,
+    "terra-sandbox": 393,
+    "terra-stream": 45
+  },
+  "distinct_passing_rust_tests": 1099,
+  "published_reports_unchanged": true,
+  "published_logs_unchanged": true,
+  "passing_rust_test_executions": 1200,
+  "completion_record": "completed-gates.json"
+}

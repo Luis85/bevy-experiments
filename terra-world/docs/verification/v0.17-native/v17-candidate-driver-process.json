@@ -1,0 +1,32 @@
+{
+  "release": "0.17.0",
+  "phase": "candidate",
+  "command": [
+    "/tmp/terra-build/target/debug/terra-demo",
+    "--config",
+    "/tmp/terra-native-017/driver-candidate/comet-config.json",
+    "--user-data",
+    "/tmp/terra-native-017/driver-candidate/player-data",
+    "--no-default-politics",
+    "--quality",
+    "performance",
+    "--asset-pack",
+    "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017/crates/terra-bevy/assets/character-demo.pack.json",
+    "--telemetry",
+    "/tmp/terra-native-017/v17-candidate-driver-telemetry.json",
+    "--telemetry-interval-seconds",
+    "10"
+  ],
+  "working_directory": "/workspace/scratch/0fdc9aa7bc4c/work/terra-world-017",
+  "started_utc": "2026-10-29T09:11:13.115573+00:00",
+  "binary_sha256": "a6a6b6c1fd840aa448a73e6925b0d2e79ee2d8602fb47ef3af169d7eb44a0d44",
+  "source_input_count": 367,
+  "expected_interruption": false,
+  "trace_file": null,
+  "pid": 82067,
+  "exit_code": 0,
+  "finished_utc": "2026-10-29T09:19:50.960542+00:00",
+  "seconds": 517.6912004219994,
+  "source_inputs_unchanged": true,
+  "log_sha256": "a0fc2a397d7bd7dd97e31db6289a8cabb0bc13f69a7f9b083a6cafa58f4cb124"
+}

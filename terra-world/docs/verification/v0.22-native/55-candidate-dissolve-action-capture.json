@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.22.0",
+  "capture_name": "55-candidate-dissolve-action",
+  "capture_started_utc": "2026-10-29T21:16:17.205343+00:00",
+  "captured_utc": "2026-10-29T21:16:17.441779+00:00",
+  "window_id": "4194306",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 210688,
+  "window_pid_status": "available",
+  "window_pid_before": 210688,
+  "window_pid_after": 210688,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "55-candidate-dissolve-action.png",
+    "sha256": "2f6c242b4a45c77b76563fe3962c17f3662a001d636fe2050cfbd7f817ce43de",
+    "bytes": 597746
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

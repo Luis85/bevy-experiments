@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "package_version": "0.9.0",
+  "wire_protocol": 7,
+  "status": "passed",
+  "recorded_utc": "2026-10-27T17:32:48.205577+00:00",
+  "scope": "Finite localhost acceptance of actual terra-server and terra-client executables. Correctness checks only; no public identity service, packet-loss model or production capacity claim.",
+  "build_command": "cargo build -p terra-net --bins --locked --offline -j 2",
+  "command": "python3 crates/terra-net/tests/process_smoke.py --server /tmp/terra-v4-headless-target/debug/terra-server --client /tmp/terra-v4-headless-target/debug/terra-client",
+  "binaries": {
+    "terra-server": {
+      "sha256": "688d3ea57be2ced65a67f4052c4a1eb9e052f27bdeed8e2ce9c8dbd9ab748bb0"
+    },
+    "terra-client": {
+      "sha256": "25533090f5ffe9d91404faede47497605eb80f4510744ddfc1a9cb7fb1ca684f"
+    }
+  },
+  "fixture_sha256": "8ed3eb47ad06ce2f8dded1cca736076ddab42eba857438331bda1f2bb6497f47",
+  "source_bundle": {
+    "manifest": "crates/terra-stream/data/heightmap-demo/manifest-v2.json",
+    "files_sha256": {
+      "manifest-v2.json": "969d365a0d13e02a4128c124b4d5d8117ce8084f896ce3713abea061441e0e7f",
+      "features-v2.geojson": "5872e5d210f353b10a0c213b8916a2ac1f947ad36aede6a4e06222691331dc38",
+      "height.png": "bedd5fbb16a8e2765a928f34874d7a44d31e46e2d3eb643710eba9aba930ef5e"
+    }
+  },
+  "checks": {
+    "procedural_two_clients": true,
+    "save_restart_two_identities": true,
+    "regional_restart_identity_and_export": true,
+    "ambiguous_restore_modes_rejected": true,
+    "regional_export_aliases_rejected_before_open": true,
+    "historical_pack_politics_client": true,
+    "mismatched_epoch_pack_politics_rejected": true,
+    "invalid_history_startup_and_resume_rejected": true,
+    "heightmap_semantic_host_matching_admission_and_crafting": true,
+    "heightmap_mismatch_mutation_coverage_and_mixed_sources_rejected": true,
+    "special_file_inputs_rejected_without_blocking": true
+  },
+  "privacy": "Only public commands, hashes and boolean outcomes are retained. Temporary private host saves, session capabilities and databases are removed by the fixture.",
+  "interpretation": "This scoped executable run is separate from the final whole-workspace gate and its exact source provenance; its cases must not be added to Rust test totals."
+}

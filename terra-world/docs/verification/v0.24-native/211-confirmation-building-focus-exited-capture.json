@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.24.0",
+  "capture_name": "211-confirmation-building-focus-exited",
+  "capture_started_utc": "2026-10-30T12:44:52.193950+00:00",
+  "captured_utc": "2026-10-30T12:44:52.450741+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 76362,
+  "window_pid_status": "available",
+  "window_pid_before": 76362,
+  "window_pid_after": 76362,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1100,
+    700
+  ],
+  "image": {
+    "name": "211-confirmation-building-focus-exited.png",
+    "sha256": "6758c4d0baca6006e08b8162ccee5f6442c788d9f7969123ac7b63b5f4a33222",
+    "bytes": 575851
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

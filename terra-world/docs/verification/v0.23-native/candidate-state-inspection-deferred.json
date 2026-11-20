@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "release": "0.23.0",
+  "phase": "candidate",
+  "status": "deferred_nonempty_wal",
+  "recorded_utc": "2026-10-30T08:30:18.469722+00:00",
+  "scope": "A second, stricter three-way read-only inspection stopped at its required absent-or-empty WAL guard. No final receipt or unchanged-input claim was emitted by that attempt.",
+  "path": "/tmp/terra-native023/menu/worlds/recovered-1793348668-11234-1/world/world.db-wal",
+  "wal_bytes_observed_after_refusal": 1788112,
+  "database_connection_opened_for_recovered_copy": false,
+  "save_data_written": false,
+  "initial_observation": "An earlier immutable read of all three databases found generation 23, exact logical equality of all world/regions rows and the requested gameplay values. That earlier observation is separate from this refused later pass.",
+  "next_step": "Coordinate with the integrator or retain exact initial-observation scope; never ignore a nonempty WAL when claiming a current database snapshot."
+}

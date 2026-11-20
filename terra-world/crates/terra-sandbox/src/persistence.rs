@@ -1,53 +1,25 @@
 use crate::{Catalog, MAX_SAVE_BYTES, SandboxError, SandboxState};
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 impl SandboxState {
     /// Validate and atomically rename a same-directory file. The previous save
-    /// remains untouched if serialization/writing fails before rename.
+    /// remains untouched on failure before publication. A published/uncertain
+    /// error retains the new visible bytes and must not be treated as rollback.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SandboxError> {
+        self.require_complete()?;
         self.validate()?;
         let bytes = serde_json::to_vec_pretty(self)?;
         if bytes.len() > MAX_SAVE_BYTES {
             return Err(SandboxError::Capacity);
         }
-        let path = path.as_ref();
-        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-            fs::create_dir_all(parent)?;
-        }
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let name = path
-            .file_name()
-            .ok_or_else(|| SandboxError::Invalid("save path".into()))?
-            .to_string_lossy();
-        let temporary = path.with_file_name(format!(".{name}.{}.{nonce}.tmp", std::process::id()));
-        let result = (|| -> Result<(), SandboxError> {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)?;
-            file.write_all(&bytes)?;
-            file.sync_all()?;
-            drop(file);
-            fs::rename(&temporary, path)?;
-            // Best-effort directory sync on platforms that support directory
-            // handles. The file data itself was synchronously flushed above.
-            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty())
-                && let Ok(directory) = File::open(parent)
-            {
-                let _ = directory.sync_all();
-            }
-            Ok(())
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        result
+        crate::publication::write_private(
+            path.as_ref(),
+            &bytes,
+            crate::publication::PublishMode::Replace,
+        )?;
+        Ok(())
     }
 
     /// Bounded parse followed by complete version/ownership/reference checks.
@@ -60,6 +32,7 @@ impl SandboxState {
             return Err(SandboxError::Capacity);
         }
         let state: Self = serde_json::from_slice(&bytes)?;
+        state.require_complete()?;
         state.validate()?;
         Ok(state)
     }

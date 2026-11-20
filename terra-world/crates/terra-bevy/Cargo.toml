@@ -8,6 +8,7 @@ description = "Streaming geospatial environment and optional renderer for Bevy"
 
 [features]
 default = ["render"]
+tls = ["terra-net/tls"]
 render = ["bevy/default_app", "bevy/bevy_winit", "bevy/x11", "bevy/default_font", "bevy/3d_bevy_render", "bevy/ui_bevy_render", "bevy/bevy_ui_widgets", "bevy/bevy_input_focus", "bevy/bevy_picking", "bevy/ui_picking"]
 
 [dependencies]
@@ -15,9 +16,15 @@ bevy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+gltf = { version = "1.4.1", default-features = false, features = ["names"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+sha2 = "0.10"
 terra-core = { path = "../terra-core" }
 terra-stream = { path = "../terra-stream" }
 terra-net = { path = "../terra-net", default-features = false }
 terra-sandbox = { path = "../terra-sandbox" }
 terra-history = { path = "../terra-history" }
+terra-persistence = { path = "../terra-persistence" }
 
+[dev-dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled"] }

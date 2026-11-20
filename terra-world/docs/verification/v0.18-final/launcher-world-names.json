@@ -1,0 +1,15 @@
+{
+  "case": "named_recovery_copies_and_metadata_only_rename",
+  "equal_creation_timestamps": true,
+  "files_changed_by_rename": 1,
+  "restored_copies": 2,
+  "scope": "Managed local checkpoint copies and profile naming; complete byte comparison of retained world and backup trees. No offsite or unsupported-source recovery claim.",
+  "verification": {
+    "distinct_chosen_names_after_relisting": true,
+    "invalid_recovery_name_rejected_before_output": true,
+    "only_selected_profile_changed": true,
+    "only_title_field_changed": true,
+    "progress_source_and_backup_bytes_exact": true,
+    "separate_world_folders": true
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "bundles": [
+    {
+      "bounds": {
+        "east": 11.62353515625,
+        "north": 48.1640625,
+        "south": 48.1146240234375,
+        "west": 11.5740966796875
+      },
+      "elevation": {
+        "attribution": "Synthetic elevation authored for the Terra heightmap importer; not the geography of Munich. Prepared as adjacent west/east bundles with a shared elevation column.",
+        "license": "MIT OR Apache-2.0",
+        "provider": "Terra authored heightmap demonstration",
+        "retrieved_unix_seconds": 0,
+        "synthetic": true,
+        "url": "urn:terra:heightmap:demo:v1"
+      },
+      "features": {
+        "attribution": "Original synthetic forests, fields, orchard and trees; not observed land use around Munich.",
+        "license": "MIT OR Apache-2.0",
+        "provider": "Terra authored valley land cover",
+        "retrieved_unix_seconds": 0,
+        "synthetic": true,
+        "url": "urn:terra:heightmap:valley-features:v2"
+      },
+      "manifest": "east.json",
+      "revision": "terra-connected-valley-east-v1"
+    },
+    {
+      "bounds": {
+        "east": 11.5740966796875,
+        "north": 48.1640625,
+        "south": 48.1146240234375,
+        "west": 11.524658203125
+      },
+      "elevation": {
+        "attribution": "Synthetic elevation authored for the Terra heightmap importer; not the geography of Munich. Prepared as adjacent west/east bundles with a shared elevation column.",
+        "license": "MIT OR Apache-2.0",
+        "provider": "Terra authored heightmap demonstration",
+        "retrieved_unix_seconds": 0,
+        "synthetic": true,
+        "url": "urn:terra:heightmap:demo:v1"
+      },
+      "features": {
+        "attribution": "Original synthetic forests, fields, orchard and trees; not observed land use around Munich.",
+        "license": "MIT OR Apache-2.0",
+        "provider": "Terra authored valley land cover",
+        "retrieved_unix_seconds": 0,
+        "synthetic": true,
+        "url": "urn:terra:heightmap:valley-features:v2"
+      },
+      "manifest": "west.json",
+      "revision": "terra-connected-valley-west-v1"
+    }
+  ],
+  "coverage": {
+    "complete": true,
+    "fully_covered_tiles": 81,
+    "level": 15,
+    "missing_tiles": [],
+    "nodata_policy": "Dense grayscale: every admitted sample is elevation. NoData masks/sentinel detection are unsupported; split or omit uncovered rectangles before export. Coverage below checks complete geographic tiles, not surveyed accuracy.",
+    "requested_bounds": {
+      "east": 11.62353515625,
+      "north": 48.1640625,
+      "south": 48.1146240234375,
+      "west": 11.524658203125
+    },
+    "requested_tiles": 81
+  },
+  "declared_bounds": {
+    "east": 11.62353515625,
+    "north": 48.1640625,
+    "south": 48.1146240234375,
+    "west": 11.524658203125
+  },
+  "entrypoint": "manifest.json",
+  "files": [
+    {
+      "blake3": "blake3:66a3b7b66c7c505d1ed48ba1af22c5d512fda2b63bbd09c81cc03538ca5e5f62",
+      "bytes": 9866,
+      "path": "east.geojson"
+    },
+    {
+      "blake3": "blake3:0b1729555fd8c5cbdbe67424fcb98500e81db44faba0c7b2efb179cde667e59a",
+      "bytes": 1065,
+      "path": "east.json"
+    },
+    {
+      "blake3": "blake3:5f2efc81f29008a7d4cdaa93caa47a502f7c3ab3a5e4f16e309be25e6dcf8a2f",
+      "bytes": 47205,
+      "path": "east.png"
+    },
+    {
+      "blake3": "blake3:1e9be5ce0506292e757efb91df1f0263cea96f4b2b5b3bf401831057122df71e",
+      "bytes": 177,
+      "path": "manifest.json"
+    },
+    {
+      "blake3": "blake3:f6c9529d4d74d461205c971055a84c999f521b687b7c1b0c692641e14b1cc6ec",
+      "bytes": 8203,
+      "path": "west.geojson"
+    },
+    {
+      "blake3": "blake3:ac2b61906633fbc2742bf22fc39db9db56c6d676db87c6104eae7b8479bcb459",
+      "bytes": 1066,
+      "path": "west.json"
+    },
+    {
+      "blake3": "blake3:dfb2e1e72fa698c5e83eafad8f7e218d56a04121f67e5dbc0ad55be33b79bb6d",
+      "bytes": 47734,
+      "path": "west.png"
+    }
+  ],
+  "options": {
+    "coverage_level": 15,
+    "requested_bounds": null,
+    "terrain_resolution": 65
+  },
+  "schema_version": 1,
+  "source_identity": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+  "total_bytes": 115316
+}

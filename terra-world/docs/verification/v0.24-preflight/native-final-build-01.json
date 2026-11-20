@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo"
+  ],
+  "started_utc": "2026-10-30T12:34:21.597767+00:00",
+  "finished_utc": "2026-10-30T12:35:23.477178+00:00",
+  "seconds": 61.879413513001055,
+  "exit_code": 0,
+  "timed_out": false,
+  "execution": {
+    "status": "passed",
+    "process_platform": "posix",
+    "failure_reason": null,
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 162,
+    "retained_log_bytes": 162,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "status": "not_needed"
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "input_count": 390,
+  "source_inputs": "native-final-build-01-inputs.json",
+  "source_inputs_sha256": "27fb9388c3259d104b0fd0ee05fbd9087d9882ae79946bb12abc601ef7a4fb89",
+  "changed_inputs": [],
+  "log": "native-final-build-01.log",
+  "log_sha256": "7b63bd87a5c2ac557cb0dd54b047c52adff8f920a35283c3c246fa58174b8415",
+  "binary": "/tmp/terra023-target/debug/terra-demo",
+  "binary_sha256": "509d831c5c6ff1c6619a6ed7fc9feb92ed24dbd737048200f5aca6473ed147e6",
+  "scope": "Final main executable after the two inspected copy-only corrections; full native regression acceptance remains the canonical gate."
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "release": "0.16.0",
+  "capture_name": "v16-confirm-driver-first-clear",
+  "capture_started_utc": "2026-10-29T05:30:58.657341+00:00",
+  "captured_utc": "2026-10-29T05:30:58.946755+00:00",
+  "window_id": "2097154",
+  "window_title": "Terra World \u00b7 Geospatial Sandbox",
+  "window_pid": 71680,
+  "window_pid_status": "available",
+  "window_pid_before": 71680,
+  "window_pid_after": 71680,
+  "window_pid_error": null,
+  "window_position": [
+    0,
+    0
+  ],
+  "window_pixels": [
+    1440,
+    900
+  ],
+  "image": {
+    "name": "v16-confirm-driver-first-clear.png",
+    "sha256": "0113256764a74c1f5f5b937f2c6946d83a2fcdc3014ef62476a5fd14744899f2",
+    "bytes": 623113
+  },
+  "association_scope": "Window PID read before and after capture; unsupported or changed properties do not assert a process association."
+}

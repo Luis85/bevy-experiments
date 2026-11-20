@@ -1,0 +1,58 @@
+{
+  "authoritative_snapshot_batch": {
+    "byte_identical_views": true,
+    "includes_wire_budget_and_private_filtering": true,
+    "index_build_us": 5906,
+    "indexed_snapshot_us": 5542,
+    "linear_snapshot_us": 37145,
+    "living_bodies": 512,
+    "network_connections": 0,
+    "registered_players": 64,
+    "resource_nodes": 10000,
+    "snapshot_bytes": 779280,
+    "views": 64
+  },
+  "build": "workspace dev profile, opt-level=1",
+  "ecology_domain": {
+    "calendar_seconds": 3000,
+    "elapsed_us": 27789,
+    "environment": "permissive finite-coordinate motion resolver; imported collision not included",
+    "fixed_steps": 1000,
+    "full_pass_animal_evaluations": 1100,
+    "managed_animals": 22,
+    "observed_bodies": 65,
+    "physical_deliveries": 1,
+    "physical_seconds": 50,
+    "production_cycles": 223,
+    "schedule": {
+      "deferred": 16,
+      "deferred_total": 550,
+      "eligible": 22,
+      "evaluated": 6,
+      "evaluated_total": 550,
+      "far_decisions": 6,
+      "near_decisions": 0,
+      "observer_candidates": 0,
+      "passes": 50,
+      "threat_candidates": 2,
+      "threat_candidates_total": 148
+    },
+    "traffic_candidate_tests": 23224,
+    "traffic_queries": 13723
+  },
+  "index_only": {
+    "build_us": 34860,
+    "candidate_tests": 5720,
+    "entries": 100000,
+    "identical_results": true,
+    "indexed_query_us": 3804,
+    "linear_distance_tests": 6400000,
+    "linear_query_us": 270878,
+    "queries": 64,
+    "radius_m": 250
+  },
+  "scope": "finite domain and index probe; not a network concurrency, collision-world, or MMO benchmark",
+  "release": "0.4.0",
+  "validation_session": "2026-10-27",
+  "measurement_note": "Single Linux execution in the workspace dev profile, opt-level=1. Other build work may share the machine. Timings are evidence for this fixture, not production server capacity."
+}

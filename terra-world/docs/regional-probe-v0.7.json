@@ -1,0 +1,129 @@
+{
+  "background_checkpoint": {
+    "max_nonblocking_poll_ms": 0.0048980000000000004,
+    "policy": "one outstanding revision; authority waits while presentation continues; no simulation mutation between submit and install",
+    "poll_calls": 473,
+    "samples": 16,
+    "submission_including_snapshot_clone_p50_ms": 0.48279099999999997,
+    "submission_p95_ms": 5.369369,
+    "worker_p50_ms": 32.103570999999995,
+    "worker_p95_ms": 46.386753000000006
+  },
+  "checkpoint": {
+    "max_ms": 38.712798,
+    "mean_ms": 31.744968937500005,
+    "p50_ms": 30.905288,
+    "p95_ms": 38.712798,
+    "samples": 16
+  },
+  "environment": {
+    "arch": "x86_64",
+    "os": "linux",
+    "profile": "optimized dev (opt-level=1, debug assertions enabled)",
+    "sqlite": "3.53.2",
+    "visible_parallelism": 8
+  },
+  "final_status": {
+    "active_records": 448,
+    "active_regions": 4,
+    "checkpoint_bytes": 1700829,
+    "dependency_regions": 0,
+    "dormant_records": 6180,
+    "dormant_regions": 15,
+    "generation": 33,
+    "global_records": 26,
+    "pinned_regions": 4
+  },
+  "fixture": "synthetic finite regional storage and simulation",
+  "initial_checkpoint_ms": 31.574261,
+  "initial_status": {
+    "active_records": 448,
+    "active_regions": 3,
+    "checkpoint_bytes": 1695206,
+    "dependency_regions": 0,
+    "dormant_records": 6180,
+    "dormant_regions": 15,
+    "generation": 1,
+    "global_records": 23,
+    "pinned_regions": 3
+  },
+  "limits": "All aggregate domain caps remain. Checkpoint and activation reconstruct and validate the bounded complete world on one background worker. Authority pauses while pending, presentation may continue. Explicit startup/restore/final drain are synchronous. Timings are fixture evidence, not a server capacity or latency guarantee.",
+  "owner_dormancy": {
+    "after_status": {
+      "active_records": 37,
+      "active_regions": 3,
+      "checkpoint_bytes": 161470,
+      "dependency_regions": 0,
+      "dormant_records": 105,
+      "dormant_regions": 18,
+      "generation": 2,
+      "global_records": 128,
+      "pinned_regions": 3
+    },
+    "before_status": {
+      "active_records": 52,
+      "active_regions": 18,
+      "checkpoint_bytes": 149485,
+      "dependency_regions": 0,
+      "dormant_records": 0,
+      "dormant_regions": 0,
+      "generation": 1,
+      "global_records": 218,
+      "pinned_regions": 18
+    },
+    "dormant_owners": 15,
+    "fixture": "16 synthetic owners, 15 dormant; no sockets or renderer",
+    "limit": "Synthetic residency/invariant fixture; all global gameplay caps and complete merged validation remain. Not concurrent-player capacity.",
+    "registered_owners": 16,
+    "resident_homes_after": 1,
+    "resident_homes_before": 16,
+    "resident_owned_bodies_after": 5,
+    "resident_owned_bodies_before": 80,
+    "retirement_checkpoint_ms": 4.007808,
+    "simulated_while_dormant": {
+      "calendar_seconds": 50,
+      "physical_seconds": 5,
+      "steps": 100
+    },
+    "verification": {
+      "accounts_inventory_exact": true,
+      "offline_bodies_exact": true,
+      "offline_needs_orders_exact": true,
+      "offline_resources_exact": true,
+      "reactivation_valid": true,
+      "restart_exact": true
+    }
+  },
+  "restore_complete_world_ms": 32.694906,
+  "scope": {
+    "active_bodies": 59,
+    "active_resource_nodes": 400,
+    "calendar_seconds": 250,
+    "complete_bodies": 239,
+    "complete_resource_nodes": 6400,
+    "imported_collision": false,
+    "live_data": false,
+    "physical_seconds": 25,
+    "region_level": 16,
+    "simulation_steps": 500,
+    "sockets": 0
+  },
+  "simulation": {
+    "active_ms": 40.16224999999999,
+    "complete_ms": 99.65440000000001,
+    "note": "Different intended workloads: dormant environment and ambient bodies freeze; global economy and owned bodies advance in both."
+  },
+  "verification": {
+    "dormant_resource_unchanged": true,
+    "every_checkpoint_exact": true,
+    "every_worker_checkpoint_exact": true,
+    "full_roundtrip_exact": true,
+    "online_backup_exact": true,
+    "restart_exact": true
+  },
+  "verified_partition_cache": {
+    "decoded_checkpoints": 0,
+    "hits": 98
+  },
+  "version": "0.7.0"
+}

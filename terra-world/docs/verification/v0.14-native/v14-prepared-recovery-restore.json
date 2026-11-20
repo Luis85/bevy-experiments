@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "bundle_identity": "sha256:d062719256f5238561c1d486a83d82fff21ab293bc4c832d40e1fbe6a4467765",
+  "committed_generation": 31,
+  "committed_archive_sha256": "sha256:df4c42a11090e419cde837a1405bb33f6a3ec1d6ac5902f163b4b30b239b3c4a",
+  "domain_and_local_metadata_exact": true,
+  "source_and_catalog_exact": true,
+  "runtime_paths_rebased": true,
+  "original_bundle_unchanged": true
+}

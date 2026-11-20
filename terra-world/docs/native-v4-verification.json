@@ -1,0 +1,404 @@
+{
+  "release": "0.4.0",
+  "validation_date": "2026-10-27",
+  "native_environment": {
+    "os": "Linux x86_64",
+    "window_system": "X11 private virtual display",
+    "graphics": "Mesa llvmpipe software Vulkan",
+    "reference_window": [
+      1440,
+      900
+    ],
+    "minimum_window": [
+      1100,
+      700
+    ],
+    "profile": "optimized development build; no production-GPU claim"
+  },
+  "review_scope": [
+    "Native quality cycle Balanced \u2192 High \u2192 Performance; no post-fix render validation errors",
+    "TPS/FPS entry, automatic panel hiding, E context opening and RTS restoration",
+    "Explicit F5 local save created a complete local envelope",
+    "Minimum-window performance pane scroll reaches final diagnostic text",
+    "Final heightmap and 121-chunk source work fully integrated",
+    "Actual protocol 3 graphical client receives deltas/keyframes with synchronized baseline",
+    "All three final sessions exited normally with successful telemetry export"
+  ],
+  "initial_review_fixes": [
+    "Unsupported 2x MSAA changed to supported 4x in Balanced/High",
+    "Graceful-window telemetry ordered after Bevy ExitSystems",
+    "Unavailable sky control disabled",
+    "Disconnected baseline status corrected",
+    "Performance scrollbar and compact active-body footer"
+  ],
+  "native_save_envelope_fields": [
+    "clock",
+    "identity",
+    "player_id",
+    "politics",
+    "schema_version",
+    "state"
+  ],
+  "reports": {
+    "heightmap_high": {
+      "atmosphere_active": true,
+      "ecology_work": {
+        "deferred": 30,
+        "deferred_total": 3217,
+        "eligible": 64,
+        "evaluated": 34,
+        "evaluated_total": 3901,
+        "far_decisions": 16,
+        "near_decisions": 18,
+        "observer_candidates": 165,
+        "passes": 115,
+        "threat_candidates": 256,
+        "threat_candidates_total": 20670
+      },
+      "last_simulation_error": null,
+      "last_world_error": null,
+      "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+      "network_authority": false,
+      "population": {
+        "bodies": 107,
+        "counts_are_received_view": false,
+        "wildlife": 64
+      },
+      "presentation": {
+        "immersive_controls": true,
+        "inspector_open": false
+      },
+      "quality": {
+        "atmospheric_sky": true,
+        "quality": "high",
+        "terrain_lod": true
+      },
+      "release": "0.4.0",
+      "render": {
+        "chunks": 49,
+        "lod_chunks": [
+          6,
+          20,
+          23
+        ],
+        "pending": 0,
+        "source_vertices": 161393,
+        "terrain_full_vertices": 207025,
+        "terrain_vertices": 161393
+      },
+      "replication": null,
+      "source": {
+        "epoch": null,
+        "heightmap": true,
+        "revision": "terra-authored-heightmap-demo-v1"
+      },
+      "timings": {
+        "cpu_stages": {
+          "base_world": {
+            "last_ms": 0.002334,
+            "max_ms": 0.060682,
+            "mean_ms": 0.007738924999999998,
+            "p50_ms": 0.005738999999999999,
+            "p95_ms": 0.015344,
+            "total_samples": 2329,
+            "window_samples": 240
+          },
+          "controlled_motion": {
+            "last_ms": 2.9999999999999997e-05,
+            "max_ms": 0.009264,
+            "mean_ms": 0.0001582458333333334,
+            "p50_ms": 0.00013099999999999999,
+            "p95_ms": 0.00023999999999999998,
+            "total_samples": 2316,
+            "window_samples": 240
+          },
+          "ecology": {
+            "last_ms": 0.00708,
+            "max_ms": 0.782805,
+            "mean_ms": 0.03793522083333334,
+            "p50_ms": 0.014221,
+            "p95_ms": 0.094002,
+            "total_samples": 2316,
+            "window_samples": 240
+          },
+          "economy": {
+            "last_ms": 8.1e-05,
+            "max_ms": 0.026920999999999997,
+            "mean_ms": 0.0004604291666666666,
+            "p50_ms": 0.00016,
+            "p95_ms": 0.000571,
+            "total_samples": 2316,
+            "window_samples": 240
+          },
+          "living": {
+            "last_ms": 0.180292,
+            "max_ms": 1.236181,
+            "mean_ms": 0.2550738666666668,
+            "p50_ms": 0.23814,
+            "p95_ms": 0.365894,
+            "total_samples": 2316,
+            "window_samples": 240
+          },
+          "streaming": {
+            "last_ms": 0.035934,
+            "max_ms": 0.343469,
+            "mean_ms": 0.041465191666666686,
+            "p50_ms": 0.034112,
+            "p95_ms": 0.063235,
+            "total_samples": 472,
+            "window_samples": 240
+          }
+        },
+        "frame_interval": {
+          "last_ms": 501.02172099999996,
+          "max_ms": 616.425889,
+          "mean_ms": 455.3773111791664,
+          "p50_ms": 444.680621,
+          "p95_ms": 547.084027,
+          "total_samples": 471,
+          "window_samples": 240
+        },
+        "window_capacity": 240
+      },
+      "transport": null
+    },
+    "regional_performance": {
+      "atmosphere_active": false,
+      "ecology_work": {
+        "deferred": 23,
+        "deferred_total": 2696,
+        "eligible": 64,
+        "evaluated": 41,
+        "evaluated_total": 4614,
+        "far_decisions": 16,
+        "near_decisions": 25,
+        "observer_candidates": 160,
+        "passes": 118,
+        "threat_candidates": 89,
+        "threat_candidates_total": 11225
+      },
+      "last_simulation_error": null,
+      "last_world_error": null,
+      "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+      "network_authority": false,
+      "population": {
+        "bodies": 107,
+        "counts_are_received_view": false,
+        "wildlife": 64
+      },
+      "presentation": {
+        "immersive_controls": true,
+        "inspector_open": false
+      },
+      "quality": {
+        "atmospheric_sky": true,
+        "quality": "performance",
+        "terrain_lod": true
+      },
+      "release": "0.4.0",
+      "render": {
+        "chunks": 121,
+        "lod_chunks": [
+          6,
+          19,
+          96
+        ],
+        "pending": 0,
+        "source_vertices": 2050554,
+        "terrain_full_vertices": 511225,
+        "terrain_vertices": 138681
+      },
+      "replication": null,
+      "source": {
+        "epoch": null,
+        "heightmap": false,
+        "revision": "terra-procedural-v2"
+      },
+      "timings": {
+        "cpu_stages": {
+          "base_world": {
+            "last_ms": 0.055312999999999994,
+            "max_ms": 0.302197,
+            "mean_ms": 0.11975661250000003,
+            "p50_ms": 0.11140800000000001,
+            "p95_ms": 0.172511,
+            "total_samples": 2383,
+            "window_samples": 240
+          },
+          "controlled_motion": {
+            "last_ms": 8.999999999999999e-05,
+            "max_ms": 0.0008309999999999999,
+            "mean_ms": 0.00022840000000000008,
+            "p50_ms": 0.00021,
+            "p95_ms": 0.00046100000000000004,
+            "total_samples": 2375,
+            "window_samples": 240
+          },
+          "ecology": {
+            "last_ms": 0.012759,
+            "max_ms": 2.587308,
+            "mean_ms": 0.1049911041666667,
+            "p50_ms": 0.020601,
+            "p95_ms": 0.216817,
+            "total_samples": 2375,
+            "window_samples": 240
+          },
+          "economy": {
+            "last_ms": 0.00031,
+            "max_ms": 0.021603,
+            "mean_ms": 0.0007499541666666668,
+            "p50_ms": 0.000531,
+            "p95_ms": 0.001152,
+            "total_samples": 2375,
+            "window_samples": 240
+          },
+          "living": {
+            "last_ms": 6.057119,
+            "max_ms": 13.838436000000002,
+            "mean_ms": 6.6803559875,
+            "p50_ms": 6.453966,
+            "p95_ms": 8.547765,
+            "total_samples": 2375,
+            "window_samples": 240
+          },
+          "streaming": {
+            "last_ms": 0.113961,
+            "max_ms": 0.675886,
+            "mean_ms": 0.0745417208333333,
+            "p50_ms": 0.06419699999999999,
+            "p95_ms": 0.118699,
+            "total_samples": 503,
+            "window_samples": 240
+          }
+        },
+        "frame_interval": {
+          "last_ms": 214.109953,
+          "max_ms": 385.631638,
+          "mean_ms": 239.5031527208333,
+          "p50_ms": 234.574288,
+          "p95_ms": 284.94050999999996,
+          "total_samples": 502,
+          "window_samples": 240
+        },
+        "window_capacity": 240
+      },
+      "transport": null
+    },
+    "protocol 3_client": {
+      "atmosphere_active": true,
+      "ecology_work": {
+        "deferred": 0,
+        "deferred_total": 0,
+        "eligible": 0,
+        "evaluated": 0,
+        "evaluated_total": 0,
+        "far_decisions": 0,
+        "near_decisions": 0,
+        "observer_candidates": 0,
+        "passes": 0,
+        "threat_candidates": 0,
+        "threat_candidates_total": 0
+      },
+      "last_simulation_error": null,
+      "last_world_error": null,
+      "measurement_scope": "Rolling frame intervals and local CPU stage timings; no GPU timestamps or server-load claim. No session capabilities are exported.",
+      "network_authority": true,
+      "population": {
+        "bodies": 64,
+        "counts_are_received_view": true,
+        "wildlife": 27
+      },
+      "presentation": {
+        "immersive_controls": true,
+        "inspector_open": false
+      },
+      "quality": {
+        "atmospheric_sky": true,
+        "quality": "balanced",
+        "terrain_lod": true
+      },
+      "release": "0.4.0",
+      "render": {
+        "chunks": 9,
+        "lod_chunks": [
+          6,
+          3,
+          0
+        ],
+        "pending": 0,
+        "source_vertices": 1120929,
+        "terrain_full_vertices": 38025,
+        "terrain_vertices": 32073
+      },
+      "replication": {
+        "deltas": 1787,
+        "entity_removals": 40,
+        "entity_upserts": 67107,
+        "full_snapshot_bytes": 52146856,
+        "keyframes": 26,
+        "resync_requests": 0,
+        "wire_bytes": 30908323
+      },
+      "source": {
+        "epoch": null,
+        "heightmap": false,
+        "revision": "terra-procedural-v2"
+      },
+      "timings": {
+        "cpu_stages": {
+          "streaming": {
+            "last_ms": 0.013601,
+            "max_ms": 0.07535399999999999,
+            "mean_ms": 0.01873360833333334,
+            "p50_ms": 0.015954,
+            "p95_ms": 0.035113,
+            "total_samples": 278,
+            "window_samples": 240
+          }
+        },
+        "frame_interval": {
+          "last_ms": 446.144088,
+          "max_ms": 1285.715205,
+          "mean_ms": 440.990780970833,
+          "p50_ms": 434.641197,
+          "p95_ms": 505.254145,
+          "total_samples": 277,
+          "window_samples": 240
+        },
+        "window_capacity": 240
+      },
+      "transport": {
+        "bytes_received": 30910022,
+        "bytes_sent": 54207,
+        "frames_queued": 567
+      }
+    }
+  },
+  "interpretation": "These are different native workloads. Frame intervals are software-rendering observations, not a controlled profile-speedup or gaming-GPU benchmark. Multiplayer population counts describe the received view. Runtime/session/save files are excluded.",
+  "final_layout_confirmation": {
+    "window": [
+      1100,
+      700
+    ],
+    "scrollbar_inside_panel": true,
+    "last_diagnostic_line_visible": true,
+    "graceful_exit_code": 0,
+    "render": {
+      "chunks": 49,
+      "lod_chunks": [
+        6,
+        20,
+        23
+      ],
+      "pending": 0,
+      "source_vertices": 161393,
+      "terrain_full_vertices": 207025,
+      "terrain_vertices": 161393
+    },
+    "quality": {
+      "atmospheric_sky": true,
+      "quality": "high",
+      "terrain_lod": true
+    }
+  }
+}

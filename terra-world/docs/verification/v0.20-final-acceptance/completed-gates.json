@@ -1,0 +1,301 @@
+{
+  "version": "0.20.0",
+  "started_utc": "2026-10-29T16:16:26.968121+00:00",
+  "status": "failed",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.12.14",
+    "cargo_build_jobs": "3",
+    "cargo_build_target_environment": null,
+    "offline": true
+  },
+  "scope": "Local TCP/TLS with prepared terrain and 1024 cold overlay regions; bounded autonomous geometry including narrow corridors and restored support, live owner commitments, finite commercial careers, named managed and complete local recovery, portable sources, original animated human/vehicle/wildlife packs, retained diagnostics, native code and build. Native interaction, hardware/platform qualification and uncoached player experience require separate review.",
+  "source_inputs": 370,
+  "gates": [
+    {
+      "name": "compatibility",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "scripts/check_compatibility.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.069,
+      "log": "compatibility.log",
+      "log_sha256": "74b3fa316965e7d45c502406da0a1707970bc6c6dd75667454489bb49607ea77",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "desktop-packaging-tests",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.562,
+      "log": "desktop-packaging-tests.log",
+      "log_sha256": "1fe3b16ce52a559fcc9262c1c24fc3ddcb004708bd81e41d25eddb355ab243de",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.548,
+      "log": "format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "headless",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--exclude",
+        "terra-demo",
+        "--exclude",
+        "terra-bevy",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 123.801,
+      "log": "headless.log",
+      "log_sha256": "e6304df626771e6e66002ac1ed4baf75cb184c0073f892f5602596a9a03eed6b",
+      "passed_test_executions": 619,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_depots",
+        "six_session_warehouse_career_conserves_finite_goods_cash_and_recovers_scarcity",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.307,
+      "log": "career-report.log",
+      "log_sha256": "a4ae385dff70e230a05499a5b1b0ac02ded8cf9986746957ec80b0971687a850",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "purchased-career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_depots",
+        "purchased_stock_career_accounts_for_acquisition_setup_and_recovery_without_inventing_profit",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.536,
+      "log": "purchased-career-report.log",
+      "log_sha256": "3d63d06843b1b60da932e083f25bec59beafe38bcc03fa692ce6b220deab9e0e",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "novice-career-report",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "company_career",
+        "finite_novice_passenger_career_prices_rental_costs_and_resumes_for_one_physical_hour",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 54.421,
+      "log": "novice-career-report.log",
+      "log_sha256": "b666f9459a31166080b5a6d32812a8094d7a2fb749c4637ef0f76c9a96570e7c",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "traffic-recovery",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "traffic_recovery",
+        "--locked",
+        "--offline",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.923,
+      "log": "traffic-recovery.log",
+      "log_sha256": "5cc0ccc725ae426d676bf81c02224aa3d549a9d18e3946da2922f3fcac694eb1",
+      "passed_test_executions": 3,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "navigation-cluster",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "navigation_clusters",
+        "autonomous_vehicle_passes_a_cluster_without_moving_parked_bodies_or_losing_its_load",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.156,
+      "log": "navigation-cluster.log",
+      "log_sha256": "403ab071e4a58b4d4c214a3a849c5139c4fcf69882e7ac5dcfef6e244ee849ee",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "navigation-geometry",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "navigation_geometry",
+        "--locked",
+        "--offline",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.353,
+      "log": "navigation-geometry.log",
+      "log_sha256": "a6313479288db509876491cfef6e1e57dbd23e791e78ab63cf168f6a9acb0dd8",
+      "passed_test_executions": 10,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "guidance-continuity",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-sandbox",
+        "--test",
+        "guidance_commitments",
+        "continuing_guidance_journey_preserves_obligations_and_rebuilds_after_resume",
+        "--locked",
+        "--offline",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.376,
+      "log": "guidance-continuity.log",
+      "log_sha256": "90813e75a6df6f4f2d11e07f3a1a31c7636a14f430159d74aa36108ccff75242",
+      "passed_test_executions": 1,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "bevy-headless",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "terra-bevy",
+        "--no-default-features",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 30.658,
+      "log": "bevy-headless.log",
+      "log_sha256": "71c5a08a12ff2b1239e6434c6a9311e9274dd750c4c09ad1bdd9e83f9f2fbf55",
+      "passed_test_executions": 79,
+      "failed_tests": 2,
+      "ignored_tests": 0
+    }
+  ],
+  "evidence_artifacts": {
+    "source-hashes.json": "134dceabe658ee71121777dcc6f3f3079b23a6493d33cf660cb4f0e90d159888",
+    "career-report.json": "4c3a467b072eda19bcf4a9f648a136f60a9008d88d393d29b9cdf7a55855cff7",
+    "purchased-career-report.json": "d2b264a21025e6a0e06a525fa37c5d989fdee843d663bd0bf4e1640dda2d8031",
+    "novice-career-report.json": "6b57e029583c4bcbd99eda797b5b368ec2b7057453472ec94f895bb57a7dbe52",
+    "traffic-recovery.json": "14dc943629496a36f4b1d05cdb1d4fdceb52001314298bc58fa7e7649b7830f2",
+    "navigation-cluster.json": "951606748eeb349eefa598cef8b098eab176047598de37f846dac44c279a4595",
+    "navigation-geometry.json": "ef7c3e110dec36ed0413f060c1ce60994b255814889fcacc74005067d4622fd1",
+    "guidance-continuity.json": "b1f7720a11daa681e4d8863a6a461663760ded8d1139f1378402a3fa43b89257",
+    "distinct-tests.json": "d58aa505d143bff0963b93dde8e628f6ea07ece44ec532e52054054ef372a3f3"
+  },
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "finished_utc": "2026-10-29T16:20:10.767852+00:00",
+  "source_inputs_unchanged": true,
+  "distinct_tests_by_crate": {
+    "terra-cli": 4,
+    "terra-core": 33,
+    "terra-history": 13,
+    "terra-net": 125,
+    "terra-persistence": 48,
+    "terra-sandbox": 351,
+    "terra-stream": 45
+  },
+  "distinct_passing_rust_tests": 619,
+  "published_reports_unchanged": true,
+  "published_logs_unchanged": true,
+  "passing_rust_test_executions": 716,
+  "completion_record": "completed-gates.json"
+}

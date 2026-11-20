@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "checked_utc": "2026-10-30T08:55:46.413838+00:00",
+  "status": "passed",
+  "scenario": "Accepted-mode native provenance audit refuses an absent real terminal receipt while the canonical run is still in progress.",
+  "validator_sha256": "e4a7b3dbac1692e3d61e56b78140c3f682c6bfc1511bb93dfa216120d3825edf",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.23-native/audit_confirmation_023.py",
+    "--phase",
+    "accepted",
+    "--output",
+    "/tmp/terra023-native-admission-rrw84sd2/must-not-pass.json"
+  ],
+  "terminal_absent_before_run": true,
+  "observed_exit_code": 1,
+  "accepted_report_created": false,
+  "stdout": "",
+  "stderr": "{\"status\": \"failed\", \"error\": \"[Errno 2] No such file or directory: '/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.23-release-acceptance/completed-gates.json'\"}\n",
+  "scope": "Negative admission evidence only; successful native checks and completed canonical acceptance are separate records."
+}

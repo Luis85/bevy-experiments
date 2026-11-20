@@ -1,0 +1,35 @@
+{
+  "final_confirmation_passed": true,
+  "captures": [
+    {"name":"v12-empty-confirm-finances","description":"An unregistered company has one concise Finances explanation and a visible Manage company action at 1100 by 700 with 150% text."},
+    {"name":"v12-empty-confirm-keyboard","description":"Keyboard management navigation visibly focuses Manage company; activating it opens the Company section."},
+    {"name":"v12-confirm-character","description":"The saved Mira Vale character remains visible in third person at 1440 by 900 before returning to the RTS overview."},
+    {"name":"v12-confirm-rts-company","description":"Returning from third person to RTS keeps the marked character in the overview; the company summary and six section buttons remain available."},
+    {"name":"v12-confirm-finances-small-result","description":"The compact financial result shows -10.00 credits before owner funding and -30.00 after recorded owner-paid costs, with the Manage company action visible."},
+    {"name":"v12-confirm-finances-funding","description":"The owner funding section shows the 50.00-credit company deposit, 20.00-credit personally paid setup and 70.00-credit gross known owner funding."},
+    {"name":"v12-confirm-finances-journal","description":"The report explains that it covers cash since registration and does not value goods, vehicles, unpaid time or depreciation; the recruitment journal entry follows."},
+    {"name":"v12-confirm-finances-entries","description":"The recent journal retains the owner deposit and personally paid registration, distinguishes their cash effects and reports all three entries."},
+    {"name":"v12-confirm-compact-chooser","description":"The compact activity chooser shows management destinations with Fleet highlighted at 1100 by 700 and 150% text."},
+    {"name":"v12-confirm-activities","description":"Activities retains 50 community XP, one completed supply contract and the housing-plot next step with a visible building-tools action."},
+    {"name":"v12-confirm-scene-budget","description":"Performance diagnostics show 57 selected wildlife instances, seven distant procedural fallbacks, five retained models and a 9.6 MiB estimated payload against the 128 MiB limit; unmeasured CPU/GPU allocation and GPU time are explicitly labeled."},
+    {"name":"v12-resume-activities","description":"A separate process reopens the saved paused world with the same community progress, housing goal and personal cash."},
+    {"name":"v12-resume-sections","description":"The reopened world retains Vale Transport, 40.00 company credits and one employee; all six compact company sections remain reachable."},
+    {"name":"v12-resume-finances","description":"The reopened company retains the same -10.00 and -30.00 credit financial results at 1100 by 700 with 150% text."}
+  ],
+  "observed": {
+    "empty_finances": {"concise_explanation":true,"manage_company_visible_without_scrolling":true,"keyboard_focus_visible":true,"keyboard_action_opens_company":true},
+    "management": {"compact_activity_chooser":true,"six_company_sections_reachable":true,"active_section_highlight":true,"section_change_resets_content_scroll":true,"resize_preserves_content_scroll":true},
+    "financial_report": {"company_cash_minor":4000,"owner_cash_minor":13188,"before_owner_funding_minor":-1000,"after_recorded_owner_costs_minor":-3000,"owner_deposit_minor":5000,"owner_paid_registration_minor":2000,"recruitment_minor":1000,"recent_entries":3,"cash_basis_limitations_visible":true},
+    "camera": {"third_person_character_visible":true,"return_to_body_focused_rts_keeps_character_in_view":true,"saved_heading_degrees_approximately":212.64352},
+    "guidance": {"community_xp":50,"completed_supply_contracts":1,"next_step":"Claim a housing plot","primary_action":"Open building tools","retained_after_reopen":true},
+    "presentation": {"performance_preset":true,"models":5,"ready_instances_observed":57,"distant_procedural_fallbacks_observed":7,"estimated_payload_display_mib":9.6,"estimated_payload_limit_mib":128,"gpu_allocation_and_gpu_time_explicitly_unmeasured":true},
+    "session_handling": {"three_distinct_final_executable_processes":true,"all_clean_save_and_quit":true,"company_comparison_world_kept_paused":true,"normal_menu_keyboard_exit":true}
+  },
+  "limitations": [
+    "Native confirmation used Linux X11/Xvfb, the Performance preset, keyboard and mouse, and Mesa llvmpipe software Vulkan. It does not qualify representative graphics hardware, controller or wheel hardware, other operating systems, or screen-reader behavior.",
+    "The 1440 by 900 and 1100 by 700 captures use 150% interface text. Other viewport and text-scale combinations are not established by these captures.",
+    "Scene payload figures are importer estimates, not measured CPU/GPU allocations or a hardware frame-rate guarantee. Distant actors intentionally remain procedural under the presentation policy.",
+    "The final native company sequence verifies the reviewed paused registration/funding/recruitment state and save/reopen continuity. Automated career reports separately measure physical routes and cash conservation; neither claims campaign profitability or complete asset valuation.",
+    "The reviewed source is an authored synthetic connected heightmap example at real coordinates, not worldwide terrain coverage. The earlier candidate walking observations do not establish a general shortest-path guarantee."
+  ]
+}

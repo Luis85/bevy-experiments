@@ -1,0 +1,31 @@
+{
+  "release": "0.15.0",
+  "phase": "package_confirmation",
+  "command": [
+    "strace",
+    "-f",
+    "-qq",
+    "-e",
+    "trace=file",
+    "-o",
+    "/tmp/terra-native/v15-desktop-launcher.trace",
+    "/tmp/terra-desktop-015/terra-world-0.15.0-linux-x86_64/start-terra.sh",
+    "--frames",
+    "90",
+    "--screenshot",
+    "/tmp/terra-native/v15-desktop-launcher.png"
+  ],
+  "working_directory": "/tmp/terra-desktop-unrelated-015",
+  "started_utc": "2026-10-28T23:16:14.636766+00:00",
+  "binary_sha256": "73bef2f236d0b6c7a93cc17de86a22d7e85c15ac67a49d7fec9c74a5c71caf61",
+  "source_input_count": 356,
+  "expected_interruption": false,
+  "trace_file": "/tmp/terra-native/v15-desktop-launcher.trace",
+  "pid": 50350,
+  "exit_code": 0,
+  "finished_utc": "2026-10-28T23:16:25.633803+00:00",
+  "seconds": 10.997005654999157,
+  "source_inputs_unchanged": true,
+  "log_sha256": "8bb0d70332711f64a51c5b314c693e90f6888ed88c71f2624398055b50d843b2",
+  "trace_sha256": "5fbe03cfdca0144b824034dc9285db6c0818985e26fad1e4d258b29390ebaaa1"
+}

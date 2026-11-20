@@ -1,0 +1,48 @@
+{
+  "scope": "Expected-negative invocation against actual absent terminal 0.24 acceptance. No accepted receipt or package was fabricated; this does not qualify a final package.",
+  "status": "passed_expected_rejection",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/workspace/scratch/96f1d170dd13/source/terra-world/docs/verification/v0.24-delivery/package_source_024.py",
+    "--root",
+    "/workspace/scratch/96f1d170dd13/source/terra-world",
+    "--original",
+    "/workspace/scratch/96f1d170dd13/baseline/terra-world-0.23.0.zip",
+    "--output",
+    "/tmp/terra024-world-source-negative-01.zip",
+    "--report",
+    "/tmp/terra024-world-source-negative-01-report.json"
+  ],
+  "cwd": "/workspace/scratch/96f1d170dd13/source/terra-world",
+  "started_utc": "2026-10-30T11:39:58.764230+00:00",
+  "finished_utc": "2026-10-30T11:39:58.821232+00:00",
+  "elapsed_seconds": 0.05698588400082372,
+  "exit_code": 1,
+  "checks": {
+    "nonzero_exit": true,
+    "actual_missing_terminal_referenced": true,
+    "zip_not_created": true,
+    "report_not_created": true,
+    "reviewed_inputs_unchanged": true
+  },
+  "inputs_before": {
+    "docs/verification/v0.24-delivery/package_source_024.py": "1846ea392ae20e36df07c4b211aceb5957bf3cb92925842c744862cb4a0acd76",
+    "scripts/package_desktop.py": "9de2e22f6fcb4b727fde4322b5eb3fba2b5d6333de0e91706387daf2adead5ea",
+    "scripts/release_contract.py": "76e191b374c563cae322d22f9f9a41102cbc333fc6268e3b2d8cfe8ccb3f1712",
+    "scripts/verify.py": "e031ef498d44fcc529ae93abdf32ad105fc2c95e3f59cf6e3fea0d5fea481a52",
+    "scripts/verify_desktop.py": "77f6135965501aca734825310600a5d9623f8959ac8935b8bc73ec0b0e9c6dd3"
+  },
+  "inputs_after": {
+    "docs/verification/v0.24-delivery/package_source_024.py": "1846ea392ae20e36df07c4b211aceb5957bf3cb92925842c744862cb4a0acd76",
+    "scripts/package_desktop.py": "9de2e22f6fcb4b727fde4322b5eb3fba2b5d6333de0e91706387daf2adead5ea",
+    "scripts/release_contract.py": "76e191b374c563cae322d22f9f9a41102cbc333fc6268e3b2d8cfe8ccb3f1712",
+    "scripts/verify.py": "e031ef498d44fcc529ae93abdf32ad105fc2c95e3f59cf6e3fea0d5fea481a52",
+    "scripts/verify_desktop.py": "77f6135965501aca734825310600a5d9623f8959ac8935b8bc73ec0b0e9c6dd3"
+  },
+  "log": "docs/verification/v0.24-preflight/world-source-packer-negative-01.log",
+  "log_sha256": "8abbc3647346f36d93bbcb221e51d31b4782f556a194b26d8c7d19957db8f327",
+  "stdout_bytes": 0,
+  "stderr_bytes": 977,
+  "output": "/tmp/terra024-world-source-negative-01.zip",
+  "report": "/tmp/terra024-world-source-negative-01-report.json"
+}

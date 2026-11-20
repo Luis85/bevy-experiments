@@ -1,0 +1,53 @@
+{
+  "status": "failed",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/tmp/terra023-toolchain/run.py",
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "terra-demo",
+    "--bin",
+    "terra-demo"
+  ],
+  "started_utc": "2026-10-30T11:39:03.644254+00:00",
+  "finished_utc": "2026-10-30T11:41:11.867541+00:00",
+  "seconds": 128.290637099999,
+  "exit_code": 101,
+  "timed_out": false,
+  "execution": {
+    "status": "failed",
+    "process_platform": "posix",
+    "failure_reason": "nonzero_exit",
+    "output_limit_bytes": 16777216,
+    "raw_output_bytes_observed": 27307,
+    "retained_log_bytes": 27307,
+    "output_overflow": false,
+    "output_complete": true,
+    "leader_exit_observed": true,
+    "descendant_check": {
+      "status": "owned_process_group_absent"
+    },
+    "cleanup": {
+      "request": "owned process group already absent",
+      "leader_exit_observed": true,
+      "descendant_check": {
+        "status": "owned_process_group_absent"
+      },
+      "output_closed": true
+    },
+    "scope": "Owned POSIX group; deliberately detached descendants are outside this check. Other platforms establish leader exit and output closure only."
+  },
+  "summaries": [
+    "FAILED. 249 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.24s"
+  ],
+  "source_inputs": "player-native-suite-attempt4-inputs.json",
+  "source_inputs_sha256": "c24a1b4e47dd16a5ee5e7c58107342d02edae4c79b22ee8f226a2b6f2e639022",
+  "input_count": 390,
+  "changed_inputs": [],
+  "log": "player-native-suite-attempt4.log",
+  "log_sha256": "d508ce56882c7f94fb00c095eb32c67ccac88d60cdb2f962f32624148c25cce3",
+  "scope": "Full terra-demo unit and native activation/dispatch regression suite on the recorded Linux host; no native-window or physical-device qualification."
+}

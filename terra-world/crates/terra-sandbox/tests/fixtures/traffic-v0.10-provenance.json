@@ -1,0 +1,78 @@
+{
+  "scope": "Synthetic flat SDK traffic snapshots from the v0.10 development diagnostic; not native player data or a fresh-world acceptance run. The original bytes are retained without edits.",
+  "recorded_evidence": "docs/verification/v0.10/traffic-exit-limit.json",
+  "original_replay": {
+    "steps": 240,
+    "real_seconds_per_step": 0.5,
+    "simulation_seconds_per_step": 0.0,
+    "duration_seconds": 120.0,
+    "source": "queued-jam-continuation.rs; original development replay used SandboxState::advance_living with Catalog::builtin."
+  },
+  "notes": [
+    "The 300-second snapshot contains the rear-waypoint trap. Its original 120-second continuation produced the 420-second occupied-exit snapshot.",
+    "Both fixtures contain 52 living units, two generic SDK players and disabled registered transport. Ground is the SDK flat compatibility environment.",
+    "Do not adjust fixture positions, source terrain, clearance margins, traffic permits or replay deadlines to turn a safety hold into completion."
+  ],
+  "fixtures": [
+    {
+      "file": "traffic-rear-trap-v0.10.json",
+      "sha256": "a6f2b0fd5e1cc8f82cf1865d718e191f73e6d26c2541ada33c45b7a500ed277d",
+      "bytes": 86716,
+      "elapsed_physical_seconds": 300.0,
+      "original_diagnostic_file": "living-review-finite-original.json"
+    },
+    {
+      "file": "traffic-exit-held-v0.10.json",
+      "sha256": "313277c80504b0bb117f262d2645a078c3c2d6e0a20c75046fd30ebfb9d96c7b",
+      "bytes": 87128,
+      "elapsed_physical_seconds": 420.0,
+      "original_diagnostic_file": "living-review-jam-final-recovery.json"
+    }
+  ],
+  "current_baseline": {
+    "source_release": "0.11.0",
+    "replay_duration_seconds": 120,
+    "input_300_second_snapshot": {
+      "end_physical_seconds": 420,
+      "courier_displacement_m": 1.934,
+      "cargo_wood": 12,
+      "completed": 0,
+      "returned": 0,
+      "path_index": 2,
+      "path_points": 5
+    },
+    "input_420_second_snapshot": {
+      "end_physical_seconds": 540,
+      "courier_displacement_m": 0.0,
+      "cargo_wood": 12,
+      "completed": 0,
+      "returned": 0,
+      "path_index": 2,
+      "path_points": 5
+    },
+    "goods_by_item": {
+      "berries": 12,
+      "bread": 40,
+      "cooked_fish": 6,
+      "fiber": 16,
+      "fish": 8,
+      "fishing_rod": 4,
+      "flour": 50,
+      "iron_tool": 2,
+      "planks": 40,
+      "stone": 100,
+      "stone_blocks": 20,
+      "tool": 8,
+      "water": 148,
+      "wheat": 60,
+      "wheat_seed": 136,
+      "wood": 120
+    },
+    "total_goods_including_player_inventory": 770,
+    "total_goods_excluding_player_inventory": 654,
+    "money_minor_credits": 150000,
+    "every_step_goods_and_money_equal": true,
+    "save_at_60_seconds_then_continue_matches_uninterrupted": true,
+    "baseline_log_sha256": "404613f728fd4e1e0c47d83f58c406bafaa657c608be188fe4044a4aac9f3500"
+  }
+}

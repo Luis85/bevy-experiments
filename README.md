@@ -15,6 +15,11 @@ assets, tests and architecture. There is deliberately no root `Cargo.toml`:
 run Cargo from the experiment you are working on. All currently use Rust
 **1.99.1**, edition 2024, and Bevy **0.20**.
 
+[NPC World Viewer](npc-world-viewer/README.md) is an independent TypeScript / ExcaliburJS project
+beside these workspaces. It follows NPC Framework's configurable world-state JSON exports to show
+the island village as an interactive, read-only pixel-art browser world. Start with its two-terminal
+showcase instructions; it has its own npm lockfile and needs no Bevy window.
+
 ## Get started
 
 Install [Rust with rustup](https://www.rust-lang.org/tools/install), Git and the

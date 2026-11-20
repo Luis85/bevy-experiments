@@ -138,6 +138,268 @@ impl SandboxState {
         })
     }
 
+    pub(crate) fn decline_faction_invite(
+        &mut self,
+        player: u64,
+        faction_id: u64,
+    ) -> Result<Outcome, SandboxError> {
+        let faction = self
+            .factions
+            .get_mut(&faction_id)
+            .ok_or_else(|| SandboxError::Missing(format!("faction:{faction_id}")))?;
+        if !faction.invites.contains(&player) {
+            return Err(SandboxError::NotOwner);
+        }
+        faction.invites.remove(&player);
+        Ok(Outcome {
+            message: "Faction invitation declined; your affiliation slot is available again".into(),
+            created_id: None,
+        })
+    }
+
+    pub(crate) fn revoke_faction_invite(
+        &mut self,
+        leader: u64,
+        faction_id: u64,
+        invitee: u64,
+    ) -> Result<Outcome, SandboxError> {
+        let faction = self
+            .factions
+            .get_mut(&faction_id)
+            .ok_or_else(|| SandboxError::Missing(format!("faction:{faction_id}")))?;
+        if faction.leader != leader {
+            return Err(SandboxError::NotOwner);
+        }
+        if !faction.invites.contains(&invitee) {
+            return Err(SandboxError::Missing(format!("invitation:{invitee}")));
+        }
+        faction.invites.remove(&invitee);
+        Ok(Outcome {
+            message: "Faction invitation revoked".into(),
+            created_id: None,
+        })
+    }
+
+    pub(crate) fn leave_faction(
+        &mut self,
+        player: u64,
+        faction_id: u64,
+    ) -> Result<Outcome, SandboxError> {
+        self.end_faction_membership(player, faction_id, player)
+    }
+
+    /// Check whether the active sole leader may remove an unused faction.
+    /// This is read-only and uses the same checks as `DissolveFaction`.
+    ///
+    /// On authoritative complete state or a validated regional working set,
+    /// every plot and territory is global. Valid shared houses and farms must
+    /// belong to a matching faction plot, so those global references also
+    /// protect cold property. A filtered client replica can report visible
+    /// blockers, but absence there is not proof of whole-world eligibility;
+    /// the host must check its current authority before applying the command.
+    pub fn faction_dissolution_readiness(
+        &self,
+        player: u64,
+        faction_id: u64,
+    ) -> Result<(), SandboxError> {
+        if !self.players.contains_key(&player) {
+            return Err(SandboxError::PlayerMissing);
+        }
+        if self.is_player_dormant(player) {
+            return Err(SandboxError::Invalid(
+                "resume the owner's session before dissolving a faction".into(),
+            ));
+        }
+        let faction = self
+            .factions
+            .get(&faction_id)
+            .ok_or_else(|| SandboxError::Missing(format!("faction:{faction_id}")))?;
+        if faction.leader != player || faction.members.get(&player) != Some(&FactionRole::Leader) {
+            return Err(SandboxError::NotOwner);
+        }
+        if faction.members.len() != 1 {
+            return Err(SandboxError::Invalid(
+                "only a sole-member faction can dissolve; other members must leave first".into(),
+            ));
+        }
+        if self
+            .plots
+            .values()
+            .any(|plot| plot.faction_owner == Some(faction_id))
+            || self
+                .settlements
+                .territories
+                .values()
+                .any(|territory| territory.faction_owner == Some(faction_id))
+        {
+            return Err(SandboxError::Invalid(
+                "a faction with shared land or a settlement cannot dissolve; its property, public stock and treasury must be retained".into(),
+            ));
+        }
+        // Defensive explicit references supplement the global ownership proof.
+        // In a validated world these all imply an existing shared plot.
+        if self
+            .structures
+            .values()
+            .any(|body| body.faction_owner == Some(faction_id))
+            || self
+                .farms
+                .values()
+                .any(|farm| farm.faction_owner == Some(faction_id))
+            || self.players.values().any(|principal| {
+                principal.home.is_some_and(|id| {
+                    self.home_reference(id)
+                        .is_some_and(|(_, owner)| owner == Some(faction_id))
+                })
+            })
+        {
+            return Err(SandboxError::Invalid(
+                "a faction with shared housing or crops cannot dissolve".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn dissolve_faction(
+        &mut self,
+        player: u64,
+        faction_id: u64,
+    ) -> Result<Outcome, SandboxError> {
+        self.faction_dissolution_readiness(player, faction_id)?;
+        // Only the faction and its own invitations disappear. Memberships are
+        // stored in faction rosters, never duplicated on player records. There
+        // are no assets to transfer/refund, and fresh IDs remain monotonic.
+        let faction = self.factions.remove(&faction_id).expect("faction checked");
+        Ok(Outcome {
+            message: format!(
+                "Dissolved {} #{}; {} invitations revoked. No property or funds moved.",
+                faction.name,
+                faction.id,
+                faction.invites.len()
+            ),
+            created_id: None,
+        })
+    }
+
+    pub(crate) fn remove_faction_member(
+        &mut self,
+        leader: u64,
+        faction_id: u64,
+        player: u64,
+    ) -> Result<Outcome, SandboxError> {
+        let faction = self
+            .factions
+            .get(&faction_id)
+            .ok_or_else(|| SandboxError::Missing(format!("faction:{faction_id}")))?;
+        if faction.leader != leader {
+            return Err(SandboxError::NotOwner);
+        }
+        self.end_faction_membership(leader, faction_id, player)
+    }
+
+    /// Only leave/remove callers enter here. References are checked against the
+    /// same current faction authority used by every shared-property command.
+    /// Cold home descriptors let an offline member leave without loading or
+    /// changing the house itself. Reservation descriptors remain unchanged
+    /// until the host merges the working set with the original cold pages.
+    fn end_faction_membership(
+        &mut self,
+        caller: u64,
+        faction_id: u64,
+        player: u64,
+    ) -> Result<Outcome, SandboxError> {
+        let faction = self
+            .factions
+            .get(&faction_id)
+            .ok_or_else(|| SandboxError::Missing(format!("faction:{faction_id}")))?;
+        if !faction.members.contains_key(&player) {
+            return Err(SandboxError::Missing(format!("member:{player}")));
+        }
+        if player == faction.leader {
+            return Err(SandboxError::Invalid(
+                "transfer leadership to another member before leaving; a faction must retain its leader".into(),
+            ));
+        }
+        let principal = self
+            .players
+            .get(&player)
+            .ok_or(SandboxError::PlayerMissing)?;
+        let clear_home = principal.home.is_some_and(|id| {
+            self.home_reference(id)
+                .is_some_and(|(_, owner)| owner == Some(faction_id))
+        });
+
+        // Every fallible check precedes mutation. Shared assets, contributions,
+        // bodies, personal property, inventories and money are never reassigned.
+        self.factions
+            .get_mut(&faction_id)
+            .expect("faction validated")
+            .members
+            .remove(&player);
+        if clear_home {
+            self.players
+                .get_mut(&player)
+                .expect("player validated")
+                .home = None;
+        }
+        let action = if caller == player {
+            "Left faction".to_string()
+        } else {
+            format!("Removed player #{player} from faction")
+        };
+        Ok(Outcome {
+            message: format!(
+                "{action}; shared property and contributions remain with the faction{}",
+                if clear_home {
+                    "; shared home unset"
+                } else {
+                    ""
+                },
+            ),
+            created_id: None,
+        })
+    }
+
+    pub(crate) fn transfer_faction_leadership(
+        &mut self,
+        leader: u64,
+        faction_id: u64,
+        successor: u64,
+    ) -> Result<Outcome, SandboxError> {
+        let faction = self
+            .factions
+            .get(&faction_id)
+            .ok_or_else(|| SandboxError::Missing(format!("faction:{faction_id}")))?;
+        if faction.leader != leader {
+            return Err(SandboxError::NotOwner);
+        }
+        if successor == leader {
+            return Err(SandboxError::Invalid(
+                "choose another existing faction member to lead".into(),
+            ));
+        }
+        if !faction.members.contains_key(&successor) {
+            return Err(SandboxError::Missing(format!("member:{successor}")));
+        }
+
+        // An explicit handover, never an inactivity election. Keeping the
+        // outgoing leader as Builder preserves shared public-works access; only
+        // the new leader can change the roster or transfer leadership again.
+        let faction = self
+            .factions
+            .get_mut(&faction_id)
+            .expect("faction validated");
+        faction.members.insert(leader, FactionRole::Builder);
+        faction.members.insert(successor, FactionRole::Leader);
+        faction.leader = successor;
+        Ok(Outcome {
+            message: format!(
+                "Player #{successor} now leads the faction; you remain a Builder. Shared property and treasury stay with the faction"
+            ),
+            created_id: None,
+        })
+    }
+
     pub(crate) fn transfer_plot_to_faction(
         &mut self,
         player: u64,

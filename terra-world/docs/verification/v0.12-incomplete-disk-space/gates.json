@@ -1,0 +1,66 @@
+{
+  "version": "0.12.0",
+  "started_utc": "2026-10-28T15:23:01.453985+00:00",
+  "status": "failed",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.12.14",
+    "cargo_build_jobs": "3",
+    "cargo_build_target_environment": null,
+    "offline": true
+  },
+  "scope": "Local TCP/TLS with prepared terrain and 1024 cold overlay regions; domain, persistence, portable source distribution, assets, native code and build. Native interaction and hardware performance require separate review.",
+  "source_inputs": 327,
+  "gates": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.626,
+      "log": "format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    },
+    {
+      "name": "headless",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--exclude",
+        "terra-demo",
+        "--exclude",
+        "terra-bevy",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 90.158,
+      "log": "headless.log",
+      "log_sha256": "7c33f8446a66b666eaa1cdd61b72d0b9736c2c3cd9d24b8c1404c7c304b68264",
+      "passed_test_executions": 0,
+      "failed_tests": 0,
+      "ignored_tests": 0
+    }
+  ],
+  "evidence_artifacts": {
+    "source-hashes.json": "24eb4cce63ccf854ebb334578e8820b9a6aced4f1f189ec396b2e8a56fc6c3ca",
+    "distinct-tests.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  },
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "finished_utc": "2026-10-28T15:24:33.313599+00:00",
+  "source_inputs_unchanged": true,
+  "distinct_tests_by_crate": {},
+  "distinct_passing_rust_tests": 0,
+  "published_reports_unchanged": true,
+  "published_logs_unchanged": true
+}

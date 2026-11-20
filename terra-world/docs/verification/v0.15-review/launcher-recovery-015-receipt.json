@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "all_launcher_tests": {
+    "passed": 23,
+    "failed": 0,
+    "ignored": 0
+  },
+  "retained_journey_reports": 1,
+  "true_continuity_booleans": 12,
+  "report": {
+    "character_and_presentation_retained": true,
+    "checkpoint_present": true,
+    "complete_archive_exact": true,
+    "global_records": 25,
+    "living_bodies": 52,
+    "nonempty_regions": 19,
+    "original_backup_unchanged": true,
+    "original_world_and_inputs_removed": true,
+    "paged_records": 57,
+    "players": 2,
+    "political_input_exact": true,
+    "profile_published_after_complete_restore": true,
+    "recovered_world_can_be_backed_up_again": true,
+    "repeat_backup_uses_new_directory": true,
+    "resources": 16,
+    "restored_profile_discoverable": true,
+    "runtime_paths_absolute_and_rehomed": true,
+    "schema_version": 1,
+    "source_generation": 2,
+    "source_identity_retained": true
+  },
+  "ui_copy_only_polish_after_tests": true,
+  "native_visual_review_pending": true
+}

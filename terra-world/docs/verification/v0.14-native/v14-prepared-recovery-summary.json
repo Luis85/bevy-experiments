@@ -1,0 +1,15 @@
+{
+  "release": "0.14.0",
+  "phase": "prepared-company recovery rehearsal",
+  "bundle_identity": "sha256:d062719256f5238561c1d486a83d82fff21ab293bc4c832d40e1fbe6a4467765",
+  "input_description": "Private exact input copy of the native-reviewed prepared Company world",
+  "original_input_tree_removed": true,
+  "exact_full_export_retained": true,
+  "before_export_sha256": "319d09e7e1cd8141f59868209ce12b294a6cd72aa9e0d703fd0f6a7dab1aef61",
+  "after_export_sha256": "319d09e7e1cd8141f59868209ce12b294a6cd72aa9e0d703fd0f6a7dab1aef61",
+  "source": "heightmap-set-v1:1100816335f7077227658413231028310009b25af7c8f5797e578b088cd151a3",
+  "political_source": false,
+  "native_reopen": "passed with exact accepted executable from unrelated working directory",
+  "private_worlds_excluded": true,
+  "native_process_record": "v14-confirm-prepared-company-process.json"
+}

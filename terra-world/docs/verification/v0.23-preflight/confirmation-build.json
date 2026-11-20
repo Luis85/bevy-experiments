@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "exit_code": 0,
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-p",
+    "terra-demo"
+  ],
+  "seconds": 58.32901315899926,
+  "profile": "dev opt-level1",
+  "binary": "/tmp/terra023-target/debug/terra-demo",
+  "native_binary_sha256": "432748a47f507d23e3efdbd2862f4e5beaae68c41801eeaf4a057392d4f3c99f",
+  "log_sha256": "2b4331f44bb8f2c0b466fcb538778aeb89c886a15fb553b41c6e52fd95658a17",
+  "scope": "Final copy-correction confirmation build; canonical frozen acceptance remains separate."
+}

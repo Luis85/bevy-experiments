@@ -1,0 +1,19 @@
+{
+  "release": "0.16.0",
+  "status": "passed",
+  "completed_utc": "2026-10-29T05:45:05.335305+00:00",
+  "scope": "Read-only comparison of every file retained before named restore, after final recovered world closed normally. New recovered world may save its own continuation.",
+  "confirmation": {
+    "process": "v16-confirm-recovered-world",
+    "pid": 73099,
+    "binary_sha256": "6ba842ceaa3a9efe88603ae81db48053606185655827b3b5cf657dbe5c296434",
+    "gate_sha256": "24b9fbad2b23897cee6dc03160baab6d63fc59290aada4e5c97d762e108d757d",
+    "source_inputs_sha256": "43790fc936ab0593d00f88265949dc498528eb126c94933cd3b94454261867a8",
+    "observed_utc": "2026-10-29T05:45:05.335222+00:00",
+    "observation_phase": "after_exit"
+  },
+  "all_original_files_unchanged": true,
+  "file_count": 57,
+  "recovered_profile": "/tmp/terra-native/launcher-review-fixture-016/player-data/worlds/recovered-1793252594-72827-0/world.json",
+  "baseline_sha256": "a37a7f5f18b8c324929e34ac3cb14986044d8f32d779d6ffbaf52f4685499734"
+}

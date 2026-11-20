@@ -1,0 +1,307 @@
+{
+  "schema": 1,
+  "status": "passed_selected_checkpoint_checks",
+  "reviewer": "world/framework specialist independent read-only audit",
+  "started_utc": "2026-10-30T12:35:31.526322+00:00",
+  "finished_utc": "2026-10-30T12:35:31.593760+00:00",
+  "method": "Read regular non-symlink files with stable fstat/path signatures; parse JSON with duplicate-key rejection; compare selected actual saved values; independently reread both file digests before reporting.",
+  "files": {
+    "building_checkpoint": {
+      "path": "/tmp/terra-native024/candidate-building-checkpoint.json",
+      "sha256": "412f4e8ff1369137e3f459bdd4e94532598a5c742cfdcffa785992f1cbdeacfe",
+      "bytes": 1769411,
+      "mtime_utc": "2026-10-30T12:05:35.617066+00:00",
+      "mtime_ns": 1793361935617066244,
+      "regular_file": true,
+      "read_identity_stable": true
+    },
+    "final_save_quit": {
+      "path": "/tmp/terra-native024/candidate-world.json",
+      "sha256": "932413c61bd2ee1cff5b5847eb9597afe5e5af946979e2d4b41d15b16484e516",
+      "bytes": 1776513,
+      "mtime_utc": "2026-10-30T12:32:08.836796+00:00",
+      "mtime_ns": 1793363528836796139,
+      "regular_file": true,
+      "read_identity_stable": true
+    }
+  },
+  "selected_states": {
+    "building_checkpoint": {
+      "wrapper_schema": 1,
+      "domain_version": 1,
+      "player_id": 1,
+      "identity": {
+        "base_data_revision": "terra-procedural-v2",
+        "seed": 42,
+        "chunk_level": 15,
+        "terrain_resolution": 65,
+        "live_data": false,
+        "osm_features": true,
+        "data_epoch_unix": null,
+        "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+      },
+      "clock": {
+        "unix_seconds": 1793013966.49929,
+        "time_scale": 1.0,
+        "paused": false
+      },
+      "personal_money_minor": 25613,
+      "active_unit": 1000050,
+      "avatar_unit": 1000050,
+      "possessed": false,
+      "inventory": {
+        "planks": 2,
+        "stone": 20,
+        "wheat_seed": 8,
+        "wood": 24
+      },
+      "progress": {
+        "player_id": 1,
+        "experience": 40,
+        "contracts_completed": 1,
+        "settlements_founded": 0
+      },
+      "owned_claimed_contracts": [],
+      "structure_count": 1,
+      "fence_2": {
+        "id": 2,
+        "owner": 1,
+        "faction_owner": null,
+        "blueprint": "fence",
+        "position": {
+          "latitude": 48.135177538384454,
+          "longitude": 11.57254442548286,
+          "altitude_m": 160.6080322265625
+        },
+        "hitpoints": 15,
+        "max_hitpoints": 40,
+        "radius_m": 0.7,
+        "housing": false,
+        "workbench": false
+      },
+      "company": null,
+      "vehicle": {
+        "unit_id": 1000053,
+        "owner": 1,
+        "model": "pickup",
+        "cargo": {},
+        "rental": null,
+        "odometer_m": 0.0,
+        "fuel_l": 48.75,
+        "condition": 1.0,
+        "parking_brake": false
+      },
+      "vehicle_body": {
+        "id": 1000053,
+        "name": "Utility rover",
+        "owner": 1,
+        "position": {
+          "latitude": 48.136955034287205,
+          "longitude": 11.574919386882073,
+          "altitude_m": 167.02754821777344
+        },
+        "velocity_enu_m_s": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "order": {
+          "type": "idle"
+        }
+      },
+      "route_stop_names": {
+        "2": "Town interchange",
+        "3": "Hillside interchange"
+      }
+    },
+    "final_save_quit": {
+      "wrapper_schema": 1,
+      "domain_version": 1,
+      "player_id": 1,
+      "identity": {
+        "base_data_revision": "terra-procedural-v2",
+        "seed": 42,
+        "chunk_level": 15,
+        "terrain_resolution": 65,
+        "live_data": false,
+        "osm_features": true,
+        "data_epoch_unix": null,
+        "political_dataset_revision": "natural-earth-110m-countries-captured-2026-10-26-sha256-6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f"
+      },
+      "clock": {
+        "unix_seconds": 1793015460.0478656,
+        "time_scale": 1.0,
+        "paused": false
+      },
+      "personal_money_minor": 18613,
+      "active_unit": 1000050,
+      "avatar_unit": 1000050,
+      "possessed": false,
+      "inventory": {
+        "planks": 2,
+        "stone": 20,
+        "wheat_seed": 8,
+        "wood": 24
+      },
+      "progress": {
+        "player_id": 1,
+        "experience": 40,
+        "contracts_completed": 1,
+        "settlements_founded": 0
+      },
+      "owned_claimed_contracts": [],
+      "structure_count": 1,
+      "fence_2": {
+        "id": 2,
+        "owner": 1,
+        "faction_owner": null,
+        "blueprint": "fence",
+        "position": {
+          "latitude": 48.135177538384454,
+          "longitude": 11.57254442548286,
+          "altitude_m": 160.6080322265625
+        },
+        "hitpoints": 15,
+        "max_hitpoints": 40,
+        "radius_m": 0.7,
+        "housing": false,
+        "workbench": false
+      },
+      "company": {
+        "owner": 1,
+        "name": "Field Service",
+        "cash_minor": 3934,
+        "revenue_minor": 0,
+        "drivers": [
+          {
+            "id": 1,
+            "name": "Mira",
+            "vehicle_id": 1000053,
+            "route_id": 2,
+            "next_stop": 0,
+            "running": false,
+            "status": "paused",
+            "trip": null,
+            "wages_earned": 66,
+            "wages_spent": 0,
+            "wage_fraction": 0.8999999999999999,
+            "stalled_seconds": 0.0,
+            "deliveries_completed": 0
+          }
+        ],
+        "routes": [
+          {
+            "id": 2,
+            "name": "Town service",
+            "stops": [
+              2,
+              3
+            ],
+            "service": {
+              "type": "passengers",
+              "count": 1
+            }
+          }
+        ],
+        "accounting": {
+          "coverage": "since_registration",
+          "opening_cash": 0,
+          "opening_payroll": 0,
+          "opening_revenue": 0,
+          "totals": {
+            "payroll": 66,
+            "recruitment": 1000,
+            "owner_deposit": 5000,
+            "owner_paid_registration": 2000
+          },
+          "monetary_entry_count": 69,
+          "personal_vehicle_used": true
+        },
+        "retained_receipt_count": 64,
+        "retained_receipt_sequence_range": [
+          6,
+          69
+        ]
+      },
+      "vehicle": {
+        "unit_id": 1000053,
+        "owner": 1,
+        "model": "pickup",
+        "cargo": {},
+        "rental": null,
+        "odometer_m": 36.08069748351235,
+        "fuel_l": 48.74101362327657,
+        "condition": 0.9999811,
+        "parking_brake": true
+      },
+      "vehicle_body": {
+        "id": 1000053,
+        "name": "Utility rover",
+        "owner": 1,
+        "position": {
+          "latitude": 48.13698799764539,
+          "longitude": 11.575021274456136,
+          "altitude_m": 167.26947631835938
+        },
+        "velocity_enu_m_s": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "order": {
+          "type": "idle"
+        }
+      },
+      "route_stop_names": {
+        "2": "Town interchange",
+        "3": "Hillside interchange"
+      }
+    }
+  },
+  "comparison": {
+    "personal_money_delta_minor": -7000,
+    "company_cash_minor": 3934,
+    "payroll_paid_minor": 66,
+    "vehicle_odometer_delta_m": 36.08069748351235,
+    "vehicle_fuel_delta_l": -0.008986376723427725
+  },
+  "checks": {
+    "same_world_identity": true,
+    "schema_and_player_identity": true,
+    "saved_inventory_preserved": true,
+    "supply_progress_preserved": true,
+    "no_remaining_owned_supply_claim": true,
+    "fence_exactly_preserved_between_checkpoints": true,
+    "fence_observed_identity_and_health": true,
+    "company_absent_earlier_and_named_final": true,
+    "personal_balances_observed": true,
+    "personal_delta_matches_recorded_registration_and_deposit": true,
+    "recorded_company_totals": true,
+    "company_cash_reconciles": true,
+    "exact_paused_employee_assignment": true,
+    "employee_paid_wages_reconcile": true,
+    "exact_passenger_route": true,
+    "owned_pickup_identity": true,
+    "vehicle_stopped_in_final_save": true,
+    "recorded_vehicle_progress_between_checkpoints": true,
+    "building_checkpoint_unchanged_through_audit": true,
+    "final_save_quit_unchanged_through_audit": true
+  },
+  "source_context": {
+    "crates/terra-sandbox/src/catalog.rs": {
+      "sha256": "ae9d84f216ff77e79889fae594f1dcc5fb4d92ee4e65277558f27d8470e628ac",
+      "observed_rule": "planks consumes 2 wood and creates 4 planks; fence consumes 2 planks and has 40 maximum health"
+    },
+    "crates/terra-sandbox/src/transport/model.rs": {
+      "sha256": "cd541dba962a9d691fbdbaea595a7186823f5424f5c0b927e0df439be3282d78",
+      "observed_rule": "VehicleModel::Pickup display name is Trail utility pickup; saved actor name remains Utility rover"
+    }
+  },
+  "limits": [
+    "Both requested checkpoints are after the supply delivery, crafting and building-damage actions. They do not independently establish the pre-delivery wallet/inventory, delivered quantity, reward increment, craft event count or before-damage health.",
+    "The saved 24 wood, 2 planks, 40 XP, one completed supply contract and fence at 15/40 are consistent with the separately observed native journey. The 4-wood / 6.13-credit delivery and crafting sequence require its earlier screenshots/process record for event evidence.",
+    "The comparison proves only the selected observed values and their retention between these exact saved files. It is not full Rust save validation, a reload execution, whole-world conservation proof, publisher authentication or a final release acceptance.",
+    "Money values in JSON are integer minor credits, 100 per displayed credit. The employee wage_fraction is retained unpaid fractional accrual and is not another paid wage amount.",
+    "No full save was copied into the repository. Checkpoints and source were read only; no Cargo or native executable was started by this audit."
+  ]
+}

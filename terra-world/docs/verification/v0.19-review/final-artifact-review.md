@@ -1,0 +1,23 @@
+# Final artifact preparation review — 0.19
+
+Reviewed 29 October 2026. Scope at this stage: `/workspace/scratch/1c0c5a298a25/finalize_source_019.py` before archive creation. No final archive result or current native/desktop acceptance is implied by this preparatory review.
+
+## Preservation and privacy findings
+
+The finalizer preserves every baseline path, limits changed baseline files to an explicit reviewed set, checks that the old current Product review/Validation were copied byte-for-byte to their 0.18 historical names, preserves baseline file modes, rejects unexpected symlinks and verifies ZIP entry bytes/modes, CRC and portable namespace. Its changed-baseline allowlist excludes original assets, authored/source data and historical evidence, so their preservation is enforced rather than inferred from filenames. Baseline Python bytecode is explicitly restored as historical content, and new bytecode is excluded; it must never be presented as current execution evidence.
+
+The reviewed current new-file inventory consists of the planned documentation, specialist review/implementation/test evidence, in-progress 0.19 acceptance evidence and `scripts/release_contract.py`. No new runtime profile, private identity or save file appeared in that inventory. The script's suffix-only runtime database check is narrower than privacy admission: runtime state and capabilities can also be JSON or text. Recommended strengthening: restrict new paths to the exact planned files and named current review/acceptance/native evidence scopes; separately review new evidence for unintended private runtime state before publication.
+
+## Integrity and publication corrections requested
+
+1. The manifest snapshots hashes before ZIP creation, while the final check compares archived bytes with the later live file tree. A change between hashing and ZIP entry reading could therefore leave an internally stale manifest despite matching the later local file. Compare every archived entry's size and SHA-256 against the manifest entry, in addition to the local-byte check. Keep the intentional manifest self-exclusion explicit.
+2. Writing directly with `ZipFile(OUT, 'w')` makes an incomplete archive visible and can overwrite a path created after `assert not OUT.exists()`. Create and validate a temporary sibling archive, then atomically publish to the new output path without replacement, as the desktop packager already does.
+3. Final acceptance must additionally bind the fresh gate record/source manifest and desktop executable digest. This script's baseline-preservation checks are useful but do not by themselves establish successful current-release tests or native execution.
+
+These points were sent to the integrator before execution. The final independent archive inspection will be recorded outside the source project after the integrator signals that both archives are ready, avoiding a self-referential archive receipt. That inspection must check the exact accepted desktop binary, current source input hashes, original asset/data and historical-evidence preservation, archive namespaces/modes and absence of newly introduced runtime state.
+
+## Correction review before execution
+
+The revised scratch finalizer was re-read after the integrator's corrections. It now compares each archived file's exact size, SHA-256 and stored mode against its manifest entry as well as the live file bytes. Publication builds a sibling temporary ZIP, validates that complete staged archive and then uses exclusive `os.link` publication, so an existing destination is not replaced and partial output is not exposed under the final archive name. `sys.dont_write_bytecode=True` prevents the validation import from introducing new bytecode after file enumeration. New paths are restricted to the named 0.19 files and current-version evidence namespace; final inventory review still needs to inspect what that evidence contains. These changes resolve the manifest/publication corrections identified above. Temporary-stage cleanup on a failed verification remains a scratch housekeeping matter and does not publish a final output.
+
+No final archive was available for inspection at this correction review. The integrator reports that rendered native QA was blocked before game launch by Unix-socket permission denial and retained a sanitized failure receipt. A later accepted executable's CLI/help smoke can establish executable loading and argument handling on that host; it cannot be called fresh native visual, input, gameplay, save/reopen or GPU acceptance. The independent archive check will preserve that distinction and treat prior 0.18 native screenshots as historical evidence only.

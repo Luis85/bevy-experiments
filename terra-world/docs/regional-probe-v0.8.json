@@ -1,0 +1,210 @@
+{
+  "background_checkpoint": {
+    "max_nonblocking_poll_ms": 0.0027240000000000003,
+    "policy": "one outstanding revision; authority waits while presentation continues; no simulation mutation between submit and install",
+    "poll_calls": 182,
+    "samples": 16,
+    "submission_including_snapshot_clone_p50_ms": 0.407987,
+    "submission_p95_ms": 1.265404,
+    "worker_p50_ms": 10.424076,
+    "worker_p95_ms": 17.85461
+  },
+  "checkpoint": {
+    "max_ms": 13.643996,
+    "mean_ms": 9.2607985,
+    "p50_ms": 8.433196,
+    "p95_ms": 13.643996,
+    "samples": 16
+  },
+  "checkpoint_stages": {
+    "compose": {
+      "max_ms": 7.845862,
+      "mean_ms": 4.730614499999999,
+      "p50_ms": 4.723094,
+      "p95_ms": 7.845862,
+      "samples": 16
+    },
+    "encode": {
+      "max_ms": 1.3938979999999999,
+      "mean_ms": 0.77022075,
+      "p50_ms": 0.748392,
+      "p95_ms": 1.3938979999999999,
+      "samples": 16
+    },
+    "install": {
+      "max_ms": 2.59113,
+      "mean_ms": 1.355739375,
+      "p50_ms": 1.1479059999999999,
+      "p95_ms": 2.59113,
+      "samples": 16
+    },
+    "last_work": {
+      "compose_ms": 4.021122,
+      "deleted_pages": 0,
+      "encode_ms": 0.629021,
+      "encoded_page_bytes": 0,
+      "encoded_pages": 0,
+      "install_ms": 0.764416,
+      "reused_page_bytes": 1683609,
+      "reused_pages": 19,
+      "select_ms": 3.002381,
+      "selected_records_validated": 476,
+      "transaction_ms": 0.947674,
+      "validation": {
+        "active_records": 476,
+        "certified_environment_groups": 15,
+        "certified_environment_records": 6000,
+        "merged_scope_records": 656
+      }
+    },
+    "select": {
+      "max_ms": 6.081088,
+      "mean_ms": 2.9406635,
+      "p50_ms": 2.712813,
+      "p95_ms": 6.081088,
+      "samples": 16
+    },
+    "transaction": {
+      "max_ms": 1.306215,
+      "mean_ms": 1.0172865624999998,
+      "p50_ms": 0.9935919999999999,
+      "p95_ms": 1.306215,
+      "samples": 16
+    }
+  },
+  "environment": {
+    "arch": "x86_64",
+    "os": "linux",
+    "profile": "optimized dev (opt-level=1, debug assertions enabled)",
+    "sqlite": "3.53.2",
+    "visible_parallelism": 8
+  },
+  "final_status": {
+    "active_records": 448,
+    "active_regions": 4,
+    "checkpoint_bytes": 1701450,
+    "dependency_regions": 0,
+    "dormant_records": 6180,
+    "dormant_regions": 15,
+    "generation": 33,
+    "global_records": 28,
+    "pinned_regions": 4
+  },
+  "fixture": "synthetic finite regional storage and simulation",
+  "initial_checkpoint_ms": 28.180533,
+  "initial_status": {
+    "active_records": 448,
+    "active_regions": 4,
+    "checkpoint_bytes": 1695761,
+    "dependency_regions": 0,
+    "dormant_records": 6180,
+    "dormant_regions": 15,
+    "generation": 1,
+    "global_records": 23,
+    "pinned_regions": 4
+  },
+  "limits": "All aggregate domain caps remain. Checkpoint certifies unchanged dependency-closed environmental groups; active/global and dependent cold bodies, housing and ecology are fully validated. Complete restores validate all decoded records. Page encoding is reused only under exact immutable equality and database epoch guards. One background worker remains. Authority pauses while pending, presentation may continue. Explicit startup/restore/final drain are synchronous. Timings are fixture evidence, not a server capacity or latency guarantee.",
+  "owner_dormancy": {
+    "after_status": {
+      "active_records": 37,
+      "active_regions": 4,
+      "checkpoint_bytes": 162249,
+      "dependency_regions": 0,
+      "dormant_records": 105,
+      "dormant_regions": 18,
+      "generation": 2,
+      "global_records": 128,
+      "pinned_regions": 4
+    },
+    "before_status": {
+      "active_records": 52,
+      "active_regions": 19,
+      "checkpoint_bytes": 150264,
+      "dependency_regions": 0,
+      "dormant_records": 0,
+      "dormant_regions": 0,
+      "generation": 1,
+      "global_records": 218,
+      "pinned_regions": 19
+    },
+    "dormant_owners": 15,
+    "fixture": "16 synthetic owners, 15 dormant; no sockets or renderer",
+    "limit": "Synthetic residency/invariant fixture; global gameplay caps and full dependent cold-record validation remain. Static environment groups may use their immutable proof. Not concurrent-player capacity.",
+    "registered_owners": 16,
+    "resident_homes_after": 1,
+    "resident_homes_before": 16,
+    "resident_owned_bodies_after": 5,
+    "resident_owned_bodies_before": 80,
+    "retirement_checkpoint_ms": 5.139884,
+    "simulated_while_dormant": {
+      "calendar_seconds": 50,
+      "physical_seconds": 5,
+      "steps": 100
+    },
+    "verification": {
+      "accounts_inventory_exact": true,
+      "offline_bodies_exact": true,
+      "offline_needs_orders_exact": true,
+      "offline_resources_exact": true,
+      "reactivation_valid": true,
+      "restart_exact": true
+    }
+  },
+  "restore_complete_world_ms": 36.372238,
+  "scope": {
+    "active_bodies": 59,
+    "active_resource_nodes": 400,
+    "calendar_seconds": 250,
+    "complete_bodies": 239,
+    "complete_resource_nodes": 6400,
+    "imported_collision": false,
+    "live_data": false,
+    "physical_seconds": 25,
+    "region_level": 16,
+    "simulation_steps": 500,
+    "sockets": 0
+  },
+  "simulation": {
+    "active_ms": 93.751895,
+    "complete_ms": 128.690084,
+    "note": "Different intended workloads: dormant environment and ambient bodies freeze; global economy and owned bodies advance in both."
+  },
+  "validation_scope_comparison": {
+    "certified_environment_merge": {
+      "max_ms": 8.901704,
+      "mean_ms": 4.101574937500001,
+      "p50_ms": 3.462146,
+      "p95_ms": 8.901704,
+      "samples": 16
+    },
+    "full_scope_merge": {
+      "max_ms": 17.260983,
+      "mean_ms": 11.819317062500001,
+      "p50_ms": 10.777320999999999,
+      "p95_ms": 17.260983,
+      "samples": 16
+    },
+    "note": "Alternating same-revision domain merges; excludes storage, encoding, selection and socket work. Full reference is the previous certified-partition merge algorithm with complete merged-state validation.",
+    "same_revision_canonical_equal": true,
+    "samples": 16,
+    "work": {
+      "active_records": 476,
+      "certified_environment_groups": 15,
+      "certified_environment_records": 6000,
+      "merged_scope_records": 656
+    }
+  },
+  "verification": {
+    "dormant_resource_unchanged": true,
+    "every_checkpoint_exact": true,
+    "every_worker_checkpoint_exact": true,
+    "full_roundtrip_exact": true,
+    "online_backup_exact": true,
+    "restart_exact": true
+  },
+  "verified_partition_cache": {
+    "decoded_checkpoints": 0,
+    "hits": 99
+  },
+  "version": "0.8.0"
+}
