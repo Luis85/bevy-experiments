@@ -65,9 +65,13 @@ pub fn bond_tier(world: &World, actor: Entity, other: SimId) -> usize {
 }
 
 /// Whether today is one of `id`'s curious days, on which it prefers
-/// somebody it is not yet friends with (`schedule.curious_permille`).
+/// somebody it is not yet friends with (`schedule.curious_permille`, moved by
+/// the resident's curiosity: `resident::curious_permille`).
 pub fn curious_today(world: &World, id: SimId) -> bool {
-    let permille = steer(world).curious_permille;
+    let base = steer(world).curious_permille;
+    let permille = world.resource::<SimIndex>().get(id).map_or(base, |actor| {
+        super::super::resident::curious_permille(world, actor, base)
+    });
     let day = super::super::calendar(world).0;
     permille > 0
         && sim_rand(world.resource::<WorldSeed>().0, id, day, CURIOUS_PURPOSE) % 1000 < permille

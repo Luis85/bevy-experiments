@@ -492,8 +492,9 @@ coat.
 
 ## Traits
 
-Each resident gets four integers when the world is founded, drawn from these
-ranges with the world seed and never changed afterwards.
+Each resident gets six integers when the world is founded, drawn from these
+ranges with the world seed, and a preferred food. A child born on the island
+takes after its parents instead (below). Traits never change afterwards.
 
 ```json
 "traits": {
@@ -501,17 +502,49 @@ ranges with the world seed and never changed afterwards.
   "sociability": {"min": 5,    "max": 95},
   "chronotype":  {"min": -100, "max": 100},
   "thrift":      {"min": 0,    "max": 100},
+  "curiosity":   {"min": 0,    "max": 100},
+  "caution":     {"min": 0,    "max": 100},
   "sociable_min": 35,
-  "thrift_reserve_coins": 80
+  "thrift_reserve_coins": 80,
+  "thrift_stock_permille": 500,
+  "curious_shift_permille": 250,
+  "caution_need_shift": 8000,
+  "inherit_noise": 15,
+  "food_inherit_permille": 700
 }
 ```
+
+Every effect is centred on 50: a resident at 50 behaves as one without the
+trait, so traits spread the village's behaviour without moving its average.
+Each trait feeds a decision that already exists; none adds a system.
 
 | Trait | Range | Effect in the shipped tree |
 |---|---|---|
 | Diligence | 0 to 100 | Delays the leisure block, so a diligent resident works longer. |
 | Sociability | 0 to 100 | At `sociable_min` or more the resident takes leisure: meets neighbours or strolls to the square. Below it the resident spends its free time alone: it strolls, but nobody chats with it in its leisure, neither in passing nor by seeking it out. Not in the cold without a coat. |
 | Chronotype | -100 to 100 | Shifts the whole own day (meals and the shared leisure by at most `align_permille`). Negative is an early riser. |
-| Thrift | 0 to 100 | Keeps `thrift` x `thrift_reserve_coins` / 100 coins back from stocking provisions ahead of need. Buying when actually thirsty or hungry is never held back. |
+| Thrift | 0 to 100 | Keeps `thrift` x `thrift_reserve_coins` / 100 coins back from stocking provisions ahead of need (buying when actually thirsty or hungry is never held back), and moves the days of water and food the plan stocks for the resident: (50 - thrift) / 50 x `thrift_stock_permille` permille of a day more (a free spender, half a day at thrift 0) or less (the thrifty). |
+| Curiosity | 0 to 100 | Moves the share of curious days (`schedule.curious_permille`, on which somebody new is met before a friend) by (curiosity - 50) / 50 x `curious_shift_permille`: 0 at curiosity 0, 500 permille at 100 with the shipped numbers. |
+| Caution | 0 to 100 | Moves the Thirst and Hunger thresholds (`island_ai.thirst_threshold`, `hunger_threshold`) by (caution - 50) / 50 x `caution_need_shift`: a cautious resident sets out to drink and eat earlier, a carefree one later. Critical thresholds do not move. |
+| Preferred food | a food | Drawn from `economy.seed.food_preferences` (shipped: cooked meal, bread twice, eggs, turnips). The preferred food comes first in the resident's diet, so it is what it buys and eats first and what the plan stocks for it. |
+
+**Inheritance.** At birth a child's traits are drawn: per trait its parents'
+mean, moved by a seeded amount of at most `inherit_noise` points either way and
+kept within the authored range; with `food_inherit_permille` it keeps one
+parent's preferred food, else it draws one from the list. The draw is kept with
+the child (`demography::Child::inherited`, saved and hashed) and becomes the
+adult's on coming of age.
+
+**In words.** The inspector's Traits row shows every trait as a word ("early
+riser", "hard-working", "sociable", "thrifty", "curious", "cautious", "likes
+eggs"; 67 or more reads strong, below 34 weak). When a trait decided what the
+resident is doing (`resident::trait_motive`), the Why sentence names it:
+"Drinking, because they are thirsty and they are cautious" (Thirst or
+Hunger between the world's threshold and the resident's own), "they are
+free-spending" (stocking provisions at thrift below 34), "they are
+hard-working" (working through the world's free time at diligence 67 or more),
+"they are curious" (meeting somebody new on a curious day), "they are sociable",
+"they keep to themself".
 
 Set `min` equal to `max` to give everybody the same value. Trait effects come
 only from the conditions that read them, so a tree that never asks
@@ -776,7 +809,7 @@ A guard may test with parameters, or negate any condition (review fix pass, S3.1
 | `has_good` | `good` (a good key or a tag), `value` (count, default 1) | the pack holds at least that many |
 | `is_trade` | `trade` (a profession key) | the resident works that trade |
 | `season` | `season` | it is that season |
-| `trait_at_least` | `trait` (`diligence`, `sociability`, `thrift`), `value` 0..=100 | the trait is at least the value |
+| `trait_at_least` | `trait` (`caution`, `curiosity`, `diligence`, `sociability`, `thrift`), `value` 0..=100 | the trait is at least the value |
 | `in_block` | `block` (`work`, `meal`, `leisure`, `sleep`) | the resident's shifted schedule is in that block |
 | `life.player_within` | `value` in metres, 1..=100 | the played character has arrived, is alive and is within that distance (integer squared distance; one index lookup, no scan) |
 | any registered condition | `not: true` | the condition is false |

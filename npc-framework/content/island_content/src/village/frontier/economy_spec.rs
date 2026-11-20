@@ -322,7 +322,15 @@ impl Default for SeedSpec {
             coins: 200,
             common: stacks(&[("bread", 2), (WATER, 2), ("log", 2)]),
             founders,
-            food_preferences: vec![COOKED_MEAL.into(), "bread".into(), "bread".into()],
+            // Every staple food has residents who like it best (review
+            // npc-ai#13): eggs and turnips have buyers of their own.
+            food_preferences: vec![
+                COOKED_MEAL.into(),
+                "bread".into(),
+                "bread".into(),
+                "village_egg".into(),
+                "village_turnip".into(),
+            ],
             endowment_bonus_max: 1,
             extra_aptitudes: 1,
         }

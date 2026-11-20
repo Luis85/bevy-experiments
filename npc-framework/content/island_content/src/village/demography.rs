@@ -110,6 +110,17 @@ pub struct Child {
     pub unfed_ticks: u64,
     /// Of age, but no workplace of the settlement has a free seat yet.
     pub waiting_for_seat: bool,
+    /// What the child takes after its parents, drawn at birth (review
+    /// npc-ai#13); `None` for a child recorded without parents' traits, who
+    /// is seeded like a newcomer on coming of age.
+    pub inherited: Option<Inheritance>,
+}
+
+/// A child's traits and preferred food, mixed from its parents' at birth.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+pub struct Inheritance {
+    pub traits: super::resident::ResidentTraits,
+    pub preferred_food: String,
 }
 
 /// Children and the village's vital statistics.
@@ -205,6 +216,10 @@ impl SimHashResource for Demography {
             h.i32(child.fed);
             h.u64(child.unfed_ticks);
             h.u8(u8::from(child.waiting_for_seat));
+            h.opt(child.inherited.as_ref(), |h, inherited| {
+                inherited.traits.sim_hash(h);
+                h.str(&inherited.preferred_food);
+            });
         }
         h.u32(self.next_child);
         h.opt(self.last_day.as_ref(), |h, day| h.u64(*day));
@@ -1096,6 +1111,7 @@ fn births(world: &mut World, spec: &DemographySpec, day: u64) {
         }
         let child = {
             let id = world.resource::<Demography>().next_child + 1;
+            let inherited = inheritance(world, seed, id, a, b);
             Child {
                 id,
                 name: pick_name(world, u64::from(id) << 8 | 1, spec),
@@ -1106,6 +1122,7 @@ fn births(world: &mut World, spec: &DemographySpec, day: u64) {
                 fed: 100_000,
                 unfed_ticks: 0,
                 waiting_for_seat: false,
+                inherited,
             }
         };
         for actor in [a, b] {
@@ -1127,6 +1144,33 @@ fn births(world: &mut World, spec: &DemographySpec, day: u64) {
         );
         super::colony_demand_changed(world);
     }
+}
+
+/// Traits and preferred food of child number `child` of residents `a` and
+/// `b` (review npc-ai#13): the parents' mean plus seeded noise, and a
+/// parent's food or one drawn from the world's list.
+fn inheritance(world: &World, seed: u64, child: u32, a: Entity, b: Entity) -> Option<Inheritance> {
+    let spec = &super::resident::spec(world)?.traits;
+    let traits = super::resident::inherit_traits(
+        spec,
+        seed,
+        child,
+        super::resident::traits(world, a),
+        super::resident::traits(world, b),
+    );
+    let parents: Vec<String> = [a, b]
+        .iter()
+        .filter_map(|actor| world.get::<ResidentProfile>(*actor))
+        .map(|profile| profile.preferred_food.clone())
+        .collect();
+    let choices = super::frontier::spec(world)
+        .map(|spec| spec.economy.seed.food_preferences.clone())
+        .unwrap_or_default();
+    let preferred_food = super::resident::inherit_food(spec, seed, child, &parents, &choices)?;
+    Some(Inheritance {
+        traits,
+        preferred_food,
+    })
 }
 
 /// A child of age becomes a resident with a trade and a parent's aptitude.
@@ -1210,6 +1254,14 @@ fn come_of_age(world: &mut World, spec: &DemographySpec, day: u64) {
             continue;
         };
         let actor = world.resource::<SimIndex>().get(id).expect("new adult");
+        // What the child took after its parents replaces the newcomer's draw
+        // (the own day follows in `enroll`).
+        if let Some(inherited) = &child.inherited {
+            world.entity_mut(actor).insert(inherited.traits);
+            if let Some(mut profile) = world.get_mut::<ResidentProfile>(actor) {
+                profile.preferred_food = inherited.preferred_food.clone();
+            }
+        }
         enroll(
             world,
             actor,

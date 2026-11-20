@@ -203,7 +203,10 @@ pub struct TraitRange {
     pub max: i32,
 }
 
-/// Seeding ranges of the four traits and what one trait point is worth.
+/// Seeding ranges of the traits and what one trait point is worth (review
+/// npc-ai#13). Every effect is centred on 50: a resident with 50 behaves as
+/// one without the trait, so a trait spreads behaviour without moving the
+/// village's average.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct TraitSpec {
@@ -213,11 +216,32 @@ pub struct TraitSpec {
     pub sociability: TraitRange,
     /// -100..=100. Negative is an early bird; shifts every schedule block.
     pub chronotype: TraitRange,
-    /// 0..=100. Coins kept back from stocking provisions ahead of need.
+    /// 0..=100. Coins kept back from stocking provisions ahead of need, and
+    /// fewer days of provisions stocked.
     pub thrift: TraitRange,
+    /// 0..=100. How often a free evening is spent with somebody new.
+    pub curiosity: TraitRange,
+    /// 0..=100. How early a resident drinks and eats.
+    pub caution: TraitRange,
     pub sociable_min: i32,
     /// Coins a resident with thrift 100 keeps back; scales linearly.
     pub thrift_reserve_coins: u32,
+    /// Permille of a day of provisions a resident with thrift 0 stocks more
+    /// than the settlement's reserve days, and one with thrift 100 less;
+    /// linear in between.
+    pub thrift_stock_permille: i32,
+    /// Permille added to `schedule.curious_permille` (the share of curious
+    /// days) at curiosity 100 and taken off at curiosity 0.
+    pub curious_shift_permille: i32,
+    /// Milli-units the thirst and hunger thresholds rise by at caution 100
+    /// and fall by at caution 0: the cautious drink and eat earlier.
+    pub caution_need_shift: i32,
+    /// A child's trait is its parents' mean, moved by at most this many
+    /// points either way (seeded), within the authored range.
+    pub inherit_noise: i32,
+    /// Permille of children who take a parent's preferred food; the others
+    /// draw one from `economy.seed.food_preferences`.
+    pub food_inherit_permille: u32,
 }
 
 impl Default for TraitSpec {
@@ -230,8 +254,15 @@ impl Default for TraitSpec {
                 max: 100,
             },
             thrift: TraitRange { min: 0, max: 100 },
+            curiosity: TraitRange { min: 0, max: 100 },
+            caution: TraitRange { min: 0, max: 100 },
             sociable_min: 35,
             thrift_reserve_coins: 80,
+            thrift_stock_permille: 500,
+            curious_shift_permille: 250,
+            caution_need_shift: 8_000,
+            inherit_noise: 15,
+            food_inherit_permille: 700,
         }
     }
 }
@@ -403,6 +434,8 @@ impl BehaviorSpec {
             ("sociability", self.traits.sociability, 0),
             ("chronotype", self.traits.chronotype, -100),
             ("thrift", self.traits.thrift, 0),
+            ("curiosity", self.traits.curiosity, 0),
+            ("caution", self.traits.caution, 0),
         ] {
             if range.min > range.max || range.min < lowest || range.max > 100 {
                 return Err(format!(
@@ -415,6 +448,20 @@ impl BehaviorSpec {
         {
             return Err(
                 "behavior.traits needs sociable_min 0..=100 and thrift_reserve_coins <= 10000"
+                    .into(),
+            );
+        }
+        let t = &self.traits;
+        if !(0..=1000).contains(&t.thrift_stock_permille)
+            || !(0..=1000).contains(&t.curious_shift_permille)
+            || !(0..=40_000).contains(&t.caution_need_shift)
+            || !(0..=100).contains(&t.inherit_noise)
+            || t.food_inherit_permille > 1000
+        {
+            return Err(
+                "behavior.traits needs thrift_stock_permille and curious_shift_permille in \
+                 0..=1000, caution_need_shift in 0..=40000, inherit_noise in 0..=100 and \
+                 food_inherit_permille at most 1000"
                     .into(),
             );
         }
@@ -572,12 +619,19 @@ impl BehaviorSpec {
             self.traits.sociability,
             self.traits.chronotype,
             self.traits.thrift,
+            self.traits.curiosity,
+            self.traits.caution,
         ] {
             h.i32(range.min);
             h.i32(range.max);
         }
         h.i32(self.traits.sociable_min);
         h.u32(self.traits.thrift_reserve_coins);
+        h.i32(self.traits.thrift_stock_permille);
+        h.i32(self.traits.curious_shift_permille);
+        h.i32(self.traits.caution_need_shift);
+        h.i32(self.traits.inherit_noise);
+        h.u32(self.traits.food_inherit_permille);
         h.opt(self.stage_trees.child.as_ref(), |h, tree| h.str(tree));
         h.opt(self.stage_trees.elder.as_ref(), |h, tree| h.str(tree));
         h.u32(self.schedule.blocks.len() as u32);
@@ -819,7 +873,9 @@ fn first_leaves(tree: &TreeDef, node: NodeIdx, cond: &str, out: &mut Vec<LeafKey
     }
 }
 
-/// Per-resident personality, seeded once at founding and never changed.
+/// Per-resident personality: seeded at founding, mixed from the parents for
+/// somebody born on the island, and never changed afterwards. The preferred
+/// food is `ResidentProfile::preferred_food`.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[reflect(Component)]
 pub struct ResidentTraits {
@@ -827,6 +883,8 @@ pub struct ResidentTraits {
     pub sociability: i32,
     pub chronotype: i32,
     pub thrift: i32,
+    pub curiosity: i32,
+    pub caution: i32,
 }
 
 impl ResidentTraits {
@@ -836,16 +894,20 @@ impl ResidentTraits {
         sociability: 50,
         chronotype: 0,
         thrift: 50,
+        curiosity: 50,
+        caution: 50,
     };
 }
 
 impl SimHash for ResidentTraits {
-    const NAME: &'static str = "regional_resident_traits_v1";
+    const NAME: &'static str = "regional_resident_traits_v2";
     fn sim_hash(&self, h: &mut Fnv64) {
         h.i32(self.diligence);
         h.i32(self.sociability);
         h.i32(self.chronotype);
         h.i32(self.thrift);
+        h.i32(self.curiosity);
+        h.i32(self.caution);
     }
 }
 
@@ -854,6 +916,11 @@ const DILIGENCE_PURPOSE: u32 = 0x4149_5401;
 const SOCIABILITY_PURPOSE: u32 = 0x4149_5402;
 const CHRONOTYPE_PURPOSE: u32 = 0x4149_5403;
 const THRIFT_PURPOSE: u32 = 0x4149_5404;
+const CURIOSITY_PURPOSE: u32 = 0x4149_5405;
+const CAUTION_PURPOSE: u32 = 0x4149_5406;
+/// `sim_rand` purpose of a child's inherited traits and food (id 0, tick =
+/// child number x 8 + axis).
+const INHERIT_PURPOSE: u32 = 0x4149_5407;
 
 /// Deterministic founding traits of resident `id`.
 pub fn seed_traits(spec: &TraitSpec, seed: u64, id: SimId) -> ResidentTraits {
@@ -866,7 +933,61 @@ pub fn seed_traits(spec: &TraitSpec, seed: u64, id: SimId) -> ResidentTraits {
         sociability: draw(spec.sociability, SOCIABILITY_PURPOSE),
         chronotype: draw(spec.chronotype, CHRONOTYPE_PURPOSE),
         thrift: draw(spec.thrift, THRIFT_PURPOSE),
+        curiosity: draw(spec.curiosity, CURIOSITY_PURPOSE),
+        caution: draw(spec.caution, CAUTION_PURPOSE),
     }
+}
+
+fn inherit_draw(seed: u64, child: u32, axis: u64) -> u64 {
+    npc_framework::kernel::rng::sim_rand(
+        seed,
+        SimId(0),
+        u64::from(child) * 8 + axis,
+        INHERIT_PURPOSE,
+    )
+}
+
+/// Traits of child number `child` of parents `a` and `b`: per trait the
+/// parents' mean moved by a seeded amount of at most `inherit_noise` either
+/// way, within the authored range (review npc-ai#13).
+pub fn inherit_traits(
+    spec: &TraitSpec,
+    seed: u64,
+    child: u32,
+    a: ResidentTraits,
+    b: ResidentTraits,
+) -> ResidentTraits {
+    let noise = spec.inherit_noise.max(0);
+    let mix = |axis: u64, x: i32, y: i32, range: TraitRange| {
+        let moved = (inherit_draw(seed, child, axis) % (2 * noise + 1) as u64) as i32 - noise;
+        ((x + y).div_euclid(2) + moved).clamp(range.min, range.max)
+    };
+    ResidentTraits {
+        diligence: mix(0, a.diligence, b.diligence, spec.diligence),
+        sociability: mix(1, a.sociability, b.sociability, spec.sociability),
+        chronotype: mix(2, a.chronotype, b.chronotype, spec.chronotype),
+        thrift: mix(3, a.thrift, b.thrift, spec.thrift),
+        curiosity: mix(4, a.curiosity, b.curiosity, spec.curiosity),
+        caution: mix(5, a.caution, b.caution, spec.caution),
+    }
+}
+
+/// The preferred food of child number `child`: one of `parents`' foods with
+/// `food_inherit_permille`, else one drawn from `choices` (the world's
+/// `economy.seed.food_preferences`). `None` with neither to draw from.
+pub fn inherit_food(
+    spec: &TraitSpec,
+    seed: u64,
+    child: u32,
+    parents: &[String],
+    choices: &[String],
+) -> Option<String> {
+    let keep = inherit_draw(seed, child, 6);
+    if !parents.is_empty() && keep % 1000 < u64::from(spec.food_inherit_permille) {
+        return Some(parents[((keep / 1000) % parents.len() as u64) as usize].clone());
+    }
+    (!choices.is_empty())
+        .then(|| choices[(inherit_draw(seed, child, 7) % choices.len() as u64) as usize].clone())
 }
 
 /// The active behaviour data of a regional world.
@@ -993,6 +1114,111 @@ pub fn walk_ticks(world: &World, actor: Entity, legs: &[SimPos]) -> u64 {
 /// `traits.sociable_min` (`life.sociable`).
 pub fn sociable(world: &World, actor: Entity) -> bool {
     spec(world).is_some_and(|spec| traits(world, actor).sociability >= spec.traits.sociable_min)
+}
+
+/// Ticks of provisions `actor` stocks beyond (positive) or short of
+/// (negative) the settlement's reserve days, out of a day of `day_ticks`:
+/// a free spender lays in more, a thrifty resident less
+/// (`traits.thrift_stock_permille`).
+pub fn thrift_stock_shift(world: &World, actor: Entity, day_ticks: u64) -> i64 {
+    let Some(spec) = spec(world) else {
+        return 0;
+    };
+    let thrift = i64::from(traits(world, actor).thrift.clamp(0, 100));
+    day_ticks as i64 * (50 - thrift) * i64::from(spec.traits.thrift_stock_permille) / 50_000
+}
+
+/// `base` (a policy threshold of Thirst or Hunger) for `actor`: higher for a
+/// cautious resident, who drinks and eats earlier, lower for a carefree one
+/// (`traits.caution_need_shift`). Critical thresholds are not moved.
+pub fn need_threshold(world: &World, actor: Entity, base: i32) -> i32 {
+    let Some(spec) = spec(world) else {
+        return base;
+    };
+    let caution = traits(world, actor).caution.clamp(0, 100);
+    (base + (caution - 50) * spec.traits.caution_need_shift / 50).clamp(1_000, 99_000)
+}
+
+/// Share in permille of `actor`'s days that are curious days: the world's
+/// `schedule.curious_permille`, moved by curiosity
+/// (`traits.curious_shift_permille`).
+pub fn curious_permille(world: &World, actor: Entity, base: u64) -> u64 {
+    let Some(spec) = spec(world) else {
+        return base;
+    };
+    let curiosity = i64::from(traits(world, actor).curiosity.clamp(0, 100));
+    (base as i64 + (curiosity - 50) * i64::from(spec.traits.curious_shift_permille) / 50)
+        .clamp(0, 1000) as u64
+}
+
+/// A trait value at or above this reads as strong ("thrifty", "curious").
+pub const TRAIT_STRONG: i32 = 67;
+/// A trait value below this reads as weak ("free-spending", "carefree").
+pub const TRAIT_WEAK: i32 = 34;
+
+/// The trait that decided what `actor` is doing now, as the end of a "because"
+/// sentence ("they are cautious"), when the same resident with a middling
+/// value would not be doing it (review npc-ai#13). Read-only: the inspector's
+/// Why asks it for the selected resident, never per frame for everybody.
+///
+/// - drinking or eating while the need is still above the world's threshold,
+///   below the resident's own (caution);
+/// - stocking provisions ahead of need with thrift below [`TRAIT_WEAK`];
+/// - working through the world's free time with diligence of
+///   [`TRAIT_STRONG`] or more;
+/// - meeting or seeking somebody who is not yet a friend on a curious day
+///   (curiosity), else seeking company with sociability of [`TRAIT_STRONG`] or
+///   more, or spending free time alone below `sociable_min`.
+pub fn trait_motive(world: &World, actor: Entity) -> Option<&'static str> {
+    use super::behavior::LifeGoal;
+    let spec = spec(world)?;
+    let traits = traits(world, actor);
+    if super::behavior::decision(world, actor) == Some("stocking provisions") {
+        return (traits.thrift < TRAIT_WEAK).then_some("they are free-spending");
+    }
+    let goal = world.get::<super::behavior::LifeDecision>(actor)?.goal;
+    let policy = super::policy::active(world);
+    let early = |need: &str, base: i32| {
+        let value = super::economy::need(world, actor, need);
+        value >= base && value < need_threshold(world, actor, base)
+    };
+    match goal {
+        LifeGoal::Thirst => early("Thirst", policy.map_or(55_000, |p| p.thirst_threshold))
+            .then_some("they are cautious"),
+        LifeGoal::Hunger => early("Hunger", policy.map_or(50_000, |p| p.hunger_threshold))
+            .then_some("they are cautious"),
+        LifeGoal::Work => {
+            let now = day_permille(world);
+            let world_leisure = spec.schedule.blocks.iter().any(|block| {
+                block.kind == BlockKind::Leisure && contains(block.from, block.to, now)
+            });
+            (traits.diligence >= TRAIT_STRONG
+                && world_leisure
+                && !in_block(world, actor, BlockKind::Leisure))
+            .then_some("they are hard-working")
+        }
+        LifeGoal::Leisure => {
+            if !sociable(world, actor) {
+                return Some("they keep to themself");
+            }
+            let partner = world
+                .get::<super::colony::Chatting>(actor)
+                .map(|chat| chat.with)
+                .or_else(|| world.get::<super::colony::SocialLife>(actor)?.seeking)?;
+            let id = *world.get::<SimId>(actor)?;
+            let stranger = super::colony::bond_tier(world, actor, partner)
+                < spec.schedule.friend_tier as usize;
+            if stranger
+                && traits.curiosity >= TRAIT_STRONG
+                && super::colony::curious_today(world, id)
+            {
+                Some("they are curious")
+            } else {
+                (traits.sociability >= TRAIT_STRONG).then_some("they are sociable")
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Coins `actor` keeps back from stocking provisions ahead of need.

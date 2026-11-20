@@ -252,8 +252,11 @@ pub(super) fn advance(world: &mut World) {
             }
             match decision.goal {
                 LifeGoal::Thirst => {
-                    let threshold =
-                        super::policy::active(world).map_or(55_000, |p| p.thirst_threshold);
+                    let threshold = super::resident::need_threshold(
+                        world,
+                        actor,
+                        super::policy::active(world).map_or(55_000, |p| p.thirst_threshold),
+                    );
                     ai::satisfy(
                         world,
                         actor,
@@ -265,8 +268,11 @@ pub(super) fn advance(world: &mut World) {
                     );
                 }
                 LifeGoal::Hunger => {
-                    let threshold =
-                        super::policy::active(world).map_or(50_000, |p| p.hunger_threshold);
+                    let threshold = super::resident::need_threshold(
+                        world,
+                        actor,
+                        super::policy::active(world).map_or(50_000, |p| p.hunger_threshold),
+                    );
                     ai::satisfy(
                         world,
                         actor,

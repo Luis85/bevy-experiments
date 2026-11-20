@@ -215,3 +215,17 @@ before and after the swap. Marker created and deleted.
 | `island_living_world_s7.json` | `0cba87a695a174da80608e90c38b3ffa21a3a1a820858b2fd4af01e5ceb2a78c` |
 | `island_living_world_s11.json` | `a2c7db44fe29830a326950ae2977413f8d9eeb1949954623abe477e23ccdbfc4` |
 | `island_living_world_s23.json` | `8ae47866fecb8c2479a7f8edfa941803a271b83a39b7d5c5cfed37f84f2a067f` |
+
+## Re-baseline 2026-11-20: richer traits (backlog item 11)
+
+Same approval. Traits component renamed `regional_resident_traits_v2`, new trait spec fields: content hash
+`13107680033447328940` (`b5e7d58aff1bbcac`) -> `14928686895348995515` (`cf2d59a2c04e55bb`), and every state hash.
+Old files refused: `content hash mismatch: replay b5e7d58aff1bbcac, this build cf2d59a2c04e55bb`.
+Recorded into `target/island-split/b11/`, each seed twice, byte-identical; each verifies `"ok":true`, 40 checkpoints,
+before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `9a2b83c77499840812b4c0e318631177b8a43b3f9477b17ab259521aa18c5e40` |
+| `island_living_world_s11.json` | `355805f9fdb02624bf987bf893d2ba4ed6929b387f9c9d5449575f6e755d164b` |
+| `island_living_world_s23.json` | `f00917b70303f7daf12d46ff3b3d1101d1ea9a4bf7b5b6acab2b0135e9a54172` |

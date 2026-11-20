@@ -137,6 +137,7 @@ fn effective_schedule_blocks_follow_chronotype_and_diligence() {
             sociability: 50,
             chronotype,
             thrift: 50,
+            ..ResidentTraits::NEUTRAL
         };
         // The own day is derived from the traits (review npc-ai#11).
         resident::refresh_schedule(app.world_mut(), actor);

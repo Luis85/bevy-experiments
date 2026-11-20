@@ -620,6 +620,7 @@ fn why_parts(world: &World, id: SimId, entity: Entity) -> Result<model::Why, Str
         origin,
         plan: live_plan(world, entity),
         activity: Some(activity_label(world, entity)),
+        motive: resident::trait_motive(world, entity),
     };
     Ok(model::why(record, &context))
 }
@@ -817,8 +818,13 @@ pub(crate) fn entries(world: &World) -> Vec<Entry> {
                 rows.extend(friends_entries(world, id));
             }
             if resident && let Some(spec) = resident::spec(world) {
-                let words =
-                    model::trait_words(resident::traits(world, entity), spec.traits.sociable_min);
+                let traits = resident::traits(world, entity);
+                let food = good_name(world, village::production::food_preference(world, entity));
+                let words: Vec<String> = model::trait_words(traits, spec.traits.sociable_min)
+                    .into_iter()
+                    .map(str::to_owned)
+                    .chain(model::more_trait_words(traits, &food))
+                    .collect();
                 rows.push(
                     Entry::caption("traits_title", "Traits").with_tip(Tooltip::new(
                         "Traits",

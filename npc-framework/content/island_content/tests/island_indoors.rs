@@ -300,6 +300,7 @@ fn beds_are_shared_by_capacity_and_only_the_homeless_sleep_outside() {
             fed: 100_000,
             unfed_ticks: 0,
             waiting_for_seat: false,
+            inherited: None,
         });
     }
     let home = view::home(app.world(), house).expect("home");

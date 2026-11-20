@@ -10,6 +10,35 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Richer traits (review npc-ai#13). `ResidentTraits` (hash name `regional_resident_traits_v2`, saved) gains
+  `curiosity` and `caution` (0..=100, seeded with new `sim_rand` purposes; the four existing draws are unchanged), and
+  every trait now feeds an existing decision through hashed, validated `behavior.traits` scales, all centred on 50:
+  thrift also moves the plan's stocked days of water and food (`thrift_stock_permille` 500: half a day more at 0,
+  half less at 100; `production::forecast_amount`); curiosity moves the share of curious days in friendship steering
+  (`curious_shift_permille` 250: 0 at curiosity 0, 500 permille at 100; `colony::curious_today`); caution moves the
+  Thirst and Hunger thresholds (`caution_need_shift` 8000 milli-units; `life.thirsty`, `life.hungry` and the goal's
+  own `satisfy`). The shipped `economy.seed.food_preferences` adds eggs and turnips, so new foods have buyers.
+  Children take after their parents: at birth `demography::Child::inherited` (saved, hashed) records the parents'
+  mean per trait moved by at most `inherit_noise` (15) seeded points, and a parent's food with
+  `food_inherit_permille` (700) else a draw from the list; it becomes the adult's on coming of age.
+  `trait_at_least` accepts `curiosity` and `caution`. The inspector's Traits row adds "curious" / "open to new
+  faces" / "sticks to old friends", "cautious" / "sensible" / "carefree" and "likes <food>", and Why names the
+  deciding trait (`resident::trait_motive`, read for the selected resident only): "..., because it is their free
+  time and they are sociable". `ISLAND_SAVE_VERSION` 9; content and state hashes change, island replays to be
+  re-baselined. Tests: new `island_trait_effects` (9), an inspector words/Why test; three `Child` literals in
+  `island_demography`/`island_indoors` gain `inherited: None` and three `ResidentTraits` literals gain
+  `..ResidentTraits::NEUTRAL` (mechanical); `EconomySpec::default()` lists the same five preferences as the shipped
+  file. One-year soak (seeds 7/11/23, before -> after): no deaths either way; built 33/25/26 -> 33/31/28; bread
+  imported 51/41/73 -> 42/41/57; bread made 1172/1196/1088 -> 776/584/648; eggs made 180/192/148 -> 848/622/598,
+  eaten 87/107/92 -> 511/379/358, spoiled 65/50/45 -> 166/137/144; turnips eaten 29/20/56 -> 174/250/293, spoiled
+  33/34/34 -> 20/26/31; births 18/18/16 -> 15/18/12. Seed 11 day-7 tick profile 501 -> 468 ticks/s (one run each).
+  `island_economy_s4::the_bread_target_is_stable_between_dawn_and_midday` failed on day 1 (harbour bread use 4 at
+  dawn, 7 at midday). A trace shows a first-day transient, not a window artifact: residents start fed, so day 1's seven
+  closed buckets hold no meals and at dawn the open bucket has the harbour's only two (one loaf, one cooked meal),
+  which set the share; by midday three buckets hold 12 loaves, 1 meal, 1 egg. Reading closed buckets only was tried
+  and is worse (dawn 5/4/3 against midday 7/8/8: the preference prior now under-counts bread, because egg and
+  turnip lovers eat bread while those are scarce), so it was reverted. Approved by the owner: the test now reads
+  at dawn and midday of day 3 (read times only; the bar and assertions are unchanged).
 - Every resident keeps its own day (review npc-ai#11). `resident::OwnSchedule` (hash name `island_own_schedule_v1`,
   saved) holds the resident's blocks, derived once from data (`resident::own_blocks`) when its tree is assigned
   (founding, settling, coming of age, a change of trade, becoming an elder) and when the behaviour data is replaced:

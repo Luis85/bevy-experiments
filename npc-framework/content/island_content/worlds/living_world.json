@@ -3073,7 +3073,9 @@
         "food_preferences": [
           "village_cooked_meal",
           "bread",
-          "bread"
+          "bread",
+          "village_egg",
+          "village_turnip"
         ],
         "endowment_bonus_max": 1,
         "extra_aptitudes": 1

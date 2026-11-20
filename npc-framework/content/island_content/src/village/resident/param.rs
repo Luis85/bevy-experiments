@@ -59,7 +59,7 @@ pub struct ParamConds {
 pub const PLAYER_WITHIN: &str = "life.player_within";
 
 const NEEDS: [&str; 4] = ["Hunger", "Thirst", "Energy", "Warmth"];
-const TRAITS: [&str; 3] = ["diligence", "sociability", "thrift"];
+const TRAITS: [&str; 5] = ["caution", "curiosity", "diligence", "sociability", "thrift"];
 
 /// Rewrites every `{"if": ..}` guard of a raw tree into a plain `cond`.
 pub fn rewrite_guards(value: &mut Value) -> Result<(), String> {
@@ -284,6 +284,8 @@ fn eval(world: &World, actor: Entity, cond: &ParamCond) -> bool {
             let have = match name.as_str() {
                 "diligence" => traits.diligence,
                 "sociability" => traits.sociability,
+                "curiosity" => traits.curiosity,
+                "caution" => traits.caution,
                 _ => traits.thrift,
             };
             have >= *value

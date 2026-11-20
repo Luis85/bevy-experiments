@@ -365,6 +365,7 @@ fn births_wait_for_food_and_children_are_rehoused_when_a_home_stands() {
             fed: 100_000,
             unfed_ticks: 0,
             waiting_for_seat: false,
+            inherited: None,
         });
     }
     assert_eq!(demography::crowding(app.world(), harbour), (1, 3));
@@ -850,6 +851,7 @@ fn a_parent_fetches_food_for_a_hungry_child_with_an_empty_larder() {
             fed: 40_000,
             unfed_ticks: 0,
             waiting_for_seat: false,
+            inherited: None,
         });
     app.world_mut().resource_mut::<Demography>().next_child = 2;
     assert!(demography::child_needs_food(app.world(), a, 60_000));

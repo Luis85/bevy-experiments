@@ -21,7 +21,8 @@ use npc_framework::prelude::*;
 fn the_bread_target_is_stable_between_dawn_and_midday() {
     let mut app = world_with(|world| only_weather(world, "clear"));
     let day = app.world().resource::<SimConfig>().day_length;
-    run_ticks(app.world_mut(), day);
+    // Dawn of day 3: day one's few meals are too small a sample with mixed food preferences.
+    run_ticks(app.world_mut(), 2 * day);
     let read = |app: &bevy_app::App| -> Vec<(u32, u32)> {
         settlements::all(app.world())
             .into_iter()

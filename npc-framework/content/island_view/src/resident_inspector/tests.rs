@@ -358,6 +358,7 @@ fn traits_read_as_four_short_words() {
         sociability: 10,
         chronotype: -80,
         thrift: 95,
+        ..ResidentTraits::NEUTRAL
     };
     assert_eq!(
         trait_words(early, 35),
@@ -373,6 +374,7 @@ fn traits_read_as_four_short_words() {
         sociability: 80,
         chronotype: 70,
         thrift: 5,
+        ..ResidentTraits::NEUTRAL
     };
     assert_eq!(
         trait_words(late, 35),
@@ -1153,4 +1155,60 @@ fn the_day_tab_reads_todays_meal_from_the_world_and_changes_nothing() {
         .resource_mut::<village::VillageState>()
         .played = id;
     assert_eq!(meal(&mut app), None);
+}
+
+#[test]
+fn the_richer_traits_read_as_words_and_why_names_the_deciding_one() {
+    let curious = ResidentTraits {
+        curiosity: 90,
+        caution: 80,
+        ..ResidentTraits::NEUTRAL
+    };
+    assert_eq!(
+        more_trait_words(curious, "eggs"),
+        ["curious", "cautious", "likes eggs"].map(str::to_owned)
+    );
+    let settled = ResidentTraits {
+        curiosity: 10,
+        caution: 5,
+        ..ResidentTraits::NEUTRAL
+    };
+    assert_eq!(
+        more_trait_words(settled, "turnips"),
+        ["sticks to old friends", "carefree", "likes turnips"].map(str::to_owned)
+    );
+    assert_eq!(
+        more_trait_words(ResidentTraits::NEUTRAL, "bread"),
+        ["open to new faces", "sensible", "likes bread"].map(str::to_owned)
+    );
+    // The trait joins the reason, or is the reason.
+    let record = serde_json::json!({
+        "branch": "Resident > Leisure > Free time > Sociable > Meet a neighbour",
+        "action": "life.socialise",
+        "param": "",
+        "considered": [],
+    });
+    let names = |key: &str| key.to_owned();
+    let context = WhyContext {
+        activity: Some(meeting_phrase("Ana", "stranger", false)),
+        motive: Some("they are curious"),
+        ..WhyContext::plain(&names)
+    };
+    let chosen = why(&record, &context).chosen;
+    assert_eq!(
+        chosen,
+        "Meeting Ana, someone new, because it is their free time and they are curious."
+    );
+    assert_plain(&chosen);
+    let bare =
+        serde_json::json!({"branch": "", "action": "life.drink", "param": "", "considered": []});
+    let context = WhyContext {
+        activity: Some("drinking".into()),
+        motive: Some("they are cautious"),
+        ..WhyContext::plain(&names)
+    };
+    assert_eq!(
+        why(&bare, &context).chosen,
+        "Drinking, because they are cautious."
+    );
 }

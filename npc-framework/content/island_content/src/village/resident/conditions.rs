@@ -219,7 +219,7 @@ pub const CONDITIONS: &[ConditionInfo] = &[
         "life.hungry",
         hungry,
         MEALS,
-        "Not busy, Hunger below `hunger_threshold`, and food is carried, affordable or \
+        "Not busy, Hunger below `hunger_threshold` (moved by caution), and food is carried, affordable or \
          forageable."
     ),
     condition!(
@@ -320,7 +320,7 @@ pub const CONDITIONS: &[ConditionInfo] = &[
         "life.thirsty",
         thirsty,
         DRINKS,
-        "Not busy, Thirst below `thirst_threshold`, and water is carried, affordable or \
+        "Not busy, Thirst below `thirst_threshold` (moved by caution), and water is carried, affordable or \
          gatherable."
     ),
     condition!(
@@ -454,7 +454,11 @@ fn thirsty(world: &World, actor: Entity) -> bool {
         && behavior::thirsty(
             world,
             actor,
-            policy::active(world).map_or(55_000, |policy| policy.thirst_threshold),
+            super::need_threshold(
+                world,
+                actor,
+                policy::active(world).map_or(55_000, |policy| policy.thirst_threshold),
+            ),
         )
 }
 
@@ -465,7 +469,11 @@ fn hungry(world: &World, actor: Entity) -> bool {
         && (behavior::hungry(
             world,
             actor,
-            policy::active(world).map_or(50_000, |policy| policy.hunger_threshold),
+            super::need_threshold(
+                world,
+                actor,
+                policy::active(world).map_or(50_000, |policy| policy.hunger_threshold),
+            ),
         ) || fetch_for_child(world, actor, 60_000))
 }
 

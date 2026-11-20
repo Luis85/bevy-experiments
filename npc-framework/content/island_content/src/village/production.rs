@@ -1639,10 +1639,11 @@ fn forecast_amount(world: &World, actor: Entity, need: &str) -> u64 {
     // A storm tomorrow keeps everybody indoors for a day: residents who can
     // read the sky lay in one more day of provisions (regional weather).
     let reserve_days = reserve_days + u32::from(super::weather::storm_tomorrow(world));
-    let horizon = world
-        .resource::<SimConfig>()
-        .day_length
-        .saturating_mul(u64::from(reserve_days));
+    let day = world.resource::<SimConfig>().day_length;
+    // A free spender lays in more, a thrifty resident less (review npc-ai#13).
+    let horizon = (day.saturating_mul(u64::from(reserve_days)) as i64
+        + super::resident::thrift_stock_shift(world, actor, day))
+    .max(0) as u64;
     let depleted = (100_000 - econ::need(world, actor, need)).max(0) as u64;
     // Children eat from the packs of the household's adults (regional only).
     let dependants = if need == "Hunger" {

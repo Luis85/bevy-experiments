@@ -139,6 +139,23 @@ pub(crate) fn trait_words(traits: ResidentTraits, sociable_min: i32) -> [&'stati
     [hours, work, company, money]
 }
 
+/// The traits beyond the four above (review npc-ai#13), in a fixed order:
+/// new faces, then needs; and the preferred food as "likes eggs" from its
+/// display name.
+pub(crate) fn more_trait_words(traits: ResidentTraits, food: &str) -> [String; 3] {
+    let faces = match traits.curiosity {
+        value if value >= 67 => "curious",
+        value if value < 34 => "sticks to old friends",
+        _ => "open to new faces",
+    };
+    let care = match traits.caution {
+        value if value >= 67 => "cautious",
+        value if value < 34 => "carefree",
+        _ => "sensible",
+    };
+    [faces.to_owned(), care.to_owned(), format!("likes {food}")]
+}
+
 /// What a moment of the day is for, as the strip shows it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Slot {
@@ -610,6 +627,9 @@ pub(crate) struct WhyContext<'a> {
     /// What the card says they are doing now, where that is more exact than
     /// the leaf's own label ("gathering fiber" for "working to a plan").
     pub(crate) activity: Option<String>,
+    /// The trait that decided it ("they are cautious"),
+    /// `resident::trait_motive`.
+    pub(crate) motive: Option<&'static str>,
 }
 
 impl WhyContext<'_> {
@@ -624,6 +644,7 @@ impl WhyContext<'_> {
             origin: None,
             plan: None,
             activity: None,
+            motive: None,
         }
     }
 }
@@ -994,6 +1015,12 @@ pub(crate) fn why(record: &Value, context: &WhyContext) -> Why {
         .clone()
         .unwrap_or_else(|| activity_of(source));
     let reason = branch_reason(source["branch"].as_str().unwrap_or_default(), began);
+    // The trait that decided it joins the reason: "because it is their free
+    // time and they are sociable".
+    let reason = match (reason, context.motive) {
+        (Some(reason), Some(motive)) => Some(format!("{reason} and {motive}")),
+        (reason, motive) => reason.or_else(|| motive.map(str::to_owned)),
+    };
     let chosen = if carrying_on && context.origin.is_none() {
         "Finishing what they had started; nothing more urgent has come up.".to_owned()
     } else {
