@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "base_revision": "63417af",
+  "task": "Comprehensive review and subagent-driven improvement/polish",
+  "review": {
+    "independent_domains": [
+      "gameplay/privacy/persistence",
+      "operator/process/harness",
+      "native observer/accessibility"
+    ],
+    "final_source_review": "approved after Escape regression; no remaining actionable P0/P1/P2",
+    "resolved_critical": [
+      "scheduler descendants survive root exit",
+      "liveness uncertainty authorizes overlap",
+      "blocking smoke I/O outlasts stated cap"
+    ],
+    "extra_integration_fixes": [
+      "concrete refusal persists while next action is pending",
+      "F7 ownership transfers from HUD/window",
+      "Escape closes only the top notebook",
+      "named prompt controls preserve Button role",
+      "capture waits for PNG encoding completion"
+    ]
+  },
+  "checks": {
+    "scheduler_tests": 14,
+    "agent_information_tests": 6,
+    "island_tests": 24,
+    "economy_soak_tests": 3,
+    "seasonal_fixtures": 12,
+    "stages_required_per_season": 10,
+    "view_tests": {
+      "passed": 81,
+      "ignored": 1
+    },
+    "python_tests": 14,
+    "focused_clippy": "passed with warnings denied",
+    "full_gate": {
+      "ok": true,
+      "command": "cargo xtask verify",
+      "environment": {
+        "NEXTEST_TEST_THREADS": "4",
+        "scope": "verification process only; restored"
+      },
+      "steps": [
+        {
+          "name": "fmt",
+          "ok": true,
+          "ms": 15197,
+          "summary": "all files formatted"
+        },
+        {
+          "name": "clippy",
+          "ok": true,
+          "ms": 77918,
+          "summary": "no warnings"
+        },
+        {
+          "name": "test",
+          "ok": true,
+          "ms": 1329932,
+          "summary": "nextest: 1348 tests run: 1348 passed (4 leaky), 12 skipped; doc tests: 1 passed, 0 failed, 10 ignored"
+        },
+        {
+          "name": "arch_fitness",
+          "ok": true,
+          "ms": 11035,
+          "summary": "7 passed, 0 failed, 0 ignored"
+        },
+        {
+          "name": "replays",
+          "ok": true,
+          "ms": 79438,
+          "summary": "8 replay(s) verified with npcctl (session 1, testbed 3, village 4)"
+        },
+        {
+          "name": "goldens",
+          "ok": true,
+          "ms": 8,
+          "summary": "6 snapshot(s), none pending (checked by `test` with INSTA_UPDATE=no)"
+        },
+        {
+          "name": "deny",
+          "ok": true,
+          "ms": 28031,
+          "summary": "advisories ok, bans ok, licenses ok, sources ok"
+        }
+      ],
+      "skipped_tools": [],
+      "raw_json": "target/review-polish/full-verify.json"
+    }
+  },
+  "native": {
+    "profile": "debug",
+    "primary": "target/playtest-native-258eeab564",
+    "primary_pngs_opened": 15,
+    "confirmation": "target/polish-short-ae0ff5db",
+    "confirmation_pngs_opened": 5,
+    "short_physical_pixels": [
+      960,
+      720
+    ],
+    "short_logical_pixels": [
+      480,
+      360
+    ],
+    "dpi_scale": 2,
+    "input": "BRP key/widget automation, registered requests, recorded operator commands; Windows UI input on actual launcher",
+    "launcher_path": "Main > Explore > New > Island Village/human > Start in window > prompt Tab/Enter > HUD Tab > F7",
+    "long_name_errors": "action controls remain visible; body scrolls; notebook underlay removed; focus restored",
+    "owned_trees_stopped": true,
+    "screen_reader": "not tested",
+    "updated_live_accessibility_roles": "unit role assertions pass; post-close AX query did not observe final roles",
+    "release_performance_comparison": false
+  },
+  "failed_qa_fixtures": [
+    {
+      "path": "target/polish-short-5b79b14e",
+      "reason": "height did not settle; not counted as short-viewport evidence"
+    },
+    {
+      "path": "target/polish-short-35f6d1a3",
+      "reason": "header queried before async writer finished; maintained helper now waits for terminal chunk"
+    }
+  ],
+  "provider": {
+    "real_usage_this_pass": false,
+    "private_history_read": false,
+    "authenticated_continuation": "unverified; new explicit authorization required",
+    "fake_contracts_do_not_satisfy_live_gate": true
+  },
+  "invariants": {
+    "authoritative_registrations_and_numeric_model": "unchanged",
+    "prices_needs_shipped_presets": "unchanged",
+    "oracles_hooks_generated_lint_policy_dependencies_global_config": "unchanged",
+    "art_palette_native_conventions": "retained"
+  },
+  "readiness": "OFFLINE READY / LIVE SETUP BLOCKED",
+  "go": false,
+  "changed_files": [
+    "CHANGELOG.md",
+    "content/testbed_content/src/village/agent.rs",
+    "content/testbed_content/src/village/commands.rs",
+    "content/testbed_content/tests/island_agent_information.rs",
+    "content/testbed_content/tests/island_economy_soak.rs",
+    "content/testbed_content/tests/island_village.rs",
+    "content/testbed_view/src/explorer_modal.rs",
+    "content/testbed_view/src/explorer_panel.rs",
+    "content/testbed_view/src/village.rs",
+    "content/testbed_view/src/village_world.rs",
+    "crates/npc_agent_io/src/scheduler.rs",
+    "crates/npc_agent_io/src/scheduler/process.rs",
+    "crates/npc_agent_io/src/stats.rs",
+    "docs/_notes/2026-10-29-island-first-playtest-execution.md",
+    "docs/_notes/2026-10-29-island-first-playtest-followup-evidence.json",
+    "docs/_notes/2026-10-29-island-first-playtest-followup.md",
+    "docs/adr/0023-host-idle-supervision-for-ai-cli-sessions.md",
+    "docs/island-village-playtest.md",
+    "scripts/playtest/capture_native.py",
+    "scripts/playtest/harness_runtime.py",
+    "scripts/playtest/live_smoke.py",
+    "scripts/playtest/test_live_smoke.py"
+  ],
+  "source_sha256_line_endings": "LF",
+  "source_sha256": {
+    "content/testbed_content/src/village/agent.rs": "c433c706116cd0f532e62213101054df8491ab63ba325e3cae4ed4bd0085efcf",
+    "content/testbed_content/src/village/commands.rs": "5de0e47a7502773123d63d0338f7d4473ae97cf0fe2f4354879f8ede0424bd53",
+    "content/testbed_content/tests/island_agent_information.rs": "abf11792fcc166192f556db9900369bf4b2b7b4ca30057e8d36e5ae1e5730e84",
+    "content/testbed_content/tests/island_economy_soak.rs": "3c368e192cab712aca0cf18178aec32f883596b263de6f06e85086d8db70c470",
+    "content/testbed_content/tests/island_village.rs": "d48712a02a272d020e171f573849e658e2a157d7b40db27e5ec506a7d3def45b",
+    "content/testbed_view/src/explorer_modal.rs": "f70f02c0ea55a2b85eb2b37abb9f17942956892da45e77a128a8395b972886fe",
+    "content/testbed_view/src/explorer_panel.rs": "e0f9980ad83be71db9269be269af5d660d06e3dad84c26c3af7b24d94ff65ec5",
+    "content/testbed_view/src/village.rs": "19d55b65063de8c07d8cb918546001d48cc33b9dc20fe3d7635cbd5a11a2aa7d",
+    "content/testbed_view/src/village_world.rs": "fd03babe83555877bbb505a07db544cc2f47bca7870ad867f6c01efedcf48db1",
+    "crates/npc_agent_io/src/scheduler.rs": "499d97883478911a7365a03e6190d8a4b580c7cc3701a3c916b7d10ca0565979",
+    "crates/npc_agent_io/src/scheduler/process.rs": "56e8e0e657671e6ba9ce9da43383824e911c6a32d419301f42b79fe7ce8253d4",
+    "crates/npc_agent_io/src/stats.rs": "3d350faaff413e0907a0bebcd5229565bf228c19a31b14c137604f95d86b7673",
+    "scripts/playtest/capture_native.py": "a24b077bd37c120c473cd75d0b4582694afb91cf09442b7efee75d75f2848c00",
+    "scripts/playtest/harness_runtime.py": "cf8b68aa169711f3c43ef11a44fd1bc533965c09553f00df18005ad36abaea84",
+    "scripts/playtest/live_smoke.py": "50ac66244de40e4d79a8ccf937ef4d2ff84bfefe44dc41d18b7a489befcfc753",
+    "scripts/playtest/test_live_smoke.py": "a9d5406cf65d7c4b4b3994abece2740a6bbd7bbebb58a855e86eba7cce8895e1"
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "base_revision": "a1b65ba65d470bf37d2fcee8edc1998e178ce5a6",
+  "branch": "codex/island-first-playtest-verified",
+  "readiness": "OFFLINE READY / LIVE SETUP BLOCKED",
+  "full_gate": {
+    "ok": true,
+    "command": "cargo xtask verify",
+    "environment": {
+      "NEXTEST_TEST_THREADS": "4",
+      "scope": "verification process only; restored afterward"
+    },
+    "steps": [
+      {
+        "name": "fmt",
+        "ok": true,
+        "ms": 8014,
+        "summary": "all files formatted"
+      },
+      {
+        "name": "clippy",
+        "ok": true,
+        "ms": 14680,
+        "summary": "no warnings"
+      },
+      {
+        "name": "test",
+        "ok": true,
+        "ms": 775328,
+        "summary": "nextest: 1337 tests run: 1337 passed (3 leaky), 12 skipped; doc tests: 1 passed, 0 failed, 10 ignored"
+      },
+      {
+        "name": "arch_fitness",
+        "ok": true,
+        "ms": 2424,
+        "summary": "7 passed, 0 failed, 0 ignored"
+      },
+      {
+        "name": "replays",
+        "ok": true,
+        "ms": 18232,
+        "summary": "8 replay(s) verified with npcctl (session 1, testbed 3, village 4)"
+      },
+      {
+        "name": "goldens",
+        "ok": true,
+        "ms": 8,
+        "summary": "6 snapshot(s), none pending (checked by `test` with INSTA_UPDATE=no)"
+      },
+      {
+        "name": "deny",
+        "ok": true,
+        "ms": 5134,
+        "summary": "advisories ok, bans ok, licenses ok, sources ok"
+      }
+    ],
+    "skipped_tools": [],
+    "raw_json": "target/playtest-evidence/full-verify.json"
+  },
+  "independent_review": {
+    "status": "source_fixes_approved",
+    "remaining_source_p0_p1": 0,
+    "deferred_p2": [
+      "F7 observer-HUD overlap; native confirmation stopped by operator",
+      "Seasonal aggregate production does not assert every stage in each season"
+    ],
+    "external_gaps_block_go": true
+  },
+  "source_evidence_root": "C:/Projects/bevy-experiments/npc-framework/target",
+  "focused_results": {
+    "agent_information": {
+      "passed": 5
+    },
+    "island_village": {
+      "passed": 23,
+      "full_suite_in_final_gate": true
+    },
+    "economy_soak": {
+      "passed": 3,
+      "normal_day_fixtures": 6,
+      "seasonal_fixtures": 12,
+      "depleted_bowl_fixtures": 3,
+      "seeds": [
+        1,
+        7,
+        42
+      ],
+      "currency_total": 1800
+    },
+    "scheduler": {
+      "passed": 10
+    },
+    "scheduler_cli": {
+      "passed": 2
+    },
+    "registered_client": {
+      "passed": 2,
+      "first_sale_tick": 3003,
+      "needs_cycle_tick": 3669,
+      "requests": 150,
+      "rejections": 0,
+      "seed": "1793111524941051400",
+      "clock_owner": "operator harness; accelerated"
+    },
+    "content_library": {
+      "passed": 88,
+      "ignored": 1
+    },
+    "view_library": {
+      "passed": 76,
+      "ignored": 1
+    },
+    "successor_notebooks": {
+      "passed": 1,
+      "host_frame_deliberately_omitted": true
+    },
+    "owned_process": {
+      "passed": 3,
+      "seconds": 1.673,
+      "real_providers": false,
+      "unrelated_sentinel_preserved": true
+    }
+  },
+  "native": {
+    "input": "BRP widgets/keys and recorded operator commands; Computer Use launcher click, then Escape stop",
+    "baseline": {
+      "directory": "playtest-native-f1834c65fa",
+      "tps": 19.958339079,
+      "frame_ms": 16.627235833
+    },
+    "integrated": {
+      "directory": "playtest-native-c00ebc8811",
+      "tps": 19.955327722,
+      "frame_ms": 16.68228
+    },
+    "all_generated_pngs_opened": true,
+    "final_confirmation": "not run after Computer Use Escape stop",
+    "launcher": "Main inspected; Explore button activated, then operator stopped Computer Use"
+  },
+  "providers": [
+    {
+      "provider": "codex",
+      "directory": "playtest-live-7660ce6997",
+      "elapsed_seconds": 352.416,
+      "initial_game_action": false,
+      "continuation": "not attempted",
+      "owned_resources_stopped": true
+    },
+    {
+      "provider": "codex",
+      "directory": "playtest-live-526b8c1a8b",
+      "elapsed_seconds": 32.73,
+      "diagnostic": true,
+      "initial_tools": [
+        "register",
+        "enter_world",
+        "take_control"
+      ],
+      "initial_game_action": false,
+      "continuation": "not attempted",
+      "owned_resources_stopped": true
+    },
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "effort": "low",
+      "directory": "playtest-live-390cd67c8f",
+      "elapsed_seconds": 50.296,
+      "initial_game_action": true,
+      "physical_diary_pages": 1,
+      "continuation": "not attempted; original harness required unnecessary notebook entry",
+      "owned_resources_stopped": true
+    }
+  ],
+  "remaining_gaps": [
+    "Authenticated exact-conversation idle continuation",
+    "Native confirmation of final feedback/harness corrections",
+    "Complete launcher New path",
+    "Longer observed unaided AI economic playtest"
+  ],
+  "privacy": "No tokens, conversation UUIDs, provider transcripts or private notebook contents",
+  "task_files": [
+    "CHANGELOG.md",
+    "apps/npcctl/src/scheduler.rs",
+    "apps/npcctl/tests/island_playtest.rs",
+    "content/testbed_content/src/explorer/workspace.rs",
+    "content/testbed_content/src/village/agent.rs",
+    "content/testbed_content/src/village/catalog.rs",
+    "content/testbed_content/src/village/commands.rs",
+    "content/testbed_content/src/village/economy.rs",
+    "content/testbed_content/src/village/mod.rs",
+    "content/testbed_content/tests/island_village.rs",
+    "content/testbed_content/tests/island_agent_information.rs",
+    "content/testbed_content/tests/island_economy_soak.rs",
+    "content/testbed_view/src/village.rs",
+    "crates/npc_agent_io/src/api.rs",
+    "crates/npc_agent_io/src/scheduler.rs",
+    "crates/npc_agent_io/src/stats.rs",
+    "docs/ai-village.md",
+    "docs/island-village-playtest.md",
+    "docs/_notes/2026-10-29-island-first-playtest-baseline.md",
+    "docs/superpowers/plans/2026-10-29-island-village-first-playtest.md",
+    "scripts/playtest/.gitignore",
+    "scripts/playtest/capture_native.py",
+    "scripts/playtest/live_smoke.py",
+    "crates/npc_agent_io/src/registration.rs",
+    "docs/_notes/2026-10-29-island-first-playtest-execution.md",
+    "content/testbed_content/src/explorer/host.rs",
+    "scripts/playtest/owned_process.py",
+    "scripts/playtest/test_owned_process.py",
+    "docs/_notes/2026-10-29-island-first-playtest-evidence.json"
+  ],
+  "prior_smoke_cleanup": {
+    "root_exits_observed": true,
+    "initial_summary_tree_claim_overstated": true,
+    "later_matching_mcp_process_audit_count": 0,
+    "new_harness_job_cleanup_fake_tests_passed": true
+  },
+  "go": false,
+  "previous_full_gates": [
+    {
+      "file": "target/playtest-evidence/full-verify-first.json",
+      "ok": false,
+      "reason": "two collapsible-if style diagnostics in new rehearsal; fixed without assertion changes",
+      "workspace_tests_passed": 1337
+    },
+    {
+      "file": "target/playtest-evidence/full-verify-second.json",
+      "ok": false,
+      "reason": "protected stop_hook_loop_guard timestamp fixture failed under shell contention",
+      "workspace_tests_passed": 1336,
+      "workspace_tests_failed": 1,
+      "protected_test_unchanged": true,
+      "isolated_rerun_passed": true
+    }
+  ],
+  "source_sha256_line_endings": "LF",
+  "source_sha256": {
+    "apps/npcctl/src/scheduler.rs": "84a6d1f038def83a34224a663e0a380830e1d11afd24734b87af502b3c324cba",
+    "apps/npcctl/tests/island_playtest.rs": "3c314b3811747eaac8847114039857d63f981ce2a99e55ece190abbbbbc8aa15",
+    "content/testbed_content/src/explorer/workspace.rs": "7ce74c4dadfa4aa8305b8fce0d9e8e3b4eed1059dc48c3a3ecb88ca737a1a97d",
+    "content/testbed_content/src/village/agent.rs": "2fa9f7346920a7073571cbff5f04e6198d0fcdf1e7d7b8c2415181d090ad8437",
+    "content/testbed_content/src/village/catalog.rs": "001a3e0be3c1578c92c8da7453a2229ff18286a68904ed484c570577f413a415",
+    "content/testbed_content/src/village/commands.rs": "34ecc0f78daeecda627fe87366b8859aaf886f79a51a15233b5a37e61b092aba",
+    "content/testbed_content/src/village/economy.rs": "a5c57bde9d1a0b2396697d571136cb906e988bc357b597f4f42be967462d4f1e",
+    "content/testbed_content/src/village/mod.rs": "ddf684eca944c674c3b8637279f19b50c45119e3b723eb71d1fc2429d88367b1",
+    "content/testbed_content/tests/island_village.rs": "51959657b683f0f75a6b8e90f3cc60ea974be82e60cdcefea9413854ec2b3845",
+    "content/testbed_content/tests/island_agent_information.rs": "cb74ee1ba8953bb62da37bcebae6e2f895a629c19d4db371054a3a849aca7494",
+    "content/testbed_content/tests/island_economy_soak.rs": "3a2ae968bdee87320fe11bd6c154c520e5e134602985e53b4a31fab2c1d17570",
+    "content/testbed_view/src/village.rs": "5059e5784cfffd5b1ab428ca4c471ae7897b566edc2a7ea14e143ea1c618666e",
+    "crates/npc_agent_io/src/api.rs": "86b0d8bbb186ef8ced1e872ea12c55166eca64dd90e1ff24ad99e23bca3cf235",
+    "crates/npc_agent_io/src/scheduler.rs": "b66241fa83b63911de25b1e97cf59c1a88549c5ac44ddbe5be51e5d720d4eec3",
+    "crates/npc_agent_io/src/stats.rs": "6e00465208d6c3817c04a4e699c050284c856570d0397bc27def4266efe1b731",
+    "scripts/playtest/capture_native.py": "3385fb587a2cf7e3ba2041238ff0cca1d7dc6113fc4554d31022cd7592114157",
+    "scripts/playtest/live_smoke.py": "9baeaa21a468528d0f7399b0bed6858c68cbada6b51ef3e61c4266e8d29146b2",
+    "crates/npc_agent_io/src/registration.rs": "9e8f454e499d4f3f0c7ca7238a4dc2ac4f76259462afd0b94b87cf5b3e066211",
+    "content/testbed_content/src/explorer/host.rs": "a14817a4f14c0d6b4d21cc0ec2df4af2863373ae2ae5e55aad6aa24a97afe20f",
+    "scripts/playtest/owned_process.py": "9fc09878448e208efbfcedff1a1965fdb0ee768e4e44e5fb00520a9bebc9983e",
+    "scripts/playtest/test_owned_process.py": "19e9ea3df04acbedf79b727976fec0ae2bcaf72eee303dbee1962f49cc2ca82f"
+  }
+}
