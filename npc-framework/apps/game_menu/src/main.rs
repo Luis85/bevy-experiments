@@ -6,7 +6,7 @@
 //!
 //! ```text
 //! cargo run -p game_menu -- [--settings FILE] [--screen NAME] [--resume AGENT]
-//!     [--detached AGENT] [--screenshot PATH [--after-secs S]] [--worlds-page ai_scheduler|resident_ai]
+//!     [--detached AGENT] [--screenshot PATH [--after-secs S]] [--worlds-page ai_scheduler]
 //! ```
 //!
 //! Screens: Main (Explore with an AI agent, Actor Testbed, Village, RTS
@@ -48,7 +48,6 @@
 mod agent_history;
 mod detached;
 mod explorer;
-mod frontend_dispatch;
 mod launch;
 mod menu_input;
 mod paste;
@@ -71,9 +70,8 @@ use run::BuildTools;
 use screens::{Action, Screen, ScreensPlugin};
 use testbed_content::explorer::settings::Settings;
 
-const USAGE: &str = "usage: game_menu [--settings FILE] [--front-end [actor host options]]
-       game_menu --developer-menu [--settings FILE] [--screen NAME] [--resume AGENT] \
-     [--detached AGENT] [--sessions AGENT] [--session-view metrics|logs] [--screenshot PATH [--after-secs S] [--capture-size WIDTHxHEIGHT] [--settings-focus ai_logs]] [--worlds-page ai_scheduler|resident_ai]";
+const USAGE: &str = "usage: game_menu [--developer-menu] [--settings FILE] [--screen NAME] [--resume AGENT] \
+     [--detached AGENT] [--sessions AGENT] [--session-view metrics|logs] [--screenshot PATH [--after-secs S] [--capture-size WIDTHxHEIGHT] [--settings-focus ai_logs]] [--worlds-page ai_scheduler]";
 
 /// The settings in use.
 #[derive(Resource, Clone, Debug)]
@@ -235,12 +233,6 @@ fn parse_args() -> Args {
 }
 
 fn main() -> AppExit {
-    let raw: Vec<String> = std::env::args().skip(1).collect();
-    match frontend_dispatch::arguments(&raw) {
-        Ok(Some(args)) => return actor_testbed::run_from_args(args),
-        Ok(None) => {}
-        Err(error) => usage(&error),
-    }
     let args = parse_args();
     let exe_dir = std::env::current_exe()
         .ok()

@@ -18,10 +18,6 @@
 //!   closed with "No". Once it answered it gets [`ANSWERED_GRACE`] more to
 //!   exit; one that has not quit in time is killed through the menu's own
 //!   child handle (and its `run.json` removed);
-//! - a local Island Village: `app/quit {pid}` over its recorded private
-//!   loopback port. A matching `saved:true` acknowledgement and normal exit
-//!   are required. Refusal, missing acknowledgement or timeout keeps the game
-//!   alive; only an explicit **Quit anyway** discards unsaved changes;
 //! - the Village, a testbed scenario or the RTS units demo: nothing to
 //!   save, killed through the menu's child handle at once (ruling R17: the
 //!   menu passes them no `--remote`);
@@ -410,31 +406,13 @@ fn step_world(world: &mut World, item: &mut Item, agent: &str, wait: Duration) {
     }
 }
 
-/// Explorer endpoints follow their agent's run.json; local islands retain the
-/// loopback endpoint selected when the menu launched their owned child.
+/// Explorer endpoints follow their agent's run.json.
 enum Target {
     Explorer(AgentDir),
-    Island(u16),
-}
-
-fn local_island(world: &World) -> bool {
-    world
-        .get_resource::<Running>()
-        .is_some_and(|running| matches!(&running.job, Job::Game(crate::launch::Entry::Island(_))))
 }
 
 fn window_target(world: &World, agents_dir: &std::path::Path) -> Result<Option<Target>, String> {
-    if local_island(world) {
-        world
-            .resource::<Running>()
-            .island_port
-            .map(|port| Some(Target::Island(port)))
-            .ok_or_else(|| {
-                "the local island has no save/quit endpoint; close its window to save safely".into()
-            })
-    } else {
-        Ok(window_dir(world, agents_dir).map(Target::Explorer))
-    }
+    Ok(window_dir(world, agents_dir).map(Target::Explorer))
 }
 
 fn unsuccessful_window_quit(
@@ -443,13 +421,7 @@ fn unsuccessful_window_quit(
     agents_dir: &std::path::Path,
     why: &str,
 ) {
-    if local_island(world) {
-        // A successful save acknowledgement is not permission to kill a host
-        // whose final save failed or whose normal exit has not completed.
-        item.state = State::Refused(format!("island kept running: {why}"));
-    } else {
-        kill_window(world, item, agents_dir, why);
-    }
+    kill_window(world, item, agents_dir, why);
 }
 
 /// One step of the game window (see the module docs).
@@ -529,11 +501,7 @@ fn step_window(
             }
             Ok(Err(e)) => {
                 item.ask = None;
-                let why = if local_island(world) {
-                    format!("app/quit could not confirm a saved exit ({e})")
-                } else {
-                    format!("no answer to app/quit within {} s ({e})", wait.as_secs())
-                };
+                let why = format!("no answer to app/quit within {} s ({e})", wait.as_secs());
                 unsuccessful_window_quit(world, item, agents_dir, &why);
                 return;
             }
@@ -572,8 +540,7 @@ fn kill_window(world: &mut World, item: &mut Item, agents_dir: &std::path::Path,
 }
 
 /// `app/quit {pid}` to the window until it answers or `deadline` passes (a
-/// worker thread): explorer ports are looked up on every try; local islands
-/// use their launch endpoint and must acknowledge the completed save.
+/// worker thread): explorer ports are looked up on every try.
 fn ask_window(
     control: &dyn Control,
     target: &Target,
@@ -586,22 +553,9 @@ fn ask_window(
                 .filter(|r| r.pid == pid && r.mode == RunMode::Window)
                 .map(|r| r.port)
                 .ok_or_else(|| format!("no run.json of pid {pid} in {}", dir.dir.display())),
-            Target::Island(port) => Ok(*port),
         };
         let err = match port.and_then(|p| control.quit_window(p, pid)) {
-            Ok(reply) => {
-                if matches!(target, Target::Island(_))
-                    && (reply.get("saved").and_then(serde_json::Value::as_bool) != Some(true)
-                        || reply.get("quitting").and_then(serde_json::Value::as_bool) != Some(true)
-                        || reply.get("pid").and_then(serde_json::Value::as_u64)
-                            != Some(u64::from(pid)))
-                {
-                    return Err(
-                        "island did not acknowledge a completed save for this process".into(),
-                    );
-                }
-                return Ok(());
-            }
+            Ok(_) => return Ok(()),
             Err(e) => e,
         };
         if Instant::now() + ASK_RETRY >= deadline {
@@ -648,7 +602,7 @@ pub fn quit_anyway(world: &mut World) {
                     world,
                     item,
                     &agents_dir,
-                    "Quit anyway: keeping only the last saved island state",
+                    "Quit anyway: keeping only the last saved state",
                 );
                 continue;
             }
@@ -751,7 +705,7 @@ fn spawn_quitting(mut commands: Commands) {
     );
     commands.entity(panel).with_children(|p| {
         p.spawn(ui::label(
-            "Stopping everything the game started. Island villages, detached worlds and explorer windows save first.",
+            "Stopping everything the game started. Detached worlds and explorer windows save first.",
             14.0,
             ui::DIM,
         ));
@@ -988,7 +942,6 @@ mod tests {
             started: started.into(),
             agent: agent.into(),
             world: "Moor".into(),
-            projection: None,
         }
         .write(&dir)
         .unwrap();
@@ -1206,137 +1159,6 @@ mod tests {
         assert!(!pid_alive(pid));
         release(&[&marker]);
         let _ = std::fs::remove_dir_all(&d);
-    }
-
-    #[test]
-    fn quit_saves_local_island_and_waits_for_its_normal_exit() {
-        let d = tmp("q-local-island-save");
-        let mut app = menu(&d);
-        app.insert_resource(QuitWait(Duration::from_secs(2)));
-        let marker = d.join("quit-island");
-        let save = d.join("island-save.json");
-        let calls = fake_spawner(
-            &mut app,
-            vec![Plan {
-                code: 0,
-                stdout: String::new(),
-                stderr: String::new(),
-                until: Some(marker.clone()),
-            }],
-        );
-        let asked: Arc<Mutex<Vec<(u16, u32)>>> = Arc::default();
-        let (log, exit, saved) = (Arc::clone(&asked), marker.clone(), save.clone());
-        fake_control_with(
-            &mut app,
-            |_| Err("no detached world".into()),
-            move |port, pid| {
-                log.lock().unwrap().push((port, pid));
-                std::fs::write(&saved, r#"{"tick":999,"saved":true}"#).unwrap();
-                let exit = exit.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(100));
-                    std::fs::write(exit, "").unwrap();
-                });
-                Ok(json!({"pid":pid,"quitting":true,"saved":true}))
-            },
-        );
-        run::start_game(app.world_mut(), Entry::Island("inspector"));
-        let running = app.world().resource::<Running>();
-        let pid = running.child.id();
-        let port = running.island_port.expect("island quit port is retained");
-        let args = &calls.lock().unwrap()[0].1;
-        assert!(args.iter().any(|arg| arg == "--remote"));
-        assert!(
-            args.windows(2)
-                .any(|pair| pair[0] == "--remote-port" && pair[1] == port.to_string())
-        );
-        apply_action(app.world_mut(), Action::Quit);
-        assert!(until(&mut app, Duration::from_secs(15), exiting));
-        assert_eq!(asked.lock().unwrap().as_slice(), &[(port, pid)]);
-        assert_eq!(
-            std::fs::read_to_string(save).unwrap(),
-            r#"{"tick":999,"saved":true}"#
-        );
-        assert!(!app.world().contains_resource::<Running>());
-        assert!(
-            has_text(&mut app, "quit when asked"),
-            "{:?}",
-            texts(&mut app)
-        );
-        release(&[&marker]);
-        let _ = std::fs::remove_dir_all(&d);
-    }
-
-    #[test]
-    fn local_island_failed_or_unconfirmed_quit_keeps_child_alive_until_explicit_discard() {
-        for case in [
-            "save_failed",
-            "silent",
-            "unconfirmed",
-            "wrong_pid",
-            "stays",
-            "missing_endpoint",
-        ] {
-            let d = tmp(&format!("q-island-{case}"));
-            let mut app = menu(&d);
-            app.insert_resource(QuitWait(Duration::from_millis(400)));
-            let marker = d.join("quit-island");
-            fake_spawner(
-                &mut app,
-                vec![Plan {
-                    code: 0,
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    until: Some(marker.clone()),
-                }],
-            );
-            fake_control_with(
-                &mut app,
-                |_| Err("no detached world".into()),
-                move |_, pid| match case {
-                    "save_failed" => Err("save failed: disk full".into()),
-                    "silent" => Err("connection refused".into()),
-                    "unconfirmed" => Ok(json!({"pid":pid,"quitting":true})),
-                    "wrong_pid" => {
-                        Ok(json!({"pid":pid.wrapping_add(1),"quitting":true,"saved":true}))
-                    }
-                    _ => Ok(json!({"pid":pid,"quitting":true,"saved":true})),
-                },
-            );
-            run::start_game(app.world_mut(), Entry::Island("editor"));
-            let pid = app.world().resource::<Running>().child.id();
-            if case == "missing_endpoint" {
-                app.world_mut().resource_mut::<Running>().island_port = None;
-            }
-            apply_action(app.world_mut(), Action::Quit);
-            let stuck = |a: &mut App| {
-                a.world()
-                    .get_resource::<Quitting>()
-                    .is_some_and(Quitting::stuck)
-            };
-            assert!(until(&mut app, Duration::from_secs(15), stuck), "{case}");
-            assert!(!exiting(&mut app), "{case}");
-            assert!(
-                pid_alive(pid),
-                "{case}: a saved world is never an implicit kill target"
-            );
-            assert!(app.world().contains_resource::<Running>());
-            back(app.world_mut());
-            app.update();
-            assert_eq!(screen(&app), Screen::Main);
-            assert!(pid_alive(pid));
-            apply_action(app.world_mut(), Action::Quit);
-            assert!(until(&mut app, Duration::from_secs(15), stuck), "{case}");
-            quit_anyway(app.world_mut());
-            assert!(until(&mut app, Duration::from_secs(15), exiting), "{case}");
-            assert!(
-                !pid_alive(pid),
-                "{case}: explicit Quit anyway kills the owned child"
-            );
-            assert!(!app.world().contains_resource::<Running>());
-            release(&[&marker]);
-            let _ = std::fs::remove_dir_all(&d);
-        }
     }
 
     /// Quit while Open in window is in flight: the world's stop ends (it
@@ -1753,7 +1575,6 @@ mod tests {
             started: "2026-10-26T01:00:00Z".into(),
             agent: "Cara Vell".into(),
             world: "Dune".into(),
-            projection: None,
         }
         .write(&cara)
         .unwrap();

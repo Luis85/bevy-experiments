@@ -6,7 +6,7 @@ My Bevy playground: games, deterministic simulations and reusable Rust framework
 |---|---|---|
 | [Frontline](bevy-rts/README.md) | WWII RTS foundation with deterministic simulation, terrain, selection, formations and pathfinding | `cargo run --locked -p fl_game` |
 | [Legion Battle Lab](legion-battle-lab/README.md) | Native battle sandbox with configurable armies and a GPU crowd renderer | `cargo run --locked --release -p legion` |
-| [NPC Framework](npc-framework/README.md) | NPC behaviour, needs, crafting, vehicles and agent control; village and Actor Testbed demos | `cargo run --locked -p game_menu` |
+| [NPC Framework](npc-framework/README.md) | NPC behaviour, needs, crafting, vehicles and agent control; the Island Village game; village and Actor Testbed examples | `cargo run --locked -p island_game` |
 | [Terra World](terra-world/README.md) | Geographic environment SDK, world explorer, sandbox and multiplayer reference | `cargo run --locked -p terra-demo` |
 | [Lastlight: Horde Defense](horde-defense/README.md) | Eleven-lane survival, incremental progression, autonomous survivor combat, defenses and a connected country campaign | `cargo run --locked -p horde-defense` |
 
@@ -27,7 +27,7 @@ git clone https://github.com/Luis85/bevy-experiments.git
 cd bevy-experiments
 rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
 cd npc-framework
-cargo run --locked -p game_menu
+cargo run --locked -p island_game
 ```
 
 For a headless starting point, run `cargo run --locked -p npcctl -- run --seed 1

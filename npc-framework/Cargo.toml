@@ -23,11 +23,14 @@ members = [
     "content/village_view",
     "content/testbed_view",
     "content/testbed_content",
+    "content/island_content",
+    "content/island_view",
     "apps/village",
     "apps/npcctl",
     "apps/actor_testbed",
     "apps/rts_units_demo",
     "apps/game_menu",
+    "apps/island_game",
     "xtask",
 ]
 
@@ -66,6 +69,8 @@ village_content = { path = "content/village_content" }
 village_view = { path = "content/village_view", default-features = false }
 testbed_content = { path = "content/testbed_content" }
 testbed_view = { path = "content/testbed_view" }
+island_content = { path = "content/island_content" }
+island_view = { path = "content/island_view" }
 
 [profile.dev]
 opt-level = 1

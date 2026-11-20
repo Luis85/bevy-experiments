@@ -10,8 +10,8 @@ available from the pause menu. All three modes share one persistent local world.
 
 ```powershell
 cd npc-framework
-cargo build --locked -p game_menu -p actor_testbed -p npcctl
-.\target\debug\game_menu.exe
+cargo build --locked -p island_game
+.\target\debug\island_game.exe
 ```
 
 The bottom toolbar opens **Pouch, Craft, Build, Garden, Trade, People and Explore**. **E** uses
@@ -20,7 +20,7 @@ world and permanent-life survival rules remain in place.
 [Start playing](docs/island-life.md) · [Colony and landscape tools](docs/island-colony.md) ·
 [Editable NPC routines and GOAP](docs/island-ai-authoring.md).
 [Explore the larger coastal world](docs/living-world.md) covers regional travel,
-fishing, restoration, occupations, authoring and preserved legacy saves.
+fishing, restoration, occupations and authoring. Saves of earlier builds are refused, not upgraded.
 [Architecture and mechanic ownership](docs/architecture-island.md) describes the
 simulation, domain, action, control and presentation boundaries.
 The [world/ecology](docs/research/2026-11-09-living-world-expansion.md),
@@ -32,8 +32,10 @@ records the 14-day autonomous audit, native confirmation and remaining final che
 Earlier player-flow evidence remains in its
 [separate validation record](docs/_notes/2026-11-09-island-player-flow-validation.md).
 
-The remaining examples below document the framework and historical development scenarios.
-Use `--developer-menu` to open the older launcher toolbox and its settings/editors.
+The island is its own three crates (`content/island_content`, `content/island_view`,
+`apps/island_game`; [ADR 0044](docs/adr/0044-island-crates-split.md)). The remaining examples below
+document the framework. `cargo run --locked -p game_menu` opens the developer menu (Actor Testbed,
+village, RTS demo, editors, AI explorer).
 
 A deterministic 3D NPC and actor framework in Rust on **Bevy 0.20**, for colony sims, RTS games and emergent
 behaviour. Units think with behaviour trees and act through plain ECS actions; the simulation is integer-only,
@@ -41,24 +43,6 @@ runs headless, and replays bit for bit from a seed and a command log, on every O
 perception, a GURPS-like rules layer, interaction with items and doors, RTS orders and formations, vehicles,
 progression, crafting, and control by external AI agents. Everything is reachable as JSON for humans and agents:
 a headless CLI, a JSON-RPC interface on the running game, a journal of every decision, and a profiler.
-
-The earlier **Island Village** AI explorer scenario has nine residents running finite food/material/tool chains, while
-the visiting actor earns coins by gathering or crafting and buys necessities. It has blocked water,
-day/night, seasons, lethal needs and permanent actor lives with recoverable diaries. Scene-level AI
-interaction uses a dedicated AI client that starts and continues Codex/Claude CLI
-sessions automatically through an existing subscription login.
-[Play and configure it](docs/ai-village.md).
-Residents now run an inspectable daily-life behavior tree and share survival, production and recovery
-actions with clients. [NPC life and the environment API](docs/npc-life-and-environment.md).
-
-The **Living Island Village** development preset adds a needs-driven economy with twelve residents, adaptive prices,
-finite hunting, and production chains joining food, tools, leather, thread and warm clothing.
-Players and AI actors use the same physical actions and can offer their crafted goods to NPC buyers.
-[Create a fresh living world and participate](docs/living-island-economy.md).
-The expanded **Living Island Homestead** preset adds connected trade districts and six clear sites,
-with shared actions to claim land, build a material-backed cottage, water grain beds and use or sell
-the harvest. In direct developer launches, **F2** opens **Home & farm** with player controls, supplies,
-recipes and food/trade actions. [Your little home and garden](docs/living-homestead.md).
 
 | The village | The Actor Testbed | A foreign RTS host | The AI explorer |
 |---|---|---|---|
@@ -91,7 +75,7 @@ recipes and food/trade actions. [Your little home and garden](docs/living-homest
 - **Entity reference**: one page per ECS [component](docs/entities/components/index.md) (fields and units, who
   adds, reads and writes it, hashed and/or saved in world snapshots) and per [system](docs/entities/systems/index.md)
   (schedule and set, reads/writes, determinism, perf mechanic).
-- Decisions: [`docs/adr/`](docs/adr/) (0001–0036). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
+- Decisions: [`docs/adr/`](docs/adr/) (0001–0044). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
   `docs/superpowers/`. Benchmarks: [`bench/README.md`](bench/README.md). Agent workflow: [`CLAUDE.md`](CLAUDE.md).
 
 ## Features
@@ -123,23 +107,25 @@ Rust 1.99.1 toolchain (`rust-toolchain.toml`); the manifests declare a minimum o
 compiles Bevy and takes a while.
 
 ```bash
-cargo run --locked -p game_menu                                 # Island Village: title → New/Continue → play
-cargo run --locked -p game_menu -- --developer-menu              # legacy launcher, Settings and authoring tools
+cargo run --locked -p island_game                               # Island Village: title → New/Continue → play
+cargo run --locked -p game_menu                                 # developer menu: examples, Settings and authoring tools
 cargo run --locked -p actor_testbed -- --actor-editor    # Actors: validated preset forms and a 3D preview
 cargo run --locked -p village                                   # the village (F1 overlay, F3 journal, F4 perf, Space, 1-4)
-cargo run --locked -p actor_testbed                             # disposable Island Village in inspector mode
+cargo run --locked -p island_game -- --scenario living_world   # disposable island in inspector mode (developer host)
+cargo run --locked -p actor_testbed                             # the Actor Testbed compound
 cargo run --locked -p actor_testbed -- --scenario vehicles      # embedded scenarios: doors, locked_store, chop, craft,
                                                        # perception, vehicles, formation, agent, smithy, explorer
 cargo run --locked -p rts_units_demo                            # 200 units, scripted opening orders
 cargo run --locked -p rts_units_demo -- --headless-ticks 1500   # no window: a JSON summary with the state hash
 ```
 
-Normal Island Village play runs in one window and process. Its pause menu saves, returns to the title,
+Normal Island Village play runs in one window and process in `island_game`. Its pause menu saves, returns to the title,
 and opens colony/landscape tools. See the [player guide](docs/island-life.md).
 
-The explicit **developer menu** starts its tools and scenarios as child processes and comes back when they close. A missing binary shows its build
+The **developer menu** (`game_menu`) starts its tools and scenarios as child processes and comes back when they close. A missing binary shows its build
 command and a **Build** button; `cargo build --locked -p game_menu -p actor_testbed -p village -p rts_units_demo
--p npcctl` builds the games, tooling and dedicated AI client. **Settings** selects the agents folder, optional actors/worlds folders and fog of war.
+-p npcctl` builds the examples, tooling and dedicated AI client; the game itself is `-p island_game`, which the
+developer menu does not start. **Settings** selects the agents folder, optional actors/worlds folders and fog of war.
 **Actors** opens the standalone preset editor with a rotating 3D preview; **Worlds** edits needs, day/night,
 perception, systems and inhabitants. **Explore with an AI agent → New** selects both an actor and a world preset,
 then starts in a window or detached. Resume lists each saved actor/world choice.
@@ -275,8 +261,10 @@ through a complete unit type and every capability.
 ## Crate map
 
 ```
-apps/game_menu                                                      ← Island Village entry; explicit developer launcher/editors
-apps/village  apps/actor_testbed  apps/rts_units_demo  apps/npcctl      ← demos, island host/frontend library, Actors editor, RTS, CLI
+apps/island_game                                                    ← Island Village, the shipped game
+content/island_content  content/island_view                           ← the island (sim content / its view)
+apps/game_menu                                                      ← developer menu: examples, editors, AI explorer
+apps/village  apps/actor_testbed  apps/rts_units_demo  apps/npcctl      ← village demo, Actor Testbed host/explorer/Actors editor, RTS, CLI
 content/village_content  content/village_view                         ← the villager (sim content / its view)
 content/testbed_content  content/testbed_view                         ← testbed, explorer host and preset rules / models, fog, F7, markers
 npc_framework            the facade: NpcPlugins (+ with_<capability>()), NpcAppExt, prelude, glue/<a>_<b>

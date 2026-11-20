@@ -141,10 +141,27 @@ pub fn ensure_frozen(world: &mut World) {
         h.str(category);
         h.str(name);
     }
+    world.insert_resource(InitialContentHash(h.0));
     world.insert_resource(ContentHash {
         hash: h.0,
         manifest,
     });
+}
+
+/// The content hash at the freeze: the build a run started from. A host may
+/// later replace content at an explicit, recorded call (an island's
+/// behaviour trees, ADR 0045) and recompute [`ContentHash`]; a replay of the
+/// run is still stamped with this value, the hash its fresh build starts
+/// with. Not hashed, not saved: rebuilt at every freeze.
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InitialContentHash(pub u64);
+
+/// [`InitialContentHash`] (freezing first if needed).
+pub fn initial_content_hash(world: &mut World) -> u64 {
+    ensure_frozen(world);
+    world
+        .get_resource::<InitialContentHash>()
+        .map_or_else(|| world.resource::<ContentHash>().hash, |initial| initial.0)
 }
 
 /// The content hash (freezing first if needed).

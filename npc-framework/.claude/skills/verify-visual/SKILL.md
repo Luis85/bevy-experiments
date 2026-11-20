@@ -1,7 +1,7 @@
 ---
 name: verify-visual
-description: Check what a windowed app (the village, the Actor Testbed or the RTS units demo) actually renders by taking a screenshot at a fixed sim tick and reading the PNG against a checklist. Use after any change to visuals, animation, lighting, camera, overlay, panels or scene layout, or when text state alone cannot prove something is visible.
-argument-hint: "[tick] [seed] [app: village|actor_testbed|rts_units_demo]"
+description: Check what a windowed app (Island Village, the village, the Actor Testbed or the RTS units demo) actually renders by taking a screenshot at a fixed sim tick and reading the PNG against a checklist. Use after any change to visuals, animation, lighting, camera, overlay, panels or scene layout, or when text state alone cannot prove something is visible.
+argument-hint: "[tick] [seed] [app: island_game|village|actor_testbed|rts_units_demo]"
 ---
 
 # Verify visually
@@ -11,6 +11,7 @@ Arguments: $ARGUMENTS (target tick, default 1200; seed, default 1; app, default 
 
 | App | Quick capture | Notes |
 |---|---|---|
+| `island_game` | `cargo run --locked -p island_game -- --scenario living_world --screenshot "$PWD/target/shots/island.png" --after-secs 8` | the shipped game; `--scenario` is the developer host (no title); `--front-end --island-save FILE` shows the player flow on a copy of a save (never your own). Also `--select`, `--camera`, `--panels`, `--paused`, `--ui-gallery PAGE`; BRP `npc/screenshot` / `npc/step` as below (dev build or `--remote`) |
 | `actor_testbed` | `cargo run -p actor_testbed -- --scenario testbed --select 38 --panels sheet,perception --screenshot "$PWD/target/shots/tb.png" --after-secs 8` | `--camera X,Z,DIST[,YAW,PITCH]`, `--paused`; BRP `npc/screenshot` and `npc/step` work as below; cross-check with `npcctl inspect --scenario testbed --tick TICK --unit 38` |
 | `rts_units_demo` | `cargo run -p rts_units_demo -- --screenshot "$PWD/target/shots/rts.png" --after-secs 18` | no BRP: time-based only; `--headless-ticks N` for the state hash |
 

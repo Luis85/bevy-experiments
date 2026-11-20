@@ -17,7 +17,10 @@ pub(crate) const PAN_LIMIT: f32 = 30.0;
 
 /// Orbit camera state: looks at `focus` from `distance` at `pitch` above the
 /// ground plane, rotated `yaw` around +Y (yaw 0 = camera on the +Z side).
-#[derive(Component, Clone, Copy, Debug, PartialEq)]
+/// Reflected so a capture script can place the view over the remote
+/// protocol; it is view state and changing it changes no simulation result.
+#[derive(Component, Reflect, Clone, Copy, Debug, PartialEq)]
+#[reflect(Component)]
 pub struct RtsCamera {
     pub focus: Vec3,
     pub yaw: f32,
@@ -60,16 +63,8 @@ pub struct CameraFocusOnSelected {
     pub distance: Option<f32>,
 }
 
-/// Actual camera input intent, outside simulation state. A serial distinguishes a fresh input
-/// system run from stale state while modal/UI focus suppresses the camera's input set.
-#[derive(Resource, Default)]
-pub(crate) struct CameraManualIntent {
-    pub serial: u64,
-    pub active: bool,
-}
-
 pub(crate) fn plugin(app: &mut App) {
-    app.init_resource::<CameraManualIntent>()
+    app.register_type::<RtsCamera>()
         .add_systems(Startup, spawn_camera)
         .add_systems(
             Update,
@@ -121,7 +116,6 @@ fn focus_at_start(
     commands.remove_resource::<CameraFocusOnSelected>();
 }
 
-#[allow(clippy::too_many_arguments)]
 fn rts_camera(
     time: Res<Time>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
@@ -130,45 +124,12 @@ fn rts_camera(
     index: Option<Res<SimIndex>>,
     positions: Query<&SimPos>,
     mut cameras: Query<(&mut RtsCamera, &mut Transform)>,
-    mut manual: ResMut<CameraManualIntent>,
-    mode: Option<Res<crate::IslandMode>>,
-    experience: Option<Res<crate::PlayerExperience>>,
-    terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
-    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
 ) {
     let dt = time.delta_secs();
-    let character = mode.as_deref() == Some(&crate::IslandMode::Character);
-    let player = character && experience.is_some_and(|experience| experience.enabled);
     let focus_target = selected_pos(selected.as_deref(), index.as_deref(), &positions);
-    manual.serial = manual.serial.saturating_add(1);
-    manual.active = keys.as_deref().is_some_and(|keys| {
-        [
-            KeyCode::KeyW,
-            KeyCode::KeyA,
-            KeyCode::KeyS,
-            KeyCode::KeyD,
-            KeyCode::ArrowUp,
-            KeyCode::ArrowLeft,
-            KeyCode::ArrowDown,
-            KeyCode::ArrowRight,
-        ]
-        .into_iter()
-        .any(|key| {
-            keys.pressed(key)
-                && (!character
-                    || matches!(
-                        key,
-                        KeyCode::ArrowUp
-                            | KeyCode::ArrowLeft
-                            | KeyCode::ArrowDown
-                            | KeyCode::ArrowRight
-                    ))
-        }) || (keys.just_pressed(KeyCode::KeyF) && focus_target.is_some())
-    });
     for (mut rts, mut transform) in &mut cameras {
         if let Some(keys) = keys.as_deref() {
-            let pressed =
-                |a: KeyCode, b: KeyCode| (!character && keys.pressed(a)) || keys.pressed(b);
+            let pressed = |a: KeyCode, b: KeyCode| keys.pressed(a) || keys.pressed(b);
             let mut input = Vec2::ZERO;
             if pressed(KeyCode::KeyW, KeyCode::ArrowUp) {
                 input.y -= 1.0;
@@ -191,7 +152,7 @@ fn rts_camera(
             if keys.pressed(KeyCode::KeyQ) {
                 rts.yaw -= 1.5 * dt;
             }
-            if keys.pressed(if player { KeyCode::KeyR } else { KeyCode::KeyE }) {
+            if keys.pressed(KeyCode::KeyE) {
                 rts.yaw += 1.5 * dt;
             }
             if keys.pressed(KeyCode::PageUp) {
@@ -212,31 +173,43 @@ fn rts_camera(
                 MouseScrollUnit::Pixel => scroll.delta.y / 40.0,
             };
             if lines != 0.0 {
-                rts.distance = (rts.distance * 0.9f32.powf(lines)).clamp(
-                    MIN_DISTANCE,
-                    if regional.is_some() {
-                        600.0
-                    } else if terrain.is_some() {
-                        180.0
-                    } else {
-                        MAX_DISTANCE
-                    },
-                );
+                rts.distance =
+                    (rts.distance * 0.9f32.powf(lines)).clamp(MIN_DISTANCE, MAX_DISTANCE);
             }
         }
-        let pan_limit = regional.as_ref().map_or(
-            if terrain.is_some() { 90.0 } else { PAN_LIMIT },
-            |terrain| terrain.width.max(terrain.height) as f32 * 0.5 + 20.0,
-        );
         rts.focus = rts
             .focus
-            .clamp(Vec3::splat(-pan_limit), Vec3::splat(pan_limit));
-        if regional.is_none() {
-            rts.focus.y = 0.0;
-        }
+            .clamp(Vec3::splat(-PAN_LIMIT), Vec3::splat(PAN_LIMIT));
+        rts.focus.y = 0.0;
         let want = rts.transform();
         if *transform != want {
             *transform = want;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_wheel_zooms_inside_the_limits_and_keeps_the_pitch() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .init_resource::<AccumulatedMouseScroll>()
+            .add_systems(Update, rts_camera);
+        let camera = app
+            .world_mut()
+            .spawn((RtsCamera::default(), Transform::default()))
+            .id();
+        let before = *app.world().get::<RtsCamera>(camera).unwrap();
+        app.world_mut()
+            .resource_mut::<AccumulatedMouseScroll>()
+            .delta = Vec2::new(0.0, 40.0);
+        app.update();
+        let after = *app.world().get::<RtsCamera>(camera).unwrap();
+        assert_eq!(after.distance, MIN_DISTANCE);
+        assert_eq!(after.pitch, before.pitch);
+        assert_eq!(after.yaw, before.yaw);
     }
 }

@@ -13,6 +13,8 @@ npc_framework = { workspace = true, features = ["tools", "perf", "agent-io"] }
 village_content = { workspace = true, features = ["perf"] }
 # The Actor Testbed scenario loader (`serve --scenario testbed` or a file).
 testbed_content.workspace = true
+# The island's replay factory and scenario loader (`--scenario island:<name>`).
+island_content.workspace = true
 # `trace` emits one span per system run (timed by npc_perf); `debug` keeps
 # real system names (without it every system is "<Enable the debug feature>").
 bevy_ecs = { workspace = true, features = ["trace", "debug"] }

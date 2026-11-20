@@ -43,9 +43,6 @@ pub fn prepare(app: &mut App, p: &WorldPreset) {
     app.world_mut().resource_mut::<SimConfig>().day_length = p.day_night.cycle_ticks;
     app.world_mut().resource_mut::<SimConfig>().night_permille =
         if p.day_night.on { 300 } else { 0 };
-    if p.scene == crate::worlds::WorldScene::IslandVillage {
-        return;
-    }
     app.register_snapshot_component_named::<WorldActor>("explorer_world_actor")
         .register_snapshot_component_named::<RecoverySource>("explorer_recovery_source")
         .register_verb_gate("testbed.world_rules", verb_gate)
@@ -115,10 +112,6 @@ pub fn enabled(world: &World, field: fn(&crate::worlds::SystemsSpec) -> bool) ->
         .is_none_or(|p| field(&p.0.systems))
 }
 pub fn apply(world: &mut World, played: SimId, p: &WorldPreset) {
-    if p.scene == crate::worlds::WorldScene::IslandVillage {
-        crate::village::apply(world, played);
-        return;
-    }
     if world.contains_resource::<Applied>() {
         return;
     }

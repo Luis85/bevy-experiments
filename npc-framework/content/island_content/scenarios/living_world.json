@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "content": "island",
+  "name": "living_world",
+  "seed": 7,
+  "world": {
+    "layout": "island",
+    "economy": "needs_driven",
+    "island_geography": "expanded",
+    "colony": true,
+    "island_ai": {
+      "thirst_threshold": 60000,
+      "recovery_threshold": 40000
+    },
+    "furnish": false,
+    "store_locked": false,
+    "detection": "automatic"
+  },
+  "actors": [
+    {
+      "kind": "unit",
+      "name": "human",
+      "template": "scout",
+      "pos": [
+        500,
+        -43000
+      ],
+      "preset": "human",
+      "facing": [
+        0,
+        1
+      ]
+    }
+  ],
+  "controllers": []
+}

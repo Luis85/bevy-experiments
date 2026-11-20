@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-28
+- Superseded in part by [ADR 0044](0044-island-crates-split.md): the `ai_village` / `island_village` tier is removed.
 
 The new AI scene is opt-in content, exposed as the `ai_village` scenario and `island_village` world
 preset. Existing scenarios keep their registries, IDs, behavior and oracle files. Additions register

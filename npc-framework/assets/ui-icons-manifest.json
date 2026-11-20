@@ -1,0 +1,985 @@
+{
+  "version": 1,
+  "sets": {
+    "maki": {
+      "source": "https://github.com/mapbox/maki",
+      "version": "8.0.0",
+      "commit": "070ed0af1012da8dee83593bb0a33e4592ed68f5",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "license_line": "CC0 1.0 Universal"
+    },
+    "temaki": {
+      "source": "https://github.com/rapideditor/temaki",
+      "version": "5.13.0",
+      "commit": "ff12eb30f7f91b4c0e17594f8c548be29aa03f4b",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "license_line": "### CC0 1.0 Universal"
+    }
+  },
+  "atlases": [
+    {
+      "path": "ui/icons/icons-32.png",
+      "cell": 32,
+      "columns": 10,
+      "width": 320,
+      "height": 320,
+      "bytes": 19494,
+      "sha256": "141be67e3569575454159ba5bb4c2b9ea58d77d44a607e86087a2340f9e5b9b3",
+      "change": "rasterised to white on transparent by scripts/fetch_ui_icons.py"
+    },
+    {
+      "path": "ui/icons/icons-64.png",
+      "cell": 64,
+      "columns": 10,
+      "width": 640,
+      "height": 640,
+      "bytes": 45035,
+      "sha256": "4c2ce1dc8f45f0b6ecb8ec734c979ad49cd6c016bcfbe01d3bcb1700b36556ec",
+      "change": "rasterised to white on transparent by scripts/fetch_ui_icons.py"
+    }
+  ],
+  "cells": {
+    "maki/aquarium": 0,
+    "maki/arrow": 1,
+    "maki/bakery": 2,
+    "maki/beer": 3,
+    "maki/caution": 4,
+    "maki/circle": 5,
+    "maki/circle-stroked": 6,
+    "maki/clothing-store": 7,
+    "maki/cross": 8,
+    "maki/diamond": 9,
+    "maki/farm": 10,
+    "maki/fence": 11,
+    "maki/ferry": 12,
+    "maki/garden": 13,
+    "maki/harbor": 14,
+    "maki/hardware": 15,
+    "maki/heart": 16,
+    "maki/home": 17,
+    "maki/hospital": 18,
+    "maki/information": 19,
+    "maki/library": 20,
+    "maki/lodging": 21,
+    "maki/logging": 22,
+    "maki/marker": 23,
+    "maki/mountain": 24,
+    "maki/paint": 25,
+    "maki/park": 26,
+    "maki/restaurant": 27,
+    "maki/roadblock": 28,
+    "maki/shoe": 29,
+    "maki/shop": 30,
+    "maki/slaughterhouse": 31,
+    "maki/square": 32,
+    "maki/star": 33,
+    "maki/triangle": 34,
+    "maki/viewpoint": 35,
+    "maki/village": 36,
+    "maki/warehouse": 37,
+    "maki/waste-basket": 38,
+    "maki/water": 39,
+    "maki/windmill": 40,
+    "temaki/anvil": 41,
+    "temaki/anvil_and_hammer": 42,
+    "temaki/barn": 43,
+    "temaki/binoculars": 44,
+    "temaki/boulder1": 45,
+    "temaki/bow_and_arrow": 46,
+    "temaki/bread": 47,
+    "temaki/brick_trowel": 48,
+    "temaki/briefcase": 49,
+    "temaki/bulb": 50,
+    "temaki/bulletin_board": 51,
+    "temaki/cabin": 52,
+    "temaki/campfire": 53,
+    "temaki/clock": 54,
+    "temaki/compass": 55,
+    "temaki/dagger": 56,
+    "temaki/fireplace": 57,
+    "temaki/fishing_pier": 58,
+    "temaki/garden_bed": 59,
+    "temaki/grapes": 60,
+    "temaki/grass": 61,
+    "temaki/handbag": 62,
+    "temaki/hotpot": 63,
+    "temaki/ice_fishing": 64,
+    "temaki/island_trees_building": 65,
+    "temaki/lock": 66,
+    "temaki/meat": 67,
+    "temaki/mineshaft_cage": 68,
+    "temaki/money_hand": 69,
+    "temaki/needle_and_spool": 70,
+    "temaki/pedestrian": 71,
+    "temaki/pick_hammer": 72,
+    "temaki/plant": 73,
+    "temaki/portrait": 74,
+    "temaki/room": 75,
+    "temaki/row_houses": 76,
+    "temaki/scaffold": 77,
+    "temaki/silo": 78,
+    "temaki/sleep_shelter": 79,
+    "temaki/snow": 80,
+    "temaki/speaker": 81,
+    "temaki/spice_bottle": 82,
+    "temaki/storage": 83,
+    "temaki/tools": 84,
+    "temaki/toolbox": 85,
+    "temaki/town_hall": 86,
+    "temaki/tree_needleleaved": 87,
+    "temaki/tree_stump": 88,
+    "temaki/vase": 89,
+    "temaki/well_pump_manual": 90,
+    "temaki/windsock": 91
+  },
+  "files": [
+    {
+      "path": "licenses/Maki-8.0.0-CC0.txt",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/LICENSE.txt",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 6555,
+      "sha256": "36ffd9dc085d529a7e60e1276d73ae5a030b020313e6c5408593a6ae2af39673"
+    },
+    {
+      "path": "licenses/Temaki-5.13.0-CC0.txt",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/LICENSE.md",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 6720,
+      "sha256": "32e9b76c6886b3b17c7a96ec0fbe6fb96b7ebf41cdd1f344f28b748631f95b8b"
+    },
+    {
+      "path": "ui/icons/src/maki/aquarium.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/aquarium.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 1088,
+      "sha256": "5c69df372adb713cd00df897409a92dc1e26cbd299d7a8b4f4ab343457858f0e"
+    },
+    {
+      "path": "ui/icons/src/maki/arrow.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/arrow.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 540,
+      "sha256": "b8cf9e6b1d8d70d1188129ce0e7a4007d6c1503bc498ff6e14228a5dd18067d3"
+    },
+    {
+      "path": "ui/icons/src/maki/bakery.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/bakery.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 573,
+      "sha256": "d81d7e6bcf70bdf0925e296fbe7ae2543105d6e8523322ff3523d2b8d0cc4c3b"
+    },
+    {
+      "path": "ui/icons/src/maki/beer.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/beer.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 713,
+      "sha256": "c922f5c79832ff76722051a90ef591cc8f1a68d87e0392352e049ee762e1e2a4"
+    },
+    {
+      "path": "ui/icons/src/maki/caution.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/caution.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 656,
+      "sha256": "0cb97708910c0a77900e7d122bfeb4407db9b8db252dc52f91c8bec06b1b7372"
+    },
+    {
+      "path": "ui/icons/src/maki/circle.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/circle.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 254,
+      "sha256": "3f7eef5763e114f79c02d63ca91dd5951b81efdff015a31ea8a9b6b57fb6b640"
+    },
+    {
+      "path": "ui/icons/src/maki/circle-stroked.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/circle-stroked.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 418,
+      "sha256": "c85d14562018b1a8ca39fe6ee83ce89a73834c02f8906bb029b5b38f4ab2262f"
+    },
+    {
+      "path": "ui/icons/src/maki/clothing-store.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/clothing-store.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 221,
+      "sha256": "34d756d74c62d7a9a642bf252b9f3d20d5308614fdd01f3c4f7d4e09a25871ed"
+    },
+    {
+      "path": "ui/icons/src/maki/cross.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/cross.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 647,
+      "sha256": "782576b6bb76744c3101f3fd10bdf2ddd3a22ac4f26afc3af8399f3ba89f8189"
+    },
+    {
+      "path": "ui/icons/src/maki/diamond.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/diamond.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 741,
+      "sha256": "2e03a20ad04c4d7d55b98f7b87170e326b559d23550baa81019f9ae38961f433"
+    },
+    {
+      "path": "ui/icons/src/maki/farm.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/farm.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 322,
+      "sha256": "2c681c94db3e5a08ad8d837c60549c8b8a23150814fb9b6d01a65fce4aa08b4d"
+    },
+    {
+      "path": "ui/icons/src/maki/fence.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/fence.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 2671,
+      "sha256": "42f81f965f79edefcfa95bf1c7a28cc30f66fb9bc5bacd5381d462b843b62dab"
+    },
+    {
+      "path": "ui/icons/src/maki/ferry.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/ferry.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 1732,
+      "sha256": "0ff0d257e92a4cbb8e0894d22a564c3e18e3428d1f670e21b85fc08beb239590"
+    },
+    {
+      "path": "ui/icons/src/maki/garden.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/garden.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 605,
+      "sha256": "ee7a367e728ee0853020b3f8414375d39cf6c97cf5e5b074ba0479de4d4bebc9"
+    },
+    {
+      "path": "ui/icons/src/maki/harbor.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/harbor.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 853,
+      "sha256": "52c40a9eb2d36c65ce939a57ee929fdce54698926d5a785ab70533ed170498ca"
+    },
+    {
+      "path": "ui/icons/src/maki/hardware.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/hardware.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 1028,
+      "sha256": "bdd5219902982628cb9db81addfddb1d36d52f54c14754adea1d4c8330fdc5fc"
+    },
+    {
+      "path": "ui/icons/src/maki/heart.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/heart.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 348,
+      "sha256": "db06b908f3081c9109dbb7099cf82276b358e42fa32ff2e53d08ae7bc02b683d"
+    },
+    {
+      "path": "ui/icons/src/maki/home.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/home.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 706,
+      "sha256": "6c8b075ce7e6d0099e2be4dc9b41d1702f5d74ed02b6a608d4ccad6514b758de"
+    },
+    {
+      "path": "ui/icons/src/maki/hospital.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/hospital.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 353,
+      "sha256": "00b76d183cdec4df12488c49835938a808b28e04606017a38d8da22834480209"
+    },
+    {
+      "path": "ui/icons/src/maki/information.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/information.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 343,
+      "sha256": "bf9e360168db3a6c8a9f07673d7c6aae1564500a39846c885a64688742732481"
+    },
+    {
+      "path": "ui/icons/src/maki/library.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/library.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 1958,
+      "sha256": "b00354a886a98b894a616cd00f1c53a1b3ed4e8ec9542c05eda87535b8e40b0b"
+    },
+    {
+      "path": "ui/icons/src/maki/lodging.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/lodging.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 580,
+      "sha256": "cc8e756612c6aa292b257a855234da2c55612d95831d4f10fc3d4416f5a7c79f"
+    },
+    {
+      "path": "ui/icons/src/maki/logging.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/logging.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 1277,
+      "sha256": "97a6b6276a6b1be09d6c6eb29138aa516c1d9ff9188921892ffaf805ef0cc0a8"
+    },
+    {
+      "path": "ui/icons/src/maki/marker.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/marker.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 289,
+      "sha256": "5350899297309f6864c3c34f532c320d9e9ceafe5fbee48bf337d40fc9ac217c"
+    },
+    {
+      "path": "ui/icons/src/maki/mountain.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/mountain.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 336,
+      "sha256": "9c5f0d06d07eea0c6b983c2f930a6148156acbd92ee4dd4f7f599d0b05b5035f"
+    },
+    {
+      "path": "ui/icons/src/maki/paint.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/paint.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 603,
+      "sha256": "b19462c7224384e888148c308cba5149d707fb9dbd486400ad5fb6a6d163f024"
+    },
+    {
+      "path": "ui/icons/src/maki/park.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/park.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 1248,
+      "sha256": "9f25e71f59ea90b3ffd974005cb94b704911526832dd157776e36f18ccc9085a"
+    },
+    {
+      "path": "ui/icons/src/maki/restaurant.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/restaurant.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 555,
+      "sha256": "0a51307695a54f27c510e7703cb8f4d54a5f25baa48e0cef2fab0362e3de44a4"
+    },
+    {
+      "path": "ui/icons/src/maki/roadblock.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/roadblock.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 292,
+      "sha256": "93bea78b872588f9600b444221fdd633c2ea37b79e6325e8f09139d9d5e5dc21"
+    },
+    {
+      "path": "ui/icons/src/maki/shoe.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/shoe.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 502,
+      "sha256": "787b42f6d9a0446b0f6bea4ec95076eb3e18002693f046a766550b9d22ce9746"
+    },
+    {
+      "path": "ui/icons/src/maki/shop.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/shop.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 696,
+      "sha256": "1e5b1aa8e2ddd4585d3f0d76f13782d9ab1d5cb3089fea42a1e76acc7aa3304b"
+    },
+    {
+      "path": "ui/icons/src/maki/slaughterhouse.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/slaughterhouse.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 910,
+      "sha256": "f45a67a40f9ff80e5a6a320d407bf6e84a83a07c22b941c2455df273ad7e7bcd"
+    },
+    {
+      "path": "ui/icons/src/maki/square.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/square.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 273,
+      "sha256": "f52b4043db286b188d976ff8ca2ec283388a89de2131839305984dcddbfeb5c4"
+    },
+    {
+      "path": "ui/icons/src/maki/star.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/star.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 256,
+      "sha256": "cc88be8f5e8bd45cf1b6acf6ad5d8d0c39b53431c15907cce4ee8c21ea318045"
+    },
+    {
+      "path": "ui/icons/src/maki/triangle.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/triangle.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 395,
+      "sha256": "cf1e538ad810dfcbdceeb51cbe5c61264f014dc67339fadd88f145327b726ba0"
+    },
+    {
+      "path": "ui/icons/src/maki/viewpoint.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/viewpoint.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 598,
+      "sha256": "b542353205c6b6e86756dbbf62e480fb723d998de8187c7c1787b4e4a7fdcd82"
+    },
+    {
+      "path": "ui/icons/src/maki/village.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/village.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 677,
+      "sha256": "b9eef738f5652355b2823a45b1a7b929763dd7ee3a3e0352d478ca18e264b73b"
+    },
+    {
+      "path": "ui/icons/src/maki/warehouse.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/warehouse.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 488,
+      "sha256": "88f3229db8681f084136ba8848fb952559c6f9cd45c70c8161a0452c0ac06dc8"
+    },
+    {
+      "path": "ui/icons/src/maki/waste-basket.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/waste-basket.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 665,
+      "sha256": "d36bd044f99702edf7142ef8270daa18bbcfc473113551f85fc158f30d96d01a"
+    },
+    {
+      "path": "ui/icons/src/maki/water.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/water.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 291,
+      "sha256": "37110496414c4982c1027e59ea50c9fba026871bf179acdb744de2fea795109f"
+    },
+    {
+      "path": "ui/icons/src/maki/windmill.svg",
+      "url": "https://raw.githubusercontent.com/mapbox/maki/070ed0af1012da8dee83593bb0a33e4592ed68f5/icons/windmill.svg",
+      "source": "https://github.com/mapbox/maki",
+      "author": "Mapbox and contributors",
+      "license": "CC0-1.0",
+      "bytes": 575,
+      "sha256": "fb22d9005c4523d0bb0b110177be63aeb30447050677a650ac3cffb2c6982ec0"
+    },
+    {
+      "path": "ui/icons/src/temaki/anvil.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/anvil.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 406,
+      "sha256": "1852f5e762b16920280362b9f4775a53c1da66fceef45c587da3362e4f9be8b4"
+    },
+    {
+      "path": "ui/icons/src/temaki/anvil_and_hammer.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/anvil_and_hammer.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 672,
+      "sha256": "c64715b5639c9aab927beb53f8530d4667b692ff0d17dd2d614a6ca92fe0ebfd"
+    },
+    {
+      "path": "ui/icons/src/temaki/barn.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/barn.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 278,
+      "sha256": "53f476c8d4fe0f33ad0e1d4d3047c0997795c4f153b7d1fbe64bd9e14378c03b"
+    },
+    {
+      "path": "ui/icons/src/temaki/binoculars.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/binoculars.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 815,
+      "sha256": "956dfed8f218140701c5e68ded71d521317e3b8ca31eda87f26100279018cf46"
+    },
+    {
+      "path": "ui/icons/src/temaki/boulder1.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/boulder1.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 387,
+      "sha256": "8dd3ec81fda3eb82f4496bbc6d0d7017925af64eac38328173703be5c001806d"
+    },
+    {
+      "path": "ui/icons/src/temaki/bow_and_arrow.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/bow_and_arrow.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 645,
+      "sha256": "9c8821d6c283f4f1b239804f9e2d9d4994835f8d18a257277b8d705a2041a421"
+    },
+    {
+      "path": "ui/icons/src/temaki/bread.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/bread.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 388,
+      "sha256": "c613755f28782e5e6e8ff4b1e6e7e18613955f30b5966e7eafef39ea02287e9c"
+    },
+    {
+      "path": "ui/icons/src/temaki/brick_trowel.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/brick_trowel.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 663,
+      "sha256": "b2096573a63b1ad3a778cb64a341c0cfb571b49f5f6e9b83af9585ccc50bb907"
+    },
+    {
+      "path": "ui/icons/src/temaki/briefcase.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/briefcase.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 367,
+      "sha256": "e67d0b7e096eb741217f292fe8db7dbce195fc916ab15f790b393c5d59d97469"
+    },
+    {
+      "path": "ui/icons/src/temaki/bulb.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/bulb.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 677,
+      "sha256": "147945320ad7acfd90a922c76e602c3818e8b99ddd71f9892c2161099f9e2c72"
+    },
+    {
+      "path": "ui/icons/src/temaki/bulletin_board.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/bulletin_board.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 461,
+      "sha256": "1e874e680c1f30d96198486492aeb62d2483896bdf2aafdf8894fd0850923797"
+    },
+    {
+      "path": "ui/icons/src/temaki/cabin.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/cabin.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 656,
+      "sha256": "f303c7925a93c4b8a1a502a4ff356bd498f8aaf8b7d6ff5b6735f016f20962d0"
+    },
+    {
+      "path": "ui/icons/src/temaki/campfire.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/campfire.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 581,
+      "sha256": "b66ed4c3f509d78f25eb9a9fd043ede379e26d7a7bbc93248d15c46180abe9d0"
+    },
+    {
+      "path": "ui/icons/src/temaki/clock.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/clock.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 831,
+      "sha256": "586317e7df2e443c9a0a1f3347f6b5f6708c23634679473a4c570fc18b291a9d"
+    },
+    {
+      "path": "ui/icons/src/temaki/compass.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/compass.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 559,
+      "sha256": "ec56ae6d0a36e87988e7d1ab695c569cfc8e63b472410bfde04b6f1d5f6bb12d"
+    },
+    {
+      "path": "ui/icons/src/temaki/dagger.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/dagger.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 676,
+      "sha256": "693bb1ed0051fee176a9ad62bb942086e8ca48118428fa71d458f8e565b93530"
+    },
+    {
+      "path": "ui/icons/src/temaki/fireplace.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/fireplace.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 627,
+      "sha256": "15983a92acf84e69bf506e3c1f33f4f8fab7aa8bdfae768fe8a030bc475214f8"
+    },
+    {
+      "path": "ui/icons/src/temaki/fishing_pier.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/fishing_pier.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1794,
+      "sha256": "57d4e850136bf438cfce50846e5d34aa3a5f7bbac536748839a453d82914cf98"
+    },
+    {
+      "path": "ui/icons/src/temaki/garden_bed.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/garden_bed.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 669,
+      "sha256": "af05b6628f4a739ee7bca94e2b1e91b7089d713c27b51c5b01a408bbdbe6b5b4"
+    },
+    {
+      "path": "ui/icons/src/temaki/grapes.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/grapes.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 2105,
+      "sha256": "99fa6c38da300aa0e089336d1a56c02db96354bac658fa2a71dd7d9ac773b20a"
+    },
+    {
+      "path": "ui/icons/src/temaki/grass.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/grass.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 695,
+      "sha256": "f9958db388d6af72578484c118f1897a575a39e1263a057e5a0428158ee35656"
+    },
+    {
+      "path": "ui/icons/src/temaki/handbag.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/handbag.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 474,
+      "sha256": "6de7d16b733fa5650334012819a369b7d5d0e3f846db7a1f6a56a18deb271b1a"
+    },
+    {
+      "path": "ui/icons/src/temaki/hotpot.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/hotpot.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 644,
+      "sha256": "6d53bfe742cd936b0342e8f8999dde686e778613f09127ecf77b84f574e58b98"
+    },
+    {
+      "path": "ui/icons/src/temaki/ice_fishing.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/ice_fishing.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 981,
+      "sha256": "dac5c4b99faf0961b3f0862651661e40eaf0b03688b6fcf1276424c357c8d42d"
+    },
+    {
+      "path": "ui/icons/src/temaki/island_trees_building.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/island_trees_building.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 2693,
+      "sha256": "3ac24546b0f1feec6fd8b6ae090dca932125e89082470eed55d4f07a392928f3"
+    },
+    {
+      "path": "ui/icons/src/temaki/lock.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/lock.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 651,
+      "sha256": "e95ea2eac37af283c45498f324f46543e2bb683097e7e26d6ca7babe11b38bfc"
+    },
+    {
+      "path": "ui/icons/src/temaki/meat.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/meat.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1271,
+      "sha256": "869e274de3b7557e2b34a6892ba097e6b62b4b6b4068288eb77637210d12a9b8"
+    },
+    {
+      "path": "ui/icons/src/temaki/mineshaft_cage.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/mineshaft_cage.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 505,
+      "sha256": "b2591183152407edc0ac2ba96610a208e8ba960f852e152a2e25508f73840017"
+    },
+    {
+      "path": "ui/icons/src/temaki/money_hand.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/money_hand.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1012,
+      "sha256": "a9fcc45e127933a73d923434fb64886f6173395ebd1090c921b97e703ed7a10c"
+    },
+    {
+      "path": "ui/icons/src/temaki/needle_and_spool.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/needle_and_spool.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1334,
+      "sha256": "a60bc14c7aecbeca1380961599640a50c169a60e87de6fbd75f741962ce0adbe"
+    },
+    {
+      "path": "ui/icons/src/temaki/pedestrian.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/pedestrian.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 567,
+      "sha256": "3617324298040149eaf22ee45f2014dd499d715f373649063ea879a39ff80b9c"
+    },
+    {
+      "path": "ui/icons/src/temaki/pick_hammer.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/pick_hammer.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 649,
+      "sha256": "c782b8d76594a9ddf21dd51fed71f6db8ffb54401f80085b7bac83c872272f8d"
+    },
+    {
+      "path": "ui/icons/src/temaki/plant.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/plant.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 694,
+      "sha256": "42daae6e7bda5159308921d58fd83998e8c27baf897e8f5906810d5222aefe65"
+    },
+    {
+      "path": "ui/icons/src/temaki/portrait.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/portrait.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 866,
+      "sha256": "ddcd934c31232176e8e482a57f56b7592128af7371f308005aa5efd46222e6cb"
+    },
+    {
+      "path": "ui/icons/src/temaki/room.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/room.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 717,
+      "sha256": "a064d5204147f0770746a725443904b1618988110c53ec5c807e5f2cc335591b"
+    },
+    {
+      "path": "ui/icons/src/temaki/row_houses.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/row_houses.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 396,
+      "sha256": "48c32bde6da38e7a7883eee36ac09823e97b5e7ae97d5dc36fb5be70a92e5abf"
+    },
+    {
+      "path": "ui/icons/src/temaki/scaffold.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/scaffold.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 596,
+      "sha256": "a6cbfbc30dd152022cf7a879a69a9ab992d5ab4bb601eac2c8c848bd266c72e6"
+    },
+    {
+      "path": "ui/icons/src/temaki/silo.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/silo.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 333,
+      "sha256": "17671b51a6ec36fb3f6f4b4b1c4c2205aa3c22b29666d6a63a7017bd69cbaff8"
+    },
+    {
+      "path": "ui/icons/src/temaki/sleep_shelter.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/sleep_shelter.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 587,
+      "sha256": "ff7db5fde9c318a30c1e8f31d8bf398b2170e294f5370da1d154ace83597b256"
+    },
+    {
+      "path": "ui/icons/src/temaki/snow.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/snow.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1110,
+      "sha256": "24fbf5f4ad606d91807f22bd2745a17e5a8117c59b9cc6c891aac8416dadebf4"
+    },
+    {
+      "path": "ui/icons/src/temaki/speaker.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/speaker.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 704,
+      "sha256": "67f9069729328e5ea9b7ee37323c5b39a93661a121c11a2d579dabcffc0af223"
+    },
+    {
+      "path": "ui/icons/src/temaki/spice_bottle.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/spice_bottle.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 735,
+      "sha256": "b1513224ff6c691f48acea550196c877ea4d5adab05ba752e912558eebc83fd6"
+    },
+    {
+      "path": "ui/icons/src/temaki/storage.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/storage.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 224,
+      "sha256": "3764abc78e81c57232722433c45fe2aec49925eea82771b813e309b641b5d113"
+    },
+    {
+      "path": "ui/icons/src/temaki/tools.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/tools.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 810,
+      "sha256": "234ee8c03a39fec8a16ce8846a30b656285d1a478c4899798d3575ff8ffb5d36"
+    },
+    {
+      "path": "ui/icons/src/temaki/toolbox.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/toolbox.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1085,
+      "sha256": "a4ae2bf064efb3ebbc49012e268cf8ac0a94df5ca4964b5fa0ac36f3b6f68034"
+    },
+    {
+      "path": "ui/icons/src/temaki/town_hall.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/town_hall.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 439,
+      "sha256": "c698f1e6b661b53089e74e0b72a908c2ab4b2238d24df90df08616ab33f6b5ad"
+    },
+    {
+      "path": "ui/icons/src/temaki/tree_needleleaved.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/tree_needleleaved.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 328,
+      "sha256": "b9d546a914484d81512acc327f64cd6226d4a46c48af13bc248c98a6c1723b30"
+    },
+    {
+      "path": "ui/icons/src/temaki/tree_stump.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/tree_stump.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 1291,
+      "sha256": "71a0fc5e4b5ea5548dc6d75fb1f294ed7bb3568e9a41df0f9edee7bec38449a9"
+    },
+    {
+      "path": "ui/icons/src/temaki/vase.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/vase.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 849,
+      "sha256": "477701dc88d1d6f08e7008043a6fd38220dc71f2d75b0ffc38ea62383feda8bd"
+    },
+    {
+      "path": "ui/icons/src/temaki/well_pump_manual.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/well_pump_manual.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 538,
+      "sha256": "3dc4e7f8d0fd1e85934e56581107807667059cc5b43404c4043e4ceef29e8038"
+    },
+    {
+      "path": "ui/icons/src/temaki/windsock.svg",
+      "url": "https://raw.githubusercontent.com/rapideditor/temaki/ff12eb30f7f91b4c0e17594f8c548be29aa03f4b/icons/windsock.svg",
+      "source": "https://github.com/rapideditor/temaki",
+      "author": "Rapid editor contributors",
+      "license": "CC0-1.0",
+      "bytes": 535,
+      "sha256": "76415a09df930cab5cb536256a0749b154f8f559ebb8afbeb44be306ce211975"
+    }
+  ]
+}

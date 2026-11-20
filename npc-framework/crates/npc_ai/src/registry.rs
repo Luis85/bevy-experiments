@@ -168,6 +168,81 @@ impl AiRegistry {
         self.frozen = true;
     }
 
+    /// Replaces every tree of a frozen registry at an explicit host call (a
+    /// recorded command, so replays repeat it at the same tick), adding the
+    /// condition names the new trees need (`conds`; names already
+    /// registered are kept as they are). Actions and scorers stay as
+    /// registered: a tree naming an unknown one is refused. Conditions are
+    /// sorted by name again, so every tree is resolved again and earlier
+    /// `TreeId`s and `CondId`s are void: the host resets each agent's brain.
+    /// On an error nothing changes. Existing registration, freezing and the
+    /// content hash of a tree are untouched by this function.
+    ///
+    /// # Errors
+    /// A registry that is not frozen yet, a tree name given twice, or the
+    /// first unknown action, condition or scorer (with the tree and node).
+    pub fn replace_trees(
+        &mut self,
+        trees: Vec<TreeDef>,
+        conds: Vec<(&'static str, CondFn)>,
+    ) -> Result<(), String> {
+        if !self.frozen {
+            return Err("the registry is not frozen yet; register trees with add_tree".into());
+        }
+        let mut all_conds = self.conds.clone();
+        for (name, f) in conds {
+            if !all_conds.iter().any(|(known, _)| *known == name) {
+                all_conds.push((name, f));
+            }
+        }
+        all_conds.sort_by_key(|c| c.0);
+        if u16::try_from(all_conds.len().saturating_sub(1)).is_err() {
+            return Err("too many conditions".into());
+        }
+        let mut trees = trees;
+        trees.sort_by(|a, b| a.name.cmp(&b.name));
+        if let Some(pair) = trees.windows(2).find(|pair| pair[0].name == pair[1].name) {
+            return Err(format!("tree `{}` is given twice", pair[0].name));
+        }
+        if u16::try_from(trees.len().saturating_sub(1)).is_err() {
+            return Err("too many trees".into());
+        }
+        let actions: Vec<&'static str> = self.actions.iter().map(|a| a.name).collect();
+        let cond_names: Vec<&'static str> = all_conds.iter().map(|c| c.0).collect();
+        let scorers: Vec<&'static str> = self.scorers.iter().map(|s| s.0).collect();
+        for tree in &mut trees {
+            let tree_name = tree.name.clone();
+            for node in &mut tree.nodes {
+                let at = |kind: &str, name: &str| {
+                    format!(
+                        "tree `{tree_name}` node `{}` references unknown {kind} `{name}`",
+                        node.name
+                    )
+                };
+                match &mut node.kind {
+                    NodeKind::Leaf { action, .. } => {
+                        let at = at("action", &action.name);
+                        try_resolve(action, &actions, ActionId).ok_or(at)?;
+                    }
+                    NodeKind::Guard { cond, .. } => {
+                        let at = at("condition", &cond.name);
+                        try_resolve(cond, &cond_names, CondId).ok_or(at)?;
+                    }
+                    NodeKind::UtilitySelector { scorers: refs } => {
+                        for s in refs {
+                            let at = at("scorer", &s.name);
+                            try_resolve(s, &scorers, ScoreId).ok_or(at)?;
+                        }
+                    }
+                    NodeKind::Selector | NodeKind::Sequence => {}
+                }
+            }
+        }
+        self.conds = all_conds;
+        self.trees = trees;
+        Ok(())
+    }
+
     /// Every registered name per kind (`"action"`, `"cond"`, `"scorer"`,
     /// `"tree"`), sorted: what the content hash covers.
     pub fn manifest(&self) -> Vec<(&'static str, String)> {
@@ -229,6 +304,17 @@ fn dup_check<'a>(names: impl Iterator<Item = &'a str>, kind: &str) {
         assert!(prev != Some(name), "{kind} `{name}` is registered twice");
         prev = Some(name);
     }
+}
+
+/// [`resolve`] without the panic: `None` for an unknown name.
+fn try_resolve<I: Copy>(
+    r: &mut NameRef<I>,
+    known: &[&'static str],
+    make: fn(u16) -> I,
+) -> Option<()> {
+    let index = known.binary_search(&r.name.as_str()).ok()?;
+    r.id = Some(make(u16::try_from(index).ok()?));
+    Some(())
 }
 
 fn resolve<I: Copy>(

@@ -29,7 +29,6 @@
 //! the dev chose **Quit anyway** for, is killed by its own pid. A world
 //! that exits on its own is dropped from the list.
 
-use std::collections::BTreeMap;
 use std::io::{BufRead as _, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -45,9 +44,8 @@ use serde_json::Value;
 use testbed_content::explorer::ai_client::{self, Provider};
 use testbed_content::explorer::home::{AgentDir, read_lossy, slug};
 use testbed_content::explorer::host::{
-    DetachedLine, ProjectionLaunch, RemoteError, RunFile, append_projection_args, detach_command,
-    latest_prompt, parse_rfc3339, pid_alive, prompt_text, remote_call, remote_call_checked,
-    session_call,
+    DetachedLine, RemoteError, RunFile, detach_command, latest_prompt, parse_rfc3339, pid_alive,
+    prompt_text, remote_call, remote_call_checked, session_call,
 };
 
 use crate::explorer::{ResumeInfo, ResumeNotice};
@@ -173,91 +171,6 @@ impl Control for RpcControl {
 /// The [`Control`] in use.
 #[derive(Resource, Clone)]
 pub struct Controls(pub Arc<dyn Control>);
-
-#[derive(Clone)]
-struct ProjectionHandover {
-    world: String,
-    port: u16,
-    projection: ProjectionLaunch,
-}
-/// Short-lived launch intent, scoped to the exact agent folder/world/port. It survives a failed
-/// window move so the existing detached restart path uses the same public file.
-#[derive(Resource, Default)]
-struct ProjectionHandovers(BTreeMap<PathBuf, ProjectionHandover>);
-
-fn remember_projection_run(world: &mut World, run: &RunFile, dir: &AgentDir) -> Result<(), String> {
-    if let Some(projection) = &run.projection {
-        projection.validate()?;
-    }
-    let mut handovers = world.get_resource_or_init::<ProjectionHandovers>();
-    if let Some(projection) = &run.projection {
-        handovers.0.insert(
-            dir.dir.clone(),
-            ProjectionHandover {
-                world: run.world.clone(),
-                port: run.port,
-                projection: projection.clone(),
-            },
-        );
-    } else {
-        handovers.0.remove(&dir.dir);
-    }
-    while handovers.0.len() > 128 {
-        let first = handovers
-            .0
-            .keys()
-            .next()
-            .cloned()
-            .expect("nonempty handover map");
-        handovers.0.remove(&first);
-    }
-    Ok(())
-}
-fn remember_projection_before_stop(world: &mut World, agent: &str) -> Result<(), String> {
-    let dir = agent_dir(world, agent);
-    if let Some(run) = RunFile::read_any(&dir) {
-        if run.agent != agent
-            || world
-                .resource::<DetachedWorlds>()
-                .get(agent)
-                .is_some_and(|tracked| tracked.world != run.world || tracked.port != run.port)
-        {
-            return Err("projection handover metadata belongs to a different world or port".into());
-        }
-        remember_projection_run(world, &run, &dir)?;
-    }
-    Ok(())
-}
-/// Called by the ordinary menu launcher; other entry types and disabled exports are unchanged.
-pub fn append_projection_handover_args(
-    world: &mut World,
-    entry: &Entry,
-    args: &mut Vec<String>,
-) -> Result<(), String> {
-    let (agent, port) = match entry {
-        Entry::ExplorerMove { agent, port } | Entry::ExplorerRestart { agent, port } => {
-            (agent, *port)
-        }
-        _ => return Ok(()),
-    };
-    let dir = agent_dir(world, agent);
-    let Some(handover) = world
-        .get_resource::<ProjectionHandovers>()
-        .and_then(|handover| handover.0.get(&dir.dir))
-        .cloned()
-    else {
-        return Ok(());
-    };
-    let metadata = testbed_content::explorer::home::read_meta(&dir)?;
-    if handover.world != metadata.world || handover.port != port {
-        world
-            .resource_mut::<ProjectionHandovers>()
-            .0
-            .remove(&dir.dir);
-        return Ok(());
-    }
-    append_projection_args(args, Some(&handover.projection))
-}
 
 impl Default for Controls {
     fn default() -> Self {
@@ -833,18 +746,6 @@ pub fn adopt_moved(world: &mut World, moved: DetachedLine) {
 /// stopped next).
 pub fn adopt_moved_quietly(world: &mut World, moved: DetachedLine) {
     let dir = agent_dir(world, &moved.agent);
-    let projection = match RunFile::read_any(&dir).filter(|run| {
-        run.agent == moved.agent && run.world == moved.world && run.port == moved.port
-    }) {
-        Some(run) => run.projection,
-        // The old window can remove run.json before the new detached child writes it. Retain
-        // only the matching in-flight world's known descriptor through that handover gap.
-        None => world
-            .get_resource::<ProjectionHandovers>()
-            .and_then(|handovers| handovers.0.get(&dir.dir))
-            .filter(|handover| handover.world == moved.world && handover.port == moved.port)
-            .map(|handover| handover.projection.clone()),
-    };
     let run = RunFile {
         pid: moved.pid,
         port: moved.port,
@@ -852,11 +753,7 @@ pub fn adopt_moved_quietly(world: &mut World, moved: DetachedLine) {
         started: String::new(),
         agent: moved.agent.clone(),
         world: moved.world,
-        projection,
     };
-    if let Err(error) = remember_projection_run(world, &run, &dir) {
-        warn!("game_menu: cannot retain projection handover: {error}");
-    }
     let mut worlds = world.resource_mut::<DetachedWorlds>();
     worlds.remove(&moved.agent);
     adopt(&mut worlds, &run, &dir);
@@ -954,18 +851,6 @@ pub fn start_op(world: &mut World, agent: &str, kind: OpKind) -> bool {
         Some(w) if w.is_running() => save_path(world, w),
         _ => return false,
     };
-    if kind == OpKind::Open
-        && let Err(error) = remember_projection_before_stop(world, agent)
-    {
-        set_notice(
-            world,
-            agent,
-            Notice::error(format!(
-                "Open in window aborted: {error}; the world keeps running detached"
-            )),
-        );
-        return false;
-    }
     let mut worlds = world.resource_mut::<DetachedWorlds>();
     let Some(w) = worlds.get_mut(agent) else {
         return false;
@@ -2527,90 +2412,6 @@ pub(crate) mod tests {
     /// A window closed with "keep it running detached" (or F9) prints its
     /// detached host: the menu tracks it and shows its Detached screen.
     #[test]
-    fn projection_descriptor_survives_detached_stop_window_move_and_failed_move_restart_only_for_its_world()
-     {
-        let d = tmp("projection-handover");
-        let mut app = menu(&d);
-        let dir =
-            create_agent(&d.join("agents"), "Herp", "Island", "2026-10-29T10:00:00Z").unwrap();
-        let descriptor = ProjectionLaunch {
-            output: d.join("stream/world state.json"),
-            interval_ms: 750,
-        };
-        let run = RunFile {
-            pid: std::process::id(),
-            port: 15794,
-            mode: RunMode::Detached,
-            started: "2026-10-29T10:00:00Z".into(),
-            agent: "Herp".into(),
-            world: "Island".into(),
-            projection: Some(descriptor.clone()),
-        };
-        run.write(&dir).unwrap();
-        adopt(
-            &mut app.world_mut().resource_mut::<DetachedWorlds>(),
-            &run,
-            &dir,
-        );
-        remember_projection_before_stop(app.world_mut(), "Herp").unwrap();
-        run.remove(&dir).unwrap(); // A successful stop removes run.json before the next launch.
-        adopt_moved_quietly(
-            app.world_mut(),
-            DetachedLine {
-                pid: std::process::id(),
-                port: 15794,
-                agent: "Herp".into(),
-                world: "Island".into(),
-            },
-        );
-        // The window-to-detached stdout notice can arrive in the run.json replacement gap.
-        for entry in [
-            Entry::ExplorerMove {
-                agent: "Herp".into(),
-                port: 15794,
-            },
-            Entry::ExplorerRestart {
-                agent: "Herp".into(),
-                port: 15794,
-            },
-        ] {
-            let settings = app.world().resource::<AppSettings>().0.clone();
-            let (_, mut args) = launch::command_for(&entry, &settings);
-            append_projection_handover_args(app.world_mut(), &entry, &mut args).unwrap();
-            assert!(args.windows(2).any(|pair| pair[0] == "--world-state-out"
-                && pair[1] == descriptor.output.display().to_string()));
-            assert!(
-                args.windows(2)
-                    .any(|pair| pair == ["--world-state-interval-ms", "750"])
-            );
-            assert_eq!(
-                args.iter()
-                    .filter(|arg| *arg == "--world-state-out")
-                    .count(),
-                1
-            );
-        }
-        let unrelated = Entry::Testbed("ai_village");
-        let mut unrelated_args = Vec::new();
-        append_projection_handover_args(app.world_mut(), &unrelated, &mut unrelated_args).unwrap();
-        assert!(unrelated_args.is_empty());
-        let wrong_port = Entry::ExplorerMove {
-            agent: "Herp".into(),
-            port: 15795,
-        };
-        let mut args = Vec::new();
-        append_projection_handover_args(app.world_mut(), &wrong_port, &mut args).unwrap();
-        assert!(
-            args.is_empty(),
-            "another world/port must not inherit a previous export"
-        );
-        assert!(
-            !RunFile::path(&dir).exists(),
-            "argument propagation never starts or advertises another host"
-        );
-        let _ = std::fs::remove_dir_all(d);
-    }
-    #[test]
     fn a_window_that_moved_to_detached_is_tracked() {
         let d = tmp("d-moved");
         let mut app = menu(&d);
@@ -2689,7 +2490,6 @@ pub(crate) mod tests {
             started: "2026-10-26T01:00:00Z".into(),
             agent: "Wren Ashdown".into(),
             world: "Moor".into(),
-            projection: None,
         }
         .write(&wren)
         .unwrap();
@@ -2727,7 +2527,6 @@ pub(crate) mod tests {
             started: "2026-10-26T01:00:00Z".into(),
             agent: "Wren Ashdown".into(),
             world: "Moor".into(),
-            projection: None,
         }
         .write(&wren)
         .unwrap();
@@ -2845,7 +2644,6 @@ pub(crate) mod tests {
                 started: "2026-10-26T01:00:00Z".into(),
                 agent: agent.into(),
                 world: world.into(),
-                projection: None,
             }
             .write(dir)
             .unwrap();

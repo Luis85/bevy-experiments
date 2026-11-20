@@ -1,0 +1,437 @@
+//! Island scenario files (`content: "island"`), the loader registered with
+//! `npc_agent_io`, and the headless constructors.
+//!
+//! `world` holds the island construction (`layout: "island"`, the economy and
+//! geography profile, the colony and resident AI policy, and for the regional
+//! island the `living_world` definition); `furnish` must be `false` (the
+//! island supplies its own village). `actors` are `kind: "unit"` with the
+//! [`UnitSpec`] fields; `pos` is required. The world spawns first (so its
+//! `SimId`s do not depend on the actors), then the actors in order. Names
+//! land in [`IslandIds`].
+//!
+//! The scenario files in `content/island_content/scenarios/` are embedded
+//! ([`SCENARIO_FILES`]); [`try_new_sim_app`] builds one by name.
+
+use bevy_app::App;
+use bevy_ecs::prelude::*;
+use npc_framework::agent_io::scenario::{
+    LoadedScenario, ScenarioDoc, ScenarioLoaders, attach_controllers,
+};
+use npc_framework::kernel::commands::check_pos;
+use npc_framework::kernel::replay::ScenarioInfo;
+use npc_framework::kernel::spatial::GridBounds;
+use npc_framework::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use crate::layout::{GRID_CELLS, ItemSpec, UnitSpec, spawn_item, spawn_unit};
+use crate::world::IslandIds;
+use crate::{IslandAgentPlugin, IslandBasePlugin};
+
+/// The loader's `content` name.
+pub const CONTENT: &str = "island";
+
+/// The embedded scenario files: `(name, JSON)`. `testbed` is the default
+/// showcase; the others focus on one feature each (see the README).
+pub const SCENARIO_FILES: [(&str, &str); 1] = [(
+    "living_world",
+    include_str!("../scenarios/living_world.json"),
+)];
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Layout {
+    /// The island village, spawned by [`crate::village`].
+    #[default]
+    Island,
+}
+
+impl Layout {
+    /// Grid size in cells (centred on the origin).
+    pub const fn grid_cells(self) -> u32 {
+        GRID_CELLS
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Detection {
+    #[default]
+    PerRoll,
+    Automatic,
+}
+
+/// The `world` object of a testbed scenario (see the module docs).
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct WorldSpec {
+    pub living_world: Option<crate::village::frontier::LivingWorldSpec>,
+    pub colony: bool,
+    pub island_ai: Option<crate::village::policy::IslandAiPolicy>,
+    pub economy: crate::worlds::EconomyModel,
+    pub island_geography: crate::worlds::IslandGeography,
+    pub ai_scheduler: Option<npc_framework::agent_io::scheduler::SchedulerPolicy>,
+    /// Present only in host-generated explorer descriptors; pure replay data.
+    pub construction: Option<crate::construction::Construction>,
+    pub layout: Layout,
+    pub furnish: bool,
+    pub store_locked: bool,
+    pub detection: Detection,
+    pub stagger: u32,
+    pub items: Vec<ItemSpec>,
+    pub open_doors: Vec<String>,
+}
+
+impl Default for WorldSpec {
+    fn default() -> Self {
+        Self {
+            living_world: None,
+            colony: false,
+            island_ai: None,
+            economy: crate::worlds::EconomyModel::Fixed,
+            island_geography: crate::worlds::IslandGeography::Compact,
+            ai_scheduler: None,
+            construction: None,
+            layout: Layout::Island,
+            furnish: true,
+            store_locked: true,
+            detection: Detection::PerRoll,
+            stagger: npc_framework::perception::DEFAULT_STAGGER,
+            items: Vec::new(),
+            open_doors: Vec::new(),
+        }
+    }
+}
+
+impl WorldSpec {
+    pub fn parse(v: &serde_json::Value) -> Result<Self, String> {
+        if v.is_null() {
+            return Ok(Self::default());
+        }
+        let spec: Self = serde_json::from_value(v.clone()).map_err(|e| format!("world: {e}"))?;
+        if let Some(definition) = &spec.living_world {
+            definition.validate()?;
+            if !spec.colony || spec.island_ai.is_none() {
+                return Err("Regional living world requires colony and resident AI policy".into());
+            }
+        }
+        if spec.colony
+            && (spec.layout != Layout::Island
+                || spec.economy != crate::worlds::EconomyModel::NeedsDriven
+                || spec.island_geography != crate::worlds::IslandGeography::Expanded)
+        {
+            return Err("colony simulation requires an expanded, needs-driven island".into());
+        }
+        if let Some(policy) = &spec.island_ai {
+            policy.validate()?;
+            if spec.living_world.is_some() {
+                policy.validate_regional()?;
+            }
+            if spec.layout != Layout::Island
+                || spec.economy != crate::worlds::EconomyModel::NeedsDriven
+            {
+                return Err("island AI policy requires a needs-driven island".into());
+            }
+        }
+        if spec.island_geography == crate::worlds::IslandGeography::Expanded
+            && (spec.layout != Layout::Island
+                || spec.economy != crate::worlds::EconomyModel::NeedsDriven)
+        {
+            return Err("expanded island geography requires a needs-driven island".into());
+        }
+        if spec.economy == crate::worlds::EconomyModel::NeedsDriven && spec.layout != Layout::Island
+        {
+            return Err("the needs-driven economy requires an island layout".into());
+        }
+        if let Some(policy) = &spec.ai_scheduler {
+            policy.validate()?;
+        }
+        if spec.layout == Layout::Island && spec.furnish {
+            return Err("island layout supplies its own village; set furnish:false".into());
+        }
+        Ok(spec)
+    }
+}
+
+/// The testbed's plugin set: `NpcPlugins` (no driver) with every capability
+/// and its glue, the per-roll detection check active unless `detection` is
+/// `automatic`, `npc_nav`, [`IslandBasePlugin`] and [`IslandAgentPlugin`].
+pub fn island_plugins(seed: u64, detection: Detection) -> NpcPlugins {
+    let plugins = NpcPlugins::new()
+        .seed(seed)
+        .without_driver()
+        .with_perception()
+        .with_rules()
+        .with_agent_io()
+        .with_interaction()
+        .with_command()
+        .with_vehicles()
+        .with_progression()
+        .with_crafting();
+    match detection {
+        Detection::PerRoll => plugins.with_per_roll_detection(),
+        Detection::Automatic => plugins,
+    }
+}
+
+/// A fresh app (tick 0, content frozen, not finished, no driver) for
+/// `world`, with `plugins` added before the freeze.
+pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -> App {
+    let mut app = App::new();
+    let regional = world
+        .construction
+        .as_ref()
+        .and_then(|c| c.world.as_ref())
+        .and_then(|s| s.preset.living_world.as_ref())
+        .or(world.living_world.as_ref());
+    let bounds = regional.map_or_else(
+        || GridBounds::centered(world.layout.grid_cells(), world.layout.grid_cells()),
+        |s| s.bounds(),
+    );
+    app.insert_resource(SpatialGrid::new(1000, bounds))
+        .insert_resource(PerceptionConfig {
+            stagger: world.stagger.max(1),
+            ..Default::default()
+        });
+    app.add_plugins((
+        island_plugins(seed, world.detection),
+        NavPlugin,
+        IslandBasePlugin,
+        IslandAgentPlugin,
+    ));
+    let policy = world
+        .construction
+        .as_ref()
+        .and_then(|c| c.world.as_ref())
+        .map(|s| s.preset.ai_scheduler.clone())
+        .or_else(|| world.ai_scheduler.clone())
+        .unwrap_or_default();
+    app.insert_resource(policy);
+    if world.layout == Layout::Island {
+        let preset = world
+            .construction
+            .as_ref()
+            .and_then(|c| c.world.as_ref())
+            .map(|s| s.preset.clone())
+            .expect("load_with checked the construction");
+        crate::village::prepare(&mut app, &preset);
+    }
+    plugins(&mut app);
+    crate::finish_content(app.world_mut());
+    app
+}
+
+fn spawn_world(world: &mut World, spec: &WorldSpec, ids: &mut IslandIds) -> Result<(), String> {
+    if spec.layout == Layout::Island {
+        crate::village::spawn_places(world, ids);
+    }
+    for (i, item) in spec.items.iter().enumerate() {
+        let (x, z) = item
+            .pos
+            .ok_or_else(|| format!("world.items[{i}]: needs pos"))?;
+        let pos = check_pos("pos", (x, z)).map_err(|e| format!("world.items[{i}]: {e}"))?;
+        if npc_framework::interaction::items::kind_def(world, &item.kind).is_none() {
+            return Err(format!(
+                "world.items[{i}]: unknown item kind `{}`",
+                item.kind
+            ));
+        }
+        let id = spawn_item(world, &item.kind, item.stack, item.quality, pos);
+        if let Some(name) = &item.name {
+            ids.name(name.clone(), id);
+        }
+    }
+    for name in &spec.open_doors {
+        let id = ids
+            .get(name)
+            .ok_or_else(|| format!("world.open_doors: no door named `{name}`"))?;
+        let e = world
+            .resource::<SimIndex>()
+            .get(id)
+            .ok_or("door left the sim")?;
+        let mut door = world
+            .get_mut::<Door>(e)
+            .ok_or_else(|| format!("world.open_doors: `{name}` is not a door"))?;
+        door.locked_by = None;
+        door.open = true;
+    }
+    Ok(())
+}
+
+/// Loads `doc` with `seed` and `plugins` added before the freeze.
+pub fn load_with(
+    doc: &ScenarioDoc,
+    seed: u64,
+    plugins: impl FnOnce(&mut App),
+) -> Result<LoadedScenario, String> {
+    let spec = WorldSpec::parse(&doc.world)?;
+    if spec
+        .construction
+        .as_ref()
+        .and_then(|context| context.world.as_ref())
+        .is_none()
+    {
+        return Err("an island scenario needs its construction (`world.construction`)".into());
+    }
+    if let Some(selection) = spec
+        .construction
+        .as_ref()
+        .and_then(|context| context.world.as_ref())
+    {
+        crate::worlds::validate(&selection.preset).map_err(|reasons| reasons.join("; "))?;
+        if (selection.preset.scene == crate::worlds::WorldScene::IslandVillage)
+            != (spec.layout == Layout::Island)
+        {
+            return Err("scene layout must match the selected world's scene type".into());
+        }
+    }
+    let mut app = build_app(seed, &spec, |app| {
+        plugins(app);
+        if let Some(context) = &spec.construction {
+            if let Some(world) = &context.world {
+                app.world_mut()
+                    .get_resource_or_init::<crate::worlds::WorldPresets>()
+                    .0
+                    .insert(world.id.clone(), world.preset.clone());
+                crate::worlds::prepare(app, &world.preset);
+            }
+            app.world_mut()
+                .get_resource_or_init::<crate::actors::ActorPresets>()
+                .0
+                .insert(context.preset_id.clone(), context.preset.clone());
+        }
+    });
+    let world = app.world_mut();
+    if spec.layout == Layout::Island {
+        let preset = spec
+            .construction
+            .as_ref()
+            .map(|c| c.preset_id.clone())
+            .or_else(|| {
+                doc.actors
+                    .first()
+                    .and_then(|a| a.extra.get("preset"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| "human".into());
+        world.insert_resource(crate::village::BirthPreset(preset));
+    }
+    let mut ids = IslandIds::default();
+    spawn_world(world, &spec, &mut ids)?;
+    let mut actors = Vec::new();
+    for (i, a) in doc.actors.iter().enumerate() {
+        if a.kind != "unit" {
+            return Err(format!(
+                "actors[{i}]: unknown kind `{}` (testbed has: unit)",
+                a.kind
+            ));
+        }
+        let (x, z) = a.pos.ok_or_else(|| format!("actors[{i}]: needs pos"))?;
+        let pos = check_pos("pos", (x, z)).map_err(|e| format!("actors[{i}]: {e}"))?;
+        let unit: UnitSpec = serde_json::from_value(serde_json::Value::Object(a.extra.clone()))
+            .map_err(|e| format!("actors[{i}]: {e}"))?;
+        if unit.template.is_empty() {
+            return Err(format!("actors[{i}]: needs a template"));
+        }
+        let id = spawn_unit(world, pos, &unit).map_err(|e| format!("actors[{i}]: {e}"))?;
+        if let Some(name) = &unit.name {
+            ids.name(name.clone(), id);
+        }
+        actors.push(id);
+    }
+    ids.units = actors.clone();
+    world.insert_resource(ids);
+    world.insert_resource(ScenarioInfo {
+        name: doc.info_name(),
+        villagers: u32::try_from(actors.len()).unwrap_or(u32::MAX),
+    });
+    if let Some(context) = &spec.construction {
+        context.apply(&mut app)?;
+        if let Some(selection) = &context.world {
+            let played = app
+                .world()
+                .resource::<IslandIds>()
+                .get(&context.actor)
+                .ok_or("This world has no character to play.")?;
+            crate::worlds::apply(app.world_mut(), played, &selection.preset);
+        }
+    }
+    if spec.layout == Layout::Island {
+        // An island needs somebody to play (review fix S1.5): refused here,
+        // not a panic later.
+        let Some(played) = actors.first() else {
+            return Err("This world has no character to play.".into());
+        };
+        crate::village::apply(app.world_mut(), *played);
+    }
+    Ok(LoadedScenario { app, actors })
+}
+
+/// The testbed's scenario loader (`npc_agent_io::scenario::ScenarioLoaderFn`).
+pub fn load_scenario(doc: &ScenarioDoc, seed: u64) -> Result<LoadedScenario, String> {
+    load_with(doc, seed, |_| {})
+}
+
+/// Adds the testbed loader (`content: "testbed"`) to `loaders`.
+pub fn register_scenario_loader(loaders: &mut ScenarioLoaders) {
+    loaders.add(CONTENT, load_scenario);
+}
+
+/// The embedded scenario file `name` (see [`SCENARIO_FILES`]).
+pub fn scenario_text(name: &str) -> Option<&'static str> {
+    SCENARIO_FILES
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, t)| *t)
+}
+
+/// The scenario `name` as the island builds it: the embedded file with its
+/// construction written in ([`crate::construction::shipped`]).
+pub fn scenario_doc(name: &str) -> Result<ScenarioDoc, String> {
+    base_doc(name)?;
+    Ok(crate::construction::shipped())
+}
+
+/// The embedded scenario file `name`, parsed, without a construction (the
+/// base [`crate::construction::from_preset`] writes into).
+pub fn base_doc(name: &str) -> Result<ScenarioDoc, String> {
+    let text = scenario_text(name).ok_or_else(|| {
+        format!(
+            "unknown island scenario `{name}` (expected one of {:?})",
+            SCENARIO_FILES.map(|(n, _)| n)
+        )
+    })?;
+    ScenarioDoc::parse(text)
+}
+
+/// The headless constructor (tests, tools, replays): the embedded scenario
+/// `scenario` built for `seed` with its controllers pre-attached, content
+/// frozen, the app not finished, no driver; drive it with
+/// `run_ticks(app.world_mut(), n)`. `ScenarioInfo.name` is `scenario`, so
+/// the signature matches the replay `AppFactory` (`_units` is ignored: the
+/// scenario files fix the actors).
+pub fn try_new_sim_app(seed: u64, scenario: &str, _units: u32) -> Result<App, String> {
+    try_new_sim_app_with(seed, scenario, |_| {})
+}
+
+/// [`try_new_sim_app`] with `plugins` added before the freeze.
+pub fn try_new_sim_app_with(
+    seed: u64,
+    scenario: &str,
+    plugins: impl FnOnce(&mut App),
+) -> Result<App, String> {
+    // The shipped construction, the same one the game builds (decision D2).
+    let doc = scenario_doc(scenario)?;
+    let mut loaded = load_with(&doc, seed, plugins)?;
+    attach_controllers(&doc, &mut loaded)?;
+    loaded.app.insert_resource(ScenarioInfo {
+        name: scenario.to_owned(),
+        villagers: u32::try_from(loaded.actors.len()).unwrap_or(u32::MAX),
+    });
+    Ok(loaded.app)
+}
+
+/// [`try_new_sim_app`], panicking on an unknown scenario.
+pub fn new_sim_app(seed: u64, scenario: &str) -> App {
+    try_new_sim_app(seed, scenario, 0).unwrap_or_else(|e| panic!("{e}"))
+}

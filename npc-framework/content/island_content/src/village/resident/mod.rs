@@ -1,0 +1,1480 @@
+//! Data-authored resident behaviour for the regional island profile.
+//!
+//! The `behavior` block of [`LivingWorldSpec`](super::frontier::LivingWorldSpec)
+//! carries the behaviour trees, the trait ranges, the daily schedule and named
+//! places. A world file without the block gets the built-in data: the tree in
+//! `content/island_content/trees/resident.json` and the defaults below. The
+//! block is validated with the world, hashed with it and saved as part of the
+//! construction data, so a continued world keeps the trees it was built with.
+//!
+//! Trees use the engine's flat `TreeDef` format. Every action and condition a
+//! tree may name is listed in [`actions::ACTIONS`] and
+//! [`conditions::CONDITIONS`]; `docs/island-ai-authoring.md` is the guide.
+pub mod actions;
+pub mod conditions;
+pub mod day;
+pub mod param;
+pub mod record;
+pub mod replace;
+
+use super::frontier::economy_spec::EconomySpec;
+use bevy_app::App;
+use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
+use npc_framework::ai::{NodeDef, NodeIdx, NodeKind, TreeDef};
+use npc_framework::prelude::*;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::BTreeSet;
+
+pub use day::{BlockEdges, DayShape, OwnSchedule, own_blocks, refresh_schedule, schedule_of};
+pub use record::{ConsideredOption, DecisionTrace, DecisionView, decision, explain};
+
+pub const BEHAVIOR_VERSION: u32 = 1;
+/// The tree every regional resident runs.
+pub const RESIDENT_TREE: &str = super::behavior::TREE;
+/// Built-in tree files, embedded like the world file.
+const BUILTIN_TREES: [(&str, &str); 1] = [(
+    "resident.json",
+    include_str!("../../../trees/resident.json"),
+)];
+const MAX_NODES: usize = 512;
+
+/// One behaviour tree and the file it was authored in (used in messages).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct TreeFile {
+    pub file: String,
+    pub tree: TreeDef,
+}
+
+impl<'de> Deserialize<'de> for TreeFile {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Raw {
+            file: String,
+            tree: serde_json::Value,
+        }
+        let raw = Raw::deserialize(deserializer)?;
+        let tree = parse_tree(&raw.file, &raw.tree).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            file: raw.file,
+            tree,
+        })
+    }
+}
+
+/// Parses one tree file, naming the file and the node in every error.
+///
+/// Two shapes are read. The nested shape, `{"name", "root"}`, writes each
+/// node's children inline, so a branch can be moved or inserted without
+/// renumbering anything. The flat shape, `{"name", "nodes"}`, is the engine's
+/// `TreeDef` itself: nodes in pre-order, children as indices. Both become the
+/// same `TreeDef`; the saved construction data always holds the flat shape.
+pub fn parse_tree(file: &str, value: &serde_json::Value) -> Result<TreeDef, String> {
+    // Guards with parameters or `not` become plain condition names first.
+    let mut rewritten = value.clone();
+    param::rewrite_guards(&mut rewritten)
+        .map_err(|error| format!("behaviour tree file `{file}`: {error}"))?;
+    let value = &rewritten;
+    let shape = "a tree has `name` and either `root` (nested nodes) or `nodes` (flat list)";
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("behaviour tree file `{file}`: expected an object; {shape}"))?;
+    if let Some(unknown) = object
+        .keys()
+        .find(|key| !matches!(key.as_str(), "name" | "nodes" | "root"))
+    {
+        return Err(format!(
+            "behaviour tree file `{file}`: unknown field `{unknown}`; {shape}"
+        ));
+    }
+    let name = object
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| format!("behaviour tree file `{file}`: `name` must be a string"))?;
+    let mut parsed = Vec::new();
+    match (object.get("root"), object.get("nodes")) {
+        (Some(root), None) => {
+            nested_node(file, root, &mut parsed)?;
+        }
+        (None, Some(nodes)) => {
+            let nodes = nodes
+                .as_array()
+                .ok_or_else(|| format!("behaviour tree file `{file}`: `nodes` must be a list"))?;
+            for (index, node) in nodes.iter().enumerate() {
+                parsed.push(node_def(file, index, node, node.get("children").cloned())?);
+            }
+        }
+        _ => {
+            return Err(format!(
+                "behaviour tree file `{file}`: give exactly one of `root` and `nodes`; {shape}"
+            ));
+        }
+    }
+    Ok(TreeDef {
+        name: name.to_owned(),
+        nodes: parsed,
+    })
+}
+
+/// One node without its children, which the caller supplies as indices.
+fn node_def(
+    file: &str,
+    index: usize,
+    node: &serde_json::Value,
+    children: Option<serde_json::Value>,
+) -> Result<NodeDef, String> {
+    let label = node
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(|name| format!(" `{name}`"))
+        .unwrap_or_default();
+    let at = format!("behaviour tree file `{file}`, node {index}{label}");
+    let object = node
+        .as_object()
+        .ok_or_else(|| format!("{at}: a node is an object with `name`, `kind` and `children`"))?;
+    if let Some(unknown) = object
+        .keys()
+        .find(|key| !matches!(key.as_str(), "name" | "kind" | "children"))
+    {
+        return Err(format!(
+            "{at}: unknown field `{unknown}`; a node has `name`, `kind` and `children`"
+        ));
+    }
+    let mut flat = object.clone();
+    flat.insert(
+        "children".into(),
+        children.unwrap_or_else(|| serde_json::Value::Array(Vec::new())),
+    );
+    serde_json::from_value::<NodeDef>(serde_json::Value::Object(flat))
+        .map_err(|error| format!("{at}: {error}"))
+}
+
+/// Appends a nested node and its subtree in pre-order; returns its index.
+fn nested_node(
+    file: &str,
+    node: &serde_json::Value,
+    out: &mut Vec<NodeDef>,
+) -> Result<NodeIdx, String> {
+    let index = out.len();
+    if index >= MAX_NODES {
+        return Err(format!(
+            "behaviour tree file `{file}`: a tree needs 1..={MAX_NODES} nodes"
+        ));
+    }
+    out.push(node_def(file, index, node, None)?);
+    let children = match node.get("children") {
+        None => &[][..],
+        Some(serde_json::Value::Array(children)) => children.as_slice(),
+        Some(_) => {
+            return Err(format!(
+                "behaviour tree file `{file}`, node {index} `{}`: `children` must be a list of \
+                 nodes",
+                out[index].name
+            ));
+        }
+    };
+    for child in children {
+        let child = nested_node(file, child, out)?;
+        out[index].children.push(child);
+    }
+    Ok(index as NodeIdx)
+}
+
+fn builtin_trees() -> Vec<TreeFile> {
+    BUILTIN_TREES
+        .iter()
+        .map(|(file, text)| {
+            let value = serde_json::from_str(text)
+                .unwrap_or_else(|error| panic!("built-in tree file `{file}` is not JSON: {error}"));
+            TreeFile {
+                file: (*file).to_owned(),
+                tree: parse_tree(file, &value).unwrap_or_else(|error| panic!("{error}")),
+            }
+        })
+        .collect()
+}
+
+/// Inclusive range a trait is drawn from when a resident is founded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TraitRange {
+    pub min: i32,
+    pub max: i32,
+}
+
+/// Seeding ranges of the traits and what one trait point is worth (review
+/// npc-ai#13). Every effect is centred on 50: a resident with 50 behaves as
+/// one without the trait, so a trait spreads behaviour without moving the
+/// village's average.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct TraitSpec {
+    /// 0..=100. A diligent resident starts leisure later (see the schedule).
+    pub diligence: TraitRange,
+    /// 0..=100. At or above `sociable_min` a resident takes leisure time.
+    pub sociability: TraitRange,
+    /// -100..=100. Negative is an early bird; shifts every schedule block.
+    pub chronotype: TraitRange,
+    /// 0..=100. Coins kept back from stocking provisions ahead of need, and
+    /// fewer days of provisions stocked.
+    pub thrift: TraitRange,
+    /// 0..=100. How often a free evening is spent with somebody new.
+    pub curiosity: TraitRange,
+    /// 0..=100. How early a resident drinks and eats.
+    pub caution: TraitRange,
+    pub sociable_min: i32,
+    /// Coins a resident with thrift 100 keeps back; scales linearly.
+    pub thrift_reserve_coins: u32,
+    /// Permille of a day of provisions a resident with thrift 0 stocks more
+    /// than the settlement's reserve days, and one with thrift 100 less;
+    /// linear in between.
+    pub thrift_stock_permille: i32,
+    /// Permille added to `schedule.curious_permille` (the share of curious
+    /// days) at curiosity 100 and taken off at curiosity 0.
+    pub curious_shift_permille: i32,
+    /// Milli-units the thirst and hunger thresholds rise by at caution 100
+    /// and fall by at caution 0: the cautious drink and eat earlier.
+    pub caution_need_shift: i32,
+    /// A child's trait is its parents' mean, moved by at most this many
+    /// points either way (seeded), within the authored range.
+    pub inherit_noise: i32,
+    /// Permille of children who take a parent's preferred food; the others
+    /// draw one from `economy.seed.food_preferences`.
+    pub food_inherit_permille: u32,
+}
+
+impl Default for TraitSpec {
+    fn default() -> Self {
+        Self {
+            diligence: TraitRange { min: 20, max: 95 },
+            sociability: TraitRange { min: 5, max: 95 },
+            chronotype: TraitRange {
+                min: -100,
+                max: 100,
+            },
+            thrift: TraitRange { min: 0, max: 100 },
+            curiosity: TraitRange { min: 0, max: 100 },
+            caution: TraitRange { min: 0, max: 100 },
+            sociable_min: 35,
+            thrift_reserve_coins: 80,
+            thrift_stock_permille: 500,
+            curious_shift_permille: 250,
+            caution_need_shift: 8_000,
+            inherit_noise: 15,
+            food_inherit_permille: 700,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockKind {
+    Work,
+    Meal,
+    Leisure,
+    Sleep,
+}
+
+/// A daily window in permille of the day, `from` inclusive, `to` exclusive.
+/// 0 is dawn; with the shipped 30% night, night falls at 700. `from > to`
+/// wraps past midnight.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleBlock {
+    pub kind: BlockKind,
+    pub from: i32,
+    pub to: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ScheduleSpec {
+    pub blocks: Vec<ScheduleBlock>,
+    /// Permille of the day every block moves later at chronotype 100.
+    pub chronotype_shift: i32,
+    /// Permille of the day leisure starts later at diligence 100 (earlier at 0).
+    pub diligence_shift: i32,
+    /// The shared blocks (meals, and the world's leisure where a trade keeps
+    /// it) move by at most this many permille, whatever a resident's hours,
+    /// trade and age add up to, so meals and free time stay shared (review
+    /// npc-ai#11). Work and sleep take the whole shift.
+    pub align_permille: i32,
+    /// How an elder's day differs (`demography.elder_age_seasons`): applied
+    /// after the trade's own shape.
+    pub elder: DayShape,
+    /// During a meal block a resident carrying food eats below this Hunger.
+    pub meal_hunger_threshold: i32,
+    /// Ticks a meeting lasts; it pays its morale and affinity at the end.
+    pub chat_ticks: u64,
+    /// A meeting ends early, paying nothing, beyond this distance (mm).
+    pub chat_break_mm: i32,
+    /// Ticks after a meeting before a resident meets again (closing fix:
+    /// 300 gave nine or ten meetings a day; 2400 leaves a few, and matches
+    /// the 2400-tick window in which a meeting counts as company for morale).
+    pub meet_cooldown_ticks: u64,
+    /// Affinity a meeting pays each party: a few meetings a day pay about
+    /// what ten short ones did (ten at 250), so couples still form at
+    /// `demography.pair_affinity` (closing fix: at 600 no couple formed).
+    pub meet_affinity: i32,
+    /// Friendship steers meetings (review npc-ai#10): each bond tier above
+    /// the first (`economy.live.tiers`) makes a partner count as this many
+    /// millimetres nearer when a resident chooses whom to meet.
+    pub bond_pull_mm: i32,
+    /// Permille of days (seeded per resident and day) on which a resident
+    /// prefers somebody it is not yet friends with, so new bonds still form.
+    pub curious_permille: u32,
+    /// Tier index (`economy.live.tiers`) from which a bond is a friendship:
+    /// friends are sought out, and passed over on a curious day.
+    pub friend_tier: u32,
+    /// With nobody to meet within the local 15 m, a sociable resident walks
+    /// to a free friend up to this route distance (mm); 0 never.
+    pub seek_friend_mm: i32,
+}
+
+impl Default for ScheduleSpec {
+    fn default() -> Self {
+        let block = |kind, from, to| ScheduleBlock { kind, from, to };
+        Self {
+            blocks: vec![
+                block(BlockKind::Work, 0, 700),
+                block(BlockKind::Meal, 250, 300),
+                block(BlockKind::Meal, 600, 650),
+                block(BlockKind::Leisure, 620, 700),
+                block(BlockKind::Sleep, 700, 1000),
+            ],
+            chronotype_shift: 25,
+            diligence_shift: 40,
+            align_permille: 40,
+            // Elders rise and go to bed a little earlier and stop work an
+            // hour and a half before the others.
+            elder: DayShape {
+                shift: -20,
+                edges: vec![BlockEdges {
+                    kind: BlockKind::Work,
+                    from: 0,
+                    to: -60,
+                }],
+                blocks: Vec::new(),
+            },
+            meal_hunger_threshold: 60_000,
+            chat_ticks: 200,
+            chat_break_mm: 3000,
+            meet_cooldown_ticks: 2400,
+            meet_affinity: 1500,
+            bond_pull_mm: 3000,
+            curious_permille: 250,
+            friend_tier: 2,
+            seek_friend_mm: 40_000,
+        }
+    }
+}
+
+/// A named position a `life.go_to` leaf can walk to. Several entries may share
+/// a key; a resident walks to the nearest.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceDef {
+    pub key: String,
+    pub position: SimPos,
+}
+
+/// The `behavior` block of the regional world file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BehaviorSpec {
+    pub version: u32,
+    /// Behaviour trees in the engine's `TreeDef` format. One must be named
+    /// [`RESIDENT_TREE`].
+    pub trees: Vec<TreeFile>,
+    pub traits: TraitSpec,
+    pub schedule: ScheduleSpec,
+    pub places: Vec<PlaceDef>,
+    /// Trees by life stage (review fix S3.1); a profession may name its own
+    /// (`professions[].tree`). Order: child, profession, elder, default.
+    pub stage_trees: StageTrees,
+}
+
+/// The trees a child and an elder run, when they differ from the default.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct StageTrees {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elder: Option<String>,
+}
+
+impl Default for BehaviorSpec {
+    fn default() -> Self {
+        Self {
+            version: BEHAVIOR_VERSION,
+            trees: builtin_trees(),
+            traits: TraitSpec::default(),
+            schedule: ScheduleSpec::default(),
+            places: Vec::new(),
+            stage_trees: StageTrees::default(),
+        }
+    }
+}
+
+/// Built-in destinations of `life.go_to`.
+pub const BUILTIN_PLACES: [&str; 4] = ["home", "work", "centre", "meal"];
+
+impl BehaviorSpec {
+    pub fn validate(&self, economy: &EconomySpec, bounds: GridBounds) -> Result<(), String> {
+        if self.version != BEHAVIOR_VERSION {
+            return Err(format!(
+                "behavior.version {} is not supported; this build reads version {BEHAVIOR_VERSION}",
+                self.version
+            ));
+        }
+        for (name, range, lowest) in [
+            ("diligence", self.traits.diligence, 0),
+            ("sociability", self.traits.sociability, 0),
+            ("chronotype", self.traits.chronotype, -100),
+            ("thrift", self.traits.thrift, 0),
+            ("curiosity", self.traits.curiosity, 0),
+            ("caution", self.traits.caution, 0),
+        ] {
+            if range.min > range.max || range.min < lowest || range.max > 100 {
+                return Err(format!(
+                    "behavior.traits.{name} needs {lowest} <= min <= max <= 100"
+                ));
+            }
+        }
+        if !(0..=100).contains(&self.traits.sociable_min)
+            || self.traits.thrift_reserve_coins > 10_000
+        {
+            return Err(
+                "behavior.traits needs sociable_min 0..=100 and thrift_reserve_coins <= 10000"
+                    .into(),
+            );
+        }
+        let t = &self.traits;
+        if !(0..=1000).contains(&t.thrift_stock_permille)
+            || !(0..=1000).contains(&t.curious_shift_permille)
+            || !(0..=40_000).contains(&t.caution_need_shift)
+            || !(0..=100).contains(&t.inherit_noise)
+            || t.food_inherit_permille > 1000
+        {
+            return Err(
+                "behavior.traits needs thrift_stock_permille and curious_shift_permille in \
+                 0..=1000, caution_need_shift in 0..=40000, inherit_noise in 0..=100 and \
+                 food_inherit_permille at most 1000"
+                    .into(),
+            );
+        }
+        let schedule = &self.schedule;
+        if schedule.blocks.len() > 16
+            || schedule.blocks.iter().any(|block| {
+                !(0..=1000).contains(&block.from)
+                    || !(0..=1000).contains(&block.to)
+                    || block.from == block.to
+            })
+        {
+            return Err(
+                "behavior.schedule.blocks: at most 16 blocks, each with from and to in 0..=1000 \
+                 permille of the day and from != to"
+                    .into(),
+            );
+        }
+        for kind in [BlockKind::Work, BlockKind::Sleep] {
+            if !schedule.blocks.iter().any(|block| block.kind == kind) {
+                return Err(
+                    "behavior.schedule.blocks needs at least one work and one sleep block".into(),
+                );
+            }
+        }
+        if !(0..=200).contains(&schedule.chronotype_shift)
+            || !(0..=200).contains(&schedule.diligence_shift)
+            || !(1..=100_000).contains(&schedule.meal_hunger_threshold)
+        {
+            return Err(
+                "behavior.schedule needs chronotype_shift and diligence_shift in 0..=200 permille \
+                 and meal_hunger_threshold in 1..=100000"
+                    .into(),
+            );
+        }
+        if !(0..=200).contains(&schedule.align_permille) {
+            return Err("behavior.schedule needs align_permille in 0..=200".into());
+        }
+        schedule.elder.validate("behavior.schedule.elder")?;
+        for entry in &economy.professions {
+            entry
+                .day
+                .validate(&format!("profession `{}` day", entry.role.key()))?;
+            if entry.day.shift.abs() + schedule.elder.shift.abs() > 200 {
+                return Err(format!(
+                    "profession `{}` day: its shift and the elder's add up to more than 200                      permille",
+                    entry.role.key()
+                ));
+            }
+        }
+        if !(0..=15_000).contains(&schedule.bond_pull_mm)
+            || schedule.curious_permille > 1000
+            || !(1..=16).contains(&schedule.friend_tier)
+            || !(0..=200_000).contains(&schedule.seek_friend_mm)
+        {
+            return Err(
+                "behavior.schedule needs bond_pull_mm in 0..=15000, curious_permille at most \
+                 1000, friend_tier in 1..=16 and seek_friend_mm in 0..=200000"
+                    .into(),
+            );
+        }
+        let mut places = BTreeSet::new();
+        for place in &self.places {
+            let cell = CellCoord::new(
+                place.position.x.div_euclid(1000),
+                place.position.z.div_euclid(1000),
+            );
+            if place.key.is_empty()
+                || BUILTIN_PLACES.contains(&place.key.as_str())
+                || !bounds.contains(cell)
+            {
+                return Err(format!(
+                    "behavior.places: `{}` needs a non-empty key other than home, work or centre \
+                     and a position inside the map",
+                    place.key
+                ));
+            }
+            places.insert(place.key.as_str());
+        }
+        if self.places.len() > 64 {
+            return Err("behavior.places: at most 64 places".into());
+        }
+        let mut files = BTreeSet::new();
+        let mut names = BTreeSet::new();
+        for file in &self.trees {
+            if file.file.is_empty() || !files.insert(file.file.as_str()) {
+                return Err(format!(
+                    "behavior.trees: file name `{}` is empty or used twice",
+                    file.file
+                ));
+            }
+            let name = file.tree.name.as_str();
+            if !names.insert(name) {
+                return Err(format!(
+                    "behaviour tree file `{}`: tree name `{name}` is used twice",
+                    file.file
+                ));
+            }
+            validate_tree(
+                file,
+                &Context {
+                    economy,
+                    places: &places,
+                    bounds,
+                },
+            )?;
+        }
+        if !names.contains(RESIDENT_TREE) {
+            return Err(format!(
+                "behavior.trees needs a tree named `{RESIDENT_TREE}`: the tree every resident runs"
+            ));
+        }
+        // Every tree a stage or a trade names exists (S3.1).
+        for (what, tree) in [
+            ("stage_trees.child", &self.stage_trees.child),
+            ("stage_trees.elder", &self.stage_trees.elder),
+        ] {
+            if let Some(tree) = tree
+                && !names.contains(tree.as_str())
+            {
+                return Err(format!(
+                    "behavior.{what} names tree `{tree}`, which `behavior.trees` does not contain"
+                ));
+            }
+        }
+        for entry in &economy.professions {
+            if let Some(tree) = &entry.tree
+                && !names.contains(tree.as_str())
+            {
+                return Err(format!(
+                    "profession `{}` names tree `{tree}`, which `behavior.trees` does not contain",
+                    entry.role.key()
+                ));
+            }
+        }
+        let params = param::names_in(&self.trees);
+        if params.len() > param::SLOTS {
+            return Err(format!(
+                "behavior.trees use {} conditions with parameters or `not`; at most {}",
+                params.len(),
+                param::SLOTS
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn sim_hash(&self, h: &mut Fnv64) {
+        h.u32(self.version);
+        h.u32(self.trees.len() as u32);
+        for file in &self.trees {
+            h.str(&file.file);
+            h.u64(file.tree.content_hash());
+        }
+        for range in [
+            self.traits.diligence,
+            self.traits.sociability,
+            self.traits.chronotype,
+            self.traits.thrift,
+            self.traits.curiosity,
+            self.traits.caution,
+        ] {
+            h.i32(range.min);
+            h.i32(range.max);
+        }
+        h.i32(self.traits.sociable_min);
+        h.u32(self.traits.thrift_reserve_coins);
+        h.i32(self.traits.thrift_stock_permille);
+        h.i32(self.traits.curious_shift_permille);
+        h.i32(self.traits.caution_need_shift);
+        h.i32(self.traits.inherit_noise);
+        h.u32(self.traits.food_inherit_permille);
+        h.opt(self.stage_trees.child.as_ref(), |h, tree| h.str(tree));
+        h.opt(self.stage_trees.elder.as_ref(), |h, tree| h.str(tree));
+        h.u32(self.schedule.blocks.len() as u32);
+        for block in &self.schedule.blocks {
+            h.u8(block.kind as u8);
+            h.i32(block.from);
+            h.i32(block.to);
+        }
+        h.i32(self.schedule.chronotype_shift);
+        h.i32(self.schedule.diligence_shift);
+        h.i32(self.schedule.align_permille);
+        self.schedule.elder.sim_hash(h);
+        h.i32(self.schedule.meal_hunger_threshold);
+        h.u64(self.schedule.chat_ticks);
+        h.i32(self.schedule.chat_break_mm);
+        h.u64(self.schedule.meet_cooldown_ticks);
+        h.i32(self.schedule.meet_affinity);
+        h.i32(self.schedule.bond_pull_mm);
+        h.u32(self.schedule.curious_permille);
+        h.u32(self.schedule.friend_tier);
+        h.i32(self.schedule.seek_friend_mm);
+        h.u32(self.places.len() as u32);
+        for place in &self.places {
+            h.str(&place.key);
+            place.position.sim_hash(h);
+        }
+    }
+}
+
+/// What a leaf parameter may be, checked when the world is validated.
+pub(super) struct Context<'a> {
+    pub economy: &'a EconomySpec,
+    pub places: &'a BTreeSet<&'a str>,
+    pub bounds: GridBounds,
+}
+
+/// `(action, parameter name)` of a leaf; the parameter name is empty for none.
+type LeafKey = (String, String);
+
+pub(super) fn param_name(param: &ParamValue) -> String {
+    match param {
+        ParamValue::None => String::new(),
+        ParamValue::Int(value) => value.to_string(),
+        ParamValue::Pos(x, z) => format!("{x},{z}"),
+        ParamValue::Name(name) => name.clone(),
+    }
+}
+
+fn list(names: impl Iterator<Item = impl AsRef<str>>) -> String {
+    let mut names: Vec<String> = names.map(|name| name.as_ref().to_owned()).collect();
+    names.sort();
+    names.join(", ")
+}
+
+/// Checks structure, every referenced name, every leaf parameter and every
+/// aborting guard. Errors name the file, the node index and the node name.
+fn validate_tree(file: &TreeFile, context: &Context) -> Result<(), String> {
+    let tree = &file.tree;
+    let at = |index: usize| {
+        format!(
+            "behaviour tree file `{}`, node {index} `{}`",
+            file.file, tree.nodes[index].name
+        )
+    };
+    if tree.nodes.is_empty() || tree.nodes.len() > MAX_NODES {
+        return Err(format!(
+            "behaviour tree file `{}`: a tree needs 1..={MAX_NODES} nodes",
+            file.file
+        ));
+    }
+    // Pre-order: the children of node n start at n + 1 and each child follows
+    // the previous child's whole subtree.
+    let mut end = vec![0_usize; tree.nodes.len()];
+    for index in (0..tree.nodes.len()).rev() {
+        let node = &tree.nodes[index];
+        if node.name.trim().is_empty() {
+            return Err(format!(
+                "behaviour tree file `{}`, node {index}: a node needs a name",
+                file.file
+            ));
+        }
+        let mut expected = index + 1;
+        for &child in &node.children {
+            let child = child as usize;
+            if child >= tree.nodes.len() || child != expected {
+                return Err(format!(
+                    "{}: children must list the nodes that follow it in order; expected child \
+                     index {expected}, found {child}",
+                    at(index)
+                ));
+            }
+            expected = end[child];
+        }
+        end[index] = expected;
+        let count = node.children.len();
+        match &node.kind {
+            NodeKind::Leaf { .. } if count != 0 => {
+                return Err(format!("{}: a leaf has no children", at(index)));
+            }
+            NodeKind::Guard { .. } if count != 1 => {
+                return Err(format!(
+                    "{}: a guard needs exactly one child, found {count}",
+                    at(index)
+                ));
+            }
+            NodeKind::Selector | NodeKind::Sequence if count == 0 => {
+                return Err(format!(
+                    "{}: a selector or sequence needs at least one child",
+                    at(index)
+                ));
+            }
+            NodeKind::UtilitySelector { scorers } if count == 0 || count != scorers.len() => {
+                return Err(format!(
+                    "{}: a utility selector needs one child per scorer ({} scorers, {count} \
+                     children)",
+                    at(index),
+                    scorers.len()
+                ));
+            }
+            _ => {}
+        }
+    }
+    if end[0] != tree.nodes.len() {
+        return Err(format!(
+            "behaviour tree file `{}`, node {} `{}`: not reachable from the root (node 0); every \
+             node must be listed as a child of an earlier node",
+            file.file, end[0], tree.nodes[end[0]].name
+        ));
+    }
+    for (index, node) in tree.nodes.iter().enumerate() {
+        match &node.kind {
+            NodeKind::Leaf { action, param } => {
+                actions::check(&action.name, param, context)
+                    .map_err(|error| format!("{}: {error}", at(index)))?;
+            }
+            NodeKind::Guard { cond, abort } if param::is_param(&cond.name) => {
+                param::parse(&cond.name, context.economy)
+                    .map_err(|error| format!("{}: {error}", at(index)))?;
+                if *abort == Abort::LowerPriority {
+                    return Err(if cond.name.starts_with("not:") {
+                        format!(
+                            "{}: a `not` guard cannot abort lower-priority work",
+                            at(index)
+                        )
+                    } else {
+                        format!(
+                            "{}: condition `{}` does not promise that its branch can start, so \
+                             it must not abort lower-priority work; use \"abort\": \"None\"",
+                            at(index),
+                            cond.name
+                        )
+                    });
+                }
+            }
+            NodeKind::Guard { cond, abort } => {
+                let Some(info) = conditions::find(&cond.name) else {
+                    return Err(format!(
+                        "{}: unknown condition `{}`; known conditions: {}",
+                        at(index),
+                        cond.name,
+                        list(conditions::names())
+                    ));
+                };
+                if *abort == Abort::LowerPriority {
+                    let mut first = Vec::new();
+                    first_leaves(tree, node.children[0], &cond.name, &mut first);
+                    let always = first
+                        .iter()
+                        .any(|(action, param)| actions::always_starts(action, param));
+                    let missing: Vec<String> = info
+                        .covers
+                        .iter()
+                        .filter(|(action, param)| {
+                            !first.iter().any(|(a, p)| a == action && p == param)
+                        })
+                        .map(|(action, param)| format!("{action} {param}").trim().to_owned())
+                        .collect();
+                    if !always && info.covers.is_empty() {
+                        return Err(format!(
+                            "{}: condition `{}` does not promise that its branch can start, so \
+                             it must not abort lower-priority work; use \"abort\": \"None\" or \
+                             give the branch a first leaf that always starts ({})",
+                            at(index),
+                            cond.name,
+                            list(actions::always_starting())
+                        ));
+                    }
+                    if !always && !missing.is_empty() {
+                        return Err(format!(
+                            "{}: condition `{}` only promises that one of its covered leaves can \
+                             start, and the branch cannot start `{}` first; add the leaf, or use \
+                             \"abort\": \"None\"",
+                            at(index),
+                            cond.name,
+                            missing.join("`, `")
+                        ));
+                    }
+                }
+            }
+            NodeKind::UtilitySelector { scorers } => {
+                for scorer in scorers {
+                    if !conditions::SCORERS
+                        .iter()
+                        .any(|(name, _, _)| *name == scorer.name)
+                    {
+                        return Err(format!(
+                            "{}: unknown scorer `{}`; known scorers: {}",
+                            at(index),
+                            scorer.name,
+                            list(conditions::SCORERS.iter().map(|(name, _, _)| *name))
+                        ));
+                    }
+                }
+            }
+            NodeKind::Selector | NodeKind::Sequence => {}
+        }
+    }
+    Ok(())
+}
+
+/// The leaves a branch may start first when it is entered: every option of a
+/// selector, the first step of a sequence. A nested guard with another
+/// condition may be closed, so its leaves do not count.
+fn first_leaves(tree: &TreeDef, node: NodeIdx, cond: &str, out: &mut Vec<LeafKey>) {
+    let def = &tree.nodes[node as usize];
+    match &def.kind {
+        NodeKind::Leaf { action, param } => out.push((action.name.clone(), param_name(param))),
+        NodeKind::Sequence => first_leaves(tree, def.children[0], cond, out),
+        NodeKind::Selector | NodeKind::UtilitySelector { .. } => {
+            for &child in &def.children {
+                first_leaves(tree, child, cond, out);
+            }
+        }
+        NodeKind::Guard { cond: inner, .. } => {
+            if inner.name == cond {
+                first_leaves(tree, def.children[0], cond, out);
+            }
+        }
+    }
+}
+
+/// Per-resident personality: seeded at founding, mixed from the parents for
+/// somebody born on the island, and never changed afterwards. The preferred
+/// food is `ResidentProfile::preferred_food`.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[reflect(Component)]
+pub struct ResidentTraits {
+    pub diligence: i32,
+    pub sociability: i32,
+    pub chronotype: i32,
+    pub thrift: i32,
+    pub curiosity: i32,
+    pub caution: i32,
+}
+
+impl ResidentTraits {
+    /// Used for an actor that was never given traits.
+    pub const NEUTRAL: Self = Self {
+        diligence: 50,
+        sociability: 50,
+        chronotype: 0,
+        thrift: 50,
+        curiosity: 50,
+        caution: 50,
+    };
+}
+
+impl SimHash for ResidentTraits {
+    const NAME: &'static str = "regional_resident_traits_v2";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.i32(self.diligence);
+        h.i32(self.sociability);
+        h.i32(self.chronotype);
+        h.i32(self.thrift);
+        h.i32(self.curiosity);
+        h.i32(self.caution);
+    }
+}
+
+/// `sim_rand` purposes of the seeded traits (tick 0, per resident).
+const DILIGENCE_PURPOSE: u32 = 0x4149_5401;
+const SOCIABILITY_PURPOSE: u32 = 0x4149_5402;
+const CHRONOTYPE_PURPOSE: u32 = 0x4149_5403;
+const THRIFT_PURPOSE: u32 = 0x4149_5404;
+const CURIOSITY_PURPOSE: u32 = 0x4149_5405;
+const CAUTION_PURPOSE: u32 = 0x4149_5406;
+/// `sim_rand` purpose of a child's inherited traits and food (id 0, tick =
+/// child number x 8 + axis).
+const INHERIT_PURPOSE: u32 = 0x4149_5407;
+
+/// Deterministic founding traits of resident `id`.
+pub fn seed_traits(spec: &TraitSpec, seed: u64, id: SimId) -> ResidentTraits {
+    let draw = |range: TraitRange, purpose: u32| {
+        let span = (range.max - range.min + 1).max(1) as u64;
+        range.min + (npc_framework::kernel::rng::sim_rand(seed, id, 0, purpose) % span) as i32
+    };
+    ResidentTraits {
+        diligence: draw(spec.diligence, DILIGENCE_PURPOSE),
+        sociability: draw(spec.sociability, SOCIABILITY_PURPOSE),
+        chronotype: draw(spec.chronotype, CHRONOTYPE_PURPOSE),
+        thrift: draw(spec.thrift, THRIFT_PURPOSE),
+        curiosity: draw(spec.curiosity, CURIOSITY_PURPOSE),
+        caution: draw(spec.caution, CAUTION_PURPOSE),
+    }
+}
+
+fn inherit_draw(seed: u64, child: u32, axis: u64) -> u64 {
+    npc_framework::kernel::rng::sim_rand(
+        seed,
+        SimId(0),
+        u64::from(child) * 8 + axis,
+        INHERIT_PURPOSE,
+    )
+}
+
+/// Traits of child number `child` of parents `a` and `b`: per trait the
+/// parents' mean moved by a seeded amount of at most `inherit_noise` either
+/// way, within the authored range (review npc-ai#13).
+pub fn inherit_traits(
+    spec: &TraitSpec,
+    seed: u64,
+    child: u32,
+    a: ResidentTraits,
+    b: ResidentTraits,
+) -> ResidentTraits {
+    let noise = spec.inherit_noise.max(0);
+    let mix = |axis: u64, x: i32, y: i32, range: TraitRange| {
+        let moved = (inherit_draw(seed, child, axis) % (2 * noise + 1) as u64) as i32 - noise;
+        ((x + y).div_euclid(2) + moved).clamp(range.min, range.max)
+    };
+    ResidentTraits {
+        diligence: mix(0, a.diligence, b.diligence, spec.diligence),
+        sociability: mix(1, a.sociability, b.sociability, spec.sociability),
+        chronotype: mix(2, a.chronotype, b.chronotype, spec.chronotype),
+        thrift: mix(3, a.thrift, b.thrift, spec.thrift),
+        curiosity: mix(4, a.curiosity, b.curiosity, spec.curiosity),
+        caution: mix(5, a.caution, b.caution, spec.caution),
+    }
+}
+
+/// The preferred food of child number `child`: one of `parents`' foods with
+/// `food_inherit_permille`, else one drawn from `choices` (the world's
+/// `economy.seed.food_preferences`). `None` with neither to draw from.
+pub fn inherit_food(
+    spec: &TraitSpec,
+    seed: u64,
+    child: u32,
+    parents: &[String],
+    choices: &[String],
+) -> Option<String> {
+    let keep = inherit_draw(seed, child, 6);
+    if !parents.is_empty() && keep % 1000 < u64::from(spec.food_inherit_permille) {
+        return Some(parents[((keep / 1000) % parents.len() as u64) as usize].clone());
+    }
+    (!choices.is_empty())
+        .then(|| choices[(inherit_draw(seed, child, 7) % choices.len() as u64) as usize].clone())
+}
+
+/// The active behaviour data of a regional world.
+pub fn spec(world: &World) -> Option<&BehaviorSpec> {
+    super::frontier::spec(world).map(|spec| &spec.behavior)
+}
+
+/// Traits of `actor`; neutral for an actor without any.
+pub fn traits(world: &World, actor: Entity) -> ResidentTraits {
+    world
+        .get::<ResidentTraits>(actor)
+        .copied()
+        .unwrap_or(ResidentTraits::NEUTRAL)
+}
+
+/// Permille of the day elapsed at the current tick; 0 is dawn.
+pub fn day_permille(world: &World) -> i32 {
+    let day = world.resource::<SimConfig>().day_length.max(1);
+    (world.resource::<SimClock>().tick % day * 1000 / day) as i32
+}
+
+pub(crate) fn contains(from: i32, to: i32, at: i32) -> bool {
+    if from <= to {
+        from <= at && at < to
+    } else {
+        at >= from || at < to
+    }
+}
+
+/// Whether `actor` is inside a block of `kind` of its own day now
+/// ([`OwnSchedule`]: the world's blocks after the resident's hours, trade and
+/// age, review npc-ai#11).
+pub fn in_block(world: &World, actor: Entity, kind: BlockKind) -> bool {
+    in_block_at(world, actor, kind, world.resource::<SimClock>().tick)
+}
+
+/// [`in_block`] at another tick of the clock.
+pub fn in_block_at(world: &World, actor: Entity, kind: BlockKind, tick: u64) -> bool {
+    let day = world.resource::<SimConfig>().day_length.max(1);
+    let at = (tick % day * 1000 / day) as i32;
+    schedule_of(world, actor)
+        .iter()
+        .any(|block| block.kind == kind && contains(block.from, block.to, at))
+}
+
+/// The resident whose work leaf (a leaf of goal `Work`) is starting its step
+/// now; set by the shared leaf start for the length of the step only. Not
+/// hashed or saved: it never outlives the call that sets it.
+#[derive(Resource, Default)]
+pub struct WorkStart(pub Option<Entity>);
+
+/// Whether a timed job of `ticks` that `actor` is about to start fits before
+/// its free time: a work leaf started in the work hours does not begin a
+/// job (gathering, crafting, field or site work) whose expected duration
+/// would run into the resident's leisure or sleep block, since running work
+/// is never cancelled and the evening would go to it. Anything else (a need,
+/// a played character, work started in free time) is not held back.
+pub fn fits_before_rest(world: &World, actor: Entity, ticks: u64) -> bool {
+    if world
+        .get_resource::<WorkStart>()
+        .is_none_or(|start| start.0 != Some(actor))
+    {
+        return true;
+    }
+    let resting = |tick: u64| {
+        in_block_at(world, actor, BlockKind::Leisure, tick)
+            || in_block_at(world, actor, BlockKind::Sleep, tick)
+    };
+    let now = world.resource::<SimClock>().tick;
+    if resting(now) {
+        return true;
+    }
+    !reached_within(world, now, ticks, resting)
+}
+
+/// Whether `inside` holds at some tick after `now` and up to `now + ticks`.
+/// Blocks are at least a few permille long: a step of a tenth of a percent of
+/// the day cannot jump over one.
+fn reached_within(world: &World, now: u64, ticks: u64, inside: impl Fn(u64) -> bool) -> bool {
+    let step = (world.resource::<SimConfig>().day_length / 1000).max(1);
+    let end = now.saturating_add(ticks);
+    let mut at = now;
+    while at < end {
+        at = at.saturating_add(step).min(end);
+        if inside(at) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether a free-time errand of `ticks` (the walk there and the task) that
+/// `actor` would start now is done before its own bedtime: it is not in its
+/// sleep block now and none begins within the errand (review npc-ai#11). An
+/// errand it cannot finish in time is not started, so nobody sets out on a
+/// walk that bedtime breaks off.
+pub fn fits_before_bed(world: &World, actor: Entity, ticks: u64) -> bool {
+    let now = world.resource::<SimClock>().tick;
+    let asleep = |tick: u64| in_block_at(world, actor, BlockKind::Sleep, tick);
+    !asleep(now) && !reached_within(world, now, ticks, asleep)
+}
+
+/// Ticks `actor` needs to walk from where it stands through `legs` at its own
+/// pace: the route estimate of each leg, else the straight line.
+pub fn walk_ticks(world: &World, actor: Entity, legs: &[SimPos]) -> u64 {
+    let Some(mut from) = world.get::<SimPos>(actor).copied() else {
+        return 0;
+    };
+    let speed = world
+        .get::<super::Villager>(actor)
+        .map_or(1, |person| person.base_speed.max(1)) as u64;
+    let mut distance = 0_u64;
+    for to in legs {
+        distance += super::frontier::routes::estimate(world, from, *to).map_or_else(
+            || from.dist2(*to).max(0).isqrt() as u64,
+            |route| u64::from(route.distance_mm),
+        );
+        from = *to;
+    }
+    distance.div_ceil(speed)
+}
+
+/// Whether `actor` spends its free time in company: sociability at least
+/// `traits.sociable_min` (`life.sociable`).
+pub fn sociable(world: &World, actor: Entity) -> bool {
+    spec(world).is_some_and(|spec| traits(world, actor).sociability >= spec.traits.sociable_min)
+}
+
+/// Ticks of provisions `actor` stocks beyond (positive) or short of
+/// (negative) the settlement's reserve days, out of a day of `day_ticks`:
+/// a free spender lays in more, a thrifty resident less
+/// (`traits.thrift_stock_permille`).
+pub fn thrift_stock_shift(world: &World, actor: Entity, day_ticks: u64) -> i64 {
+    let Some(spec) = spec(world) else {
+        return 0;
+    };
+    let thrift = i64::from(traits(world, actor).thrift.clamp(0, 100));
+    day_ticks as i64 * (50 - thrift) * i64::from(spec.traits.thrift_stock_permille) / 50_000
+}
+
+/// `base` (a policy threshold of Thirst or Hunger) for `actor`: higher for a
+/// cautious resident, who drinks and eats earlier, lower for a carefree one
+/// (`traits.caution_need_shift`). Critical thresholds are not moved.
+pub fn need_threshold(world: &World, actor: Entity, base: i32) -> i32 {
+    let Some(spec) = spec(world) else {
+        return base;
+    };
+    let caution = traits(world, actor).caution.clamp(0, 100);
+    (base + (caution - 50) * spec.traits.caution_need_shift / 50).clamp(1_000, 99_000)
+}
+
+/// Share in permille of `actor`'s days that are curious days: the world's
+/// `schedule.curious_permille`, moved by curiosity
+/// (`traits.curious_shift_permille`).
+pub fn curious_permille(world: &World, actor: Entity, base: u64) -> u64 {
+    let Some(spec) = spec(world) else {
+        return base;
+    };
+    let curiosity = i64::from(traits(world, actor).curiosity.clamp(0, 100));
+    (base as i64 + (curiosity - 50) * i64::from(spec.traits.curious_shift_permille) / 50)
+        .clamp(0, 1000) as u64
+}
+
+/// A trait value at or above this reads as strong ("thrifty", "curious").
+pub const TRAIT_STRONG: i32 = 67;
+/// A trait value below this reads as weak ("free-spending", "carefree").
+pub const TRAIT_WEAK: i32 = 34;
+
+/// The trait that decided what `actor` is doing now, as the end of a "because"
+/// sentence ("they are cautious"), when the same resident with a middling
+/// value would not be doing it (review npc-ai#13). Read-only: the inspector's
+/// Why asks it for the selected resident, never per frame for everybody.
+///
+/// - drinking or eating while the need is still above the world's threshold,
+///   below the resident's own (caution);
+/// - stocking provisions ahead of need with thrift below [`TRAIT_WEAK`];
+/// - working through the world's free time with diligence of
+///   [`TRAIT_STRONG`] or more;
+/// - meeting or seeking somebody who is not yet a friend on a curious day
+///   (curiosity), else seeking company with sociability of [`TRAIT_STRONG`] or
+///   more, or spending free time alone below `sociable_min`.
+pub fn trait_motive(world: &World, actor: Entity) -> Option<&'static str> {
+    use super::behavior::LifeGoal;
+    let spec = spec(world)?;
+    let traits = traits(world, actor);
+    if super::behavior::decision(world, actor) == Some("stocking provisions") {
+        return (traits.thrift < TRAIT_WEAK).then_some("they are free-spending");
+    }
+    let goal = world.get::<super::behavior::LifeDecision>(actor)?.goal;
+    let policy = super::policy::active(world);
+    let early = |need: &str, base: i32| {
+        let value = super::economy::need(world, actor, need);
+        value >= base && value < need_threshold(world, actor, base)
+    };
+    match goal {
+        LifeGoal::Thirst => early("Thirst", policy.map_or(55_000, |p| p.thirst_threshold))
+            .then_some("they are cautious"),
+        LifeGoal::Hunger => early("Hunger", policy.map_or(50_000, |p| p.hunger_threshold))
+            .then_some("they are cautious"),
+        LifeGoal::Work => {
+            let now = day_permille(world);
+            let world_leisure = spec.schedule.blocks.iter().any(|block| {
+                block.kind == BlockKind::Leisure && contains(block.from, block.to, now)
+            });
+            (traits.diligence >= TRAIT_STRONG
+                && world_leisure
+                && !in_block(world, actor, BlockKind::Leisure))
+            .then_some("they are hard-working")
+        }
+        LifeGoal::Leisure => {
+            if !sociable(world, actor) {
+                return Some("they keep to themself");
+            }
+            let partner = world
+                .get::<super::colony::Chatting>(actor)
+                .map(|chat| chat.with)
+                .or_else(|| world.get::<super::colony::SocialLife>(actor)?.seeking)?;
+            let id = *world.get::<SimId>(actor)?;
+            let stranger = super::colony::bond_tier(world, actor, partner)
+                < spec.schedule.friend_tier as usize;
+            if stranger
+                && traits.curiosity >= TRAIT_STRONG
+                && super::colony::curious_today(world, id)
+            {
+                Some("they are curious")
+            } else {
+                (traits.sociability >= TRAIT_STRONG).then_some("they are sociable")
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Coins `actor` keeps back from stocking provisions ahead of need.
+pub fn thrift_reserve(world: &World, actor: Entity) -> u32 {
+    let Some(spec) = spec(world) else {
+        return 0;
+    };
+    (traits(world, actor).thrift.clamp(0, 100) as u32) * spec.traits.thrift_reserve_coins / 100
+}
+
+/// Position of a `life.go_to` destination for `actor`.
+pub fn place(world: &World, actor: Entity, param: &ParamValue) -> Option<SimPos> {
+    match param {
+        ParamValue::Pos(x, z) => Some(SimPos::new(*x, *z)),
+        ParamValue::Name(name) => match name.as_str() {
+            "home" => world
+                .get::<super::Villager>(actor)
+                .map(|person| person.home),
+            "work" => {
+                let workplace = world.get::<super::Villager>(actor)?.workplace;
+                let site = world.resource::<SimIndex>().get(workplace)?;
+                world.get::<SimPos>(site).copied()
+            }
+            "centre" => {
+                let settlement = super::frontier::settlements::member(world, actor)?;
+                super::frontier::settlements::definition(world, settlement)
+                    .map(|definition| definition.center)
+            }
+            // Where a meal is eaten (S3.3): at home, else at the nearest
+            // inn, else at the square.
+            // Where a meal is eaten (S3.3): at home, else at the nearest
+            // inn, else at the square.
+            "meal" => {
+                let id = *world.get::<SimId>(actor)?;
+                if super::colony::home_of(world, id).is_some() {
+                    return world
+                        .get::<super::Villager>(actor)
+                        .map(|person| person.home);
+                }
+                let here = *world.get::<SimPos>(actor)?;
+                super::indoors::inns(world)
+                    .into_iter()
+                    .map(|inn| inn.entrance)
+                    .min_by_key(|door| (here.dist2(*door), door.x, door.z))
+                    .or_else(|| place(world, actor, &ParamValue::Name("centre".into())))
+            }
+            key => {
+                let here = *world.get::<SimPos>(actor)?;
+                spec(world)?
+                    .places
+                    .iter()
+                    .filter(|place| place.key == key)
+                    .map(|place| place.position)
+                    .min_by_key(|position| (here.dist2(*position), position.x, position.z))
+            }
+        },
+        _ => None,
+    }
+}
+
+/// Registers the resident actions, conditions, scorers, traits and the trees
+/// of the world's behaviour data. Regional profile only.
+pub(super) fn register(app: &mut App) {
+    let spec = app
+        .world()
+        .resource::<super::frontier::LivingWorldSpec>()
+        .behavior
+        .clone();
+    app.init_resource::<DecisionTrace>()
+        .init_resource::<WorkStart>()
+        .register_sim_component::<ResidentTraits>()
+        .register_sim_component::<DayRhythm>()
+        .register_sim_component::<OwnSchedule>()
+        .register_sim_component::<super::ai::Errand>()
+        .register_command::<replace::ReplaceBehavior>();
+    for action in actions::ACTIONS {
+        app.register_action(action.name, action.start, super::behavior::stop);
+    }
+    for condition in conditions::CONDITIONS {
+        if !condition.external {
+            app.register_cond(condition.name, condition.test);
+        }
+    }
+    for (name, score, _) in conditions::SCORERS {
+        app.register_scorer(name, *score);
+    }
+    // Conditions with parameters or `not`: one slot each (S3.1).
+    let economy = app
+        .world()
+        .resource::<super::frontier::LivingWorldSpec>()
+        .economy
+        .clone();
+    let mut table = param::ParamConds::default();
+    for (index, name) in param::names_in(&spec.trees).into_iter().enumerate() {
+        let Ok(cond) = param::parse(&name, &economy) else {
+            continue;
+        };
+        let leaked: &'static str = Box::leak(name.clone().into_boxed_str());
+        app.register_cond(leaked, param::SLOT_FNS[index]);
+        table.slots.push((name, cond));
+    }
+    app.insert_resource(table);
+    for file in spec.trees {
+        app.world_mut()
+            .get_resource_or_init::<AiRegistry>()
+            .add_tree(file.tree);
+    }
+}
+
+/// The tree `actor` runs: its life stage's (a child's), else its trade's,
+/// else an elder's, else [`RESIDENT_TREE`] (S3.1). A working elder keeps the
+/// trade's routine.
+pub fn tree_for(world: &World, actor: Entity) -> Option<npc_framework::ai::TreeId> {
+    let registry = world.get_resource::<AiRegistry>()?;
+    let spec = spec(world);
+    let stage = super::demography::stage(world, actor);
+    let by_name = |name: &Option<String>| name.as_deref().and_then(|name| registry.tree_id(name));
+    let trade = world.get::<super::Villager>(actor).and_then(|person| {
+        super::frontier::economy_spec::registry(world)?
+            .definition(person.role)?
+            .tree
+            .clone()
+    });
+    let child = spec
+        .filter(|_| stage == super::demography::LifeStage::Child)
+        .and_then(|spec| by_name(&spec.stage_trees.child));
+    let elder = spec
+        .filter(|_| stage == super::demography::LifeStage::Elder)
+        .and_then(|spec| by_name(&spec.stage_trees.elder));
+    child
+        .or_else(|| by_name(&trade))
+        .or(elder)
+        .or_else(|| registry.tree_id(RESIDENT_TREE))
+}
+
+/// Gives `actor` the tree [`tree_for`] names, stopping its running leaf
+/// through the one teardown path when the tree changes.
+pub fn assign_tree(world: &mut World, actor: Entity) {
+    // The day follows the trade and the life stage as the tree does.
+    refresh_schedule(world, actor);
+    let Some(tree) = tree_for(world, actor) else {
+        return;
+    };
+    if world
+        .get::<Brain>(actor)
+        .is_some_and(|brain| brain.tree == tree)
+    {
+        return;
+    }
+    if world.get::<ActiveLeaf>(actor).is_some() {
+        super::behavior::stop(world, actor, npc_framework::ai::StopReason::Aborted);
+    }
+    world
+        .entity_mut(actor)
+        .remove::<(BrainState, ActiveLeaf)>()
+        .insert(Brain { tree });
+}
+
+/// Stops `actor`'s running leaf and gives it a fresh brain on the tree
+/// [`tree_for`] names (after the trees were replaced, every id is new).
+pub fn reset_brain(world: &mut World, actor: Entity) {
+    refresh_schedule(world, actor);
+    if world.get::<ActiveLeaf>(actor).is_some() {
+        super::behavior::stop(world, actor, npc_framework::ai::StopReason::Aborted);
+    }
+    let Some(tree) = tree_for(world, actor) else {
+        return;
+    };
+    world
+        .entity_mut(actor)
+        .remove::<(BrainState, ActiveLeaf)>()
+        .insert(Brain { tree });
+}
+
+/// The meals a resident has had (S3.3): the day it last sat down to a meal,
+/// so the day has one sit-down meal (the first meal block it reaches;
+/// hunger is still answered at any hour).
+#[derive(
+    Component, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Component)]
+pub struct DayRhythm {
+    /// The day of the last sit-down meal; `None` before the first.
+    pub last_meal: Option<u64>,
+}
+impl SimHash for DayRhythm {
+    const NAME: &'static str = "island_day_rhythm_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.opt(self.last_meal.as_ref(), |h, meal| h.u64(*meal));
+    }
+}
+
+/// The day, while `actor` is in a meal block of its own day (none outside one).
+pub fn meal_block(world: &World, actor: Entity) -> Option<u64> {
+    let day = world.resource::<SimClock>().tick / world.resource::<SimConfig>().day_length.max(1);
+    in_block(world, actor, BlockKind::Meal).then_some(day)
+}
+
+/// Marks that the travel of the leaf being started was abandoned for good.
+pub(super) fn travel_failed(world: &mut World) {
+    if let Some(mut trace) = world.get_resource_mut::<DecisionTrace>() {
+        trace.travel_failed = true;
+    }
+}
+
+/// Short present-tense label of the running resident leaf, for inspectors.
+pub fn label(world: &World, actor: Entity) -> Option<&'static str> {
+    let leaf = world.get::<ActiveLeaf>(actor)?;
+    let brain = world.get::<Brain>(actor)?;
+    let registry = world.get_resource::<AiRegistry>()?;
+    let NodeKind::Leaf { action, param } = &registry
+        .tree(brain.tree)
+        .nodes
+        .get(leaf.node as usize)?
+        .kind
+    else {
+        return None;
+    };
+    if super::indoors::asleep(world, actor) {
+        // A guest in a rented bed sleeps at the inn, not at home.
+        let at_inn = super::indoors::inside_entity(world, actor)
+            .is_some_and(|building| super::indoors::is_inn(world, building));
+        return Some(if at_inn {
+            "asleep at the inn"
+        } else {
+            "asleep at home"
+        });
+    }
+    // A resident who has reached home is no longer "going home".
+    if action.name == "life.go_to"
+        && *param == ParamValue::Name("home".into())
+        && world.get::<SimPos>(actor).is_some_and(|here| {
+            world
+                .get::<super::Villager>(actor)
+                .is_some_and(|person| here.dist2(person.home) <= 1_500_i64.pow(2))
+        })
+    {
+        return Some(if in_block(world, actor, BlockKind::Sleep) {
+            "asleep at home"
+        } else {
+            "at home"
+        });
+    }
+    // Fishing is a gathering at a fishing ground: say so, at the water and
+    // on the way there.
+    let fishing = world
+        .get::<super::Gathering>(actor)
+        .and_then(|gathering| world.resource::<SimIndex>().get(gathering.patch))
+        .and_then(|patch| world.get::<super::ResourcePatch>(patch))
+        .is_some_and(|patch| patch.kind == super::catalog::FISH)
+        || (action.name == "life.gather"
+            && world.get::<super::Villager>(actor).is_some_and(|person| {
+                super::catalog::outputs_for(world, person.role).contains(&super::catalog::FISH)
+            }));
+    if fishing && matches!(action.name.as_str(), "life.gather" | "life.continue") {
+        return Some("fishing");
+    }
+    actions::label(&action.name, param)
+}

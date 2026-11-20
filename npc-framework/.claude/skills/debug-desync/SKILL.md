@@ -15,12 +15,13 @@ cargo run -p npcctl -- replay verify tests/replays/<name>.json          # {ok, c
 cargo run -p npcctl -- diverge --a <a.json> --b <b.json> --pretty        # two replays of the same content, or:
 cargo run -p npcctl -- diverge --seed-a 1 --seed-b 1 --ticks 4000 --pretty   # same seed twice must NOT diverge
 cargo run -p npcctl -- diverge --scenario testbed:smithy --seed-a 1 --seed-b 1 --ticks 2400 --pretty
+cargo run -p npcctl -- diverge --scenario island:living_world --seed-a 7 --seed-b 7 --ticks 2400 --pretty
 cargo run -p npcctl -- replay verify-session <session.json>             # an agent session record (also `replay verify`)
 ```
 
 `diverge` gives `first_divergent_tick`, `entities_differing` and per entity `components_differing` with
 `a`/`b` values (every registered component by name). Exit 1 = diverged. Replays name their content
-(`village`, `village_n`, `testbed`, `testbed:<name>`); a replay whose `content_hash` differs from the build
+(`village`, `village_n`, `testbed`, `testbed:<name>`, `island:living_world`); a replay whose `content_hash` differs from the build
 (a registered name was added, renamed or removed) is refused: that is a content change, not a desync.
 
 Cross-OS: CI's `determinism` job (`.github/workflows/npc-framework.yml` at the repository root) uploads
@@ -65,5 +66,9 @@ cargo run -p npcctl -- journal --seed 1 --ticks <T+1> --unit <id> --from <T-50> 
 ## 5. Fix and gate
 
 - [ ] Add a regression test that reproduces the divergence (`content/village_content/tests/regressions.rs`,
-      `content/testbed_content/tests/`, or the generic crate's unit tests).
-- [ ] `cargo xtask verify` → `"ok":true`, replay corpus included. Report tick, entity, component and cause.
+      `content/testbed_content/tests/`, `content/island_content/tests/`, or the generic crate's unit tests).
+      The island's base code is a diverged copy of the testbed's (ADR 0044): a fix on one side does not reach
+      the other, so check both when the cause is in copied code.
+- [ ] `cargo xtask verify` → `"ok":true`, replay corpus included (`--island` verifies only the island replays,
+      `island_*` in `tests/replays/` and staged ones in `tests/replays.next/`). Report tick, entity, component
+      and cause.

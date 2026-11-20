@@ -13,8 +13,9 @@ Claude Code hooks. Specs/plans live in `docs/superpowers/`, decisions in
 - Do not alter replay/golden/snapshot baselines, architecture tests, protected
   tooling or lint policy to pass a check. Follow `docs/rebaselining.md`; stage new
   evidence and obtain the documented approval before replacing an oracle.
-- Run Cargo inside `npc-framework/`. `cargo run --locked -p game_menu` launches
-  the demos; `cargo run --locked -p npcctl -- --help` lists headless tooling.
+- Run Cargo inside `npc-framework/`. `cargo run --locked -p island_game` starts
+  Island Village; `cargo run --locked -p game_menu` opens the developer menu with
+  the framework examples; `cargo run --locked -p npcctl -- --help` lists headless tooling.
 - Focused tests: `cargo test --locked -p <crate>`. Final gate:
   `cargo xtask verify`; report the JSON `ok` verdict and any skipped tools.
   `cargo xtask verify --quick` is an iteration check, not a full gate.

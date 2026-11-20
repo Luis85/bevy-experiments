@@ -7,7 +7,8 @@
 //! `village_nav`, and the village's own error for unknown names), so a run
 //! without `--scenario` is the village exactly as before. The testbed takes
 //! `testbed` and `testbed:<name>` (an embedded scenario file; a bare
-//! embedded name such as `smithy` is qualified to `testbed:smithy`). A
+//! embedded name such as `smithy` is qualified to `testbed:smithy`). The
+//! island takes `island:<name>` (its embedded scenario files). A
 //! `--scenario` that names an existing file, ends in `.json` or contains a
 //! path separator is a scenario **file** (`{"version":1,"content":..}`), built by the content's
 //! `npc_agent_io` scenario loader. Replays carry the scenario name, so
@@ -54,11 +55,17 @@ fn claims_all(_: &str) -> bool {
 
 /// Every content, in the order names are offered; the village (last) takes
 /// any name the others do not claim.
-pub const CONTENTS: [ContentEntry; 2] = [
+pub const CONTENTS: [ContentEntry; 3] = [
     ContentEntry {
         name: "testbed",
         factory: testbed_content::replay::try_new_replay_app,
         claims: testbed_content::replay::is_testbed,
+        sized: false,
+    },
+    ContentEntry {
+        name: "island",
+        factory: island_content::replay::try_new_replay_app,
+        claims: island_content::replay::is_island,
         sized: false,
     },
     ContentEntry {
@@ -141,12 +148,16 @@ impl Scenario {
                 },
             });
         }
-        // A bare embedded testbed scenario (`smithy`) is `testbed:smithy`.
-        let name = if !testbed_content::replay::is_testbed(name)
-            && !name.starts_with("village")
-            && testbed_content::scenario::scenario_text(name).is_some()
-        {
+        // A bare embedded testbed scenario (`smithy`) is `testbed:smithy`;
+        // a bare embedded island scenario (`living_world`) is
+        // `island:living_world`.
+        let qualifiable = !testbed_content::replay::is_testbed(name)
+            && !island_content::replay::is_island(name)
+            && !name.starts_with("village");
+        let name = if qualifiable && testbed_content::scenario::scenario_text(name).is_some() {
             testbed_content::replay::qualified(name)
+        } else if qualifiable && island_content::scenario::scenario_text(name).is_some() {
+            island_content::replay::qualified(name)
         } else {
             name.to_owned()
         };

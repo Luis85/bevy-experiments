@@ -52,4 +52,4 @@ apps built successfully. Native day/night and desktop/narrow browser inspection
 passed; no provider session or physical input was used.
 
 See [full evidence and limits](../../_notes/2026-11-01-npc-life-closeout.md)
-and [the shared action API guide](../../npc-life-and-environment.md).
+and the shared action API guide (`docs/npc-life-and-environment.md`, since removed; the island's actions are advertised by `agent/observe`, `docs/debugging.md`).

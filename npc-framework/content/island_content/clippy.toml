@@ -1,0 +1,62 @@
+# Determinism guardrails for a sim crate (Task P1 of
+# docs/superpowers/plans/2026-10-23-baseline-hardening.md).
+# Rules: docs/superpowers/specs/2026-10-23-villager-npc-design.md §6.2 and
+# docs/superpowers/specs/2026-10-23-baseline-hardening-design.md §2.6.
+#
+# Clippy finds this file from the crate's own directory (CARGO_MANIFEST_DIR),
+# so it covers every target of this crate: lib, tests, benches, examples.
+# Keep crates/npc_ai/clippy.toml and this file identical.
+#
+# Semantics, checked against clippy 0.1.99:
+# - A ban matches the item's *definition*, so banning
+#   `bevy_platform::collections::HashMap` also bans every re-export of it,
+#   such as `bevy::platform::collections::HashMap`, `bevy_ecs::...` aliases and
+#   `use` renames.
+# - A path whose crate is not in the crate graph is ignored silently. A path
+#   whose crate exists but whose item does not (e.g. `rand::thread_rng` on
+#   rand >= 0.10) warns unless `allow-invalid = true`.
+# - Escape hatch: `#[allow(clippy::disallowed_types)]` (or `_methods`) on the
+#   smallest item, with a `// determinism: <why>` comment. Never edit this file
+#   to make a check pass.
+
+disallowed-types = [
+    # Hash containers: iteration order is not part of the sim contract.
+    { path = "std::collections::HashMap", reason = "iteration order is random per process; use BTreeMap or a Vec sorted by SimId (villager spec §6.2)" },
+    { path = "std::collections::HashSet", reason = "iteration order is random per process; use BTreeSet or a sorted Vec (villager spec §6.2)" },
+    { path = "std::collections::hash_map::RandomState", reason = "per-process random hashing (villager spec §6.2)" },
+    { path = "bevy_platform::collections::HashMap", reason = "hash-order iteration (also bans bevy::platform::collections::HashMap); use BTreeMap or a Vec sorted by SimId (villager spec §6.2)" },
+    { path = "bevy_platform::collections::HashSet", reason = "hash-order iteration (also bans bevy::platform::collections::HashSet); use BTreeSet or a sorted Vec (villager spec §6.2)" },
+    { path = "hashbrown::HashMap", reason = "hash-order iteration; use BTreeMap or a Vec sorted by SimId (villager spec §6.2)", allow-invalid = true },
+    { path = "hashbrown::HashSet", reason = "hash-order iteration; use BTreeSet or a sorted Vec (villager spec §6.2)", allow-invalid = true },
+    # Host time: the sim reads SimClock only.
+    { path = "bevy_time::Time", reason = "sim systems never read Time (also bans bevy::time::Time); read SimClock (villager spec §6.2, hardening spec §2.2)" },
+    # Floats: sim state is integers (mm positions, milli-unit needs).
+    { path = "f32", reason = "sim state is integer-only: positions in mm (SimPos), needs in milli-units (villager spec §6.2)" },
+    { path = "f64", reason = "sim state is integer-only: positions in mm (SimPos), needs in milli-units (villager spec §6.2)" },
+]
+
+disallowed-methods = [
+    # Wall clocks (bevy_platform::time::Instant re-exports std's on native).
+    { path = "std::time::Instant::now", reason = "wall clock in sim; read SimClock (villager spec §6.2)" },
+    { path = "std::time::SystemTime::now", reason = "wall clock in sim; read SimClock (villager spec §6.2)" },
+    # Stateful/OS randomness. rand 0.8 has thread_rng, rand >= 0.9 has rng.
+    { path = "rand::thread_rng", reason = "stateful RNG; use rng::sim_rand (counter-based, villager spec §6.2)", allow-invalid = true },
+    { path = "rand::rng", reason = "stateful RNG; use rng::sim_rand (counter-based, villager spec §6.2)", allow-invalid = true },
+    { path = "rand::random", reason = "stateful RNG; use rng::sim_rand (counter-based, villager spec §6.2)", allow-invalid = true },
+    # Backstop for float literals that never name f32/f64: libm results differ
+    # across platforms.
+    { path = "f32::sin", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f32::cos", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f32::tan", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f32::atan2", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f32::powf", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f32::exp", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f32::ln", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::sin", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::cos", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::tan", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::atan2", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::powf", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::exp", reason = "platform-dependent libm result (villager spec §6.2)" },
+    { path = "f64::ln", reason = "platform-dependent libm result (villager spec §6.2)" },
+]

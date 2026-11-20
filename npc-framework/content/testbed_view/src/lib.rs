@@ -35,29 +35,17 @@
 mod anim;
 mod assets;
 mod camera;
-mod colony_panel;
-mod colony_scene;
 mod command;
 mod explorer_modal;
 mod explorer_panel;
 mod field_clipboard;
 mod fog;
-pub mod game_ui;
-mod homestead_panel;
-mod island_camera;
-mod island_control;
 mod landmarks;
 mod model_preview;
 mod overlay;
-mod panel_scroll;
 mod panels;
-mod player_actions;
-mod player_hud;
 mod robots;
 mod scene;
-mod scene_readiness;
-mod village;
-mod village_world;
 mod visuals;
 
 use bevy::prelude::*;
@@ -78,33 +66,6 @@ pub use fog::{
     MaskRegion, area_look, marker_pos, mask_alpha, mask_hash, mask_texel, mask_texels, static_look,
     unit_look,
 };
-pub use island_control::IslandMode;
-pub use player_hud::{FrontendGate, FrontendUiRoot, PlayerExperience, PlayerMenuRequest};
-pub use scene_readiness::SceneReadiness;
-
-/// One control authority for the host shell, player toolbar and advanced modes.
-pub fn request_island_mode(world: &mut World, mode: IslandMode) -> Result<(), String> {
-    island_control::request_mode(world, mode)
-}
-/// Explicit spectator choice, including acknowledgement of a completed life.
-pub fn watch_island_village(world: &mut World) -> Result<(), String> {
-    player_hud::watch_village(world)
-}
-pub fn native_control_active(world: &World) -> bool {
-    player_actions::control(world) == player_actions::ControlState::Native
-}
-/// Preserve committed work while recording a stop for transient navigation.
-/// A host must wait for the receipt before saving; this does not pause or tick.
-pub fn prepare_player_suspend(world: &mut World) -> Result<Option<(u64, u32)>, String> {
-    player_actions::prepare_suspend(world)
-}
-/// Discard transient view intent before the host replaces a world snapshot.
-/// This does not change authoritative actor state or advance the simulation.
-pub fn clear_player_view_intent(world: &mut World) {
-    player_hud::clear(world);
-    player_actions::clear_view(world);
-    island_control::clear_view(world);
-}
 pub use model_preview::{
     ModelPreview, ModelPreviewPlugin, ModelPreviewSettings, ModelPreviewSystems,
     ModelPreviewViewport, PreviewActor,
@@ -145,21 +106,11 @@ pub struct TestbedViewPlugin;
 
 impl Plugin for TestbedViewPlugin {
     fn build(&self, app: &mut App) {
-        game_ui::install(app);
-        app.init_resource::<FrontendGate>()
-            .configure_sets(Update, ViewSystems::Input.run_if(player_hud::gate_open))
-            .configure_sets(
-                Update,
-                ViewSystems::OverlayInput.run_if(player_hud::gate_open),
-            );
         if !app.is_plugin_added::<NpcViewHelpersPlugin>() {
             app.add_plugins(NpcViewHelpersPlugin);
         }
         app.add_plugins((
             assets::plugin,
-            village_world::plugin,
-            village::plugin,
-            homestead_panel::plugin,
             robots::plugin,
             scene::plugin,
             camera::plugin,
@@ -171,14 +122,6 @@ impl Plugin for TestbedViewPlugin {
             landmarks::plugin,
             command::plugin,
             fog::plugin,
-        ))
-        .add_plugins((
-            island_control::plugin,
-            island_camera::plugin,
-            colony_panel::plugin,
-            colony_scene::plugin,
-            player_hud::plugin,
-            scene_readiness::plugin,
         ))
         .add_systems(Update, toggle_debug_panels.in_set(ViewSystems::Input));
     }
@@ -200,16 +143,6 @@ pub fn perf_tags(tags: &mut npc_framework::perf::MechanicTags) {
         "panels",
         "scene",
         "visuals",
-        "village",
-        "village_world",
-        "player_hud",
-        "player_actions",
-        "island_control",
-        "island_camera",
-        "colony_panel",
-        "colony_scene",
-        "homestead_panel",
-        "game_ui",
     ] {
         tags.add(format!("testbed_view::{module}"), format!("view.{module}"));
     }

@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
+- Superseded in part by [ADR 0044](0044-island-crates-split.md): the `living_island` / `living_village` tier and the `needs_driven` gate are removed.
 
 The existing island has physical stock, wallets, crafting and life trees, but its prices and production ceilings are fixed. That creates useful demonstrations without a general needs-to-production feedback loop.
 

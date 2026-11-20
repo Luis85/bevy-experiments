@@ -10,7 +10,9 @@ pins Rust **1.99.1** in `rust-toolchain.toml`; the workspace manifest minimum is
 independent workspace (`npc-framework/`), using `--locked` for standard builds/tests. The sim is integer-only, runs headless, and is replayable bit for bit.
 Opt-in capabilities (perception,
 rules, interaction, RTS command, vehicles, progression, crafting, agent control, grid A*) plug into a facade.
-Example content: the village (villagers with needs, a food economy) and the Actor Testbed (every capability).
+The shipped game is Island Village (`island_content`, `island_view`, `island_game`). Example content: the
+village (villagers with needs, a food economy) and the Actor Testbed (every capability). The island and the
+examples do not depend on each other (ADR 0044).
 
 ## Crate map
 
@@ -33,10 +35,12 @@ Example content: the village (villagers with needs, a food economy) and the Acto
 | `crates/npc_framework` | **the facade**: `NpcPlugins` (+ `with_<capability>()`), `NpcAppExt`, `prelude`; `glue/<a>_<b>.rs` pairwise capability glue, each behind both features (ADR 0011) | the generic crates |
 | `crates/npc_view_helpers` | generic view: `VisualOf`, interpolation, panels, selection, screenshots, gizmos, `command_ui`, perf setup | `bevy`, kernel |
 | `content/village_content` / `village_view` | the villager: needs, places, actions, tree, commands, scenarios / models, animation, camera, F1 overlay | facade (+ `bevy` for the view) |
-| `content/testbed_content` / `testbed_view` | Actor Testbed, actor/world preset validation, optional world mechanics, explorer hosts/workspaces/settings / models, fog, standalone model preview, F5/F6, F7 notebooks + Map, landmark markers, prompt modal, RTS UI | facade (+ `bevy` for the view) |
-| `apps/village` / `apps/actor_testbed` | windowed hosts (speed keys, BRP `npc/*` + `agent/*`); actor_testbed library owns the single-window island frontend/session, explorer `--explorer-home` and standalone `--actor-editor` | facade + content + view |
-| `apps/game_menu` | normal entry dispatches into actor_testbed's host library; explicit `--developer-menu` retains Worlds/Actors editors, settings, AI explorer New/Resume, detached worlds and lifecycle tools | `bevy` + `testbed_content` + `actor_testbed` host library |
-| `apps/npcctl` | headless JSON CLI, explorer serve, registered/legacy agent + player notes/map clients, stdio MCP (never a renderer) | facade + content |
+| `content/testbed_content` / `testbed_view` | example: Actor Testbed, actor/world preset validation, optional world mechanics, explorer hosts/workspaces/settings / models, fog, standalone model preview, F5/F6, F7 notebooks + Map, landmark markers, prompt modal, RTS UI; no island | facade (+ `bevy` for the view); never an `island_*` crate |
+| `content/island_content` / `island_view` | **the shipped game's content**: the `living_world` island (residents, economy, colony, terrain, saves; `village/**`), its one construction (`construction::shipped()`), world rules and resident tree / terrain, residents, buildings, camera, player HUD, colony panels, shell, audio | facade (+ `bevy` and `island_content` for the view); never a `testbed_*` or `village_*` crate |
+| `apps/island_game` | **the shipped game**: one window with title, New/Continue, play and pause (`frontend`, `island::session`), local saves in `<home>/island-village/`; BRP `npc/*` + `agent/*` + `world/state` with `--remote`; `--scenario` selects the developer host | `bevy` + facade + `island_content` + `island_view` |
+| `apps/village` / `apps/actor_testbed` | example windowed hosts (speed keys, BRP `npc/*` + `agent/*`); actor_testbed hosts the testbed scenarios (default `testbed`), explorer `--explorer-home` and standalone `--actor-editor`; no island | facade + content + view |
+| `apps/game_menu` | the developer menu only: starts the examples (Actor Testbed, village, RTS demo) as child processes; Worlds/Actors editors, settings, AI explorer New/Resume, detached worlds and lifecycle tools. It does not start the island | `bevy` + `testbed_content` |
+| `apps/npcctl` | headless JSON CLI over three contents (`village` default, `testbed[:<name>]`, `island:living_world`), explorer serve (testbed worlds only), registered/legacy agent + player notes/map clients, stdio MCP (never a renderer) | facade + `village_content` + `testbed_content` + `island_content` |
 | `apps/rts_units_demo` | portability proof: own units/map/physics, 10 Hz in host `FixedUpdate`, `--headless-ticks N` | facade + `bevy` only |
 | `xtask` | `cargo xtask verify`, architecture fitness and hook tests | tooling |
 
@@ -56,17 +60,39 @@ Capability crates depend on each other only per ADR 0012's whitelist; everything
 - [0023: host idle supervision for AI CLI sessions](docs/adr/0023-host-idle-supervision-for-ai-cli-sessions.md).
 - [0035: island colony showcase and ownership](docs/adr/0035-island-colony-showcase.md).
 - [0036: one-window island player flow](docs/adr/0036-one-window-island-player-flow.md).
+- [0044: the island in its own crates, older tiers removed](docs/adr/0044-island-crates-split.md).
 
-The normal entry showcases `island_colony` through title, New/Continue, play and pause
-in one process. The old launcher is explicit (`--developer-menu`). Read
-[`docs/architecture-island.md`](docs/architecture-island.md) before extending its
-mechanics: colony contexts own state and pure queries, resident actions own physical
-execution, production owns its plan, native control has one coordinator, and views
-submit recorded inputs. Local saves and launcher shutdown use an explicit persistent
-host lifecycle. Historical scenarios remain developer/replay fixtures.
+`island_game` is the game: title, New/Continue, play and pause in one process, on the
+one island construction, `living_world`. The island lives in `content/island_content`,
+`content/island_view` and `apps/island_game` and shares no code with the testbed or
+village crates; `arch_fitness` forbids a dependency in either direction (ADR 0044).
+The older island tiers are removed (scenarios `ai_village`, `living_village`,
+`island_colony`; worlds `island_village`, `living_island`, `living_homestead`,
+`island_colony`; the Home & farm panel). There are no profile gates and no historical
+island scenarios: do not add a branch for a world that does not ship. Nothing is kept
+compatible: a save of another build or an older tier is refused with a plain sentence
+and never migrated (ADR 0042), and old save locations are not read. The explorer and
+AI-agent hosts do not host an island; an agent reaches it through `island_game --remote`.
 
-The host's `frontend` and `island::session` own screens, pause and file lifecycle;
-`testbed_view::player_hud` owns player presentation and submits shared actions.
+Read [`docs/architecture-island.md`](docs/architecture-island.md) before extending
+the island's mechanics: colony contexts own state and pure queries, resident actions
+own physical execution, production owns its plan, native control has one coordinator,
+and views submit recorded inputs. Local saves use an explicit persistent host
+lifecycle. Base code the island once shared with the testbed (unit spawn, ids, item
+kinds, idle tree, scenario loader, parts of the view) is a diverged copy; a fix on
+one side does not reach the other.
+
+One construction builds the island everywhere: `island_content::construction::shipped()`
+is used by `try_new_sim_app` (so every headless test) and the replay factory, and New
+Game builds `construction::from_preset` of the chosen world, so tests and replays pin
+the world the player gets. The island's registered names are its own (`island_unit`,
+`island_ids`, `island_idling`, `IslandIdle`, `island_idle`, `island.allowed_actions`,
+`island.world_rules`; plugins `IslandBasePlugin`, `IslandAgentPlugin`, `IslandViewPlugin`).
+A new or renamed registration changes the island's content hash and every island state
+hash: say so, and re-baseline island oracles by `docs/rebaselining.md`.
+
+`island_game`'s `frontend` and `island::session` own screens, pause and file lifecycle;
+`island_view::player_hud` owns player presentation and submits shared actions.
 `FrontendGate` suppresses gameplay input and automatic view work while menus are
 open; it does not become simulation state. `village::player_journey` projects
 guidance from actor-scoped observations without rewards or persisted quest counters.
@@ -111,7 +137,9 @@ Path-scoped detail loads automatically from `.claude/rules/` (sim, view, content
   registries, including detection, rather than a default world. New saves the selected IDs and complete
   immutable copies; Resume/reset use those copies even if source files change or disappear. The explicit
   `world.explorer_context` descriptor lets the ordinary loader prepare before freeze and apply after spawn
-  exactly once. Generic replay/snapshot loaders must not read agent metadata, credentials or preset folders.
+  exactly once (the island's own descriptor is `world.construction`, in `island_content::construction`).
+  Explorer hosts serve testbed worlds only; they never host the island (ADR 0044).
+  Generic replay/snapshot loaders must not read agent metadata, credentials or preset folders.
 - `RegistrationRequired` is opt-in. Explorer New/Resume/reset/handover leaves the assigned actor idle and
   unattached; control uses recorded attach commands. Preserve unlocked scenarios and the legacy default MCP
   schemas. Generated explorer config selects `mcp --registered`; its tools expose no unit/controller/session.
@@ -141,13 +169,18 @@ Path-scoped detail loads automatically from `.claude/rules/` (sim, view, content
 ```sh
 cargo xtask verify            # full gate: fmt, clippy -D warnings, nextest/test, arch, replays, goldens, deny
 cargo xtask verify --quick    # what the Stop hook runs (no deny, no long tests)
+cargo xtask verify --island   # only the island game: island crates, island replays (not with --quick)
 cargo test --locked -p <crate> [--test <file>]    # the inner loop while you work; verify once at the end
 ```
 
 Keep at most two Cargo builders active, preferably one for a cold Bevy build; each checkout needs its own
 build output directory.
 
-Timings (busy machine): fresh build ~15 min, `verify --quick` ~5 min, full `verify` 40–50 min (run it once, last).
+Timings (measured November 2026, warm build): `verify --quick` ~23 min, full `verify` ~31 min, `verify --island`
+~13 min; a cold build adds 15–20 min and about 110 GB under `target/debug` (run the full gate once, last). Unit
+tests run with `cargo test --lib --bins`, one process per crate; integration tests run under nextest, one process
+per test, which is most of the time (a view or host test binary is 70–100 MB and takes ~0.5 s to start).
+Keep `CARGO_INCREMENTAL` the same across runs: switching it rebuilds every workspace crate.
 
 Headless CLI (`cargo run --locked -p npcctl -- <cmd>`; JSON out, exit 0 ok / 1 check failed / 2 usage error):
 
@@ -159,14 +192,23 @@ npcctl replay record --ticks 2400 --out r.json  /  npcctl replay verify tests/re
 npcctl diverge --seed-a 1 --seed-b 2 --ticks 2400       # or --a r1.json --b r2.json
 npcctl bench --villagers 1,100,500 --ticks 2000 --baseline bench/baseline.json   # release build
 npcctl run --scenario testbed[:<name>] --ticks 4800    # any subcommand above; or --scenario file.json
+npcctl run --scenario island:living_world --ticks 4800 # the island (a bare `living_world` means the same)
 npcctl serve --scenario smithy --record s.json  /  npcctl agent observe --unit 33 --format text  /  npcctl mcp
+```
+
+The game:
+
+```sh
+cargo run --locked -p island_game                                   # the player flow: title, New/Continue, play, pause
+cargo run --locked -p island_game -- --front-end --island-save FILE [--island-rules FILE]   # the same on another save
+cargo run --locked -p island_game -- --scenario living_world [--island-mode inspector|character|editor]   # developer host, no title
+cargo run --locked -p island_game -- --island-save FILE --island-new [--island-rules FILE]  # developer host on a fresh save
 ```
 
 Explorer and editor commands (folder arguments below are placeholders; use absolute paths):
 
 ```sh
-cargo run --locked -p game_menu
-cargo run --locked -p game_menu -- --developer-menu
+cargo run --locked -p game_menu                                     # the developer menu (examples, editors, AI explorer)
 cargo run --locked -p actor_testbed -- --actor-editor --actors-dir DIR
 cargo run --locked -p actor_testbed -- --explorer-home DIR --agent NAME --world WORLD --preset rover --world-preset survival
 cargo run --locked -p npcctl -- serve --explorer-home DIR --agent NAME --resume
@@ -178,21 +220,32 @@ npcctl agent-token rotate --explorer-home DIR --agent NAME
 ```
 
 Read ID/TOKEN privately from the agent's `AGENTS.md`; never paste real credentials into documentation or logs.
-Normal `game_menu` play uses the configured agents folder's `living-world.world.json`,
-with the new `living_world` construction; the previous `local-island.world.json`
-is preserved and still loads explicitly using its frozen original profile,
-with no remote listener by default. Explicit `--front-end` forwards host flags such
-as `--island-save PATH`, `--island-rules PATH` and `--remote`. The title does not tick
-or overwrite the world; the pause menu provides Save game, Save and title, and Quit game.
+
+`island_game` with no flag saves to `<home>/island-village/island.world.json` and keeps its
+world rules beside it as `living_world.json` (installed from the shipped preset when missing;
+home is `USERPROFILE` or `HOME`); player settings are `island-settings.json` next to the save.
+It reads nothing from the agents folder: the earlier `living-world.world.json` and
+`local-island.world.json` are not loaded, and a save of another build is refused with a plain
+sentence (`ISLAND_SAVE_VERSION` 3). Flags: `--island-save PATH`, `--island-rules PATH` (rules
+for a new world; a saved world keeps its original rules), `--seed N`, `--speed N`, `--mute`,
+`--dev-keys` (keep the developer keys F1, F3-F6 in the player session), `--ui-gallery PAGE`,
+`--screenshot PATH --after-secs S`, `--remote | --no-remote`, `--remote-port N`. `--scenario`,
+a bare `--island-save`, `--island-new`, `--commands` or `--record` select the developer host
+(no title); add `--front-end` to keep the player flow with a custom save. The title does not
+tick or overwrite the world; the pause menu provides Save game, Save and title, and Quit game.
+`game_menu` opens the developer menu with no flag (`--developer-menu` is still accepted);
+`actor_testbed` has no `--front-end` or `--island-*` flags.
 
 Explorer hosts also accept `--actors-dir DIR` and `--worlds-dir DIR`. Stop the active host before a manual
 resume. The developer menu's Open/Stop and explorer window's F9/close dialog manage save and same-port handover automatically;
 a failed save keeps the host alive. Menu Quit stops its started/adopted hosts, not unrelated processes.
 
-Live games serve BRP on `127.0.0.1:15702` (`npc/*`, `agent/*`, `world/state`; dev builds, or `--remote`). Change
+Live games (`island_game`, `actor_testbed`, `village`) serve BRP on `127.0.0.1:15702` (`npc/*`, `agent/*`,
+`world/state`; dev builds, or `--remote`). `app/quit {pid?}` saves and quits a local island. Change
 simulation state only through recorded commands (`npc/command` or the command/verb paths behind `agent/act`).
 RPC file paths are relative to `target/npc-out/`. `--screenshot shot.png --after-secs 5` saves a PNG and exits
-(read it). `--panels explorer` opens F7 on Diary, `--panels map` opens its Map tab when enabled; F8 toggles fog.
+(read it). On `actor_testbed`, `--panels explorer` opens F7 on Diary, `--panels map` opens its Map tab when
+enabled; F8 toggles fog. The island has no F7 notebooks and its fog is always off.
 Use these capture helpers or existing BRP widget events for visual verification; compilation alone is not GUI
 validation. Tokens, methods, security and flags: `docs/debugging.md` §3–4 and `docs/agent-experiments.md`.
 
@@ -225,8 +278,10 @@ Skills: `/add-mechanic`, `/add-unit-type`, `/verify-visual`, `/debug-desync`, `/
 - Guides: `docs/using-npc-framework.md` (integrating into a game), `docs/debugging.md` (every CLI subcommand,
   RPC method, journal kind, budget, recipes), `docs/rebaselining.md`, `docs/agent-experiments.md` (AI agents
   playing actors), `docs/adding-a-host-app.md` (a new windowed app in this workspace: the `deny.toml` step).
-- Island: `docs/island-life.md` (normal player flow), `docs/island-colony.md` (management/terrain),
-  `docs/island-ai-authoring.md` (routines and GOAP), `docs/architecture-island.md` (system ownership).
+- Island: `docs/island-life.md` (normal player flow), `docs/living-world.md` (the world), `docs/island-colony.md`
+  (management/terrain), `docs/island-ai-authoring.md` (routines and GOAP), `docs/island-economy-authoring.md`
+  (catalog data), `docs/island-ui.md`, `docs/island-packaging.md`, `docs/architecture-island.md` (system
+  ownership). The island's code is `content/island_content`, `content/island_view`, `apps/island_game`.
 - Research: `docs/research/2026-11-09-{experience,simulation,implementation}-research.md`
   records source evidence, proposed changes and limits. These briefs are not a passing
   test report or permission to broaden the task; use the corresponding validation note.

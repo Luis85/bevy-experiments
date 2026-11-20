@@ -316,9 +316,12 @@ fn tools(index: usize, session_turn: usize) {
         );
         return;
     }
+    // A successful game tool with a private payload. Explorer hosts serve
+    // testbed worlds, which have no `talk` verb (that is the island's, ADR 0044);
+    // a diary entry works on every explorer world.
     request(
-        "talk",
-        "{\"text\":\"Owned fixture checking its game tools.\"}",
+        "notes_add",
+        "{\"book\":\"diary\",\"title\":\"Fixture\",\"body\":\"Owned fixture checking its game tools.\"}",
         true,
     );
     // A known rejected command generates a closed, own-actor outcome for notification testing.

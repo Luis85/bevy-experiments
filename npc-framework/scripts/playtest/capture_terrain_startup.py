@@ -26,7 +26,7 @@ CAMERA = "bevy_camera::camera::Camera"
 VISIBILITY = "bevy_camera::visibility::ViewVisibility"
 BACKGROUND = "bevy_ui::ui_node::BackgroundColor"
 MESH = "bevy_mesh::components::Mesh3d"
-READINESS = "testbed_view::scene_readiness::SceneReadiness"
+READINESS = "island_view::scene_readiness::SceneReadiness"
 ENTRY_LABELS = {"Continue", "New game", "Start on the island", "Oversee the village"}
 
 
@@ -249,7 +249,7 @@ def water_cell_in_empty_chunk(terrain, state):
 def lifecycle(flow, save, report):
     flow.click("New game")
     flow.click("Oversee the village")
-    poll(lambda: flow.has_widget("Play character"), flow.child, flow.deadline)
+    poll(lambda: flow.has_widget("Live"), flow.child, flow.deadline)
     flow.call("npc/pause")
     flow.click("Menu")
     # Keep the pause menu open during operator stepping/saving to hold the clock.
@@ -329,7 +329,7 @@ def lifecycle(flow, save, report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--timeout", type=float, default=120, help="startup timeout; never a readiness condition")
     parser.add_argument("--samples-after-ready", type=int, default=3)
     parser.add_argument("--lifecycle", action="store_true", help="also exercise recorded land/water/land mesh creation and removal")
@@ -339,7 +339,7 @@ def main():
         parser.error("Timeout and samples-after-ready must be positive")
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before native QA")
+        parser.error("Build island_game before native QA")
     run = ROOT / "target" / ("terrain-startup-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings, save = run / "settings.json", run / "living-world.world.json"
@@ -362,7 +362,7 @@ def main():
     print(run, flush=True)
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=env,
                 stdout=log, stderr=subprocess.STDOUT,

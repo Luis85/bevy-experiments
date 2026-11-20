@@ -45,7 +45,7 @@ pub const V: f32 = 0.75;
 const HEX: f32 = 4.0 * V;
 /// Kenney Survival models (workbench, anvil, campfire, tools).
 const SURVIVAL: f32 = 4.5 * V;
-const KENNEY_TOOL: f32 = 4.7;
+pub(crate) const KENNEY_TOOL: f32 = 4.7;
 const CART_SCALE: f32 = 3.0 * V;
 const RAM_SCALE: f32 = 2.5 * V;
 /// Length of a Dungeon wall piece in model units.
@@ -295,7 +295,6 @@ fn spawn_visuals(
             Option<&Owner>,
             Option<&testbed_content::actors::ActorModel>,
             Option<&Sensors>,
-            Option<&testbed_content::village::frontier::labor::ResidentProfile>,
         ),
         Without<Prop>,
     >,
@@ -496,13 +495,12 @@ fn spawn_visuals(
         index.map.insert(sim, root);
     }
 
-    for (sim, unit, pos, owner, preset_model, sensors, profile) in &actors {
+    for (sim, unit, pos, owner, preset_model, sensors) in &actors {
         if !fresh(&mut index, sim) {
             continue;
         }
-        let kind = profile
-            .map(|profile| ModelKind::for_resident(profile.appearance))
-            .or_else(|| preset_model.and_then(|m| ModelKind::from_name(&m.0)))
+        let kind = preset_model
+            .and_then(|m| ModelKind::from_name(&m.0))
             .unwrap_or_else(|| ModelKind::for_actor(&unit.template, owner.map(|o| o.0.0)));
         if kind.is_robot() && robots.is_none() {
             continue;
@@ -540,16 +538,16 @@ fn spawn_visuals(
                 hand_l: Some(left),
             });
         } else {
-            commands
-                .spawn((
-                    ChildOf(root),
-                    ActorModel { root },
-                    model(
-                        &assets.actor[kind.index()],
-                        Transform::from_scale(Vec3::splat(kind.scale())),
-                    ),
-                ))
-                .observe(crate::anim::on_actor_ready);
+            let scale = kind.scale();
+            let mut body = commands.spawn((
+                ChildOf(root),
+                ActorModel { root },
+                model(
+                    &assets.actor[kind.index()],
+                    Transform::from_scale(Vec3::splat(scale)),
+                ),
+            ));
+            body.observe(crate::anim::on_actor_ready);
         }
         commands.spawn((
             ChildOf(root),
@@ -695,17 +693,7 @@ fn on_vehicle_ready(
 }
 
 /// Despawns visuals whose sim entity is gone.
-type VisualSimKinds = Or<(
-    With<Prop>,
-    With<Item>,
-    With<TestbedUnit>,
-    With<testbed_content::village::VillagePlace>,
-    With<testbed_content::village::ResourcePatch>,
-    With<testbed_content::village::colony::Household>,
-    With<testbed_content::village::hunting::Wildlife>,
-    With<testbed_content::village::homestead::HomesteadPlot>,
-    With<testbed_content::village::homestead::Cottage>,
-)>;
+type VisualSimKinds = Or<(With<Prop>, With<Item>, With<TestbedUnit>)>;
 pub(crate) fn despawn_visuals(
     mut commands: Commands,
     mut index: ResMut<VisualIndex>,
@@ -1017,17 +1005,9 @@ impl ItemLook {
                 Some((Quat::from_rotation_y(PI), Vec3::new(0.0, -0.18, 0.0))),
             ),
             STORE_KEY => (|m| &m.key, 0.5, flat_x, 0.08, None),
-            BOOK | testbed_content::village::catalog::DIARY => {
-                (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None)
-            }
+            BOOK => (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None),
             SCROLL => (|m| &m.scroll, 1.5 * V, upright, 0.0, None),
-            BREAD | testbed_content::village::catalog::BOWL => {
-                (|m| &m.food, 0.5 * V, upright, 0.0, None)
-            }
-            testbed_content::village::catalog::WATER => {
-                (|m| &m.barrel, 0.4 * V, upright, 0.0, None)
-            }
-            testbed_content::village::catalog::COINS => (|m| &m.ingot, 0.5 * V, upright, 0.0, None),
+            BREAD => (|m| &m.food, 0.5 * V, upright, 0.0, None),
             LOG => (|m| &m.log, 2.0 * V, upright, 0.11, None),
             PLANK => (|m| &m.planks, 2.0 * V, upright, 0.0, None),
             ORE => (|m| &m.stone, 1.4 * V, upright, 0.0, None),
@@ -1151,127 +1131,6 @@ mod tests {
     use testbed_content::layout::{cart_vehicle, wagon_vehicle};
 
     use super::*;
-
-    #[test]
-    fn living_wildlife_visuals_survive_cleanup_until_the_animal_is_gone() {
-        let mut app = testbed_content::new_sim_app(7, "living_village");
-        app.init_resource::<VisualIndex>()
-            .add_systems(Update, despawn_visuals);
-        let animals: Vec<_> = app
-            .world_mut()
-            .query_filtered::<Entity, With<testbed_content::village::hunting::Wildlife>>()
-            .iter(app.world())
-            .collect();
-        assert_eq!(animals.len(), 8);
-        let roots: Vec<_> = animals
-            .into_iter()
-            .map(|animal| {
-                let visual = app.world_mut().spawn(VisualOf(animal)).id();
-                app.world_mut()
-                    .resource_mut::<VisualIndex>()
-                    .map
-                    .insert(animal, visual);
-                (animal, visual)
-            })
-            .collect();
-        for _ in 0..5 {
-            app.update();
-            assert_eq!(app.world().resource::<VisualIndex>().map.len(), 8);
-            assert!(
-                roots
-                    .iter()
-                    .all(|(_, visual)| app.world().get_entity(*visual).is_ok())
-            );
-        }
-        let (animal, visual) = roots[0];
-        app.world_mut().despawn(animal);
-        app.update();
-        assert!(app.world().get_entity(visual).is_err());
-        assert!(
-            !app.world()
-                .resource::<VisualIndex>()
-                .map
-                .contains_key(&animal)
-        );
-        assert_eq!(app.world().resource::<VisualIndex>().map.len(), 7);
-        assert!(
-            roots[1..]
-                .iter()
-                .all(|(_, visual)| app.world().get_entity(*visual).is_ok())
-        );
-    }
-
-    #[test]
-    fn village_buildings_and_patches_survive_visual_cleanup_until_the_sim_entity_is_removed() {
-        use testbed_content::village::{ResourcePatch, VillagePlace};
-        let mut app = testbed_content::new_sim_app(3, "ai_village");
-        app.init_resource::<VisualIndex>()
-            .add_systems(Update, despawn_visuals);
-        let targets: Vec<_> = app
-            .world_mut()
-            .query_filtered::<Entity, Or<(With<VillagePlace>, With<ResourcePatch>)>>()
-            .iter(app.world())
-            .collect();
-        assert_eq!(targets.len(), 13);
-        let mut roots = Vec::new();
-        for sim in targets {
-            let root = app.world_mut().spawn(VisualOf(sim)).id();
-            app.world_mut()
-                .resource_mut::<VisualIndex>()
-                .map
-                .insert(sim, root);
-            roots.push((sim, root));
-        }
-        app.update();
-        assert!(
-            roots
-                .iter()
-                .all(|(_, root)| app.world().get_entity(*root).is_ok())
-        );
-        let (sim, root) = roots[0];
-        app.world_mut().despawn(sim);
-        app.update();
-        assert!(app.world().get_entity(root).is_err());
-        assert!(!app.world().resource::<VisualIndex>().map.contains_key(&sim));
-        assert!(
-            roots[1..]
-                .iter()
-                .all(|(_, root)| app.world().get_entity(*root).is_ok())
-        );
-    }
-
-    #[test]
-    fn settlement_house_visual_survives_cleanup_until_its_household_is_removed() {
-        let mut app = App::new();
-        app.init_resource::<VisualIndex>()
-            .add_systems(Update, despawn_visuals);
-        let home = app
-            .world_mut()
-            .spawn(testbed_content::village::colony::Household {
-                label: "Household".into(),
-                capacity: 2,
-                residents: vec![],
-                door: SimPos::new(0, 0),
-                heated_until: 0,
-                logs_burned: 0,
-            })
-            .id();
-        let visual = app.world_mut().spawn(VisualOf(home)).id();
-        app.world_mut()
-            .resource_mut::<VisualIndex>()
-            .map
-            .insert(home, visual);
-        app.update();
-        app.update();
-        assert!(app.world().get_entity(visual).is_ok());
-        assert_eq!(
-            app.world().resource::<VisualIndex>().map.get(&home),
-            Some(&visual)
-        );
-        app.world_mut().despawn(home);
-        app.update();
-        assert!(app.world().get_entity(visual).is_err());
-    }
 
     use npc_framework::interaction::items::{place_in_world, put_in_inventory, put_in_slot};
     use npc_framework::perception::{ExploredCells, RevealsFog, SeenStatics, VisibleCells};

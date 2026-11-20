@@ -50,11 +50,7 @@ pub const CONTENT: &str = "testbed";
 
 /// The embedded scenario files: `(name, JSON)`. `testbed` is the default
 /// showcase; the others focus on one feature each (see the README).
-pub const SCENARIO_FILES: [(&str, &str); 15] = [
-    (
-        "living_world",
-        include_str!("../scenarios/living_world.json"),
-    ),
+pub const SCENARIO_FILES: [(&str, &str); 11] = [
     ("testbed", include_str!("../scenarios/testbed.json")),
     ("doors", include_str!("../scenarios/doors.json")),
     (
@@ -69,15 +65,6 @@ pub const SCENARIO_FILES: [(&str, &str); 15] = [
     ("agent", include_str!("../scenarios/agent.json")),
     ("smithy", include_str!("../scenarios/smithy.json")),
     ("explorer", include_str!("../scenarios/explorer.json")),
-    ("ai_village", include_str!("../scenarios/ai_village.json")),
-    (
-        "living_village",
-        include_str!("../scenarios/living_village.json"),
-    ),
-    (
-        "island_colony",
-        include_str!("../scenarios/island_colony.json"),
-    ),
 ];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -89,7 +76,6 @@ pub enum Layout {
     /// The compound plus the outside features of [`crate::layout::spawn_frontier`]
     /// on a 128-cell grid.
     Frontier,
-    Island,
 }
 
 impl Layout {
@@ -97,7 +83,7 @@ impl Layout {
     pub const fn grid_cells(self) -> u32 {
         match self {
             Self::Frontier => FRONTIER_GRID_CELLS,
-            Self::Compound | Self::Open | Self::Island => GRID_CELLS,
+            Self::Compound | Self::Open => GRID_CELLS,
         }
     }
 }
@@ -114,11 +100,6 @@ pub enum Detection {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct WorldSpec {
-    pub living_world: Option<crate::village::frontier::LivingWorldSpec>,
-    pub colony: bool,
-    pub island_ai: Option<crate::village::policy::IslandAiPolicy>,
-    pub economy: crate::worlds::EconomyModel,
-    pub island_geography: crate::worlds::IslandGeography,
     pub ai_scheduler: Option<npc_framework::agent_io::scheduler::SchedulerPolicy>,
     /// Present only in host-generated explorer descriptors; pure replay data.
     pub explorer_context: Option<crate::explorer::context::ExplorerContext>,
@@ -134,11 +115,6 @@ pub struct WorldSpec {
 impl Default for WorldSpec {
     fn default() -> Self {
         Self {
-            living_world: None,
-            colony: false,
-            island_ai: None,
-            economy: crate::worlds::EconomyModel::Fixed,
-            island_geography: crate::worlds::IslandGeography::Compact,
             ai_scheduler: None,
             explorer_context: None,
             layout: Layout::Compound,
@@ -158,42 +134,8 @@ impl WorldSpec {
             return Ok(Self::default());
         }
         let spec: Self = serde_json::from_value(v.clone()).map_err(|e| format!("world: {e}"))?;
-        if let Some(definition) = &spec.living_world {
-            definition.validate()?;
-            if !spec.colony || spec.island_ai.is_none() {
-                return Err("Regional living world requires colony and resident AI policy".into());
-            }
-        }
-        if spec.colony
-            && (spec.layout != Layout::Island
-                || spec.economy != crate::worlds::EconomyModel::NeedsDriven
-                || spec.island_geography != crate::worlds::IslandGeography::Expanded)
-        {
-            return Err("colony simulation requires an expanded, needs-driven island".into());
-        }
-        if let Some(policy) = &spec.island_ai {
-            policy.validate()?;
-            if spec.layout != Layout::Island
-                || spec.economy != crate::worlds::EconomyModel::NeedsDriven
-            {
-                return Err("island AI policy requires a needs-driven island".into());
-            }
-        }
-        if spec.island_geography == crate::worlds::IslandGeography::Expanded
-            && (spec.layout != Layout::Island
-                || spec.economy != crate::worlds::EconomyModel::NeedsDriven)
-        {
-            return Err("expanded island geography requires a needs-driven island".into());
-        }
-        if spec.economy == crate::worlds::EconomyModel::NeedsDriven && spec.layout != Layout::Island
-        {
-            return Err("the needs-driven economy requires an island layout".into());
-        }
         if let Some(policy) = &spec.ai_scheduler {
             policy.validate()?;
-        }
-        if spec.layout == Layout::Island && spec.furnish {
-            return Err("island layout supplies its own village; set furnish:false".into());
         }
         Ok(spec)
     }
@@ -224,16 +166,7 @@ pub fn testbed_plugins(seed: u64, detection: Detection) -> NpcPlugins {
 /// `world`, with `plugins` added before the freeze.
 pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -> App {
     let mut app = App::new();
-    let regional = world
-        .explorer_context
-        .as_ref()
-        .and_then(|c| c.world.as_ref())
-        .and_then(|s| s.preset.living_world.as_ref())
-        .or(world.living_world.as_ref());
-    let bounds = regional.map_or_else(
-        || GridBounds::centered(world.layout.grid_cells(), world.layout.grid_cells()),
-        |s| s.bounds(),
-    );
+    let bounds = GridBounds::centered(world.layout.grid_cells(), world.layout.grid_cells());
     app.insert_resource(SpatialGrid::new(1000, bounds))
         .insert_resource(PerceptionConfig {
             stagger: world.stagger.max(1),
@@ -253,29 +186,6 @@ pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -
         .or_else(|| world.ai_scheduler.clone())
         .unwrap_or_default();
     app.insert_resource(policy);
-    if world.layout == Layout::Island {
-        let preset = world
-            .explorer_context
-            .as_ref()
-            .and_then(|c| c.world.as_ref())
-            .map(|s| s.preset.clone())
-            .unwrap_or_else(|| {
-                let mut preset = crate::worlds::builtin_preset(
-                    if world.economy == crate::worlds::EconomyModel::NeedsDriven {
-                        "living_island"
-                    } else {
-                        "island_village"
-                    },
-                )
-                .expect("shipped island rules");
-                preset.island_geography = world.island_geography;
-                preset.colony = world.colony;
-                preset.island_ai = world.island_ai.clone();
-                preset.living_world = world.living_world.clone();
-                preset
-            });
-        crate::village::prepare(&mut app, &preset);
-    }
     plugins(&mut app);
     crate::finish_content(app.world_mut());
     app
@@ -290,9 +200,6 @@ fn spawn_world(world: &mut World, spec: &WorldSpec, ids: &mut TestbedIds) -> Res
     }
     if spec.layout == Layout::Frontier {
         spawn_frontier(world, ids);
-    }
-    if spec.layout == Layout::Island {
-        crate::village::spawn_places(world, ids);
     }
     for (i, item) in spec.items.iter().enumerate() {
         let (x, z) = item
@@ -340,11 +247,6 @@ pub fn load_with(
         .and_then(|context| context.world.as_ref())
     {
         crate::worlds::validate(&selection.preset).map_err(|reasons| reasons.join("; "))?;
-        if (selection.preset.scene == crate::worlds::WorldScene::IslandVillage)
-            != (spec.layout == Layout::Island)
-        {
-            return Err("scene layout must match the selected world's scene type".into());
-        }
     }
     let mut app = build_app(seed, &spec, |app| {
         plugins(app);
@@ -363,21 +265,6 @@ pub fn load_with(
         }
     });
     let world = app.world_mut();
-    if spec.layout == Layout::Island {
-        let preset = spec
-            .explorer_context
-            .as_ref()
-            .map(|c| c.preset_id.clone())
-            .or_else(|| {
-                doc.actors
-                    .first()
-                    .and_then(|a| a.extra.get("preset"))
-                    .and_then(|v| v.as_str())
-                    .map(str::to_owned)
-            })
-            .unwrap_or_else(|| "human".into());
-        world.insert_resource(crate::village::BirthPreset(preset));
-    }
     let mut ids = TestbedIds::default();
     spawn_world(world, &spec, &mut ids)?;
     let mut actors = Vec::new();
@@ -418,11 +305,6 @@ pub fn load_with(
             crate::worlds::apply(app.world_mut(), played, &selection.preset);
         }
     }
-    if spec.layout == Layout::Island
-        && let Some(played) = actors.first()
-    {
-        crate::village::apply(app.world_mut(), *played);
-    }
     Ok(LoadedScenario { app, actors })
 }
 
@@ -441,10 +323,6 @@ pub fn register_scenario_loader(loaders: &mut ScenarioLoaders) {
 /// game menu lists them).
 pub fn embedded_scenarios() -> &'static [(&'static str, &'static str)] {
     const LIST: [(&str, &str); SCENARIO_FILES.len()] = [
-        (
-            "living_world",
-            "Explore three working villages, restore woodland habitats and shape a larger living island.",
-        ),
         (
             "testbed",
             "The showcase: 8 actors in two factions, a woodcutter, Per-roll detection.",
@@ -488,18 +366,6 @@ pub fn embedded_scenarios() -> &'static [(&'static str, &'static str)] {
         (
             "explorer",
             "The frontier map for an AI agent: the compound, groves, ore and a ruin.",
-        ),
-        (
-            "ai_village",
-            "An island village: earn coins, buy food and lodging, survive the seasons, and leave a diary.",
-        ),
-        (
-            "living_village",
-            "A needs-driven island: gather, hunt, craft and trade in a physical adaptive economy.",
-        ),
-        (
-            "island_colony",
-            "Island Village: inspect a living colony, join as a character, or shape the landscape.",
         ),
     ];
     &LIST

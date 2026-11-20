@@ -1,7 +1,7 @@
 ---
 name: add-unit-type
-description: Add a new NPC/unit type (e.g. an engineer, a soldier squad member, a trader), or a new behaviour for an existing unit type (an RTS engineer that repairs walls on its own or on order), by composing needs, a behaviour tree, actions, order executors and opt-in capabilities in content, without touching core crates. Use when asked to create a new kind of agent, or teach an existing one something, for the village, the Actor Testbed or the RTS demo.
-argument-hint: "<unit type or behaviour> [game: village|testbed|rts]"
+description: Add a new NPC/unit type (e.g. an engineer, a soldier squad member, a trader), or a new behaviour for an existing unit type (an RTS engineer that repairs walls on its own or on order), by composing needs, a behaviour tree, actions, order executors and opt-in capabilities in content, without touching core crates. Use when asked to create a new kind of agent, or teach an existing one something, for Island Village (the shipped game), the village, the Actor Testbed or the RTS demo.
+argument-hint: "<unit type or behaviour> [game: island|village|testbed|rts]"
 ---
 
 # Add a unit type or behaviour: $ARGUMENTS
@@ -15,13 +15,16 @@ the same pieces: a branch in its tree and/or an order executor. Rules: `.claude/
 
 | Game | Where | Pattern to copy |
 |---|---|---|
+| island | `content/island_content`: residents and roles under `src/village/**` (`resident/`, `roles.rs`, `demography.rs`), the resident tree as data in `trees/resident.json`, the unit spawn in `src/layout.rs` / `src/world.rs` (`IslandUnit`); view in `content/island_view` | `IslandBasePlugin`, `docs/island-ai-authoring.md` (routines and GOAP), `docs/architecture-island.md` |
 | village | `content/village_content/src/<unit>.rs`, its own `<Unit>Plugin` next to `VillagePlugin` | `villager.rs` (tree, actions, conds), `commands.rs` (`SpawnVillager`) |
 | testbed | `content/testbed_content/src/`: a sheet template (`content.rs`), a `Behaviour` + tree (`tree.rs`), a scenario actor (`scenario.rs`, `layout::spawn_unit`) | `TestbedPlugin`, `scenarios/*.json` |
 | rts | `apps/rts_units_demo/src/sim.rs`: a `UnitKind` variant, a tree name, spawn in `spawn_world` | `RtsContentPlugin` (the `has_unit_order` → `ExecuteOrder` branch over `RtsIdle`) |
 
 Depend only on `npc_framework`. Core crates (`npc_ai`, kernel/needs/jobs/locomotion/nav, the capability crates,
 `npc_perf`, tools, facade, view helpers) are **off limits**. If the API cannot express the unit, stop and
-propose the core change separately.
+propose the core change separately. The island shares no code with the testbed or village crates
+(ADR 0044): its unit spawn, ids, item kinds and idle tree are its own diverged copies, so change the
+island's copy for the island and the testbed's for the testbed.
 
 ## 2. Tree branch or order executor?
 
@@ -55,14 +58,15 @@ The tree decides *what* runs. Orders reach the tree through its order branch (`h
 - RTS demo: copy `apps/rts_units_demo/tests/small_scenario.rs`. It has `small_app(seed)` (the demo's sim, no
   driver), `spawn_unit(&mut app, kind, player, pos)` (one unit as `spawn_world` makes it, no squad),
   `run_until`, and `journal_kinds`. Village: `content/village_content/tests/common/mod.rs`. Testbed:
-  `try_new_sim_app_with(seed, name, ..)` + `TestbedIds::id(name)`.
-- Look ids up, never hard-code them: `TestbedIds`, `VillageIds`, the `SimId` that `spawn_sim` returned, or
+  `try_new_sim_app_with(seed, name, ..)` + `TestbedIds::id(name)`. Island: `content/island_content/tests/`
+  with `tests/life_support/` (`world_for(seed, edit)` on the shipped world) + `IslandIds::id(name)`.
+- Look ids up, never hard-code them: `IslandIds`, `TestbedIds`, `VillageIds`, the `SimId` that `spawn_sim` returned, or
   `next_sim_id(&app)` for a runtime spawn.
 - An order test also checks the refusal path: another player's unit, or a unit `validate` refuses, with and
   without `skip_invalid`.
 - A determinism check: two runs with the same seed give the same `state_hash`.
 - Inner loop: `cargo test -p <crate> --test <file>` (seconds to minutes). The full `cargo xtask verify` takes
-  40–50 min, so run it once at the end.
+  ~31 min warm, so run it once at the end (`--island`, ~13 min, for the island crates while you work).
 
 ## 4. Compose
 
@@ -109,7 +113,8 @@ The tree decides *what* runs. Orders reach the tree through its order branch (`h
       (`app.register_budget(mechanic, fixed_us, per_agent_us)`), as in `/add-mechanic` step 3.
 - [ ] Agents (optional, with `agent-io`): an observation section / affordances for it (`register_observation`,
       `register_affordances`, `register_action_handler`).
-- [ ] View (optional): a visual linked by `VisualOf`, animation from sim state (`.claude/rules/view.md`; testbed
+- [ ] View (optional): a visual linked by `VisualOf`, animation from sim state (`.claude/rules/view.md`; island
+      `content/island_view` (models listed in `assets/living-world-manifest.json`), testbed
       `content/testbed_view`, RTS `apps/rts_units_demo/src/view.rs`).
 
 ## 5. Add a behaviour to an existing unit type
@@ -123,8 +128,9 @@ The tree decides *what* runs. Orders reach the tree through its order branch (`h
    condition by name.
 4. Test the new behaviour on a small scenario (§3), and also test that the existing behaviour still wins where it
    should (an order still interrupts it; idle still runs when there is nothing to do).
-5. A new registered name changes that content's hash. For the village or testbed, that means a staged re-baseline
-   of its replays (`docs/rebaselining.md`). The RTS demo has no corpus: its tests and the summary just change.
+5. A new registered name changes that content's hash. For the island, village or testbed, that means a staged
+   re-baseline of its replays (`docs/rebaselining.md`; island replays are `island_*`). The RTS demo has no corpus:
+   its tests and the summary just change.
 
 ## 6. Check
 
@@ -132,12 +138,14 @@ The tree decides *what* runs. Orders reach the tree through its order branch (`h
 cargo test -p <crate> --test <unit>
 cargo run -p npcctl -- journal --seed 1 --ticks 4000 --unit <id> --kind LeafStart,Abort --limit 40        # village
 cargo run -p npcctl -- journal --scenario testbed --ticks 2400 --unit <id> --kind LeafStart,OrderDone --limit 40
+cargo run -p npcctl -- journal --scenario island:living_world --ticks 2400 --unit <id> --kind LeafStart,Abort --limit 40
 cargo run -p rts_units_demo -- --headless-ticks 1500                                                     # rts: JSON summary
 git diff --stat            # must show no files under crates/
 ```
 
 - Existing replays and goldens stay unchanged unless the user approved a re-baseline. A new name in the testbed
-  changes the testbed's content hash, so `tests/replays/testbed_*` fail: say so before. Follow
+  changes the testbed's content hash, so `tests/replays/testbed_*` fail (on the island: `island_*` and every
+  island state hash): say so before. Follow
   `docs/rebaselining.md`: stage, show evidence, ask; the user swaps.
 
 ## 7. Gate

@@ -3,6 +3,8 @@
 The dedicated `ai-agent-game-client` process manages Codex or Claude Code sessions
 for an explorer actor. The game supplies the mission, workspace, game tools and
 continuation prompts. You supply an installed CLI that is already logged in.
+Explorer worlds are Actor Testbed worlds: since ADR 0044 the explorer does not host
+the island. An agent reaches the island through `island_game --remote` instead.
 You never need to copy a prompt, look up a conversation ID, or prompt the agent
 again after its turn finishes.
 

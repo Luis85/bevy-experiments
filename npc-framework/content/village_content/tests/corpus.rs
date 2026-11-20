@@ -29,7 +29,7 @@ fn corpus_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/replays")
 }
 
-/// A testbed replay or an agent session record of another content.
+/// A testbed or island replay, or an agent session record of another content.
 fn is_other_content(v: &serde_json::Value) -> bool {
     let session = v.get("replay").is_some_and(serde_json::Value::is_object)
         && v["scenario"]["content"]
@@ -38,7 +38,10 @@ fn is_other_content(v: &serde_json::Value) -> bool {
     let testbed = v["scenario"]
         .as_str()
         .is_some_and(|s| s == "testbed" || s.starts_with("testbed:"));
-    session || testbed
+    let island = v["scenario"]
+        .as_str()
+        .is_some_and(|s| s == "island" || s.starts_with("island:"));
+    session || testbed || island
 }
 
 #[test]

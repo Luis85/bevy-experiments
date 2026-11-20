@@ -53,8 +53,6 @@ pub enum Job {
 pub struct Running {
     pub child: Child,
     pub job: Job,
-    /// Private loopback endpoint chosen for a local island's save/quit handshake.
-    pub island_port: Option<u16>,
     /// The child's stderr, when it was piped.
     stderr: Option<StderrTail>,
     /// An explorer window's stdout, when it was piped.
@@ -70,7 +68,6 @@ impl Running {
         Self {
             child,
             job,
-            island_port: None,
             stderr,
             stdout,
         }
@@ -415,36 +412,12 @@ pub fn start_game(world: &mut World, entry: Entry) {
         return;
     }
     let settings = world.resource::<AppSettings>().0.clone();
-    let (stem, mut args) = launch::command_for(&entry, &settings);
-    if let Err(error) = detached::append_projection_handover_args(world, &entry, &mut args) {
-        world.insert_resource(MainNotice::error(format!(
-            "cannot preserve world projection: {error}"
-        )));
-        set_screen(world, Screen::Main);
-        return;
-    }
+    let (stem, args) = launch::command_for(&entry, &settings);
     let exe_dir = world.resource::<Paths>().exe_dir.clone();
     let Some(exe) = launch::find_exe(stem, &exe_dir) else {
         world.insert_resource(Missing::new(stem, entry, &exe_dir));
         set_screen(world, Screen::Missing);
         return;
-    };
-    let island_port = if matches!(entry, Entry::Island(_)) {
-        match std::net::TcpListener::bind(("127.0.0.1", 0)).and_then(|socket| socket.local_addr()) {
-            Ok(address) => {
-                args.extend(["--remote-port".into(), address.port().to_string()]);
-                Some(address.port())
-            }
-            Err(error) => {
-                world.insert_resource(MainNotice::error(format!(
-                    "Cannot prepare the island save/quit connection: {error}"
-                )));
-                set_screen(world, Screen::Main);
-                return;
-            }
-        }
-    } else {
-        None
     };
     if entry.is_detached() {
         info!(
@@ -474,9 +447,7 @@ pub fn start_game(world: &mut World, entry: Entry) {
     let spawner = world.get_resource::<Spawner>().cloned().unwrap_or_default();
     match (spawner.0)(cmd) {
         Ok(child) => {
-            let mut running = Running::new(child, Job::Game(entry));
-            running.island_port = island_port;
-            world.insert_resource(running);
+            world.insert_resource(Running::new(child, Job::Game(entry)));
             show_window(world, false);
             set_screen(world, Screen::Running);
         }

@@ -2,6 +2,339 @@
   "version": 1,
   "files": [
     {
+      "path": "characters/Rogue_Hooded.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Characters/gltf/Rogue_Hooded.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3597652,
+      "sha256": "93e6e25213009952276d9cf34f5d96a243767334c66f280db0433ddfabb91545"
+    },
+    {
+      "path": "furniture/bed_single_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0/96d5930a8dbdb363409bbc2d3341718b00e17c9c/addons/kaykit_furniture_bits/Assets/gltf/bed_single_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 22044,
+      "sha256": "fc7631db4540d31cbe76dac3c672bc8836ee302796d14bba428bda84b9237f5b"
+    },
+    {
+      "path": "furniture/bed_single_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0/96d5930a8dbdb363409bbc2d3341718b00e17c9c/addons/kaykit_furniture_bits/Assets/gltf/bed_single_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3009,
+      "sha256": "7b2852bb66bf82cad3e0d03a499b1480879790fa66b645347e3e73761c4fe3f5"
+    },
+    {
+      "path": "furniture/book_single.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0/96d5930a8dbdb363409bbc2d3341718b00e17c9c/addons/kaykit_furniture_bits/Assets/gltf/book_single.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3992,
+      "sha256": "0aa0921f471184039e85488a80041a0b4aee6f68589ad53077eea03f4659d66c"
+    },
+    {
+      "path": "furniture/book_single.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0/96d5930a8dbdb363409bbc2d3341718b00e17c9c/addons/kaykit_furniture_bits/Assets/gltf/book_single.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3056,
+      "sha256": "7b86695b060681fc6de8ac70fc1f24b870edcaf84bfe4ed98b7e706ae594d464"
+    },
+    {
+      "path": "furniture/furniturebits_texture.png",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0/96d5930a8dbdb363409bbc2d3341718b00e17c9c/addons/kaykit_furniture_bits/Assets/gltf/furniturebits_texture.png",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15605,
+      "sha256": "de62db37a80d1801c3d9eb674890ae04b04469e0c149481a51fa250562c628dc"
+    },
+    {
+      "path": "hex/barrel.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/barrel.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15552,
+      "sha256": "ff1b034f1ac95b063a2baa3d72a0ad0b33f25337f776e7a25fbc811d9c77dee8"
+    },
+    {
+      "path": "hex/barrel.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/barrel.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3042,
+      "sha256": "24673663eb53ffab6c8db612654856f051c4877bfc02ea25fee89cd95ee4d100"
+    },
+    {
+      "path": "hex/building_grain.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_grain.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 13636,
+      "sha256": "09793d41dfecbd5ace3a2fae3de7a5117d740b7b1ba2a2e85fbe7d1b75bf0297"
+    },
+    {
+      "path": "hex/building_grain.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_grain.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3041,
+      "sha256": "f0369ab4750c4b60d34b6afdcef3d5545cb80d94c10c322d4a66aebe7b209d89"
+    },
+    {
+      "path": "hex/building_home_A_blue.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/blue/building_home_A_blue.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 55348,
+      "sha256": "31c30bc9d4fb9ac6182e20331f2501ec153131ca01a57d8412a6b8e6219c23fd"
+    },
+    {
+      "path": "hex/building_home_A_blue.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/blue/building_home_A_blue.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3090,
+      "sha256": "60b3568e086d586b491eed8168c46acb61bb9670fb2c296faa64929b18dfcbea"
+    },
+    {
+      "path": "hex/crate_A_big.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_A_big.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 7000,
+      "sha256": "600d29bdf010f891dcabfb014b6271789e7b45fec7317989a13ccca92908c5c8"
+    },
+    {
+      "path": "hex/crate_A_big.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_A_big.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3055,
+      "sha256": "a96ce5522e45104b5a04cf9605ca30b9572cc79c7633d41f3434b9843010a225"
+    },
+    {
+      "path": "hex/fence_wood_straight.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_wood_straight.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15032,
+      "sha256": "fa71b68019e2fe287621f3a5b06b7e18d1dcdd74a6f1c38af7888a8fb0c0078b"
+    },
+    {
+      "path": "hex/fence_wood_straight.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_wood_straight.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3061,
+      "sha256": "5a2af87c5a6b90875e3bc11f289a321a5d4b2459975dba52351edbc58b2132e3"
+    },
+    {
+      "path": "hex/hexagons_medieval.png",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/hexagons_medieval.png",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15783,
+      "sha256": "5301a06866ba3be68dcc14cc429bd6d0f69004b72884283715d7e233f2e9782e"
+    },
+    {
+      "path": "hex/resource_lumber.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_lumber.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 11880,
+      "sha256": "90bb1e1f23dbc3de372059b45ae289ec414b1fb50b49852ce0a3b30dc370db8b"
+    },
+    {
+      "path": "hex/resource_lumber.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_lumber.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3060,
+      "sha256": "601a69f44f0c4a9b5070a80bd4a20887960e01f1523a6125c1edc8ba19168f1f"
+    },
+    {
+      "path": "hex/resource_stone.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_stone.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 11560,
+      "sha256": "8af67e8fb7272c0d5e439361f9ebb33f55406bb65a4dcf0d7156fc2959ddb744"
+    },
+    {
+      "path": "hex/resource_stone.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_stone.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3061,
+      "sha256": "427a22daaec3934ac85cd7e538415157264b96527577a3c9bbf793c1b5df8dca"
+    },
+    {
+      "path": "hex/rock_single_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 1228,
+      "sha256": "0f038d45b8df2c9efa034e5d3c3635a475a2683e2e741aa9a0cd197c5689e2ce"
+    },
+    {
+      "path": "hex/rock_single_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3031,
+      "sha256": "ddf307987fb18aa8e7594bb399de3943e497b50bc01aae0e7292a38418944915"
+    },
+    {
+      "path": "hex/rock_single_C.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_C.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2192,
+      "sha256": "7d63c76a9f576bda17a63c77d8f7c9f617e11ed57e3459d9c8d5da7ebdf0b8f1"
+    },
+    {
+      "path": "hex/rock_single_C.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_C.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3052,
+      "sha256": "4cbf4a67fa176d2374b4863348fddf7879b892e612dd455ad14173f17172d45b"
+    },
+    {
+      "path": "hex/sack.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/sack.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3240,
+      "sha256": "5c3e6f5c63f8c4420ed3dfb2027beffc981740b5af9c89be148b56c19b993e02"
+    },
+    {
+      "path": "hex/sack.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/sack.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3031,
+      "sha256": "b61929d6161907aff4f1fd211cd0a8300d002d1a686ba43d07c4aff171fbd9f0"
+    },
+    {
+      "path": "hex/tree_single_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3340,
+      "sha256": "437deac68f35338bb309b01e4d346dd4be37557d7a2f033d04765f63e1b88825"
+    },
+    {
+      "path": "hex/tree_single_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3053,
+      "sha256": "ac913af6eaed6f15d26a2b75a877aa8dd10de90f26298f3f953abad86a4b4606"
+    },
+    {
+      "path": "hex/tree_single_A_cut.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_A_cut.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 1056,
+      "sha256": "ce55d40343e9eaaddf693604157a6d5ef2e4e311530b5d3c09bceb13a80564ce"
+    },
+    {
+      "path": "hex/tree_single_A_cut.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_A_cut.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3060,
+      "sha256": "203a2a60e03d4e5dd16fd06571c81e9f7e3dd39e276bb59e0e004e839fc30f28"
+    },
+    {
+      "path": "hex/tree_single_B.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_B.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 7368,
+      "sha256": "c6a7423ce62f61216f7d8c77e1bd1d8665cbbee59718e59e0e42485f9acfca36"
+    },
+    {
+      "path": "hex/tree_single_B.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_B.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3056,
+      "sha256": "1c038591301947c485937e9fdbab182c813ef32df48c02fad3daeb2f1f0421e0"
+    },
+    {
+      "path": "hex/tree_single_B_cut.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_B_cut.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 1796,
+      "sha256": "19a09a1739c9ec1064601d890c4d5ca068b277b9cefc24cbfcfe6cd76e550f02"
+    },
+    {
+      "path": "hex/tree_single_B_cut.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/tree_single_B_cut.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3063,
+      "sha256": "9fb68492630dfe08e4d99c8b0f8f9ea2118b68ec26a2c2557f97a48c48008395"
+    },
+    {
+      "path": "hex/trees_A_medium.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_medium.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 31680,
+      "sha256": "3cc6f0f007aa2dc0042583741f35d9b0b8e65496e7289b9e312626c3936ff8b2"
+    },
+    {
+      "path": "hex/trees_A_medium.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_medium.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3066,
+      "sha256": "c330d7c775c50b7ccbc6ce7799e699fbdbbeb14a390315e85419dc0dfe5178a6"
+    },
+    {
       "path": "licenses/KayKit-Character-Pack-Adventures-1.0.txt",
       "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/LICENSE.txt",
       "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
@@ -11,6 +344,24 @@
       "sha256": "ae322141814056dda0deea7540d74c41d87aee1da319977cd1bd84ee5a923629"
     },
     {
+      "path": "licenses/KayKit-Dungeon-Remastered-1.0.txt",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0/b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07/LICENSE.txt",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 829,
+      "sha256": "c5f17abf619731f57f6bbff450f6484214605c13aa96bb75bbcfc70930941ff7"
+    },
+    {
+      "path": "licenses/KayKit-Furniture-Bits-1.0.txt",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0/96d5930a8dbdb363409bbc2d3341718b00e17c9c/LICENSE.txt",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 827,
+      "sha256": "cd675f2adc31eb5fedaedc1072d8ddc27b917f523682f0561837c03dc56393cb"
+    },
+    {
       "path": "licenses/KayKit-Medieval-Hexagon-Pack-1.0.txt",
       "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/LICENSE.txt",
       "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
@@ -18,6 +369,573 @@
       "license": "CC0-1.0",
       "bytes": 1027,
       "sha256": "881e50d3629fba90629bedc65e9e6f47cfab3609598c296dcb7f70ea83174360"
+    },
+    {
+      "path": "licenses/Kenney-Interface-Sounds-1.0.txt",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#License.txt",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 574,
+      "sha256": "f7966c773bbed0eca6a9c75081c44a178b38eae112724dbb5fdfbd4192d118a9"
+    },
+    {
+      "path": "licenses/Kenney-Music-Jingles.txt",
+      "url": "https://opengameart.org/sites/default/files/jingleSounds_Kenney.zip#license.txt",
+      "source": "https://opengameart.org/content/85-short-music-jingles",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 480,
+      "sha256": "a42f5a692f121ee3353e0d70a33713c4395faa42f4a365905f63eadac109db7b"
+    },
+    {
+      "path": "licenses/Kenney-Nature-Kit-2.1.txt",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#License.txt",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 611,
+      "sha256": "cb96b75e3560ac78d7a53ce6f083f4cdb5c53faea6141b62d63458dcfe1e4b9d"
+    },
+    {
+      "path": "licenses/Kenney-Pirate-Kit-2.1.txt",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#License.txt",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 699,
+      "sha256": "5e99246a5a65fa3420a1a1c7a8616f096202c78866f73d7aacfe73c0aab0ca36"
+    },
+    {
+      "path": "licenses/Kenney-RPG-Audio.txt",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#license.txt",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 477,
+      "sha256": "6f12f89bf8d1cc417b25afd1f8e6d9560b2b1d1ac2b175cf4ee9c377e180783d"
+    },
+    {
+      "path": "licenses/Kenney-Survival-Kit.txt",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#License.txt",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 715,
+      "sha256": "62c8356876481204fa4d40dc59183dfed777adf987d7f2a1390fffe8a699f3ff"
+    },
+    {
+      "path": "licenses/Quaternius-Ultimate-Animated-Animal-Pack.txt",
+      "url": "https://drive.usercontent.google.com/download?id=1F2uy8T2fRpdc6gZ4mnS02_C2E63WvKtn&export=download",
+      "source": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 364,
+      "sha256": "83d8959f9fc56353ed571fbe2dc52e4bcd64508e2399501cd45ac2ce3df0bf8c"
+    },
+    {
+      "path": "licenses/ambientCG-CC0.txt",
+      "url": "https://docs.ambientcg.com/license/",
+      "source": "https://ambientcg.com/view?id=Grass004",
+      "author": "Lennart Demes (ambientCG)",
+      "license": "CC0-1.0",
+      "bytes": 1209,
+      "sha256": "393822cdf038946be610d383e3623b5d21a508f2915a1b1df03bec02a21c9784"
+    },
+    {
+      "path": "living/animals/Deer.gltf",
+      "url": "https://drive.usercontent.google.com/download?id=1iGpXKrqYGyZCPGHPPSuDAoKnOXLhXJ0q&export=download",
+      "source": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 3288813,
+      "sha256": "b8afd0647e7a74332ce802c8326dfefe1a2b76da67ab925a631aaddb5ae9bdd4"
+    },
+    {
+      "path": "living/animals/Stag.gltf",
+      "url": "https://drive.usercontent.google.com/download?id=1URNoFeIFblJXPFOV6qwPrxZr5dLZ3YGx&export=download",
+      "source": "https://quaternius.com/packs/ultimateanimatedanimals.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 3224724,
+      "sha256": "170b964909d16d1ab4d428b1d714f25016913d32481acd9c3d62923192583be6"
+    },
+    {
+      "path": "living/audio/ambience/birds.ogg",
+      "url": "https://opengameart.org/sites/default/files/birds-isaiah658_0.ogg",
+      "source": "https://opengameart.org/content/ambient-bird-sounds",
+      "author": "isaiah658",
+      "license": "CC0-1.0",
+      "bytes": 544669,
+      "sha256": "359e4e3f9da9d75aac64cede511c7e3ef8b461f9d9f8c230f8f80e44c4b3e35f"
+    },
+    {
+      "path": "living/audio/ambience/birds_morning.ogg",
+      "url": "https://opengameart.org/sites/default/files/amb_morning_0.ogg",
+      "source": "https://opengameart.org/content/amb-morning-sounds-perfect-loop",
+      "author": "Kresiek The Furry",
+      "license": "CC0-1.0",
+      "bytes": 3229148,
+      "sha256": "f49f9470038fcbd75742ca88a9914de0e7fe515340cfddaf3a7614e42678b4a7"
+    },
+    {
+      "path": "living/audio/ambience/fire.ogg",
+      "url": "https://opengameart.org/sites/default/files/fire-1_0.ogg",
+      "source": "https://opengameart.org/content/fire-crackling",
+      "author": "AntumDeluge",
+      "license": "CC0-1.0",
+      "bytes": 22784,
+      "sha256": "f922929805bc6afdf0a35727fa3998033db544c1b6f62ed3aeab94341ed6ddeb"
+    },
+    {
+      "path": "living/audio/ambience/rain.ogg",
+      "url": "https://opengameart.org/sites/default/files/Rain%20OGG.zip#1.ogg",
+      "source": "https://opengameart.org/content/rain-loopable",
+      "author": "Ylmir",
+      "license": "CC0-1.0",
+      "bytes": 550049,
+      "sha256": "4f659f68cf5219007d0bb0969a1862491ceee4057fda4c491c6001e8608fa2cb"
+    },
+    {
+      "path": "living/audio/ambience/storm.ogg",
+      "url": "https://opengameart.org/sites/default/files/rain-thunder.ogg",
+      "source": "https://opengameart.org/content/rain-long-thunder",
+      "author": "WuxiaScrub",
+      "license": "CC0-1.0",
+      "bytes": 875624,
+      "sha256": "9499fd1aefa3b5d8ba3764ea46d15c00ab449be7e19c029290a1f52228f1434c"
+    },
+    {
+      "path": "living/audio/ambience/thunder.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_100_v2.zip#sfx100v2_thunder_01.ogg",
+      "source": "https://opengameart.org/content/100-cc0-sfx-2",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 51493,
+      "sha256": "8a4f1dee999546b363f989eff92174375eeae7c241dc9beaa0892fb131ef12a9"
+    },
+    {
+      "path": "living/audio/ambience/wind.ogg",
+      "url": "https://opengameart.org/sites/default/files/wind.zip#wind/Wind.ogg",
+      "source": "https://opengameart.org/content/wind",
+      "author": "IgnasD",
+      "license": "CC0-1.0",
+      "bytes": 59861,
+      "sha256": "ff4f8a48b824e88ef3a53c5bc726e1da2b9593d84ac1bd6048b4ed6ddd4bad69"
+    },
+    {
+      "path": "living/audio/music/day.ogg",
+      "url": "https://opengameart.org/sites/default/files/Meadow%20Thoughts.ogg",
+      "source": "https://opengameart.org/content/meadow-thoughts",
+      "author": "\u00c9crivain",
+      "license": "CC0-1.0",
+      "bytes": 2396007,
+      "sha256": "9c55cfadb5acca6ef9ca81bf89d343b13f2b09984d45ae520cf877f1f9ad4404"
+    },
+    {
+      "path": "living/audio/music/jingle_built.ogg",
+      "url": "https://opengameart.org/sites/default/files/jingleSounds_Kenney.zip#OGG/jingles_STEEL/jingles_STEEL02.ogg",
+      "source": "https://opengameart.org/content/85-short-music-jingles",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 21919,
+      "sha256": "891c2b48d3586744b38be18b8c5a35f46ac30fe06efb48f70f3f5528a0cec0c3"
+    },
+    {
+      "path": "living/audio/music/jingle_morning.ogg",
+      "url": "https://opengameart.org/sites/default/files/jingleSounds_Kenney.zip#OGG/jingles_STEEL/jingles_STEEL07.ogg",
+      "source": "https://opengameart.org/content/85-short-music-jingles",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 22460,
+      "sha256": "206b5cb18870c1faa393047cb857eda28441b9682380c9eb5910119ea04c2ece"
+    },
+    {
+      "path": "living/audio/music/night.ogg",
+      "url": "https://opengameart.org/sites/default/files/forest_whisper_theme.zip#Forest%20Whisper%20Theme/Forest%20Whisper.ogg",
+      "source": "https://opengameart.org/content/forest-whisper-theme",
+      "author": "Cleyton Kauffman",
+      "license": "CC0-1.0",
+      "bytes": 2001071,
+      "sha256": "995d13d3bb050066c607730a9f637cc7c38f0678512efab89b9e0322a803c283"
+    },
+    {
+      "path": "living/audio/ui/alert.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/glass_004.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 8323,
+      "sha256": "2379b58f953e3d86982aa8cddcae763022c6258e9820171bf905ce58b4e97766"
+    },
+    {
+      "path": "living/audio/ui/click.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/click_001.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 4876,
+      "sha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+    },
+    {
+      "path": "living/audio/ui/close.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/close_001.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9915,
+      "sha256": "44af8249b933e0fd35ec957a638bb1a0b01f85b53fbe9674bf77bd3ca3168ef4"
+    },
+    {
+      "path": "living/audio/ui/coin.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/handleCoins.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 25394,
+      "sha256": "8a91f969e932df709df80ee124d86a51389eed9b67f22e5e716bc2bbf60d8dab"
+    },
+    {
+      "path": "living/audio/ui/coin_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/handleCoins2.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 13094,
+      "sha256": "4b857968d64f9ac9336a10ffac6694d7547e1f01566ad6857b30bc8db3ee6c32"
+    },
+    {
+      "path": "living/audio/ui/confirm.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/confirmation_001.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 8968,
+      "sha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a"
+    },
+    {
+      "path": "living/audio/ui/error.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/error_006.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 8288,
+      "sha256": "a97513d7fd2b12b1210c423be943b4c1ab0e899b11db95855e9b74836e646ae0"
+    },
+    {
+      "path": "living/audio/ui/hover.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/tick_002.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 4514,
+      "sha256": "869442f54214be902ec7437f79e400dc91c1bfd90d18a6dd2d5b7e41ffbf457b"
+    },
+    {
+      "path": "living/audio/ui/open.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/open_001.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9834,
+      "sha256": "a27c6bb0df7da1e6af5dd5937593c98bc58b6e513f42fe6a3254cd6a6949c648"
+    },
+    {
+      "path": "living/audio/ui/page.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/bookFlip2.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 12393,
+      "sha256": "3409042acbfaebc24c1a6327dc073e36f9250841712e96c5040da566a97df73c"
+    },
+    {
+      "path": "living/audio/ui/place.ogg",
+      "url": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip#Audio/drop_002.ogg",
+      "source": "https://opengameart.org/content/interface-sounds",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 6411,
+      "sha256": "4ac4d1cef7e936965cbf795852ca2020300b9e2ba7daa59f2bf4f1f7bf416218"
+    },
+    {
+      "path": "living/audio/work/chop_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/chop.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9370,
+      "sha256": "d00c2b3c9fff07e376145c8c8c45c90e5084ec192f6ce0387db233f7b86f1486"
+    },
+    {
+      "path": "living/audio/work/chop_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_100_v2.zip#sfx100v2_wood_hit_01.ogg",
+      "source": "https://opengameart.org/content/100-cc0-sfx-2",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 7629,
+      "sha256": "84abc80d93011d86f29bc55c10a023265ece0851d0784d1bf07c5990f08daeab"
+    },
+    {
+      "path": "living/audio/work/chop_3.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_100_v2.zip#sfx100v2_wood_hit_02.ogg",
+      "source": "https://opengameart.org/content/100-cc0-sfx-2",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 8233,
+      "sha256": "7ff0c18fafb7d025addb5d3cb586444842d8281ca9ed265eb2ac7213fa754b8a"
+    },
+    {
+      "path": "living/audio/work/cloth_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/cloth1.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 16508,
+      "sha256": "ddb93a3671233f95da0e0b10367f082f7eb42fa6caaddcf776410aa8833c747d"
+    },
+    {
+      "path": "living/audio/work/cloth_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/cloth2.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 11787,
+      "sha256": "8a7451193c38bc05483aec25dd193e163a15d44cf7fff04ac7912573231b0201"
+    },
+    {
+      "path": "living/audio/work/dig_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#mud02.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 9925,
+      "sha256": "354682c2cb340cd787d892d31beb87c45dda94ca6e8363b16828ab2f1d129b82"
+    },
+    {
+      "path": "living/audio/work/dig_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#gravel.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 21087,
+      "sha256": "34e6057ec1581b5cb8802e4942952b00b1dac235bfcb0ed8cff0ceb15a3ebbbf"
+    },
+    {
+      "path": "living/audio/work/door_close.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/doorClose_1.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 18564,
+      "sha256": "834d29c60a8a8bfb50b158cdb6b7dfa8f02812a408a1ee9703d038dfab0b1aeb"
+    },
+    {
+      "path": "living/audio/work/door_open.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/doorOpen_1.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 22848,
+      "sha256": "4ab93bab96522d8eb109ff96dc57cb6765deb02448fe14c10472084be5bb2a0b"
+    },
+    {
+      "path": "living/audio/work/eat_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/crunch_-_tito.zip#crunch.3.ogg",
+      "source": "https://opengameart.org/content/7-eating-crunches",
+      "author": "StarNinjas",
+      "license": "CC0-1.0",
+      "bytes": 13723,
+      "sha256": "a24b3e10c6085662eed6ac9f34e133b4d2e645d67121ecdc1d9e66dc279e828d"
+    },
+    {
+      "path": "living/audio/work/eat_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/crunch_-_tito.zip#crunch.5.ogg",
+      "source": "https://opengameart.org/content/7-eating-crunches",
+      "author": "StarNinjas",
+      "license": "CC0-1.0",
+      "bytes": 17398,
+      "sha256": "b015b7e1091d20e75404b52b4d90aee1d5c9942e4e361ee62ba7599c2bf9a973"
+    },
+    {
+      "path": "living/audio/work/hammer_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/100-CC0-wood-metal-SFX.zip#wood_hammer_01.ogg",
+      "source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 14174,
+      "sha256": "7af2b82ed659153da6c3dd69024e15bdb3c3c5b101c4086ee2181c1f846fe28a"
+    },
+    {
+      "path": "living/audio/work/hammer_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/100-CC0-wood-metal-SFX.zip#wood_hammer_02.ogg",
+      "source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 13316,
+      "sha256": "f3e8812f053d35d5ebbaec39c7d7136ccfcf4ad7b420beded1401c9aaca13625"
+    },
+    {
+      "path": "living/audio/work/metal_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/100-CC0-wood-metal-SFX.zip#metal_hit_01.ogg",
+      "source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 12422,
+      "sha256": "f5fd185fce454947c1d91ce6757e219c4d7c6c139d4aa9d419cd7a79c7f6df3b"
+    },
+    {
+      "path": "living/audio/work/metal_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/100-CC0-wood-metal-SFX.zip#metal_hit_02.ogg",
+      "source": "https://opengameart.org/content/100-cc0-metal-and-wood-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 17378,
+      "sha256": "9074c0828727bd00834cabcaaf5b8cbff2cfad7b45676b95d86c0919e444f8b1"
+    },
+    {
+      "path": "living/audio/work/saw.ogg",
+      "url": "https://opengameart.org/sites/default/files/saw_-_starninjas_0.ogg",
+      "source": "https://opengameart.org/content/saw-or-wood-impact",
+      "author": "StarNinjas",
+      "license": "CC0-1.0",
+      "bytes": 50457,
+      "sha256": "4ed1587394af8adde4fe6443ca6367a16b6dbb8e5e09d39c96df608de32c5d32"
+    },
+    {
+      "path": "living/audio/work/saw_loop.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_loops.zip#saw.ogg",
+      "source": "https://opengameart.org/content/30-cc0-sfx-loops",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 95942,
+      "sha256": "395788a09e2916c25caa1e45a06e955ff4429d811a3d63d3bed2a7b3764bf261"
+    },
+    {
+      "path": "living/audio/work/splash_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/water-splash-slime-sfx.zip#splash_02.ogg",
+      "source": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 37895,
+      "sha256": "eab0bb4bc01386528ba1e6244c6fd8940ee8d3c91ddb9e9cfea186e8560e04de"
+    },
+    {
+      "path": "living/audio/work/splash_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/water-splash-slime-sfx.zip#splash_08.ogg",
+      "source": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 36747,
+      "sha256": "fd4c9c8fbfe4ac7348644918a73b1d004b037bac3ef24a1303549b705624828a"
+    },
+    {
+      "path": "living/audio/work/splash_3.ogg",
+      "url": "https://opengameart.org/sites/default/files/water-splash-slime-sfx.zip#splash_12.ogg",
+      "source": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 36732,
+      "sha256": "59d425f60046afd9c4ea15e85037bcc4e4a0172b5d267852ab1b0571d06d5604"
+    },
+    {
+      "path": "living/audio/work/step_dirt_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/footstep00.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9475,
+      "sha256": "6fe61ef1fc3bcf0e253bf2eb64759db6cb69e2fe452f4d88cc597ecf78a3d601"
+    },
+    {
+      "path": "living/audio/work/step_dirt_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip#OGG/footstep05.ogg",
+      "source": "https://opengameart.org/content/50-rpg-sound-effects",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 10288,
+      "sha256": "817957e1f95d97fd36870064c41673895575cde17bccb245f50364c86ed10198"
+    },
+    {
+      "path": "living/audio/work/step_grass_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#leaves01.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 11761,
+      "sha256": "93b3bbcd06380eec54335d1869924db6ff2cc6c1cb103502133d78484c5ca836"
+    },
+    {
+      "path": "living/audio/work/step_grass_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#leaves02.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 11823,
+      "sha256": "477c35bfd3f740915b24f93cb66364523217692d2749057f9b8be162eb8209f4"
+    },
+    {
+      "path": "living/audio/work/step_wood_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#wood01.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 8569,
+      "sha256": "482d97c5e1e6eb7b239be46f25d093ebebb94cefb56eedb04807b6a5dc68e972"
+    },
+    {
+      "path": "living/audio/work/step_wood_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#wood02.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 8672,
+      "sha256": "588bb121bd3db005b4c2a5b55c1cf39b8ec620f820c2123ac1f62748d132dac2"
+    },
+    {
+      "path": "living/audio/work/step_wood_3.ogg",
+      "url": "https://opengameart.org/sites/default/files/%5Bkdd%5DDifferentSteps_0.zip#wood03.ogg",
+      "source": "https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud",
+      "author": "TinyWorlds",
+      "license": "CC0-1.0",
+      "bytes": 9832,
+      "sha256": "9b677c284389163f132b94e1323ea713a4c7ac9d5fba849cf7cbf8b53a1627e2"
+    },
+    {
+      "path": "living/audio/work/stone_1.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_100_v2.zip#sfx100v2_stones_01.ogg",
+      "source": "https://opengameart.org/content/100-cc0-sfx-2",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 12669,
+      "sha256": "20d293a892e1fa6330da2569065aa260a822198bddce2b183f8c11642e7deb4d"
+    },
+    {
+      "path": "living/audio/work/stone_2.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_100_v2.zip#sfx100v2_stones_02.ogg",
+      "source": "https://opengameart.org/content/100-cc0-sfx-2",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 12558,
+      "sha256": "23f8c7335eb656ea759899946ed665712ec41f4572656f421f7f5652bea66279"
+    },
+    {
+      "path": "living/audio/work/stone_3.ogg",
+      "url": "https://opengameart.org/sites/default/files/sfx_100_v2.zip#sfx100v2_stones_03.ogg",
+      "source": "https://opengameart.org/content/100-cc0-sfx-2",
+      "author": "rubberduck",
+      "license": "CC0-1.0",
+      "bytes": 12455,
+      "sha256": "94d7e0978fd90621d2d24e8ea33eefbae2933a434bb14c643cc12ea5175cefa9"
+    },
+    {
+      "path": "living/audio/work/tree_fall.ogg",
+      "url": "https://opengameart.org/sites/default/files/chop-tree-fall.ogg",
+      "source": "https://opengameart.org/content/tree-chop-fall-thud",
+      "author": "kheetor",
+      "license": "CC0-1.0",
+      "bytes": 194760,
+      "sha256": "21842dd004b46315a5d52be80997773421d8b1d3a0d473ddbcad388efd93b33a"
     },
     {
       "path": "living/buildings/building_blacksmith_blue.bin",
@@ -308,6 +1226,60 @@
       "sha256": "581f5a9227488ef1b377c527764bd8f009d670bf229def04460e569ad8c46684"
     },
     {
+      "path": "living/nature/flower_purpleA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/flower_purpleA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7112,
+      "sha256": "f6fc34c96a03420a74fe36d4c2d0ec88f15204fcad99cd1416c3c4ecb22e48c4"
+    },
+    {
+      "path": "living/nature/flower_redA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/flower_redA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7104,
+      "sha256": "171930b7789ddbf735af3745576b5393750beb9133b9ff4a444bb6bb2986c020"
+    },
+    {
+      "path": "living/nature/flower_yellowA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/flower_yellowA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7120,
+      "sha256": "8a3b08cd2ca411c21f9c581d5bda651d78b13c50cba45ad8fa0389398ead6d1d"
+    },
+    {
+      "path": "living/nature/grass.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/grass.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 11496,
+      "sha256": "260e41d3e5f2472492ed7b475c5b92a30b13ce2bad408535b5ff50574d4575e7"
+    },
+    {
+      "path": "living/nature/grass_large.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/grass_large.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 18504,
+      "sha256": "af49a595624abca7249824eeefb944d4baf974abeeb5b16110d175da3563d6cd"
+    },
+    {
+      "path": "living/nature/grass_leafs.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/grass_leafs.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 4608,
+      "sha256": "8bc4c0b17c2e64c34e1acbf7c4a2fd8c04cfcd7155328e61767887b2ced112c7"
+    },
+    {
       "path": "living/nature/hexagons_medieval.png",
       "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/hexagons_medieval.png",
       "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
@@ -315,6 +1287,132 @@
       "license": "CC0-1.0",
       "bytes": 15783,
       "sha256": "5301a06866ba3be68dcc14cc429bd6d0f69004b72884283715d7e233f2e9782e"
+    },
+    {
+      "path": "living/nature/lily_large.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/lily_large.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 8044,
+      "sha256": "c8f7080df0ae3166e9d33f523b66360c2ac7556dff36cc9c8ee78b6a676c7db2"
+    },
+    {
+      "path": "living/nature/log.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/log.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 14288,
+      "sha256": "8c8fe8f6adfc03a3c0cd6cb24961ff74be96c2da284d70322f05797d049972d6"
+    },
+    {
+      "path": "living/nature/log_large.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/log_large.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7924,
+      "sha256": "e7a92369062d491e5a31a163d390e07db04ee573605bbfa84c00660d18896b4c"
+    },
+    {
+      "path": "living/nature/log_stack.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/log_stack.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 10896,
+      "sha256": "90eaae4a01ba1f25c2f0c6d83087e4a7a8fac684f2452615245333968d118d68"
+    },
+    {
+      "path": "living/nature/mushroom_red.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/mushroom_red.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 6364,
+      "sha256": "843e2de43dce78920a5675a67bac4b72f500e6220315e713fe08381642cfc571"
+    },
+    {
+      "path": "living/nature/mushroom_redGroup.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/mushroom_redGroup.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 14960,
+      "sha256": "29f02df0589dd2b09e8d2aff6a4662394dac5cfcf1fec701640dcbd6127e0802"
+    },
+    {
+      "path": "living/nature/mushroom_tanGroup.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/mushroom_tanGroup.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 14956,
+      "sha256": "2dc979485f164d7dce34329096271f44e0c9ea329c104251d94bcfbc8f8fe05e"
+    },
+    {
+      "path": "living/nature/plant_bush.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/plant_bush.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 4396,
+      "sha256": "ae7b1beb39e242b13f5f29e3ec23ef21034b814f82297b8aa00a9bf4e1b09590"
+    },
+    {
+      "path": "living/nature/plant_bushLarge.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/plant_bushLarge.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 6436,
+      "sha256": "10e1d9fbf29d96d1d1a56fb2ce25ae66537505101759229afe01ae22c6c45e02"
+    },
+    {
+      "path": "living/nature/plant_bushSmall.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/plant_bushSmall.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 3212,
+      "sha256": "a9620a7d1fb165ae68d323676f80dbb2a9e3aafb21110d18d18d90b07026b91d"
+    },
+    {
+      "path": "living/nature/plant_flatTall.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/plant_flatTall.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 3480,
+      "sha256": "b192523736f32754788de4dc7a5dcf30a58322b260ec8969120c91432a10b633"
+    },
+    {
+      "path": "living/nature/rock_largeA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/rock_largeA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7552,
+      "sha256": "6dd15390fd96501dcd1454765a17ba61dbbd8d47705dfe5149c8dd92b353ce25"
+    },
+    {
+      "path": "living/nature/rock_single_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 1228,
+      "sha256": "0f038d45b8df2c9efa034e5d3c3635a475a2683e2e741aa9a0cd197c5689e2ce"
+    },
+    {
+      "path": "living/nature/rock_single_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3031,
+      "sha256": "ddf307987fb18aa8e7594bb399de3943e497b50bc01aae0e7292a38418944915"
     },
     {
       "path": "living/nature/rock_single_B.bin",
@@ -333,6 +1431,24 @@
       "license": "CC0-1.0",
       "bytes": 3052,
       "sha256": "2014965b7131e6f9a804be7a90ba3800b6035e8af2ff6f0bf67c5e72cac1bf15"
+    },
+    {
+      "path": "living/nature/rock_single_C.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_C.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2192,
+      "sha256": "7d63c76a9f576bda17a63c77d8f7c9f617e11ed57e3459d9c8d5da7ebdf0b8f1"
+    },
+    {
+      "path": "living/nature/rock_single_C.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/rock_single_C.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3052,
+      "sha256": "4cbf4a67fa176d2374b4863348fddf7879b892e612dd455ad14173f17172d45b"
     },
     {
       "path": "living/nature/rock_single_D.bin",
@@ -369,6 +1485,87 @@
       "license": "CC0-1.0",
       "bytes": 3057,
       "sha256": "09e77f8cca93237863a1c6bac262bb473eb2706c0781035b01b031d1207e6d29"
+    },
+    {
+      "path": "living/nature/rock_smallA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/rock_smallA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 3044,
+      "sha256": "df9fff9d711e61370e8df0caa2514c89b8f8a8dc6c6fafaf4eb2ec79c5ae07c1"
+    },
+    {
+      "path": "living/nature/rock_tallA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/rock_tallA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 12072,
+      "sha256": "88250f236a3b75f8b55c1d8afb6af020f8a91b1e81f9fb51f7ef513420d45a2d"
+    },
+    {
+      "path": "living/nature/stump_old.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/stump_old.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9564,
+      "sha256": "4c2d2da34804c1662c6a776a9d60fe4449e6f6fdd50914bfec7d5cca3e9ceddb"
+    },
+    {
+      "path": "living/nature/stump_round.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/stump_round.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 5644,
+      "sha256": "e9b0f385f0ef98493ef716a055aa51e0b99efb8445279be7bb8bd83329a4c4af"
+    },
+    {
+      "path": "living/nature/tree_default.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/tree_default.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9428,
+      "sha256": "562d29638c902de3c7bee465d3a53bb77117efbc392ae04ed894faf6b5dc691d"
+    },
+    {
+      "path": "living/nature/tree_oak.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/tree_oak.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 14644,
+      "sha256": "d7fd8773674928c50c11b66d12c636d49bdcc15a8b1c7fbb98e6f63a3439a3f3"
+    },
+    {
+      "path": "living/nature/tree_pineDefaultA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/tree_pineDefaultA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 17220,
+      "sha256": "60d8f352fa3659ed275e06cbddfecf8f92c8effe2977c2f2d7b29b6c9b582e46"
+    },
+    {
+      "path": "living/nature/tree_pineRoundA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/tree_pineRoundA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 14488,
+      "sha256": "7dc9711f31585eafdcb965d0649c30af5e19f2def1955f7a915081d30759ef8e"
+    },
+    {
+      "path": "living/nature/tree_pineTallA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/tree_pineTallA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7200,
+      "sha256": "e0a56eb196d8a64ba86c7304d607136e17e6f9ad748dffcf86bd53b18b91b196"
     },
     {
       "path": "living/nature/tree_single_A.bin",
@@ -443,6 +1640,69 @@
       "sha256": "9fb68492630dfe08e4d99c8b0f8f9ea2118b68ec26a2c2557f97a48c48008395"
     },
     {
+      "path": "living/nature/tree_thin.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/tree_thin.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 17200,
+      "sha256": "f0f1f6861fe0446963d3be216cc628324f538bb0841bc9a8e14140313f64e2f3"
+    },
+    {
+      "path": "living/nature/trees_A_cut.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_cut.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 19008,
+      "sha256": "e46809c49b90b87a413a59f17f84bfa89d39d45101f8bb555bb58ee286828bc5"
+    },
+    {
+      "path": "living/nature/trees_A_cut.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_cut.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3054,
+      "sha256": "272463101be93d4cb9d4875e6e803710cdadcdd2199a76f4bd506c99e41d36ff"
+    },
+    {
+      "path": "living/nature/trees_A_large.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_large.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 57024,
+      "sha256": "0f4fe0b3677bfc15b841632db34db8b50c45319492a8e89b6663f679b2525227"
+    },
+    {
+      "path": "living/nature/trees_A_large.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_large.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3066,
+      "sha256": "8747dd5f3d7209e0b01c4b6af662a776db451374b7ee11671d8fa9676d89c33f"
+    },
+    {
+      "path": "living/nature/trees_A_medium.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_medium.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 31680,
+      "sha256": "3cc6f0f007aa2dc0042583741f35d9b0b8e65496e7289b9e312626c3936ff8b2"
+    },
+    {
+      "path": "living/nature/trees_A_medium.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_medium.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3066,
+      "sha256": "c330d7c775c50b7ccbc6ce7799e699fbdbbeb14a390315e85419dc0dfe5178a6"
+    },
+    {
       "path": "living/nature/trees_A_small.bin",
       "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_A_small.bin",
       "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
@@ -459,6 +1719,60 @@
       "license": "CC0-1.0",
       "bytes": 3058,
       "sha256": "5065a925666cc65caad857bcdebe5dda33aa19dab465504f809a17f6526bfbb4"
+    },
+    {
+      "path": "living/nature/trees_B_cut.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_B_cut.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 12732,
+      "sha256": "e033319c3fd8dae5aacda273242ec3fb9d57d4b3256440ce729ef715649b6c80"
+    },
+    {
+      "path": "living/nature/trees_B_cut.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_B_cut.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3052,
+      "sha256": "d8c6544b88f132f87f77c7f9c8c7ed9d77c607680137c69d7d24a59d2d0fa8fe"
+    },
+    {
+      "path": "living/nature/trees_B_large.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_B_large.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 51960,
+      "sha256": "125ccb49803100448883631c079c5b95c2d4d2cf6551dd59d31f46eb063702af"
+    },
+    {
+      "path": "living/nature/trees_B_large.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_B_large.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3067,
+      "sha256": "96079d9ef389d4f51512bed4a8da3d05f89b8bb6a24e1ef0e04711de27f141fd"
+    },
+    {
+      "path": "living/nature/trees_B_medium.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_B_medium.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 37096,
+      "sha256": "1e9220c141074ce2d530a14996cd1fc1d02dc49f76c1717cd4e55b8cd3cf1936"
+    },
+    {
+      "path": "living/nature/trees_B_medium.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/trees_B_medium.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3066,
+      "sha256": "339abd58c47a5d7f2da2b30fe448c72452471a99b22007bc412d7439ef5384ca"
     },
     {
       "path": "living/nature/trees_B_small.bin",
@@ -497,6 +1811,24 @@
       "sha256": "037a145b2e75f8dc35b0712456469dd99697046b112194843deac454589474b8"
     },
     {
+      "path": "living/nature/waterlily_B.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/waterlily_B.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2840,
+      "sha256": "0798b6372fda29e878b84abc16ed2b557588d40da6013702089b2424292b2f85"
+    },
+    {
+      "path": "living/nature/waterlily_B.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/waterlily_B.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3028,
+      "sha256": "c45b2c221633c184f02d09371b23773339ef33f3b8725985b4943b97ed83fefa"
+    },
+    {
       "path": "living/nature/waterplant_A.bin",
       "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/waterplant_A.bin",
       "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
@@ -531,6 +1863,933 @@
       "license": "CC0-1.0",
       "bytes": 3056,
       "sha256": "4f1722158c7afae8629fcb8da2efe1c574ca9002b9bc3d76356dd07262acad4d"
+    },
+    {
+      "path": "living/nature/waterplant_C.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/waterplant_C.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 11852,
+      "sha256": "776a05613c27f8a63a51e19e9668d086200fc40a8289bffc8dae1e909a8983d8"
+    },
+    {
+      "path": "living/nature/waterplant_C.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/nature/waterplant_C.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3058,
+      "sha256": "f70a9bdf104cf4a1ed3d7e9d96abcb1f147916e265992fa9cd2b08e31d30d1c1"
+    },
+    {
+      "path": "living/props/barrel.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/barrel.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15552,
+      "sha256": "ff1b034f1ac95b063a2baa3d72a0ad0b33f25337f776e7a25fbc811d9c77dee8"
+    },
+    {
+      "path": "living/props/barrel.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/barrel.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3042,
+      "sha256": "24673663eb53ffab6c8db612654856f051c4877bfc02ea25fee89cd95ee4d100"
+    },
+    {
+      "path": "living/props/bucket_empty.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/bucket_empty.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 6976,
+      "sha256": "6e4c2d223e1c17425222dc67ce406c7890d1cf0168f7b8811745dfb024d56fee"
+    },
+    {
+      "path": "living/props/bucket_empty.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/bucket_empty.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3058,
+      "sha256": "9ac858e12319da05b9f5ac891b1fcf276a0c942aef3cf6a6c2fa9a1a8dc1a6da"
+    },
+    {
+      "path": "living/props/bucket_water.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/bucket_water.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 6976,
+      "sha256": "715a23aa28232449c1b99d62a5f9d432f080dda0e766cbe09ef2fee38b4be958"
+    },
+    {
+      "path": "living/props/bucket_water.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/bucket_water.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3058,
+      "sha256": "5e7ba97fe666f4a05d1933ea6d2d8555f5846ca4fc0f19e673e922d8441c8c4b"
+    },
+    {
+      "path": "living/props/building_bridge_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_bridge_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 25576,
+      "sha256": "dc78350862e173e7d948dab4dbb3e32234f3ab2302a149da8d0c0da9380040d5"
+    },
+    {
+      "path": "living/props/building_bridge_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_bridge_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3039,
+      "sha256": "7f3a7e8b3e72a66dec70d6a00eb87e62d3ca5c6892b9b965c675cb9d193e4d29"
+    },
+    {
+      "path": "living/props/building_bridge_B.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_bridge_B.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 25576,
+      "sha256": "3303ed6240dc693d38befac1e8adbccfe370490183bc74382ebd7a47e1f73815"
+    },
+    {
+      "path": "living/props/building_bridge_B.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_bridge_B.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3039,
+      "sha256": "b5f8d508c1b5cfd528a2276f6105627a386a75a77d987e2068605b1b7762a71d"
+    },
+    {
+      "path": "living/props/building_grain.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_grain.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 13636,
+      "sha256": "09793d41dfecbd5ace3a2fae3de7a5117d740b7b1ba2a2e85fbe7d1b75bf0297"
+    },
+    {
+      "path": "living/props/building_grain.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_grain.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3041,
+      "sha256": "f0369ab4750c4b60d34b6afdcef3d5545cb80d94c10c322d4a66aebe7b209d89"
+    },
+    {
+      "path": "living/props/building_stage_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_stage_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 41792,
+      "sha256": "d18c8bd6cac535ea1be929f316b4dbd1367c24c49918df1980ffc29fe7322b3e"
+    },
+    {
+      "path": "living/props/building_stage_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_stage_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3077,
+      "sha256": "43ef26645bfab5fc2ef1a66b27173857485f0392e0e96b2243ceed53fd9043d5"
+    },
+    {
+      "path": "living/props/building_stage_B.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_stage_B.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 49316,
+      "sha256": "4878dffc475b69081778e703feca790f5c7aa39b18f11435a381beff1c6295f0"
+    },
+    {
+      "path": "living/props/building_stage_B.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_stage_B.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3076,
+      "sha256": "c45eec59415c78576c8488711bf0120705d08e0b50834c88c90606f590671a1b"
+    },
+    {
+      "path": "living/props/building_stage_C.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_stage_C.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 68908,
+      "sha256": "5a796b17dd2d9ff514ccccbc6018c1756827e33a2fd098e473c6644151e21d8c"
+    },
+    {
+      "path": "living/props/building_stage_C.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/building_stage_C.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3077,
+      "sha256": "9de7e1e3b336905b3eee72c7bc010b4fb803fa07b9adb91411d5aff0861e3446"
+    },
+    {
+      "path": "living/props/crate_A_big.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_A_big.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 7000,
+      "sha256": "600d29bdf010f891dcabfb014b6271789e7b45fec7317989a13ccca92908c5c8"
+    },
+    {
+      "path": "living/props/crate_A_big.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_A_big.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3055,
+      "sha256": "a96ce5522e45104b5a04cf9605ca30b9572cc79c7633d41f3434b9843010a225"
+    },
+    {
+      "path": "living/props/crate_A_small.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_A_small.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 7000,
+      "sha256": "f46debeb9ad1f44b174f9bd62c382412172676b1cdfa714d15e3b11227f1eeb3"
+    },
+    {
+      "path": "living/props/crate_A_small.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_A_small.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3059,
+      "sha256": "3a7fee2b962949d44bdac360405f2cd9c442bf41eea65e057f08b6b2e2d6f6d8"
+    },
+    {
+      "path": "living/props/crate_B_big.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_B_big.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 7000,
+      "sha256": "ee936e7cd02e8cb83c77026cec2238e22b664d7ef73f84325446bc82eeec985e"
+    },
+    {
+      "path": "living/props/crate_B_big.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_B_big.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3055,
+      "sha256": "0f545d422bdc42138c75d8cd2de20b26a0234f7a77d3b9d84d82292e262b2bae"
+    },
+    {
+      "path": "living/props/crate_long_A.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_long_A.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 14204,
+      "sha256": "1fb1050d8da5dfa703ed1d5a6c853682161dd299dfa23112941f625f63eae1c3"
+    },
+    {
+      "path": "living/props/crate_long_A.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_long_A.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3041,
+      "sha256": "36b6bc187c410f3a4d7ec1bd88161e20ffd43f4b3a952c14165cfb83f65a06ff"
+    },
+    {
+      "path": "living/props/crate_open.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_open.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 12056,
+      "sha256": "e7f3ace70545116f56844b14ab2191efac4d3ed96a454439a6a58b66ad5319c8"
+    },
+    {
+      "path": "living/props/crate_open.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/crate_open.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3054,
+      "sha256": "e82806d7cd3d905c4915e81cad1973415aecec83a8d3ad968e0298d8920265ed"
+    },
+    {
+      "path": "living/props/crops_wheatStageA.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/crops_wheatStageA.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 56228,
+      "sha256": "d8c690d473a230741cf4d03fa6a69a405f0ae6a246847a2a72e7f50dd5bebc08"
+    },
+    {
+      "path": "living/props/crops_wheatStageB.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/crops_wheatStageB.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 30040,
+      "sha256": "589db4d6fe0bd7616c1f1c2f10a335704b2dad5d24638dc08a5b2e5334c68852"
+    },
+    {
+      "path": "living/props/fence_gate.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/fence_gate.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 27652,
+      "sha256": "34d10d5620179b8a211a01eea837caa828c0782422f0b408e1a5838788888436"
+    },
+    {
+      "path": "living/props/fence_simple.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/fence_simple.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 5712,
+      "sha256": "ecaf6c29532aa9fd305a8ef71df769d60748bd797f2eb1c63bdefc4edb8062a7"
+    },
+    {
+      "path": "living/props/fence_stone_straight.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_stone_straight.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 13800,
+      "sha256": "a8b6f2cd8f0f67996b1e6fb4675a707d1cc43b5d5c743ac6af7c0aec695e3aa9"
+    },
+    {
+      "path": "living/props/fence_stone_straight.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_stone_straight.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3079,
+      "sha256": "9738b7f152b3e4d9912cbad772435d9bd8247982be81e713b9b3ddc7579d1439"
+    },
+    {
+      "path": "living/props/fence_stone_straight_gate.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_stone_straight_gate.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 16112,
+      "sha256": "2ea58679c76618ae4ef052df5c036ab4d20eb31c96e4771645c90b33b2cb949f"
+    },
+    {
+      "path": "living/props/fence_stone_straight_gate.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_stone_straight_gate.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 5224,
+      "sha256": "f1589d939722ad0b59503cc42bd453628583cce92c8524078c81e6f3b4766c7a"
+    },
+    {
+      "path": "living/props/fence_wood_straight.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_wood_straight.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15032,
+      "sha256": "fa71b68019e2fe287621f3a5b06b7e18d1dcdd74a6f1c38af7888a8fb0c0078b"
+    },
+    {
+      "path": "living/props/fence_wood_straight.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_wood_straight.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3061,
+      "sha256": "5a2af87c5a6b90875e3bc11f289a321a5d4b2459975dba52351edbc58b2132e3"
+    },
+    {
+      "path": "living/props/fence_wood_straight_gate.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_wood_straight_gate.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 19384,
+      "sha256": "baeccfc22cfaea7ebc8b676278b2faf8d09ce4c638420d10a995fdebcd1d1c4d"
+    },
+    {
+      "path": "living/props/fence_wood_straight_gate.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/fence_wood_straight_gate.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 5220,
+      "sha256": "ca9cc002a5896f387754e562f2109d5544ab5cf0e6f9555f2fa6a051664258eb"
+    },
+    {
+      "path": "living/props/flag_blue.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_blue.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2464,
+      "sha256": "2ff9fa2caea9c02a2eda8092c203e378ef92dca7741d41110627740211fc03a7"
+    },
+    {
+      "path": "living/props/flag_blue.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_blue.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3023,
+      "sha256": "de33035f0e9945f8d4e6ca3242e18f4822227cc8cc3a1afd9f0d193419573f08"
+    },
+    {
+      "path": "living/props/flag_green.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_green.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2464,
+      "sha256": "76878b69c0a3a56d835018bb3d3a489d0ae6ddd425e4b67ee5c27c4a445fc10f"
+    },
+    {
+      "path": "living/props/flag_green.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_green.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3026,
+      "sha256": "3d3192dc48ae58179391adc15d38faadcc1680e2d6b8bab582da054cf01c82bd"
+    },
+    {
+      "path": "living/props/flag_red.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_red.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2464,
+      "sha256": "04aea453efb0632960b2395a356fd0ee2fd4c24e16fe726be956b1ee182cf4b5"
+    },
+    {
+      "path": "living/props/flag_red.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_red.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3020,
+      "sha256": "c1f76b1ca3d47a30a868500ecbe2844e89b75b4bebc7283f41bd37561aa58c1f"
+    },
+    {
+      "path": "living/props/flag_yellow.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_yellow.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 2464,
+      "sha256": "f64d1627cd1222f79c02d0e999528aee9030e4d898b9ea7f633ffd8a12f23cea"
+    },
+    {
+      "path": "living/props/flag_yellow.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/flag_yellow.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3029,
+      "sha256": "0e68155151ea610a3a4f37c30127b1275e51c66c2c7afc48803196730b10119a"
+    },
+    {
+      "path": "living/props/hexagons_medieval.png",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/buildings/neutral/hexagons_medieval.png",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15783,
+      "sha256": "5301a06866ba3be68dcc14cc429bd6d0f69004b72884283715d7e233f2e9782e"
+    },
+    {
+      "path": "living/props/ladder.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/ladder.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 5880,
+      "sha256": "07d5f9271a58ae9cc93f3b3877103a6c037b727077b44a5d7a6dc1ae90c2b173"
+    },
+    {
+      "path": "living/props/ladder.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/ladder.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3040,
+      "sha256": "de1f471e8c11615388a9caad79aef97414903390ff54924b33bff2547bc19e72"
+    },
+    {
+      "path": "living/props/pallet.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/pallet.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 5040,
+      "sha256": "b3e0e50ac5aaf3784ebc3ac601bf8f9e04474a575a026ba4cbf9d164dfa14e12"
+    },
+    {
+      "path": "living/props/pallet.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/pallet.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3019,
+      "sha256": "4e55587c2f2017e7e2965482b0976c75339e7dafcb627de2d275077bb6a97dc3"
+    },
+    {
+      "path": "living/props/resource_lumber.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_lumber.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 11880,
+      "sha256": "90bb1e1f23dbc3de372059b45ae289ec414b1fb50b49852ce0a3b30dc370db8b"
+    },
+    {
+      "path": "living/props/resource_lumber.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_lumber.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3060,
+      "sha256": "601a69f44f0c4a9b5070a80bd4a20887960e01f1523a6125c1edc8ba19168f1f"
+    },
+    {
+      "path": "living/props/resource_stone.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_stone.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 11560,
+      "sha256": "8af67e8fb7272c0d5e439361f9ebb33f55406bb65a4dcf0d7156fc2959ddb744"
+    },
+    {
+      "path": "living/props/resource_stone.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/resource_stone.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3061,
+      "sha256": "427a22daaec3934ac85cd7e538415157264b96527577a3c9bbf793c1b5df8dca"
+    },
+    {
+      "path": "living/props/sack.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/sack.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3240,
+      "sha256": "5c3e6f5c63f8c4420ed3dfb2027beffc981740b5af9c89be148b56c19b993e02"
+    },
+    {
+      "path": "living/props/sack.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/sack.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3031,
+      "sha256": "b61929d6161907aff4f1fd211cd0a8300d002d1a686ba43d07c4aff171fbd9f0"
+    },
+    {
+      "path": "living/props/sign.glb",
+      "url": "https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip#Models/GLTF%20format/sign.glb",
+      "source": "https://opengameart.org/content/nature-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 5040,
+      "sha256": "c658c21672ecd63c5d3e53f06f875d68e6509edb1ab7e3b75374df7c61e7dd0c"
+    },
+    {
+      "path": "living/props/tent.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/tent.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 6148,
+      "sha256": "fce10cd8e153d14b53a4f0fd902124c214ea29fac370707bb3a604ce2a718fc2"
+    },
+    {
+      "path": "living/props/tent.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/tent.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3008,
+      "sha256": "d8920394ddec09d8afa0cfaa2dad1c75b55fd21819fbd7c31392b3b8dce5dca0"
+    },
+    {
+      "path": "living/props/wheelbarrow.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/wheelbarrow.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 19016,
+      "sha256": "72ca612b0dc940c856ed5abbbb9df9562c09bff52cfb2258375b16cbaad29e12"
+    },
+    {
+      "path": "living/props/wheelbarrow.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/84fa4e91af6a88989be7c99e0891cede11f2ca38/addons/kaykit_medieval_hexagon_pack/Assets/gltf/decoration/props/wheelbarrow.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3059,
+      "sha256": "bb037662a3e5be1f4fe597ffc4927d2a6ad88d307da10388cfb178ca5fdae63d"
+    },
+    {
+      "path": "living/ships/Environment_Dock_Pole.gltf",
+      "url": "https://drive.usercontent.google.com/download?id=1um2OgeTm1aDwaLp9-bzGXMy6X9uMl0wG&export=download",
+      "source": "https://quaternius.com/packs/piratekit.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 25593,
+      "sha256": "f5a511f3f59283153ed470b3edd4a3f91700ee31d6fe89fd941510ac08318ced"
+    },
+    {
+      "path": "living/ships/Prop_Anchor.gltf",
+      "url": "https://drive.usercontent.google.com/download?id=1BrxKp3juHV7C-74LVzDEJLtsBRxqZ2Fg&export=download",
+      "source": "https://quaternius.com/packs/piratekit.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 43082,
+      "sha256": "98504894d03160b86f8b4a34d6e1b9b31bac173ce424378100f13143fd0223fc"
+    },
+    {
+      "path": "living/ships/Prop_Bucket_Fishes.gltf",
+      "url": "https://drive.usercontent.google.com/download?id=1wtdo4wGr64nkDXBitakU6Tg1vAZl5rLL&export=download",
+      "source": "https://quaternius.com/packs/piratekit.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 187678,
+      "sha256": "cc3f71fad513f43a4999503fbe6f3fa8725eb9c9b57702738c21ba97246fa79a"
+    },
+    {
+      "path": "living/ships/Prop_Fish_Mackerel.gltf",
+      "url": "https://drive.usercontent.google.com/download?id=1xWvn_cBCQWbE1pSr81SLMAOyuMe1eRrC&export=download",
+      "source": "https://quaternius.com/packs/piratekit.html",
+      "author": "Quaternius",
+      "license": "CC0-1.0",
+      "bytes": 61094,
+      "sha256": "2695abf47ba7f8b15959fee50df63ea6c44ce15347323880a9c66bbd38bff92e"
+    },
+    {
+      "path": "living/ships/Textures/colormap.png",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/Textures/colormap.png",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 10061,
+      "sha256": "451e1d7a53b8e76f4b2ee58742e241509fee5f82cf2cee6e3f7aca86ba718abe"
+    },
+    {
+      "path": "living/ships/barrel.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/barrel.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 14092,
+      "sha256": "7616dedf7c1023afa6ecd3c52a4609460aae0e582dee14e60ec5e47c1174793b"
+    },
+    {
+      "path": "living/ships/boat-row-large.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/boat-row-large.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 15972,
+      "sha256": "b496c0d5f9053ebc7e9b9a39a4770d5ccaff5510c51b7c72c1b8391442e61d0f"
+    },
+    {
+      "path": "living/ships/boat-row-small.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/boat-row-small.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 17616,
+      "sha256": "846d9b17a73f80e03f7201d3bf0ad1b1bbb49e114b99697740d3426e4f42482d"
+    },
+    {
+      "path": "living/ships/crate.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/crate.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9232,
+      "sha256": "b525674e07c8b83667512a8dd93be0d7684358347d0e64d2bb16b156ac382ed1"
+    },
+    {
+      "path": "living/ships/flag-pennant.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/flag-pennant.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 13640,
+      "sha256": "05956b9389135492e0644bd7d49711d1e4f865cd67808f7da5709a23e02d7d6f"
+    },
+    {
+      "path": "living/ships/flag.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/flag.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 15184,
+      "sha256": "374500dc875e3e713fbd3e2d4bf18087b4a450bfc5a7b04b4329aaf0c0e3a877"
+    },
+    {
+      "path": "living/ships/platform-planks.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/platform-planks.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 6524,
+      "sha256": "4313f45d4feb8cd01adbb4b4785f368c7df091f33e473dea536172868805b167"
+    },
+    {
+      "path": "living/ships/ship-large.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/ship-large.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 155792,
+      "sha256": "270fff44a9c97f0f5038b0776f9a9b661961ff2098109a9ce614b645cc5e0d20"
+    },
+    {
+      "path": "living/ships/ship-medium.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/ship-medium.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 144944,
+      "sha256": "279ea019268f855240c3cebf7616644c8141c20bee617da72eae4733b8e310af"
+    },
+    {
+      "path": "living/ships/ship-small.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/ship-small.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 116440,
+      "sha256": "6fdabdfd358f345ad3dd0510af4165843ab3fffe46357395c94ca00db4f317b3"
+    },
+    {
+      "path": "living/ships/structure-platform-dock-small.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/structure-platform-dock-small.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 32156,
+      "sha256": "63fb708c20db73860da2380ba6c13e4725930c07535bb2ed5958a2f30eeea36c"
+    },
+    {
+      "path": "living/ships/structure-platform-dock.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/structure-platform-dock.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 33336,
+      "sha256": "bf64343d37b5570cb78cf0918e3eeb98f96f9b2c69b3f16d103c61ebc8f063f7"
+    },
+    {
+      "path": "living/ships/structure-platform.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/structure-platform.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 24248,
+      "sha256": "250e85e6021c47a1244603bba3924f04dbc4b0ab171fb589fb9eacc952609904"
+    },
+    {
+      "path": "living/ships/structure-roof.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/structure-roof.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 34480,
+      "sha256": "d7518ffa7cf209b91dc07920e762f28706a367742edc45c27ae45c434b089329"
+    },
+    {
+      "path": "living/ships/structure.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip#Models/GLB%20format/structure.glb",
+      "source": "https://opengameart.org/content/pirate-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 27988,
+      "sha256": "b82b2f949063fc418576dc14fcaedf407db6badf87dc529a33114e2f62606f9a"
+    },
+    {
+      "path": "props/axe_1handed.bin",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Assets/gltf/axe_1handed.bin",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 12524,
+      "sha256": "0e3e5f009e0706506971fe5b1eae0fa30b0b28c70fd67c4b7943d975a821f4af"
+    },
+    {
+      "path": "props/axe_1handed.gltf",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Assets/gltf/axe_1handed.gltf",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3087,
+      "sha256": "dbe0ba59abcae66a464809ee281179b10f85e41ef0d69786d39627472ca7e5dd"
+    },
+    {
+      "path": "props/barbarian_texture.png",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Assets/gltf/barbarian_texture.png",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 15089,
+      "sha256": "7329b2ff9709e8d54c886d5ef49c08bd42b12be3bbb2facb1488a6b48b1e8a80"
+    },
+    {
+      "path": "testbed/characters/Knight.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/672074b73ba276876a19e8816ecdc5241817ab47/addons/kaykit_character_pack_adventures/Characters/gltf/Knight.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 3659532,
+      "sha256": "60428e3abc09ba83e595d256e3af8c5c976b46cdae599f0802fc82b4a3445168"
+    },
+    {
+      "path": "testbed/dungeon/barrel_small.gltf.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0/b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07/addons/kaykit_dungeon_remastered/Assets/gltf/barrel_small.gltf.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 32060,
+      "sha256": "f46d0c421e46080aff079286ce9459a22da25e1b4f3489a04243f17617175212"
+    },
+    {
+      "path": "testbed/dungeon/box_large.gltf.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0/b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07/addons/kaykit_dungeon_remastered/Assets/gltf/box_large.gltf.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 28740,
+      "sha256": "6dacda267f04769f8ebbb7e991885785054923ea3d5eb19e833768a911d5b661"
+    },
+    {
+      "path": "testbed/dungeon/chest.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0/b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07/addons/kaykit_dungeon_remastered/Assets/gltf/chest.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 81412,
+      "sha256": "f72fd2201cd42ad399928a0b7bcc34d5b0e6d0624aeaf824fef81852109955f8"
+    },
+    {
+      "path": "testbed/dungeon/coin_stack_small.gltf.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0/b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07/addons/kaykit_dungeon_remastered/Assets/gltf/coin_stack_small.gltf.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 38404,
+      "sha256": "b7395adb0c3f8d392f42f483d667af672232a25de4e0cdb23c58fca8bab1dd8f"
+    },
+    {
+      "path": "testbed/dungeon/plate_food_A.gltf.glb",
+      "url": "https://raw.githubusercontent.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0/b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07/addons/kaykit_dungeon_remastered/Assets/gltf/plate_food_A.gltf.glb",
+      "source": "https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0",
+      "author": "Kay Lousberg",
+      "license": "CC0-1.0",
+      "bytes": 41236,
+      "sha256": "4549db448834c615e753f65327d01b8f55b9d20d915e004c8a0da123cb76e86e"
+    },
+    {
+      "path": "testbed/survival/Textures/colormap.png",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/Textures/colormap.png",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 7440,
+      "sha256": "6ca023be9f12e8c2358fcf94320c8a894b4c05a3dd0bad1f5c268312053caca1"
+    },
+    {
+      "path": "testbed/survival/resource-planks.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/resource-planks.glb",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 8884,
+      "sha256": "d3804257474a3baab7ac067be91de5c3d6d18d5803775dc876cb6d9442c30873"
+    },
+    {
+      "path": "testbed/survival/tool-hammer.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/tool-hammer.glb",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 6520,
+      "sha256": "9b27f03c26dabd49a7ea358615e63fe65e1c3d0157887d4ee1ecdfa1f0e688f3"
+    },
+    {
+      "path": "testbed/survival/tool-pickaxe.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/tool-pickaxe.glb",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 8152,
+      "sha256": "2b77a238b8666338094d83fc5561984643c335c49ccacd9e0e0a50fb2849c542"
+    },
+    {
+      "path": "testbed/survival/tree-log.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/tree-log.glb",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 9180,
+      "sha256": "bd358e55e63a75bd54bea1e4b40ed362baa937ce8e503f2aa2370a5a1d9da11c"
+    },
+    {
+      "path": "testbed/survival/workbench-anvil.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/workbench-anvil.glb",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 30084,
+      "sha256": "a6253df726c1eba7cbaddf7e31cd5a4adfac31309894bf647e4b803d9d75c275"
+    },
+    {
+      "path": "testbed/survival/workbench.glb",
+      "url": "https://opengameart.org/sites/default/files/kenney_survival-kit.zip#Models/GLB%20format/workbench.glb",
+      "source": "https://opengameart.org/content/survival-kit",
+      "author": "Kenney",
+      "license": "CC0-1.0",
+      "bytes": 26104,
+      "sha256": "bf72d2d535fa29127e5078a6c4c2023a74fa5cd7d02d91ad550e897e088e1dc8"
+    },
+    {
+      "path": "textures/grass_color.jpg",
+      "url": "https://ambientcg.com/get?file=Grass004_1K-JPG.zip#Grass004_1K-JPG_Color.jpg",
+      "source": "https://ambientcg.com/view?id=Grass004",
+      "author": "Lennart Demes (ambientCG)",
+      "license": "CC0-1.0",
+      "bytes": 1985561,
+      "sha256": "9e1c60da44b34a9738b1256ba827541f097dc583521b1d281e61b5f4b4217bc5"
     }
   ]
 }

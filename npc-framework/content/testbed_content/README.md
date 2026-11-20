@@ -5,6 +5,9 @@ switched on: perception (Per-roll detection), rules, agent control, interaction,
 progression and crafting. It serves as the showcase and as the integration test. All of its content lives in this
 crate and is registered by stable name; no core crate is touched.
 
+The island village no longer lives here: it is `content/island_content` (ADR 0044), and neither crate depends on
+the other.
+
 ```rust
 let mut app = testbed_content::new_sim_app(1, "testbed"); // or try_new_sim_app(seed, name, 0)
 npc_framework::prelude::run_ticks(app.world_mut(), 600);

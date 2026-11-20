@@ -211,7 +211,6 @@ pub fn save_now(world: &mut World, dir: &AgentDir, now: &str) -> Result<(), Stri
 
 /// Saves the sim state of `world` with `header` to `path` (atomically).
 fn write_save(world: &mut World, path: &Path, header: Map<String, Value>) -> Result<(), String> {
-    crate::village::host::frame(world);
     let mut snap = snapshot::save(world)?;
     snap.header = header;
     snapshot::write_atomic(path, &snap)
@@ -693,51 +692,6 @@ pub fn detached_resume_args(home: &Path, agent: &str, port: u16) -> Vec<String> 
     .to_vec()
 }
 
-/// Operator-owned observer launch data, never a world/save/preset or simulation resource.
-/// Paths are canonicalized by the publishing host after its initial successful publication.
-#[derive(Resource, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ProjectionLaunch {
-    pub output: PathBuf,
-    pub interval_ms: u64,
-}
-impl ProjectionLaunch {
-    pub fn validate(&self) -> Result<(), String> {
-        if !self.output.is_absolute() || self.output.file_name().is_none() || self.output.is_dir() {
-            return Err("projection handover requires an absolute output file path".into());
-        }
-        if !(50..=60000).contains(&self.interval_ms) {
-            return Err("projection handover interval must be 50..=60000 ms".into());
-        }
-        Ok(())
-    }
-}
-/// Extend structured process arguments only after validating host metadata. Disabled export leaves
-/// every incumbent argument vector byte-for-byte unchanged.
-pub fn append_projection_args(
-    args: &mut Vec<String>,
-    projection: Option<&ProjectionLaunch>,
-) -> Result<(), String> {
-    if let Some(projection) = projection {
-        projection.validate()?;
-        if args.iter().any(|arg| {
-            matches!(
-                arg.as_str(),
-                "--world-state-out" | "--world-state-interval-ms"
-            )
-        }) {
-            return Err("projection launch arguments are already present".into());
-        }
-        args.extend([
-            "--world-state-out".into(),
-            projection.output.display().to_string(),
-            "--world-state-interval-ms".into(),
-            projection.interval_ms.to_string(),
-        ]);
-    }
-    Ok(())
-}
-
 /// The line the window prints on stdout when it moved its world to
 /// detached (`{"detached":{"pid","port","agent","world"}}`), so the menu
 /// that started the window tracks the new host.
@@ -1191,10 +1145,6 @@ fn reload_credentials(world: &mut World) {
         {
             if let Some(assigned) = world.resource::<TestbedIds>().get(&source.agent) {
                 source.assigned = assigned;
-                // Registration reload can precede the next host frame after
-                // NewLife. Publish the successor's life-specific notebooks in
-                // this same host boundary before exposing its credential.
-                crate::village::host::setup_notes(world);
                 registration::set_credential(
                     world,
                     source.agent_id.clone(),
@@ -1219,23 +1169,6 @@ fn reload_credentials(world: &mut World) {
         }
     }
     world.insert_resource(source);
-}
-
-/// A permanent village death may be followed by a different actor, never by reviving the corpse.
-/// Re-read current credentials rather than reinstalling a stale token from a session clone.
-pub fn refresh_village_assignment(world: &mut World) {
-    if world
-        .get_resource::<crate::village::VillageState>()
-        .is_none()
-    {
-        return;
-    }
-    if world
-        .get_resource::<CredentialFile>()
-        .is_some_and(|s| world.resource::<TestbedIds>().get(&s.agent) != Some(s.assigned))
-    {
-        reload_credentials(world);
-    }
 }
 
 fn enter_world(world: &World, agent_id: &str, assigned: SimId) -> Value {
@@ -1685,7 +1618,6 @@ pub fn insert_notes(world: &mut World, unit: SimId, dir: &AgentDir, clock: fn() 
         .set_owner(&dir.dir, owner);
     world.insert_resource(NotesDirs(BTreeMap::from([(unit, dir.dir.clone())])));
     world.insert_resource(NotesClock(clock));
-    crate::village::host::setup_notes(world);
 }
 
 /// Where a running world is.
@@ -1716,8 +1648,6 @@ pub struct RunFile {
     pub agent: String,
     /// The world's name.
     pub world: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub projection: Option<ProjectionLaunch>,
 }
 
 impl RunFile {
@@ -2089,56 +2019,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&home);
     }
 
-    #[test]
-    fn projection_handover_metadata_preserves_legacy_runs_and_only_appends_validated_host_flags() {
-        let old = serde_json::json!({"pid":1,"port":15702,"mode":RunMode::Window,"started":"2026-10-29T10:00:00Z","agent":"Herp","world":"Island"});
-        let mut run: RunFile = serde_json::from_value(old.clone()).unwrap();
-        assert!(run.projection.is_none());
-        assert_eq!(serde_json::to_value(&run).unwrap(), old);
-        let projection = ProjectionLaunch {
-            output: std::env::current_dir()
-                .unwrap()
-                .join("target/public stream/state.json"),
-            interval_ms: 750,
-        };
-        let base = detached_resume_args(Path::new("agents"), "Herp", 15702);
-        let mut disabled = base.clone();
-        append_projection_args(&mut disabled, None).unwrap();
-        assert_eq!(disabled, base);
-        let mut enabled = base.clone();
-        append_projection_args(&mut enabled, Some(&projection)).unwrap();
-        assert_eq!(&enabled[..base.len()], base.as_slice());
-        assert_eq!(
-            &enabled[base.len()..],
-            [
-                "--world-state-out",
-                projection.output.to_str().unwrap(),
-                "--world-state-interval-ms",
-                "750"
-            ]
-        );
-        assert!(
-            append_projection_args(&mut enabled, Some(&projection)).is_err(),
-            "never duplicate launch flags"
-        );
-        let mut bad = projection.clone();
-        bad.output = "relative.json".into();
-        assert!(append_projection_args(&mut Vec::new(), Some(&bad)).is_err());
-        bad = projection.clone();
-        bad.interval_ms = 49;
-        assert!(append_projection_args(&mut Vec::new(), Some(&bad)).is_err());
-        run.projection = Some(projection.clone());
-        assert_eq!(
-            serde_json::from_value::<RunFile>(serde_json::to_value(run).unwrap())
-                .unwrap()
-                .projection,
-            Some(projection.clone())
-        );
-        let mut app = crate::new_sim_app(1, "ai_village");
-        let hash = npc_framework::prelude::state_hash(app.world_mut());
-        app.insert_resource(projection);
-        assert_eq!(npc_framework::prelude::state_hash(app.world_mut()), hash);
-    }
     #[test]
     fn this_process_is_alive() {
         assert!(pid_alive(std::process::id()));

@@ -141,6 +141,11 @@ fn staged_testbed_corpus_is_the_same_runs() {
         .map(|e| e.expect("dir entry").path())
         .filter(|p| p.extension().is_some_and(|e| e == "json"))
         .filter(|p| !p.to_string_lossy().ends_with(IDMAP_SUFFIX))
+        // Island replays (`island_*.json`) are the island's own corpus.
+        .filter(|p| {
+            !p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with("island_"))
+        })
         .collect();
     names.sort();
     let mut loaders = ScenarioLoaders::default();

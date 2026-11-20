@@ -7,7 +7,7 @@ combined Rust workspace. Read the relevant nested `AGENTS.md` before editing:
 |---|---|---|
 | `bevy-rts/` | `AGENTS.md`, `CLAUDE.md`, `OWNERS.toml`, `docs/adr/` | `cargo run --locked -p fl_game` |
 | `legion-battle-lab/` | `AGENTS.md`, `README.md`, `ARCHITECTURE.md` | `cargo run --locked -p legion` |
-| `npc-framework/` | `AGENTS.md`, `CLAUDE.md`, `docs/adr/` | `cargo run --locked -p game_menu` |
+| `npc-framework/` | `AGENTS.md`, `CLAUDE.md`, `docs/adr/` | `cargo run --locked -p island_game` |
 | `terra-world/` | `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md` | `cargo run --locked -p terra-demo` |
 | `horde-defense/` | `AGENTS.md`, `README.md`, `docs/GDD.md` | `cargo run --locked -p horde-defense` |
 
