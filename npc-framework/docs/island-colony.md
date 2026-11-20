@@ -604,6 +604,21 @@ Under the building projects, **Homes residents build themselves** says how many
 residents are building a home of their own ("No resident is building a home of
 their own.") and lists the commissions that can be given.
 
+### Upkeep and fire
+
+Buildings wear a little every day, faster in storms and snow. Below half their
+condition the village repairs them: a small repair site opens at the door
+("Repairs to Harbour cottage 3"), residents carry a share of the building's
+materials there and the civic fund pays as for any site. Neglected below 30%, a
+building works worse (slower work, a colder home, a smaller store) and at 0 it
+cannot be used until repaired. An oven, a forge and, in winter, a home's hearth
+can catch fire; a worn building more easily. Smoke and sparks rise from a
+burning building, the alerts say "Fire at the bakery in Alderwood", and
+residents nearby come to fight it, which keeps the damage and the chance it
+spreads next door low. The Projects page counts the repairs and the fires; the
+building card shows the condition. Rules and numbers:
+[economy guide](island-economy-authoring.md#upkeep-and-fire).
+
 ### Building cards
 
 Click a site or a building in Oversee (not a resident, who takes precedence;
@@ -613,7 +628,9 @@ of thing it is and where, and two icon buttons: **Show on the island**, which
 frames it again, and **Close** (**Esc**). A site says how it stands as a shape,
 a colour and words (**Collecting materials**, **Waiting** after a day without a
 delivery or while the fund cannot pay, **Ready to build**, **Under way**,
-**Finished**) with a progress bar, then its materials, its builder and the planner's reason; a home shows its
+**Finished**) with a progress bar, then its materials, its builder and the planner's reason; a building that
+wears first says its condition ("Condition 42% · needs repair", "worn, works worse", "unusable until
+repaired", "On fire"), and whether repairs are under way; a home shows its
 beds, who lives there and whether the hearth is lit; a workplace its trade and
 who works there, and an inn also who is inside now; a store or a stall its stock, how full it is and what it has
 sold. Where a building has more than one kind of fact the card has tabs:

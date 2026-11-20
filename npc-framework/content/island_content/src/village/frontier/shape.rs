@@ -591,10 +591,11 @@ pub fn export_spec(world: &World) -> Option<LivingWorldSpec> {
                     )
                 })
             } else {
-                // Prop sites are exported with the props.
+                // Prop sites are exported with the props; repairs are
+                // not a building of their own.
                 let site = world
                     .get::<ConstructionSite>(*entity)
-                    .filter(|site| !site.is_prop())?;
+                    .filter(|site| !site.is_prop() && site.repairs().is_none())?;
                 Some((
                     *id,
                     PlacedBuilding {

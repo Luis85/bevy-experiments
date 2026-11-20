@@ -113,6 +113,33 @@ pub fn home_of(world: &World, resident: SimId) -> Option<SimId> {
         .map(|(id, _)| *id)
         .min()
 }
+/// The actor's own home, if it has one.
+pub fn home_entity(world: &World, actor: Entity) -> Option<Entity> {
+    world
+        .get::<SimId>(actor)
+        .and_then(|id| home_of(world, *id))
+        .and_then(|id| world.resource::<SimIndex>().get(id))
+}
+
+/// The actor's own home as a shelter: whether its hearth is lit, and how
+/// well it shelters in percent (`civic::upkeep::shelter_percent`: a worn
+/// home less, one that can no longer be used not at all, and then its
+/// hearth gives no heat either). Without a colony, a lit hearth and full
+/// shelter, as `home_heated`.
+pub fn home_shelter(world: &World, actor: Entity) -> (bool, u32) {
+    if !world.contains_resource::<ColonyState>() {
+        return (true, 100);
+    }
+    let Some(home) = home_entity(world, actor) else {
+        return (false, 100);
+    };
+    let shelter = super::super::civic::upkeep::shelter_percent(world, home);
+    let heated = world
+        .get::<Household>(home)
+        .is_some_and(|home| home.heated_until > world.resource::<SimClock>().tick);
+    (heated && shelter > 0, shelter)
+}
+
 pub fn home_heated(world: &World, actor: Entity) -> bool {
     if !world.contains_resource::<ColonyState>() {
         return true;
@@ -561,7 +588,8 @@ pub(super) fn tick(world: &mut World, now: u64) -> bool {
         let fuels = super::super::roles::roles(world).fuels;
         for (house_id, entity) in households(world) {
             let house = world.get::<Household>(entity).expect("house").clone();
-            if house.heated_until > now {
+            // A home that can no longer be used has no hearth to light.
+            if house.heated_until > now || !super::super::civic::upkeep::usable(world, entity) {
                 continue;
             }
             for resident in &house.residents {

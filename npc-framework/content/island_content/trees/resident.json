@@ -24,6 +24,9 @@
     {"name": "Current activity", "kind": {"Guard": {"cond": "life.busy", "abort": "None"}}, "children": [
       {"name": "Carry on", "kind": {"Leaf": {"action": "life.continue", "param": "None"}}}
     ]},
+    {"name": "Fire nearby", "kind": {"Guard": {"cond": "life.fire_nearby", "abort": "None"}}, "children": [
+      {"name": "Fight the fire", "kind": {"Leaf": {"action": "life.fight_fire", "param": "None"}}}
+    ]},
     {"name": "Thirst", "kind": {"Guard": {"cond": "life.thirsty", "abort": "LowerPriority"}}, "children": [
       {"name": "Quench thirst", "kind": "Selector", "children": [
         {"name": "Drink", "kind": {"Leaf": {"action": "life.drink", "param": "None"}}},

@@ -248,6 +248,18 @@ fn rank(world: &World, site: &ConstructionSite, held: bool) -> (bool, u8) {
     if site.is_prop() {
         return (held, 0);
     }
+    // Repairs: a home or a building that can no longer be used comes first,
+    // with the homes; any other after the overseer's plot.
+    if let Some(target) = site.repairs() {
+        let home = super::definition(world, &site.building)
+            .is_some_and(|def| matches!(def.kind, BuildingKind::Home { .. }));
+        let broken = !super::upkeep::usable_id(world, target);
+        return if home || broken {
+            (false, if held { 2 } else { 0 })
+        } else {
+            (held, 2)
+        };
+    }
     let Some(def) = super::definition(world, &site.building) else {
         return (true, u8::MAX);
     };
@@ -812,6 +824,31 @@ fn finish(world: &mut World, site_id: SimId, builder: Option<SimId>, founding: b
         );
         return;
     }
+    // A repair site mends its building: the site goes, the building is
+    // sound again.
+    if site.repairs().is_some() {
+        release_workers(world, site_id);
+        {
+            let mut civic = world.resource_mut::<CivicState>();
+            if let Some(sites) = civic.sites.get_mut(&site.settlement) {
+                sites.retain(|id| *id != site_id);
+            }
+            if let Some(planner) = civic.planners.get_mut(&site.settlement) {
+                planner.projects.retain(|id| *id != site_id);
+            }
+        }
+        world.despawn(entity);
+        super::upkeep::repaired(world, &site, site_id);
+        crate::village::colony_demand_changed(world);
+        record_effect(
+            world,
+            None,
+            "VillageCivicProject",
+            &json!({"settlement":site.settlement,"decision":"repaired","building":site.building,
+                "site":site_id,"reason":site.reason,"paid":site.paid,"repair":site.repairs()}),
+        );
+        return;
+    }
     let Some(def) = economy_spec::registry(world)
         .and_then(|registry| registry.spec.building(&site.building))
         .cloned()
@@ -910,6 +947,7 @@ fn finish(world: &mut World, site_id: SimId, builder: Option<SimId>, founding: b
     if let Some(herd) = &def.livestock {
         crate::village::livestock::established(world, entity, herd);
     }
+    super::upkeep::established(world, entity, &site.building, founding);
     crate::village::colony_demand_changed(world);
     if founding {
         record_effect(

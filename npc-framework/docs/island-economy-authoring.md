@@ -208,6 +208,90 @@ house (the hen keeper's workplace, four to eight hens) and the garden plot. The 
 world starts with are still listed under `settlements`; the buildings section
 describes what can be added later, with the same beds, professions and stations.
 
+### Upkeep and fire
+
+A building whose entry has an `upkeep` block wears and may burn; one without
+(the fields, the garden plot) never does. Conditions are permille of a sound
+building, saved and hashed (`civic::upkeep::Upkeep`).
+
+```json
+{"id": "bakery", "upkeep": {"wear_per_day": 20, "bad_weather_percent": 150,
+  "repair_percent": 40, "fire": {"daily_permille": 5}}},
+{"id": "cottage", "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150,
+  "repair_percent": 40, "fire": {"daily_permille": 3, "seasons": ["winter"]}}}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `wear_per_day` | Condition lost each day, 0 to 1000 |
+| `bad_weather_percent` | Wear on a day of storm or snow, percent of an ordinary day's (default 100) |
+| `repair_percent` | Share of the building's `cost` and `work_ticks` a repair from 0 takes, 1 to 100; a lighter repair takes that share of the damage (rounded up, at least one unit) |
+| `fire` | `daily_permille` (at most 100) and the `seasons` it applies in (empty: all year). Absent: it never catches fire itself, though a fire next door may spread to it |
+
+The shared rules are the `economy.upkeep` section:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `repair_below_permille` | 500 | Below this the building needs repair: the planner opens a repair site |
+| `worn_below_permille` | 300 | Below this it is worn and works worse; at 0 it is unusable until repaired |
+| `founding_min_permille` | 600 | Buildings of the founding start at a seeded condition from this up to sound |
+| `worn_work_percent` | 125 | Crafting at a worn workplace takes this share of the time |
+| `worn_warmth_percent` | 60 | A worn home's shelter and hearth warm at this share |
+| `worn_storage_percent` | 75 | A worn store or stall takes new goods up to this share of its capacity |
+| `fire_worn_percent` | 200 | Fire chance of a worn building, percent of a sound one's |
+| `fire_burn_ticks` | 2000 | How long a fire burns when nobody fights it |
+| `fire_flash_permille`, `fire_damage_per_100_ticks` | 150, 35 | Condition a fire takes at once, and every 100 ticks while it burns |
+| `fire_fighter_relief_percent` | 50 | Each firefighter at the door multiplies damage and spread by 100 / (100 + 50 per fighter) |
+| `fire_fight_ticks` | 900 | Fighter-ticks that put a fire out (three fighters: 300 ticks) |
+| `fire_water_percent` | 200 | A firefighter with water works this fast, spending one unit per 100 ticks |
+| `fire_reach_m` | 40 | Residents within this distance come to fight (`life.fire_nearby`, `life.fight_fire`) |
+| `fire_spread_m`, `fire_spread_permille` | 10, 15 | A fire may spread to a building whose door is this close, with this chance per 100 ticks |
+
+What a worn or broken building does: a workplace crafts slower
+(`worn_work_percent`) and at 0 takes no work at all; a home shelters and its
+hearth warms at `worn_warmth_percent`, and at 0 it shelters nobody, its hearth
+cannot be lit and its residents rent a bed at any staffed inn; a store or a
+stall takes new goods only up to `worn_storage_percent` of its capacity, and at
+0 none (what lies there stays and sells).
+
+Repairs go through the ordinary site path. At each review the planner picks the
+building of the settlement in the worst condition below `repair_below_permille`
+that is not burning (one repair site at a time per settlement: repairs are one
+need) and opens a repair site on the cell at its door (`SiteKind::Repair`,
+`civic::sites(world)[i].kind == "repair"`, labelled "Repairs to Harbour
+cottage 3"), with the planner's other checks (a free builder, a place in
+`max_open_sites`, materials that can come, coins). It is supplied by haulers,
+paid on delivery by the civic fund and worked in stages like any site; the last
+stage makes the building sound again and the site goes. A repair of a home or of
+a building that can no longer be used comes before every other project and is
+served with the homes; any other comes right after the homes.
+
+Fires are rolled once a day from the world seed, the building and the day; one
+that is due breaks out at a seeded tick between six in the morning and ten at
+night. While it burns it is in `civic::upkeep::UpkeepState.burning`, and every
+100 ticks residents within 4 m of the door fight it. Journal effects:
+`VillageFire` (building, label, kind, settlement, pos, `from` when it spread),
+`VillageFireOut` (damage, fighters, `put_out`, `burned_out`),
+`VillageBuildingUnusable`, `VillageBuildingRepaired`; the alerts say "Fire at
+the bakery in Alderwood". `civic::upkeep::report(world)` sums the island.
+
+Why these defaults. A timber building wants a repair about once in a 28-day year:
+at 15 a day a sound cottage reaches the repair mark in 34 days, and the seeded
+founding conditions spread the first repairs over days 7 to 33 so they do not
+all fall due at once. An oven and a forge wear faster (20) and burn all year;
+an open yard (the well, the fishing hut) and a stockpile wear slower (10). The
+200-point gap between the repair mark and the worn mark gives the planner about
+two weeks to finish a repair before a building works worse, so worn effects
+show where repairs fall behind, not as a matter of course. A repair costs 40%
+of the cost from nothing, so a typical repair at 450 costs about a fifth of the
+building (a cottage: 2 to 3 planks and 1 to 2 logs). Fires are rare: about one
+oven or forge fire and one winter hearth fire a year on the shipped island
+(six ovens and forges at 5 permille over 28 days, 42 homes at 3 permille over
+7 winter days). A fire nobody fights takes 850 (flash 150 and 35 a step for 20
+steps) and leaves a building already below 850 unusable; three firefighters
+put it out in about 300 ticks with a quarter of that damage. These are the
+shipped values, not values tuned to a test.
+
 ### Seed
 
 `coins` per founder; `common` goods for every founder; `founders`, the fourteen

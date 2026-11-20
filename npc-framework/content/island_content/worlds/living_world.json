@@ -2244,6 +2244,7 @@
             }
           ],
           "work_ticks": 600,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40, "fire": {"daily_permille": 3, "seasons": ["winter"]}},
           "footprint": {
             "width": 4,
             "depth": 5
@@ -2275,6 +2276,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2308,6 +2310,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2341,6 +2344,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 20, "bad_weather_percent": 150, "repair_percent": 40, "fire": {"daily_permille": 5}},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2374,6 +2378,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 10, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 3,
             "depth": 3
@@ -2408,6 +2413,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2441,6 +2447,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2474,6 +2481,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2507,6 +2515,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 20, "bad_weather_percent": 150, "repair_percent": 40, "fire": {"daily_permille": 5}},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2540,6 +2549,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2573,6 +2583,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2606,6 +2617,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2639,6 +2651,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 5
@@ -2672,6 +2685,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 10, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 3,
             "depth": 3
@@ -2702,6 +2716,7 @@
             }
           ],
           "work_ticks": 200,
+          "upkeep": {"wear_per_day": 10, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 4,
             "depth": 4
@@ -2734,6 +2749,7 @@
             }
           ],
           "work_ticks": 600,
+          "upkeep": {"wear_per_day": 12, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 5,
             "depth": 4
@@ -2766,6 +2782,7 @@
             }
           ],
           "work_ticks": 800,
+          "upkeep": {"wear_per_day": 15, "bad_weather_percent": 150, "repair_percent": 40, "fire": {"daily_permille": 3, "seasons": ["winter"]}},
           "footprint": {
             "width": 5,
             "depth": 6
@@ -2830,6 +2847,7 @@
             }
           ],
           "work_ticks": 400,
+          "upkeep": {"wear_per_day": 12, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 4,
             "depth": 3
@@ -2865,6 +2883,7 @@
             }
           ],
           "work_ticks": 300,
+          "upkeep": {"wear_per_day": 12, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 3,
             "depth": 2
@@ -2931,6 +2950,7 @@
             }
           ],
           "work_ticks": 400,
+          "upkeep": {"wear_per_day": 12, "bad_weather_percent": 150, "repair_percent": 40},
           "footprint": {
             "width": 4,
             "depth": 3
@@ -3660,6 +3680,25 @@
         "help_work_ticks": 300,
         "haul_fee_percent": 20,
         "builder_wage": 4
+      },
+      "upkeep": {
+        "enabled": true,
+        "repair_below_permille": 500,
+        "worn_below_permille": 300,
+        "founding_min_permille": 600,
+        "worn_work_percent": 125,
+        "worn_warmth_percent": 60,
+        "worn_storage_percent": 75,
+        "fire_worn_percent": 200,
+        "fire_burn_ticks": 2000,
+        "fire_flash_permille": 150,
+        "fire_damage_per_100_ticks": 35,
+        "fire_fighter_relief_percent": 50,
+        "fire_fight_ticks": 900,
+        "fire_water_percent": 200,
+        "fire_reach_m": 40,
+        "fire_spread_m": 10,
+        "fire_spread_permille": 15
       },
       "props": [
         {

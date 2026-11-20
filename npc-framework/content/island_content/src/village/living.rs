@@ -527,14 +527,33 @@ pub fn climate_tick(world: &mut World) {
                     .get::<Durability>(*item)
                     .is_some_and(|d| d.current > 0)
             });
-        let heated = sheltered && super::colony::home_heated(world, actor);
+        // The own home's hearth, and how well the building shelters: a worn
+        // home warms less, one that can no longer be used not at all (as in
+        // the open). Inside another building (an inn) it is that building's.
+        let (heated, shelter) = if !sheltered {
+            (false, 100)
+        } else {
+            let (heated, shelter) = super::colony::home_shelter(world, actor);
+            match super::indoors::inside_entity(world, actor) {
+                Some(inside)
+                    if world
+                        .get::<SimId>(actor)
+                        .and_then(|id| super::colony::home_of(world, *id))
+                        != Some(inside) =>
+                {
+                    (heated, 100)
+                }
+                _ => (heated, shelter),
+            }
+        };
+        let sheltered = sheltered && shelter > 0;
         let warmth_before = economy::need(world, actor, "Warmth");
         change_need(
             world,
             actor,
             "Warmth",
             if sheltered {
-                if heated { 100 } else { 20 }
+                (if heated { 100 } else { 20 }) * shelter as i32 / 100
             } else if !cold {
                 10
             } else if coat.is_some() {

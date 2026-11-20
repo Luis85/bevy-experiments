@@ -10,6 +10,27 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island economy, housing and tick cost (S4)
 
+- Building upkeep and fire (`village::civic::upkeep`). Every building whose definition has the new `upkeep` block
+  (`wear_per_day`, `bad_weather_percent`, `repair_percent`, optional `fire {daily_permille, seasons}`) carries
+  `Upkeep` (hash name `island_building_upkeep_v1`, saved: condition permille, a pending ignition, the fire, since when
+  unusable); `UpkeepState` (`island_upkeep_state_v1`) keeps the day, the ignitions and fires and the tallies. The new
+  `economy.upkeep` section holds the shared rules (repair below 500, worn below 300, seeded founding condition
+  600..=1000, worn work 125%, warmth 60%, storage 75%, fire flash 150 and 35 per 100 ticks for 2000 ticks, relief 50%
+  per firefighter, 900 fighter-ticks, water 200%, reach 40 m, spread 10 m at 15 permille per 100 ticks). Buildings wear
+  once a day (150% on storm and snow days); a worn workplace crafts slower and a broken one takes no work, a worn home
+  shelters and heats less and a broken one not at all (its hearth is not lit; its residents rent any staffed inn), a
+  worn store withholds a share of its room (`Depot.withheld`) and a broken one takes nothing new. Repairs are civic
+  projects on the existing site path: `SiteKind::Repair { target }` on the door cell, a share of the build materials
+  and work, paid by the civic fund, one repair need per settlement under the planner's usual checks (`admit`, factored
+  out of `commission`); repairs of homes or broken buildings go first. Fires are rolled daily from the world seed,
+  break out at a seeded hour, spread with a seeded chance to near doors, and residents nearby fight them through the
+  new leaf `life.fight_fire` and condition `life.fire_nearby` (tree branch "Fire nearby"). Journal effects
+  `VillageFire`, `VillageFireOut`, `VillageBuildingUnusable`, `VillageBuildingRepaired`; alerts "Fire at the bakery in
+  Alderwood" (critical), building cards show the condition and "needs repair", the Projects page counts repairs and
+  fires, and a burning building shows dense smoke and sparks (`smoke::blaze`, generated quads, no new asset).
+  `ISLAND_SAVE_VERSION` 10; content and state hashes change, island replays to be re-baselined. Tests: new
+  `island_upkeep` (8), card and alert tests in `island_view`; five `Card` literals gain `upkeep: None` (mechanical);
+  the year soak prints `GENERATIONS_UPKEEP` and the year trace `TRACE_UPKEEP` and accepts `TRACE_UPKEEP_PATCH`.
 - Richer traits (review npc-ai#13). `ResidentTraits` (hash name `regional_resident_traits_v2`, saved) gains
   `curiosity` and `caution` (0..=100, seeded with new `sim_rand` purposes; the four existing draws are unchanged), and
   every trait now feeds an existing decision through hashed, validated `behavior.traits` scales, all centred on 50:

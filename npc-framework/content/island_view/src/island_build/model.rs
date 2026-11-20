@@ -680,7 +680,48 @@ pub(crate) enum CardBody {
 pub(crate) struct Card {
     pub(crate) title: String,
     pub(crate) settlement: Option<String>,
+    /// The building's condition, for one that wears (`civic::upkeep`).
+    pub(crate) upkeep: Option<CardUpkeep>,
     pub(crate) body: CardBody,
+}
+
+/// What a building card says of the building's upkeep.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CardUpkeep {
+    /// Condition, permille.
+    pub(crate) condition: u32,
+    pub(crate) needs_repair: bool,
+    pub(crate) worn: bool,
+    pub(crate) unusable: bool,
+    pub(crate) burning: bool,
+    /// A repair site is open for it.
+    pub(crate) repairing: bool,
+}
+
+impl CardUpkeep {
+    /// "Condition 42% · needs repair", and what follows from it.
+    pub(crate) fn lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        if self.burning {
+            lines.push("On fire: residents nearby are fighting it.".to_owned());
+        }
+        let state = if self.unusable {
+            " · unusable until repaired"
+        } else if self.worn {
+            " · worn, works worse · needs repair"
+        } else if self.needs_repair {
+            " · needs repair"
+        } else {
+            ""
+        };
+        lines.push(format!("Condition {}%{state}", self.condition / 10));
+        if self.repairing {
+            lines.push("Repairs are under way.".to_owned());
+        } else if self.needs_repair {
+            lines.push("The village repairs it when it has the builders and the coins.".to_owned());
+        }
+        lines
+    }
 }
 
 fn names(list: &[String], nobody: &str) -> String {
@@ -760,6 +801,17 @@ impl Card {
         } else {
             CardTab::Overview
         };
+        if tab == CardTab::Overview
+            && let Some(upkeep) = &self.upkeep
+        {
+            let mut lines = upkeep.lines();
+            lines.extend(self.tab_lines_of(tab));
+            return lines;
+        }
+        self.tab_lines_of(tab)
+    }
+
+    fn tab_lines_of(&self, tab: CardTab) -> Vec<String> {
         let listed = |names: &[String], nobody: &str| {
             if names.is_empty() {
                 vec![nobody.to_owned()]
@@ -873,8 +925,15 @@ impl Card {
             None => kind.to_owned(),
         }
     }
-    /// The card's lines under the kind line.
+    /// The card's lines under the kind line: the condition of a building
+    /// that wears, then what its kind shows.
     pub(crate) fn lines(&self) -> Vec<String> {
+        let mut lines = self.upkeep.map(|upkeep| upkeep.lines()).unwrap_or_default();
+        lines.extend(self.body_lines());
+        lines
+    }
+
+    fn body_lines(&self) -> Vec<String> {
         match &self.body {
             CardBody::Site(site) => {
                 let mut lines = vec![

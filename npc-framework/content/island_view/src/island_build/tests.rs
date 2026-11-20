@@ -337,6 +337,7 @@ fn a_building_card_shows_what_its_kind_needs() {
     let site = Card {
         title: "Harbour cottage 3".into(),
         settlement: Some("Harbour".into()),
+        upkeep: None,
         body: CardBody::Site(site((8, 4), 300)),
     };
     assert_eq!(
@@ -367,6 +368,7 @@ fn a_building_card_shows_what_its_kind_needs() {
     let home = Card {
         title: "Harbour cottage 3".into(),
         settlement: None,
+        upkeep: None,
         body: CardBody::Home {
             beds: 2,
             residents: vec!["Ada".into()],
@@ -382,6 +384,7 @@ fn a_building_card_shows_what_its_kind_needs() {
     let work = Card {
         title: "Harbour smithy 1".into(),
         settlement: Some("Harbour".into()),
+        upkeep: None,
         body: CardBody::Workplace {
             trade: "Blacksmith".into(),
             seats: Some(2),
@@ -399,6 +402,7 @@ fn a_building_card_shows_what_its_kind_needs() {
     let inn = Card {
         title: "Harbour inn".into(),
         settlement: Some("Harbour".into()),
+        upkeep: None,
         body: CardBody::Workplace {
             trade: "Innkeeper".into(),
             seats: None,
@@ -455,6 +459,7 @@ fn a_building_card_shows_what_its_kind_needs() {
     let stall = Card {
         title: "Harbour market stall 1".into(),
         settlement: Some("Harbour".into()),
+        upkeep: None,
         body: CardBody::Depot {
             stall: true,
             shelf: Shelf {
@@ -1218,4 +1223,79 @@ fn a_workplace_card_is_titled_by_its_building() {
         workplace_title("Harbour innkeeper", "innkeeper", Some("Harbour inn")),
         "Harbour inn"
     );
+}
+
+#[test]
+fn a_building_card_shows_its_condition_and_whether_it_needs_repair() {
+    let upkeep = model::CardUpkeep {
+        condition: 420,
+        needs_repair: true,
+        worn: false,
+        unusable: false,
+        burning: false,
+        repairing: false,
+    };
+    let home = Card {
+        title: "Harbour cottage 3".into(),
+        settlement: None,
+        upkeep: Some(upkeep),
+        body: CardBody::Home {
+            beds: 2,
+            residents: vec!["Ada".into()],
+            heated: false,
+        },
+    };
+    assert_eq!(
+        home.tab_lines(model::CardTab::Overview)[..2],
+        [
+            "Condition 42% \u{b7} needs repair".to_owned(),
+            "The village repairs it when it has the builders and the coins.".to_owned()
+        ]
+    );
+    assert_eq!(home.lines()[0], "Condition 42% \u{b7} needs repair");
+    let burning = Card {
+        upkeep: Some(model::CardUpkeep {
+            condition: 0,
+            unusable: true,
+            worn: true,
+            burning: true,
+            repairing: true,
+            ..upkeep
+        }),
+        ..home.clone()
+    };
+    assert_eq!(
+        burning.lines()[..3],
+        [
+            "On fire: residents nearby are fighting it.".to_owned(),
+            "Condition 0% \u{b7} unusable until repaired".to_owned(),
+            "Repairs are under way.".to_owned()
+        ]
+    );
+    // A sound building just says so.
+    let sound = Card {
+        upkeep: Some(model::CardUpkeep {
+            condition: 980,
+            needs_repair: false,
+            ..upkeep
+        }),
+        ..home
+    };
+    assert_eq!(sound.lines()[0], "Condition 98%");
+    assert_eq!(sound.tab_lines(model::CardTab::People), ["Ada"]);
+}
+
+/// The card of a running world reads the simulation's own condition and
+/// records nothing.
+#[test]
+fn the_card_of_a_founding_home_reads_its_condition() {
+    let mut app = island_content::try_new_sim_app(7, "living_world", 1).expect("island");
+    run_ticks(app.world_mut(), 2);
+    let home = app.world().resource::<IslandIds>().id("harbour_home_00");
+    let hash = state_hash(app.world_mut());
+    let card = card(app.world(), home).expect("a card");
+    let upkeep = card.upkeep.expect("a home wears");
+    assert!((600..=1000).contains(&upkeep.condition));
+    assert!(card.lines()[0].starts_with("Condition "));
+    assert_eq!(state_hash(app.world_mut()), hash, "a card records nothing");
 }

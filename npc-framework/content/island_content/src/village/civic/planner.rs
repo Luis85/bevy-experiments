@@ -437,7 +437,9 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
         if !sites::stalled(site, now, stall) {
             in_progress += 1;
         }
-        if let Some(def) = super::definition(world, &site.building) {
+        if site.repairs().is_some() {
+            open_keys.insert(REPAIR_KEY.to_owned());
+        } else if let Some(def) = super::definition(world, &site.building) {
             open_keys.insert(need_key(def));
         }
         open.push(site_id);
@@ -604,6 +606,26 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
     if let Some(role) = role_due {
         due.push((role_levels.get(&role).copied().unwrap_or_default(), 4));
     }
+    // Upkeep: one repair at a time, the building in the worst condition
+    // first. A building that can no longer be used, or a home, comes before
+    // everything else; any other right after the homes.
+    let repair = if open_keys.contains(REPAIR_KEY) {
+        None
+    } else {
+        super::upkeep::repair_candidate(world, settlement)
+    };
+    if let Some((target, _, _, broken)) = &repair {
+        let home = world
+            .resource::<SimIndex>()
+            .get(*target)
+            .is_some_and(|entity| world.get::<colony::Household>(entity).is_some());
+        if *broken || home {
+            due.insert(0, (oversee::PriorityLevel::High, 5));
+        } else {
+            let at = usize::from(beds_due);
+            due.insert(at, (housing_level, 5));
+        }
+    }
     // The planner's choice for one due need: the building and its reason.
     let choose = |world: &World, need: u8| -> Option<(String, String)> {
         if need == 0 {
@@ -687,6 +709,33 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
     let slots = (members.len() / tuning.planner_residents_per_project.max(1) as usize).max(1);
     let mut deferral: Option<(String, serde_json::Value)> = None;
     for need in oversee::order_projects(due) {
+        if need == 5 {
+            let Some((target, cost, work, broken)) = repair.clone() else {
+                continue;
+            };
+            let outcome = commission_repair(
+                world,
+                settlement,
+                target,
+                cost,
+                work,
+                broken,
+                &open,
+                in_progress,
+                slots,
+            );
+            match outcome {
+                Commission::Placed => return,
+                Commission::Wait(decision, detail) => {
+                    decide(world, settlement, &decision, detail);
+                    return;
+                }
+                Commission::Skip(decision, detail) => {
+                    deferral.get_or_insert((decision, detail));
+                }
+            }
+            continue;
+        }
         let Some((building, reason)) = choose(world, need) else {
             continue;
         };
@@ -720,6 +769,8 @@ fn review(world: &mut World, settlement: SimId, now: u64) {
 /// What the planner keys an open project by: one project answers each need.
 /// Every home answers the one need for beds; any other building its own.
 const HOME_KEY: &str = "home";
+/// Every repair answers the one need for upkeep: one repair site at a time.
+const REPAIR_KEY: &str = "repair";
 fn need_key(def: &BuildingDef) -> String {
     if matches!(def.kind, BuildingKind::Home { .. }) {
         HOME_KEY.to_owned()
@@ -761,66 +812,23 @@ fn commission(
     let building = def.id.clone();
     let cost = estimate(world, def);
     let fund = world.resource::<VillageState>().fund;
-    let further = !open.is_empty();
-    if further {
-        if in_progress >= slots {
-            return Commission::Wait(
-                "deferred: every builder the settlement can spare is busy".into(),
-                json!({"building":building,"reason":reason,"projects":open.len(),
-                    "in_progress":in_progress,"slots":slots}),
-            );
-        }
-        if sites::open_building_sites(world, settlement) + 1 >= super::max_open_sites(world) {
-            return Commission::Wait(
-                "deferred: the last open site is kept for the overseer".into(),
-                json!({"building":building,"reason":reason,"projects":open.len()}),
-            );
-        }
-        let goods: super::model::Goods = def
-            .cost
-            .iter()
-            .map(|stack| (stack.good.clone(), stack.count))
-            .collect();
-        // A home outranks another project for the goods it still lacks
-        // (`sites::home_waits_for`): a further project needing them waits
-        // until the home has them.
-        if let Some(kind) = goods
-            .keys()
-            .find(|kind| sites::home_waits_for(world, settlement, kind))
-        {
-            return Commission::Skip(
-                format!("deferred: a home still waits for {kind}"),
-                json!({"building":building,"reason":reason,"good":kind}),
-            );
-        }
-        if let Err(kind) = super::supply::materials_reachable(world, settlement, &goods) {
-            return Commission::Skip(
-                format!("deferred: no {kind} can reach another site now"),
-                json!({"building":building,"reason":reason,"good":kind}),
-            );
-        }
-    }
-    // What the fund may spend now, plus what the building levy can raise;
-    // a further project also leaves what the open sites still need.
-    let committed = if further {
-        sites::outstanding_cost_of(world, settlement)
-    } else {
-        0
-    };
-    if cost.saturating_add(committed)
-        > sites::budget(world).saturating_add(sites::levy_capacity(world))
-    {
-        world
-            .resource_mut::<CivicState>()
-            .planners
-            .entry(settlement)
-            .or_default()
-            .pending_cost = cost;
-        return Commission::Wait(
-            "deferred: the civic fund cannot pay for the materials yet".into(),
-            json!({"building":building,"reason":reason,"estimated_cost":cost,"fund":fund,
-                "committed":committed}),
-        );
+    let goods: super::model::Goods = def
+        .cost
+        .iter()
+        .map(|stack| (stack.good.clone(), stack.count))
+        .collect();
+    if let Err(outcome) = admit(
+        world,
+        settlement,
+        &building,
+        reason,
+        &goods,
+        cost,
+        open,
+        in_progress,
+        slots,
+    ) {
+        return outcome;
     }
     let Some((x, z, rotation)) =
         find_site(world, def, settlement, tuning.planner_search_radius_cells)
@@ -865,6 +873,158 @@ fn commission(
         Err(error) => Commission::Skip(
             "deferred: the chosen site was refused".into(),
             json!({"building":building,"reason":reason,"refusal":error}),
+        ),
+    }
+}
+
+/// The checks every civic project passes before it opens. The first project
+/// of a settlement needs only the coins; a further one needs, besides, a
+/// free builder (fewer projects that can progress than `slots`), a place in
+/// the open-site allowance that leaves one for the overseer, no good an
+/// open home still lacks, materials that can come
+/// (`supply::materials_reachable`) and coins for itself on top of what the
+/// settlement's open sites still need.
+#[allow(clippy::too_many_arguments)]
+fn admit(
+    world: &mut World,
+    settlement: SimId,
+    building: &str,
+    reason: &str,
+    goods: &super::model::Goods,
+    cost: u32,
+    open: &[SimId],
+    in_progress: usize,
+    slots: usize,
+) -> Result<(), Commission> {
+    let fund = world.resource::<VillageState>().fund;
+    let further = !open.is_empty();
+    if further {
+        if in_progress >= slots {
+            return Err(Commission::Wait(
+                "deferred: every builder the settlement can spare is busy".into(),
+                json!({"building":building,"reason":reason,"projects":open.len(),
+                    "in_progress":in_progress,"slots":slots}),
+            ));
+        }
+        if sites::open_building_sites(world, settlement) + 1 >= super::max_open_sites(world) {
+            return Err(Commission::Wait(
+                "deferred: the last open site is kept for the overseer".into(),
+                json!({"building":building,"reason":reason,"projects":open.len()}),
+            ));
+        }
+        // A home outranks another project for the goods it still lacks
+        // (`sites::home_waits_for`): a further project needing them waits
+        // until the home has them.
+        if let Some(kind) = goods
+            .keys()
+            .find(|kind| sites::home_waits_for(world, settlement, kind))
+        {
+            return Err(Commission::Skip(
+                format!("deferred: a home still waits for {kind}"),
+                json!({"building":building,"reason":reason,"good":kind}),
+            ));
+        }
+        if let Err(kind) = super::supply::materials_reachable(world, settlement, goods) {
+            return Err(Commission::Skip(
+                format!("deferred: no {kind} can reach another site now"),
+                json!({"building":building,"reason":reason,"good":kind}),
+            ));
+        }
+    }
+    // What the fund may spend now, plus what the building levy can raise;
+    // a further project also leaves what the open sites still need.
+    let committed = if further {
+        sites::outstanding_cost_of(world, settlement)
+    } else {
+        0
+    };
+    if cost.saturating_add(committed)
+        > sites::budget(world).saturating_add(sites::levy_capacity(world))
+    {
+        world
+            .resource_mut::<CivicState>()
+            .planners
+            .entry(settlement)
+            .or_default()
+            .pending_cost = cost;
+        return Err(Commission::Wait(
+            "deferred: the civic fund cannot pay for the materials yet".into(),
+            json!({"building":building,"reason":reason,"estimated_cost":cost,"fund":fund,
+                "committed":committed}),
+        ));
+    }
+    Ok(())
+}
+
+/// Opens the repair site of `target` for the planner, through the same
+/// checks as any civic project (`admit`).
+#[allow(clippy::too_many_arguments)]
+fn commission_repair(
+    world: &mut World,
+    settlement: SimId,
+    target: SimId,
+    goods: super::model::Goods,
+    work: u32,
+    broken: bool,
+    open: &[SimId],
+    in_progress: usize,
+    slots: usize,
+) -> Commission {
+    let Some(entity) = world.resource::<SimIndex>().get(target) else {
+        return Commission::Skip("deferred: the building is gone".into(), json!({}));
+    };
+    let key = world
+        .get::<super::upkeep::Upkeep>(entity)
+        .map(|upkeep| upkeep.building.clone())
+        .unwrap_or_default();
+    let condition = super::upkeep::condition(world, entity).unwrap_or(0);
+    let name = super::upkeep::label(world, entity);
+    let reason = if broken {
+        format!("{name} can no longer be used")
+    } else {
+        format!("{name} is worn ({}% sound)", condition / 10)
+    };
+    let cost = goods
+        .iter()
+        .map(|(kind, count)| count.saturating_mul(market::unit_price(world, kind).unwrap_or(0)))
+        .fold(0, u32::saturating_add);
+    if let Err(outcome) = admit(
+        world,
+        settlement,
+        &key,
+        &reason,
+        &goods,
+        cost,
+        open,
+        in_progress,
+        slots,
+    ) {
+        return outcome;
+    }
+    let fund = world.resource::<VillageState>().fund;
+    match super::upkeep::open_repair(world, target, goods, work, &reason) {
+        Ok(site) => {
+            {
+                let mut civic = world.resource_mut::<CivicState>();
+                let planner = civic.planners.entry(settlement).or_default();
+                planner.projects.push(site);
+                planner.projects.sort_unstable();
+                planner.last_decision = format!("commissioned repairs to {}", target.0);
+                planner.last_decision_text = format!("Commissioned repairs: {reason}");
+            }
+            record_effect(
+                world,
+                None,
+                "VillageCivicProject",
+                &json!({"settlement":settlement,"decision":"commissioned","building":key,
+                    "site":site,"reason":reason,"repair":target,"estimated_cost":cost,
+                    "fund":fund,"projects":open.len() + 1}),
+            );
+            Commission::Placed
+        }
+        Err(error) => Commission::Skip(
+            "deferred: the repair could not be laid out".into(),
+            json!({"building":key,"reason":reason,"refusal":error}),
         ),
     }
 }

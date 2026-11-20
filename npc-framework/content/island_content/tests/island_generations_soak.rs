@@ -555,6 +555,12 @@ impl Run {
                 .unwrap_or(0),
             world.resource::<VillageState>().fund,
         );
+        println!(
+            "GENERATIONS_UPKEEP seed={} day={} {season:?} {}",
+            self.seed,
+            day + 1,
+            serde_json::to_string(&civic::upkeep::report(world)).expect("report")
+        );
         let census = view::census(world);
         let civic = world.resource::<civic::CivicState>();
         let boat = world.resource::<merchant::Merchant>();

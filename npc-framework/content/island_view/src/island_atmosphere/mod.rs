@@ -103,7 +103,12 @@ pub(crate) fn plugin(app: &mut App) {
         )
         .add_systems(
             Update,
-            (night::night_lights, smoke::animate).in_set(ViewSystems::Present),
+            (
+                night::night_lights,
+                smoke::animate,
+                smoke::blaze.after(smoke::animate),
+            )
+                .in_set(ViewSystems::Present),
         );
     // Review aid: `ISLAND_VIEW_DRESSING=off` leaves out the outcrop rocks and
     // edge bushes, to measure what they cost.

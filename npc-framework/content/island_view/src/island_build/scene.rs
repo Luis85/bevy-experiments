@@ -983,7 +983,8 @@ fn sync(
                     .as_deref()
                     .and_then(|registry| registry.spec.building(&site.building))
                     .is_some_and(|def| def.field.is_some());
-                site_look(site.is_prop(), field)
+                // Repairs lie staked at the door of the building they mend.
+                site_look(site.is_prop() || site.repairs().is_some(), field)
             });
             match look {
                 SiteLook::Raised => spawn_site(

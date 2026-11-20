@@ -506,11 +506,20 @@ pub(crate) fn card(world: &World, id: SimId) -> Option<Card> {
     let entity = world.get_resource::<SimIndex>()?.get(id)?;
     let settlement = frontier::settlements::member(world, entity)
         .and_then(|settlement| settlement_label(world, settlement));
+    let upkeep = civic::upkeep::view(world, id).map(|view| model::CardUpkeep {
+        condition: view.condition,
+        needs_repair: view.needs_repair,
+        worn: view.worn,
+        unusable: view.unusable,
+        burning: view.burning,
+        repairing: view.repair_site.is_some(),
+    });
     if world.get::<civic::ConstructionSite>(entity).is_some() {
         let site = civic::sites(world).into_iter().find(|site| site.id == id)?;
         return Some(Card {
             title: site.label.clone(),
             settlement,
+            upkeep,
             body: CardBody::Site(site_row(world, &site)),
         });
     }
@@ -519,6 +528,7 @@ pub(crate) fn card(world: &World, id: SimId) -> Option<Card> {
         return Some(Card {
             title: built.map_or_else(|| "Store".to_owned(), |building| building.label.clone()),
             settlement,
+            upkeep,
             body: CardBody::Depot {
                 stall: depot.public,
                 shelf: Shelf {
@@ -542,6 +552,7 @@ pub(crate) fn card(world: &World, id: SimId) -> Option<Card> {
         return Some(Card {
             title: home.label.clone(),
             settlement,
+            upkeep,
             body: CardBody::Home {
                 beds: home.capacity,
                 residents: home
@@ -572,6 +583,7 @@ pub(crate) fn card(world: &World, id: SimId) -> Option<Card> {
             built.map(|building| building.label.as_str()),
         ),
         settlement,
+        upkeep,
         body: CardBody::Workplace {
             trade: crate::colony_panel::trade_display(world, place.role),
             seats: civic::workplace_seats(world, entity),

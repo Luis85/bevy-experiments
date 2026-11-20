@@ -14,8 +14,8 @@ pub use arrival::JoinIsland;
 pub use commands::ColonyAct;
 pub use housing::{
     ConstructionIntent, HomeHeating, can_claim_cottage, construction_intent,
-    construction_materials, cottage_claimed, heating_period_ticks, home_heated, home_heating,
-    home_of, household_materials,
+    construction_materials, cottage_claimed, heating_period_ticks, home_entity, home_heated,
+    home_heating, home_of, home_shelter, household_materials,
 };
 pub use model::{AwaitingArrival, ColonyState, Household, HousingProject, SocialLife};
 pub use social::Chatting;

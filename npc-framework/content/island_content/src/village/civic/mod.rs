@@ -15,6 +15,7 @@ mod placement;
 mod planner;
 mod sites;
 mod supply;
+pub mod upkeep;
 
 pub(crate) use depot::reserve as depot_reserve;
 pub use depot::{
@@ -69,6 +70,9 @@ pub fn register(app: &mut App) {
         .register_sim_component::<Depot>()
         .register_sim_component::<SiteWork>()
         .register_sim_component::<SuspendedWork>()
+        .register_sim_component::<upkeep::Upkeep>()
+        .init_resource::<upkeep::UpkeepState>()
+        .register_sim_resource::<upkeep::UpkeepState>()
         .register_command::<PlaceBuilding>()
         .register_command::<CancelBuilding>();
 }
@@ -76,6 +80,7 @@ pub fn register(app: &mut App) {
 /// Call once after the settlements exist.
 pub fn spawn(world: &mut World) {
     planner::spawn(world);
+    upkeep::spawn(world);
 }
 
 /// Called once per tick by the regional Effects composition, after resident
@@ -85,6 +90,7 @@ pub fn tick(world: &mut World) {
         return;
     }
     let now = world.resource::<SimClock>().tick;
+    upkeep::tick(world, now);
     sites::tick(world, now);
     planner::tick(world, now);
 }
@@ -163,6 +169,8 @@ pub struct SiteView {
     pub paid: u32,
     /// One sentence on the money: funded, or short and by how much.
     pub funding: String,
+    /// The building a repair site mends; `None` for any other site.
+    pub repairs: Option<SimId>,
 }
 
 /// Every open construction site, ascending by identity.
@@ -181,8 +189,12 @@ pub fn sites(world: &World) -> Vec<SiteView> {
                 building: site.building.clone(),
                 label: site.label.clone(),
                 // A prop site reads `prop`; its `building` is the prop's key.
+                // A repair site reads `repair`; its `building` is the key of
+                // the building it mends.
                 kind: if site.is_prop() {
                     "prop"
+                } else if site.repairs().is_some() {
+                    "repair"
                 } else {
                     definition(world, &site.building).map_or("", |def| def.kind.name())
                 },
@@ -200,6 +212,7 @@ pub fn sites(world: &World) -> Vec<SiteView> {
                 last_delivery_at: site.last_delivery_at,
                 paid: site.paid,
                 funding: funding(world, site),
+                repairs: site.repairs(),
             })
         })
         .collect()
@@ -442,6 +455,7 @@ pub fn validate(world: &World) -> Result<(), String> {
             }
         }
     }
+    upkeep::validate(world)?;
     crate::village::fields::validate(world)?;
     crate::village::livestock::validate(world)?;
     crate::village::live::validate(world)?;

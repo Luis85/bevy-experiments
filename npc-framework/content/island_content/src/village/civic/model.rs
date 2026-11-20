@@ -97,6 +97,11 @@ pub enum SiteKind {
     /// A prop of the catalog (`ConstructionSite.building` is the prop's key),
     /// placed with the cell and quarter turns of its `PlaceProp`.
     Prop { x: i32, z: i32, rotation: u8 },
+    /// Repairs to a standing building (`ConstructionSite.building` is the
+    /// key of its definition): a share of its materials and work, laid out
+    /// on the cell at its door; finished, it restores the building's
+    /// condition (`upkeep`) and the site goes.
+    Repair { target: SimId },
 }
 
 /// A building under construction. The entity keeps its `SimId` when finished.
@@ -134,6 +139,13 @@ pub struct ConstructionSite {
 impl ConstructionSite {
     pub fn is_prop(&self) -> bool {
         matches!(self.kind, SiteKind::Prop { .. })
+    }
+    /// The building a repair site mends; `None` for any other site.
+    pub fn repairs(&self) -> Option<SimId> {
+        match self.kind {
+            SiteKind::Repair { target } => Some(target),
+            _ => None,
+        }
     }
     /// Whether `actor` may take the builder's place now.
     pub fn free_for(&self, actor: SimId, now: u64) -> bool {
@@ -183,6 +195,10 @@ impl SimHash for ConstructionSite {
                 h.i32(*x);
                 h.i32(*z);
                 h.u8(*rotation);
+            }
+            SiteKind::Repair { target } => {
+                h.u8(2);
+                h.u32(target.0);
             }
         }
     }
@@ -234,10 +250,15 @@ pub struct Depot {
     /// field's granary takes only the seed and harvest of its crop.
     #[serde(default)]
     pub only: Vec<String>,
+    /// Units of capacity a worn or broken building cannot take new goods
+    /// into (`upkeep`); goods already there stay and sell.
+    #[serde(default)]
+    pub withheld: u32,
 }
 impl Depot {
     pub fn new(capacity: u32, public: bool) -> Self {
         Self {
+            withheld: 0,
             only: Vec::new(),
             capacity,
             public,
@@ -280,7 +301,10 @@ impl Depot {
             .filter(|(holder, hold)| Some(**holder) != hauler && hold.until > now)
             .map(|(_, hold)| hold.count)
             .fold(0, u32::saturating_add);
-        self.free().saturating_sub(promised)
+        self.capacity
+            .saturating_sub(self.withheld)
+            .saturating_sub(self.used())
+            .saturating_sub(promised)
     }
     pub(crate) fn add(&mut self, kind: &str, owner: SimId, count: u32) {
         if count > 0 {
@@ -338,6 +362,7 @@ impl SimHash for Depot {
         for kind in &self.only {
             h.str(kind);
         }
+        h.u32(self.withheld);
     }
 }
 

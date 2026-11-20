@@ -145,6 +145,13 @@ pub const ACTIONS: &[ActionInfo] = &[
         doc: "Put on a carried coat. Fails when one is already worn or none is carried.",
     },
     ActionInfo {
+        name: "life.fight_fire",
+        start: timed!("life.fight_fire", fight_fire),
+        param: Param::None,
+        always_starts: false,
+        doc: "Living world: walk to the door of the nearest burning building within               `upkeep.fire_reach_m` and fight the fire there (every resident within 4 m of the               door slows its damage and its spread and helps put it out; one carrying water               spends a unit every 100 ticks and works faster). Fails when nothing burns near.",
+    },
+    ActionInfo {
         name: "life.gather",
         start: timed!("life.gather", gather),
         param: Param::NamesOrGood(GATHER_CLASSES),
@@ -421,6 +428,7 @@ pub(super) fn label(action: &str, param: &ParamValue) -> Option<&'static str> {
         ("life.drink", _) => "drinking",
         ("life.eat", _) => "eating",
         ("life.equip", _) => "putting on a coat",
+        ("life.fight_fire", _) => "fighting a fire",
         ("life.gather", "water") => "fetching water",
         ("life.gather", "food") => "foraging",
         ("life.gather", "fuel") => "gathering hearth fuel",
@@ -460,6 +468,7 @@ type Step = Result<(), &'static str>;
 const OUTDOOR_ERRANDS: &[&str] = &[
     "life.build",
     "life.craft",
+    "life.fight_fire",
     "life.gather",
     "life.go_to",
     "life.harvest",
@@ -1035,7 +1044,11 @@ fn inn_on_the_way(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
     let here = *world.get::<SimPos>(actor)?;
     let home = world.get::<Villager>(actor)?.home;
     let far = here.dist2(home);
-    if far < i64::from(tuning.inn_detour_m).pow(2) * 1_000_000 {
+    // A home that can no longer be used shelters nobody: any staffed inn
+    // is on the way then.
+    let roofless = super::super::colony::home_entity(world, actor)
+        .is_some_and(|home| !super::super::civic::upkeep::usable(world, home));
+    if !roofless && far < i64::from(tuning.inn_detour_m).pow(2) * 1_000_000 {
         return None;
     }
     let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
@@ -1052,7 +1065,7 @@ fn inn_on_the_way(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
                 return None;
             }
             let distance = inn.entrance.dist2(here);
-            (distance * 4 <= far).then_some((distance, keeper, inn.entrance))
+            (roofless || distance * 4 <= far).then_some((distance, keeper, inn.entrance))
         })
         .collect();
     keepers.sort_unstable_by_key(|(distance, keeper, _)| (*distance, *keeper));
@@ -1299,6 +1312,38 @@ fn go_to(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
         }
         Ok(())
     })
+}
+
+/// Walks to the door of the nearest fire and stands there: being there is
+/// the fighting (`civic::upkeep` counts who is at the door).
+fn fight_fire(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
+    begin(
+        world,
+        actor,
+        "life.fight_fire",
+        param,
+        LifeGoal::Busy,
+        |world, actor| {
+            use super::super::civic::upkeep;
+            let Some((_, door)) = upkeep::fire_to_fight(world, actor) else {
+                return Err("nothing burns nearby");
+            };
+            production::clear_intent(world, actor);
+            let close = (upkeep::FIGHT_REACH_MM - 1_000).pow(2);
+            if world
+                .get::<SimPos>(actor)
+                .is_some_and(|here| here.dist2(door) <= close)
+            {
+                world.entity_mut(actor).remove::<MoveIntent>();
+                return Ok(());
+            }
+            let arrived = ai::travel(world, actor, door);
+            if !arrived && world.get::<MoveIntent>(actor).is_none() {
+                return Err("the way there is blocked");
+            }
+            Ok(())
+        },
+    )
 }
 
 fn sit_down(world: &mut World, actor: Entity, param: &ParamValue) -> Status {

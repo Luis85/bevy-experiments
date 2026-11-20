@@ -41,6 +41,12 @@ pub(crate) enum AlertKind {
     Social,
     /// The played character's homestead grew a tier.
     Homestead,
+    /// A building caught fire.
+    Fire,
+    /// A building can no longer be used until it is repaired.
+    Unusable,
+    /// A fire is out: put out, or burnt down.
+    FireOut,
 }
 
 impl AlertKind {
@@ -48,8 +54,11 @@ impl AlertKind {
     /// something. Info: routine notes, folded into one line per day.
     pub(crate) fn severity(self) -> Severity {
         match self {
-            Self::Death | Self::Starving | Self::Dehydrated | Self::Freezing => Severity::Critical,
-            Self::Exhausted
+            Self::Death | Self::Starving | Self::Dehydrated | Self::Freezing | Self::Fire => {
+                Severity::Critical
+            }
+            Self::Unusable
+            | Self::Exhausted
             | Self::Depleted
             | Self::Shortage
             | Self::Homeless
@@ -66,7 +75,8 @@ impl AlertKind {
             | Self::LaidToRest
             | Self::Woken
             | Self::Social
-            | Self::Homestead => Severity::Info,
+            | Self::Homestead
+            | Self::FireOut => Severity::Info,
         }
     }
     /// The reduced Live feed interrupts play for emergencies only.
@@ -89,6 +99,7 @@ impl AlertKind {
             Self::Woken => ("sleeper woken", "sleepers woken"),
             Self::Social => ("village note", "village notes"),
             Self::Homestead => ("homestead change", "homestead changes"),
+            Self::FireOut => ("fire out", "fires out"),
             _ => ("alert", "alerts"),
         }
     }
@@ -540,7 +551,7 @@ pub(crate) fn waiting_due(days: u32, announced: Option<u32>) -> bool {
 /// field that names the site in each.
 pub(crate) fn project_site_field(effect: &str) -> Option<&'static str> {
     match effect {
-        "VillageSitePlaced" | "VillageSiteCancelled" => Some("site"),
+        "VillageSitePlaced" | "VillageSiteCancelled" | "VillageBuildingRepaired" => Some("site"),
         "VillageBuildingCompleted" => Some("building"),
         _ => None,
     }
@@ -788,6 +799,54 @@ pub(crate) fn classify(
                 },
             )
         }
+        // Upkeep and fire (`civic::upkeep`).
+        "VillageFire" => {
+            let label = text_field(read, "label").unwrap_or_else(|| "a building".into());
+            let what = text_field(read, "what").unwrap_or_else(|| "building".into());
+            (
+                AlertKind::Fire,
+                match text_field(read, "settlement_name") {
+                    // A home is named; a workplace is the only one of its kind.
+                    Some(village) if text_field(read, "kind").as_deref() != Some("home") => {
+                        format!("Fire at the {what} in {village}")
+                    }
+                    _ => format!("Fire at {label}"),
+                },
+            )
+        }
+        "VillageFireOut" => {
+            let label = text_field(read, "label").unwrap_or_else(|| "a building".into());
+            let damage = number("damage").unwrap_or(0) / 10;
+            let put_out = read("put_out").and_then(|value| value.as_bool()) == Some(true);
+            (
+                AlertKind::FireOut,
+                if put_out {
+                    format!(
+                        "The fire at {label} was put out by {} ({damage}% damage)",
+                        crate::game_ui::words::count(
+                            u64::try_from(number("fighters").unwrap_or(0)).unwrap_or(0),
+                            "firefighter"
+                        )
+                    )
+                } else {
+                    format!("The fire at {label} burnt down ({damage}% damage)")
+                },
+            )
+        }
+        "VillageBuildingUnusable" => (
+            AlertKind::Unusable,
+            format!(
+                "{} can no longer be used until it is repaired",
+                text_field(read, "label").unwrap_or_else(|| "A building".into())
+            ),
+        ),
+        "VillageBuildingRepaired" => (
+            AlertKind::ProjectCompleted,
+            format!(
+                "{} is repaired",
+                text_field(read, "label").unwrap_or_else(|| "A building".into())
+            ),
+        ),
         "VillageBuildingCompleted" => (
             AlertKind::ProjectCompleted,
             format!(
@@ -1274,5 +1333,43 @@ mod tests {
         // Another site's wait is its own row.
         feed.supersede(incoming(AlertKind::SiteWaiting, 900, 48_000), 3.0);
         assert_eq!(feed.len(), 3);
+    }
+
+    #[test]
+    fn a_fire_is_an_emergency_and_its_end_a_note() {
+        let fire = json!({"label": "Alderwood bakery", "what": "bakery", "kind": "workplace",
+            "settlement_name": "Alderwood"});
+        let read = |key: &str| fire.get(key).cloned();
+        assert_eq!(
+            classify("VillageFire", "A resident", &read),
+            Some((AlertKind::Fire, "Fire at the bakery in Alderwood".into()))
+        );
+        assert_eq!(AlertKind::Fire.severity(), Severity::Critical);
+        let home = json!({"label": "Harbour cottage 4", "what": "cottage", "kind": "home",
+            "settlement_name": "Harbour"});
+        let read = |key: &str| home.get(key).cloned();
+        assert_eq!(
+            classify("VillageFire", "A resident", &read).map(|(_, text)| text),
+            Some("Fire at Harbour cottage 4".into())
+        );
+        let out = json!({"label": "Harbour cottage 4", "damage": 240, "fighters": 3,
+            "put_out": true});
+        let read = |key: &str| out.get(key).cloned();
+        assert_eq!(
+            classify("VillageFireOut", "A resident", &read),
+            Some((
+                AlertKind::FireOut,
+                "The fire at Harbour cottage 4 was put out by 3 firefighters (24% damage)".into()
+            ))
+        );
+        assert_eq!(AlertKind::FireOut.severity(), Severity::Info);
+        let broken = json!({"label": "Harbour cottage 4"});
+        let read = |key: &str| broken.get(key).cloned();
+        assert_eq!(
+            classify("VillageBuildingUnusable", "A resident", &read).map(|(kind, _)| kind),
+            Some(AlertKind::Unusable)
+        );
+        assert_eq!(AlertKind::Unusable.severity(), Severity::Warning);
+        assert_eq!(project_site_field("VillageBuildingRepaired"), Some("site"));
     }
 }

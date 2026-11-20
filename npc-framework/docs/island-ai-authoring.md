@@ -138,6 +138,7 @@ is in progress.
 | `life.pursue_goal` | none, or `elsewhere` | GOAP: plan buy, gather and craft steps towards the funded production goal and take the first; a gathering tool the trade lacks (and the ledger funds) is bought first when the time it saves on the funded units pays for the trip and its share of the price. `elsewhere` (living world) plans instead for funded demand on the island that no maker is planned to meet and the trade can serve: purchases the residents of its own settlement want beyond what its makers are planned to make, the purchases or stock target of a settlement with no maker of the good, and what the boat's announced order still wants beyond the port's makers; the plan ends with `deliver`, carrying up to four units to that settlement's store or stall, or the trading post, where they are on sale as the resident's own. | No funded goal (no demand elsewhere), or no plan within the search limits. |
 | `life.change_job` | none | Take a requested or better-paid vacant workplace. | Nothing changes (the usual case). |
 | `life.equip` | none | Put on a carried coat. | One is worn or none is carried. |
+| `life.fight_fire` | none | Living world: walk to the door of the nearest burning building within `upkeep.fire_reach_m` and fight the fire there. Every living, awake resident within 4 m of the door counts as a firefighter: each slows the damage and the spread and helps put it out; one carrying water spends a unit every 100 ticks and works at `upkeep.fire_water_percent`. | Nothing burns near. |
 | `life.sow` | none | A farmer walks to a field of the settlement with a fallow plot and sows it. Seed comes from the field's own seed stock, else from the pack. | Not a farmer, no fallow plot, not a sowing season, too late to ripen before winter, or no seed. |
 | `life.tend` | none | A farmer walks to a field and tends a growing plot that has gone the crop's `tend_interval_ticks` without care. | Not a farmer, or no plot needs it. |
 | `life.harvest` | none | A farmer walks to a field with a ripe plot and harvests it into the pack; the plot's seed stays in the field. | Not a farmer, no ripe plot, or the pack is full. |
@@ -210,6 +211,7 @@ schedule or the resident's traits.
 | `life.in_sleep_window` | Inside a sleep block of the resident's own day. | nothing |
 | `life.wants_leisure` | Not busy, inside a leisure block, and not out in the cold (night or winter) without a coat. Everybody has an evening; sociability decides whether it is spent in company. | nothing |
 | `life.family_at_home` | Has a partner or a child, and a home, and the village is not gathering. | nothing |
+| `life.fire_nearby` | Living world: not busy, and a building burns within `upkeep.fire_reach_m`. | nothing |
 | `life.gathering` | The village is gathering, the resident is free to attend (no need at or below `gathering_needs_above`), not busy, not in its sleep block, not cold without a coat. | nothing |
 | `life.meal_due` | Not busy, inside a meal block on a day without a sit-down meal yet, carrying food, and the village is not gathering. | nothing |
 | `life.sociable` | Sociability is at least `traits.sociable_min`. | nothing |
@@ -260,6 +262,7 @@ lower-priority work.
 | Critical hunger | `life.critical_hunger` LP | eat, buy food, forage |
 | Player orders | `has_unit_order` LP | `ExecuteOrder` |
 | Current activity | `life.busy` | continue |
+| Fire nearby | `life.fire_nearby` | fight the fire (residents finish the work in hand first, then come) |
 | Thirst | `life.thirsty` LP | drink, buy water, fetch water |
 | Hunger | `life.hungry` LP | eat, buy food, forage |
 | Coat before winter | `life.coat_season` | wear a carried coat, else buy one |

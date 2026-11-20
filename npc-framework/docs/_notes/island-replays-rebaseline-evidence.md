@@ -229,3 +229,17 @@ before and after the swap. Marker created and deleted.
 | `island_living_world_s7.json` | `9a2b83c77499840812b4c0e318631177b8a43b3f9477b17ab259521aa18c5e40` |
 | `island_living_world_s11.json` | `355805f9fdb02624bf987bf893d2ba4ed6929b387f9c9d5449575f6e755d164b` |
 | `island_living_world_s23.json` | `f00917b70303f7daf12d46ff3b3d1101d1ea9a4bf7b5b6acab2b0135e9a54172` |
+
+## Re-baseline 2026-11-20: building upkeep and fire (backlog item 12)
+
+Same approval. New leaf `life.fight_fire`, condition `life.fire_nearby`, upkeep spec: content hash
+`14928686895348995515` (`cf2d59a2c04e55bb`) -> `8388278310067148816` (`746926ae14aa9810`), and every state hash.
+Old files refused: `content hash mismatch: replay cf2d59a2c04e55bb, this build 746926ae14aa9810`.
+Recorded into `target/island-split/b12/`, each seed twice, byte-identical; each verifies `"ok":true`, 40 checkpoints,
+before and after the swap. Marker created and deleted.
+
+| File | SHA-256 |
+|---|---|
+| `island_living_world_s7.json` | `01038179ca01ea8a224f6e41b771f801d1f8301294dddff0f582ccee463989ed` |
+| `island_living_world_s11.json` | `d1665e56c0e637b90a47269134118929773e3226f538bc79b385e347078e804a` |
+| `island_living_world_s23.json` | `a085ab6e65a5619eaf4638b5650125e22c8ab46e73ca2237bba2f5a97dd8bd83` |

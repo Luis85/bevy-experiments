@@ -273,6 +273,7 @@ fn as_building(def: &PropDef) -> BuildingDef {
         },
         field: None,
         livestock: None,
+        upkeep: None,
     }
 }
 

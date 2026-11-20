@@ -746,6 +746,149 @@ impl WeatherSpec {
     }
 }
 
+/// Upkeep and fire (`civic::upkeep`): the rules every building kind shares.
+/// What wears and what may burn, and how fast, is data of each building
+/// (`buildings[].upkeep`). Conditions are permille of a sound building.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct UpkeepSpec {
+    pub enabled: bool,
+    /// Below this condition a building needs repair: the planner opens a
+    /// repair site for it.
+    pub repair_below_permille: u32,
+    /// Below this condition a building is worn and works worse; at 0 it is
+    /// unusable until repaired.
+    pub worn_below_permille: u32,
+    /// Buildings standing at the founding start at a seeded condition from
+    /// this up to sound, so their repairs do not all fall due at once.
+    pub founding_min_permille: u32,
+    /// Work at a worn workplace takes this percent of the usual time.
+    pub worn_work_percent: u32,
+    /// A worn home's shelter and hearth warm at this percent.
+    pub worn_warmth_percent: u32,
+    /// A worn store takes new goods up to this percent of its capacity.
+    pub worn_storage_percent: u32,
+    /// Fire chance of a worn building, percent of a sound one's.
+    pub fire_worn_percent: u32,
+    /// Ticks a fire burns when nobody fights it.
+    pub fire_burn_ticks: u64,
+    /// Condition a fire takes at once when it breaks out.
+    pub fire_flash_permille: u32,
+    /// Condition a fire nobody fights takes every 100 ticks.
+    pub fire_damage_per_100_ticks: u32,
+    /// Each firefighter at the door divides that damage: it is multiplied by
+    /// 100 / (100 + this percent per fighter).
+    pub fire_fighter_relief_percent: u32,
+    /// Fighter-ticks that put a fire out.
+    pub fire_fight_ticks: u32,
+    /// A firefighter carrying water (the drink good) spends one unit every
+    /// 100 ticks and works at this percent.
+    pub fire_water_percent: u32,
+    /// Residents of the settlement within this many metres come to fight.
+    pub fire_reach_m: u32,
+    /// A fire may spread to a building whose door is within this many metres.
+    pub fire_spread_m: u32,
+    /// Chance per 100 ticks of fire that it spreads to one such neighbour,
+    /// permille; firefighters at the door divide it like the damage.
+    pub fire_spread_permille: u32,
+}
+
+impl Default for UpkeepSpec {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            repair_below_permille: 500,
+            worn_below_permille: 300,
+            founding_min_permille: 600,
+            worn_work_percent: 125,
+            worn_warmth_percent: 60,
+            worn_storage_percent: 75,
+            fire_worn_percent: 200,
+            fire_burn_ticks: 2_000,
+            fire_flash_permille: 150,
+            fire_damage_per_100_ticks: 35,
+            fire_fighter_relief_percent: 50,
+            fire_fight_ticks: 900,
+            fire_water_percent: 200,
+            fire_reach_m: 40,
+            fire_spread_m: 10,
+            fire_spread_permille: 15,
+        }
+    }
+}
+
+impl UpkeepSpec {
+    pub(super) fn validate(&self) -> Result<(), String> {
+        let u = self;
+        let checks = [
+            (
+                u.worn_below_permille <= u.repair_below_permille
+                    && u.repair_below_permille <= 1_000
+                    && u.founding_min_permille <= 1_000,
+                "worn_below_permille <= repair_below_permille <= 1000 and \
+                 founding_min_permille at most 1000",
+            ),
+            (
+                (100..=1_000).contains(&u.worn_work_percent)
+                    && u.worn_warmth_percent <= 100
+                    && u.worn_storage_percent <= 100,
+                "worn_work_percent must be 100..=1000, worn_warmth_percent and \
+                 worn_storage_percent at most 100",
+            ),
+            (
+                u.fire_worn_percent <= 1_000
+                    && (1..=100_000).contains(&u.fire_burn_ticks)
+                    && u.fire_flash_permille <= 1_000
+                    && u.fire_damage_per_100_ticks <= 1_000,
+                "fire_worn_percent and fire_flash_permille and fire_damage_per_100_ticks must \
+                 be at most 1000 and fire_burn_ticks 1..=100000",
+            ),
+            (
+                u.fire_fighter_relief_percent <= 1_000
+                    && (1..=100_000).contains(&u.fire_fight_ticks)
+                    && (100..=1_000).contains(&u.fire_water_percent),
+                "fire_fighter_relief_percent at most 1000, fire_fight_ticks 1..=100000 and \
+                 fire_water_percent 100..=1000",
+            ),
+            (
+                u.fire_reach_m <= 200 && u.fire_spread_m <= 50 && u.fire_spread_permille <= 1_000,
+                "fire_reach_m at most 200, fire_spread_m at most 50 and fire_spread_permille at \
+                 most 1000",
+            ),
+        ];
+        for (ok, message) in checks {
+            if !ok {
+                return Err(format!("economy: upkeep.{message}"));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn sim_hash(&self, h: &mut Fnv64) {
+        h.u8(u8::from(self.enabled));
+        for value in [
+            self.repair_below_permille,
+            self.worn_below_permille,
+            self.founding_min_permille,
+            self.worn_work_percent,
+            self.worn_warmth_percent,
+            self.worn_storage_percent,
+            self.fire_worn_percent,
+            self.fire_flash_permille,
+            self.fire_damage_per_100_ticks,
+            self.fire_fighter_relief_percent,
+            self.fire_fight_ticks,
+            self.fire_water_percent,
+            self.fire_reach_m,
+            self.fire_spread_m,
+            self.fire_spread_permille,
+        ] {
+            h.u32(value);
+        }
+        h.u64(self.fire_burn_ticks);
+    }
+}
+
 pub(super) fn validate_merchant(economy: &EconomySpec) -> Result<(), String> {
     let m = &economy.merchant;
     if !m.enabled {

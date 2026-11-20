@@ -802,6 +802,138 @@ fn drift(
     }
 }
 
+/// Puffs and embers of a burning building: a dense column with sparks.
+const PUFFS_PER_BLAZE: usize = 9;
+const EMBERS_PER_BLAZE: usize = 9;
+/// Scale of a blaze's puff against a hearth's.
+const BLAZE_PUFF_SIZE: f32 = 1.6;
+/// Where a blaze rises from, over the building's visual root.
+const BLAZE_MOUTH: Vec3 = Vec3::new(0.0, 3.0, 0.0);
+
+/// The smoke and sparks of a building on fire (`civic::upkeep`): spawned
+/// under its visual root while the simulation lists it as burning, and gone
+/// when the fire is out. Read from the sim, never written.
+#[derive(Component)]
+pub(crate) struct Blaze {
+    building: SimId,
+    wind: Quat,
+}
+
+/// Keeps one blaze over every burning building and moves its puffs and
+/// embers. The sim's list of burning buildings is short and read whole; no
+/// building is scanned.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn blaze(
+    mut commands: Commands,
+    assets: Option<Res<SmokeAssets>>,
+    upkeep: Option<Res<village::civic::upkeep::UpkeepState>>,
+    index: Res<SimIndex>,
+    visuals: Res<VisualIndex>,
+    roots: Query<&Transform, (Without<Puff>, Without<Ember>)>,
+    (time, wind): (Res<Time>, Option<Res<crate::island_world::ambient::Wind>>),
+    blazes: Query<(Entity, &Blaze, &Children)>,
+    mut puffs: Query<(
+        &mut Puff,
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+    )>,
+    mut embers: Query<(&Ember, &mut Transform), Without<Puff>>,
+    cameras: Query<&GlobalTransform, With<RtsCamera>>,
+) {
+    let Some(assets) = assets else { return };
+    let burning: &[SimId] = upkeep
+        .as_deref()
+        .map_or(&[], |state| state.burning.as_slice());
+    if burning.is_empty() && blazes.is_empty() {
+        return;
+    }
+    let mut shown = BTreeSet::new();
+    for (entity, blaze, _) in &blazes {
+        if burning.contains(&blaze.building) {
+            shown.insert(blaze.building);
+        } else {
+            commands.entity(entity).despawn();
+        }
+    }
+    for id in burning {
+        if shown.contains(id) {
+            continue;
+        }
+        let Some((root, turn)) = index
+            .get(*id)
+            .and_then(|entity| visuals.map.get(&entity))
+            .and_then(|root| Some((*root, roots.get(*root).ok()?)))
+        else {
+            continue;
+        };
+        let column = commands
+            .spawn((
+                Name::new("fire"),
+                ChildOf(root),
+                Blaze {
+                    building: *id,
+                    wind: wind_frame(Some(turn)),
+                },
+                Transform::from_translation(BLAZE_MOUTH),
+                Visibility::Inherited,
+            ))
+            .id();
+        for i in 0..PUFFS_PER_BLAZE {
+            commands.spawn((
+                ChildOf(column),
+                Puff::new(i, PUFFS_PER_BLAZE, *id, BLAZE_PUFF_SIZE),
+                Mesh3d(assets.puff.clone()),
+                MeshMaterial3d(assets.fades[0].clone()),
+                Transform::default(),
+                bevy::light::NotShadowCaster,
+                bevy::light::NotShadowReceiver,
+            ));
+        }
+        for i in 0..EMBERS_PER_BLAZE {
+            commands.spawn((
+                ChildOf(column),
+                Ember {
+                    seed: i as f32 * 0.618_034 + 0.017 * (id.0 % 13) as f32,
+                },
+                Mesh3d(assets.ember_mesh.clone()),
+                MeshMaterial3d(assets.ember.clone()),
+                Transform::default(),
+                bevy::light::NotShadowCaster,
+            ));
+        }
+    }
+    let (seconds, bend) = wind
+        .as_deref()
+        .map_or((time.elapsed_secs(), Bend::default()), |wind| {
+            (wind.time, Bend::of(wind))
+        });
+    let facing = cameras
+        .iter()
+        .next()
+        .map_or(Quat::IDENTITY, |camera| camera.rotation());
+    for (_, blaze, children) in &blazes {
+        for child in children.iter() {
+            if let Ok((mut puff, mut transform, mut material)) = puffs.get_mut(child) {
+                drift(
+                    &mut puff,
+                    &mut transform,
+                    &mut material,
+                    &assets,
+                    seconds * 1.6,
+                    1.0,
+                    blaze.wind,
+                    bend,
+                    facing,
+                );
+            } else if let Ok((ember, mut transform)) = embers.get_mut(child) {
+                let (offset, scale) = ember_state(seconds, ember.seed);
+                transform.translation = offset * 1.5;
+                transform.scale = Vec3::splat(scale * 1.6);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

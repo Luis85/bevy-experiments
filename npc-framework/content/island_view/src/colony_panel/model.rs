@@ -752,6 +752,19 @@ fn project_entries(
             Tooltip::new("Civic fund", crate::island_build::fund_line(world)).icon(Icon::CivicFund),
         ),
     ];
+    // Upkeep at a glance, from the simulation's own tallies (no scan).
+    if let Some(upkeep) = world.get_resource::<village::civic::upkeep::UpkeepState>() {
+        let mut line = format!(
+            "Upkeep: {} repaired so far; {} fire{} so far",
+            crate::game_ui::words::count(upkeep.repairs, "building"),
+            upkeep.fires,
+            if upkeep.fires == 1 { "" } else { "s" }
+        );
+        if !upkeep.burning.is_empty() {
+            line.push_str(&format!(", {} burning now", upkeep.burning.len()));
+        }
+        rows.push(Entry::text("civic_upkeep", line, false));
+    }
     if sites.is_empty() {
         rows.push(Entry::text(
             "civic_none",

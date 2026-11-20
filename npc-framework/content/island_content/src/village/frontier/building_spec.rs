@@ -116,6 +116,44 @@ pub struct BuildingDef {
     /// trade's recipes feed them (input) and collect what they yield (output).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub livestock: Option<LivestockDef>,
+    /// How the finished building wears and whether it can catch fire
+    /// (`civic::upkeep`). Absent: it never wears or burns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upkeep: Option<UpkeepDef>,
+}
+
+/// The wear and fire risk of one building kind (`civic::upkeep`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpkeepDef {
+    /// Condition lost a day, permille of a sound building (0 to 1000).
+    pub wear_per_day: u32,
+    /// Wear on a day of storm or snow, percent of an ordinary day's.
+    #[serde(default = "hundred")]
+    pub bad_weather_percent: u32,
+    /// Share of the building's cost and work a repair from nothing (a
+    /// condition of 0) takes, percent; a lighter repair takes that share of
+    /// the damage. A repair restores the building to sound.
+    pub repair_percent: u32,
+    /// A fire risk: a hearth, an oven or a forge. Absent: it never burns
+    /// on its own (a fire next door may still spread to it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fire: Option<FireDef>,
+}
+fn hundred() -> u32 {
+    100
+}
+
+/// The daily fire risk of a building kind.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FireDef {
+    /// Chance of a fire on one day, permille (at most 100).
+    pub daily_permille: u32,
+    /// The seasons with that risk (a home's hearth burns in winter); empty:
+    /// every season.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seasons: Vec<crate::village::Season>,
 }
 
 /// The animals of a pen (`village::livestock`).
@@ -192,14 +230,33 @@ fn building(id: &str, display: &str, cost: &[(&str, u32)], work_ticks: u32) -> B
         placement: PlacementRules::default(),
         field: None,
         livestock: None,
+        upkeep: None,
     }
+}
+
+/// Wear and fire risk of a shipped building: condition lost a day, and the
+/// fire chance a day with its seasons. Repairs take 40% of the cost from
+/// nothing and bad weather wears at 150%. Reasons in
+/// `docs/island-economy-authoring.md` (Upkeep and fire).
+fn upkeep(wear: u32, fire: Option<(u32, &[crate::village::Season])>) -> Option<UpkeepDef> {
+    Some(UpkeepDef {
+        wear_per_day: wear,
+        bad_weather_percent: 150,
+        repair_percent: 40,
+        fire: fire.map(|(daily_permille, seasons)| FireDef {
+            daily_permille,
+            seasons: seasons.to_vec(),
+        }),
+    })
 }
 
 /// The built-in buildings: the cottage and the thirteen workplaces of the
 /// shipped settlements, plus the stores and the stall residents can add.
 pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
+    use crate::village::Season::Winter;
     let mut out = vec![BuildingDef {
         footprint: FootprintCells { width: 4, depth: 5 },
+        upkeep: upkeep(15, Some((3, &[Winter]))),
         ..building("cottage", "Cottage", &[("plank", 8), ("log", 4)], 600)
     }];
     for (role, id, display) in [
@@ -237,6 +294,12 @@ pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
                 FootprintCells { width: 5, depth: 5 }
             },
             solid: !open,
+            // An oven and a forge burn all year; an open yard wears slower.
+            upkeep: match role {
+                Role::Baker | Role::Smith => upkeep(20, Some((5, &[]))),
+                _ if open => upkeep(10, None),
+                _ => upkeep(15, None),
+            },
             ..building(id, display, &[("plank", 10), ("log", 6)], 800)
         });
     }
@@ -244,17 +307,20 @@ pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
         kind: BuildingKind::Storage { capacity: 120 },
         footprint: FootprintCells { width: 4, depth: 4 },
         solid: false,
+        upkeep: upkeep(10, None),
         ..building("stockpile", "Stockpile", &[("log", 4)], 200)
     });
     out.push(BuildingDef {
         kind: BuildingKind::Storage { capacity: 240 },
         footprint: FootprintCells { width: 5, depth: 4 },
         civic: false,
+        upkeep: upkeep(12, None),
         ..building("barn", "Barn", &[("plank", 12), ("log", 6)], 600)
     });
     out.push(BuildingDef {
         kind: BuildingKind::Home { beds: 4 },
         footprint: FootprintCells { width: 5, depth: 6 },
+        upkeep: upkeep(15, Some((3, &[Winter]))),
         ..building("house", "Family house", &[("plank", 12), ("log", 6)], 800)
     });
     out.push(BuildingDef {
@@ -286,6 +352,7 @@ pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
             coast: true,
             ..PlacementRules::default()
         },
+        upkeep: upkeep(12, None),
         ..building(
             "trading_post",
             "Trading post",
@@ -298,6 +365,7 @@ pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
         footprint: FootprintCells { width: 3, depth: 2 },
         solid: false,
         civic: false,
+        upkeep: upkeep(12, None),
         ..building(
             "market_stall",
             "Market stall",
@@ -341,6 +409,7 @@ pub fn default_buildings(economy: &EconomySpec) -> Vec<BuildingDef> {
         }),
         footprint: FootprintCells { width: 4, depth: 3 },
         solid: false,
+        upkeep: upkeep(12, None),
         ..building("hen_house", "Hen house", &[("plank", 6), ("log", 4)], 400)
     });
     // A small plot the overseer lays out with the Shape tools; the planner
@@ -513,6 +582,32 @@ pub fn validate(economy: &EconomySpec) -> Result<(), String> {
                 ));
             }
         }
+        if let Some(upkeep) = &def.upkeep {
+            if upkeep.wear_per_day > 1000
+                || !(1..=1000).contains(&upkeep.bad_weather_percent)
+                || !(1..=100).contains(&upkeep.repair_percent)
+            {
+                return Err(format!(
+                    "economy: building `{name}` upkeep needs wear_per_day up to 1000, \
+                     bad_weather_percent 1..=1000 and repair_percent 1..=100"
+                ));
+            }
+            if def.cost.is_empty() {
+                return Err(format!(
+                    "economy: building `{name}` has upkeep but no cost: a repair takes a \
+                     share of the cost, so a building that wears must cost something"
+                ));
+            }
+            if upkeep
+                .fire
+                .as_ref()
+                .is_some_and(|fire| fire.daily_permille > 100)
+            {
+                return Err(format!(
+                    "economy: building `{name}` fire daily_permille must be at most 100"
+                ));
+            }
+        }
         let rules = &def.placement;
         if rules.surfaces.is_empty() {
             return Err(format!(
@@ -589,5 +684,17 @@ pub fn sim_hash(buildings: &[BuildingDef], h: &mut Fnv64) {
         }
         h.u32(def.placement.max_slope_mm);
         h.u32(def.placement.clearance);
+        h.opt(def.upkeep.as_ref(), |h, upkeep| {
+            h.u32(upkeep.wear_per_day);
+            h.u32(upkeep.bad_weather_percent);
+            h.u32(upkeep.repair_percent);
+            h.opt(upkeep.fire.as_ref(), |h, fire| {
+                h.u32(fire.daily_permille);
+                h.u32(fire.seasons.len() as u32);
+                for season in &fire.seasons {
+                    h.u8(*season as u8);
+                }
+            });
+        });
     }
 }

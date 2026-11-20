@@ -554,8 +554,11 @@ pub(super) fn craft_best(
             if super::routing::avoiding(world, actor, pos, Some(workplace)) {
                 continue;
             }
-            // A pen's hens are fed once a day: no batch beyond them.
-            if !super::livestock::can_feed(world, workplace) {
+            // A pen's hens are fed once a day: no batch beyond them. A
+            // workplace that can no longer be used takes no work.
+            if !super::livestock::can_feed(world, workplace)
+                || !super::civic::upkeep::usable_id(world, workplace)
+            {
                 continue;
             }
             if !super::resident::fits_before_rest(world, actor, recipe_ticks(world, &recipe)) {
@@ -575,7 +578,7 @@ pub(super) fn craft_best(
             )
             .is_ok()
             {
-                pace_craft(world, actor);
+                pace_craft(world, actor, workplace);
                 return true;
             }
         }
@@ -797,10 +800,13 @@ pub fn construction_step(world: &mut World, actor: Entity) -> bool {
         .is_ok()
 }
 
-/// Morale paces a resident's own craft within the bounded band. Inputs,
-/// reservations and outputs are untouched; only the completion tick moves.
-fn pace_craft(world: &mut World, actor: Entity) {
-    let pace = u64::from(super::colony::work_pace_percent(world, actor));
+/// Morale paces a resident's own craft within the bounded band, and a worn
+/// workplace slows it (`civic::upkeep::work_percent`). Inputs, reservations
+/// and outputs are untouched; only the completion tick moves.
+fn pace_craft(world: &mut World, actor: Entity, station: SimId) {
+    let pace = u64::from(super::colony::work_pace_percent(world, actor))
+        * u64::from(super::civic::upkeep::work_percent(world, station))
+        / 100;
     if let Some(mut craft) = world.get_mut::<Crafting>(actor) {
         let duration = craft.ends.saturating_sub(craft.started);
         craft.ends = craft.started.saturating_add((duration * pace / 100).max(1));
@@ -886,6 +892,7 @@ pub(super) fn planned_work_in(world: &mut World, actor: Entity, scope: super::go
                 return false;
             };
             if !super::livestock::can_feed(world, *target)
+                || !super::civic::upkeep::usable_id(world, *target)
                 || !super::resident::fits_before_rest(world, actor, recipe_ticks(world, recipe))
             {
                 super::goap::forget(world, actor);
@@ -905,7 +912,7 @@ pub(super) fn planned_work_in(world: &mut World, actor: Entity, scope: super::go
                 )
                 .is_ok();
                 if begun {
-                    pace_craft(world, actor);
+                    pace_craft(world, actor, *target);
                 }
                 begun
             }

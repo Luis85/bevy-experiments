@@ -40,6 +40,29 @@ fn year_trace() {
                 economy(world)["live"][key] = value.clone();
             }
         }
+        // `TRACE_UPKEEP_PATCH`: keys of `economy.upkeep`, and `fire_scale`,
+        // which multiplies every building's daily fire chance.
+        if let Ok(text) = std::env::var("TRACE_UPKEEP_PATCH") {
+            let patch: serde_json::Value = serde_json::from_str(&text).expect("patch JSON");
+            println!("TRACE_UPKEEP_PATCH {patch}");
+            for (key, value) in patch.as_object().expect("upkeep keys") {
+                if key == "fire_scale" {
+                    let scale = value.as_u64().expect("a whole factor");
+                    for building in economy(world)["buildings"]
+                        .as_array_mut()
+                        .expect("buildings")
+                    {
+                        if let Some(chance) = building["upkeep"]["fire"]["daily_permille"].as_u64()
+                        {
+                            building["upkeep"]["fire"]["daily_permille"] =
+                                serde_json::json!((chance * scale).min(100));
+                        }
+                    }
+                } else {
+                    economy(world)["upkeep"][key] = value.clone();
+                }
+            }
+        }
         // `TRACE_SCHEDULE_PATCH`: keys of `behavior.schedule` (the rest of
         // the behaviour block keeps its defaults).
         if let Ok(text) = std::env::var("TRACE_SCHEDULE_PATCH") {
@@ -113,6 +136,11 @@ fn year_trace() {
                 .map(|pen| (pen.head, pen.born, pen.died, pen.hungry_days))
                 .collect::<Vec<_>>(),
             roles,
+        );
+        println!(
+            "TRACE_UPKEEP seed={seed} day={day} deaths={:?} {}",
+            census.deaths,
+            serde_json::to_string(&civic::upkeep::report(world)).expect("report")
         );
     }
     println!("TRACE_KEEPERS seed={seed} {keeper_time:?}");

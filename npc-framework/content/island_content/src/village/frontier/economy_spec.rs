@@ -655,6 +655,8 @@ pub struct EconomySpec {
     pub live: super::life_spec::LiveSpec,
     /// Props the overseer may place with the Shape tools.
     pub props: Vec<super::props::PropDef>,
+    /// Upkeep and fire: how buildings wear, burn and are repaired.
+    pub upkeep: super::life_spec::UpkeepSpec,
 }
 
 /// The thirteen resident professions, in founding order.
@@ -1359,6 +1361,7 @@ impl Default for EconomySpec {
             merchant: super::life_spec::MerchantSpec::default(),
             live: super::life_spec::LiveSpec::default(),
             props: super::props::default_props(),
+            upkeep: super::life_spec::UpkeepSpec::default(),
         };
         spec.buildings = super::building_spec::default_buildings(&spec);
         spec
@@ -1416,6 +1419,7 @@ impl EconomySpec {
         self.demography.validate()?;
         super::life_spec::validate_crops(self)?;
         self.weather.validate()?;
+        self.upkeep.validate()?;
         super::life_spec::validate_merchant(self)?;
         super::life_spec::validate_live(self)
     }
@@ -2240,6 +2244,7 @@ impl EconomySpec {
         self.demography.sim_hash(h);
         super::life_spec::hash_crops(&self.crops, h);
         self.weather.sim_hash(h);
+        self.upkeep.sim_hash(h);
         self.merchant.sim_hash(h);
         self.live.sim_hash(h);
     }

@@ -158,6 +158,12 @@ pub const CONDITIONS: &[ConditionInfo] = &[
         "Food is carried or an affordable seller offers some."
     ),
     condition!(
+        "life.fire_nearby",
+        fire_nearby,
+        &[],
+        "Living world: not busy, and a building burns within `upkeep.fire_reach_m`: a          resident nearby comes to fight it (`life.fight_fire`)."
+    ),
+    condition!(
         "life.fuel_patch_nearer",
         fuel_patch_nearer,
         &[],
@@ -504,6 +510,12 @@ fn family_at_home(world: &World, actor: Entity) -> bool {
 /// A gathering of the calendar is a village event: it ranks above tiredness
 /// that is not critical, the meal and the chores (shopping, stocking up,
 /// storing, restocking). Critical needs, the night and the cold still win.
+fn fire_nearby(world: &World, actor: Entity) -> bool {
+    super::super::living(world, actor)
+        && !behavior::busy(world, actor)
+        && super::super::civic::upkeep::fire_to_fight(world, actor).is_some()
+}
+
 fn gathering(world: &World, actor: Entity) -> bool {
     super::super::live::attending(world, actor)
         && !behavior::busy(world, actor)
