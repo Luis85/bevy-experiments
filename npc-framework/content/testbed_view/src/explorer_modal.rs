@@ -30,7 +30,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use bevy::input_focus::AutoFocus;
+use bevy::input_focus::tab_navigation::{NavAction, TabGroup, TabIndex, TabNavigation};
+use bevy::input_focus::{AcquireFocus, AutoFocus, FocusCause, InputFocus};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::Pressed;
@@ -91,13 +92,22 @@ impl Plugin for ExplorerModalPlugin {
         }
         app.init_resource::<PromptModal>()
             .init_resource::<ModalUi>()
+            .init_resource::<InputFocus>()
             .add_message::<PromptModalClosed>()
+            .add_observer(acquire_focus)
             .configure_sets(Update, ViewSystems::Input.run_if(not(modal_open)))
             .configure_sets(Update, ViewSystems::OverlayInput.run_if(not(modal_open)))
             .configure_sets(Update, ExplorerModalSystems.after(ViewSystems::Input))
             .add_systems(
                 Update,
-                (apply_close, sync_modal, poll_copy, refresh, scroll_hint)
+                (
+                    keyboard,
+                    apply_close,
+                    sync_modal,
+                    poll_copy,
+                    refresh,
+                    scroll_hint,
+                )
                     .chain()
                     .in_set(ExplorerModalSystems),
             );
@@ -156,6 +166,50 @@ struct ScrollHint;
 const BUTTON: Color = Color::srgb(0.20, 0.24, 0.30);
 const BUTTON_HOVER: Color = Color::srgb(0.27, 0.32, 0.40);
 const BUTTON_PRESSED: Color = Color::srgb(0.14, 0.17, 0.22);
+const FOCUS: Color = Color::srgb(0.95, 0.80, 0.45);
+
+fn acquire_focus(
+    mut event: On<AcquireFocus>,
+    buttons: Query<(), Or<(With<CopyButton>, With<OkButton>)>>,
+    mut focus: ResMut<InputFocus>,
+) {
+    if buttons.contains(event.focused_entity) {
+        event.propagate(false);
+        focus.set(event.focused_entity, FocusCause::Navigated);
+    }
+}
+
+fn keyboard(
+    modal: Res<PromptModal>,
+    keys: Option<Res<ButtonInput<KeyCode>>>,
+    roots: Query<Entity, With<ModalRoot>>,
+    buttons: Query<(), Or<(With<CopyButton>, With<OkButton>)>>,
+    navigation: TabNavigation,
+    mut focus: ResMut<InputFocus>,
+    mut commands: Commands,
+) {
+    let Some(keys) = keys else { return };
+    if !modal.open || !keys.just_pressed(KeyCode::Tab) {
+        return;
+    }
+    let direction = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+        NavAction::Previous
+    } else {
+        NavAction::Next
+    };
+    let target = if focus.get().is_some_and(|entity| buttons.contains(entity)) {
+        navigation.navigate(&focus, direction).ok()
+    } else {
+        roots
+            .single()
+            .ok()
+            .and_then(|root| navigation.initialize(root, direction).ok())
+    };
+    if let Some(entity) = target {
+        focus.set(entity, FocusCause::Navigated);
+        commands.trigger(bevy::ui_widgets::ScrollIntoView { entity });
+    }
+}
 
 /// The Copy label: "Copied" for [`COPIED_FOR`] after a copy at `copied_at`.
 fn copy_label(copied_at: Option<Duration>, now: Duration) -> &'static str {
@@ -284,12 +338,21 @@ fn apply_close(
 
 /// Spawns the panel when the modal opens (or changes), despawns it when it
 /// closes.
-fn sync_modal(mut commands: Commands, modal: Res<PromptModal>, mut ui: ResMut<ModalUi>) {
+fn sync_modal(
+    mut commands: Commands,
+    modal: Res<PromptModal>,
+    mut ui: ResMut<ModalUi>,
+    buttons: Query<(), Or<(With<CopyButton>, With<OkButton>)>>,
+    mut focus: ResMut<InputFocus>,
+) {
     let rebuild = modal.is_changed() && ui.root.is_some();
     if (!modal.open || rebuild)
         && let Some(root) = ui.root.take()
     {
         commands.entity(root).despawn();
+        if focus.get().is_some_and(|entity| buttons.contains(entity)) {
+            focus.clear();
+        }
         ui.copied_at = None;
         ui.copy_error = None;
         ui.pending = None;
@@ -309,6 +372,7 @@ fn spawn_panel(commands: &mut Commands, modal: &PromptModal) -> Entity {
         .spawn((
             Name::new("explorer prompt modal"),
             ModalRoot,
+            TabGroup::modal(),
             // Full screen: dims the world and takes the pointer.
             Node {
                 position_type: PositionType::Absolute,
@@ -389,21 +453,30 @@ fn spawn_panel(commands: &mut Commands, modal: &PromptModal) -> Entity {
                     })
                     .with_children(|row| {
                         row.spawn((
+                            WidgetButton,
                             Name::new("prompt modal Copy"),
                             CopyButton,
+                            Hovered::default(),
+                            TabIndex(0),
+                            AccessibleLabel::new("Copy start prompt"),
                             button_node(),
                             BackgroundColor(BUTTON),
+                            BorderColor::all(Color::NONE),
                         ))
-                        .insert((WidgetButton, Hovered::default()))
                         .with_child((CopyLabel, Text::new(COPY), font(14.0)))
                         .observe(on_copy);
                         row.spawn((
+                            WidgetButton,
                             Name::new("prompt modal OK"),
                             OkButton,
+                            Hovered::default(),
+                            AutoFocus,
+                            TabIndex(0),
+                            AccessibleLabel::new("OK - start world"),
                             button_node(),
                             BackgroundColor(BUTTON),
+                            BorderColor::all(Color::NONE),
                         ))
-                        .insert((WidgetButton, Hovered::default(), AutoFocus))
                         .with_child((Text::new("OK"), font(14.0)))
                         .observe(on_ok);
                     });
@@ -428,10 +501,17 @@ fn refresh(
     modal: Res<PromptModal>,
     ui: Res<ModalUi>,
     time: Option<Res<Time<Real>>>,
+    focus: Res<InputFocus>,
     mut labels: Query<&mut Text, (With<CopyLabel>, Without<NotesText>)>,
     mut notes: Query<&mut Text, (With<NotesText>, Without<CopyLabel>)>,
     mut buttons: Query<
-        (&mut BackgroundColor, Option<&Hovered>, Has<Pressed>),
+        (
+            Entity,
+            &mut BackgroundColor,
+            &mut BorderColor,
+            Option<&Hovered>,
+            Has<Pressed>,
+        ),
         Or<(With<CopyButton>, With<OkButton>)>,
     >,
 ) {
@@ -451,7 +531,7 @@ fn refresh(
             text.0.clone_from(&want);
         }
     }
-    for (mut bg, hovered, pressed) in &mut buttons {
+    for (entity, mut bg, mut border, hovered, pressed) in &mut buttons {
         let color = if pressed {
             BUTTON_PRESSED
         } else if hovered.is_some_and(|h| h.0) {
@@ -462,6 +542,11 @@ fn refresh(
         if bg.0 != color {
             bg.0 = color;
         }
+        border.set_if_neq(BorderColor::all(if focus.get() == Some(entity) {
+            FOCUS
+        } else {
+            Color::NONE
+        }));
     }
 }
 
@@ -563,7 +648,20 @@ mod tests {
                 notes: vec!["remote: http://127.0.0.1:15703".into()],
                 open,
                 file: Some(PathBuf::from("C:/agents/wren/prompts/start.md")),
-            });
+            })
+            // No renderer/visibility propagation runs in this headless fixture.
+            .add_systems(
+                PostUpdate,
+                |mut nodes: Query<(&Node, &mut InheritedVisibility)>| {
+                    for (node, mut visible) in &mut nodes {
+                        *visible = if node.display == Display::None {
+                            InheritedVisibility::HIDDEN
+                        } else {
+                            InheritedVisibility::VISIBLE
+                        };
+                    }
+                },
+            );
         app.update();
         app
     }
@@ -613,6 +711,92 @@ mod tests {
             "remote: http://127.0.0.1:15703"
         );
         assert!(app.world_mut().run_system_cached(modal_open).unwrap());
+    }
+
+    #[test]
+    fn keyboard_tabs_between_named_prompt_buttons_and_enter_uses_the_native_observer() {
+        use bevy::a11y::AccessibilityNode;
+        use bevy::input::ButtonState;
+        use bevy::input::keyboard::{Key, KeyboardInput};
+        use bevy::input_focus::FocusedInput;
+        let mut app = app(true);
+        app.init_resource::<ButtonInput<KeyCode>>()
+            .insert_resource(PromptClipboard(fake_clipboard));
+        let ok = one::<OkButton>(&mut app);
+        let copy = one::<CopyButton>(&mut app);
+        // Compare against the native Button requirement, as the notes controls
+        // do: adding an accessible name must preserve its Button role.
+        let bare_button = app.world_mut().spawn(WidgetButton).id();
+        let button_role = app
+            .world()
+            .get::<AccessibilityNode>(bare_button)
+            .unwrap()
+            .role();
+        for entity in [copy, ok] {
+            assert_eq!(
+                app.world().get::<AccessibilityNode>(entity).unwrap().role(),
+                button_role
+            );
+        }
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(ok, FocusCause::Navigated);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(copy));
+        assert_eq!(
+            app.world().get::<BorderColor>(copy),
+            Some(&BorderColor::all(FOCUS))
+        );
+        assert_eq!(
+            app.world().get::<AccessibleLabel>(copy).unwrap().0,
+            "Copy start prompt"
+        );
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut().trigger(FocusedInput::new(
+            copy,
+            KeyboardInput {
+                key_code: KeyCode::Enter,
+                logical_key: Key::Enter,
+                state: ButtonState::Pressed,
+                text: None,
+                repeat: false,
+                window: Entity::PLACEHOLDER,
+            },
+            Entity::PLACEHOLDER,
+        ));
+        app.world_mut().flush();
+        settle(&mut app);
+        assert_eq!(text_of::<CopyLabel>(&mut app), COPIED);
+        assert!(app.world().resource::<PromptModal>().open);
+        let keys = &mut *app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        keys.press(KeyCode::ShiftLeft);
+        keys.press(KeyCode::Tab);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(ok));
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut().trigger(FocusedInput::new(
+            ok,
+            KeyboardInput {
+                key_code: KeyCode::Enter,
+                logical_key: Key::Enter,
+                state: ButtonState::Pressed,
+                text: None,
+                repeat: false,
+                window: Entity::PLACEHOLDER,
+            },
+            Entity::PLACEHOLDER,
+        ));
+        app.world_mut().flush();
+        app.update();
+        assert!(!app.world().resource::<PromptModal>().open);
+        assert!(app.world().resource::<InputFocus>().get().is_none());
     }
 
     #[test]

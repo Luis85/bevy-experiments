@@ -8,6 +8,15 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Leftover branch audit (2026-11-20)
+
+- Actor Testbed explorer prompt modal: Tab / Shift+Tab move between Copy and OK inside the modal, the focused
+  button shows a gold border, Enter activates it, and both buttons carry accessible names ("Copy start prompt",
+  "OK - start world") while keeping the Button role. Recovered from the unmerged first-playtest branch (`dc303f7`).
+- Docs: kept the 2026-10-29 first-playtest execution/followup evidence and CLI handoff note, the 2026-11-08 next-iteration
+  plan, and `docs/_notes/2026-11-20-unported-agent-supervision.md` (process containment and CLI identity handoff that
+  main never took, and what porting them would take).
+
 ### Island economy, housing and tick cost (S4)
 
 - Building upkeep and fire (`village::civic::upkeep`). Every building whose definition has the new `upkeep` block
